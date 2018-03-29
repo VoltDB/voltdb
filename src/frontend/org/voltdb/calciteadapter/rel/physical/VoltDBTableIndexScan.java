@@ -80,14 +80,15 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     @Override
     protected String computeDigest() {
         String dg = super.computeDigest();
-        dg += "_index_" + m_index.getTypeName();
+        // Need to differentiate between the same index chosen for ORDER_BY or search purposes
+        dg += "_index_" + m_index.getTypeName() + "_" + m_accessPath.getIndexExpressions().size();
         return dg;
     }
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
-        pw.item("index", m_index.getTypeName());
+        pw.item("index", m_index.getTypeName() + "_" + m_accessPath.getIndexExpressions().size());
         return pw;
     }
 

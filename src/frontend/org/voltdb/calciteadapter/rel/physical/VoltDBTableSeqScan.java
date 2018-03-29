@@ -100,6 +100,8 @@ public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
                 limit);
         return newScan;
     }
+
+    @Override
     protected RelNode copyWithNewProgram(RexProgram newProgram) {
         // Do we need a deep copy including the inputs?
         VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(

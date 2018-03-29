@@ -20,43 +20,24 @@ package org.voltdb.calciteadapter.rules.physical;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexProgram;
-import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPhysicalTableScan;
-import org.voltdb.calciteadapter.rel.physical.VoltDBFilter;
+import org.voltdb.calciteadapter.rel.physical.VoltDBCalc;
 
-public class VoltDBFilterScanMergeRule extends RelOptRule {
+public class VoltDBCalcScanMergeRule extends RelOptRule {
 
-    public static final VoltDBFilterScanMergeRule INSTANCE = new VoltDBFilterScanMergeRule();
+    public static final VoltDBCalcScanMergeRule INSTANCE = new VoltDBCalcScanMergeRule();
 
-    private VoltDBFilterScanMergeRule() {
-        super(operand(VoltDBFilter.class,
+    private VoltDBCalcScanMergeRule() {
+        super(operand(VoltDBCalc.class,
                 operand(AbstractVoltDBPhysicalTableScan.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBFilter filter= call.rel(0);
+        VoltDBCalc calc= call.rel(0);
         AbstractVoltDBPhysicalTableScan scan = call.rel(1);
 
-        // Create a program containing the filter.
-        final RexBuilder rexBuilder = filter.getCluster().getRexBuilder();
-        final RexProgramBuilder progBuilder =
-            new RexProgramBuilder( scan.getRowType(), rexBuilder);
-        progBuilder.addIdentity();
-        progBuilder.addCondition(filter.getCondition());
-        RexProgram topProgram = progBuilder.getProgram();
-        RexProgram bottomProgram = scan.getProgram();
-
-        // Merge the programs together.
-        RexProgram mergedProgram =
-            RexProgramBuilder.mergePrograms(
-                topProgram,
-                bottomProgram,
-                rexBuilder);
-
-        RelNode newScan = scan.copy(mergedProgram, rexBuilder);
+        RelNode newScan = scan.copy(calc.getProgram(), calc.getCluster().getRexBuilder());
         call.transformTo(newScan);
     }
 

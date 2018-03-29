@@ -379,6 +379,10 @@ public class RexConverter {
             m_program = program;
         }
 
+        public RefExpressionConvertingVisitor(RexProgram program) {
+            this(null, null, program, -1);
+        }
+
         @Override
         public AbstractExpression visitLocalRef(RexLocalRef localRef) {
             assert(m_program != null);

@@ -124,16 +124,16 @@ public class CalcitePlanner {
 
             // Transform the relational expression
 
-            // Apply Rule set 1 - standard Calcite transformations and convert to the VOLTDB Logical convention
+            // Apply Rule set 0 - standard Calcite transformations and convert to the VOLTDB Logical convention
             traitSet = prepareFinalTraitSet(planner, VoltDBLogicalRel.VOLTDB_LOGICAL, convertedRel.getTraitSet());
             phaseOneRel = planner.transform(0, traitSet, convertedRel);
 
-            // Apply Rule Set 2 - VoltDB transformations
+            // Apply Rule Set 1 - VoltDB transformations
             // Add traits that the transformed relNode must have
             traitSet = prepareFinalTraitSet(planner, VoltDBPhysicalRel.VOLTDB_PHYSICAL, phaseOneRel.getTraitSet());
             phaseTwoRel = planner.transform(1, traitSet, phaseOneRel);
 
-            // Apply Rule Set 3 - VoltDB transformations
+            // Apply Rule Set 2 - VoltDB transformations
             phaseThreeRel = planner.transform(2, traitSet, phaseTwoRel);
 
             // Convert To VoltDB plan

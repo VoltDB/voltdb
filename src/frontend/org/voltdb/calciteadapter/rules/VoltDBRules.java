@@ -24,31 +24,26 @@ import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
-import org.apache.calcite.rel.rules.ProjectSortTransposeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
-import org.apache.calcite.rel.rules.SortProjectTransposeRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
-import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalFilterRule;
-import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalProjectRule;
+import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalCalcRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalSortRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalTableScanRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBFilterScanMergeRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBFilterScanToIndexRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBCalcScanMergeRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBCalcScanToIndexRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBLimitScanMergeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBLimitSortMergeRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalFilterRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalCalcRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalLimitRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalProjectRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSeqScanRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSortRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBProjectScanMergeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBSortConvertRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBSortScanToIndexRule;
 
 public class VoltDBRules {
 
-    public static Program RULES_SET_1 = Programs.ofRules(
+    public static Program RULES_SET_0 = Programs.ofRules(
                 // Calcite's Logical Rules
                 CalcMergeRule.INSTANCE
                 , FilterCalcMergeRule.INSTANCE
@@ -57,19 +52,15 @@ public class VoltDBRules {
                 , ProjectToCalcRule.INSTANCE
                 , ProjectMergeRule.INSTANCE
                 , FilterProjectTransposeRule.INSTANCE
-//                , SortProjectTransposeRule.INSTANCE
-                , ProjectSortTransposeRule.INSTANCE
 
                 // VoltDBLogical Conversion Rules
                 , VoltDBLogicalSortRule.INSTANCE
-                , VoltDBLogicalProjectRule.INSTANCE
-                , VoltDBLogicalFilterRule.INSTANCE
                 , VoltDBLogicalTableScanRule.INSTANCE
-                , VoltDBLogicalFilterRule.INSTANCE
+                , VoltDBLogicalCalcRule.INSTANCE
 
                 );
 
-    public static Program RULES_SET_2 = Programs.ofRules(
+    public static Program RULES_SET_1 = Programs.ofRules(
                 // Calcite's Rules
                 AbstractConverter.ExpandConversionRule.INSTANCE
 
@@ -78,23 +69,22 @@ public class VoltDBRules {
                 // VoltDB Physical Rules
 
                 // VoltDB Physical Conversion Rules
-                , VoltDBPhysicalProjectRule.INSTANCE
+                , VoltDBPhysicalCalcRule.INSTANCE
                 , VoltDBPhysicalSeqScanRule.INSTANCE
-                , VoltDBPhysicalFilterRule.INSTANCE
                 , VoltDBPhysicalSortRule.INSTANCE
                 , VoltDBSortConvertRule.INSTANCE_NONE
                 , VoltDBSortConvertRule.INSTANCE_VOLTDB
-                , VoltDBSortScanToIndexRule.INSTANCE
-                , VoltDBFilterScanToIndexRule.INSTANCE
+                , VoltDBSortScanToIndexRule.INSTANCE_SORT_CALC_SCAN
+                , VoltDBSortScanToIndexRule.INSTANCE_SORT_SCAN
+                , VoltDBCalcScanToIndexRule.INSTANCE
                 , VoltDBPhysicalLimitRule.INSTANCE
 
                 );
 
-    public static Program RULES_SET_3 = Programs.ofRules(
+    public static Program RULES_SET_2 = Programs.ofRules(
                 // VoltDB Inline Rules
 
-                VoltDBProjectScanMergeRule.INSTANCE
-                , VoltDBFilterScanMergeRule.INSTANCE
+                VoltDBCalcScanMergeRule.INSTANCE
                 , VoltDBLimitScanMergeRule.INSTANCE
                 , VoltDBLimitSortMergeRule.INSTANCE
 
@@ -102,6 +92,6 @@ public class VoltDBRules {
 
     public static Program[] getProgram() {
 
-        return new Program[] {RULES_SET_1, RULES_SET_2, RULES_SET_3};
+        return new Program[] {RULES_SET_0, RULES_SET_1, RULES_SET_2};
     }
 }

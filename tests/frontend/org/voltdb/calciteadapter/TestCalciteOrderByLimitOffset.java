@@ -263,6 +263,15 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         String sql;
         sql = "select si, i from RI1 where I > 3 order by i";
         // ORDER BY is redundant because of the index on (I) columns
+        // The index is for SCANNING purpose
+        comparePlans(sql);
+    }
+
+    public void testIndexScanWithRedundantOrderBy15() throws Exception {
+        String sql;
+        sql = "select si, i from RI1 where SI > 3 order by i";
+        // ORDER BY is redundant because of the index on (I) columns
+     // The index is for sort order only
         comparePlans(sql);
     }
 
