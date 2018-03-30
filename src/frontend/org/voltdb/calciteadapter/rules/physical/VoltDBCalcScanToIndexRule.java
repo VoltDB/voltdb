@@ -21,10 +21,6 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.RelTrait;
-import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -86,7 +82,7 @@ public class VoltDBCalcScanToIndexRule extends RelOptRule {
 
             if (accessPath != null) {
                 // if accessPath.other is not null, need to create a new Filter
-                VoltDBTableIndexScan indexScan = new VoltDBTableIndexScan(
+                VoltDBTableIndexScan indexScan = VoltDBTableIndexScan.create(
                         scan.getCluster(),
                         scan.getTraitSet(),
                         scan.getTable(),
