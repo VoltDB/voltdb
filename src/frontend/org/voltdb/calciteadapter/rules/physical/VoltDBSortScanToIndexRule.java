@@ -20,14 +20,10 @@ package org.voltdb.calciteadapter.rules.physical;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexProgram;
-import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltcore.utils.Pair;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
-import org.voltdb.calciteadapter.rel.physical.VoltDBCalc;
 import org.voltdb.calciteadapter.rel.physical.VoltDBSort;
 import org.voltdb.calciteadapter.rel.physical.VoltDBTableIndexScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBTableSeqScan;
@@ -40,25 +36,17 @@ import org.voltdb.types.SortDirectionType;
 
 public class VoltDBSortScanToIndexRule extends RelOptRule {
 
-    public static final VoltDBSortScanToIndexRule INSTANCE_SORT_SCAN = new VoltDBSortScanToIndexRule();
-    public static final VoltDBSortScanToIndexRule INSTANCE_SORT_CALC_SCAN = new VoltDBSortScanToIndexRule(1);
+    public static final VoltDBSortScanToIndexRule INSTANCE = new VoltDBSortScanToIndexRule();
 
     private VoltDBSortScanToIndexRule() {
         super(operand(VoltDBSort.class,
-                operand(VoltDBTableSeqScan.class, none())), "VoltDBSortScanToIndexRule");
-    }
-
-    private VoltDBSortScanToIndexRule(int dummy) {
-        super(operand(VoltDBSort.class,
-                operand(VoltDBCalc.class,
-                        operand(VoltDBTableSeqScan.class, none()))), "VoltDBSortCalcScanToIndexRule");
+                operand(VoltDBTableSeqScan.class, none())));
     }
 
     @Override
     public boolean matches(RelOptRuleCall call) {
         VoltDBSort sort = call.rel(0);
-        VoltDBTableSeqScan scan = (call.rels.length == 2) ?
-                call.rel(1) : call.rel(2);
+        VoltDBTableSeqScan scan = call.rel(1);
         VoltDBTable table = scan.getVoltDBTable();
         assert(table != null);
         boolean matches = !table.getCatTable().getIndexes().isEmpty() &&
@@ -74,15 +62,18 @@ public class VoltDBSortScanToIndexRule extends RelOptRule {
         VoltDBSort sort = call.rel(0);
         RelCollation sortCollation = sort.getCollation();
 
-        VoltDBTableSeqScan scan = (call.rels.length == 2) ?
-                call.rel(1) : call.rel(2);
+        VoltDBTableSeqScan scan = call.rel(1);
         Table catTable = scan.getVoltDBTable().getCatTable();
 
         RexBuilder builder = scan.getCluster().getRexBuilder();
-        RexProgram program = getProgram(call);
+        RexProgram program = scan.getProgram();
         assert(program != null);
 
         for (Index index : catTable.getIndexes()) {
+            if (!index.getPredicatejson().isEmpty()) {
+                // this is apartial index and it can not be considered here
+                continue;
+            }
             RelCollation indexCollation =
                     VoltDBRexUtil.createIndexCollation(index, catTable, builder, program);
             Pair<SortDirectionType, Boolean> collationsCompatibility =
@@ -97,66 +88,19 @@ public class VoltDBSortScanToIndexRule extends RelOptRule {
                         IndexLookupType.EQ,
                         collationsCompatibility.getFirst(),
                         true);
-                RelNode transformedNode = buildTransformedNode(call, sortCollation, index, accessPath);
-                call.transformTo(transformedNode);
+                VoltDBTableIndexScan indexScan = VoltDBTableIndexScan.create(
+                        scan.getCluster(),
+                        scan.getTraitSet(),
+                        scan.getTable(),
+                        scan.getVoltDBTable(),
+                        scan.getProgram(),
+                        index,
+                        accessPath,
+                        scan.getLimitRexNode(),
+                        scan.getOffsetRexNode());
+
+                call.transformTo(indexScan);
             }
-        }
-    }
-
-    RexProgram getProgram(RelOptRuleCall call) {
-        VoltDBTableSeqScan scan = null;
-        VoltDBCalc calc = null;
-        if (call.rels.length == 2) {
-            scan = call.rel(1);
-            return scan.getProgram();
-        } else {
-            calc = call.rel(1);
-            scan = call.rel(2);
-            RexProgram calcProgram = calc.getProgram();
-            RexProgram scanProgram = scan.getProgram();
-            // Merge two programs
-            RexBuilder rexBuilder = calc.getCluster().getRexBuilder();
-            RexProgram mergedProgram = RexProgramBuilder.mergePrograms(
-                    calcProgram,
-                    scanProgram,
-                    rexBuilder);
-            return mergedProgram;
-        }
-    }
-
-    RelNode buildTransformedNode(
-            RelOptRuleCall call,
-            RelCollation sortCollation,
-            Index index,
-            AccessPath accessPath) {
-        VoltDBTableSeqScan scan = null;
-        VoltDBCalc calc = null;
-        if (call.rels.length == 2) {
-            scan = call.rel(1);
-        } else {
-            calc = call.rel(1);
-            scan = call.rel(2);
-        }
-        VoltDBTableIndexScan indexScan = new VoltDBTableIndexScan(
-                scan.getCluster(),
-                scan.getTraitSet(),
-                scan.getTable(),
-                scan.getVoltDBTable(),
-                scan.getProgram(),
-                index,
-                accessPath,
-                scan.getLimitRexNode(),
-                scan.getOffsetRexNode());
-
-        if (calc == null) {
-            return indexScan;
-        } else {
-            // Copy calc with the sort collation added
-            Calc newCalc = calc.copy(
-                    calc.getTraitSet().plus(sortCollation),
-                    indexScan,
-                    calc.getProgram());
-            return newCalc;
         }
     }
 

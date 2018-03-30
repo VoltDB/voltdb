@@ -173,9 +173,11 @@ public class CalcitePlanner {
             Convention outConvention,
             RelTraitSet traceSetIn) {
         RelTraitSet traitSet = planner.getEmptyTraitSet().replace(outConvention);
-        RelTrait collationTrait =  (RelTrait) traceSetIn.getTrait(RelCollationTraitDef.INSTANCE);
-        if (collationTrait instanceof RelCollation) {
-            traitSet = traitSet.plus(collationTrait);
+        if (traceSetIn != null) {
+            RelTrait collationTrait = traceSetIn.getTrait(RelCollationTraitDef.INSTANCE);
+            if (collationTrait instanceof RelCollation) {
+                traitSet = traitSet.plus(collationTrait);
+            }
         }
         return traitSet;
     }

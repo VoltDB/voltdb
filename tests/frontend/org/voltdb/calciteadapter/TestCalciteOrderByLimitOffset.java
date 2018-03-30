@@ -264,6 +264,16 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         sql = "select si, i from RI1 where I > 3 order by i";
         // ORDER BY is redundant because of the index on (I) columns
         // The index is for SCANNING purpose
+        // The only difference is the "SORT_DIRECTION":"INVALID" for Calcite at the moment.
+        // Should be ASC (after improved SortMerge Rule)
+        comparePlans(sql);
+    }
+
+    public void testIndexScanWithRedundantOrderBy14() throws Exception {
+        String sql;
+        sql = "select si from RI1 where SI > 3 order by i";
+        // ORDER BY is redundant because of the index on (I) columns
+     // The index is for sort order only
         comparePlans(sql);
     }
 
@@ -313,7 +323,13 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
 
     public void testIndexReversedScan() throws Exception {
         String sql;
-        sql = "select si, i from RI1 where bi > 3 order by bi , si ";
+        sql = "select si, i from RI1 order by bi desc , si desc";
+        comparePlans(sql);
+    }
+
+    public void testIndexReversedScan10() throws Exception {
+        String sql;
+        sql = "select si, i from RI1 where bi > 3 order by bi desc , si desc";
         comparePlans(sql);
     }
 

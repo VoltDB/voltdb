@@ -160,6 +160,9 @@ public class AccessPath {
         return sortDirection;
     }
 
+    public void setSortDirection(SortDirectionType newSortDirection) {
+        sortDirection = newSortDirection;
+    }
     public IndexLookupType getIndexLookupType() {
         return lookupType;
     }

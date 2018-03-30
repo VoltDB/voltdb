@@ -470,6 +470,15 @@ public class RexConverter {
         return nodeSchema;
     }
 
+    public static List<RexNode> expandLocalRef(List<RexLocalRef> localRefList, RexProgram program) {
+        List<RexNode> rexNodeLists = new ArrayList<>();
+        for (RexLocalRef localRef : localRefList) {
+            RexNode rexNode = program.expandLocalRef(localRef);
+            rexNodeLists.add(rexNode);
+        }
+        return rexNodeLists;
+    }
+
     public static NodeSchema convertToVoltDBNodeSchema(RexProgram program) {
         NodeSchema newNodeSchema = new NodeSchema();
         int i = 0;

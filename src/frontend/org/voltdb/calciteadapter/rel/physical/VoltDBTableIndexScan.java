@@ -49,7 +49,21 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     private final Index m_index;
     private final AccessPath m_accessPath;
 
-    public VoltDBTableIndexScan(
+    /**
+     * Constructor is private to force users to use the static create method
+     * which properly adds the index collation trait.
+     * 
+     * @param cluster
+     * @param traitSet
+     * @param table
+     * @param voltDBTable
+     * @param program
+     * @param index
+     * @param accessPath
+     * @param offset
+     * @param limit
+     */
+    private VoltDBTableIndexScan(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelOptTable table,
@@ -65,12 +79,6 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         m_index = index;
         assert (accessPath != null);
         m_accessPath = accessPath;
-
-        // Set collation trait from the index if it's a scannable one
-        RelCollation indexCollation = VoltDBRexUtil.createIndexCollation(index, voltDBTable.getCatTable(),
-                cluster.getRexBuilder(), program);
-
-        traitSet = getTraitSet().replace(indexCollation);
     }
 
     /**
@@ -81,14 +89,14 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     protected String computeDigest() {
         String dg = super.computeDigest();
         // Need to differentiate between the same index chosen for ORDER_BY or search purposes
-        dg += "_index_" + m_index.getTypeName() + "_" + m_accessPath.getIndexExpressions().size();
+        dg += "_index_" + m_index.getTypeName() + "_" + m_accessPath.getSortDirection() + m_accessPath.getIndexExpressions().size();
         return dg;
     }
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
-        pw.item("index", m_index.getTypeName() + "_" + m_accessPath.getIndexExpressions().size());
+        pw.item("index", m_index.getTypeName() + "_" + m_accessPath.getSortDirection() + m_accessPath.getIndexExpressions().size());
         return pw;
     }
 
@@ -298,7 +306,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     @Override
     public  RelNode copyWithLimitOffset(RexNode offset, RexNode limit) {
         // Do we need a deep copy including the inputs?
-        VoltDBTableIndexScan newScan = new VoltDBTableIndexScan(
+        return VoltDBTableIndexScan.create(
                 getCluster(),
                 getTraitSet(),
                 getTable(),
@@ -308,12 +316,11 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
                 m_accessPath,
                 offset,
                 limit);
-        return newScan;
     }
 
     @Override
     protected RelNode copyWithNewProgram(RexProgram newProgram) {
-        VoltDBTableIndexScan newScan = new VoltDBTableIndexScan(
+        return VoltDBTableIndexScan.create(
                 getCluster(),
                 getTraitSet(),
                 getTable(),
@@ -324,6 +331,38 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
                 getOffsetRexNode(),
                 getLimitRexNode());
 
-        return newScan;
     }
+
+    public static VoltDBTableIndexScan create(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelOptTable table,
+            VoltDBTable voltDBTable,
+            RexProgram program,
+            Index index,
+            AccessPath accessPath,
+            RexNode offset,
+            RexNode limit) {
+
+      // Set collation trait from the index if it's a scannable one
+      RelCollation indexCollation = VoltDBRexUtil.createIndexCollation(index, voltDBTable.getCatTable(),
+              cluster.getRexBuilder(), program);
+      RelTraitSet finalTraitSet = traitSet;
+      if (!RelCollations.EMPTY.equals(indexCollation)) {
+          finalTraitSet = finalTraitSet.replace(indexCollation);
+      }
+
+      return new VoltDBTableIndexScan(
+              cluster,
+              finalTraitSet,
+              table,
+              voltDBTable,
+              program,
+              index,
+              accessPath,
+              offset,
+              limit);
+
+    }
+
 }
