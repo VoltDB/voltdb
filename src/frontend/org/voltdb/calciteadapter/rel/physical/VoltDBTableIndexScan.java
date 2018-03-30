@@ -52,7 +52,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     /**
      * Constructor is private to force users to use the static create method
      * which properly adds the index collation trait.
-     * 
+     *
      * @param cluster
      * @param traitSet
      * @param table
