@@ -23,6 +23,14 @@ import org.apache.calcite.rel.RelNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPhysicalTableScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBCalc;
 
+/**
+ * This simply merges/inline Calc(project and/or Condition) into a Scan.
+ * It does not attempt to convert a Sequential scan into a Index scan.
+ * This should be done by the VoltDBCalcToIndexRule
+ *
+ * @author mikealexeev
+ *
+ */
 public class VoltDBCalcScanMergeRule extends RelOptRule {
 
     public static final VoltDBCalcScanMergeRule INSTANCE = new VoltDBCalcScanMergeRule();

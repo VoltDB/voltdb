@@ -111,6 +111,8 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         addLimitOffset(ispn);
         // Set projection
         addProjection(ispn);
+        // Set predicate
+        addPredicate(ispn);
 
         return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath);
     }

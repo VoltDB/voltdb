@@ -252,7 +252,8 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         sql = "select si, i from RI1 where I > 3 order by i limit 3";
         // ORDER BY is redundant because of the index on I column
         // LIMIT is inlined with IndexScan
-        // Node ids differ
+        // The only difference is the "SORT_DIRECTION":"INVALID" for Calcite at the moment.
+        // Should be ASC (after improved SortMerge Rule)
         Map<String, String> ignores = new HashMap<>();
         ignores.put("\"INLINE_NODES\":[{\"ID\":4", "\"INLINE_NODES\":[{\"ID\":3");
         ignores.put("\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\"", "\"ID\":4,\"PLAN_NODE_TYPE\":\"LIMIT\"");
@@ -273,7 +274,8 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         String sql;
         sql = "select si from RI1 where SI > 3 order by i";
         // ORDER BY is redundant because of the index on (I) columns
-     // The index is for sort order only
+        // The index is for sort order only
+        // redundunt predicate
         comparePlans(sql);
     }
 
@@ -281,7 +283,8 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         String sql;
         sql = "select si, i from RI1 where SI > 3 order by i";
         // ORDER BY is redundant because of the index on (I) columns
-     // The index is for sort order only
+        // The index is for sort order only
+        // redundunt predicate
         comparePlans(sql);
     }
 
