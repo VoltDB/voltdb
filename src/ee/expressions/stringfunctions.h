@@ -41,7 +41,7 @@ namespace voltdb {
 /** implement the 1-argument SQL OCTET_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
     if (isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_INTEGER);
     }
     int32_t length;
     getObject_withoutNull(&length);
@@ -51,7 +51,7 @@ template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
 /** implement the 1-argument SQL CHAR function */
 template<> inline NValue NValue::callUnary<FUNC_CHAR>() const {
     if (isNull()) {
-        return getNullValue();
+        return getNullStringValue();
     }
 
     unsigned int point = static_cast<unsigned int>(castAsBigIntAndGetValue());
@@ -63,7 +63,7 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR>() const {
 /** implement the 1-argument SQL CHAR_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     if (isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_BIGINT);
     }
 
     int32_t lenValue;
@@ -183,14 +183,14 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     assert(arguments.size() == 2);
     const NValue& target = arguments[0];
     if (target.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_INTEGER);
     }
     if (target.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (target.getValueType(), VALUE_TYPE_VARCHAR);
     }
     const NValue& pool = arguments[1];
     if (pool.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_INTEGER);
     }
     int32_t lenTarget;
     const char* targetChars = target.getObject_withoutNull(&lenTarget);
@@ -661,7 +661,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
 /** implement the Volt SQL STR function for decimal values */
 template<> inline NValue NValue::callUnary<FUNC_VOLT_STR>() const {
     if (isNull()) {
-       return getNullValue();
+       return getNullStringValue();
     }
 
     if (getValueType() != VALUE_TYPE_DECIMAL && getValueType() != VALUE_TYPE_DOUBLE) {
@@ -865,7 +865,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
 
     const NValue& source = arguments[0];
     if (source.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_BIGINT);
     }
     if (source.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException(source.getValueType(), VALUE_TYPE_VARCHAR);
@@ -873,7 +873,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
 
     const NValue& pat = arguments[1];
     if (pat.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_BIGINT);
     }
     if (pat.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException(pat.getValueType(), VALUE_TYPE_VARCHAR);
