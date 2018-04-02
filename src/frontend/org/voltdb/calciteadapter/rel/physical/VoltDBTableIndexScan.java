@@ -116,7 +116,8 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         addLimitOffset(ispn);
         // Set projection
         addProjection(ispn);
-        // Set predicate
+        // Set predicate - not required here since program's conditions should be already 
+        // converted to accessPath.OTHER
         addPredicate(ispn);
 
         return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath);
@@ -328,8 +329,8 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     @Override
     protected RelNode copyWithNewProgram(RexProgram newProgram, RexBuilder rexBuilder) {
         // A new program may have a condition expression on its own that needs to be transfered
-        // to the current index access path as an additional OTHER expression since.
-        // We are not changing index here so existing index expression stay as is
+        // to the current index access path as an additional OTHER expression.
+        // We are not changing index here so existing index expression stay as is.
         // This is a result of keeping the expression in the program and access path
         RexLocalRef newCondition = newProgram.getCondition();
         if (newCondition != null) {
