@@ -26,7 +26,8 @@ ConstraintFailureException::ConstraintFailureException(
         Table *table,
         TableTuple tuple,
         TableTuple otherTuple,
-        ConstraintType type) :
+        ConstraintType type,
+        PersistentTableSurgeon *surgeon) :
     SQLException(
             SQLException::integrity_constraint_violation,
             "Attempted violation of constraint",
@@ -34,7 +35,8 @@ ConstraintFailureException::ConstraintFailureException(
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(otherTuple),
-    m_type(type)
+    m_type(type),
+    m_surgeon(surgeon)
 {
     assert(table);
     assert(!tuple.isNullTuple());
@@ -43,7 +45,8 @@ ConstraintFailureException::ConstraintFailureException(
 ConstraintFailureException::ConstraintFailureException(
         Table *table,
         TableTuple tuple,
-        string message) :
+        string message,
+        PersistentTableSurgeon *surgeon) :
         SQLException(
                 SQLException::integrity_constraint_violation,
                 message,
@@ -51,7 +54,8 @@ ConstraintFailureException::ConstraintFailureException(
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(TableTuple()),
-    m_type(CONSTRAINT_TYPE_PARTITIONING)
+    m_type(CONSTRAINT_TYPE_PARTITIONING),
+    m_surgeon(surgeon)
 {
     assert(table);
     assert(!tuple.isNullTuple());
@@ -72,7 +76,12 @@ void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) c
 }
 
 ConstraintFailureException::~ConstraintFailureException() {
-    // TODO Auto-generated destructor stub
+    // if delayed tuple deallocation for serialization (by passing in tableSurgeon),
+    // do cleanup here
+    VOLT_DEBUG("ConstraintFailureException has table surgeon %s", ((m_surgeon!=NULL) ? "true": "false"));
+    if (m_surgeon && !m_tuple.isNullTuple()) {
+        m_surgeon->deleteTupleStorage(m_tuple);
+    }
 }
 
 const string

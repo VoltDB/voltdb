@@ -18,14 +18,14 @@
 #ifndef PERSISTENTTABLEUNDOINSERTACTION_H_
 #define PERSISTENTTABLEUNDOINSERTACTION_H_
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "common/types.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
 
-class PersistentTableUndoInsertAction: public voltdb::UndoAction {
+class PersistentTableUndoInsertAction: public UndoOnlyAction {
 public:
     inline PersistentTableUndoInsertAction(char* insertedTuple,
                                            voltdb::PersistentTableSurgeon *tableSurgeon)
@@ -41,12 +41,6 @@ public:
     virtual void undo() {
         m_tableSurgeon->deleteTupleForUndo(m_tuple);
     }
-
-    /*
-     * Release any resources held by the undo action. It will not need
-     * to be undone in the future.
-     */
-    virtual void release() { }
 
 private:
     char* m_tuple;

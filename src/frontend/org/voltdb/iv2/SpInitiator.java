@@ -117,7 +117,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          boolean hasMPDRGateway)
+                          boolean isLowestSiteId)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -128,7 +128,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 numberOfPartitions, startAction, agent, memStats, cl,
-                coreBindIds, hasMPDRGateway);
+                coreBindIds, isLowestSiteId);
 
         m_tickProducer.start();
 

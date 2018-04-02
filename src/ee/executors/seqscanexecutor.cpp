@@ -129,6 +129,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
 
+
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
         VOLT_DEBUG ("Empty Seq Scan :\n %s", node->getOutputTable()->debug().c_str());
@@ -229,7 +230,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             else {
                 // We may actually find out during initialization
                 // that we are done.  The p_execute_init operation
-                // will tell us by returning true if so.  See the
+                // will tell us by returning false if so.  See the
                 // definition of InsertExecutor::p_execute_init.
                 //
                 // We know we have an inline insert here.  So there
@@ -245,7 +246,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 // this and tell us by setting temp_tuple.  Note
                 // that temp_tuple is initialized if this returns
                 // false.  If it returns true all bets are off.
-                if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable, temp_tuple)) {
+                if (!m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable, temp_tuple)) {
                     return true;
                 }
                 // We should have as many expressions in the

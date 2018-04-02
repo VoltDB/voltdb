@@ -16,6 +16,8 @@
  */
 #include "storage/PersistentTableStats.h"
 #include "storage/persistenttable.h"
+#include "common/executorcontext.hpp"
+#include "execution/VoltDBEngine.h"
 #include <vector>
 #include <string>
 

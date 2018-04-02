@@ -71,7 +71,8 @@ Table* TableFactory::getPersistentTable(
             int tableAllocationTargetSize,
             int tupleLimit,
             int32_t compactionThreshold,
-            bool drEnabled)
+            bool drEnabled,
+            bool isReplicated)
 {
     Table *table = NULL;
     StreamedTable *streamedTable = NULL;
@@ -86,7 +87,8 @@ Table* TableFactory::getPersistentTable(
                                                       tableIsMaterialized,
                                                       tableAllocationTargetSize,
                                                       tupleLimit,
-                                                      drEnabled);
+                                                      drEnabled,
+                                                      isReplicated);
     }
 
     initCommon(databaseId,

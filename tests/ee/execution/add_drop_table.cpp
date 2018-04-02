@@ -28,6 +28,7 @@
 #include "catalog/database.h"
 #include "catalog/table.h"
 #include "common/common.h"
+#include "common/SynchronizedThreadLock.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/table.h"
 
@@ -55,16 +56,18 @@ class AddDropTableTest : public Test {
                              m_exceptionBuffer, 4096);
 
         m_engine->resetReusedResultOutputBuffer();
-        int partitionCount = htonl(3);
+        int partitionCount = 1;
         m_engine->initialize(m_clusterId,
                              m_siteId,
                              m_partitionId,
+                             partitionCount,
                              m_hostId,
                              m_hostName,
                              m_drClusterId,
                              1024,
                              DEFAULT_TEMP_TABLE_MEMORY,
-                             false);
+                             true);
+        partitionCount = htonl(partitionCount);
         m_engine->updateHashinator((char*)&partitionCount,
                                     NULL,
                                     0);
@@ -84,6 +87,7 @@ class AddDropTableTest : public Test {
         delete m_engine;
         delete[] m_resultBuffer;
         delete[] m_exceptionBuffer;
+        voltdb::globalDestroyOncePerProcess();
     }
 
 
@@ -93,7 +97,7 @@ class AddDropTableTest : public Test {
           "add /clusters#cluster/databases#database tables tableA\n"
           "set /clusters#cluster/databases#database/tables#tableA type 0\n"
           "set /clusters#cluster/databases#database/tables#tableA isreplicated false\n"
-          "set /clusters#cluster/databases#database/tables#tableA partitioncolumn 0\n"
+          "set /clusters#cluster/databases#database/tables#tableA partitioncolumn /clusters#cluster/databases#database/tables#tableA/columns#A\n"
           "set /clusters#cluster/databases#database/tables#tableA estimatedtuplecount 0\n"
           "add /clusters#cluster/databases#database/tables#tableA columns A\n"
           "set /clusters#cluster/databases#database/tables#tableA/columns#A index 0\n"
@@ -114,7 +118,7 @@ class AddDropTableTest : public Test {
           "add /clusters#cluster/databases#database tables tableB\n"
           "set /clusters#cluster/databases#database/tables#tableB type 0\n"
           "set /clusters#cluster/databases#database/tables#tableB isreplicated false\n"
-          "set /clusters#cluster/databases#database/tables#tableB partitioncolumn 0\n"
+          "set /clusters#cluster/databases#database/tables#tableB partitioncolumn /clusters#cluster/databases#database/tables#tableB/columns#A\n"
           "set /clusters#cluster/databases#database/tables#tableB estimatedtuplecount 0\n"
           "add /clusters#cluster/databases#database/tables#tableB columns A\n"
           "set /clusters#cluster/databases#database/tables#tableB/columns#A index 0\n"

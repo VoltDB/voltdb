@@ -18,13 +18,14 @@
 #ifndef MATERIALIZEDVIEWHANDLER_H_
 #define MATERIALIZEDVIEWHANDLER_H_
 
+#include <utility>
 #include <vector>
 #include <map>
 
 #include "catalog/materializedviewhandlerinfo.h"
 #include "common/tabletuple.h"
 #include "execution/ExecutorVector.h"
-#include "persistenttable.h"
+#include "storage/persistenttable.h"
 
 namespace voltdb {
 
@@ -48,18 +49,20 @@ private:
     PersistentTable *m_table;
 };
 
+class ReplicatedMaterializedViewHandler;
+
 // Handle materialized view related events, particularly for views defined on join queries.
 class MaterializedViewHandler {
 public:
     // Create a MaterializedViewHandler based on the catalog info and install it to the view table.
     MaterializedViewHandler(PersistentTable* targetTable,
                             catalog::MaterializedViewHandlerInfo* mvHandlerInfo,
+                            int32_t groupByColumnCount,
                             VoltDBEngine* engine);
 
-    ~MaterializedViewHandler();
-    // We maintain the source table list here to register / de-register the view handler on the source tables.
-    void addSourceTable(PersistentTable *sourceTable);
-    void dropSourceTable(PersistentTable *sourceTable);
+    virtual ~MaterializedViewHandler();
+
+    virtual void dropSourceTable(PersistentTable *sourceTable);
 
     // This is called to catch up with the existing data in the source tables.
     // It is useful when the view is created after the some data was inserted into the
@@ -68,9 +71,11 @@ public:
     // This must be done outside of the constructor, since the
     // catching up executes a plan fragment which may throw an
     // exception.
-    void catchUpWithExistingData(bool fallible);
+    virtual void catchUpWithExistingData(bool fallible);
 
-    PersistentTable *destTable() const { return m_destTable; }
+    PersistentTable *destTable() const {
+        return m_destTable;
+    }
     /* A view handler becomes dirty (and needs to be recreated) when:
      * 1. One of the source table is re-created. This may result from:
      *    a. The source table was empty so it was deleted and re-created.
@@ -78,27 +83,28 @@ public:
      *    c. The source table was replicated and a partition table statement was executed.
      * 2. Indices are changed on the source table (add/remove).
      */
-    bool isDirty() { return m_dirty; }
-    void pollute() { m_dirty = true; }
+    virtual bool isDirty() { return m_dirty; }
+    virtual void pollute() { m_dirty = true; }
     // handleTupleInsert and handleTupleDelete are event handlers.
     // They are called when a source table has data being inserted / deleted.
     // The update operation is considered as a sequence of delete and insert operation.
     // When insertion and deletion happens on the source table, the affected
     // tuple will be inserted into a delta table affiliated with the source table.
     // The handler will move the source table into delta mode and execute the view definition query.
-    void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
-    void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
+    virtual void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
+    virtual void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
 
 private:
-    std::vector<PersistentTable*> m_sourceTables;
-    PersistentTable *m_destTable;
+    std::map<PersistentTable*, int32_t> m_sourceTables;
+    // Make pointer immutable so it is safe for ReplicatedMaterializedViewHandler to use it's local copy
+    PersistentTable * const m_destTable;
     // This is the index automatically created on view creation.
     TableIndex *m_index;
     // Vector of query plans (executors) for every min/max column.
     std::vector<boost::shared_ptr<ExecutorVector>> m_minMaxExecutorVectors;
     // The executor vector for the view definition query.
     boost::shared_ptr<ExecutorVector> m_createQueryExecutorVector;
-    const int m_groupByColumnCount;
+    const int32_t m_groupByColumnCount;
     // Store the index of last COUNT(*) for optimization
     int m_countStarColumnIndex;
     int m_aggColumnCount;
@@ -116,7 +122,12 @@ private:
     // aggregated columns, but there might be some other mostly harmless ones in there that are based
     // solely on the immutable primary key (GROUP BY columns).
     std::vector<TableIndex*> m_updatableIndexList;
+    std::unique_ptr<ReplicatedMaterializedViewHandler> m_replicatedWrapper;
 
+    // We maintain the source table list here to register / de-register the view handler on the source tables.
+    void addSourceTable(bool viewHandlerPartitioned, PersistentTable *sourceTable,
+            int32_t relativeTableIndex, VoltDBEngine* engine);
+    void dropSourceTable(bool viewHandlerPartitioned, std::map<PersistentTable*, int32_t>::iterator);
     // Install the view handler to source / dest table(s).
     void install(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                  VoltDBEngine *engine);
@@ -140,6 +151,44 @@ private:
     // Find a fallback min/max value for the designated column.
     // Please note that the minMaxColumnIndex is used to locate the correct query plan to execute.
     NValue fallbackMinMaxColumn(int columnIndex, int minMaxColumnIndex);
+};
+
+class ReplicatedMaterializedViewHandler : public MaterializedViewHandler {
+public:
+    // Create a MaterializedViewHandler based on the catalog info and install it to the view table.
+    ReplicatedMaterializedViewHandler(PersistentTable* destTable, MaterializedViewHandler* partitionedHandler, int32_t partitionId);
+
+    virtual void dropSourceTable(PersistentTable *sourceTable) {
+        m_partitionedHandler->dropSourceTable(sourceTable);
+    }
+
+    // This is called to catch up with the existing data in the source tables.
+    // It is useful when the view is created after the some data was inserted into the
+    // source table(s).
+    //
+    // This must be done outside of the constructor, since the
+    // catching up executes a plan fragment which may throw an
+    // exception.
+    virtual void catchUpWithExistingData(bool fallible) {
+        m_partitionedHandler->catchUpWithExistingData(fallible);
+    }
+
+    /* A view handler becomes dirty (and needs to be recreated) when:
+     * 1. One of the source table is re-created. This may result from:
+     *    a. The source table was empty so it was deleted and re-created.
+     *    b. The source table was truncated.
+     *    c. The source table was replicated and a partition table statement was executed.
+     * 2. Indices are changed on the source table (add/remove).
+     */
+    virtual bool isDirty() { return m_partitionedHandler->isDirty(); }
+    virtual void pollute() { m_partitionedHandler->pollute(); }
+
+    virtual void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
+    virtual void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
+
+private:
+    MaterializedViewHandler* m_partitionedHandler;
+    int32_t m_handlerPartitionId;
 };
 
 } // namespace voltdb

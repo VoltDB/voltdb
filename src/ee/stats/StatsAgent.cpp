@@ -60,11 +60,12 @@ StatsAgent::StatsAgent() {}
 void StatsAgent::registerStatsSource(StatisticsSelectorType sst,
                                      CatalogId catalogId,
                                      StatsSource* statsSource) {
+    assert(statsSource != NULL);
     m_statsCategoryByStatsSelector[sst].insert(
         pair<CatalogId, StatsSource*>(catalogId, statsSource));
 }
 
-void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst) {
+void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst, int32_t relativeIndexOfTable) {
     // get the map of id-to-source
     map<StatisticsSelectorType,
       multimap<CatalogId, StatsSource*> >::iterator it1 =
@@ -73,7 +74,12 @@ void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst) {
     if (it1 == m_statsCategoryByStatsSelector.end()) {
         return;
     }
-    it1->second.clear();
+    if (relativeIndexOfTable == -1) {
+        it1->second.clear();
+    }
+    else {
+        it1->second.erase(relativeIndexOfTable);
+    }
 }
 
 /**
@@ -84,6 +90,7 @@ void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst) {
  * @param Timestamp to embed in each row
  */
 TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
+                                int64_t siteId, int32_t partitionId,
                                 vector<CatalogId> catalogIds,
                                 bool interval, int64_t now) {
     if (catalogIds.size() < 1) {
@@ -112,7 +119,7 @@ TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
                 continue;
             }
 
-            TableTuple *statsTuple = ss->getStatsTuple(interval, now);
+            TableTuple *statsTuple = ss->getStatsTuple(siteId, partitionId, interval, now);
             statsTable->insertTuple(*statsTuple);
         }
     }

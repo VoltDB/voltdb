@@ -69,6 +69,7 @@
 #include "storage/DRTupleStream.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
+#include "common/SynchronizedThreadLock.h"
 
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
@@ -241,15 +242,15 @@ public:
         }
     }
 
+    // Return a table iterator by reference
     TableIterator iterator() {
-        m_iter.reset(m_data.begin());
-        return m_iter;
+        return TableIterator(this, m_data.begin());
     }
 
     TableIterator iteratorDeletingAsWeGo() {
         // we don't delete persistent tuples "as we go",
         // so just return a normal iterator.
-        return iterator();
+        return TableIterator(this, m_data.begin());
     }
 
 
@@ -258,7 +259,7 @@ public:
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool, bool fallible = true);
 
-    void truncateTable(VoltDBEngine* engine, bool fallible = true);
+    void truncateTable(VoltDBEngine* engine, bool replicatedTable = true, bool fallible = true);
 
     void swapTable
            (PersistentTable* otherTable,
@@ -357,6 +358,11 @@ public:
     // ------------------------------------------------------------------
     std::string tableType() const;
     bool equals(PersistentTable* other);
+
+    // Return a string containing info about this table
+    std::string debug() const {
+        return debug("");
+    }
     virtual std::string debug(const std::string &spacer) const;
 
     /*
@@ -440,6 +446,16 @@ public:
 
     bool isReplicatedTable() const { return (m_partitionColumn == -1); }
 
+    bool isCatalogTableReplicated() const {
+        if (!m_isMaterialized && m_isReplicated != (m_partitionColumn == -1)) {
+            VOLT_ERROR("CAUTION: detected inconsistent isReplicate flag. Table name:%s\n", m_name.c_str());
+        }
+        return m_isReplicated;
+    }
+
+    UndoQuantumReleaseInterest *getReplicatedInterest() { return &m_releaseReplicated; }
+    UndoQuantumReleaseInterest *getDummyReplicatedInterest() { return &m_releaseDummyReplicated; }
+
     /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }
 
@@ -469,7 +485,7 @@ public:
 
     virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId);
 
-    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable);
+    void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable, bool replicatedTableAction);
 
     void truncateTableRelease(PersistentTable* originalTable);
 
@@ -542,7 +558,7 @@ public:
 
 private:
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
+    PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false, bool isReplicated = false);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -616,7 +632,9 @@ private:
     // occurs. In case of exception, target tuple should be released, but the
     // source tuple's memory should still be retained until the exception is
     // handled.
-    void insertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true);
+    void insertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true, bool delayTupleDelete= false);
+
+    void doInsertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true, bool delayTupleDelete = false);
 
     void insertTupleForUndo(char* tuple);
 
@@ -638,13 +656,14 @@ private:
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
-     * to do additional processing for views and Export
+     * for loadNextDependency or processRecoveryMessage
      */
     virtual void processLoadedTuple(TableTuple& tuple,
                                     ReferenceSerializeOutput* uniqueViolationOutput,
                                     int32_t& serializedTupleCount,
                                     size_t& tupleCountPosition,
-                                    bool shouldDRStreamRows);
+                                    bool shouldDRStreamRows = false,
+                                    bool ignoreTupleLimit = true);
 
     enum LookupType {
         LOOKUP_BY_VALUES,
@@ -710,6 +729,12 @@ private:
     TableIterator m_iter;
 
     // CONSTRAINTS
+    //Is this a materialized view?
+    bool m_isMaterialized;
+
+    // Value reads from catalog table, no matter partition column exists or not
+    bool m_isReplicated;
+
     std::vector<bool> m_allowNulls;
 
     // partition key
@@ -760,9 +785,6 @@ private:
     // or truncates in the current transaction.
     PersistentTable*  m_tableForStreamIndexing;
 
-    //Is this a materialized view?
-    bool m_isMaterialized;
-
     // is DR enabled
     bool m_drEnabled;
 
@@ -801,6 +823,10 @@ private:
     PersistentTable* m_deltaTable;
 
     bool m_deltaTableActive;
+
+    // Objects used to coordinate compaction of Replicated tables
+    SynchronizedUndoQuantumReleaseInterest m_releaseReplicated;
+    SynchronizedDummyUndoQuantumReleaseInterest m_releaseDummyReplicated;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :

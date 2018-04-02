@@ -22,6 +22,7 @@
 #include "common/types.h"
 #include "common/ids.h"
 #include "common/tabletuple.h"
+#include "storage/persistenttable.h"
 
 #include <string>
 
@@ -42,7 +43,7 @@ public:
      * @param otherTuple updated tuple values or a null tuple.
      * @param type Type of constraint that was violated
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type);
+    ConstraintFailureException(Table *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type, PersistentTableSurgeon *surgeon =  NULL);
 
     /**
      * Special constructor for partitioning error CFEs only
@@ -51,7 +52,7 @@ public:
      * @param tuple Tuple that was being inserted or updated
      * @param message Description of the partitioning failure.
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, std::string message);
+    ConstraintFailureException(Table *table, TableTuple tuple, std::string message, PersistentTableSurgeon *surgeon =  NULL);
 
     virtual const std::string message() const;
     virtual ~ConstraintFailureException();
@@ -65,6 +66,7 @@ protected:
     TableTuple m_tuple;
     TableTuple m_otherTuple;
     ConstraintType m_type;
+    PersistentTableSurgeon *m_surgeon;
 };
 
 }

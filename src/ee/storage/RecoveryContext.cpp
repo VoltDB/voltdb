@@ -55,7 +55,6 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
     {
         m_iterator = getTable().iterator();
         m_firstMessage = false;
-
     }
 
     if (!m_iterator.hasNext()) {

@@ -38,7 +38,7 @@ void FallbackSerializeOutput::expand(size_t minimum_desired) {
     ::memcpy(fallbackBuffer_, data(), position_);
     setPosition(position_);
     initialize(fallbackBuffer_, maxAllocationSize);
-    ExecutorContext::getExecutorContext()->getTopend()->fallbackToEEAllocatedBuffer(fallbackBuffer_, maxAllocationSize);
+    ExecutorContext::getPhysicalTopend()->fallbackToEEAllocatedBuffer(fallbackBuffer_, maxAllocationSize);
 }
 
 template<voltdb::Endianess E>

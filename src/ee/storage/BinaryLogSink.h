@@ -45,7 +45,7 @@ private:
     int64_t apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
                   boost::unordered_map<int64_t, PersistentTable*> &tables,
                   Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                  const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow);
+                  const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow, bool replicatedTableOperation);
 };
 
 

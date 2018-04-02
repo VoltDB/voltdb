@@ -908,6 +908,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              */
             jsObj.remove("requestId");
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+            String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
             final long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -931,6 +932,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                          * failure/success to the client.
                          */
                         if (isSnapshotInProgressResponse(clientResponse)) {
+                            loggingLog.info("Deferring user snapshot with nonce " + nonce + " until after in-progress snapshot completes");
                             scheduleSnapshotForLater(jsObj.toString(4), requestId, true);
                         } else {
                             ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
@@ -947,6 +949,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     }
                 }
             });
+            loggingLog.info("Initiating user snapshot with nonce " + nonce);
             initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, blocking);
             return;
         }
