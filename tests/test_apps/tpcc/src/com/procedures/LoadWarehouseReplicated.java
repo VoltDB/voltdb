@@ -23,7 +23,6 @@
 
 package com.procedures;
 
-import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -33,25 +32,44 @@ import org.voltdb.VoltTable;
  */
 public class LoadWarehouseReplicated extends VoltProcedure {
 
-    public final static SQLStmt writeStmt = new SQLStmt("INSERT INTO WAREHOUSE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
-
-    public final SQLStmt checkItemExists = new SQLStmt("SELECT * FROM ITEM LIMIT 1");
+    public final static SQLStmt insertIntoItem = new SQLStmt("INSERT INTO ITEM VALUES (?, ?, ?, ?, ?);");
+    public final static SQLStmt insertIntoCustomerName = new SQLStmt("INSERT INTO CUSTOMER_NAME VALUES (?, ?, ?, ?, ?);");
 
     @SuppressWarnings("deprecation")
-    public VoltTable[] run(short w_id, VoltTable items, VoltTable customerNames)
+    public VoltTable[] run(VoltTable items, VoltTable customerNames)
     throws VoltAbortException {
-        if (items != null) {
-            // check if we've already set up this partition
-            voltQueueSQL(checkItemExists);
-            VoltTable item = voltExecuteSQL()[0];
-            if (item.getRowCount() > 0)
-                return null;
 
-            // now we know the partition is not loaded yet
-            DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "ITEM", items, false, false);
+        if (items != null) {
+            loadTable(items, insertIntoItem);
         }
-        DeprecatedProcedureAPIAccess.voltLoadTable(this, "cluster", "database", "CUSTOMER_NAME", customerNames, false, false);
+
+        if (customerNames != null) {
+            loadTable(customerNames, insertIntoCustomerName);
+        }
+
         return null;
+    }
+
+    private void loadTable(VoltTable sourceTable, SQLStmt stmt) {
+        final int BATCH_SIZE = 100;
+
+        int i = 0;
+        while (sourceTable.advanceRow()) {
+            ++i;
+            voltQueueSQL(stmt,
+                    sourceTable.get(0, sourceTable.getColumnType(0)),
+                    sourceTable.get(1, sourceTable.getColumnType(1)),
+                    sourceTable.get(2, sourceTable.getColumnType(2)),
+                    sourceTable.get(3, sourceTable.getColumnType(3)),
+                    sourceTable.get(4, sourceTable.getColumnType(4)));
+            if (i % BATCH_SIZE == 0) {
+                voltExecuteSQL();
+            }
+        }
+
+        if (i % BATCH_SIZE != 0) {
+            voltExecuteSQL();
+        }
     }
 
 }

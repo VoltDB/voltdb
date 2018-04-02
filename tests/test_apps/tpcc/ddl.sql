@@ -70,6 +70,10 @@ CREATE TABLE CUSTOMER (
 partition table CUSTOMER on column C_W_ID;
 CREATE INDEX IDX_CUSTOMER_TREE ON CUSTOMER (C_W_ID,C_D_ID,C_LAST);
 
+-- This table is a replicated copy of CUSTOMER (with some columns
+-- omitted) that is used to do lookups in the stored procedure
+-- paymentByCustomerNameW.  This replicated copy allows that procedure
+-- to be executed on a single partition.
 CREATE TABLE CUSTOMER_NAME (
   C_ID INTEGER DEFAULT '0' NOT NULL,
   C_D_ID TINYINT DEFAULT '0' NOT NULL,
@@ -170,7 +174,6 @@ file -inlinebatch END_OF_2ND_BATCH
 
 -- Single-partition procedures
 create procedure partition on table warehouse column w_id from class com.procedures.LoadWarehouse;
-create procedure partition on table warehouse column w_id from class com.procedures.LoadWarehouseReplicated;
 create procedure partition on table warehouse column w_id from class com.procedures.ostatByCustomerId;
 create procedure partition on table warehouse column w_id from class com.procedures.delivery;
 create procedure partition on table warehouse column w_id from class com.procedures.paymentByCustomerNameW;
@@ -183,6 +186,7 @@ create procedure partition on table customer column c_w_id parameter 3 from clas
 create procedure partition on table customer column c_w_id parameter 3 from class com.procedures.paymentByCustomerIdC;
 
 -- Multi-partition procedures
+create procedure from class com.procedures.LoadWarehouseReplicated;
 create procedure from class com.procedures.paymentByCustomerName;
 create procedure from class com.procedures.paymentByCustomerId;
 create procedure from class com.procedures.LoadStatus;
