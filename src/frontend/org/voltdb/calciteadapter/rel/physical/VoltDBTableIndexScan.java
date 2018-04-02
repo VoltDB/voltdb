@@ -29,12 +29,17 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.rex.RexProgramBuilder;
+import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.calciteadapter.util.IndexUtil;
 import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -321,7 +326,26 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    protected RelNode copyWithNewProgram(RexProgram newProgram) {
+    protected RelNode copyWithNewProgram(RexProgram newProgram, RexBuilder rexBuilder) {
+        // A new program may have a condition expression on its own that needs to be transfered
+        // to the current index access path as an additional OTHER expression since.
+        // We are not changing index here so existing index expression stay as is
+        // This is a result of keeping the expression in the program and access path
+        RexLocalRef newCondition = newProgram.getCondition();
+        if (newCondition != null) {
+            AbstractExpression expr = RexConverter.convertRefExpression(newCondition, newProgram);
+            m_accessPath.getOtherExprs().add(expr);
+            // Need a new program without the condition
+            newProgram = RexProgramBuilder.create(
+                    rexBuilder,
+                    newProgram.getInputRowType(),
+                    newProgram.getExprList(),
+                    newProgram.getProjectList(),
+                    null,
+                    newProgram.getOutputRowType(),
+                    false,
+                    null).getProgram(); //RexSimplify can be null
+        }
         return VoltDBTableIndexScan.create(
                 getCluster(),
                 getTraitSet(),

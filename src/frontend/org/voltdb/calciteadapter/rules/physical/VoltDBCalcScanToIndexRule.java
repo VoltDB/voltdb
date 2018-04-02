@@ -21,7 +21,6 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
@@ -82,19 +81,18 @@ public class VoltDBCalcScanToIndexRule extends RelOptRule {
 
             if (accessPath != null) {
                 // if accessPath.other is not null, need to create a new Filter
+                // @TODO Adjust Calc program Condition based on the access path "other" filters
                 VoltDBTableIndexScan indexScan = VoltDBTableIndexScan.create(
                         scan.getCluster(),
                         scan.getTraitSet(),
                         scan.getTable(),
                         scan.getVoltDBTable(),
-                        scan.getProgram(),
+                        mergedProgram,
                         index,
                         accessPath,
                         scan.getLimitRexNode(),
                         scan.getOffsetRexNode());
-                // @TODO Adjust Calc program Condition based on the access path "other" filters
-                RelNode newCalc = calc.copy(calc.getTraitSet(), indexScan, calc.getProgram());
-                call.transformTo(newCalc);
+                call.transformTo(indexScan);
             }
         }
     }

@@ -30,6 +30,7 @@ import org.apache.calcite.tools.Programs;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalCalcRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalSortRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalTableScanRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBCalcMergeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBCalcScanToIndexRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBLimitScanMergeRule;
@@ -40,55 +41,57 @@ import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSeqScanRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSortRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBSortCalcTransposeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBSortConvertRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBSortIndexScanRemoveRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBSortScanToIndexRule;
 
 public class VoltDBRules {
 
     public static Program RULES_SET_0 = Programs.ofRules(
-                // Calcite's Logical Rules
-                CalcMergeRule.INSTANCE
-                , FilterCalcMergeRule.INSTANCE
-                , FilterToCalcRule.INSTANCE
-                , ProjectCalcMergeRule.INSTANCE
-                , ProjectToCalcRule.INSTANCE
-                , ProjectMergeRule.INSTANCE
-                , FilterProjectTransposeRule.INSTANCE
+            // Calcite's Logical Rules
+            CalcMergeRule.INSTANCE
+            , FilterCalcMergeRule.INSTANCE
+            , FilterToCalcRule.INSTANCE
+            , ProjectCalcMergeRule.INSTANCE
+            , ProjectToCalcRule.INSTANCE
+            , ProjectMergeRule.INSTANCE
+            , FilterProjectTransposeRule.INSTANCE
 
-                // VoltDBLogical Conversion Rules
-                , VoltDBLogicalSortRule.INSTANCE
-                , VoltDBLogicalTableScanRule.INSTANCE
-                , VoltDBLogicalCalcRule.INSTANCE
+            // VoltDBLogical Conversion Rules
+            , VoltDBLogicalSortRule.INSTANCE
+            , VoltDBLogicalTableScanRule.INSTANCE
+            , VoltDBLogicalCalcRule.INSTANCE
 
-                );
+            );
 
     public static Program RULES_SET_1 = Programs.ofRules(
-                // Calcite's Rules
-                AbstractConverter.ExpandConversionRule.INSTANCE
+            // Calcite's Rules
+            AbstractConverter.ExpandConversionRule.INSTANCE
 
-                // VoltDB Logical Rules
+            // VoltDB Logical Rules
 
-                // VoltDB Physical Rules
-              , VoltDBSortScanToIndexRule.INSTANCE
-              , VoltDBCalcScanToIndexRule.INSTANCE
-              , VoltDBSortCalcTransposeRule.INSTANCE
-//            , VoltDBSortIndexScanRemoveRule.INSTANCE
+            // VoltDB Physical Rules
+            , VoltDBSortScanToIndexRule.INSTANCE
+            , VoltDBCalcScanToIndexRule.INSTANCE
+            , VoltDBSortCalcTransposeRule.INSTANCE
+            , VoltDBSortIndexScanRemoveRule.INSTANCE
+            , VoltDBCalcMergeRule.INSTANCE
 
-                // VoltDB Physical Conversion Rules
-                , VoltDBPhysicalCalcRule.INSTANCE
-                , VoltDBPhysicalSeqScanRule.INSTANCE
-                , VoltDBPhysicalSortRule.INSTANCE
-                , VoltDBSortConvertRule.INSTANCE_NONE
-                , VoltDBSortConvertRule.INSTANCE_VOLTDB
-                , VoltDBPhysicalLimitRule.INSTANCE
+            // VoltDB Physical Conversion Rules
+            , VoltDBPhysicalCalcRule.INSTANCE
+            , VoltDBPhysicalSeqScanRule.INSTANCE
+            , VoltDBPhysicalSortRule.INSTANCE
+            , VoltDBSortConvertRule.INSTANCE_NONE
+            , VoltDBSortConvertRule.INSTANCE_VOLTDB
+            , VoltDBPhysicalLimitRule.INSTANCE
 
-                );
+            );
 
     public static Program RULES_SET_2 = Programs.ofRules(
-                // VoltDB Inline Rules
+            // VoltDB Inline Rules
 
-                VoltDBCalcScanMergeRule.INSTANCE
-                , VoltDBLimitScanMergeRule.INSTANCE
-                , VoltDBLimitSortMergeRule.INSTANCE
+            VoltDBCalcScanMergeRule.INSTANCE
+            , VoltDBLimitScanMergeRule.INSTANCE
+            , VoltDBLimitSortMergeRule.INSTANCE
 
             );
 

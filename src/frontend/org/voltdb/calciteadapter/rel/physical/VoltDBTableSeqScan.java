@@ -26,6 +26,7 @@ import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
@@ -102,7 +103,7 @@ public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    protected RelNode copyWithNewProgram(RexProgram newProgram) {
+    protected RelNode copyWithNewProgram(RexProgram newProgram, RexBuilder programRexBuilder) {
         // Do we need a deep copy including the inputs?
         VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
                 getCluster(),

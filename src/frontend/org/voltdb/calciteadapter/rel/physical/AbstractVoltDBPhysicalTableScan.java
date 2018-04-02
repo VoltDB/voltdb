@@ -161,7 +161,7 @@ public abstract class AbstractVoltDBPhysicalTableScan extends AbstractVoltDBTabl
 
     abstract public RelNode copyWithLimitOffset(RexNode offset, RexNode limit);
 
-    public RelNode copy(RexProgram program, RexBuilder programRexBuilder) {
+    public RelNode copy(RexProgram program, RexBuilder rexBuilder) {
         RexProgram newProgram;
         if (m_program == null) {
             newProgram = program;
@@ -170,13 +170,13 @@ public abstract class AbstractVoltDBPhysicalTableScan extends AbstractVoltDBTabl
             newProgram = RexProgramBuilder.mergePrograms(
                             program,
                             m_program,
-                            programRexBuilder);
+                            rexBuilder);
             assert(newProgram.getOutputRowType().equals(program.getOutputRowType()));
         }
-        return copyWithNewProgram(newProgram);
+        return copyWithNewProgram(newProgram, rexBuilder);
     }
 
-    protected abstract RelNode copyWithNewProgram(RexProgram newProgram);
+    protected abstract RelNode copyWithNewProgram(RexProgram newProgram, RexBuilder programRexBuilder);
 
     protected void addPredicate(AbstractScanPlanNode scan) {
         RexLocalRef condition = m_program.getCondition();

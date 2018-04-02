@@ -499,7 +499,7 @@ public class RexConverter {
      * a corresponding TVE. If the numLhsFieldsForJoin is set to something other than -1 it means
      * that this table is an inner table of some join and its expression indexes must be adjusted
      *
-     * @param condition RexNode to be converted
+     * @param rexNode RexNode to be converted
      * @param catTableName a catalog table name
      * @param catColumns column name list
      * @param program programs that is associated with this table
@@ -508,9 +508,24 @@ public class RexConverter {
      * @return
      */
     public static AbstractExpression convertRefExpression(
-            RexNode condition, String catTableName, List<Column> catColumns, RexProgram program, int numLhsFieldsForJoin) {
-        AbstractExpression ae = condition.accept(
+            RexNode rexNode, String catTableName, List<Column> catColumns, RexProgram program, int numLhsFieldsForJoin) {
+        AbstractExpression ae = rexNode.accept(
                 new RefExpressionConvertingVisitor(catTableName, catColumns, program, numLhsFieldsForJoin));
+        assert ae != null;
+        return ae;
+    }
+
+    /**
+     * Given a conditional RexNodes representing reference expressions ($1 > $2) convert it into
+     * a corresponding TVE without setting table and column names
+     *
+     * @param rexNode RexNode to be converted
+     * @param program programs that is associated with this table
+     * @return
+     */
+    public static AbstractExpression convertRefExpression(RexNode rexNode, RexProgram program) {
+        AbstractExpression ae = rexNode.accept(
+                new RefExpressionConvertingVisitor(program));
         assert ae != null;
         return ae;
     }
