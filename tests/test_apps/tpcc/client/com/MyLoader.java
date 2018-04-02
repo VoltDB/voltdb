@@ -313,7 +313,7 @@ public class MyLoader
 
         public void generateCustomer(long c_w_id, long c_d_id, long c_id, boolean badCredit,
                 boolean doesReplicateName) {
-            final Object[] m_containerCustomer = new Object[6 + 5 + 10];
+            final Object[] containerCustomer = new Object[6 + 5 + 10];
 
             String c_first = m_generator.astring(Constants.MIN_FIRST, Constants.MAX_FIRST);
             String c_middle = Constants.MIDDLE;
@@ -339,35 +339,35 @@ public class MyLoader
             String c_data = m_generator.astring(Constants.MIN_C_DATA, Constants.MAX_C_DATA);
 
             int ind = 0;
-            m_containerCustomer[ind++] = c_id;
-            m_containerCustomer[ind++] = c_d_id;
-            m_containerCustomer[ind++] = c_w_id;
-            m_containerCustomer[ind++] = c_first;
-            m_containerCustomer[ind++] = c_middle;
-            m_containerCustomer[ind++] = c_last;
+            containerCustomer[ind++] = c_id;
+            containerCustomer[ind++] = c_d_id;
+            containerCustomer[ind++] = c_w_id;
+            containerCustomer[ind++] = c_first;
+            containerCustomer[ind++] = c_middle;
+            containerCustomer[ind++] = c_last;
 
             String street1 = m_generator.astring(Constants.MIN_STREET, Constants.MAX_STREET);
             String street2 = m_generator.astring(Constants.MIN_STREET, Constants.MAX_STREET);
             String city = m_generator.astring(Constants.MIN_CITY, Constants.MAX_CITY);
             String state = m_generator.astring(Constants.STATE, Constants.STATE);
             String zip = makeZip();
-            m_containerCustomer[ind++] = street1;
-            m_containerCustomer[ind++] = street2;
-            m_containerCustomer[ind++] = city;
-            m_containerCustomer[ind++] = state;
-            m_containerCustomer[ind++] = zip;
+            containerCustomer[ind++] = street1;
+            containerCustomer[ind++] = street2;
+            containerCustomer[ind++] = city;
+            containerCustomer[ind++] = state;
+            containerCustomer[ind++] = zip;
 
-            m_containerCustomer[ind++] = c_phone;
-            m_containerCustomer[ind++] = c_since;
-            m_containerCustomer[ind++] = c_credit;
-            m_containerCustomer[ind++] = c_credit_lim;
-            m_containerCustomer[ind++] = c_discount;
-            m_containerCustomer[ind++] = c_balance;
-            m_containerCustomer[ind++] = c_ytd_payment;
-            m_containerCustomer[ind++] = c_payment_cnt;
-            m_containerCustomer[ind++] = c_delivery_cnt;
-            m_containerCustomer[ind++] = c_data;
-            m_dataTables[IDX_CUSTOMERS].addRow(m_containerCustomer);
+            containerCustomer[ind++] = c_phone;
+            containerCustomer[ind++] = c_since;
+            containerCustomer[ind++] = c_credit;
+            containerCustomer[ind++] = c_credit_lim;
+            containerCustomer[ind++] = c_discount;
+            containerCustomer[ind++] = c_balance;
+            containerCustomer[ind++] = c_ytd_payment;
+            containerCustomer[ind++] = c_payment_cnt;
+            containerCustomer[ind++] = c_delivery_cnt;
+            containerCustomer[ind++] = c_data;
+            m_dataTables[IDX_CUSTOMERS].addRow(containerCustomer);
             if (doesReplicateName) {
                 //replicate name and id to every site
                 synchronized (s_customerNamesTables) {
@@ -402,7 +402,7 @@ public class MyLoader
         }
 
         public void generateStock(long s_w_id, long s_i_id, boolean original) {
-            final Object[] m_containerStock = new Object[3 + Constants.DISTRICTS_PER_WAREHOUSE + 4];
+            final Object[] containerStock = new Object[3 + Constants.DISTRICTS_PER_WAREHOUSE + 4];
             long s_quantity = m_generator.number(Constants.MIN_QUANTITY, Constants.MAX_QUANTITY);
             long s_ytd = 0;
             long s_order_cnt = 0;
@@ -413,19 +413,19 @@ public class MyLoader
                 s_data = fillOriginal(s_data);
             }
             int ind = 0;
-            m_containerStock[ind++] = s_i_id;
-            m_containerStock[ind++] = s_w_id;
-            m_containerStock[ind++] = s_quantity;
+            containerStock[ind++] = s_i_id;
+            containerStock[ind++] = s_w_id;
+            containerStock[ind++] = s_quantity;
             for (int i = 0; i < Constants.DISTRICTS_PER_WAREHOUSE; ++i) {
                 String s_dist_x = m_generator.astring(Constants.DIST, Constants.DIST);
-                m_containerStock[ind++] = s_dist_x;
+                containerStock[ind++] = s_dist_x;
             }
-            m_containerStock[ind++] = s_ytd;
-            m_containerStock[ind++] = s_order_cnt;
-            m_containerStock[ind++] = s_remote_cnt;
-            m_containerStock[ind++] = s_data;
+            containerStock[ind++] = s_ytd;
+            containerStock[ind++] = s_order_cnt;
+            containerStock[ind++] = s_remote_cnt;
+            containerStock[ind++] = s_data;
 
-            m_dataTables[IDX_STOCKS].addRow(m_containerStock);
+            m_dataTables[IDX_STOCKS].addRow(containerStock);
         }
 
         /* returns the generated o_ol_cnt value. */
