@@ -50,18 +50,16 @@
 
 package com;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.Iterator;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
-import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.NoConnectionsException;
@@ -70,7 +68,6 @@ import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.client.exampleutils.ClientConnection;
 
 import java.util.concurrent.Semaphore;
-import org.voltcore.utils.Pair;
 
 /** TPC-C database loader. Note: The methods order id parameters from "top level" to "low level"
 parameters. However, the insert stored procedures use the defined TPC-C table order, which goes from
@@ -87,7 +84,7 @@ public class MyLoader
     private final LoadThread m_loadThreads[];
     private final int m_warehouses;
 
-    private static final VoltTable.ColumnInfo customerTableColumnInfo[] =
+    private static final VoltTable.ColumnInfo CUSTOMER_TABLE_COLUMN_INFO[] =
         new VoltTable.ColumnInfo[] {
             new VoltTable.ColumnInfo("C_ID", VoltType.INTEGER),
             new VoltTable.ColumnInfo("C_D_ID", VoltType.TINYINT),
@@ -96,7 +93,7 @@ public class MyLoader
             new VoltTable.ColumnInfo("C_LAST", VoltType.STRING)
         };
 
-    private static final LinkedList<VoltTable> customerNamesTables = new LinkedList<VoltTable>();
+    private static final LinkedList<VoltTable> s_customerNamesTables = new LinkedList<VoltTable>();
     private static final Semaphore m_finishedLoadThreads = new Semaphore(0);
 
     public MyLoader(String args[], ClientConnection voltClient)
@@ -145,7 +142,7 @@ public class MyLoader
         m_voltClient = voltClient;
     }
 
-    private String[] table_names = new String[8];
+    private String[] m_tableNames = new String[8];
     private final static int IDX_WAREHOUSES = 0;
     private final static int IDX_DISTRICTS = 1;
     private final static int IDX_CUSTOMERS = 2;
@@ -156,14 +153,14 @@ public class MyLoader
     private final static int IDX_HISTORIES = 7;
 
     private void initTableNames() {
-        table_names[IDX_WAREHOUSES] = "warehouse";
-        table_names[IDX_DISTRICTS] = "district";
-        table_names[IDX_CUSTOMERS] = "customer";
-        table_names[IDX_STOCKS] = "stock";
-        table_names[IDX_ORDERS] = "orders";
-        table_names[IDX_NEWORDERS] = "new_order";
-        table_names[IDX_ORDERLINES] = "order_line";
-        table_names[IDX_HISTORIES] = "history";
+        m_tableNames[IDX_WAREHOUSES] = "warehouse";
+        m_tableNames[IDX_DISTRICTS] = "district";
+        m_tableNames[IDX_CUSTOMERS] = "customer";
+        m_tableNames[IDX_STOCKS] = "stock";
+        m_tableNames[IDX_ORDERS] = "orders";
+        m_tableNames[IDX_NEWORDERS] = "new_order";
+        m_tableNames[IDX_ORDERLINES] = "order_line";
+        m_tableNames[IDX_HISTORIES] = "history";
     }
 
     /**
@@ -195,7 +192,7 @@ public class MyLoader
         private final ScaleParameters m_parameters;
 
         /** table data FOR CURRENT WAREHOUSE (LoadWarehouse is partitioned on WID).*/
-        private final VoltTable[] data_tables = new VoltTable[8]; // non replicated tables
+        private final VoltTable[] m_dataTables = new VoltTable[8]; // non replicated tables
         private volatile boolean m_doMakeReplicated = false;
 
         public LoadThread(
@@ -212,12 +209,12 @@ public class MyLoader
         @Override
         public void run() {
             Integer warehouseId = null;
-            while ((warehouseId = availableWarehouseIds.poll()) != null) {
+            while ((warehouseId = m_availableWarehouseIds.poll()) != null) {
                 System.err.println("Loading warehouse " + warehouseId);
                 makeStock(warehouseId); // STOCK is made separately to reduce memory consumption
                 createDataTables();
                 makeWarehouse(warehouseId);
-                for (int i = 0; i < data_tables.length; ++i) data_tables[i] = null;
+                for (int i = 0; i < m_dataTables.length; ++i) m_dataTables[i] = null;
             }
             if (m_doMakeReplicated) {
                 try {
@@ -299,7 +296,7 @@ public class MyLoader
             addAddress(insertParameters);
             insertParameters.addAll(Arrays.asList(w_tax, w_ytd));
 
-            data_tables[IDX_WAREHOUSES].addRow(insertParameters.toArray());
+            m_dataTables[IDX_WAREHOUSES].addRow(insertParameters.toArray());
         }
 
         public void generateDistrict(long d_w_id, long d_id) {
@@ -311,12 +308,13 @@ public class MyLoader
             addAddress(insertParameters);
             insertParameters.addAll(Arrays.asList(new Object[]{d_tax, d_ytd, d_next_o_id}));
 
-            data_tables[IDX_DISTRICTS].addRow(insertParameters.toArray());
+            m_dataTables[IDX_DISTRICTS].addRow(insertParameters.toArray());
         }
 
-        private final Object[] container_customer = new Object[6 + 5 + 10];
         public void generateCustomer(long c_w_id, long c_d_id, long c_id, boolean badCredit,
                 boolean doesReplicateName) {
+            final Object[] containerCustomer = new Object[6 + 5 + 10];
+
             String c_first = m_generator.astring(Constants.MIN_FIRST, Constants.MAX_FIRST);
             String c_middle = Constants.MIDDLE;
 
@@ -341,42 +339,42 @@ public class MyLoader
             String c_data = m_generator.astring(Constants.MIN_C_DATA, Constants.MAX_C_DATA);
 
             int ind = 0;
-            container_customer[ind++] = c_id;
-            container_customer[ind++] = c_d_id;
-            container_customer[ind++] = c_w_id;
-            container_customer[ind++] = c_first;
-            container_customer[ind++] = c_middle;
-            container_customer[ind++] = c_last;
+            containerCustomer[ind++] = c_id;
+            containerCustomer[ind++] = c_d_id;
+            containerCustomer[ind++] = c_w_id;
+            containerCustomer[ind++] = c_first;
+            containerCustomer[ind++] = c_middle;
+            containerCustomer[ind++] = c_last;
 
             String street1 = m_generator.astring(Constants.MIN_STREET, Constants.MAX_STREET);
             String street2 = m_generator.astring(Constants.MIN_STREET, Constants.MAX_STREET);
             String city = m_generator.astring(Constants.MIN_CITY, Constants.MAX_CITY);
             String state = m_generator.astring(Constants.STATE, Constants.STATE);
             String zip = makeZip();
-            container_customer[ind++] = street1;
-            container_customer[ind++] = street2;
-            container_customer[ind++] = city;
-            container_customer[ind++] = state;
-            container_customer[ind++] = zip;
+            containerCustomer[ind++] = street1;
+            containerCustomer[ind++] = street2;
+            containerCustomer[ind++] = city;
+            containerCustomer[ind++] = state;
+            containerCustomer[ind++] = zip;
 
-            container_customer[ind++] = c_phone;
-            container_customer[ind++] = c_since;
-            container_customer[ind++] = c_credit;
-            container_customer[ind++] = c_credit_lim;
-            container_customer[ind++] = c_discount;
-            container_customer[ind++] = c_balance;
-            container_customer[ind++] = c_ytd_payment;
-            container_customer[ind++] = c_payment_cnt;
-            container_customer[ind++] = c_delivery_cnt;
-            container_customer[ind++] = c_data;
-            data_tables[IDX_CUSTOMERS].addRow(container_customer);
+            containerCustomer[ind++] = c_phone;
+            containerCustomer[ind++] = c_since;
+            containerCustomer[ind++] = c_credit;
+            containerCustomer[ind++] = c_credit_lim;
+            containerCustomer[ind++] = c_discount;
+            containerCustomer[ind++] = c_balance;
+            containerCustomer[ind++] = c_ytd_payment;
+            containerCustomer[ind++] = c_payment_cnt;
+            containerCustomer[ind++] = c_delivery_cnt;
+            containerCustomer[ind++] = c_data;
+            m_dataTables[IDX_CUSTOMERS].addRow(containerCustomer);
             if (doesReplicateName) {
                 //replicate name and id to every site
-                synchronized (customerNamesTables) {
-                    VoltTable customerNames = customerNamesTables.peekFirst();
+                synchronized (s_customerNamesTables) {
+                    VoltTable customerNames = s_customerNamesTables.peekFirst();
                     if (customerNames == null || customerNames.getRowCount() > 32760) {
-                        customerNames = new VoltTable(customerTableColumnInfo);
-                        customerNamesTables.push(customerNames);
+                        customerNames = new VoltTable(CUSTOMER_TABLE_COLUMN_INFO);
+                        s_customerNamesTables.push(customerNames);
                     }
                     customerNames.addRow(c_id, c_d_id, c_w_id, c_first, c_last);
                 }
@@ -403,8 +401,8 @@ public class MyLoader
             insertParameters.addAll(Arrays.asList(street1, street2, city, state, zip));
         }
 
-        private final Object[] container_stock = new Object[3 + Constants.DISTRICTS_PER_WAREHOUSE + 4];
         public void generateStock(long s_w_id, long s_i_id, boolean original) {
+            final Object[] containerStock = new Object[3 + Constants.DISTRICTS_PER_WAREHOUSE + 4];
             long s_quantity = m_generator.number(Constants.MIN_QUANTITY, Constants.MAX_QUANTITY);
             long s_ytd = 0;
             long s_order_cnt = 0;
@@ -415,19 +413,19 @@ public class MyLoader
                 s_data = fillOriginal(s_data);
             }
             int ind = 0;
-            container_stock[ind++] = s_i_id;
-            container_stock[ind++] = s_w_id;
-            container_stock[ind++] = s_quantity;
+            containerStock[ind++] = s_i_id;
+            containerStock[ind++] = s_w_id;
+            containerStock[ind++] = s_quantity;
             for (int i = 0; i < Constants.DISTRICTS_PER_WAREHOUSE; ++i) {
                 String s_dist_x = m_generator.astring(Constants.DIST, Constants.DIST);
-                container_stock[ind++] = s_dist_x;
+                containerStock[ind++] = s_dist_x;
             }
-            container_stock[ind++] = s_ytd;
-            container_stock[ind++] = s_order_cnt;
-            container_stock[ind++] = s_remote_cnt;
-            container_stock[ind++] = s_data;
+            containerStock[ind++] = s_ytd;
+            containerStock[ind++] = s_order_cnt;
+            containerStock[ind++] = s_remote_cnt;
+            containerStock[ind++] = s_data;
 
-            data_tables[IDX_STOCKS].addRow(container_stock);
+            m_dataTables[IDX_STOCKS].addRow(containerStock);
         }
 
         /* returns the generated o_ol_cnt value. */
@@ -442,7 +440,7 @@ public class MyLoader
             long o_ol_cnt = m_generator.number(Constants.MIN_OL_CNT, Constants.MAX_OL_CNT);
             long o_all_local = Constants.INITIAL_ALL_LOCAL;
 
-            data_tables[IDX_ORDERS].addRow(o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_carrier_id, o_ol_cnt, o_all_local);
+            m_dataTables[IDX_ORDERS].addRow(o_id, o_d_id, o_w_id, o_c_id, o_entry_d, o_carrier_id, o_ol_cnt, o_all_local);
             return o_ol_cnt;
         }
 
@@ -463,7 +461,7 @@ public class MyLoader
             }
             String ol_dist_info = m_generator.astring(Constants.DIST, Constants.DIST);
 
-            data_tables[IDX_ORDERLINES].addRow(ol_o_id, ol_d_id, ol_w_id, ol_number,
+            m_dataTables[IDX_ORDERLINES].addRow(ol_o_id, ol_d_id, ol_w_id, ol_number,
                     ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity, ol_amount, ol_dist_info);
         }
         //private long max_hid = 0;
@@ -474,7 +472,7 @@ public class MyLoader
             double h_amount = Constants.INITIAL_AMOUNT;
             String h_data = m_generator.astring(Constants.MIN_DATA, Constants.MAX_DATA);
 
-            data_tables[IDX_HISTORIES].addRow(h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data);
+            m_dataTables[IDX_HISTORIES].addRow(h_c_id, h_c_d_id, h_c_w_id, h_d_id, h_w_id, h_date, h_amount, h_data);
         }
 
         /** STOCK is made in different method to reduce memory consumption. */
@@ -484,7 +482,7 @@ public class MyLoader
 
             final int BATCH = 5;
             final int BATCH_SIZE = (m_parameters.items / BATCH);
-            data_tables[IDX_STOCKS] = new VoltTable(
+            m_dataTables[IDX_STOCKS] = new VoltTable(
                     new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("S_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("S_QUANTITY", VoltType.INTEGER),
@@ -516,10 +514,10 @@ public class MyLoader
                     //System.err.printf("%d/%d\n", i_id, m_parameters.items);
                 }
             }
-            if (data_tables[IDX_STOCKS].getRowCount() != 0) {
+            if (m_dataTables[IDX_STOCKS].getRowCount() != 0) {
                 commitDataTables(w_id);
             }
-            data_tables[IDX_STOCKS] = null;
+            m_dataTables[IDX_STOCKS] = null;
 
 
         }
@@ -570,7 +568,7 @@ public class MyLoader
 
                     if (newOrder) {
                         // This is a new order: make one for it
-                        data_tables[IDX_NEWORDERS].addRow((long) o_id, (long) d_id, w_id);
+                        m_dataTables[IDX_NEWORDERS].addRow((long) o_id, (long) d_id, w_id);
                     }
                 }
                 commitDataTables(w_id); // flushout current data to avoid outofmemory
@@ -599,99 +597,60 @@ public class MyLoader
                 generateItem(items, i, original);
             }
 
-            if (m_voltClient != null) {
-                // XXX
-                final int numPermits = 48;
-                final Semaphore maxOutstandingInvocations = new Semaphore(numPermits);
-                final int totalInvocations = customerNamesTables.size() * m_parameters.warehouses;
-                final ProcedureCallback callback = new ProcedureCallback() {
-                    private int invocationsCompleted = 0;
+            final int numPermits = 48;
+            final Semaphore maxOutstandingInvocations = new Semaphore(numPermits);
+            final int totalInvocations = s_customerNamesTables.size() * m_parameters.warehouses;
+            final ProcedureCallback callback = new ProcedureCallback() {
+                private int invocationsCompleted = 0;
 
-                    private double lastPercentCompleted = 0.0;
-                    @Override
-                    public synchronized void clientCallback(ClientResponse clientResponse) {
-                        if (clientResponse.getStatus() != ClientResponse.SUCCESS){
-                            System.err.println(clientResponse.getStatusString());
-                            System.exit(-1);
-                        }
-                        invocationsCompleted++;
-                        final double percentCompleted = invocationsCompleted / (double)totalInvocations;
-                        if (percentCompleted > lastPercentCompleted + .1) {
-                            lastPercentCompleted = percentCompleted;
-                            System.err.println("Finished " + invocationsCompleted + "/" +
-                                    totalInvocations + " replicated load work");
-                        }
-                        maxOutstandingInvocations.release();
+                private double lastPercentCompleted = 0.0;
+                @Override
+                public synchronized void clientCallback(ClientResponse clientResponse) {
+                    if (clientResponse.getStatus() != ClientResponse.SUCCESS){
+                        System.err.println(clientResponse.getStatusString());
+                        System.exit(-1);
                     }
-
-                };
-
-                LinkedList<Pair<Integer, LinkedList<VoltTable>>> replicatedLoadWork =
-                    new LinkedList<Pair<Integer, LinkedList<VoltTable>>>();
-
-                int totalLoadWorkGenerated = 0;
-                for (int w_id = 1; w_id <= m_parameters.warehouses; ++w_id) {
-                    replicatedLoadWork.add(
-                            new Pair<Integer, LinkedList<VoltTable>>(
-                                    w_id, new LinkedList<VoltTable>(customerNamesTables), false));
-                    totalLoadWorkGenerated += customerNamesTables.size();
+                    invocationsCompleted++;
+                    final double percentCompleted = invocationsCompleted / (double)totalInvocations;
+                    if (percentCompleted > lastPercentCompleted + .1) {
+                        lastPercentCompleted = percentCompleted;
+                        System.err.println("Finished " + invocationsCompleted + "/" +
+                                totalInvocations + " replicated load work");
+                    }
+                    maxOutstandingInvocations.release();
                 }
-                Collections.shuffle(replicatedLoadWork);
-                System.err.println("Total load work generated is " + totalLoadWorkGenerated);
 
+            };
+
+            System.err.println("Customer names tables broken into " + s_customerNamesTables.size() + " chunks");
+
+            for (VoltTable customerNameChunk : s_customerNamesTables) {
                 /*
                  * Only supply item table the first time.
                  */
-                for (Pair<Integer, LinkedList<VoltTable>> p : replicatedLoadWork) {
-                    try {
-                        VoltTable table = p.getSecond().pop();
-                        boolean queued = false;
-                        while (!queued) {
-                            queued = m_voltClient.executeAsync(callback, Constants.LOAD_WAREHOUSE_REPLICATED,
-                                    (short)p.getFirst().intValue(), items, table);
-                            m_voltClient.backpressureBarrier();
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        System.exit(-1);
-                    }
-                }
-
-
-                while (!replicatedLoadWork.isEmpty()) {
-                    Iterator<Pair<Integer, LinkedList<VoltTable>>> iter = replicatedLoadWork.iterator();
-                    while (iter.hasNext()) {
-                        Pair<Integer, LinkedList<VoltTable>> p = iter.next();
-                        if (p.getSecond().peek() == null) {
-                            iter.remove();
-                            continue;
-                        }
-                        try {
-                            maxOutstandingInvocations.acquire();
-                            VoltTable table = p.getSecond().pop();
-                            boolean queued = false;
-                            while (!queued) {
-                                queued = m_voltClient.executeAsync(callback, Constants.LOAD_WAREHOUSE_REPLICATED,
-                                        (short)p.getFirst().intValue(), null, table);
-                                m_voltClient.backpressureBarrier();
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            System.exit(-1);
-                        }
-                    }
-                }
-
                 try {
-                    maxOutstandingInvocations.acquire(numPermits);
-                    System.err.println("Finished all replicated load work");
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    boolean queued = false;
+                    while (!queued) {
+                        maxOutstandingInvocations.acquire();
+                        queued = m_voltClient.executeAsync(callback, Constants.LOAD_WAREHOUSE_REPLICATED,
+                                items, customerNameChunk);
+                        items = null;
+                        m_voltClient.backpressureBarrier();
+                    }
+                }
+                catch (Exception e) {
+                    System.err.println(e.getMessage());
                     System.exit(-1);
                 }
             }
 
-            items = null;
+            try {
+                maxOutstandingInvocations.acquire(numPermits);
+                System.err.println("Finished all replicated load work");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                System.exit(-1);
+            }
         }
 
         /** Send to data to VoltDB and/or to the jdbc connection */
@@ -699,19 +658,19 @@ public class MyLoader
             if (m_voltClient != null) {
                 commitDataTables_VoltDB(w_id);
             }
-            for (int i = 0; i < data_tables.length; ++i) {
-                if (data_tables[i] != null) {
-                    data_tables[i].clearRowData();
+            for (int i = 0; i < m_dataTables.length; ++i) {
+                if (m_dataTables[i] != null) {
+                    m_dataTables[i].clearRowData();
                 }
             }
         }
 
         private void commitDataTables_VoltDB(long w_id) {
-            Object[] params = new Object[data_tables.length + 1];
+            Object[] params = new Object[m_dataTables.length + 1];
             params[0] = (short)w_id;
-            for (int i = 0; i < data_tables.length; ++i) {
-                if (data_tables[i] != null && data_tables[i].getRowCount() > 0) {
-                    params[i + 1] = data_tables[i];
+            for (int i = 0; i < m_dataTables.length; ++i) {
+                if (m_dataTables[i] != null && m_dataTables[i].getRowCount() > 0) {
+                    params[i + 1] = m_dataTables[i];
                 }
             }
             rethrowExceptionLoad(Constants.LOAD_WAREHOUSE, params);
@@ -722,8 +681,8 @@ public class MyLoader
             //customerNames.ensureStringCapacity(parameters.warehouses * parameters.districtsPerWarehouse * parameters.customersPerDistrict * (64));
 
             //non replicated tables
-            for (int i = 0; i < data_tables.length; ++i) data_tables[i] = null;
-            data_tables[IDX_WAREHOUSES] = new VoltTable(
+            for (int i = 0; i < m_dataTables.length; ++i) m_dataTables[i] = null;
+            m_dataTables[IDX_WAREHOUSES] = new VoltTable(
                     new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),
                     new VoltTable.ColumnInfo("W_STREET_1", VoltType.STRING),
@@ -737,7 +696,7 @@ public class MyLoader
             //t.ensureRowCapacity(1);
             //t.ensureStringCapacity(200);
 
-            data_tables[IDX_DISTRICTS] = new VoltTable(
+            m_dataTables[IDX_DISTRICTS] = new VoltTable(
                     new VoltTable.ColumnInfo("D_ID", VoltType.TINYINT),
                     new VoltTable.ColumnInfo("D_W_ID", VoltType.SMALLINT),
                     new VoltTable.ColumnInfo("D_NAME", VoltType.STRING),
@@ -753,7 +712,7 @@ public class MyLoader
             //t.ensureRowCapacity(1);
             //t.ensureStringCapacity(1 * (16 + 96 + 2 + 9));
 
-            data_tables[IDX_CUSTOMERS] = new VoltTable(
+            m_dataTables[IDX_CUSTOMERS] = new VoltTable(
                     new VoltTable.ColumnInfo("C_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("C_D_ID", VoltType.TINYINT),
                     new VoltTable.ColumnInfo("C_W_ID", VoltType.SMALLINT),
@@ -779,7 +738,7 @@ public class MyLoader
             //t.ensureRowCapacity(parameters.customersPerDistrict);
             //t.ensureStringCapacity(parameters.customersPerDistrict * (32 * 6 + 2 * 3 + 9 + 500));
 
-            data_tables[IDX_ORDERS] = new VoltTable(
+            m_dataTables[IDX_ORDERS] = new VoltTable(
                     new VoltTable.ColumnInfo("O_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("O_D_ID", VoltType.TINYINT),
                     new VoltTable.ColumnInfo("O_W_ID", VoltType.SMALLINT),
@@ -791,14 +750,14 @@ public class MyLoader
             );
             //t.ensureRowCapacity(parameters.customersPerDistrict);
 
-            data_tables[IDX_NEWORDERS] = new VoltTable(
+            m_dataTables[IDX_NEWORDERS] = new VoltTable(
                     new VoltTable.ColumnInfo("NO_O_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("NO_D_ID", VoltType.TINYINT),
                     new VoltTable.ColumnInfo("NO_W_ID", VoltType.SMALLINT)
             );
             //t.ensureRowCapacity(parameters.customersPerDistrict);
 
-            data_tables[IDX_ORDERLINES] = new VoltTable(
+            m_dataTables[IDX_ORDERLINES] = new VoltTable(
                     new VoltTable.ColumnInfo("OL_O_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("OL_D_ID", VoltType.TINYINT),
                     new VoltTable.ColumnInfo("OL_W_ID", VoltType.SMALLINT),
@@ -813,7 +772,7 @@ public class MyLoader
             //t.ensureRowCapacity(parameters.customersPerDistrict * Constants.MAX_OL_CNT);
             //t.ensureStringCapacity(parameters.customersPerDistrict * Constants.MAX_OL_CNT * (32));
 
-            data_tables[IDX_HISTORIES] = new VoltTable(
+            m_dataTables[IDX_HISTORIES] = new VoltTable(
                     new VoltTable.ColumnInfo("H_C_ID", VoltType.INTEGER),
                     new VoltTable.ColumnInfo("H_C_D_ID", VoltType.TINYINT),
                     new VoltTable.ColumnInfo("H_C_W_ID", VoltType.SMALLINT),
@@ -828,7 +787,7 @@ public class MyLoader
         }
     }
 
-    private ConcurrentLinkedQueue<Integer> availableWarehouseIds = new ConcurrentLinkedQueue<Integer>();
+    private ConcurrentLinkedQueue<Integer> m_availableWarehouseIds = new ConcurrentLinkedQueue<Integer>();
 
     public void run() throws NoConnectionsException {
         ArrayList<Integer> warehouseIds = new ArrayList<Integer>();
@@ -837,7 +796,7 @@ public class MyLoader
         }
         //Shuffling spreads the loading out across physical hosts better
         Collections.shuffle(warehouseIds);
-        availableWarehouseIds.addAll(warehouseIds);
+        m_availableWarehouseIds.addAll(warehouseIds);
 
         boolean doMakeReplicated = true;
         for (LoadThread loadThread : m_loadThreads) {
