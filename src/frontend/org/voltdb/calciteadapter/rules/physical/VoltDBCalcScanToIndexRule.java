@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
@@ -30,6 +31,7 @@ import org.voltdb.calciteadapter.rel.physical.VoltDBCalc;
 import org.voltdb.calciteadapter.rel.physical.VoltDBTableIndexScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBTableSeqScan;
 import org.voltdb.calciteadapter.util.IndexUtil;
+import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -82,9 +84,15 @@ public class VoltDBCalcScanToIndexRule extends RelOptRule {
             if (accessPath != null) {
                 // if accessPath.other is not null, need to create a new Filter
                 // @TODO Adjust Calc program Condition based on the access path "other" filters
+                RelCollation indexCollation = VoltDBRexUtil.createIndexCollation(
+                        index,
+                        catTableable,
+                        rexBuilder,
+                        mergedProgram);
                 VoltDBTableIndexScan indexScan = VoltDBTableIndexScan.create(
                         scan.getCluster(),
-                        scan.getTraitSet(),
+                        // Need to add an index collation trait
+                        scan.getTraitSet().plus(indexCollation),
                         scan.getTable(),
                         scan.getVoltDBTable(),
                         mergedProgram,

@@ -90,7 +90,8 @@ public class VoltDBSortScanToIndexRule extends RelOptRule {
                         true);
                 VoltDBTableIndexScan indexScan = VoltDBTableIndexScan.create(
                         scan.getCluster(),
-                        scan.getTraitSet(),
+                        // Need to add sort collation trait
+                        scan.getTraitSet().plus(sortCollation),
                         scan.getTable(),
                         scan.getVoltDBTable(),
                         scan.getProgram(),

@@ -37,7 +37,7 @@ public class VoltDBLimitScanMergeRule extends RelOptRule {
         VoltDBLimit limitOffset = call.rel(0);
         AbstractVoltDBPhysicalTableScan scan = call.rel(1);
 
-        RelNode newScan = scan.copyWithLimitOffset(limitOffset.getOffset(), limitOffset.getLimit());
+        RelNode newScan = scan.copy(scan.getTraitSet(), limitOffset.getOffset(), limitOffset.getLimit());
         call.transformTo(newScan);
     }
 

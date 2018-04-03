@@ -37,7 +37,6 @@ import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.calciteadapter.util.IndexUtil;
-import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.AccessPath;
@@ -116,10 +115,11 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         addLimitOffset(ispn);
         // Set projection
         addProjection(ispn);
-        // Set predicate - not required here since program's conditions should be already 
+        // Set predicate - not required here since program's conditions should be already
         // converted to accessPath.OTHER
         addPredicate(ispn);
 
+        // At the moment this will override the predicate set by the addPredicate call
         return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath);
     }
 
@@ -224,7 +224,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
             tuplesToRead = 2;
         }
         else if ((m_index.getType() == IndexType.BALANCED_TREE.getValue()) ||
-                 (m_index.getType() == IndexType.BTREE.getValue())) {
+                (m_index.getType() == IndexType.BTREE.getValue())) {
             tuplesToRead = 3;
         }
         else if (m_index.getType() == IndexType.COVERING_CELL_INDEX.getValue()) {
@@ -287,7 +287,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         // count a range scan as a half covered column
         if (keyWidth > 0.0 &&
                 m_accessPath.getIndexLookupType() != IndexLookupType.EQ &&
-                        m_accessPath.getIndexLookupType() != IndexLookupType.GEO_CONTAINS) {
+                m_accessPath.getIndexLookupType() != IndexLookupType.GEO_CONTAINS) {
             keyWidth -= 0.5;
         }
         else if (keyWidth == 0.0 && !m_accessPath.getIndexExpressions().isEmpty()) {
@@ -312,11 +312,11 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    public  RelNode copyWithLimitOffset(RexNode offset, RexNode limit) {
+    public  RelNode copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
         // Do we need a deep copy including the inputs?
         return VoltDBTableIndexScan.create(
                 getCluster(),
-                getTraitSet(),
+                traitSet,
                 getTable(),
                 m_voltDBTable,
                 m_program,
@@ -327,7 +327,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    protected RelNode copyWithNewProgram(RexProgram newProgram, RexBuilder rexBuilder) {
+    protected RelNode copyWithNewProgram(RelTraitSet traitSet, RexProgram newProgram, RexBuilder rexBuilder) {
         // A new program may have a condition expression on its own that needs to be transfered
         // to the current index access path as an additional OTHER expression.
         // We are not changing index here so existing index expression stay as is.
@@ -349,7 +349,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         }
         return VoltDBTableIndexScan.create(
                 getCluster(),
-                getTraitSet(),
+                traitSet,
                 getTable(),
                 getVoltDBTable(),
                 newProgram,
@@ -371,24 +371,16 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
             RexNode offset,
             RexNode limit) {
 
-      // Set collation trait from the index if it's a scannable one
-      RelCollation indexCollation = VoltDBRexUtil.createIndexCollation(index, voltDBTable.getCatTable(),
-              cluster.getRexBuilder(), program);
-      RelTraitSet finalTraitSet = traitSet;
-      if (!RelCollations.EMPTY.equals(indexCollation)) {
-          finalTraitSet = finalTraitSet.replace(indexCollation);
-      }
-
-      return new VoltDBTableIndexScan(
-              cluster,
-              finalTraitSet,
-              table,
-              voltDBTable,
-              program,
-              index,
-              accessPath,
-              offset,
-              limit);
+        return new VoltDBTableIndexScan(
+                cluster,
+                traitSet,
+                table,
+                voltDBTable,
+                program,
+                index,
+                accessPath,
+                offset,
+                limit);
 
     }
 

@@ -89,11 +89,11 @@ public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    public RelNode copyWithLimitOffset(RexNode offset, RexNode limit) {
+    public RelNode copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
         // Do we need a deep copy including the inputs?
         VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
                 getCluster(),
-                getTraitSet(),
+                traitSet,
                 getTable(),
                 m_voltDBTable,
                 m_program,
@@ -103,14 +103,14 @@ public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    protected RelNode copyWithNewProgram(RexProgram newProgram, RexBuilder programRexBuilder) {
+    protected RelNode copyWithNewProgram(RelTraitSet traitSet, RexProgram program, RexBuilder programRexBuilder) {
         // Do we need a deep copy including the inputs?
         VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
                 getCluster(),
-                getTraitSet(),
+                traitSet,
                 getTable(),
                 getVoltDBTable(),
-                newProgram,
+                program,
                 getOffsetRexNode(),
                 getLimitRexNode());
         return newScan;

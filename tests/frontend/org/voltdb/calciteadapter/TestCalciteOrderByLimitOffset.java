@@ -159,7 +159,10 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         String sql;
         sql = "select si from R1 order by i, si desc";
 
-        // comparePlans(sql);
+        // VoltDB plan is Send/Project/Sort/Scan with Project
+        // Calcite plan is Send/Project/Sort/Scan
+        // Project/Sort is cheaper than Project/Sort/Project
+        //comparePlans(sql);
         String expectedCalcitePlan = "{\"PLAN_NODES\":[{\"ID\":1,\"PLAN_NODE_TYPE\":\"SEND\",\"CHILDREN_IDS\":[2]},{\"ID\":2,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"CHILDREN_IDS\":[3],\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":0}}]},{\"ID\":3,\"PLAN_NODE_TYPE\":\"ORDERBY\",\"CHILDREN_IDS\":[4],\"SORT_COLUMNS\":[{\"SORT_EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":1},\"SORT_DIRECTION\":\"ASC\"},{\"SORT_EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":0},\"SORT_DIRECTION\":\"DESC\"}]},{\"ID\":4,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"SI\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":4,\"COLUMN_IDX\":1}},{\"COLUMN_NAME\":\"I\",\"EXPRESSION\":{\"TYPE\":32,\"VALUE_TYPE\":5,\"COLUMN_IDX\":0}}]}],\"TARGET_TABLE_NAME\":\"R1\",\"TARGET_TABLE_ALIAS\":\"R1\"}]}";
         String calcitePlan = testPlan(sql, PlannerType.CALCITE);
         assertEquals(expectedCalcitePlan, calcitePlan);
@@ -257,6 +260,7 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         Map<String, String> ignores = new HashMap<>();
         ignores.put("\"INLINE_NODES\":[{\"ID\":4", "\"INLINE_NODES\":[{\"ID\":3");
         ignores.put("\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\"", "\"ID\":4,\"PLAN_NODE_TYPE\":\"LIMIT\"");
+        ignores.put("\"SORT_DIRECTION\":\"INVALID\"", "\"SORT_DIRECTION\":\"ASC\"");
         comparePlans(sql, ignores);
     }
 
@@ -267,7 +271,10 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         // The index is for SCANNING purpose
         // The only difference is the "SORT_DIRECTION":"INVALID" for Calcite at the moment.
         // Should be ASC (after improved SortMerge Rule)
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"SORT_DIRECTION\":\"INVALID\"", "\"SORT_DIRECTION\":\"ASC\"");
+
+        comparePlans(sql, ignores);
     }
 
     public void testIndexScanWithRedundantOrderBy14() throws Exception {
@@ -275,8 +282,9 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         sql = "select si from RI1 where SI > 3 order by i";
         // ORDER BY is redundant because of the index on (I) columns
         // The index is for sort order only
-        // redundunt predicate
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"LOOKUP_TYPE\":\"EQ\"", "\"LOOKUP_TYPE\":\"GTE\"");
+        comparePlans(sql, ignores);
     }
 
     public void testIndexScanWithRedundantOrderBy15() throws Exception {
@@ -284,8 +292,9 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         sql = "select si, i from RI1 where SI > 3 order by i";
         // ORDER BY is redundant because of the index on (I) columns
         // The index is for sort order only
-        // redundunt predicate
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"LOOKUP_TYPE\":\"EQ\"", "\"LOOKUP_TYPE\":\"GTE\"");
+        comparePlans(sql, ignores);
     }
 
     public void testIndexScanWithRedundantOrderBy20() throws Exception {
@@ -294,7 +303,10 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         // ORDER BY is redundant because of the index on (BI, SI) columns
         // The only difference is the "SORT_DIRECTION":"INVALID" for Calcite at the moment.
         // Should be ASC (after improved SortMerge Rule)
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"SORT_DIRECTION\":\"INVALID\"", "\"SORT_DIRECTION\":\"ASC\"");
+
+        comparePlans(sql, ignores);
     }
 
     public void testIndexScanWithRedundantOrderBy30() throws Exception {
@@ -303,7 +315,11 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         // ORDER BY is redundant because of the index on (BI, SI) columns
         // The only difference is the "SORT_DIRECTION":"INVALID" for Calcite at the moment.
         // Should be ASC (after improved SortMerge Rule)
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"SORT_DIRECTION\":\"INVALID\"", "\"SORT_DIRECTION\":\"ASC\"");
+        // double index scan predicate BI > 3 && BI > 3
+        // result of the CalcIndexScanMerge
+        comparePlans(sql, ignores);
     }
 
     public void testIndexScanWithRedundantOrderBy40() throws Exception {
@@ -327,18 +343,27 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
     public void testIndexReversedScan() throws Exception {
         String sql;
         sql = "select si, i from RI1 order by bi desc , si desc";
-        comparePlans(sql);
+
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"LOOKUP_TYPE\":\"EQ\"", "\"LOOKUP_TYPE\":\"GTE\"");
+
+        comparePlans(sql, ignores);
     }
 
     public void testIndexReversedScan10() throws Exception {
         String sql;
         sql = "select si, i from RI1 where bi > 3 order by bi desc , si desc";
-        comparePlans(sql);
+
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"LOOKUP_TYPE\":\"EQ\"", "\"LOOKUP_TYPE\":\"GTE\"");
+        // redundant predicate
+        comparePlans(sql, ignores);
     }
 
     public void testExpressionIndexScanWithOrder() throws Exception {
         String sql;
         sql = "select ii from RI4 where i + ii = 3 order by i + ii";
+        // Expression Index collation is not calculated properly
         comparePlans(sql);
         // Order BY is redundant INDEX RI4_IND3 ON RI4 (i + ii);
         String expectedCalcitePlan = "";

@@ -74,7 +74,9 @@ public class TestCalciteIndexScan extends TestCalciteBase {
     public void testIndexScan1() throws Exception {
         String sql;
         sql = "select * from RI2 where i > 5";
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"SORT_DIRECTION\":\"ASC\"", "\"SORT_DIRECTION\":\"INVALID\"");
+        comparePlans(sql, ignores);
     }
 
     public void testIndexScan2() throws Exception {

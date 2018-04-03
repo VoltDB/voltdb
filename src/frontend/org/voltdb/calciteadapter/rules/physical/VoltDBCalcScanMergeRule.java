@@ -19,6 +19,7 @@ package org.voltdb.calciteadapter.rules.physical;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPhysicalTableScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBCalc;
@@ -45,7 +46,9 @@ public class VoltDBCalcScanMergeRule extends RelOptRule {
         VoltDBCalc calc= call.rel(0);
         AbstractVoltDBPhysicalTableScan scan = call.rel(1);
 
-        RelNode newScan = scan.copy(calc.getProgram(), calc.getCluster().getRexBuilder());
+        // Merge trait sets to make sure we are not loosing any required traits if any
+        RelTraitSet mergedTraitSet = scan.getTraitSet().merge(calc.getTraitSet());
+        RelNode newScan = scan.copy(mergedTraitSet, calc.getProgram(), calc.getCluster().getRexBuilder());
         call.transformTo(newScan);
     }
 

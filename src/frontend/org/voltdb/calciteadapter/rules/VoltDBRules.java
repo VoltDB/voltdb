@@ -74,7 +74,7 @@ public class VoltDBRules {
             , VoltDBCalcScanToIndexRule.INSTANCE
             , VoltDBSortCalcTransposeRule.INSTANCE
             , VoltDBSortIndexScanRemoveRule.INSTANCE
-            , VoltDBCalcMergeRule.INSTANCE
+//            , VoltDBCalcMergeRule.INSTANCE
 
             // VoltDB Physical Conversion Rules
             , VoltDBPhysicalCalcRule.INSTANCE

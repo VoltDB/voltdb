@@ -58,7 +58,8 @@ public class VoltDBSortIndexScanRemoveRule extends RelOptRule {
 
             VoltDBTableIndexScan newScan = VoltDBTableIndexScan.create(
                     scan.getCluster(),
-                    scan.getTraitSet(), //.replace(sortCollation),
+                    // IndexScan already have a collation trait, so replace it
+                    scan.getTraitSet().replace(sortCollation),
                     scan.getTable(),
                     scan.getVoltDBTable(),
                     scan.getProgram(),
