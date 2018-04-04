@@ -208,8 +208,7 @@ public:
         // Add the engine to the global list tracking replicated tables
         setLowestSiteForTest();
         ThreadLocalPool::setPartitionIds(getPartitionId());
-        VOLT_DEBUG("Initializing partition %d (tid %ld) with context %p", m_partitionId,
-                SynchronizedThreadLock::getThreadId(), m_context);
+        VOLT_DEBUG("Initializing context %p", m_context.get());
         EngineLocals newLocals = EngineLocals(ExecutorContext::getExecutorContext());
         SynchronizedThreadLock::init(1, newLocals);
     }
