@@ -21,11 +21,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -128,23 +124,6 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
 
     public AccessPath getAccessPath() {
         return m_accessPath;
-    }
-
-    public RelCollation getCollation() {
-        // @TODO if we can get collations from the RelMetadataQuery then we don't need to
-        // make Sort and Scan to be next to each other (I think)
-        // final RelMetadataQuery mq = call.getMetadataQuery();
-        //mq.collations(scan);
-        RelTrait collationTrait = getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
-        if (collationTrait instanceof RelCollation) {
-            return (RelCollation) collationTrait;
-        } else {
-            return RelCollations.EMPTY;
-        }
-    }
-
-    public void setCollation(RelCollation newCollation) {
-        traitSet = getTraitSet().replace(newCollation);
     }
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
