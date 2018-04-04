@@ -354,7 +354,7 @@ public:
         int32_t stringLength = static_cast<int32_t>(length);
         assureExpand(length + sizeof(stringLength));
 
-        // do a newtork order conversion
+        // do a network order conversion
         int32_t networkOrderLen = htonl(stringLength);
 
         char* current = buffer_ + position_;

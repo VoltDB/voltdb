@@ -109,6 +109,7 @@
 #include "common/SegvException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/ElasticHashinator.h"
+#include "common/ThreadLocalPool.h"
 #include "storage/DRTupleStream.h"
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
@@ -261,6 +262,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint clusterIndex,
     jlong siteId,
     jint partitionId,
+    jint sitesPerHost,
     jint hostId,
     jbyteArray hostname,
     jint drClusterId,
@@ -288,6 +290,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         engine->initialize(clusterIndex,
                            siteId,
                            partitionId,
+                           sitesPerHost,
                            hostId,
                            hostString,
                            drClusterId,
@@ -417,22 +420,21 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     }
 
     engine->resetReusedResultOutputBuffer();
-    engine->setUndoToken(undoToken);
 
     //JNIEnv pointer can change between calls, must be updated
     updateJNILogProxy(engine);
-    VOLT_DEBUG("loading table %d in C++...", table_id);
+    VOLT_DEBUG("loading table %d in C++ on thread %d", table_id, ThreadLocalPool::getThreadPartitionId());
 
     // deserialize dependency.
     jsize length = env->GetArrayLength(serialized_table);
-    VOLT_DEBUG("deserializing %d bytes ...", (int) length);
+    VOLT_DEBUG("deserializing %d bytes on thread %d", (int) length, ThreadLocalPool::getThreadPartitionId());
     jbyte *bytes = env->GetByteArrayElements(serialized_table, NULL);
     ReferenceSerializeInputBE serialize_in(bytes, length);
     try {
         try {
             bool success = engine->loadTable(table_id, serialize_in, txnId,
                                              spHandle, lastCommittedSpHandle, uniqueId,
-                                             returnUniqueViolations, shouldDRStream);
+                                             returnUniqueViolations, shouldDRStream, undoToken);
             env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized table");
 
@@ -1376,7 +1378,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
 SHAREDLIB_JNIEXPORT jlong JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeApplyBinaryLog (
     JNIEnv *env, jobject obj, jlong engine_ptr,
-    jlong txnId, jlong spHandle, jlong lastCommittedSpHandle, jlong uniqueId, jint remoteClusterId, jlong undoToken)
+    jlong txnId, jlong spHandle, jlong lastCommittedSpHandle, jlong uniqueId, jint remoteClusterId, jint remotePartitionId, jlong undoToken)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -1391,7 +1393,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeApplyBinaryLog (
     VOLT_DEBUG("applying binary log in C++...");
 
     try {
-        return engine->applyBinaryLog(txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken,
+        return engine->applyBinaryLog(txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, remotePartitionId, undoToken,
                                engine->getParameterBuffer() + sizeof(int64_t));
     } catch (const SerializableEEException &e) {
         engine->resetReusedResultOutputBuffer();

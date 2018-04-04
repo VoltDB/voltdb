@@ -66,6 +66,7 @@
 #include <unistd.h>
 #include <memory>
 #include "harness.h"
+#include "common/FatalException.hpp"
 #include "common/SerializableEEException.h"
 
 using std::string;

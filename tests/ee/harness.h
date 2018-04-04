@@ -115,6 +115,9 @@ public:
             suite->registerTest(&RegisterTest<T>::create);
     }
 
+    ~RegisterTest() {
+    }
+
     static Test* create() {
         return new T();
     }
@@ -193,7 +196,7 @@ do { \
         STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
         fail(__FILE__, __LINE__, #one " " #operation " " #two); \
     } \
-} while (0)
+} while (false)
 
 #define EXPECT_EQ(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(==, one, two)
 #define EXPECT_NE(one, two) STUPIDUNIT_MAKE_EXPECT_MACRO(!=, one, two)

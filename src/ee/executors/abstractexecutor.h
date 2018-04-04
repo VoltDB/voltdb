@@ -52,6 +52,7 @@
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/AbstractTempTable.hpp"
+#include "common/SynchronizedThreadLock.h"
 
 #include <cassert>
 #include <vector>
@@ -109,6 +110,10 @@ class AbstractExecutor {
         return true;
     }
 
+    inline void disableReplicatedFlag() {
+        m_replicatedTableOperation = false;
+    }
+
     // Compares two tuples based on the provided sets of expressions and sort directions
     struct TupleComparer
     {
@@ -131,6 +136,7 @@ class AbstractExecutor {
         m_abstractNode = abstractNode;
         m_tmpOutputTable = NULL;
         m_engine = engine;
+        m_replicatedTableOperation = false;
     }
 
     /** Concrete executor classes implement initialization in p_init() */
@@ -159,6 +165,8 @@ class AbstractExecutor {
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
 
+    /** when true, indicates that we should use the SynchronizedThreadLock for any OperationNode */
+    bool m_replicatedTableOperation;
 };
 
 

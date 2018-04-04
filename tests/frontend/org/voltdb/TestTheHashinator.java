@@ -231,6 +231,7 @@ public class TestTheHashinator {
                         1,
                         1,
                         0,
+                        1,
                         0,
                         "",
                         0,
@@ -266,6 +267,7 @@ public class TestTheHashinator {
                         1,
                         1,
                         0,
+                        partitionCount,
                         0,
                         "",
                         0,
@@ -340,6 +342,7 @@ public class TestTheHashinator {
                             1,
                             1,
                             0,
+                            partitionCount,
                             0,
                             "",
                             0,
@@ -387,6 +390,7 @@ public class TestTheHashinator {
                         1,
                         1,
                         0,
+                        1,
                         0,
                         "",
                         0,
@@ -426,7 +430,7 @@ public class TestTheHashinator {
     @Test
     public void testSameLongHash() throws Exception {
         byte configBytes[] = TheHashinator.getConfigureBytes(1);
-        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 0, 64*1024, 100, new HashinatorConfig(configBytes, 0, 0), false);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, -1, 0, "", 0, 64*1024, 100, new HashinatorConfig(configBytes, 0, 0), false);
 
         /**
          *  Run with 10k of random values and make sure C++ and Java hash to
@@ -462,6 +466,7 @@ public class TestTheHashinator {
                         1,
                         1,
                         0,
+                        1,
                         0,
                         "",
                         0,
@@ -533,6 +538,7 @@ public class TestTheHashinator {
                         1,
                         1,
                         0,
+                        2,
                         0,
                         "",
                         0,
@@ -599,6 +605,7 @@ public class TestTheHashinator {
                         1,
                         1,
                         0,
+                        6,
                         0,
                         "",
                         0,

@@ -18,11 +18,11 @@
 #ifndef DRTUPLESTREAMUNDOACTION_H
 #define DRTUPLESTREAMUNDOACTION_H
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 
 namespace voltdb {
 
-class DRTupleStreamUndoAction : public voltdb::UndoAction {
+class DRTupleStreamUndoAction : public UndoOnlyAction {
 public:
 DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
     : m_stream(stream), m_mark(mark), m_cost(cost)
@@ -33,9 +33,6 @@ DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
         if (m_stream) {
             m_stream->rollbackTo(m_mark, m_cost);
         }
-    }
-
-    void release() {
     }
 
 private:

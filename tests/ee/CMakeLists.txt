@@ -54,6 +54,7 @@ BANNER("Configuring the VoltDB Execution Engine Unit Tests."
        "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
        "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
        "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
+       "VOLT_POOL_CHECKING:     ${VOLT_POOL_CHECKING}"
    )
 
 ########################################################################
@@ -89,6 +90,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   common/nvalue_test
   common/LargeTempTableBlockIdTest
   common/PerFragmentStatsTest
+  common/PoolCheckingTest
   common/pool_test
   common/serializeio_test
   common/tabletuple_test
@@ -100,6 +102,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   execution/add_drop_table
   execution/engine_test
   execution/FragmentManagerTest
+  executors/CommonTableExpressionTest
   executors/MergeReceiveExecutorTest
   executors/OptimizedProjectorTest
   expressions/expression_test

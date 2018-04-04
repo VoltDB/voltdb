@@ -70,7 +70,7 @@ public:
     }
 
     /// Constructs a value copied into temporary thread-local storage.
-    static NValue getTempStringValue(const std::string value) {
+    static NValue getTempStringValue(const std::string& value) {
         return NValue::getTempStringValue(value.c_str(), value.length());
     }
 

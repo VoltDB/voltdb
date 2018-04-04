@@ -22,7 +22,7 @@
 namespace voltdb {
 
 UndoLog::UndoLog()
-  : m_lastUndoToken(INT64_MIN), m_lastReleaseToken(INT64_MIN)
+  : m_lastUndoToken(INT64_MIN), m_lastReleaseToken(INT64_MIN), m_undoLogForLowestSite(false)
 {
 }
 

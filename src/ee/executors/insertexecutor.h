@@ -48,6 +48,7 @@
 
 #include "common/Pool.hpp"
 #include "common/common.h"
+#include "common/SerializableEEException.h"
 #include "common/tabletuple.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
@@ -87,7 +88,7 @@ class InsertExecutor : public AbstractExecutor
             }
 
     /**
-     * Return true iff all the work is done in init.  Inserting
+     * Return false iff all the work is done in init.  Inserting
      * a replicated table into an export table with no partition
      * column is done only on one site.  The rest of the sites
      * don't have any work to do.
@@ -142,6 +143,20 @@ class InsertExecutor : public AbstractExecutor
      */
     void executePurgeFragmentIfNeeded(PersistentTable** table);
 
+    /**
+     * Return false iff all the work is done in init.  Inserting
+     * a replicated table into an export table with no partition
+     * column is done only on one site.  The rest of the sites
+     * don't have any work to do.
+     */
+    bool p_execute_init_internal(const TupleSchema *inputSchema,
+                                 AbstractTempTable *newOutputTable,
+                                 TableTuple &temp_tuple);
+    /**
+     * Insert a row into the target table and then count it.
+     */
+    void p_execute_tuple_internal(TableTuple &tuple);
+
     /** A tuple with the target table's schema that is populated
      * with default values for each field. */
     StandAloneTupleStorage m_templateTupleStorage;
@@ -159,7 +174,8 @@ class InsertExecutor : public AbstractExecutor
      * But they are shared between p_execute and p_execute_init.
      */
     Table* m_targetTable;
-    int m_modifiedTuples;
+    int64_t m_modifiedTuples;
+    static int64_t s_modifiedTuples;
     TableTuple m_count_tuple;
     PersistentTable* m_persistentTable;
     TableTuple m_upsertTuple;
