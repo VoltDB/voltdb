@@ -317,8 +317,6 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
         // Should be ASC (after improved SortMerge Rule)
         Map<String, String> ignores = new HashMap<>();
         ignores.put("\"SORT_DIRECTION\":\"INVALID\"", "\"SORT_DIRECTION\":\"ASC\"");
-        // double index scan predicate BI > 3 && BI > 3
-        // result of the CalcIndexScanMerge
         comparePlans(sql, ignores);
     }
 

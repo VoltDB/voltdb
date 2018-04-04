@@ -35,7 +35,6 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
-import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
@@ -159,31 +158,9 @@ public abstract class AbstractVoltDBPhysicalTableScan extends AbstractVoltDBTabl
         }
     }
 
-    public RelNode copy(RelTraitSet traitSet, RexNode offset, RexNode limit) {
-        return copyWithLimitOffset(traitSet, offset, limit);
-    }
+    public abstract RelNode copy(RelTraitSet traitSet, RexNode offset, RexNode limit);
 
-    public RelNode copy(RelTraitSet traitSet, RexProgram program, RexBuilder rexBuilder) {
-        RexProgram newProgram;
-        if (m_program == null) {
-            newProgram = program;
-        } else {
-            // Merge two programs program / m_program into a new merged program
-            newProgram = RexProgramBuilder.mergePrograms(
-                            program,
-                            m_program,
-                            rexBuilder);
-            assert(newProgram.getOutputRowType().equals(program.getOutputRowType()));
-        }
-        // Merging existing and new program doubles the index scan predicate if it exists
-        // the predicate is already part of the the acceesPath.other expressions but
-        // copyWithNewProgram will add it again
-        return copyWithNewProgram(traitSet, newProgram, rexBuilder);
-    }
-
-    protected abstract RelNode copyWithNewProgram(RelTraitSet traitSet, RexProgram newProgram, RexBuilder programRexBuilder);
-
-    protected abstract RelNode copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit);
+    public abstract RelNode copy(RelTraitSet traitSet, RexProgram program, RexBuilder rexBuilder);
 
     protected void addPredicate(AbstractScanPlanNode scan) {
         RexLocalRef condition = m_program.getCondition();

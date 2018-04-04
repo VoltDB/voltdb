@@ -29,6 +29,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -89,7 +90,7 @@ public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    public RelNode copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
+    public RelNode copy(RelTraitSet traitSet, RexNode offset, RexNode limit) {
         // Do we need a deep copy including the inputs?
         VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
                 getCluster(),
@@ -103,14 +104,19 @@ public class VoltDBTableSeqScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    protected RelNode copyWithNewProgram(RelTraitSet traitSet, RexProgram program, RexBuilder programRexBuilder) {
-        // Do we need a deep copy including the inputs?
+    public RelNode copy(RelTraitSet traitSet, RexProgram newProgram, RexBuilder programRexBuilder) {
+        // Merge two programs program / m_program into a new merged program
+        RexProgram mergedProgram = RexProgramBuilder.mergePrograms(
+                newProgram,
+                m_program,
+                programRexBuilder);
+
         VoltDBTableSeqScan newScan = new VoltDBTableSeqScan(
                 getCluster(),
                 traitSet,
                 getTable(),
                 getVoltDBTable(),
-                program,
+                mergedProgram,
                 getOffsetRexNode(),
                 getLimitRexNode());
         return newScan;

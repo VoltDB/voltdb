@@ -30,7 +30,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
@@ -115,9 +114,9 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
         addLimitOffset(ispn);
         // Set projection
         addProjection(ispn);
-        // Set predicate - not required here since program's conditions should be already
-        // converted to accessPath.OTHER
-        addPredicate(ispn);
+        // No need to set Index's predicate from its program condition.
+        // It will be set from accessPath.OTHER expressions instead
+        // addPredicate(ispn);
 
         // At the moment this will override the predicate set by the addPredicate call
         return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath);
@@ -312,7 +311,7 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    public  RelNode copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
+    public  RelNode copy(RelTraitSet traitSet, RexNode offset, RexNode limit) {
         // Do we need a deep copy including the inputs?
         return VoltDBTableIndexScan.create(
                 getCluster(),
@@ -327,32 +326,26 @@ public class VoltDBTableIndexScan extends AbstractVoltDBPhysicalTableScan {
     }
 
     @Override
-    protected RelNode copyWithNewProgram(RelTraitSet traitSet, RexProgram newProgram, RexBuilder rexBuilder) {
-        // A new program may have a condition expression on its own that needs to be transfered
-        // to the current index access path as an additional OTHER expression.
-        // We are not changing index here so existing index expression stay as is.
-        // This is a result of keeping the expression in the program and access path
-        RexLocalRef newCondition = newProgram.getCondition();
+    public RelNode copy(RelTraitSet traitSet, RexProgram newProgram, RexBuilder rexBuilder) {
+        // Merge two programs program / m_program into a new merged program
+        RexProgram mergedProgram = RexProgramBuilder.mergePrograms(
+                newProgram,
+                m_program,
+                rexBuilder);
+        // If a new program has a condition the condition needs to be added to the index's accessParh
+        // as an OTHER expression to contribute to the Index Scan predicate.
+        RexNode newCondition = newProgram.getCondition();
         if (newCondition != null) {
             AbstractExpression expr = RexConverter.convertRefExpression(newCondition, newProgram);
             m_accessPath.getOtherExprs().add(expr);
-            // Need a new program without the condition
-            newProgram = RexProgramBuilder.create(
-                    rexBuilder,
-                    newProgram.getInputRowType(),
-                    newProgram.getExprList(),
-                    newProgram.getProjectList(),
-                    null,
-                    newProgram.getOutputRowType(),
-                    false,
-                    null).getProgram(); //RexSimplify can be null
         }
+
         return VoltDBTableIndexScan.create(
                 getCluster(),
                 traitSet,
                 getTable(),
                 getVoltDBTable(),
-                newProgram,
+                mergedProgram,
                 getIndex(),
                 getAccessPath(),
                 getOffsetRexNode(),
