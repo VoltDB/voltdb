@@ -354,7 +354,8 @@ public class TestCalciteOrderByLimitOffset extends TestCalciteBase {
 
         Map<String, String> ignores = new HashMap<>();
         ignores.put("\"LOOKUP_TYPE\":\"EQ\"", "\"LOOKUP_TYPE\":\"GTE\"");
-        // redundant predicate
+        // missing index end expression because it's not set for accessPath - the path sort direction
+        // is UNKNOWN at that time CalCSeqScanMerge - sort is nowhere (not even in trait set)
         comparePlans(sql, ignores);
     }
 
