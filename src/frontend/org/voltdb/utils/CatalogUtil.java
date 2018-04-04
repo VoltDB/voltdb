@@ -3020,4 +3020,14 @@ public abstract class CatalogUtil {
     public static boolean isProcedurePartitioned(Procedure proc) {
         return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
     }
+
+    public static NavigableSet<Table> getTimeToLiveTables(Database db) {
+        ImmutableSortedSet.Builder<Table> ttlTables = ImmutableSortedSet.naturalOrder();
+        for (Table t : db.getTables()) {
+            if (t.getTimetolive() != null) {
+                ttlTables.add(t);
+            }
+        }
+        return ttlTables.build();
+    }
 }

@@ -367,6 +367,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private int m_maxThreadsCount;
 
+    private TimeToLiveProcessor m_timeToLiveProcessor;
+
     @Override
     public boolean isRunningWithOldVerbs() {
         return m_isRunningWithOldVerb;
@@ -1706,6 +1708,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // let the client interface know host(s) have failed to clean up any outstanding work
                     // especially non-transactional work
                     m_clientInterface.handleFailedHosts(failedHosts);
+                    m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
                 }
             });
         }
@@ -3436,6 +3439,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 PartitionDRGateway.m_partitionDRGateways = ImmutableMap.of();
 
+                if (m_timeToLiveProcessor != null) {
+                    m_timeToLiveProcessor.shutDown();
+                }
+
                 // probably unnecessary, but for tests it's nice because it
                 // will do the memory checking and run finalizers
                 System.gc();
@@ -4065,6 +4072,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
+        m_timeToLiveProcessor = new TimeToLiveProcessor(m_myHostId, m_messenger, m_clientInterface);
+        m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
+
         hostLog.info("Logging host rejoin completion to ZK");
         m_statusTracker.setNodeState(NodeState.UP);
         Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
@@ -4276,6 +4286,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+        m_timeToLiveProcessor = new TimeToLiveProcessor(m_myHostId, m_messenger, m_clientInterface);
+        m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
     }
 
     private void databaseIsRunning() {

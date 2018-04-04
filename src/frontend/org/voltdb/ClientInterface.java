@@ -2302,4 +2302,41 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
     }
+
+    public void runTimeToLive(String tableName, String columnName, int ttlValue, int chunkSize, int timeout) {
+        try {
+            SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
+            final String procedureName = "@LowImpactDelete";
+            Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
+            Procedure proc = procedureConfig.asCatalogProcedure();
+            StoredProcedureInvocation spi = new StoredProcedureInvocation();
+            spi.setProcName(procedureName);
+            spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
+            spi.setParams(tableName, columnName, ttlValue, "<", chunkSize, timeout);
+            if (spi.getSerializedParams() == null) {
+                spi = MiscUtils.roundTripForCL(spi);
+            }
+
+            synchronized (m_executeTaskAdpater) {
+                createTransaction(m_executeTaskAdpater.connectionId(),
+                        spi,
+                        proc.getReadonly(),
+                        proc.getSinglepartition(),
+                        proc.getEverysite(),
+                        -1,
+                        spi.getSerializedSize(),
+                        System.nanoTime());
+            }
+
+            final long timeoutMS = 5 * 60 * 1000;
+            ClientResponse resp= cb.getResponse(timeoutMS);
+            if (resp.getStatus() != ClientResponse.SUCCESS) {
+                hostLog.warn(String.format("Fail to execute @LowImpactDelete on table:%s, column:%s, status:%",
+                        tableName, columnName, resp.getStatusString()));
+            }
+        } catch (IOException | InterruptedException e) {
+            hostLog.warn(String.format("Fail to execute @LowImpactDelete on table:%s, column:%s, status:%",
+                    tableName, columnName, e.getMessage()));
+        }
+    }
 }
