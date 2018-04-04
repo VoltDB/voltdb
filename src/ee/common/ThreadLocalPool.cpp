@@ -611,7 +611,7 @@ int32_t ThreadLocalPool::getEnginePartitionId() {
     return partitionId;
 }
 
-int32_t ThreadLocalPool::debugGetThreadPartitionId() {
+int32_t ThreadLocalPool::getThreadPartitionIdWithNullCheck() {
     int32_t *ptrToPartitionId = static_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
     if (ptrToPartitionId == NULL) {
         return -1;
@@ -620,7 +620,7 @@ int32_t ThreadLocalPool::debugGetThreadPartitionId() {
     return *ptrToPartitionId;
 }
 
-int32_t ThreadLocalPool::debugGetEnginePartitionId() {
+int32_t ThreadLocalPool::getEnginePartitionIdWithNullCheck() {
     int32_t *ptrToPartitionId = static_cast< int32_t* >(pthread_getspecific(m_enginePartitionIdKey));
     if (ptrToPartitionId == NULL) {
         return -1;

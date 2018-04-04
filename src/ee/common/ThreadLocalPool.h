@@ -143,7 +143,7 @@ public:
      * @return The partition id of the working thread.
      */
     static int32_t getThreadPartitionId();
-    static int32_t debugGetThreadPartitionId();
+    static int32_t getThreadPartitionIdWithNullCheck();
     /**
      * Get the partion id of the thread on whose behalf this thread is
      * working.  Generally this is the same as the value of getThreadPartitionId.
@@ -154,7 +154,7 @@ public:
      * @return The partition id of the free rider thread.
      */
     static int32_t getEnginePartitionId();
-    static int32_t debugGetEnginePartitionId();
+    static int32_t getEnginePartitionIdWithNullCheck();
 
     /**
      * Allocate space from a page of objects of approximately the requested

@@ -450,7 +450,6 @@ public:
         delete m_otherTableWithIndex;
         delete m_otherTableWithoutIndex;
         delete m_engine;
-        delete ThreadLocalPool::getThreadPartitionIdForTest();
 
         ClusterCtx cc = s_clusterMap[CLUSTER_ID_REPLICA];
         ThreadLocalPool::setThreadPartitionIdForTest(cc.getThreadPartitionId());
@@ -460,7 +459,6 @@ public:
         delete m_otherTableWithIndexReplica;
         delete m_otherTableWithoutIndexReplica;
         delete m_engineReplica;
-        delete ThreadLocalPool::getThreadPartitionIdForTest();
 
         s_clusterMap.clear();
         SynchronizedThreadLock::resetEngineLocalsForTest();

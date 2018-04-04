@@ -31,8 +31,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level) {
     tm *curTime = localtime(&t);
     char time_str[32]; // FIXME
     ::strftime(time_str, 32, VOLT_LOG_TIME_FORMAT, curTime);
-    const int32_t tPartId = ThreadLocalPool::debugGetThreadPartitionId();
-    const int32_t ePartId = ThreadLocalPool::debugGetEnginePartitionId();
+    const int32_t tPartId = ThreadLocalPool::getThreadPartitionIdWithNullCheck();
+    const int32_t ePartId = ThreadLocalPool::getEnginePartitionIdWithNullCheck();
     const char* type;
     switch (level) {
         case VOLT_LEVEL_ERROR:
