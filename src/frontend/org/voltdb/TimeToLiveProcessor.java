@@ -68,15 +68,19 @@ public class TimeToLiveProcessor {
         final int chunkSize = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
         final int timeout = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
 
+        String info = "TTL task is started for table %s, column %s";
         for (Table t : ttlTables) {
-            TimeToLive ttl = t.getTimetolive().add("ttl");
+            TimeToLive ttl = t.getTimetolive().get("ttl");
+            if (ttl == null) {
+                continue;
+            }
             m_timeToLiveExecutor.scheduleAtFixedRate(
                     () -> {m_interface.runTimeToLive(
                             t.getTypeName(), ttl.getTtlcolumn().getName(), ttl.getTtlvalue(), chunkSize, timeout);},
                     delay, ttl.getTtlvalue(), getTimeUnit(ttl.getTtlunit()));
 
+            hostLog.info(String.format(info, t.getTypeName(), ttl.getTtlcolumn().getName()));
         }
-        hostLog.info("Time to live task is started.");
     }
 
     public void shutDown() {

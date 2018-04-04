@@ -3753,6 +3753,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (m_snmp != null) {
                     m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
                 }
+
+                if (m_timeToLiveProcessor != null) {
+                    m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
+                }
                 // restart resource usage monitoring task
                 startHealthMonitor();
 
