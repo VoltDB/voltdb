@@ -33,7 +33,6 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.apache.calcite.sql.SqlKind;
-import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.types.IndexType;
@@ -186,24 +185,23 @@ public class VoltDBRexUtil {
      *  - both collations are not empty
      *  - the collation direction is the same for all fields for each collation
      *  - all fields from the sort collation have matching fields from the index collation
-     * If collations are compatible return a pair containing the sort direction (ASC, DESC) and
-     * the boolean indicating whether the index direction needs to be reversed or not.
+     * If collations are compatible return the sort direction (ASC, DESC).
      *
      * If collations are not compatible the returned sort direction is INVALID.
      *
      * @param sortCollation
      * @param indexCollation
-     * @return Pair<SortDirectionType, Boolean>
+     * @return SortDirectionType
      */
-    public static Pair<SortDirectionType, Boolean> areCollationsCompartible(RelCollation sortCollation, RelCollation indexCollation) {
+    public static SortDirectionType areCollationsCompartible(RelCollation sortCollation, RelCollation indexCollation) {
         if (sortCollation == RelCollations.EMPTY || indexCollation == RelCollations.EMPTY) {
-            return Pair.of(SortDirectionType.INVALID, false);
+            return SortDirectionType.INVALID;
         }
 
         List<RelFieldCollation> collationFields1 = sortCollation.getFieldCollations();
         List<RelFieldCollation> collationFields2 = indexCollation.getFieldCollations();
         if (collationFields2.size() < collationFields1.size()) {
-            return Pair.of(SortDirectionType.INVALID, false);
+            return SortDirectionType.INVALID;
         }
         assert(collationFields1.size() > 0);
         RelFieldCollation.Direction collationDirection1 = collationFields1.get(0).getDirection();
@@ -216,14 +214,13 @@ public class VoltDBRexUtil {
             if (fieldCollation1.direction != collationDirection1 ||
                     fieldCollation2.direction != collationDirection2 ||
                     fieldCollation1.getFieldIndex() != fieldCollation2.getFieldIndex()) {
-                return Pair.of(SortDirectionType.INVALID, false);
+                return SortDirectionType.INVALID;
             }
         }
         SortDirectionType sortDirection =
                 (Direction.ASCENDING == collationDirection1 || Direction.STRICTLY_ASCENDING == collationDirection1) ?
                 SortDirectionType.ASC : SortDirectionType.DESC;
-        boolean needReverseCollation = collationDirection1 != collationDirection2;
-        return Pair.of(sortDirection, needReverseCollation);
+        return sortDirection;
     }
 
     /**

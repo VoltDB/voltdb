@@ -22,7 +22,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexProgram;
-import org.voltcore.utils.Pair;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.calciteadapter.rel.physical.VoltDBSort;
 import org.voltdb.calciteadapter.rel.physical.VoltDBTableIndexScan;
@@ -76,17 +75,17 @@ public class VoltDBSortScanToIndexRule extends RelOptRule {
             }
             RelCollation indexCollation =
                     VoltDBRexUtil.createIndexCollation(index, catTable, builder, program);
-            Pair<SortDirectionType, Boolean> collationsCompatibility =
+            SortDirectionType sortDirection =
                     VoltDBRexUtil.areCollationsCompartible(sortCollation, indexCollation);
             //@TODO Cutting corner here. Should probably use something similar to
             // the SubPlanAssembler.WindowFunctionScoreboard
-            if (SortDirectionType.INVALID != collationsCompatibility.getFirst()) {
+            if (SortDirectionType.INVALID != sortDirection) {
                 AccessPath accessPath = new AccessPath(
                         index,
                         // With no index expression, the lookup type will be ignored and
                         // the sort direction will determine the scan direction;
                         IndexLookupType.EQ,
-                        collationsCompatibility.getFirst(),
+                        sortDirection,
                         true);
                 VoltDBTableIndexScan indexScan = VoltDBTableIndexScan.create(
                         scan.getCluster(),

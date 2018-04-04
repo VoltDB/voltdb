@@ -22,7 +22,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rex.RexProgram;
-import org.voltcore.utils.Pair;
 import org.voltdb.calciteadapter.rel.physical.VoltDBSort;
 import org.voltdb.calciteadapter.rel.physical.VoltDBTableIndexScan;
 import org.voltdb.calciteadapter.util.VoltDBRexUtil;
@@ -48,13 +47,13 @@ public class VoltDBSortIndexScanRemoveRule extends RelOptRule {
         assert(program != null);
 
         RelCollation indexCollation = scan.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
-        Pair<SortDirectionType, Boolean> collationsCompatibility =
+        SortDirectionType sortDirection =
                  VoltDBRexUtil.areCollationsCompartible(sortCollation, indexCollation);
 
-        if (SortDirectionType.INVALID != collationsCompatibility.getFirst()) {
+        if (SortDirectionType.INVALID != sortDirection) {
             // Update scan's sort direction
             AccessPath accessPath = scan.getAccessPath();
-            accessPath.setSortDirection(collationsCompatibility.getFirst());
+            accessPath.setSortDirection(sortDirection);
 
             VoltDBTableIndexScan newScan = VoltDBTableIndexScan.create(
                     scan.getCluster(),
