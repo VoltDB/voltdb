@@ -48,6 +48,7 @@ import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
+import com.google.common.primitives.Longs;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.util.concurrent.Callables;
@@ -80,7 +81,7 @@ public class TestStreamSnapshotDataTarget {
 
         m_schemas = Maps.newHashMap();
         for (int i = 0; i < 20; i++) {
-            m_schemas.put(i, Pair.of(false, Ints.toByteArray(i)));
+            m_schemas.put(i, Pair.of(new Boolean(false), Ints.toByteArray(i)));
         }
     }
 
