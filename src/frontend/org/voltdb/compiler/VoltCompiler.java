@@ -937,7 +937,6 @@ public class VoltCompiler {
             }
             compileDatabaseNode(cannonicalDDLIfAny, previousDBIfAny, ddlReaderList, jarOutput);
         } catch (final VoltCompilerException e) {
-           e.printStackTrace();
             return null;
         }
 

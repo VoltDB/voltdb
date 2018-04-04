@@ -165,7 +165,7 @@ begin Table                                  "A table (relation) in the database
   int tuplelimit                             "A maximum number of rows in a table"
   bool isDRed                                "Is this table DRed?"
   Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
-  TimeToLive? timeToLive                     "Time to live"
+  TimeToLive* timeToLive                     "Time to live"
 end
 
 begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"

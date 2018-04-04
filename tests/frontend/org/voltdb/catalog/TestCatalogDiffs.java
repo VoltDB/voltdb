@@ -764,11 +764,16 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL1.jar"));
         Catalog catOriginal = catalogForJar(testDir + File.separator + "testAlterTableTTL1.jar");
 
-        // add an index
+        // alter TTL
         builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTE ON COLUMN C2;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAlterTableTTL2.jar");
         verifyDiff(catOriginal, catUpdated, false, null, true, false, true);
+
+        builder.addLiteralSchema("\nALTER TABLE A DROP TTL;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
+        Catalog catTTlDropped = catalogForJar(testDir + File.separator + "testAlterTableTTL3.jar");
+        verifyDiff(catUpdated, catTTlDropped, false, null, true, false, true);
     }
 
     public void testAddUniqueNonCoveringTableIndexRejectedIfNotEmpty() throws IOException {

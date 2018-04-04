@@ -980,7 +980,10 @@ public class ParserDDL extends ParserRoutine {
                 return compileAlterColumn(t, column, columnIndex);
             }
             case Tokens.USING : {
-                return compileAlterTTL(t);
+                if (t.getTTL() == null) {
+                    throw Error.error(ErrorCode.X_42501);
+                }
+                return readTimeToLive(t, true);
             }
             default : {
                 throw unexpectedToken();
@@ -1002,14 +1005,16 @@ public class ParserDDL extends ParserRoutine {
                                    null, t.getName());
     }
 
-    private  Statement compileAlterTTL(Table t) {
-        if (t.getTTL() == null) {
-            throw Error.error(ErrorCode.X_42501);
+    private Statement readTimeToLive(Table table, boolean alter) {
+
+        //syntax: USING TTL 10 SECOND ON COLUMN a
+        if (!alter && token.tokenType != Tokens.USING) {
+            return null;
         }
-        Integer timeLiveValue = 0;
+        int timeLiveValue = 0;
         String ttlUnit = "SECOND";
-        int tokenCount = 0;
         String ttlColumn = "";
+        int tokenCount = 0;
         while (tokenCount <= 5) {
             read();
             switch(token.tokenType) {
@@ -1056,40 +1061,43 @@ public class ParserDDL extends ParserRoutine {
                     throw unexpectedToken();
                 }
                 ttlColumn = token.tokenString;
-                int index = t.findColumn(ttlColumn);
+
+                int index = table.findColumn(ttlColumn);
                 if (index < 0) {
                     throw unexpectedToken();
                 }
-                read();
-                ColumnSchema col = t.getColumn(index);
+                ColumnSchema col = table.getColumn(index);
                 //TIMESTAMP, INTEGER, BIGINT
-                int colType = col.getDataType().getSQLGenericTypeCode();
-                if (colType != Types.INTEGER && colType != Types.BIGINT && colType != Types.TIMESTAMP) {
+                int colType = col.getDataType().typeCode;
+                if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
                     throw unexpectedToken();
                 }
-
+                if (!alter) {
+                    table.addTTL(timeLiveValue, ttlUnit, ttlColumn);
+                }
                 tokenCount++;
+                read();
                 break;
             default:
                 throw unexpectedToken();
             }
         }
-
         //missing parameters
         if (tokenCount != 6) {
             throw unexpectedToken();
         }
 
         Object[] args = new Object[] {
-            t.getName(),
-            timeLiveValue,
-            ttlUnit,
-            ttlColumn,
-            Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
-            Boolean.valueOf(false)
-        };
+                table.getName(),
+                timeLiveValue,
+                ttlUnit,
+                ttlColumn,
+                Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
+                Boolean.valueOf(false)
+            };
         return new StatementSchema(null, StatementTypes.ALTER_TTL, args,
-                                   null, t.getName());
+                                       null, table.getName());
+
     }
     //End of VoltDB extension
 
@@ -1237,7 +1245,7 @@ public class ParserDDL extends ParserRoutine {
                     read();
 
                     // A VoltDB extension to support TTL
-                    readTTL(table);
+                    readTimeToLive(table, false);
                     // End of VoltDB extension
                     end = true;
                     break;
@@ -1299,84 +1307,6 @@ public class ParserDDL extends ParserRoutine {
 
         return new StatementSchema(sql, StatementTypes.CREATE_TABLE, args,
                                    null, null);
-    }
-
-    void readTTL(Table table) {
-        //syntax: USING TTL 10 SECOND ON COLUMN a
-        if (token.tokenType != Tokens.USING) {
-            return;
-        }
-        int timeLiveValue = 0;
-        String ttlUnit = "SECOND";
-        int tokenCount = 0;
-        while (tokenCount <= 5) {
-            read();
-            switch(token.tokenType) {
-            case Tokens.TTL:
-                if (tokenCount != 0) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                break;
-            case Tokens.X_VALUE:
-                if (tokenCount != 1) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                timeLiveValue = (Integer)(token.tokenValue);
-                break;
-            case Tokens.SECOND:
-            case Tokens.MINUTE:
-            case Tokens.HOUR:
-            case Tokens.DAY:
-                if (tokenCount != 2) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                ttlUnit = token.tokenString;
-                break;
-            case Tokens.ON:
-                if (tokenCount == 2) {
-                    tokenCount++;
-                }
-                if (tokenCount != 3) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                break;
-            case Tokens.COLUMN:
-                if (tokenCount != 4) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                break;
-            case Tokens.X_IDENTIFIER:
-                if (tokenCount != 5) {
-                    throw unexpectedToken();
-                }
-                String ttlColumn = token.tokenString;
-                int index = table.findColumn(ttlColumn);
-                if (index < 0) {
-                    throw unexpectedToken();
-                }
-                ColumnSchema col = table.getColumn(index);
-                //TIMESTAMP, INTEGER, BIGINT
-                int colType = col.getDataType().getSQLGenericTypeCode();
-                if (colType != Types.INTEGER && colType != Types.BIGINT && colType != Types.TIMESTAMP) {
-                    throw unexpectedToken();
-                }
-                table.addTTL(timeLiveValue, ttlUnit, ttlColumn);
-                tokenCount++;
-                read();
-                break;
-            default:
-                throw unexpectedToken();
-            }
-        }
-        //missing parameters
-        if (tokenCount != 6) {
-            throw unexpectedToken();
-        }
     }
 
     // skip Export to target of statment

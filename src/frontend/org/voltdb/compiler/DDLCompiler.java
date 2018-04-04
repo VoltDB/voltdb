@@ -1322,9 +1322,9 @@ public class DDLCompiler {
         }
 
         if (ttlNode != null) {
+            TimeToLive ttl =   table.getTimetolive().add("ttl");
             String column = ttlNode.attributes.get("column");
             int ttlValue = Integer.parseInt(ttlNode.attributes.get("value"));
-            TimeToLive ttl = new TimeToLive();
             ttl.setTtlunit(ttlNode.attributes.get("unit"));
             ttl.setTtlvalue(ttlValue);
             for (Column col : table.getColumns()) {
@@ -1333,7 +1333,6 @@ public class DDLCompiler {
                     break;
                 }
             }
-            table.setTimetolive(ttl);
         }
 
         // Warn user if DR table don't have any unique index.
