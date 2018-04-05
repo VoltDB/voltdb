@@ -18,7 +18,9 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -27,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
 
@@ -34,12 +37,27 @@ import org.voltdb.catalog.TimeToLive;
 //will get the task done.
 public class TimeToLiveProcessor {
 
+    public static class TimeToLiveStats {
+        final String tableName;
+        long rowsDeleted = 0L;
+        long rowsLeft = 0L;
+        public TimeToLiveStats(String tableName) {
+            this.tableName = tableName;
+        }
+        public void update(long deleted, long rowRemaining) {
+            rowsDeleted += deleted;
+            rowsLeft = rowRemaining;
+        }
+    }
+
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private ScheduledExecutorService m_timeToLiveExecutor;
 
     private final int m_hostId;
     private final HostMessenger m_messenger ;
     private final ClientInterface m_interface;
+
+    private final Map<String, TimeToLiveStats> m_stats = new HashMap<>();
 
     public TimeToLiveProcessor(int hostId, HostMessenger hostMessenger, ClientInterface clientInterface) {
         m_hostId = hostId;
@@ -65,6 +83,7 @@ public class TimeToLiveProcessor {
         //schedule all TTL tasks.
         m_timeToLiveExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("TimeToLive"));
         final int delay = Integer.getInteger("TIME_TO_LIVE_DELAY", 30);
+        final int interval = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 30);
         final int chunkSize = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
         final int timeout = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
 
@@ -74,10 +93,18 @@ public class TimeToLiveProcessor {
             if (ttl == null) {
                 continue;
             }
+            TimeToLiveStats stats = m_stats.get(t.getTypeName());
+            if (stats == null) {
+                stats =  new TimeToLiveStats(t.getTypeName());
+                m_stats.put(t.getTypeName(), stats);
+            }
             m_timeToLiveExecutor.scheduleAtFixedRate(
                     () -> {m_interface.runTimeToLive(
-                            t.getTypeName(), ttl.getTtlcolumn().getName(), ttl.getTtlvalue(), chunkSize, timeout);},
-                    delay, ttl.getTtlvalue(), getTimeUnit(ttl.getTtlunit()));
+                            t.getTypeName(), ttl.getTtlcolumn().getName(),
+                            transformValue(ttl.getTtlcolumn(), ttl.getTtlunit(), ttl.getTtlvalue()),
+                            chunkSize, timeout,
+                            m_stats.get(t.getTypeName()));},
+                    delay, interval, TimeUnit.SECONDS);
 
             hostLog.info(String.format(info, t.getTypeName(), ttl.getTtlcolumn().getName()));
         }
@@ -88,6 +115,15 @@ public class TimeToLiveProcessor {
             m_timeToLiveExecutor.shutdown();
             m_timeToLiveExecutor = null;
         }
+    }
+
+    private long transformValue(Column col, String unit, int value) {
+        if (VoltType.get((byte)col.getType()) != VoltType.TIMESTAMP) {
+            return value;
+        }
+
+        long millseconds = System.currentTimeMillis() - getTimeUnit(unit).toMillis(value);
+        return millseconds;
     }
 
     private static TimeUnit getTimeUnit(String timeUnit) {

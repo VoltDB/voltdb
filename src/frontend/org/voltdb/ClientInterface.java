@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -2303,40 +2304,34 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    public void runTimeToLive(String tableName, String columnName, int ttlValue, int chunkSize, int timeout) {
+    public void runTimeToLive(String tableName, String columnName, long ttlValue, int chunkSize, int timeout,
+            TimeToLiveProcessor.TimeToLiveStats stats) {
+
+        CountDownLatch latch = new CountDownLatch(1);
+        final ProcedureCallback cb = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse resp) throws Exception {
+                if (resp.getStatus() != ClientResponse.SUCCESS) {
+                    hostLog.warn(String.format("Fail to execute TTL on table:%s, column:%s, status:%",
+                            tableName, columnName, resp.getStatusString()));
+                } else {
+                    VoltTable t = resp.getResults()[0];
+                    while (t.advanceRow()) {
+                        String error = t.getString("note");
+                        if (error != null && !"".equals(error)) {
+                            hostLog.warn("Errors occured when running TTL one table " + tableName + ":" +  error);
+                        }
+                        stats.update(t.getLong("deletedLastRound"), t.getLong("rowsleft"));
+                    }
+                }
+                latch.countDown();
+            }
+        };
+        m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
+                true, 1000 * 120, cb, "@LowImpactDelete", new Object[] {tableName, columnName, ttlValue, "<", chunkSize, timeout});
         try {
-            SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
-            final String procedureName = "@LowImpactDelete";
-            Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
-            Procedure proc = procedureConfig.asCatalogProcedure();
-            StoredProcedureInvocation spi = new StoredProcedureInvocation();
-            spi.setProcName(procedureName);
-            spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
-            spi.setParams(tableName, columnName, ttlValue, "<", chunkSize, timeout);
-            if (spi.getSerializedParams() == null) {
-                spi = MiscUtils.roundTripForCL(spi);
-            }
-
-            synchronized (m_executeTaskAdpater) {
-                createTransaction(m_executeTaskAdpater.connectionId(),
-                        spi,
-                        proc.getReadonly(),
-                        proc.getSinglepartition(),
-                        proc.getEverysite(),
-                        -1,
-                        spi.getSerializedSize(),
-                        System.nanoTime());
-            }
-
-            final long timeoutMS = 5 * 60 * 1000;
-            ClientResponse resp= cb.getResponse(timeoutMS);
-            if (resp.getStatus() != ClientResponse.SUCCESS) {
-                hostLog.warn(String.format("Fail to execute @LowImpactDelete on table:%s, column:%s, status:%",
-                        tableName, columnName, resp.getStatusString()));
-            }
-        } catch (IOException | InterruptedException e) {
-            hostLog.warn(String.format("Fail to execute @LowImpactDelete on table:%s, column:%s, status:%",
-                    tableName, columnName, e.getMessage()));
+            latch.await();
+        } catch (InterruptedException e) {
         }
     }
 }
