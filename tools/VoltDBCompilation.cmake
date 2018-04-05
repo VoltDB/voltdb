@@ -199,7 +199,7 @@ ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     # related to the LLVM versioning numbers.
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-absolute-value)
   ENDIF()
-  IF ( "9.1.0" VERSION_LESS ${CMAKE_CXX_COMPILER_VERSION} )
+  IF ( "9.0.0" VERSION_LESS ${CMAKE_CXX_COMPILER_VERSION} )
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-user-defined-warnings)
   ENDIF()
 ELSE()
