@@ -1636,6 +1636,8 @@ public:
 
     virtual void notifyBlockWasCompactedAway(TBPtr block) {}
 
+    virtual void notifyBlockWasEmptyForReplicatedTable(TBPtr block) {}
+
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
         m_test.m_shuffles.insert(*reinterpret_cast<const int64_t*>(sourceTuple.address() + 1));

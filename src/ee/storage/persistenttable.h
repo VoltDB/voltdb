@@ -620,7 +620,11 @@ private:
                                     std::vector<TableIndex*> const& indexesToUpdate);
 
 
+    // Callback from TupleBlock become empty after TupleBlock::merge()
     void notifyBlockWasCompactedAway(TBPtr block);
+
+    // Callback from TupleBlock become empty for delete last tuple of a TupleBlock in replicated table
+    void notifyBlockWasEmptyForReplicatedTable(TBPtr block);
 
     // Call-back from TupleBlock::merge() for each tuple moved.
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
@@ -1046,7 +1050,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
 
     int retval = block->freeTuple(tuple.address());
     if (retval != NO_NEW_BUCKET_INDEX) {
-        //Check if if the block is currently pending snapshot
+        //Check if the block is currently not pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
             //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
@@ -1075,7 +1079,13 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
             }
         }
         m_blocksNotPendingSnapshot.erase(block);
-        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+        // if it's replicated table, the delete block could be in pending snapshot or actively snapshot
+        // erase here for deterministic dereference tupleblock pointer
+        if (m_isReplicated && m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            m_blocksPendingSnapshot.erase(block);
+            notifyBlockWasEmptyForReplicatedTable(block);
+        }
+
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
     }
