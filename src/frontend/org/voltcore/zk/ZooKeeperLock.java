@@ -20,24 +20,27 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-
+import java.util.concurrent.TimeUnit;
 import org.apache.zookeeper_voltpatches.AsyncCallback.VoidCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.voltcore.logging.VoltLogger;
+
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 //Use the mechanism similar to leader election by creating sequential ephemeral nodes.
 //The node with lowest sequence number will be first granted the lock, exit the protocol.
 //Then the node with next lowest sequence number gets the lock.
 public class ZooKeeperLock implements Watcher {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private final ZooKeeper m_zk;
     private final String m_basePath;
     private final String m_lockPath;
     private String m_currentPath = null;
-    final Object lock = new Object();
+    private final Object m_lock = new Object();
 
     public ZooKeeperLock(ZooKeeper zk, String nodePath, String lockName) {
         m_zk = zk;
@@ -45,11 +48,18 @@ public class ZooKeeperLock implements Watcher {
         m_lockPath = ZKUtil.joinZKPath(m_basePath, lockName);
     }
 
-    public void acquireLock() throws IOException {
+    /**
+     *
+     * @param timeout  timeout in seconds
+     * @return true if a lock is successfully acquired
+     */
+    public boolean acquireLockck(long timeout) {
         try {
-            //Create a sequential node, example: /db/action_blockers/lock0000000000
+            //Create a sequential node, example: /db/action_lock/lock0000000000
             m_currentPath = m_zk.create(m_lockPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-            synchronized(lock) {
+            synchronized(m_lock) {
+                long totalWaitingTime = TimeUnit.SECONDS.toMillis(timeout);
+                long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 while(true) {
                     List<String> nodes = getAllLockingNodes();
 
@@ -57,16 +67,21 @@ public class ZooKeeperLock implements Watcher {
                     //Grant the lock to the first entry with the lowest sequence number
                     Collections.sort(nodes);
                     if (nodes.isEmpty() || m_currentPath.endsWith(nodes.get(0))) {
-                        return;
+                        return true;
                     } else {
-                        //does not get the lock this time. Wait for next update upon node deletion or addition
-                        lock.wait();
+                        //does not get the lock this time. Wait for next update upon node deletion or addition if not timeout
+                        long nextWaitingTime = totalWaitingTime - (TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - startTime);
+                        if (nextWaitingTime <= 0 && totalWaitingTime > 0) {
+                            return false;
+                        }
+                        m_lock.wait(nextWaitingTime);
                     }
                 }
             }
-        } catch (KeeperException | InterruptedException e) {
-            throw new IOException(e);
+        } catch (InterruptedException | KeeperException e) {
+            hostLog.warn("Could not acquire a ZK lock:" + e.getMessage());
         }
+        return false;
     }
 
     private List<String> getAllLockingNodes() throws KeeperException, InterruptedException {
@@ -87,14 +102,13 @@ public class ZooKeeperLock implements Watcher {
     }
 
     public void releaseLock() throws IOException {
-        if (m_currentPath == null) {
-            return;
-        }
-        try {
-            m_zk.delete(m_currentPath, -1);
-            m_currentPath = null;
-        } catch (KeeperException | InterruptedException e) {
-            throw new IOException(e);
+        if (m_currentPath != null) {
+            try {
+                m_zk.delete(m_currentPath, -1);
+                m_currentPath = null;
+            } catch (KeeperException | InterruptedException e) {
+                throw new IOException(e);
+            }
         }
     }
 
@@ -102,8 +116,8 @@ public class ZooKeeperLock implements Watcher {
     public void process(WatchedEvent event) {
         //Invoked from a separate callback thread
         //Wake up the acquireLock() thread to check if it is its turn to own the lock.
-        synchronized (lock) {
-            lock.notifyAll();
+        synchronized (m_lock) {
+            m_lock.notifyAll();
         }
     }
 }

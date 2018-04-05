@@ -198,6 +198,8 @@ public class VoltZK {
     // Host ids that be stopped by calling @StopNode
     public static final String host_ids_be_stopped = "/db/host_ids_be_stopped";
 
+    public static final String actionLock = "/db/action_lock";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
@@ -216,7 +218,8 @@ public class VoltZK {
             cluster_settings,
             actionBlockers,
             request_truncation_snapshot,
-            host_ids_be_stopped
+            host_ids_be_stopped,
+            actionLock
     };
 
     /**
@@ -385,18 +388,17 @@ public class VoltZK {
      */
     public static String createActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
         //Acquire a lock before creating a blocker and validate actions.
-        ZooKeeperLock lock = new ZooKeeperLock(zk, VoltZK.actionBlockers, "lock");
+        ZooKeeperLock zklock = new ZooKeeperLock(zk, VoltZK.actionLock, "lock");
         try {
-            lock.acquireLock();
-            return setActionBlocker(zk, node, mode, hostLog, request);
-        } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("Unable to create action blocker " + node, true, e);
+            if(!zklock.acquireLockck(60)) {
+                return "Could not acquire a lock to create action blocker:" + request;
+            }
         } finally {
             try {
-                lock.releaseLock();
+                zklock.releaseLock();
             } catch (IOException e) {}
         }
-        return null;
+        return setActionBlocker(zk, node, mode, hostLog, request);
     }
 
     private static String setActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
