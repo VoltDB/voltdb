@@ -21,7 +21,9 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 
 public class TransactionTaskQueue
@@ -29,6 +31,16 @@ public class TransactionTaskQueue
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final protected SiteTaskerQueue m_taskQueue;
+
+    // The purpose of having it is to synchronize all MP write messages (FragmentTask, CompleteTransactionTask)
+    // across sites on the same node. Why? First reason is synchronized MP writes prevent
+    // partial commit that we've observed in some rare cases. Second reason is prevent shared-replicated
+    // table writes from blocking sites partially, e.g. some sites wait on countdown latch for all
+    // sites within a node to receive a fragment, but due to node failure the failed remote leader may never forward the
+    // fragment to the rest of sites on the given node, causes deadlock and can't be recovered from repair.
+    static NonBlockingHashMap<SiteTaskerQueue, TransactionTask> stashedMpWrites = new NonBlockingHashMap<>();
+
+    final private int m_siteCount;
 
     /*
      * Multi-part transactions create a backlog of tasks behind them. A queue is
@@ -40,6 +52,7 @@ public class TransactionTaskQueue
     TransactionTaskQueue(SiteTaskerQueue queue)
     {
         m_taskQueue = queue;
+        m_siteCount = VoltDB.instance().getCatalogContext().getNodeSettings().getLocalSitesCount();
     }
 
     /**
@@ -66,6 +79,17 @@ public class TransactionTaskQueue
                 m_backlog.addLast(task);
                 retval = true;
             }
+            /*
+             * This branch is safe because
+             */
+            else if (task instanceof FragmentTask ||
+                       task instanceof SysprocFragmentTask ||
+                       task instanceof CompleteTransactionTask) {
+                stashedMpWrites.put(m_taskQueue, task);
+                if (stashedMpWrites.size() == m_siteCount) {
+                    releaseStashedMpWrites();
+                }
+            }
             else {
                 taskQueueOffer(task);
             }
@@ -81,7 +105,19 @@ public class TransactionTaskQueue
                 m_backlog.addLast(task);
                 retval = true;
             }
-            taskQueueOffer(task);
+            /*
+             * For MP writes, the last site reach here enqueues task for every body.
+             */
+            if (task instanceof FragmentTask ||
+                task instanceof SysprocFragmentTask ||
+                task instanceof CompleteTransactionTask) {
+                stashedMpWrites.put(m_taskQueue, task);
+                if (stashedMpWrites.size() == m_siteCount) {
+                    releaseStashedMpWrites();
+                }
+            } else {
+                taskQueueOffer(task);
+            }
         }
         return retval;
     }
@@ -92,6 +128,16 @@ public class TransactionTaskQueue
     {
         Iv2Trace.logSiteTaskerQueueOffer(task);
         m_taskQueue.offer(task);
+    }
+
+    // All sites receives Mp write messages, time to fire the task.
+    static private void releaseStashedMpWrites()
+    {
+        stashedMpWrites.forEach((queue, task) -> {
+            Iv2Trace.logSiteTaskerQueueOffer(task);
+            queue.offer(task);
+        });
+        stashedMpWrites.clear();
     }
 
     /**
