@@ -26,6 +26,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -390,7 +392,7 @@ public class VoltZK {
         //Acquire a lock before creating a blocker and validate actions.
         ZooKeeperLock zklock = new ZooKeeperLock(zk, VoltZK.actionLock, "lock");
         try {
-            if(!zklock.acquireLockck(60)) {
+            if(!zklock.acquireLockWithTimeout(TimeUnit.SECONDS.toMillis(60))) {
                 return "Could not acquire a lock to create action blocker:" + request;
             }
         } finally {

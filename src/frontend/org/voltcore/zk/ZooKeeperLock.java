@@ -49,16 +49,21 @@ public class ZooKeeperLock implements Watcher {
     }
 
     /**
-     *
-     * @param timeout  timeout in seconds
+    * @return true if a lock is successfully acquired
+    */
+    public boolean acquireLock() {
+        return acquireLockWithTimeout(0);
+    }
+
+    /**
+     * @param timeout  timeout in millisecond
      * @return true if a lock is successfully acquired
      */
-    public boolean acquireLockck(long timeout) {
+    public boolean acquireLockWithTimeout(long timeout) {
         try {
             //Create a sequential node, example: /db/action_lock/lock0000000000
             m_currentPath = m_zk.create(m_lockPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
             synchronized(m_lock) {
-                long totalWaitingTime = TimeUnit.SECONDS.toMillis(timeout);
                 long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                 while(true) {
                     List<String> nodes = getAllLockingNodes();
@@ -70,11 +75,15 @@ public class ZooKeeperLock implements Watcher {
                         return true;
                     } else {
                         //does not get the lock this time. Wait for next update upon node deletion or addition if not timeout
-                        long nextWaitingTime = totalWaitingTime - (TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - startTime);
-                        if (nextWaitingTime <= 0 && totalWaitingTime > 0) {
-                            return false;
+                        if (timeout > 0) {
+                            long nextWaitingTime = timeout - (TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - startTime);
+                            if (nextWaitingTime <= 0) {
+                                return false;
+                            }
+                            m_lock.wait(nextWaitingTime);
+                        } else {
+                            m_lock.wait();
                         }
-                        m_lock.wait(nextWaitingTime);
                     }
                 }
             }
