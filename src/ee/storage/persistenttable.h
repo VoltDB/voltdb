@@ -1046,7 +1046,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
 
     int retval = block->freeTuple(tuple.address());
     if (retval != NO_NEW_BUCKET_INDEX) {
-        //Check if if the block is currently pending snapshot
+        //Check if the block is currently not pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
             //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
             block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
@@ -1075,7 +1075,10 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
             }
         }
         m_blocksNotPendingSnapshot.erase(block);
-        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+        // if it's replicated table, the delete block could be in pending snapshot or actively snapshot
+        // erase here for deterministic dereference tupleblock pointer
+        m_blocksPendingSnapshot.erase(block);
+
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
     }

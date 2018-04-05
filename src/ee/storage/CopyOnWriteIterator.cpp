@@ -15,6 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "storage/CopyOnWriteIterator.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/tabletuple.h"
 #include "storage/persistenttable.h"
 
@@ -114,7 +115,16 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
             char *finishedBlock = m_currentBlock->address();
 
             m_location = m_blockIterator.key();
-            m_currentBlock = m_blockIterator.data();
+            if (m_table->isReplicatedTable() && m_currentBlock->isEmpty()) {
+                VOLT_TRACE("COW move over an empty block for MPPOOL memory, should return it within MP Context");
+                SynchronizedThreadLock::lockReplicatedResource();
+                ExecuteWithMpMemory useMpMemory;
+                m_currentBlock = m_blockIterator.data();
+                SynchronizedThreadLock::unlockReplicatedResource();
+            } else {
+                m_currentBlock = m_blockIterator.data();
+            }
+
             assert(m_currentBlock->address() == m_location);
             m_blockOffset = 0;
 
