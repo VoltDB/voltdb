@@ -140,8 +140,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                     // into a ClientResponse.RESTART, so that the MpProcedureTask can
                     // detect the restart and take the appropriate actions.
                     TransactionRestartException restart = new TransactionRestartException(
-                            "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
-                    restart.setMisrouted(false);
+                            "Transaction being restarted due to fault recovery or shutdown.",
+                            next.getTxnId(),
+                            masters, partitionMasters);
                     poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
                     txn.offerReceivedFragmentResponse(poison);
                     if (tmLog.isDebugEnabled()) {

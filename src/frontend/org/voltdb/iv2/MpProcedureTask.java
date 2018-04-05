@@ -20,10 +20,14 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -186,7 +190,7 @@ public class MpProcedureTask extends ProcedureTask
                 response.setMisrouted(m_msg.getStoredProcedureInvocation());
                 m_initiator.deliver(response);
             } else {
-                restartTransaction();
+                restartTransaction(true);
             }
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("[MpProcedureTask] MISROUTED-RESTART: " + this);
@@ -205,7 +209,31 @@ public class MpProcedureTask extends ProcedureTask
                     hostLog.debug("[MpProcedureTask] COMPLETE: " + this);
                 }
             } else {
-                restartTransaction();
+                String respStr = response.getClientResponseData().getStatusString();
+                int ind = respStr.indexOf("RestartMasters Info:");
+                boolean isFound = ind != -1;
+                restartTransaction(!isFound);
+                if (isFound) {
+                    try {
+                        JSONObject jsObj = new JSONObject(respStr.substring(ind + "RestartMasters Info:".length()));
+                        List<Long> restartMasters = new ArrayList<>();
+                        JSONArray restartMastersIds = jsObj.getJSONArray("masters");
+                        for (int ii = 0; ii < restartMastersIds.length(); ii++) {
+                            restartMasters.add(restartMastersIds.getLong(ii));
+                        }
+                        Map<Integer, Long> restartMastersMap = new HashMap<>();
+                        JSONObject restartMasterEntries = jsObj.getJSONObject("partitionMasters");
+                        Iterator<String> it = restartMasterEntries.keys();
+                        while (it.hasNext()) {
+                            String key = it.next();
+                            Long val = Long.valueOf(restartMasterEntries.getString(key));
+                            restartMastersMap.put(Integer.valueOf(key), val);
+                        }
+                        updateMasters(restartMasters, restartMastersMap);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
                 if (hostLog.isDebugEnabled()) {
                     hostLog.debug("[MpProcedureTask] RESTART: " + this);
                 }
@@ -266,14 +294,16 @@ public class MpProcedureTask extends ProcedureTask
         m_queue.flush(getTxnId());
     }
 
-    private void restartTransaction()
+    private void restartTransaction(boolean updateMasters)
     {
         // We don't need to send restart messages here; the next SiteTasker
         // which will run on the MPI's Site thread will be the repair task,
         // which will send the necessary CompleteTransactionMessage to restart.
         ((MpTransactionState)m_txnState).restart();
-        // Update the masters list with the list provided when restart was triggered
-        updateMasters(m_restartMasters.get(), m_restartMastersMap.get());
+        if (updateMasters) {
+            // Update the masters list with the list provided when restart was triggered
+            updateMasters(m_restartMasters.get(), m_restartMastersMap.get());
+        }
         m_isRestart = true;
         m_queue.restart();
     }

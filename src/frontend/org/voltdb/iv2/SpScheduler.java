@@ -49,6 +49,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.TransactionMisroutedException;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.BorrowTaskMessage;
@@ -1118,10 +1119,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private boolean isFragmentMisrouted(FragmentResponseMessage message) {
         SerializableException ex = message.getException();
-        if (ex != null && ex instanceof TransactionRestartException) {
-            return (((TransactionRestartException)ex).isMisrouted());
-        }
-        return false;
+        return ex instanceof TransactionMisroutedException;
     }
 
     // Eventually, the master for a partition set will need to be able to dedupe

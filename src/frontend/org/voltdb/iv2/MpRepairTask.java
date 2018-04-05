@@ -49,7 +49,6 @@ public class MpRepairTask extends SiteTasker
     static VoltLogger tmLog = new VoltLogger("TM");
 
     private InitiatorMailbox m_mailbox;
-    private List<Long> m_spMasters;
     private Object m_lock = new Object();
     private boolean m_repairRan = false;
     private final String whoami;
@@ -58,10 +57,9 @@ public class MpRepairTask extends SiteTasker
     public MpRepairTask(InitiatorMailbox mailbox, List<Long> spMasters, boolean balanceSPI)
     {
         m_mailbox = mailbox;
-        m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami, balanceSPI);
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(spMasters), whoami, balanceSPI);
     }
 
     @Override

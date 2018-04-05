@@ -35,6 +35,8 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StatementStats.SingleCallStatsToken;
@@ -55,6 +57,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.MispartitionedException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
+import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.Site;
@@ -1234,14 +1237,11 @@ public class ProcedureRunner {
                 e = e.getCause();
             }
         } else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
-            org.voltdb.exceptions.TransactionRestartException te = (org.voltdb.exceptions.TransactionRestartException)e;
-            if (te.isMisrouted()) {
-                status = ClientResponse.TXN_MISROUTED;
-                msg.append("TRANSACTION MISROUTED\n");
-            } else {
-                status = ClientResponse.TXN_RESTART;
-                msg.append("TRANSACTION RESTART\n");
-            }
+            status = ClientResponse.TXN_RESTART;
+            msg.append("TRANSACTION RESTART\n");
+        } else if (e.getClass() == org.voltdb.exceptions.TransactionMisroutedException.class) {
+            status = ClientResponse.TXN_MISROUTED;
+            msg.append("TRANSACTION MISROUTED\n");
         } else if (e.getClass() == org.voltdb.exceptions.TransactionTerminationException.class) {
             msg.append("Transaction Interrupted\n");
         }
@@ -1278,6 +1278,34 @@ public class ProcedureRunner {
                 } else if (originalTimeout == 0) {
                     msg.append(
                             " The default query timeout is currently set to no timeout and can be changed in the systemsettings section of the deployment file.");
+                }
+            }
+            if (e instanceof TransactionRestartException && !readOnly) {
+                // TODO: make a subclass of ClientResponeImpl for internal Response, which can aslo stores exception
+                // For Txn_Restart case, need to use the restartMaster info from the TransactionRestartException
+                // since currently clientResponseImpl doesn't has a field for exception,
+                // stash the restartMasters info to the statusMsg part as json string
+                org.voltdb.exceptions.TransactionRestartException te = (org.voltdb.exceptions.TransactionRestartException)e;
+                JSONStringer js = new JSONStringer();
+                try {
+                    js.object();
+                    js.key("masters").array();
+                    for (long replica : te.getMasters()) {
+                        js.value(replica);
+                    }
+                    js.endArray();
+
+                    js.key("partitionMasters").object();
+                    for (Map.Entry<Integer, Long> entry : te.getPartitionMasters().entrySet()) {
+                        js.key(entry.getKey().toString()).value(entry.getValue().toString());
+                    }
+                    js.endObject();
+                    js.endObject();
+
+                    msg.append("\n  RestartMasters Info:");
+                    msg.append(js.toString());
+                } catch (JSONException jse) {
+                    jse.printStackTrace();
                 }
             }
         }

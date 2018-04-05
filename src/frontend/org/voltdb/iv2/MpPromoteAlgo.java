@@ -275,7 +275,9 @@ public class MpPromoteAlgo implements RepairAlgo
                 tmLog.debug(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(m_survivors) + " with: " + TxnEgo.txnIdToString(li.getTxnId()) +
                         " " + repairMsg);
             }
-            m_mailbox.repairReplicasWith(m_survivors, repairMsg);
+            if (repairMsg != null) {
+                m_mailbox.repairReplicasWith(m_survivors, repairMsg);
+            }
         }
 
         m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
@@ -337,6 +339,10 @@ public class MpPromoteAlgo implements RepairAlgo
                 assert(ftm.getInitiateTask() != null);
                 m_interruptedTxns.add(ftm.getInitiateTask());
             }
+
+            // since the restartingTxn could be coordinated by the poison to MPTransactionState
+            // don't rollback here
+            /*
             CompleteTransactionMessage rollback =
                 new CompleteTransactionMessage(
                         ftm.getInitiatorHSId(),
@@ -349,6 +355,8 @@ public class MpPromoteAlgo implements RepairAlgo
                         restart,   // Indicate rollback for repair as appropriate
                         ftm.isForReplay());
             return rollback;
+            */
+            return null;
         }
     }
 }

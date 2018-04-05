@@ -41,6 +41,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.TransactionMisroutedException;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
@@ -126,11 +127,11 @@ public class MpScheduler extends Scheduler
         updateReplicas(replicas, partitionMasters, false);
     }
 
-    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,  boolean balanceSPI)
+    public void updateReplicas(final List<Long> masters, final Map<Integer, Long> partitionMasters,  boolean balanceSPI)
     {
         // Handle startup and promotion semi-gracefully
         m_iv2Masters.clear();
-        m_iv2Masters.addAll(replicas);
+        m_iv2Masters.addAll(masters);
         m_partitionMasters.clear();
         m_partitionMasters.putAll(partitionMasters);
 
@@ -170,8 +171,8 @@ public class MpScheduler extends Scheduler
             }
         }
 
-        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI);
-        m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
+        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, masters, balanceSPI);
+        m_pendingTasks.repair(repairTask, masters, partitionMasters, balanceSPI);
     }
 
     /**
@@ -500,11 +501,9 @@ public class MpScheduler extends Scheduler
         // RTB: Didn't we decide early rollback can do this legitimately.
         if (txn != null) {
             SerializableException ex = message.getException();
-            if (ex != null && ex instanceof TransactionRestartException) {
-                if (((TransactionRestartException)ex).isMisrouted()) {
-                    ((MpTransactionState)txn).restartFragment(message, m_iv2Masters, m_partitionMasters);
-                    return;
-                }
+            if (ex != null && ex instanceof TransactionMisroutedException) {
+                ((MpTransactionState)txn).restartFragment(message, m_iv2Masters, m_partitionMasters);
+                return;
             }
             ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
         }

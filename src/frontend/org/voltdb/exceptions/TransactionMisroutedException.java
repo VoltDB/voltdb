@@ -19,8 +19,13 @@ package org.voltdb.exceptions;
 
 import com.google_voltpatches.common.collect.Maps;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -31,25 +36,17 @@ import java.util.Map;
  * procedure can determine whether or not it is being restarted or whether it
  * completed successfully.
  */
-public class TransactionRestartException extends SerializableException {
+public class TransactionMisroutedException extends SerializableException {
     public static final long serialVersionUID = 0L;
     private long m_txnId;
-    // This exception is local to the host has MPI, don't need to serializable
-    private final List<Long> m_masters;
-    private final Map<Integer, Long> m_partitionMasters;
-
-    public TransactionRestartException(String message, long txnId, List<Long> masters, Map<Integer, Long> partitionMasters) {
+    public TransactionMisroutedException(String message, long txnId) {
         super(message);
         m_txnId = txnId;
-        m_masters = new ArrayList<>(masters);
-        m_partitionMasters = Maps.newHashMap(partitionMasters);
     }
 
-    public TransactionRestartException(ByteBuffer b) {
+    public TransactionMisroutedException(ByteBuffer b) {
         super(b);
         m_txnId = b.getLong();
-        m_masters = new ArrayList<>();
-        m_partitionMasters = Maps.newHashMap();
     }
 
     public long getTxnId()
@@ -57,19 +54,9 @@ public class TransactionRestartException extends SerializableException {
         return m_txnId;
     }
 
-    public List<Long> getMasters()
-    {
-        return m_masters;
-    }
-
-    public Map<Integer, Long> getPartitionMasters()
-    {
-        return m_partitionMasters;
-    }
-
     @Override
     protected SerializableExceptions getExceptionType() {
-        return SerializableExceptions.TransactionRestartException;
+        return SerializableExceptions.TransactionMisroutedException;
     }
 
     @Override

@@ -33,7 +33,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.exceptions.TransactionRestartException;
+import org.voltdb.exceptions.TransactionMisroutedException;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
@@ -452,9 +452,8 @@ public class InitiatorMailbox implements Mailbox
         // If a fragment is part of a transaction which have not been seen on this site, restart it.
         if (!seenTheTxn) {
             FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
-            TransactionRestartException restart = new TransactionRestartException(
+            TransactionMisroutedException restart = new TransactionMisroutedException(
                     "Transaction being restarted due to MigratePartitionLeader.", message.getTxnId());
-            restart.setMisrouted(true);
             response.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
             response.m_sourceHSId = getHSId();
             response.setPartitionId(m_partitionId);
