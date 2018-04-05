@@ -30,6 +30,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
 
@@ -47,6 +49,10 @@ public class TimeToLiveProcessor {
         public void update(long deleted, long rowRemaining) {
             rowsDeleted += deleted;
             rowsLeft = rowRemaining;
+        }
+        @Override
+        public String toString() {
+            return String.format("TTL stats on table %s: tuples deleted %d, tuples remaining %d", tableName, rowsDeleted, rowsLeft);
         }
     }
 
@@ -93,6 +99,21 @@ public class TimeToLiveProcessor {
             if (ttl == null) {
                 continue;
             }
+            boolean indexed = false;
+            for (Index index : t.getIndexes()) {
+                for (ColumnRef colRef : index.getColumns()) {
+                    if(ttl.getTtlcolumn().equals(colRef.getColumn())){
+                        indexed = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!indexed) {
+                hostLog.warn("An index is missing on column " + t.getTypeName() + "." + ttl.getTtlcolumn().getName() + " for TTL");
+                continue;
+            }
+
             TimeToLiveStats stats = m_stats.get(t.getTypeName());
             if (stats == null) {
                 stats =  new TimeToLiveStats(t.getTypeName());
@@ -115,6 +136,7 @@ public class TimeToLiveProcessor {
             m_timeToLiveExecutor.shutdown();
             m_timeToLiveExecutor = null;
         }
+        m_stats.clear();
     }
 
     private long transformValue(Column col, String unit, int value) {
@@ -127,13 +149,13 @@ public class TimeToLiveProcessor {
     }
 
     private static TimeUnit getTimeUnit(String timeUnit) {
-        if ("MINUTE".equals(timeUnit)) {
+        if ("MINUTE".equalsIgnoreCase(timeUnit)) {
             return TimeUnit.MINUTES;
         }
-        if ("HOUR".equals(timeUnit)) {
+        if ("HOUR".equalsIgnoreCase(timeUnit)) {
             return TimeUnit.HOURS;
         }
-        if ("DAY".equals(timeUnit)) {
+        if ("DAY".equalsIgnoreCase(timeUnit)) {
             return TimeUnit.DAYS;
         }
         return TimeUnit.SECONDS;

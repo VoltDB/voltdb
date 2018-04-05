@@ -786,6 +786,19 @@ public class DDLCompiler {
         }
     }
 
+    private void handleTTL(Database db) throws VoltCompilerException {
+        for (Table table : db.getTables()) {
+            TimeToLive ttl = table.getTimetolive().get("ttl");
+            if (ttl == null) {
+                continue;
+            }
+            if (ttl.getTtlcolumn().getNullable()) {
+                String msg = "Column '" + table.getTypeName() + "." + ttl.getTtlcolumn().getName() + "' cannot be nullable for TTL." ;
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
+    }
+
     private TreeSet<String> getExportTableNames() {
         TreeSet<String> exportTableNames = new TreeSet<>();
         NavigableMap<String, NavigableSet<String>> exportsByTargetName = m_tracker.getExportedTables();
@@ -833,6 +846,7 @@ public class DDLCompiler {
 
         fillTrackerFromXML();
         handlePartitions(db);
+        handleTTL(db);
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
     }
 
