@@ -143,6 +143,7 @@ public:
      * @return The partition id of the working thread.
      */
     static int32_t getThreadPartitionId();
+    static int32_t getThreadPartitionIdWithNullCheck();
     /**
      * Get the partion id of the thread on whose behalf this thread is
      * working.  Generally this is the same as the value of getThreadPartitionId.
@@ -153,6 +154,7 @@ public:
      * @return The partition id of the free rider thread.
      */
     static int32_t getEnginePartitionId();
+    static int32_t getEnginePartitionIdWithNullCheck();
 
     /**
      * Allocate space from a page of objects of approximately the requested
@@ -194,7 +196,9 @@ public:
      */
     static void freeRelocatable(Sized* string);
 
-    static void resetStateForDebug();
+    static void resetStateForTest();
+    static int32_t* getThreadPartitionIdForTest();
+    static void setThreadPartitionIdForTest(int32_t* partitionId);
 private:
     #ifdef VOLT_POOL_CHECKING
         friend class SynchronizedThreadLock;

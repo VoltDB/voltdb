@@ -161,10 +161,10 @@ void ExecutorContext::assignThreadLocals(const EngineLocals& mapping)
     ThreadLocalPool::assignThreadLocals(mapping);
 }
 
-void ExecutorContext::resetStateForDebug() {
+void ExecutorContext::resetStateForTest() {
     pthread_setspecific(logical_executor_context_static_key, NULL);
     pthread_setspecific(physical_topend_static_key, NULL);
-    ThreadLocalPool::resetStateForDebug();
+    ThreadLocalPool::resetStateForTest();
 }
 
 void ExecutorContext::bindToThread()

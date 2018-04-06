@@ -191,14 +191,18 @@ void ThreadLocalPool::assignThreadLocals(const PoolLocals& mapping)
     pthread_setspecific(m_enginePartitionIdKey, static_cast<const void*>(mapping.enginePartitionId));
 }
 
-void ThreadLocalPool::resetStateForDebug() {
+void ThreadLocalPool::resetStateForTest() {
     pthread_setspecific(m_allocatedKey, NULL);
     pthread_setspecific(m_key, NULL);
     pthread_setspecific(m_stringKey, NULL);
     pthread_setspecific(m_enginePartitionIdKey, NULL);
-
-    delete static_cast<int32_t*>(pthread_getspecific(m_threadPartitionIdKey));
     pthread_setspecific(m_threadPartitionIdKey, NULL);
+}
+int32_t* ThreadLocalPool::getThreadPartitionIdForTest() {
+    return static_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
+}
+void ThreadLocalPool::setThreadPartitionIdForTest(int32_t* partitionId) {
+    pthread_setspecific(m_threadPartitionIdKey, static_cast<const void*>(partitionId));
 }
 
 namespace {
@@ -596,6 +600,18 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
 }
 
 int32_t ThreadLocalPool::getThreadPartitionId() {
+    int32_t partitionId =
+        *static_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
+    return partitionId;
+}
+
+int32_t ThreadLocalPool::getEnginePartitionId() {
+    int32_t partitionId =
+        *static_cast< int32_t* >(pthread_getspecific(m_enginePartitionIdKey));
+    return partitionId;
+}
+
+int32_t ThreadLocalPool::getThreadPartitionIdWithNullCheck() {
     int32_t *ptrToPartitionId = static_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
     if (ptrToPartitionId == NULL) {
         return -1;
@@ -604,10 +620,13 @@ int32_t ThreadLocalPool::getThreadPartitionId() {
     return *ptrToPartitionId;
 }
 
-int32_t ThreadLocalPool::getEnginePartitionId() {
-    int32_t partitionId =
-        *static_cast< int32_t* >(pthread_getspecific(m_enginePartitionIdKey));
-    return partitionId;
+int32_t ThreadLocalPool::getEnginePartitionIdWithNullCheck() {
+    int32_t *ptrToPartitionId = static_cast< int32_t* >(pthread_getspecific(m_enginePartitionIdKey));
+    if (ptrToPartitionId == NULL) {
+        return -1;
+    }
+
+    return *ptrToPartitionId;
 }
 
 char * voltdb_pool_allocator_new_delete::malloc(const size_type bytes) {
