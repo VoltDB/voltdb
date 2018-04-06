@@ -907,8 +907,6 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
     // delete tables in the set
     bool isReplicatedTable;
     BOOST_FOREACH (auto path, deletions) {
-        VOLT_TRACE("delete path:");
-
         // If the delete path is under the catalog functions item, drop the user-defined function.
         if (startsWith(path, catalogFunctions.path())) {
             catalog::Function* catalogFunction =
@@ -1628,14 +1626,17 @@ VoltDBEngine::loadTable(int32_t tableId,
 }
 
 /*
- * Delete and rebuild id based table collections. Does not affect
- * any currently stored tuples.
+ * Delete and rebuild the relativeIndex based table collections.
+ * It does not affect any currently stored tuples.
  */
 void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScratch) {
+    VOLT_DEBUG("UpdateReplicated = %s,%s from scratch",
+               updateReplicated ? "true" : "false",
+               fromScratch ? "" : " not");
     // 1. See header comments explaining m_snapshottingTables.
     // 2. Don't clear m_exportTables. They are still exporting, even if deleted.
     // 3. Clear everything else.
-    if (!updateReplicated && fromScratch) {
+    if (! updateReplicated && fromScratch) {
         m_tables.clear();
         m_tablesByName.clear();
         m_tablesBySignatureHash.clear();
@@ -1645,18 +1646,17 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
     }
 
-    // walk the table delegates and update local table collections
+    // Walk through table delegates and update local table collections
     BOOST_FOREACH (LabeledTCD cd, m_catalogDelegates) {
         auto tcd = cd.second;
         assert(tcd);
-        if (!tcd) {
+        if (! tcd) {
             continue;
         }
         Table* localTable = tcd->getTable();
         assert(localTable);
-        if (!localTable) {
-            VOLT_ERROR("DEBUG-NULL");//:%s", cd.first.c_str());
-            std::cout << "DEBUG-NULL:" << cd.first << std::endl;
+        if (! localTable) {
+            VOLT_ERROR("DEBUG-NULL: %s", cd.first.c_str());
             continue;
         }
         assert(m_database);
@@ -1665,7 +1665,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         const std::string& tableName = tcd->getTable()->name();
         if (catTable->isreplicated()) {
             if (updateReplicated) {
-                // Update catalog table map for other sites
+                // This engine is responsible for updating the catalog table maps for all sites.
                 ExecuteWithAllSitesMemory execAllSites;
                 for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
                     EngineLocals& curr = engineIt->second;
@@ -1676,17 +1676,16 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                 }
             }
         }
-        else {
-            if (!updateReplicated) {
-                m_tables[relativeIndexOfTable] = localTable;
-                m_tablesByName[tableName] = localTable;
-            }
+        else if (! updateReplicated) {
+            m_tables[relativeIndexOfTable] = localTable;
+            m_tablesByName[tableName] = localTable;
         }
+
         TableStats* stats = NULL;
         PersistentTable* persistentTable = tcd->getPersistentTable();
         if (persistentTable) {
             stats = persistentTable->getTableStats();
-            if (!tcd->materialized()) {
+            if (! tcd->materialized()) {
                 int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
                 if (catTable->isreplicated()) {
                     if (updateReplicated) {
@@ -1699,7 +1698,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                         }
                     }
                 }
-                else {
+                else if (! updateReplicated) {
                     m_tablesBySignatureHash[hash] = persistentTable;
                 }
             }
@@ -1713,8 +1712,8 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                         EngineLocals& curr = engineIt->second;
                         VoltDBEngine* currEngine = curr.context->getContextEngine();
                         SynchronizedThreadLock::assumeSpecificSiteContext(curr);
-                        if (!fromScratch) {
-                            // This is a swap or truncate and we need to clear the old index stats sources for this this table
+                        if (! fromScratch) {
+                            // This is a swap or truncate and we need to clear the old index stats sources for this table
                             currEngine->getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                                                 relativeIndexOfTable);
                             currEngine->getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
@@ -1725,17 +1724,15 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                                                                               relativeIndexOfTable,
                                                                               index->getIndexStats());
                         }
-                        VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s at index %d",
-                                ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str(), relativeIndexOfTable);
                         currEngine->getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                                           relativeIndexOfTable,
                                                                           stats);
                     }
                 }
             }
-            else if (!updateReplicated) {
-                if (!fromScratch) {
-                    // This is a swap or truncate and we need to clear the old index stats sources for this this table
+            else if (! updateReplicated) {
+                if (! fromScratch) {
+                    // This is a swap or truncate and we need to clear the old index stats sources for this table
                     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE, relativeIndexOfTable);
                     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX, relativeIndexOfTable);
                 }
@@ -1744,22 +1741,20 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                                                           relativeIndexOfTable,
                                                           index->getIndexStats());
                 }
-                VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s at index %d",
-                        ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str(), relativeIndexOfTable);
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                       relativeIndexOfTable,
                                                       stats);
             }
         }
         else {
-            VOLT_DEBUG("VoltDBEngine %d register stats source %p for table %s at index %d, updateReplicated %s, fromScratch %s",
-                                ThreadLocalPool::getEnginePartitionId(), stats, localTable->name().c_str(), relativeIndexOfTable,
-                                (updateReplicated ? "true" : "false"), (fromScratch ? "true" : "false"));
-            if (updateReplicated) continue;
-            // stream table could not be truncated or swapped, but pre-built DR conflict table should has already been registered the stats already.
+            // Streamed tables are all partitioned.
+            if (updateReplicated) {
+                continue;
+            }
+            // Streamed table could not be truncated or swapped, but pre-built DR conflict table
+            // should have already been registered in the stats already.
             if (fromScratch) {
                 stats = tcd->getStreamedTable()->getTableStats();
-
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                       relativeIndexOfTable,
                                                       stats);
