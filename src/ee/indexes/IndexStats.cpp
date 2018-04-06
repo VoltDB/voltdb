@@ -146,6 +146,10 @@ void IndexStats::rename(std::string name) {
     m_indexName = ValueFactory::getStringValue(name);
 }
 
+void IndexStats::updateTableName(std::string tableName) {
+    m_tableName = ValueFactory::getStringValue(tableName);
+}
+
 /**
  * Generates the list of column names that will be in the statTable_. Derived classes must override
  * this method and call the parent class's version to obtain the list of columns contributed by

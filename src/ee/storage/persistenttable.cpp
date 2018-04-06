@@ -748,7 +748,10 @@ void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
 
         auto heldName = theIndex->getName();
         theIndex->rename(otherIndex->getName());
+        // The table names are already swapped before we swap the indexes.
+        theIndex->getIndexStats()->updateTableName(m_name);
         otherIndex->rename(heldName);
+        otherIndex->getIndexStats()->updateTableName(otherTable->m_name);
     }
 }
 
