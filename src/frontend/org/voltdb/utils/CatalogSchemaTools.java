@@ -47,6 +47,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
@@ -318,7 +319,16 @@ public abstract class CatalogSchemaTools {
             table_sb.append(spacer).append(viewQuery).append(";\n");
         }
         else {
-            table_sb.append("\n);\n");
+            table_sb.append("\n)");
+            TimeToLive ttl = catalog_tbl.getTimetolive().get("ttl");
+            if (ttl != null) {
+                table_sb.append(" USING TTL " + ttl.getTtlvalue() + " ");
+                if (ttl.getTtlunit() != null) {
+                    table_sb.append(ttl.getTtlunit());
+                }
+                table_sb.append(" ON COLUMN " + ttl.getTtlcolumn().getTypeName());
+            }
+            table_sb.append(";\n");
         }
 
         // We've built the full CREATE TABLE statement for this table,
