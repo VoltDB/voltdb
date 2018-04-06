@@ -40,6 +40,7 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
 public class IndexUtil {
@@ -53,13 +54,18 @@ public class IndexUtil {
      * @param condRef RexNode representing the predicate expression.
      * @param program Program to resolve the condRef expression if its a reference expression
      * @param index The index we want to use to access the data.
+     * @param sortDirection sort direction to use
      *
      * @return A valid access path using the data or null if none found.
      */
     public static AccessPath getCalciteRelevantAccessPathForIndex(Table table,
-            List<Column> catColumns, RexNode condRef, RexProgram program, Index index) {
+            List<Column> catColumns,
+            RexNode condRef,
+            RexProgram program,
+            Index index,
+            SortDirectionType sortDirection) {
         return getCalciteRelevantAccessPathForIndex(
-                table, catColumns, condRef, program, index, -1);
+                table, catColumns, condRef, program, index, sortDirection, -1);
     }
 
     /**
@@ -73,12 +79,18 @@ public class IndexUtil {
      * @param condRef RexNode representing the predicate expression.
      * @param program Program to resolve the condRef expression if its a reference expression
      * @param index The index we want to use to access the data.
+     * @param sortDirection sort direction to use
      * @param numLhsFieldsForJoin number of fields that come from outer table (-1 if not a join)
      *
      * @return A valid access path using the data or null if none found.
      */
     public static AccessPath getCalciteRelevantAccessPathForIndex(Table table,
-            List<Column> catColumns, RexNode condRef, RexProgram program, Index index, int numLhsFieldsForJoin) {
+            List<Column> catColumns,
+            RexNode condRef,
+            RexProgram program,
+            Index index,
+            SortDirectionType sortDirection,
+            int numLhsFieldsForJoin) {
         // Get filter condition or NULL
         if (condRef == null) {
             // No filters to pick an index
@@ -91,7 +103,7 @@ public class IndexUtil {
         Collection<AbstractExpression> voltSubExprs = ExpressionUtil.uncombineAny(voltExpr);
 
         StmtTableScan tableScan = new StmtTargetTableScan(table, table.getTypeName(), 0);
-        AccessPath accessPath = SubPlanAssembler.getRelevantAccessPathForIndexForCalcite(tableScan, voltSubExprs, index);
+        AccessPath accessPath = SubPlanAssembler.getRelevantAccessPathForIndexForCalcite(tableScan, voltSubExprs, index, sortDirection);
 
         // Partial Index Check
         accessPath = SubPlanAssembler.processPartialIndex(index, tableScan, accessPath, voltSubExprs, null, null);

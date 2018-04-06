@@ -2374,10 +2374,14 @@ public abstract class SubPlanAssembler {
      * @param table The table we want data from.
      * @param exprs The set of predicate expressions.
      * @param index The index we want to use to access the data.
+     * @param sortDirection sort direction to use
      * @return A valid access path using the data or null if none found.
      */
     public static AccessPath getRelevantAccessPathForIndexForCalcite(
-            StmtTableScan tableScan, Collection<AbstractExpression> exprs, Index index)
+            StmtTableScan tableScan,
+            Collection<AbstractExpression> exprs,
+            Index index,
+            SortDirectionType sortDirection)
     {
         if (tableScan instanceof StmtTargetTableScan == false) {
             return null;
@@ -2422,6 +2426,7 @@ public abstract class SubPlanAssembler {
 
         AccessPath retval = new AccessPath();
         retval.index = index;
+        retval.sortDirection = sortDirection;
 
         if (indexIsGeographical) {
             return null;

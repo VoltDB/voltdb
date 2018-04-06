@@ -36,6 +36,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
+import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
 public class VoltDBCalcScanToIndexRule extends RelOptRule {
@@ -79,7 +80,7 @@ public class VoltDBCalcScanToIndexRule extends RelOptRule {
 
         for (Index index : catTableable.getIndexes()) {
             AccessPath accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(
-                    catTableable, columns, filterCondition, mergedProgram, index);
+                    catTableable, columns, filterCondition, mergedProgram, index, SortDirectionType.INVALID);
 
             if (accessPath != null) {
                 // if accessPath.other is not null, need to create a new Filter
