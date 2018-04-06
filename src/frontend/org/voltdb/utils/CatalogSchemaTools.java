@@ -30,6 +30,7 @@ import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
@@ -320,7 +321,7 @@ public abstract class CatalogSchemaTools {
         }
         else {
             table_sb.append("\n)");
-            TimeToLive ttl = catalog_tbl.getTimetolive().get("ttl");
+            TimeToLive ttl = catalog_tbl.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
             if (ttl != null) {
                 table_sb.append(" USING TTL " + ttl.getTtlvalue() + " ");
                 if (ttl.getTtlunit() != null) {

@@ -41,6 +41,7 @@ import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
@@ -788,7 +789,7 @@ public class DDLCompiler {
 
     private void handleTTL(Database db) throws VoltCompilerException {
         for (Table table : db.getTables()) {
-            TimeToLive ttl = table.getTimetolive().get("ttl");
+            TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
             if (ttl == null) {
                 continue;
             }
@@ -1330,13 +1331,13 @@ public class DDLCompiler {
                     }
                 }
             }
-            if (subNode.name.equalsIgnoreCase("ttl")) {
+            if (subNode.name.equalsIgnoreCase(TimeToLiveVoltDB.TTL_NAME)) {
                 ttlNode = subNode;
             }
         }
 
         if (ttlNode != null) {
-            TimeToLive ttl =   table.getTimetolive().add("ttl");
+            TimeToLive ttl =   table.getTimetolive().add(TimeToLiveVoltDB.TTL_NAME);
             String column = ttlNode.attributes.get("column");
             int ttlValue = Integer.parseInt(ttlNode.attributes.get("value"));
             ttl.setTtlunit(ttlNode.attributes.get("unit"));

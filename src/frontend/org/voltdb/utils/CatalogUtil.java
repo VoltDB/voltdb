@@ -69,6 +69,7 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
@@ -3024,10 +3025,21 @@ public abstract class CatalogUtil {
     public static NavigableSet<Table> getTimeToLiveTables(Database db) {
         ImmutableSortedSet.Builder<Table> ttlTables = ImmutableSortedSet.naturalOrder();
         for (Table t : db.getTables()) {
-            if (t.getTimetolive() != null) {
+            if (t.getTimetolive() != null && t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME) != null) {
                 ttlTables.add(t);
             }
         }
         return ttlTables.build();
+    }
+
+    public static boolean isColumnIndexed(Table table, Column column) {
+        for (Index index : table.getIndexes()) {
+            for (ColumnRef colRef : index.getColumns()) {
+                if(column.equals(colRef.getColumn())){
+                 return true;
+                }
+            }
+        }
+        return false;
     }
 }

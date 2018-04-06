@@ -26,14 +26,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
+import org.voltdb.utils.CatalogUtil;
 
 //schedule and process time-to-live feature via @LowImpactDelete. The host with smallest host id
 //will get the task done.
@@ -71,45 +71,33 @@ public class TimeToLiveProcessor {
         m_interface = clientInterface;
     }
 
+    /**
+     * schedule TTL tasks per configurations
+     * @param ttlTables A list of tables for TTL
+     */
     public void scheduleTimeToLiveTasks(NavigableSet<Table> ttlTables) {
+
+        //shutdown the execution tasks if they are running and reschedule them if needed
+        //could be smarter here: only shutdown those dropped TTL and rescheudle updated ones
+        shutDown();
+
+        if (ttlTables == null || ttlTables.isEmpty()) return;
+        //if the host id is not the smallest or no TTL table, then shutdown the task if it is running.
         List<Integer> liveHostIds = new ArrayList<Integer>(m_messenger.getLiveHostIds());
         Collections.sort(liveHostIds);
-
-        //if the host id is not the smallest or no TTL table, then shutdown the task if it is running.
-        if (m_hostId != liveHostIds.get(0) || ttlTables == null || ttlTables.isEmpty()) {
-            //shutdown if running
-            if (m_timeToLiveExecutor != null) {
-                m_timeToLiveExecutor.shutdown();
-                hostLog.info("Time to live task has been shutdown.");
-            }
-            m_timeToLiveExecutor = null;
-            return;
-        }
+        if (m_hostId != liveHostIds.get(0)) return;
 
         //schedule all TTL tasks.
         m_timeToLiveExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("TimeToLive"));
-        final int delay = Integer.getInteger("TIME_TO_LIVE_DELAY", 30);
-        final int interval = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 30);
+        final int delay = Integer.getInteger("TIME_TO_LIVE_DELAY", 5);
+        final int interval = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 5);
         final int chunkSize = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
         final int timeout = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
 
         String info = "TTL task is started for table %s, column %s";
         for (Table t : ttlTables) {
-            TimeToLive ttl = t.getTimetolive().get("ttl");
-            if (ttl == null) {
-                continue;
-            }
-            boolean indexed = false;
-            for (Index index : t.getIndexes()) {
-                for (ColumnRef colRef : index.getColumns()) {
-                    if(ttl.getTtlcolumn().equals(colRef.getColumn())){
-                        indexed = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!indexed) {
+            TimeToLive ttl = t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
+            if (!CatalogUtil.isColumnIndexed(t, ttl.getTtlcolumn())) {
                 hostLog.warn("An index is missing on column " + t.getTypeName() + "." + ttl.getTtlcolumn().getName() + " for TTL");
                 continue;
             }
@@ -136,28 +124,20 @@ public class TimeToLiveProcessor {
             m_timeToLiveExecutor.shutdown();
             m_timeToLiveExecutor = null;
         }
-        m_stats.clear();
     }
 
     private long transformValue(Column col, String unit, int value) {
         if (VoltType.get((byte)col.getType()) != VoltType.TIMESTAMP) {
             return value;
         }
-
-        long millseconds = System.currentTimeMillis() - getTimeUnit(unit).toMillis(value);
-        return millseconds;
-    }
-
-    private static TimeUnit getTimeUnit(String timeUnit) {
-        if ("MINUTE".equalsIgnoreCase(timeUnit)) {
-            return TimeUnit.MINUTES;
+        TimeUnit timeUnit = TimeUnit.SECONDS;
+        if ("MINUTE".equalsIgnoreCase(unit)) {
+            timeUnit = TimeUnit.MINUTES;
+        } else if ("HOUR".equalsIgnoreCase(unit)) {
+            timeUnit = TimeUnit.HOURS;
+        }else if ("DAY".equalsIgnoreCase(unit)) {
+            timeUnit =  TimeUnit.DAYS;
         }
-        if ("HOUR".equalsIgnoreCase(timeUnit)) {
-            return TimeUnit.HOURS;
-        }
-        if ("DAY".equalsIgnoreCase(timeUnit)) {
-            return TimeUnit.DAYS;
-        }
-        return TimeUnit.SECONDS;
+        return ((System.currentTimeMillis() - timeUnit.toMillis(value)) * 1000);
     }
 }

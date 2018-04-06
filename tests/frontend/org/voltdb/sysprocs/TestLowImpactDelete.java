@@ -63,7 +63,15 @@ public class TestLowImpactDelete extends TestCase {
               + "    PRIMARY KEY (id) \n"
               + " ); \n"
               + "PARTITION TABLE part ON COLUMN id;"
-              + "CREATE INDEX partindex ON part (ts);"
+              + "CREATE INDEX partindex ON part (ts);\n"
+
+              + "CREATE TABLE ttl (\n"
+              + "    id BIGINT not null, \n"
+              + "    ts TIMESTAMP not null, "
+              + "    PRIMARY KEY (id) \n"
+              + " ) USING TTL 10 SECOND ON COLUMN TS; \n"
+              + "PARTITION TABLE ttl ON COLUMN id;"
+              + "CREATE INDEX ttlindex ON ttl (ts);"
 
               + "CREATE TABLE rep (\n"
               + "    id BIGINT not null, \n"
@@ -78,6 +86,7 @@ public class TestLowImpactDelete extends TestCase {
         builder.addPartitionInfo("part", "id");
         builder.addStmtProcedure("partcount", "select count(*) from part;");
         builder.addStmtProcedure("repcount", "select count(*) from rep;");
+        builder.addStmtProcedure("ttlcount", "select count(*) from ttl;");
         builder.setUseDDLSchema(true);
         m_cluster = new LocalCluster("foo.jar", SPH, HOSTCOUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setHasLocalServer(true);
@@ -311,4 +320,25 @@ public class TestLowImpactDelete extends TestCase {
         }
     }
 
+    @Test
+    public void testTimeToLive() throws InterruptedException {
+        //load 500 rows
+        for (int i = 0; i < 500; i++) {
+            try {
+                m_client.callProcedure("@AdHoc", "INSERT INTO TTL VALUES(" + i + ",CURRENT_TIMESTAMP())");
+            } catch (IOException | ProcCallException e) {
+                fail("fail to insert data for TTL testing.");
+            }
+        }
+        //allow TTL to work, the inserted rows should be deleted after 10 seconds
+        try {
+            long rowCount = m_client.callProcedure("ttlcount").getResults()[0].asScalarLong();
+            assertEquals(500, rowCount);
+            Thread.sleep(60*1000);
+            rowCount = m_client.callProcedure("ttlcount").getResults()[0].asScalarLong();
+            assertEquals(0, rowCount);
+        } catch (Exception e) {
+            fail("Failed to get row count from Table ttl");
+        }
+    }
 }

@@ -127,30 +127,6 @@ import org.hsqldb_voltpatches.types.Type;
  */
 public class Table extends TableBase implements SchemaObject {
 
-    //VoltDB extension to support TTL
-    public static class TimeToLiveVoltDB {
-        final int ttlValue;
-        final String ttlUnit;
-        final ColumnSchema ttlColumn;
-
-        public TimeToLiveVoltDB(int value, String unit, ColumnSchema column) {
-            ttlValue = value;
-            ttlUnit = unit;
-            ttlColumn = column;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (o instanceof TimeToLiveVoltDB) {
-                TimeToLiveVoltDB ttl = (TimeToLiveVoltDB)o;
-                return (ttl.ttlValue == ttlValue && ttl.ttlUnit.equalsIgnoreCase(ttlUnit) &&
-                        ttl.ttlColumn.getName().equals(ttlColumn.getName()));
-            }
-            return false;
-        }
-    }
-    //End of VoltDB extension
-
     public static final Table[] emptyArray = new Table[]{};
 
     // main properties
@@ -2751,8 +2727,8 @@ public class Table extends TableBase implements SchemaObject {
         table.children.add(constraints);
 
         if (timeToLive != null) {
-            VoltXMLElement ttl = new VoltXMLElement("ttl");
-            ttl.attributes.put("name", "ttl");
+            VoltXMLElement ttl = new VoltXMLElement(TimeToLiveVoltDB.TTL_NAME);
+            ttl.attributes.put("name", TimeToLiveVoltDB.TTL_NAME);
             ttl.attributes.put("value", Integer.toString(timeToLive.ttlValue));
             ttl.attributes.put("unit",  timeToLive.ttlUnit);
             ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
