@@ -87,12 +87,8 @@ StatsSource::~StatsSource() {
     m_hostname.free();
 }
 
-/**
- * Retrieve the name of this set of statistics
- * @return Name of statistics
- */
-string StatsSource::getName() {
-    return m_name;
+const char* StatsSource::getTableName() {
+    return ValuePeeker::peekObjectValue(m_tableName);
 }
 
 /**

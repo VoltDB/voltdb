@@ -97,10 +97,10 @@ public:
     voltdb::TableTuple* getStatsTuple(int64_t siteId, int32_t partitionId, bool interval, int64_t now);
 
     /**
-     * Retrieve the name of this set of statistics
-     * @return Name of statistics
+     * Retrieve the name of the table that this set of statistics is associated with.
+     * @return Table name.
      */
-    std::string getName();
+    const char* getTableName();
 
     /**
      * String representation of the statistics. Default implementation is to print the stats table.
@@ -135,6 +135,8 @@ protected:
      */
     std::map<std::string, int> m_columnName2Index;
 
+    NValue m_tableName;
+
     bool interval() { return m_interval; }
 
 private:
@@ -148,11 +150,6 @@ private:
      * Tuple used to modify the stat table.
      */
     voltdb::TableTuple m_statsTuple;
-
-    /**
-     * Name of this set of statistics.
-     */
-    std::string m_name;
 
     voltdb::CatalogId m_hostId;
 
