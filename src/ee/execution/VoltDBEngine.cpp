@@ -1691,7 +1691,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
                 if (catTable->isreplicated()) {
                     if (updateReplicated) {
                         ExecuteWithAllSitesMemory execAllSites;
-                        for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++ engineIt) {
+                        for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
                             EngineLocals& curr = engineIt->second;
                             VoltDBEngine* currEngine = curr.context->getContextEngine();
                             SynchronizedThreadLock::assumeSpecificSiteContext(curr);
