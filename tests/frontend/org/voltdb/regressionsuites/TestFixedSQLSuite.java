@@ -63,7 +63,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
-    public void notestSmallFixedTests() throws IOException, ProcCallException
+    public void testSmallFixedTests() throws IOException, ProcCallException
     {
         subTestInsertNullPartitionString();
         subTestAndExpressionComparingSameTableColumns();
@@ -859,7 +859,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, tables);
     }
 
-    public void notestFixedTickets() throws Exception
+    public void testFixedTickets() throws Exception
     {
         subTestTicketEng2250_IsNull();
         subTestTicketEng1850_WhereOrderBy();
@@ -1073,7 +1073,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, tables);
     }
 
-    //public void notestTicket205() throws IOException, ProcCallException
+    //public void testTicket205() throws IOException, ProcCallException
     //{
     //    String[] tables = {"P1", "R1", "P2", "R2"};
     //    Client client = getClient();
@@ -1832,7 +1832,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTable(client, "P3");
     }
 
-    public void notestVarchar() throws IOException, ProcCallException {
+    public void testVarchar() throws IOException, ProcCallException {
         subTestVarcharByBytes();
         subTestVarcharByCharacter();
         subTestInlineVarcharAggregation();
@@ -2340,7 +2340,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void notestInWithString() throws IOException, ProcCallException, InterruptedException {
+    public void testInWithString() throws IOException, ProcCallException, InterruptedException {
         subTestInWithIntParams();
         subTestInWithStringParams();
         subTestInWithStringParamsAdHoc();
@@ -3004,7 +3004,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, new String[]{"P1", "R1"});
     }
 
-    public void notestExistsBugEng12204() throws Exception {
+    public void testExistsBugEng12204() throws Exception {
         Client client = getClient();
 
         client.callProcedure("@AdHoc", "insert into p1 values (0, 'foo', 0, 0.1);");
@@ -3064,8 +3064,10 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
     public void testSwapTablesTruncateReplicated() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
         Client client = getClient();
-
         client.callProcedure("@AdHoc", "insert into swapper_table_foo values (0, 'dog');");
         client.callProcedure("@AdHoc", "insert into swapper_table_foo values (1, 'cat');");
         client.callProcedure("@SwapTables", "Swapper_Table_Foo", "Swapper_Table_BAR");
@@ -3120,10 +3122,10 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // end of normally disabled section */
 
         //* CONFIG #2: HSQL
-//        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
+        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
         // end of HSQDB config */
         return builder;
     }
