@@ -64,8 +64,6 @@ public:
 
     void rename(std::string name);
 
-    void updateTableName(std::string tableName);
-
 protected:
 
     /**

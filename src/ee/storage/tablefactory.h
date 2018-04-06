@@ -143,10 +143,6 @@ public:
         const std::string &name,
         const Table* templateTable);
 
-    static void configureStats(
-        std::string name,
-        TableStats *tableStats);
-
 private:
     static void initCommon(
         voltdb::CatalogId databaseId,
@@ -156,6 +152,10 @@ private:
         const std::vector<std::string> &columnNames,
         const bool ownsTupleSchema,
         const int32_t compactionThreshold = 95);
+
+    static void configureStats(
+        std::string name,
+        TableStats *tableStats);
 };
 
 }// namespace voltdb

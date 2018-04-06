@@ -711,8 +711,8 @@ void PersistentTable::swapTableState(PersistentTable* otherTable) {
     // instead of PersistentTable?
 
     std::swap(m_name, otherTable->m_name);
-    TableFactory::configureStats(m_name, &m_stats);
-    TableFactory::configureStats(otherTable->m_name, &otherTable->m_stats);
+    m_stats.updateTableName(m_name);
+    otherTable->m_stats.updateTableName(otherTable->m_name);
 
     if (m_tableStreamer &&
             m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
