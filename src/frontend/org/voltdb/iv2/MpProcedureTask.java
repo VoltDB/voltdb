@@ -292,4 +292,8 @@ public class MpProcedureTask extends ProcedureTask
         }
         return sb.toString();
     }
+
+    public boolean needCoordination() {
+        return false;
+    }
 }

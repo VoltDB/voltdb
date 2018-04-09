@@ -303,4 +303,8 @@ public class SysprocFragmentTask extends TransactionTask
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }
+
+    public boolean needCoordination() {
+        return !m_txnState.isReadOnly();
+    }
 }
