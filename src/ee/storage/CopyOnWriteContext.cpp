@@ -424,9 +424,16 @@ void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     }
     m_blocksCompacted++;
     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
-    TBPtr nextBlock = iter->m_blockIterator.data();
-    TBPtr newNextBlock = iter->m_blockIterator.data();
     iter->notifyBlockWasCompactedAway(block);
+}
+
+void CopyOnWriteContext::notifyBlockWasEmptyForReplicatedTable(TBPtr block) {
+    assert(m_iterator.get() != NULL);
+    if (m_finishedTableScan) {
+        return;
+    }
+    CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+    iter->notifyBlockWasEmptyForReplicatedTable(block);
 }
 
 bool CopyOnWriteContext::notifyTupleInsert(TableTuple &tuple) {

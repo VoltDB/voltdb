@@ -75,6 +75,11 @@ public:
     virtual void notifyBlockWasCompactedAway(TBPtr block);
 
     /**
+     * Optional shared replicated table empty block delete handler.
+     */
+    virtual void notifyBlockWasEmptyForReplicatedTable(TBPtr block);
+
+    /**
      * Optional tuple insert handler.
      */
     virtual bool notifyTupleInsert(TableTuple &tuple);

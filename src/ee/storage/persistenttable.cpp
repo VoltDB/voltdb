@@ -1743,6 +1743,18 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
     assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
 }
 
+void PersistentTable::notifyBlockWasEmptyForReplicatedTable(TBPtr block) {
+    if (m_blocksNotPendingSnapshot.find(block) == m_blocksNotPendingSnapshot.end()) {
+        // do not find block in not pending snapshot container
+        assert(m_tableStreamer.get() != NULL);
+        assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
+        m_tableStreamer->notifyBlockWasEmptyForReplicatedTable(block);
+        return;
+    }
+    // else check that block is not in pending snapshot container
+    assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+}
+
 // Call-back from TupleBlock::merge() for each tuple moved.
 void PersistentTable::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                           TableTuple& sourceTuple, TableTuple& targetTuple) {
