@@ -26,9 +26,12 @@ import org.voltdb.iv2.TxnEgo;
 
 public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 {
+    public static final long INITIAL_TIMESTAMP = 0;
+
     boolean m_isRollback;
     boolean m_requiresAck;
     boolean m_rollbackForFault;
+    long m_timestamp = INITIAL_TIMESTAMP;
 
     int m_hash;
     int m_flags = 0;
@@ -108,6 +111,15 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 
     public void setRequireAck(boolean requireAck) {
         setBit(REQUIRESACK, requireAck);
+    }
+
+    // This is used when MP txn is restarted.
+    public void setTimestamp(long timestamp) {
+        m_timestamp = timestamp;
+    }
+
+    public long getTimestamp() {
+        return m_timestamp;
     }
 
     @Override

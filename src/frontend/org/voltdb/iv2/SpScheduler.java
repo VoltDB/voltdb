@@ -67,6 +67,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
+
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -1206,6 +1207,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //    action: no TxnEgo advance
         if (!message.isForReplica()) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+            msg.setTimestamp(message.getTimestamp());
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             advanceTxnEgo();

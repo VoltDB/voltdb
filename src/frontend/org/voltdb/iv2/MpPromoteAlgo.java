@@ -275,7 +275,9 @@ public class MpPromoteAlgo implements RepairAlgo
                 tmLog.debug(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(m_survivors) + " with: " + TxnEgo.txnIdToString(li.getTxnId()) +
                         " " + repairMsg);
             }
-            m_mailbox.repairReplicasWith(m_survivors, repairMsg);
+            if (repairMsg != null) {
+                m_mailbox.repairReplicasWith(m_survivors, repairMsg);
+            }
         }
 
         m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
@@ -337,18 +339,7 @@ public class MpPromoteAlgo implements RepairAlgo
                 assert(ftm.getInitiateTask() != null);
                 m_interruptedTxns.add(ftm.getInitiateTask());
             }
-            CompleteTransactionMessage rollback =
-                new CompleteTransactionMessage(
-                        ftm.getInitiatorHSId(),
-                        ftm.getCoordinatorHSId(),
-                        ftm.getTxnId(),
-                        ftm.isReadOnly(),
-                        0,
-                        true,   // Force rollback as our repair operation.
-                        false,  // no acks in iv2.
-                        restart,   // Indicate rollback for repair as appropriate
-                        ftm.isForReplay());
-            return rollback;
+            return null;
         }
     }
 }

@@ -158,7 +158,8 @@ public class MpProcedureTask extends ProcedureTask
                     false,  // really don't want to have ack the ack.
                     !m_txnState.isReadOnly(),
                     m_msg.isForReplay());
-
+            // TransactionTaskQueue uses it to find matching CompleteTransactionMessage
+            restart.setTimestamp(System.nanoTime());
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             //restart.setForReplica(false);
             if (hostLog.isDebugEnabled()) {

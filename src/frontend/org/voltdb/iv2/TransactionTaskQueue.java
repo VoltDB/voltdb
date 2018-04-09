@@ -20,11 +20,13 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.Map.Entry;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.CompleteTransactionMessage;
 
 public class TransactionTaskQueue
 {
@@ -38,7 +40,19 @@ public class TransactionTaskQueue
     // table writes from blocking sites partially, e.g. some sites wait on countdown latch for all
     // sites within a node to receive a fragment, but due to node failure the failed remote leader may never forward the
     // fragment to the rest of sites on the given node, causes deadlock and can't be recovered from repair.
-    static NonBlockingHashMap<SiteTaskerQueue, TransactionTask> stashedMpWrites = new NonBlockingHashMap<>();
+    private static class QueuedTasks {
+        public CompleteTransactionTask m_lastCompleteTxnTask;
+        public FragmentTask m_lastFragTask;
+
+        public void addCompletedTransactionTask(CompleteTransactionTask task) {
+            m_lastCompleteTxnTask = task;
+        }
+
+        public void addFragmentTask(FragmentTask task) {
+            m_lastFragTask = task;
+        }
+    }
+    static NonBlockingHashMap<SiteTaskerQueue, QueuedTasks> stashedMpWrites = new NonBlockingHashMap<>();
 
     final private int m_siteCount;
 
@@ -80,15 +94,14 @@ public class TransactionTaskQueue
                 retval = true;
             }
             /*
-             * This branch is safe because
+             * This branch coordinates FragmentTask or CompletedTransactionTask,
+             * holds the tasks until all the sites on the node receive the task.
+             * Task with newer spHandle will
              */
             else if (task instanceof FragmentTask ||
                        task instanceof SysprocFragmentTask ||
                        task instanceof CompleteTransactionTask) {
-                stashedMpWrites.put(m_taskQueue, task);
-                if (stashedMpWrites.size() == m_siteCount) {
-                    releaseStashedMpWrites();
-                }
+                coordinatedTaskQueueOffer(task);
             }
             else {
                 taskQueueOffer(task);
@@ -106,15 +119,14 @@ public class TransactionTaskQueue
                 retval = true;
             }
             /*
-             * For MP writes, the last site reach here enqueues task for every body.
+             * This branch coordinates FragmentTask or CompletedTransactionTask,
+             * holds the tasks until all the sites on the node receive the task.
+             * Task with newer spHandle will
              */
             if (task instanceof FragmentTask ||
                 task instanceof SysprocFragmentTask ||
                 task instanceof CompleteTransactionTask) {
-                stashedMpWrites.put(m_taskQueue, task);
-                if (stashedMpWrites.size() == m_siteCount) {
-                    releaseStashedMpWrites();
-                }
+                coordinatedTaskQueueOffer(task);
             } else {
                 taskQueueOffer(task);
             }
@@ -130,14 +142,78 @@ public class TransactionTaskQueue
         m_taskQueue.offer(task);
     }
 
-    // All sites receives Mp write messages, time to fire the task.
-    static private void releaseStashedMpWrites()
+    // All sites receives FragmentTask messages, time to fire the task.
+    static private void releaseStashedFragments()
     {
         stashedMpWrites.forEach((queue, task) -> {
-            Iv2Trace.logSiteTaskerQueueOffer(task);
-            queue.offer(task);
+            Iv2Trace.logSiteTaskerQueueOffer(task.m_lastFragTask);
+            queue.offer(task.m_lastFragTask);
+            task.m_lastFragTask = null;
         });
-        stashedMpWrites.clear();
+    }
+
+    // All sites receives CompletedTransactionTask messages, time to fire the task.
+    static private void releaseStashedComleteTxns()
+    {
+        stashedMpWrites.forEach((queue, task) -> {
+            Iv2Trace.logSiteTaskerQueueOffer(task.m_lastCompleteTxnTask);
+            queue.offer(task.m_lastCompleteTxnTask);
+            task.m_lastCompleteTxnTask = null;
+        });
+    }
+
+    private void coordinatedTaskQueueOffer(TransactionTask task) {
+        QueuedTasks queuedTask;
+        if ((queuedTask = stashedMpWrites.get(m_taskQueue)) == null) {
+            queuedTask =  new QueuedTasks();
+            stashedMpWrites.put(m_taskQueue, queuedTask);
+        }
+        if (task instanceof CompleteTransactionTask) {
+            if (queuedTask.m_lastCompleteTxnTask == null ||
+                    queuedTask.m_lastCompleteTxnTask.getSpHandle() < task.getSpHandle()) {
+                // Queue CompleteTxn task if there is no queued CompleteTxn task.
+                // If CompleteTxn exists, only keep latest CT task.
+                queuedTask.addCompletedTransactionTask((CompleteTransactionTask)task);
+            }
+            // CT task cancels previous fragment task
+            queuedTask.m_lastFragTask = null;
+        } else if (task instanceof FragmentTask ||
+                   task instanceof SysprocFragmentTask) {
+            if (queuedTask.m_lastCompleteTxnTask == null ||
+                    queuedTask.m_lastCompleteTxnTask.getSpHandle() < task.getSpHandle()) {
+                // Queue Fragment task if there is no queued CompleteTxn task.
+                // If CompleteTxn exists, only queue fragment task newer than CompleteTxn.
+                queuedTask.addFragmentTask((FragmentTask)task);
+            }
+        }
+
+        int receivedFrags = 0;
+        int receivedCompleteTxns = 0;
+        long completeTxnsTimestamp = CompleteTransactionMessage.INITIAL_TIMESTAMP;
+        boolean first = true;
+        for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
+            if (e.getValue().m_lastFragTask != null) {
+                receivedFrags++;
+            }
+            if (first) {
+                completeTxnsTimestamp = e.getValue().m_lastCompleteTxnTask.getTimestamp();
+                first = false;
+            }
+            // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
+            // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
+            // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
+            if (e.getValue().m_lastCompleteTxnTask != null &&
+                    e.getValue().m_lastCompleteTxnTask.getTimestamp() == completeTxnsTimestamp) {
+                receivedCompleteTxns++;
+            }
+        }
+
+        if (receivedFrags == m_siteCount) {
+            releaseStashedFragments();
+        }
+        if (receivedCompleteTxns == m_siteCount) {
+            releaseStashedComleteTxns();
+        }
     }
 
     /**
