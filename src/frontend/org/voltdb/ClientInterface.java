@@ -2305,7 +2305,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     public void runTimeToLive(String tableName, String columnName, long ttlValue, int chunkSize, int timeout,
-            TimeToLiveProcessor.TimeToLiveStats stats) {
+            TimeToLiveProcessor.TTLStats stats) {
 
         CountDownLatch latch = new CountDownLatch(1);
         final ProcedureCallback cb = new ProcedureCallback() {

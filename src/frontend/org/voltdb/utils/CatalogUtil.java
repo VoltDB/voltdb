@@ -3022,14 +3022,14 @@ public abstract class CatalogUtil {
         return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
     }
 
-    public static NavigableSet<Table> getTimeToLiveTables(Database db) {
-        ImmutableSortedSet.Builder<Table> ttlTables = ImmutableSortedSet.naturalOrder();
+    public static Map<String, Table> getTimeToLiveTables(Database db) {
+        Map<String, Table> ttls = Maps.newHashMap();
         for (Table t : db.getTables()) {
             if (t.getTimetolive() != null && t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME) != null) {
-                ttlTables.add(t);
+                ttls.put(t.getTypeName(),t);
             }
         }
-        return ttlTables.build();
+        return ttls;
     }
 
     public static boolean isColumnIndexed(Table table, Column column) {
