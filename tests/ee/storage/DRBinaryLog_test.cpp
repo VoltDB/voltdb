@@ -69,10 +69,12 @@ static int64_t addPartitionId(int64_t value) {
 struct ClusterCtx {
     ClusterCtx(VoltDBEngine* engine,
                EngineLocals mpEngineLocals,
-               SharedEngineLocalsType enginesByPartitionId)
+               SharedEngineLocalsType enginesByPartitionId,
+               int32_t* threadPartitionId)
     : m_engine(engine)
     , m_mpEngineLocals(mpEngineLocals)
     , m_enginesByPartitionId(enginesByPartitionId)
+    , m_threadPartitionId(threadPartitionId)
     {
     }
 
@@ -80,6 +82,7 @@ struct ClusterCtx {
     : m_engine(NULL)
     , m_mpEngineLocals()
     , m_enginesByPartitionId()
+    , m_threadPartitionId(NULL)
     {
     }
 
@@ -95,10 +98,14 @@ struct ClusterCtx {
         return m_enginesByPartitionId;
     }
 
+    int32_t* getThreadPartitionId() {
+        return m_threadPartitionId;
+    }
 private:
     VoltDBEngine* m_engine;
     EngineLocals m_mpEngineLocals;
     SharedEngineLocalsType m_enginesByPartitionId;
+    int32_t* m_threadPartitionId;
 };
 
 static std::map<int, ClusterCtx> s_clusterMap;
@@ -149,7 +156,7 @@ protected:
 
     int32_t partitionForToken(int32_t hashCode) const {
         // partition of VoltDBEngine super of MockVoltDBEngine is 0
-        return -1;
+        return 0;
     }
 };
 
@@ -160,7 +167,8 @@ public:
       : m_context(new ExecutorContext(0, 0, NULL, topend, pool, this,
                                       "localhost", 2, drStream, drReplicatedStream, clusterId))
     {
-
+        setPartitionIdForTest(0);
+        ThreadLocalPool::setPartitionIds(0);
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
         std::vector<bool> exportColumnAllowNull(12, false);
@@ -200,8 +208,7 @@ public:
         // Add the engine to the global list tracking replicated tables
         setLowestSiteForTest();
         ThreadLocalPool::setPartitionIds(getPartitionId());
-        VOLT_DEBUG("Initializing partition %d (tid %ld) with context %p", m_partitionId,
-                SynchronizedThreadLock::getThreadId(), m_context);
+        VOLT_DEBUG("Initializing context %p", m_context.get());
         EngineLocals newLocals = EngineLocals(ExecutorContext::getExecutorContext());
         SynchronizedThreadLock::init(1, newLocals);
     }
@@ -226,6 +233,7 @@ class ReplicaProcessContextSwitcher {
 public:
     ReplicaProcessContextSwitcher() {
         ClusterCtx cc = s_clusterMap[CLUSTER_ID_REPLICA];
+        ThreadLocalPool::setThreadPartitionIdForTest(cc.getThreadPartitionId());
         SynchronizedThreadLock::setEngineLocalsForTest(cc.getEngine()->getPartitionId(),
                                                        cc.getMpEngineLocals(),
                                                        cc.getEnginesByPartitionId());
@@ -233,6 +241,7 @@ public:
 
     ~ReplicaProcessContextSwitcher() {
         ClusterCtx cc = s_clusterMap[CLUSTER_ID];
+        ThreadLocalPool::setThreadPartitionIdForTest(cc.getThreadPartitionId());
         SynchronizedThreadLock::setEngineLocalsForTest(cc.getEngine()->getPartitionId(),
                                                        cc.getMpEngineLocals(),
                                                        cc.getEnginesByPartitionId());
@@ -253,16 +262,19 @@ public:
         m_engine = new MockVoltDBEngine(CLUSTER_ID, &m_topend, &m_enginesPool, &m_drStream, &m_drReplicatedStream);
         s_clusterMap[CLUSTER_ID] = ClusterCtx(m_engine,
                                               SynchronizedThreadLock::s_mpEngine,
-                                              SynchronizedThreadLock::s_enginesByPartitionId);
+                                              SynchronizedThreadLock::s_enginesByPartitionId,
+                                              ThreadLocalPool::getThreadPartitionIdForTest());
         SynchronizedThreadLock::resetEngineLocalsForTest();
 
         m_engineReplica = new MockVoltDBEngine(CLUSTER_ID_REPLICA, &m_topend, &m_enginesPool, &m_drStreamReplica, &m_drReplicatedStreamReplica);
         s_clusterMap[CLUSTER_ID_REPLICA] = ClusterCtx(m_engineReplica,
                                                       SynchronizedThreadLock::s_mpEngine,
-                                                      SynchronizedThreadLock::s_enginesByPartitionId);
+                                                      SynchronizedThreadLock::s_enginesByPartitionId,
+                                                      ThreadLocalPool::getThreadPartitionIdForTest());
 
         // Make the master cluster the default, starting now.
         ClusterCtx cc = s_clusterMap[CLUSTER_ID];
+        ThreadLocalPool::setThreadPartitionIdForTest(cc.getThreadPartitionId());
         SynchronizedThreadLock::setEngineLocalsForTest(cc.getEngine()->getPartitionId(),
                                                        cc.getMpEngineLocals(),
                                                        cc.getEnginesByPartitionId());
@@ -436,6 +448,7 @@ public:
         delete m_engine;
 
         ClusterCtx cc = s_clusterMap[CLUSTER_ID_REPLICA];
+        ThreadLocalPool::setThreadPartitionIdForTest(cc.getThreadPartitionId());
         SynchronizedThreadLock::setEngineLocalsForTest(cc.getEngine()->getPartitionId(),
                                                        cc.getMpEngineLocals(),
                                                        cc.getEnginesByPartitionId());

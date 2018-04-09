@@ -528,6 +528,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return (m_tempTableMemoryLimit * 3) / 4;
         }
 
+        void setPartitionIdForTest(int32_t partitionId) { m_partitionId = partitionId; }
         int32_t getPartitionId() const { return m_partitionId; }
 
     protected:

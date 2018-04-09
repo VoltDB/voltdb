@@ -58,56 +58,88 @@ bool DO_BACKTRACE() {
 
 }
 
+// Output log message header in this format: [type] [threadPartition:enginePartition] [file:line:function] time -
+// ex: [ERROR] [1:1] [somefile.cpp:123:doSome()] 2008/07/06 10:00:00 -
+void outputLogHeader(const char *file, int line, const char *func, int level) {
+    time_t t = ::time(NULL) ;
+    tm *curTime = localtime(&t);
+    char time_str[32]; // FIXME
+    ::strftime(time_str, 32, VOLT_LOG_TIME_FORMAT, curTime);
+    const int32_t tPartId = ThreadLocalPool::getThreadPartitionIdWithNullCheck();
+    const int32_t ePartId = ThreadLocalPool::getEnginePartitionIdWithNullCheck();
+    const char* type;
+    switch (level) {
+        case VOLT_LEVEL_ERROR:
+            type = "ERROR";
+            break;
+        case VOLT_LEVEL_WARN:
+            type = "WARN ";
+            break;
+        case VOLT_LEVEL_INFO:
+            type = "INFO ";
+            break;
+        case VOLT_LEVEL_DEBUG:
+            type = "DEBUG";
+            break;
+        case VOLT_LEVEL_TRACE:
+            type = "TRACE";
+            break;
+        default:
+            type = "UNKWN";
+    }
+    printf("[%s] [T%d:E%d] [%s:%d:%s()] %s - ", type, tPartId, ePartId, file, line, func, time_str);
+}
+
 StackTrace::StackTrace() {
 
     if (DO_BACKTRACE()) {
-        /**
-         * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
-         */
-        void *traces[128];
-        char mangledName[256];
-        for (int i = 0; i < 128; i++) traces[i] = NULL; // silence valgrind
-        const int numTraces = backtrace(traces, 128);
-        m_traceSymbols = backtrace_symbols(traces, numTraces);
+    /**
+     * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
+     */
+    void *traces[128];
+    char mangledName[256];
+    for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
+    const int numTraces = backtrace( traces, 128);
+    m_traceSymbols = backtrace_symbols( traces, numTraces);
 
-        for (int ii = 0; ii < numTraces; ii++) {
-            std::size_t sz = 200;
-            // Note: must use malloc vs. new so __cxa_demangle can use realloc.
-            char *function = static_cast<char *>(::malloc(sz));
-            char *begin = NULL, *end = NULL;
+    for (int ii = 0; ii < numTraces; ii++) {
+        std::size_t sz = 200;
+        // Note: must use malloc vs. new so __cxa_demangle can use realloc.
+        char *function = static_cast<char*>(::malloc(sz));
+        char *begin = NULL, *end = NULL;
 
-            //Find parens surrounding mangled name
-            for (char *j = m_traceSymbols[ii]; *j; ++j) {
-                if (*j == '(') {
-                    begin = j;
+        //Find parens surrounding mangled name
+        for (char *j = m_traceSymbols[ii]; *j; ++j) {
+            if (*j == '(') {
+                begin = j;
                 } else if (*j == '+') {
-                    end = j;
-                }
+                end = j;
             }
-
-            if (begin && end) {
-                begin++;
-                ::memcpy(mangledName, begin, end - begin);
-                mangledName[end - begin] = '\0';
-                int status;
-                char *ret = abi::__cxa_demangle(mangledName, function, &sz, &status);
-                if (ret) {
-                    //return value may be a realloc of input
-                    function = ret;
-                } else {
-                    // demangle failed, treat it like a C function with no args
-                    strncpy(function, mangledName, sz);
-                    strncat(function, "()", sz);
-                    function[sz - 1] = '\0';
-                }
-                m_traces.push_back(std::string(function));
-            } else {
-                //didn't find the mangled name in the trace
-                m_traces.push_back(std::string(m_traceSymbols[ii]));
-            }
-            ::free(function);
         }
+
+        if (begin && end) {
+            begin++;
+            ::memcpy(mangledName, begin, end-begin);
+            mangledName[end-begin] = '\0';
+            int status;
+            char *ret = abi::__cxa_demangle(mangledName, function, &sz, &status);
+            if (ret) {
+                //return value may be a realloc of input
+                function = ret;
+            } else {
+                // demangle failed, treat it like a C function with no args
+                strncpy(function, mangledName, sz);
+                strncat(function, "()", sz);
+                function[sz-1] = '\0';
+            }
+            m_traces.push_back(std::string(function));
+        } else {
+            //didn't find the mangled name in the trace
+            m_traces.push_back(std::string(m_traceSymbols[ii]));
+        }
+        ::free(function);
     }
+}
     else {
         m_traces.push_back("Stack traces disabled from Mac OS X Java process");
         m_traceSymbols = NULL;
