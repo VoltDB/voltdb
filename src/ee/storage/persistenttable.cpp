@@ -1337,6 +1337,9 @@ void PersistentTable::deleteTupleFinalize(TableTuple& target) {
     }
 
     // No snapshot in progress cares, just whack it.
+    // For Shared Replicated Tables case, we will preserve deleted tuples to tempTable
+    // and delete them directly here.
+    // We are in single thread mode in this case, so should be fine.
     deleteTupleStorage(target); // also frees object columns
 }
 
@@ -1736,7 +1739,7 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
         m_tableStreamer->notifyBlockWasCompactedAway(block);
         return;
     }
-    // else check that block is in pending snapshot container
+    // else check that block is not in pending snapshot container
     assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
 }
 

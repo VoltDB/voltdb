@@ -40,7 +40,8 @@ public:
     bool next(TableTuple &out);
 
     void notifyBlockWasCompactedAway(TBPtr block) {
-        if (m_blockIterator != m_end) {
+        // skip compacting away current block
+        if (m_blockIterator != m_end && m_currentBlock != block) {
             TBPtr nextBlock = m_blockIterator.data();
             //The next block is the one that was compacted away
             //Need to move the iterator forward to skip it
