@@ -72,10 +72,6 @@ public class TransactionTaskQueue
     {
         m_taskQueue = queue;
         m_siteCount = VoltDB.instance().getCatalogContext().getNodeSettings().getLocalSitesCount();
-        if (!stashedMpWrites.contains(m_taskQueue)) {
-            QueuedTasks queuedTask =  new QueuedTasks();
-            stashedMpWrites.put(m_taskQueue, queuedTask);
-        }
     }
 
     /**
@@ -175,8 +171,11 @@ public class TransactionTaskQueue
 
     private void coordinatedTaskQueueOffer(TransactionTask task) {
         synchronized (lock) {
-            QueuedTasks queuedTask = stashedMpWrites.get(m_taskQueue);
-            assert (queuedTask != null);
+            QueuedTasks queuedTask;
+            if ((queuedTask = stashedMpWrites.get(m_taskQueue)) == null) {
+                queuedTask =  new QueuedTasks();
+                stashedMpWrites.put(m_taskQueue, queuedTask);
+            }
 
             if (task instanceof CompleteTransactionTask) {
                 if (queuedTask.m_lastCompleteTxnTask == null ||
