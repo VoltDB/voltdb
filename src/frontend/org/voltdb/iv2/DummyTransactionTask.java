@@ -69,4 +69,8 @@ public class DummyTransactionTask extends TransactionTask {
     public long getSPIHSId() {
         return m_txnState.initiatorHSId;
     }
+
+    public boolean needCoordination() {
+        return false;
+    }
 }
