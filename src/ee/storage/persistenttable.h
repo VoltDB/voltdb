@@ -620,6 +620,9 @@ private:
                                     std::vector<TableIndex*> const& indexesToUpdate);
 
 
+    // Callback from
+    // 1. TupleBlock become empty after TupleBlock::merge()
+    // 2. TupleBlock become empty for delete last tuple of a TupleBlock during snapshotting a shared replicated table
     void notifyBlockWasCompactedAway(TBPtr block);
 
     // Call-back from TupleBlock::merge() for each tuple moved.
@@ -1077,7 +1080,10 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
         m_blocksNotPendingSnapshot.erase(block);
         // if it's replicated table, the delete block could be in pending snapshot or actively snapshot
         // erase here for deterministic dereference tupleblock pointer
-        m_blocksPendingSnapshot.erase(block);
+        if (m_isReplicated && m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            m_blocksPendingSnapshot.erase(block);
+            notifyBlockWasCompactedAway(block);
+        }
 
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
