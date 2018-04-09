@@ -980,9 +980,6 @@ public class ParserDDL extends ParserRoutine {
                 return compileAlterColumn(t, column, columnIndex);
             }
             case Tokens.USING : {
-                if (t.getTTL() == null) {
-                    throw Error.error(ErrorCode.X_42501);
-                }
                 return readTimeToLive(t, true);
             }
             default : {
