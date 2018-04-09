@@ -40,35 +40,13 @@ public:
     bool next(TableTuple &out);
 
     void notifyBlockWasCompactedAway(TBPtr block) {
-        // skip compacting away current block
-        if (m_blockIterator != m_end && m_currentBlock != block) {
-            TBPtr nextBlock = m_blockIterator.data();
-            //The next block is the one that was compacted away
-            //Need to move the iterator forward to skip it
-            if (nextBlock == block) {
-                m_blockIterator++;
+        removeEmptyBlock(block);
+    }
 
-                //There is another block after the one that was compacted away
-                if (m_blockIterator != m_end) {
-                    TBPtr newNextBlock = m_blockIterator.data();
-                    m_blocks.erase(block->address());
-                    m_blockIterator = m_blocks.find(newNextBlock->address());
-                    m_end = m_blocks.end();
-                    assert(m_blockIterator != m_end);
-                } else {
-                    //No block after the one compacted away
-                    //set everything to end
-                    m_blocks.erase(block->address());
-                    m_blockIterator = m_blocks.end();
-                    m_end = m_blocks.end();
-                }
-            } else {
-                //Some random block was compacted away. Remove it and regenerate the iterator
-                m_blocks.erase(block->address());
-                m_blockIterator = m_blocks.find(nextBlock->address());
-                m_end = m_blocks.end();
-                assert(m_blockIterator != m_end);
-            }
+    void notifyBlockWasEmptyForReplicatedTable(TBPtr block) {
+        // skip compacting away current block
+        if (m_currentBlock != block) {
+            removeEmptyBlock(block);
         }
     }
 
@@ -111,6 +89,39 @@ private:
     TBPtr m_currentBlock;
     // flag to track if the snapshot was activated when the table was empty
     bool m_tableEmpty;
+
+    void removeEmptyBlock(TBPtr block) {
+        if (m_blockIterator != m_end) {
+            TBPtr nextBlock = m_blockIterator.data();
+            //The next block is the one that was compacted away
+            //Need to move the iterator forward to skip it
+            if (nextBlock == block) {
+                m_blockIterator++;
+
+                //There is another block after the one that was compacted away
+                if (m_blockIterator != m_end) {
+                    TBPtr newNextBlock = m_blockIterator.data();
+                    m_blocks.erase(block->address());
+                    m_blockIterator = m_blocks.find(newNextBlock->address());
+                    m_end = m_blocks.end();
+                    assert(m_blockIterator != m_end);
+                } else {
+                    //No block after the one compacted away
+                    //set everything to end
+                    m_blocks.erase(block->address());
+                    m_blockIterator = m_blocks.end();
+                    m_end = m_blocks.end();
+                }
+            } else {
+                //Some random block was compacted away. Remove it and regenerate the iterator
+                m_blocks.erase(block->address());
+                m_blockIterator = m_blocks.find(nextBlock->address());
+                m_end = m_blocks.end();
+                assert(m_blockIterator != m_end);
+            }
+        }
+    }
+
 public:
     int32_t m_skippedDirtyRows;
     int32_t m_skippedInactiveRows;
