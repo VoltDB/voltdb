@@ -954,7 +954,7 @@ CLEANING
     <arg line="-c 'rm -rf voltdb/*.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -rf voltdb/*.so voltdb/*.jnilib'"/>
+    <arg line="-c 'rm -rf voltdb/*.so voltdb/*.jnilib voltdb/*.dylib'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf src/ee/catalog/*'"/>
