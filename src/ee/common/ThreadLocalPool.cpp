@@ -64,9 +64,6 @@ void createThreadLocalKey() {
 }
 
 ThreadLocalPool::ThreadLocalPool()
-#ifdef VOLT_POOL_CHECKING
-    : m_allocationTrace()
-#endif
 {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
     if (pthread_getspecific(m_key) == NULL) {
@@ -124,8 +121,7 @@ ThreadLocalPool::~ThreadLocalPool() {
             if (m_allocatingThread != -1 && *enginePartitionIdPtr != m_allocatingEngine) {
                 // Only the VoltDBEngine's ThreadLocalPool instance will have a -1 allocating thread because the threadId
                 // has not been assigned yet. Normally the last ThreadLocalPool instance to be deallocated is the VoltDBEngine.
-                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", m_allocatingEngine, m_allocatingThread);
-                m_allocationTrace.printLocalTrace();
+                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d", m_allocatingEngine, m_allocatingThread);
                 VOLT_ERROR("deallocation from:");
                 VOLT_ERROR_STACK();
                 assert(false);
@@ -170,8 +166,7 @@ ThreadLocalPool::~ThreadLocalPool() {
             // but deallocated on partition that cleans up the last view handler so we can't enforce thread-based allocation validation below:
             // if (m_allocatingThread != -1 && (getThreadPartitionId() != m_allocatingThread || getEnginePartitionId() != m_allocatingEngine)) {
             if (m_allocatingThread != -1 && getEnginePartitionId() != m_allocatingEngine) {
-                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", m_allocatingEngine, m_allocatingThread);
-                m_allocationTrace.printLocalTrace();
+                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d", m_allocatingEngine, m_allocatingThread);
                 VOLT_ERROR("deallocation from partition %d on thread %d:", getEnginePartitionId(), getThreadPartitionId());
                 VOLT_ERROR_STACK();
                 assert(false);
