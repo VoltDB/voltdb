@@ -394,13 +394,14 @@ public class VoltZK {
         try {
             if(!zklock.acquireLockWithTimeout(TimeUnit.SECONDS.toMillis(60))) {
                 return "Could not acquire a lock to create action blocker:" + request;
+            } else {
+                return setActionBlocker(zk, node, mode, hostLog, request);
             }
         } finally {
             try {
                 zklock.releaseLock();
             } catch (IOException e) {}
         }
-        return setActionBlocker(zk, node, mode, hostLog, request);
     }
 
     private static String setActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {

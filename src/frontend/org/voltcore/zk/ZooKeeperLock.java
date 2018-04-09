@@ -56,7 +56,7 @@ public class ZooKeeperLock implements Watcher {
     }
 
     /**
-     * @param timeout  timeout in millisecond
+     * @param timeout The value of timeout in millisecond. if timeout < 0, no timeout
      * @return true if a lock is successfully acquired
      */
     public boolean acquireLockWithTimeout(long timeout) {
