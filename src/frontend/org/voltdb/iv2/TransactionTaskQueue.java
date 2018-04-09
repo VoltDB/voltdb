@@ -146,7 +146,9 @@ public class TransactionTaskQueue
     // All sites receives FragmentTask messages, time to fire the task.
     static private void releaseStashedFragments()
     {
-        hostLog.info("release stashed fragment messages");
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("release stashed fragment messages");
+        }
         stashedMpWrites.forEach((queue, task) -> {
             Iv2Trace.logSiteTaskerQueueOffer(task.m_lastFragTask);
             queue.offer(task.m_lastFragTask);
@@ -157,7 +159,9 @@ public class TransactionTaskQueue
     // All sites receives CompletedTransactionTask messages, time to fire the task.
     static private void releaseStashedComleteTxns()
     {
-        hostLog.info("release stashed complete transaction message");
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("release stashed complete transaction message");
+        }
         stashedMpWrites.forEach((queue, task) -> {
             Iv2Trace.logSiteTaskerQueueOffer(task.m_lastCompleteTxnTask);
             queue.offer(task.m_lastCompleteTxnTask);
@@ -214,8 +218,10 @@ public class TransactionTaskQueue
                 }
             }
 
-            hostLog.info("Received " + task + " " + receivedFrags + "/" + m_siteCount);
-            dumpStashedMpWrites();
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("Received " + task + " " + receivedFrags + "/" + m_siteCount);
+                dumpStashedMpWrites();
+            }
             if (receivedFrags == m_siteCount) {
                 releaseStashedFragments();
             }

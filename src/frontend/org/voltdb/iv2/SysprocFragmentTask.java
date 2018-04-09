@@ -305,6 +305,10 @@ public class SysprocFragmentTask extends TransactionTask
     }
 
     public boolean needCoordination() {
-        return !m_txnState.isReadOnly();
+        return !m_txnState.isReadOnly() && !isBorrowedTask();
+    }
+
+    public boolean isBorrowedTask() {
+        return false;
     }
 }

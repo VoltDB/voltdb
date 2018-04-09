@@ -448,6 +448,10 @@ public class FragmentTask extends TransactionTask
     }
 
     public boolean needCoordination() {
-        return !m_txnState.isReadOnly();
+        return !m_txnState.isReadOnly() && !isBorrowedTask();
+    }
+
+    public boolean isBorrowedTask() {
+        return true;
     }
 }

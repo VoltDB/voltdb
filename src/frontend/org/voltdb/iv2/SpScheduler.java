@@ -860,16 +860,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // BorrowTask is a read only task embedded in a MP transaction
         // and its response (FragmentResponseMessage) should not be buffered
         if (message.getFragmentTaskMessage().isSysProcTask()) {
-            final SysprocFragmentTask task =
-                new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
+            final SysprocBorrowedTask task =
+                new SysprocBorrowedTask(m_mailbox, (ParticipantTransactionState)txn,
                                         m_pendingTasks, message.getFragmentTaskMessage(),
                                         message.getInputDepMap());
             task.setResponseNotBufferable();
             m_pendingTasks.offer(task);
         }
         else {
-            final FragmentTask task =
-                new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
+            final BorrowedTask task =
+                new BorrowedTask(m_mailbox, (ParticipantTransactionState)txn,
                         m_pendingTasks, message.getFragmentTaskMessage(),
                         message.getInputDepMap());
             task.setResponseNotBufferable();
