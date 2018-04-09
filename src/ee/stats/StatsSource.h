@@ -71,7 +71,7 @@ public:
      */
     void configure(std::string name);
 
-    void updateTableName(std::string tableName);
+    void updateTableName(const std::string& tableName);
 
     /*
      * Destructor that frees tupleSchema_, and statsTable_

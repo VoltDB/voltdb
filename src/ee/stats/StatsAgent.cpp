@@ -61,7 +61,7 @@ void StatsAgent::registerStatsSource(StatisticsSelectorType sst,
                                      CatalogId catalogId,
                                      StatsSource* statsSource) {
     assert(statsSource != NULL);
-    m_statsCategoryByStatsSelector[sst].insert(pair<CatalogId, StatsSource*>(catalogId, statsSource));
+    m_statsCategoryByStatsSelector[sst].insert(make_pair(catalogId, statsSource));
     VOLT_DEBUG("Partition %d registered %s stats source (%p) for table %s at index %d.",
                ThreadLocalPool::getEnginePartitionId(),
                sst == StatisticsSelectorType::STATISTICS_SELECTOR_TYPE_TABLE ? "a table" : "an index",

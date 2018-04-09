@@ -1751,8 +1751,10 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
             if (updateReplicated) {
                 continue;
             }
-            // Streamed table could not be truncated or swapped, but pre-built DR conflict table
-            // should have already been registered in the stats already.
+            // Streamed tables could not be truncated or swapped, so we will never change this
+            // table stats map in a not-from-scratch mode.
+            // Before this rebuildTableCollections() is called, pre-built DR conflict tables
+            // (which are also streamed tables) should have already been instantiated.
             if (fromScratch) {
                 stats = tcd->getStreamedTable()->getTableStats();
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,

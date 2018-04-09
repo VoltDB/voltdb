@@ -83,7 +83,7 @@ void StatsSource::configure(string name) {
     m_statsTuple = m_statsTable->tempTuple();
 }
 
-void StatsSource::updateTableName(std::string tableName) {
+void StatsSource::updateTableName(const std::string& tableName) {
     m_tableName = ValueFactory::getStringValue(tableName);
 }
 
