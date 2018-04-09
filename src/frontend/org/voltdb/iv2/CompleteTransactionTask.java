@@ -138,6 +138,11 @@ public class CompleteTransactionTask extends TransactionTask
         return m_completeMsg.getSpHandle();
     }
 
+    public long getTimestamp()
+    {
+        return m_completeMsg.getTimestamp();
+    }
+
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
