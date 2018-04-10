@@ -41,6 +41,13 @@ bool DO_BACKTRACE() {
 #else
     // On the Mac, calling backtrace_symbols can crash if done from
     // a Java process.  But it's okay when done from an IPC EE.
+    ExecutorContext* ec = ExecutorContext::getExecutorContext();
+    if (!ec) {
+        // Either we're in a unit test, or before the DB has completely initialized.
+        // No way to know if we're in a JNI environment or not...
+        return false;
+    }
+
     VoltDBEngine* engine = ExecutorContext::getEngine();
     if (engine == NULL) {
         return false;
