@@ -57,10 +57,13 @@ public class MpProcedureTask extends ProcedureTask
     final private AtomicReference<Map<Integer, Long>> m_restartMastersMap = new AtomicReference<Map<Integer, Long>>();
     boolean m_isRestart = false;
     final Iv2InitiateTaskMessage m_msg;
+    // Generator uses node id under ZK.leaders_globalservice directory, not host id.
+    // Only used for MP scoreboard at TransactionTaskQueue to track restarted MP transactions.
+    final private MpRestartSequenceGenerator m_resartSeqGenerator;
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters,
-                  long buddyHSId, boolean isRestart)
+                  long buddyHSId, boolean isRestart, int leaderNodeId)
     {
         super(mailbox, procName,
               new MpTransactionState(mailbox, msg, pInitiators, partitionMasters,
@@ -71,6 +74,7 @@ public class MpProcedureTask extends ProcedureTask
         m_initiatorHSIds.addAll(pInitiators);
         m_restartMasters.set(new ArrayList<Long>());
         m_restartMastersMap.set(new HashMap<Integer, Long>());
+        m_resartSeqGenerator = new MpRestartSequenceGenerator(leaderNodeId);
     }
 
     /**
@@ -159,7 +163,10 @@ public class MpProcedureTask extends ProcedureTask
                     !m_txnState.isReadOnly(),
                     m_msg.isForReplay());
             // TransactionTaskQueue uses it to find matching CompleteTransactionMessage
-            restart.setTimestamp(System.nanoTime());
+            long ts = m_resartSeqGenerator.getNextSeqNum();
+            restart.setTimestamp(ts);
+            // Update the timestamp to txnState so following restarted fragments could use it
+            m_txnState.setTimestamp(ts);
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             //restart.setForReplica(false);
             if (hostLog.isDebugEnabled()) {

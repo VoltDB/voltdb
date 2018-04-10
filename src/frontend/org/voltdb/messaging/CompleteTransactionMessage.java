@@ -26,8 +26,6 @@ import org.voltdb.iv2.TxnEgo;
 
 public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 {
-    public static final long INITIAL_TIMESTAMP = 0;
-
     boolean m_isRollback;
     boolean m_requiresAck;
     boolean m_rollbackForFault;
@@ -166,6 +164,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("\n  TIMESTAMP: ").append(m_timestamp);
         sb.append("\n  TRUNCATION HANDLE:" + getTruncationHandle());
         sb.append("\n  HASH: " + String.valueOf(m_hash));
+        sb.append("\n  TIMESTAMP: " + getTimestamp());
 
         if (isRollback())
             sb.append("\n  THIS IS AN ROLLBACK REQUEST");
