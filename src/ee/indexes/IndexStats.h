@@ -92,7 +92,6 @@ private:
     voltdb::TableIndex *m_index;
 
     voltdb::NValue m_indexName;
-    voltdb::NValue m_tableName;
     voltdb::NValue m_indexType;
 
     int8_t m_isUnique;

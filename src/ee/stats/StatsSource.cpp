@@ -83,16 +83,16 @@ void StatsSource::configure(string name) {
     m_statsTuple = m_statsTable->tempTuple();
 }
 
+void StatsSource::updateTableName(const std::string& tableName) {
+    m_tableName = ValueFactory::getStringValue(tableName);
+}
+
 StatsSource::~StatsSource() {
     m_hostname.free();
 }
 
-/**
- * Retrieve the name of this set of statistics
- * @return Name of statistics
- */
-string StatsSource::getName() {
-    return m_name;
+const string StatsSource::getTableName() {
+    return m_tableName.toString();
 }
 
 /**

@@ -410,3 +410,15 @@ CREATE TABLE ENG_539 (
   BIG     BIGINT,
   PRIMARY KEY (ID)
 );
+
+create table swapper_table_foo (
+       i integer,
+       j varchar(32),
+       primary key (i)
+);
+
+create table swapper_table_bar (
+       i integer,
+       j varchar(32),
+       primary key (i)
+);
