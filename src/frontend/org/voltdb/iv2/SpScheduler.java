@@ -888,6 +888,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
+        tmLog.debug("SpScheduler receives: " + message);
         FragmentTaskMessage msg = message;
         long newSpHandle;
         //The site has been marked as non-leader. The follow-up batches or fragments are processed here
@@ -899,6 +900,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg = new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
             //Not going to use the timestamp from the new Ego because the multi-part timestamp is what should be used
+            msg.setTimestamp(message.getTimestamp());
             msg.setForOldLeader(message.isForOldLeader());
             if (!message.isReadOnly()) {
                 TxnEgo ego = advanceTxnEgo();
@@ -941,6 +943,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
                 replmsg.setForReplica(true);
+                replmsg.setTimestamp(msg.getTimestamp());
                 m_mailbox.send(m_sendToHSIds,replmsg);
                 DuplicateCounter counter;
                 /*
@@ -1198,6 +1201,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
+        tmLog.debug("SpScheduler receives :" + message);
         CompleteTransactionMessage msg = message;
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
 
@@ -1258,6 +1262,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(msg);
             resp.m_sourceHSId = m_mailbox.getHSId();
             handleCompleteTransactionResponseMessage(resp);
+            tmLog.debug("SpScheduler discards: " + message);
         }
     }
 

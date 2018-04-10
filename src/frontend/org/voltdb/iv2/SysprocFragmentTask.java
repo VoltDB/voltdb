@@ -48,7 +48,7 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
 
-public class SysprocFragmentTask extends TransactionTask
+public class SysprocFragmentTask extends FragmentTaskBase
 {
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
@@ -301,6 +301,7 @@ public class SysprocFragmentTask extends TransactionTask
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        sb.append("  TIMESTAMP: ").append(getTimestamp());
         return sb.toString();
     }
 
@@ -310,5 +311,10 @@ public class SysprocFragmentTask extends TransactionTask
 
     public boolean isBorrowedTask() {
         return false;
+    }
+
+    @Override
+    public long getTimestamp() {
+        return m_fragmentMsg.getTimestamp();
     }
 }

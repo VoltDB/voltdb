@@ -172,6 +172,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // multiple fragment transaction. m_currentBatchIndex > 0
     boolean m_isForOldLeader = false;
 
+    // Use to differentiate fragments and completions from different rounds of restart
+    // (same transaction can be restarted multiple times due to multiple leader promotions)
+    long m_restartTimestamp = INITIAL_TIMESTAMP;
+
     public void setPerFragmentStatsRecording(boolean value) {
         m_perFragmentStatsRecording = value;
     }
@@ -725,6 +729,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 msgsize += 4 + item.m_stmtText.length;
             }
         }
+        // For the restarted transaction timestamp
+        msgsize += 8;
 
         return msgsize;
     }
@@ -883,6 +889,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.put(item.m_stmtText);
             }
         }
+        // timestamp for restarted transaction
+        buf.putLong(m_restartTimestamp);
     }
 
     @Override
@@ -1048,6 +1056,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.get(item.m_stmtText);
             }
         }
+        // timestamp for restarted transaction
+        m_restartTimestamp = buf.getLong();
     }
 
     @Override
@@ -1130,5 +1140,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public boolean isForOldLeader() {
         return m_isForOldLeader;
+    }
+
+    public void setTimestamp(long timestamp) {
+        m_restartTimestamp = timestamp;
+    }
+
+    public long getTimestamp() {
+        return m_restartTimestamp;
     }
 }

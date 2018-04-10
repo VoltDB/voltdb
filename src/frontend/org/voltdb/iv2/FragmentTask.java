@@ -49,7 +49,7 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
 
-public class FragmentTask extends TransactionTask
+public class FragmentTask extends FragmentTaskBase
 {
     /** java.util.logging logger. */
     private static final VoltLogger LOG = new VoltLogger("HOST");
@@ -444,6 +444,7 @@ public class FragmentTask extends TransactionTask
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        sb.append("  TIMESTAMP: ").append(getTimestamp());
         return sb.toString();
     }
 
@@ -452,6 +453,11 @@ public class FragmentTask extends TransactionTask
     }
 
     public boolean isBorrowedTask() {
-        return true;
+        return false;
+    }
+
+    @Override
+    public long getTimestamp() {
+        return m_fragmentMsg.getTimestamp();
     }
 }
