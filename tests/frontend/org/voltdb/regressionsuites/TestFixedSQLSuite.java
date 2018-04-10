@@ -3073,6 +3073,19 @@ public class TestFixedSQLSuite extends RegressionSuite {
         client.callProcedure("@SwapTables", "Swapper_Table_Foo", "Swapper_Table_BAR");
         client.callProcedure("@AdHoc", "drop table swapper_table_foo;");
         client.callProcedure("@AdHoc", "drop table swapper_table_bar;");
+
+        // Restore the catalog so that the junit re-init optimization won't complain.
+        client.callProcedure("@AdHoc", "create table swapper_table_foo (\n" +
+                                       "       i integer,\n" +
+                                       "       j varchar(32),\n" +
+                                       "       primary key (i)\n" +
+                                       ");\n" +
+                                       "\n" +
+                                       "create table swapper_table_bar (\n" +
+                                       "       i integer,\n" +
+                                       "       j varchar(32),\n" +
+                                       "       primary key (i)\n" +
+                                       ");");
     }
 
     //

@@ -91,8 +91,8 @@ StatsSource::~StatsSource() {
     m_hostname.free();
 }
 
-const char* StatsSource::getTableName() {
-    return ValuePeeker::peekObjectValue(m_tableName);
+const string StatsSource::getTableName() {
+    return m_tableName.toString();
 }
 
 /**

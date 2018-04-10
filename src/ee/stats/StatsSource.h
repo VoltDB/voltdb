@@ -102,7 +102,7 @@ public:
      * Retrieve the name of the table that this set of statistics is associated with.
      * @return Table name.
      */
-    const char* getTableName();
+    const string getTableName();
 
     /**
      * String representation of the statistics. Default implementation is to print the stats table.

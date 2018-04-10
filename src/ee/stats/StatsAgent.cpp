@@ -65,7 +65,7 @@ void StatsAgent::registerStatsSource(StatisticsSelectorType sst,
     VOLT_DEBUG("Partition %d registered %s stats source (%p) for table %s at index %d.",
                ThreadLocalPool::getEnginePartitionId(),
                sst == StatisticsSelectorType::STATISTICS_SELECTOR_TYPE_TABLE ? "a table" : "an index",
-               statsSource, statsSource->getTableName(), catalogId);
+               statsSource, statsSource->getTableName().c_str(), catalogId);
 }
 
 void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst, int32_t relativeIndexOfTable) {
