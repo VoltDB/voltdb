@@ -24,8 +24,11 @@
 package txnIdSelfCheck;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
 import java.io.InterruptedIOException;
@@ -35,7 +38,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class BigTableLoader extends BenchmarkThread {
+public class NibbleDeleteLoader extends BenchmarkThread {
 
     final Client client;
     final long targetCount;
@@ -48,10 +51,13 @@ public class BigTableLoader extends BenchmarkThread {
     final Semaphore m_permits;
     long insertsTried = 0;
     long rowsLoaded = 0;
-    long nTruncates = 0;
+    long deletesTried = 0;
+    long deletesSucceeded = 0;
+    NibbleDeleter deleter = null;
+    long rowsDeletedTotal = 0;
 
-    BigTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount) {
-        setName("BigTableLoader-"+tableName);
+    NibbleDeleteLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount) {
+        setName("NibbleDeleteLoader-"+tableName);
         this.client = client;
         this.tableName = tableName;
         this.targetCount = targetCount;
@@ -62,21 +68,19 @@ public class BigTableLoader extends BenchmarkThread {
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
-        log.info("BigTableLoader table: "+ tableName + " targetCount: " + targetCount + " storage required: " + targetCount*rowSize + " bytes");
+        log.info("NibbleDeleteLoader table: "+ tableName + " targetCount: " + targetCount + " storage required: " + targetCount*rowSize + " bytes");
+        this.deleter = new NibbleDeleter(this.tableName, "ts", "75", ">", 1000, 2000);
     }
 
     void shutdown() {
         m_shouldContinue.set(false);
-        log.info("BigTableLoader " + tableName + " shutdown: inserts tried " + insertsTried + " rows loaded " + rowsLoaded +
-                    " truncates " + nTruncates);
+        log.info("NibbleDeleteLoader " + tableName + " shutdown: inserts tried: " + insertsTried + " rows loaded: " + rowsLoaded +
+                " deletes tried: " + deletesTried + " deletes succeeded: " + deletesSucceeded);
         this.interrupt();
     }
 
-    public int getPercentLoadComplete() {
-        Double d = ((double)rowsLoaded / targetCount) * 100.;
-        return d.intValue();
-
-    }
+    //"@LowImpactDelete", [FastSerializer.VOLTTYPE_STRING,FastSerializer.VOLTTYPE_STRING,FastSerializer.VOLTTYPE_STRING,FastSerializer.VOLTTYPE_STRING,FastSerializer.VOLTTYPE_BIGINT,FastSerializer.VOLTTYPE_BIGINT],
+    //        [tablename,columnName,columnThresholdInMicros,comparisonOp,chunksize,timeoutms]
 
     class InsertCallback implements ProcedureCallback {
 
@@ -92,11 +96,11 @@ public class BigTableLoader extends BenchmarkThread {
             if (status == ClientResponse.GRACEFUL_FAILURE ||
                     status == ClientResponse.USER_ABORT) {
                 // log what happened
-                hardStop("BigTableLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
+                hardStop("NibbleDeleteLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.warn("BigTableLoader ungracefully failed to insert into table " + tableName);
+                log.warn("NibbleDeleteLoader ungracefully failed to insert into table " + tableName);
                 log.warn(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
@@ -107,13 +111,77 @@ public class BigTableLoader extends BenchmarkThread {
         }
     }
 
+
+    class NibbleDeleter extends Thread {
+
+        final String columnName;
+        final String tableName;
+        final String columnThresholdInMicros;
+        final String comparisonOp;
+        final int chunksize;
+        final int timeoutms;
+
+        NibbleDeleter(String tableName, String columnName, String columnThresholdInMicros, String comparisonOp, int chunksize, int timeoutms) {
+            this.tableName = tableName;
+            this.columnName = columnName;
+            this.columnThresholdInMicros = columnThresholdInMicros;
+            this.comparisonOp = comparisonOp;
+            this.chunksize = chunksize;
+            this.timeoutms = timeoutms;
+        }
+
+        @Override
+        public void run() {
+            while (m_shouldContinue.get()) {
+                try { Thread.sleep(1000); } catch (Exception e) { }
+                try {
+                    m_permits.acquire(1000);
+                } catch (InterruptedException e) {
+                    if (!m_shouldContinue.get()) {
+                        return;
+                    }
+                    log.error("NibbleDeleter thread interrupted while waiting for permits. " + e.getMessage());
+                }
+                try {
+                    deletesTried++;
+                    // this sysproc is synchronous
+                    ClientResponse response = TxnId2Utils.doProcCall(client, "@LowImpactDelete", tableName, columnName, columnThresholdInMicros, comparisonOp, chunksize, timeoutms);
+                    if (response.getStatus() == ClientResponse.SUCCESS) {
+                        VoltTable[] t = response.getResults();
+                        VoltTable data = t[0];
+                        if (data.getRowCount() <= 0) {
+                            hardStop("No rows");
+                        }
+                        VoltTableRow row = data.fetchRow(0);
+                        long rowsDeleted = row.getLong(0);
+                        long rowsLeft = row.getLong(1);
+                        long rounds = row.getLong(2);
+                        long deletedLastRound = row.getLong(3);
+                        String note = row.getString(4);
+                        deletesSucceeded++;
+                        rowsDeletedTotal += rowsDeleted;
+                    } else {
+
+                    }
+                } catch (ProcCallException e) {
+                    if (! m_shouldContinue.get())
+                        return;
+                    hardStop("NibbleDeleter failed a '@LowImpactDelete' procedure call for table '" + tableName + "' " + e.getMessage());
+                } catch (Exception e) {
+                    hardStop("NibbleDeleter failed a '@LowImpactDelete' for table '" + tableName + "' " + e.getMessage());
+                }
+            }
+        }
+    }
+
+
     @Override
     public void run() {
+        this.deleter.start();  // start the nibbler
         byte[] data = new byte[rowSize];
         long currentRowCount;
         while (m_shouldContinue.get()) {
             r.nextBytes(data);
-
             try {
                 currentRowCount = TxnId2Utils.getRowCount(client, tableName);
                 // insert some batches...
@@ -129,7 +197,7 @@ public class BigTableLoader extends BenchmarkThread {
                             if (!m_shouldContinue.get()) {
                                 return;
                             }
-                            log.error("BigTableLoader thread interrupted while waiting for permit. " + e.getMessage());
+                            log.error("NibbleDeleteLoader thread interrupted while waiting for permit. " + e.getMessage());
                         }
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
@@ -140,7 +208,7 @@ public class BigTableLoader extends BenchmarkThread {
                         if (!m_shouldContinue.get()) {
                             return;
                         }
-                        log.error("BigTableLoader thread interrupted while waiting." + e.getMessage());
+                        log.error("NibbleDeleteLoader thread interrupted while waiting." + e.getMessage());
                     }
                     long nextRowCount = TxnId2Utils.getRowCount(client, tableName);
                     // if no progress, throttle a bit
@@ -148,7 +216,7 @@ public class BigTableLoader extends BenchmarkThread {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
                     currentRowCount = nextRowCount;
-                    log.debug("BigTableLoader " + tableName.toUpperCase() + " count " + currentRowCount);
+                    log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " current count: " + currentRowCount + " rows deleted: " + rowsDeletedTotal);
                 }
             }
             catch (Exception e) {
@@ -156,11 +224,11 @@ public class BigTableLoader extends BenchmarkThread {
                     continue;
                 }
                 // on exception, log and end the thread, but don't kill the process
-                log.error("BigTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
+                hardStop("NibbleDeleteLoader failed a 'TableInsert' procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
         }
-        log.info("BigTableLoader normal exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded + " truncates: " + nTruncates);
+        log.info("NibbleDeleteLoader exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
+        hardStop("NibbleDeleteLoader exit");
     }
-
 }
