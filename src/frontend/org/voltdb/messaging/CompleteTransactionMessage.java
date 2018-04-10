@@ -126,7 +126,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4 + 4;
+        msgsize += 4 + 4 + 8;
         return msgsize;
     }
 
@@ -137,6 +137,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.flattenToBuffer(buf);
         buf.putInt(m_hash);
         buf.putInt(m_flags);
+        buf.putLong(m_timestamp);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -147,6 +148,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.initFromBuffer(buf);
         m_hash = buf.getInt();
         m_flags = buf.getInt();
+        m_timestamp = buf.getLong();
         assert(buf.capacity() == buf.position());
     }
 
@@ -161,6 +163,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("\n SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
+        sb.append("\n  TIMESTAMP: ").append(m_timestamp);
         sb.append("\n  TRUNCATION HANDLE:" + getTruncationHandle());
         sb.append("\n  HASH: " + String.valueOf(m_hash));
 
