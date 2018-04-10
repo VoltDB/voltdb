@@ -629,7 +629,8 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
 
-    dupTable->truncateTable(engine);
+    // X is not a partitioned table.
+    dupTable->truncateTable(engine, false);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
 
     ASSERT_NE(NULL, dupTable);
@@ -670,7 +671,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     validateCounts(1, table, dupTable, 0, tuplesToInsert);
 
-    dupTable->truncateTable(engine);
+    dupTable->truncateTable(engine, false);
     dupTable = engine->getTableDelegate("X")->getPersistentTable();
     ASSERT_NE(NULL, dupTable);
 
