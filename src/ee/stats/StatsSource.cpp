@@ -84,6 +84,7 @@ void StatsSource::configure(string name) {
 }
 
 void StatsSource::updateTableName(const std::string& tableName) {
+    m_tableName.free();
     m_tableName = ValueFactory::getStringValue(tableName);
 }
 
