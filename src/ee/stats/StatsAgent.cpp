@@ -61,8 +61,11 @@ void StatsAgent::registerStatsSource(StatisticsSelectorType sst,
                                      CatalogId catalogId,
                                      StatsSource* statsSource) {
     assert(statsSource != NULL);
-    m_statsCategoryByStatsSelector[sst].insert(
-        pair<CatalogId, StatsSource*>(catalogId, statsSource));
+    m_statsCategoryByStatsSelector[sst].insert(make_pair(catalogId, statsSource));
+    VOLT_DEBUG("Partition %d registered %s stats source (%p) for table %s at index %d.",
+               ThreadLocalPool::getEnginePartitionId(),
+               sst == StatisticsSelectorType::STATISTICS_SELECTOR_TYPE_TABLE ? "a table" : "an index",
+               statsSource, statsSource->getTableName().c_str(), catalogId);
 }
 
 void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst, int32_t relativeIndexOfTable) {
@@ -76,9 +79,16 @@ void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst, int32_t relat
     }
     if (relativeIndexOfTable == -1) {
         it1->second.clear();
+        VOLT_DEBUG("Partition %d unregistered all %s stats sources.",
+                   ThreadLocalPool::getEnginePartitionId(),
+                   sst == StatisticsSelectorType::STATISTICS_SELECTOR_TYPE_TABLE ? "table" : "index");
     }
     else {
         it1->second.erase(relativeIndexOfTable);
+        VOLT_DEBUG("Partition %d unregistered %s stats source for table at index %d.",
+                   ThreadLocalPool::getEnginePartitionId(),
+                   sst == StatisticsSelectorType::STATISTICS_SELECTOR_TYPE_TABLE ? "a table" : "an index",
+                   relativeIndexOfTable);
     }
 }
 
