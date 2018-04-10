@@ -57,6 +57,7 @@ public class TransactionTaskQueue
         }
     }
     static NonBlockingHashMap<SiteTaskerQueue, QueuedTasks> stashedMpWrites = new NonBlockingHashMap<>();
+    static long bestCompletionTimestamp = CompleteTransactionMessage.INITIAL_TIMESTAMP;
     static Object lock = new Object();
 
     final private int m_siteCount;
@@ -179,13 +180,13 @@ public class TransactionTaskQueue
 
             if (task instanceof CompleteTransactionTask) {
                 if (queuedTask.m_lastCompleteTxnTask == null ||
-                        queuedTask.m_lastCompleteTxnTask.getSpHandle() < task.getSpHandle()) {
+                        bestCompletionTimestamp >= ((CompleteTransactionTask)task).getTimestamp()) {
                     // Queue CompleteTxn task if there is no queued CompleteTxn task.
                     // If CompleteTxn exists, only keep latest CT task.
+                    bestCompletionTimestamp = ((CompleteTransactionTask)task).getTimestamp();
                     queuedTask.addCompletedTransactionTask((CompleteTransactionTask)task);
+                    queuedTask.m_lastFragTask = null;
                 }
-                // CT task cancels previous fragment task
-                queuedTask.m_lastFragTask = null;
             } else if (task instanceof FragmentTask ||
                        task instanceof SysprocFragmentTask) {
                 if (queuedTask.m_lastCompleteTxnTask == null ||
@@ -201,21 +202,20 @@ public class TransactionTaskQueue
             long completeTxnsTimestamp = CompleteTransactionMessage.INITIAL_TIMESTAMP;
             boolean first = true;
             for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
-                if (e.getValue().m_lastFragTask != null) {
-                    receivedFrags++;
-                }
-
                 if (e.getValue().m_lastCompleteTxnTask != null) {
+                    if (bestCompletionTimestamp > e.getValue().m_lastCompleteTxnTask.getTimestamp()) {
+                        // We have received an abort/completion more recent no another site so invalidate this entry
+                        e.getValue().m_lastCompleteTxnTask = null;
+                        e.getValue().m_lastFragTask = null;
+                        continue;
+                    }
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                     // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
-                    if (first) {
-                        completeTxnsTimestamp = e.getValue().m_lastCompleteTxnTask.getTimestamp();
-                        first = false;
-                    }
-                    if (e.getValue().m_lastCompleteTxnTask.getTimestamp() == completeTxnsTimestamp) {
-                        receivedCompleteTxns++;
-                    }
+                    receivedCompleteTxns++;
+                }
+                if (e.getValue().m_lastFragTask != null) {
+                    receivedFrags++;
                 }
             }
 
@@ -223,11 +223,13 @@ public class TransactionTaskQueue
                 hostLog.debug("Received " + task + " " + receivedFrags + "/" + m_siteCount);
                 dumpStashedMpWrites();
             }
-            if (receivedFrags == m_siteCount) {
-                releaseStashedFragments();
-            }
             if (receivedCompleteTxns == m_siteCount) {
                 releaseStashedComleteTxns();
+                bestCompletionTimestamp = CompleteTransactionMessage.INITIAL_TIMESTAMP;
+            }
+            else
+            if (receivedFrags == m_siteCount) {
+                releaseStashedFragments();
             }
         }
     }
@@ -271,7 +273,11 @@ public class TransactionTaskQueue
         while (iter.hasNext()) {
             TransactionTask task = iter.next();
             long lastQueuedTxnId = task.getTxnId();
-            taskQueueOffer(task);
+            if (task.needCoordination()) {
+                coordinatedTaskQueueOffer(task);
+            } else {
+                taskQueueOffer(task);
+            }
             ++offered;
             if (task.getTransactionState().isSinglePartition()) {
                 // single part can be immediately removed and offered
@@ -285,7 +291,11 @@ public class TransactionTaskQueue
                     task = iter.next();
                     if (task.getTxnId() == lastQueuedTxnId) {
                         iter.remove();
-                        taskQueueOffer(task);
+                        if (task.needCoordination()) {
+                            coordinatedTaskQueueOffer(task);
+                        } else {
+                            taskQueueOffer(task);
+                        }
                         ++offered;
                     }
                 }
