@@ -78,23 +78,9 @@ namespace voltdb {
             if (!m_replicatedWrapper) {
                 m_replicatedWrapper.reset(new ReplicatedMaterializedViewHandler(m_destTable, this, engine->getPartitionId()));
             }
-            SynchronizedThreadLock::lockReplicatedResource();
+
+            ScopedReplicatedResourceLock scopedLock;
             sourceTable->addViewHandler(m_replicatedWrapper.get());
-            SynchronizedThreadLock::unlockReplicatedResource();
-//            else {
-//                assert(false);
-//                // We are adding our (replicated) ViewHandler to each partition's instance of the partitioned table
-//                assert(SynchronizedThreadLock::isInSingleThreadMode());
-//                BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-//                    EngineLocals& curr = enginePair.second;
-//                    VoltDBEngine* currEngine = curr.context->getContextEngine();
-//                    ExecutorContext::assignThreadLocals(curr);
-//                    auto partitionedTable = dynamic_cast<PersistentTable*>(currEngine->getTableById(relativeTableIndex));
-//                    assert(partitionedTable);
-//                    partitionedTable->addViewHandler(this);
-//                }
-//                SynchronizedThreadLock::assumeLowestSiteContext();
-//            }
         }
         else {
             sourceTable->addViewHandler(this);
@@ -122,23 +108,10 @@ namespace voltdb {
             VOLT_DEBUG("Dropping Source Table %s (%p) for view %s (%p). isInSingleThreadMode %s, isHoldingResourceLock %s.",
                                 sourceTable->name().c_str(), sourceTable, m_destTable->name().c_str(), m_destTable,
                                 SynchronizedThreadLock::isInSingleThreadMode()?"true":"false",  SynchronizedThreadLock::isHoldingResourceLock()?"true":"false");
+
             // We are dropping our (partitioned) ViewHandler to a Replicated Table
-            SynchronizedThreadLock::lockReplicatedResource();
+            ScopedReplicatedResourceLock scopedLock;
             sourceTable->dropViewHandler(m_replicatedWrapper.get());
-            SynchronizedThreadLock::unlockReplicatedResource();
-//            else {
-//                // We are dropping our (replicated) ViewHandler to each partition's instance of the partitioned table
-//                assert(SynchronizedThreadLock::isInSingleThreadMode());
-//                BOOST_FOREACH (SharedEngineLocalsType::value_type& enginePair, SynchronizedThreadLock::s_enginesByPartitionId) {
-//                    EngineLocals& curr = enginePair.second;
-//                    VoltDBEngine* currEngine = curr.context->getContextEngine();
-//                    ExecutorContext::assignThreadLocals(curr);
-//                    auto partitionedTable = dynamic_cast<PersistentTable*>(currEngine->getTableById(relativeTableIndex));
-//                    assert(partitionedTable);
-//                    partitionedTable->dropViewHandler(this);
-//                }
-//                SynchronizedThreadLock::assumeLowestSiteContext();
-//            }
         }
         else {
             sourceTable->dropViewHandler(this);

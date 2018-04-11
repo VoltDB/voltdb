@@ -171,22 +171,7 @@ public:
     StackTrace();
     ~StackTrace();
 
-    static void printMangledAndUnmangledToFile(FILE *targetFile) {
-        StackTrace st;
-        // write header for backtrace file
-        int numFrames = (int)st.m_traces.size();
-        // Ignore the stack frames specific to StackTrace object
-        fprintf(targetFile, "VoltDB Backtrace (%d stack frames)\n", numFrames-2);
-        for (int ii = 2; ii < numFrames; ii++) {
-            // write original symbol to file.
-            fprintf(targetFile, "raw[%d]: %s\n", ii, st.m_traceSymbols[ii]);
-        }
-        for (int ii=2; ii < numFrames; ii++) {
-            const char* str = st.m_traces[ii].c_str();
-            fprintf(targetFile, "demangled[%d]: %s\n", ii, str);
-        }
-    }
-
+    static void printMangledAndUnmangledToFile(FILE *targetFile);
 
     static void printStackTrace() {
         StackTrace st;

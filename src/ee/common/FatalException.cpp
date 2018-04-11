@@ -17,9 +17,6 @@
 
 #include "common/FatalException.hpp"
 
-#include <cxxabi.h>   // for abi
-#include <execinfo.h> // for backtrace, backtrace_symbols
-
 #include <cstring> // for strn*
 #include <dlfcn.h>
 #include <stdio.h> // for fopen, fprintf, fclose

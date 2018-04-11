@@ -206,7 +206,6 @@ private:
 
         int32_t m_allocatingEngine;
         int32_t m_allocatingThread;
-        StackTrace m_allocationTrace;
         static pthread_mutex_t s_sharedMemoryMutex;
     #ifdef VOLT_TRACE_ALLOCATIONS
         typedef std::unordered_map<void *, StackTrace*> AllocTraceMap_t;
