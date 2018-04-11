@@ -27,6 +27,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.iv2.ProcedureTask;
 import org.voltdb.iv2.Site;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -52,6 +53,9 @@ public abstract class TransactionState extends OrderableTransaction  {
     // IZZY: make me protected/private
     public final long m_spHandle;
     private ArrayList<UndoAction> m_undoLog;
+
+    // reference back to owner of this transactionState
+    private ProcedureTask m_procedureTask;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -150,6 +154,10 @@ public abstract class TransactionState extends OrderableTransaction  {
     {
         return m_needsRollback;
     }
+
+    public void setProcedureTask(ProcedureTask mpProcedureTask) { m_procedureTask = mpProcedureTask;}
+
+    public ProcedureTask getProcedureTask() { return m_procedureTask; }
 
     public abstract StoredProcedureInvocation getInvocation();
 

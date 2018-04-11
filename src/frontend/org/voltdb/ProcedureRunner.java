@@ -60,6 +60,8 @@ import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.MpProcedureTask;
+import org.voltdb.iv2.ProcedureTask;
 import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.jni.ExecutionEngine;
@@ -118,7 +120,7 @@ public class ProcedureRunner {
 
     // per txn state (are reset after call)
     //
-    protected TransactionState m_txnState; // used for sysprocs only
+    protected TransactionState m_txnState;
     protected byte m_statusCode = ClientResponse.SUCCESS;
     protected String m_statusString = null;
     // Status code that can be set by stored procedure upon invocation that will be returned with the response.
@@ -416,6 +418,13 @@ public class ProcedureRunner {
                                               m_appStatusString,
                                               getNonVoltDBBackendIfExists(),
                                               ex);
+                    if (retval.getStatus() == ClientResponseImpl.TXN_RESTART && !m_isReadOnly) {
+                        ProcedureTask procedureTask = getTxnState().getProcedureTask();
+                        if (procedureTask instanceof MpProcedureTask) {
+                            org.voltdb.exceptions.TransactionRestartException te = (org.voltdb.exceptions.TransactionRestartException) ex;
+                            ((MpProcedureTask) procedureTask).updateMasters(te.getMasters(), te.getPartitionMasters());
+                        }
+                    }
                 }
             }
             // single statement only work - now extended to multiple statements
@@ -604,7 +613,6 @@ public class ProcedureRunner {
     }
 
     public TransactionState getTxnState() {
-        assert(m_isSysProc);
         return m_txnState;
     }
 
@@ -1280,34 +1288,6 @@ public class ProcedureRunner {
                             " The default query timeout is currently set to no timeout and can be changed in the systemsettings section of the deployment file.");
                 }
             }
-            if (e instanceof TransactionRestartException && !readOnly) {
-                // TODO: make a subclass of ClientResponeImpl for internal Response, which can aslo stores exception
-                // For Txn_Restart case, need to use the restartMaster info from the TransactionRestartException
-                // since currently clientResponseImpl doesn't has a field for exception,
-                // stash the restartMasters info to the statusMsg part as json string
-                org.voltdb.exceptions.TransactionRestartException te = (org.voltdb.exceptions.TransactionRestartException)e;
-                JSONStringer js = new JSONStringer();
-                try {
-                    js.object();
-                    js.key("masters").array();
-                    for (long replica : te.getMasters()) {
-                        js.value(replica);
-                    }
-                    js.endArray();
-
-                    js.key("partitionMasters").object();
-                    for (Map.Entry<Integer, Long> entry : te.getPartitionMasters().entrySet()) {
-                        js.key(entry.getKey().toString()).value(entry.getValue().toString());
-                    }
-                    js.endObject();
-                    js.endObject();
-
-                    msg.append("\n  RestartMasters Info:");
-                    msg.append(js.toString());
-                } catch (JSONException jse) {
-                    jse.printStackTrace();
-                }
-            }
         }
 
         // Rarely hide the stack trace.
@@ -1349,7 +1329,6 @@ public class ProcedureRunner {
        if (status == ClientResponse.TXN_MISPARTITIONED) {
            response.setMispartitionedResult(TheHashinator.getCurrentVersionedConfig());
        }
-
        return response;
     }
 

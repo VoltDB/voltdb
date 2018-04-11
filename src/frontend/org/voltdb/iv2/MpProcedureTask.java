@@ -75,6 +75,7 @@ public class MpProcedureTask extends ProcedureTask
         m_initiatorHSIds.addAll(pInitiators);
         m_restartMasters.set(new ArrayList<Long>());
         m_restartMastersMap.set(new HashMap<Integer, Long>());
+        m_txnState.setProcedureTask(this);
     }
 
     /**
@@ -209,31 +210,7 @@ public class MpProcedureTask extends ProcedureTask
                     hostLog.debug("[MpProcedureTask] COMPLETE: " + this);
                 }
             } else {
-                String respStr = response.getClientResponseData().getStatusString();
-                int ind = respStr.indexOf("RestartMasters Info:");
-                boolean isFound = ind != -1;
-                restartTransaction(!isFound);
-                if (isFound) {
-                    try {
-                        JSONObject jsObj = new JSONObject(respStr.substring(ind + "RestartMasters Info:".length()));
-                        List<Long> restartMasters = new ArrayList<>();
-                        JSONArray restartMastersIds = jsObj.getJSONArray("masters");
-                        for (int ii = 0; ii < restartMastersIds.length(); ii++) {
-                            restartMasters.add(restartMastersIds.getLong(ii));
-                        }
-                        Map<Integer, Long> restartMastersMap = new HashMap<>();
-                        JSONObject restartMasterEntries = jsObj.getJSONObject("partitionMasters");
-                        Iterator<String> it = restartMasterEntries.keys();
-                        while (it.hasNext()) {
-                            String key = it.next();
-                            Long val = Long.valueOf(restartMasterEntries.getString(key));
-                            restartMastersMap.put(Integer.valueOf(key), val);
-                        }
-                        updateMasters(restartMasters, restartMastersMap);
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                }
+                restartTransaction(false);
                 if (hostLog.isDebugEnabled()) {
                     hostLog.debug("[MpProcedureTask] RESTART: " + this);
                 }
