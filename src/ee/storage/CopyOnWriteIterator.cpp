@@ -125,10 +125,9 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
             if (m_table->isReplicatedTable() && m_currentBlock->isEmpty()) {
                 // For shared replicated table, the block needs to be released in MP Context
                 VOLT_TRACE("COW move over an empty block for MPPOOL memory, should release it in MP Context.");
-                SynchronizedThreadLock::lockReplicatedResource();
+                ScopedReplicatedResourceLock scopedLock;
                 ExecuteWithMpMemory useMpMemory;
                 m_blocks.erase(finishedBlock);
-                SynchronizedThreadLock::unlockReplicatedResource();
             } else {
                 m_blocks.erase(finishedBlock);
             }
