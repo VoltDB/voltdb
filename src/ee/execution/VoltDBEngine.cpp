@@ -2567,7 +2567,6 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
     // its corresponding remote producer has replicated stream or not.
     bool onLowestSite = false;
     int32_t replicatedTableStreamId = m_drStream->drProtocolVersion() < DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION ? 16383 : 0;
-    assert(replicatedTableStreamId == 0 || m_drReplicatedStream != NULL);
     if (UniqueId::isMpUniqueId(uniqueId) && (remotePartitionId == replicatedTableStreamId)) {
         VOLT_TRACE("applyBinaryLogMP for replicated table");
         onLowestSite = SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite());
