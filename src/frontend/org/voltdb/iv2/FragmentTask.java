@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
@@ -51,9 +50,6 @@ import org.voltdb.utils.VoltTrace;
 
 public class FragmentTask extends FragmentTaskBase
 {
-    /** java.util.logging logger. */
-    private static final VoltLogger LOG = new VoltLogger("HOST");
-
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     final Map<Integer, List<VoltTable>> m_inputDeps;
@@ -355,7 +351,7 @@ public class FragmentTask extends FragmentTaskBase
                     // get a copy of the buffer
                     fragResult.readFully(fullBacking);
                 } catch (final IOException ex) {
-                    LOG.error("Failed to deserialze result table" + ex);
+                    hostLog.error("Failed to deserialze result table" + ex);
                     throw new EEException(ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
                 }
 
