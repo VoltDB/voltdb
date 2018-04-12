@@ -24,13 +24,10 @@
 package txnIdSelfCheck;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
-import java.security.SecureRandom;
+import org.voltdb.client.*;
 
 import java.io.IOException;
+import java.security.SecureRandom;
 
 public enum TxnId2Utils {;
 

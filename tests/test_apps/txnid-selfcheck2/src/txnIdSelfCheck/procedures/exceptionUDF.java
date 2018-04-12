@@ -31,7 +31,7 @@ import org.voltdb.VoltTable;
 public class exceptionUDF extends VoltProcedure {
 
     public final SQLStmt d_getNothing = new SQLStmt(
-            "select excUDF(cid) FROM dimension");
+            "select excUDF(cid) FROM dimension where cid=-1");
 
     public VoltTable[] run() {
         voltQueueSQL(d_getNothing);
