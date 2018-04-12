@@ -174,6 +174,9 @@ public class MpProcedureTask extends ProcedureTask
             }
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("[MpProcedureTask] STARTING: " + this);
+        }
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
         // We currently don't want to restart read-only MP transactions because:
         // 1) We're not writing the Iv2InitiateTaskMessage to the first
@@ -249,27 +252,30 @@ public class MpProcedureTask extends ProcedureTask
                                                  "dest", CoreUtils.hsIdCollectionToString(m_initiatorHSIds)));
         }
 
-        CompleteTransactionMessage complete = new CompleteTransactionMessage(
-                m_initiator.getHSId(), // who is the "initiator" now??
-                m_initiator.getHSId(),
-                m_txnState.txnId,
-                m_txnState.isReadOnly(),
-                m_txnState.getHash(),
-                m_txnState.needsRollback(),
-                false,  // really don't want to have ack the ack.
-                false,
-                m_msg.isForReplay());
+        if (m_msg.isReadOnly() || ((MpTransactionState)m_txnState).haveSentInitTask()) {
+            // Only send completions for MP transactions that have processed at least one fragment
+            CompleteTransactionMessage complete = new CompleteTransactionMessage(
+                    m_initiator.getHSId(), // who is the "initiator" now??
+                    m_initiator.getHSId(),
+                    m_txnState.txnId,
+                    m_txnState.isReadOnly(),
+                    m_txnState.getHash(),
+                    m_txnState.needsRollback(),
+                    false,  // really don't want to have ack the ack.
+                    false,
+                    m_msg.isForReplay());
 
-        complete.setTruncationHandle(m_msg.getTruncationHandle());
+            complete.setTruncationHandle(m_msg.getTruncationHandle());
 
-        //If there are misrouted fragments, send message to current masters.
-        final List<Long> initiatorHSIds = new ArrayList<Long>();
-        if (((MpTransactionState)m_txnState).isFragmentRestarted()) {
-            initiatorHSIds.addAll(((MpTransactionState)m_txnState).getMasterHSIDs());
-        } else {
-            initiatorHSIds.addAll(m_initiatorHSIds);
+            //If there are misrouted fragments, send message to current masters.
+            final List<Long> initiatorHSIds = new ArrayList<Long>();
+            if (((MpTransactionState)m_txnState).isFragmentRestarted()) {
+                initiatorHSIds.addAll(((MpTransactionState)m_txnState).getMasterHSIDs());
+            } else {
+                initiatorHSIds.addAll(m_initiatorHSIds);
+            }
+            m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
         }
-        m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());
     }

@@ -125,6 +125,10 @@ public class MpTransactionState extends TransactionState
         m_isRestart = true;
     }
 
+    public boolean haveSentInitTask() {
+        return m_haveDistributedInitTask;
+    }
+
     @Override
     public boolean isSinglePartition()
     {
