@@ -387,11 +387,10 @@ public:
         ASSERT_TRUE(m_replicated_customer_table);
 
         // Either use the lock or execute on a single thread when adding tuples to a replicate table
-        voltdb::SynchronizedThreadLock::lockReplicatedResource();
+        voltdb::ScopedReplicatedResourceLock replicatedResourceLock;
         voltdb::SynchronizedThreadLock::assumeMpMemoryContext();
         ASSERT_TRUE(voltdb::tableutil::addRandomTuples(m_replicated_customer_table, NUM_OF_TUPLES));
         voltdb::SynchronizedThreadLock::assumeLocalSiteContext();
-        voltdb::SynchronizedThreadLock::unlockReplicatedResource();
     }
 
 protected:

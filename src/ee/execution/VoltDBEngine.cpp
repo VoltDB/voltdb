@@ -255,13 +255,13 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_drReplicatedStream,
                                             drClusterId);
     // Add the engine to the global list tracking replicated tables
-    SynchronizedThreadLock::lockReplicatedResourceNoThreadLocals();
+    SynchronizedThreadLock::lockReplicatedResourceForInit();
     ThreadLocalPool::setPartitionIds(m_partitionId);
     VOLT_DEBUG("Initializing partition %d (tid %ld) with context %p", m_partitionId,
             SynchronizedThreadLock::getThreadId(), m_executorContext);
     EngineLocals newLocals = EngineLocals(ExecutorContext::getExecutorContext());
     SynchronizedThreadLock::init(sitesPerHost, newLocals);
-    SynchronizedThreadLock::unlockReplicatedResource();
+    SynchronizedThreadLock::unlockReplicatedResourceForInit();
 }
 
 VoltDBEngine::~VoltDBEngine() {
@@ -308,10 +308,9 @@ VoltDBEngine::~VoltDBEngine() {
 
             if (deleteWithMpPool) {
                 if (m_isLowestSite) {
-                    SynchronizedThreadLock::lockReplicatedResource();
+                    ScopedReplicatedResourceLock scopedLock;
                     ExecuteWithMpMemory usingMpMemory;
                     delete eraseThis->second;
-                    SynchronizedThreadLock::unlockReplicatedResource();
                 }
             }
             else {
@@ -2567,7 +2566,6 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
     // its corresponding remote producer has replicated stream or not.
     bool onLowestSite = false;
     int32_t replicatedTableStreamId = m_drStream->drProtocolVersion() < DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION ? 16383 : 0;
-    assert(replicatedTableStreamId == 0 || m_drReplicatedStream != NULL);
     if (UniqueId::isMpUniqueId(uniqueId) && (remotePartitionId == replicatedTableStreamId)) {
         VOLT_TRACE("applyBinaryLogMP for replicated table");
         onLowestSite = SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite());
