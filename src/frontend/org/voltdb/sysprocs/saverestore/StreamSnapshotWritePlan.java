@@ -139,17 +139,18 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     config.tables);
 
         // table schemas for all the tables we'll snapshot on this partition
-        Map<Integer, Pair<Boolean, byte[]>> schemas = new HashMap<Integer, Pair<Boolean, byte[]>>();
+        Map<Integer, Pair<Boolean, byte[]>> schemas = new HashMap<>();
+        boolean XDCR = DrRoleType.XDCR.value().equals(context.getCluster().getDrrole());
         for (final Table table : config.tables) {
             VoltTable schemaTable;
-            if (DrRoleType.XDCR.value().equals(context.getCluster().getDrrole()) && table.getIsdred()) {
+            if (XDCR && table.getIsdred()) {
                 schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
             }
             else {
                 schemaTable = CatalogUtil.getVoltTable(table);
             }
-
-            schemas.put(table.getRelativeIndex(), Pair.of(table.getIsreplicated(), PrivateVoltTableFactory.getSchemaBytes(schemaTable)));
+            schemas.put(table.getRelativeIndex(),
+                        Pair.of(table.getIsreplicated(), PrivateVoltTableFactory.getSchemaBytes(schemaTable)));
         }
 
         List<DataTargetInfo> sdts = createDataTargets(localStreams, destsByHostId, hashinatorData, schemas);
@@ -463,6 +464,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
     }
 
+    @Override
     protected void placeReplicatedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids)
     {
         SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));

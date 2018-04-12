@@ -222,7 +222,10 @@ public class SysProcFragmentId
     public static final long PF_swapTables = 320;
     public static final long PF_swapTablesAggregate = 321;
 
+    // Pause/resume materialized views
+    public static final long PF_setViewEnabled = 330;
+
     // @PingPartitions
-    public static final long PF_pingPartitions = 330;
-    public static final long PF_pingPartitionsAggregate = 331;
+    public static final long PF_pingPartitions = 340;
+    public static final long PF_pingPartitionsAggregate = 341;
 }
