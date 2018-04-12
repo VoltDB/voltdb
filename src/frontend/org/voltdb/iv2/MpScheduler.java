@@ -190,6 +190,9 @@ public class MpScheduler extends Scheduler
     @Override
     public void deliver(VoltMessage message)
     {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("DELIVER: " + message.toString());
+        }
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
         }

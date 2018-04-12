@@ -143,6 +143,11 @@ public class CompleteTransactionTask extends TransactionTask
         return m_completeMsg.getTimestamp();
     }
 
+    public long getMsgTxnId()
+    {
+        return m_completeMsg.getTxnId();
+    }
+
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
@@ -189,9 +194,11 @@ public class CompleteTransactionTask extends TransactionTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("CompleteTransactionTask:");
-        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
-        sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
-        sb.append("  UNDO TOKEN: ").append(m_txnState.getBeginUndoToken());
+        if (m_txnState != null) {
+            sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+            sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
+            sb.append("  UNDO TOKEN: ").append(m_txnState.getBeginUndoToken());
+        }
         sb.append("  MSG: ").append(m_completeMsg.toString());
         return sb.toString();
     }
