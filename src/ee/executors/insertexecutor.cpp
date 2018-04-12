@@ -44,27 +44,12 @@
  */
 
 #include "common/ExecuteWithMpMemory.h"
-#include "common/FatalException.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
-#include "common/debuglog.h"
-#include "common/tabletuple.h"
-#include "common/types.h"
-#include "execution/ExecutorVector.h"
-#include "execution/VoltDBEngine.h"
 #include "expressions/functionexpression.h"
 #include "insertexecutor.h"
 #include "plannodes/insertnode.h"
 #include "storage/ConstraintFailureException.h"
-#include "storage/persistenttable.h"
-#include "storage/streamedtable.h"
-#include "storage/table.h"
-#include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
-
-#include <vector>
-#include <set>
 
 namespace voltdb {
 int64_t InsertExecutor::s_modifiedTuples;

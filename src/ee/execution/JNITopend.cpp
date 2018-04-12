@@ -15,10 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "JNITopend.h"
-#include <cassert>
-#include <iostream>
 
-#include "common/debuglog.h"
 #include "common/StreamBlock.h"
 #include "storage/table.h"
 

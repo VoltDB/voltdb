@@ -45,19 +45,9 @@
 
 #include "indexscanexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "common/ValueFactory.hpp"
 #include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
 #include "executors/insertexecutor.h"
-#include "execution/ExecutorVector.h"
-#include "execution/ProgressMonitorProxy.h"
-#include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
-#include "indexes/tableindex.h"
 
 // Inline PlanNodes
 #include "plannodes/indexscannode.h"
@@ -65,9 +55,7 @@
 #include "plannodes/limitnode.h"
 #include "plannodes/aggregatenode.h"
 
-#include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;

@@ -17,11 +17,7 @@
 
 #include "ContiguousAllocator.h"
 
-#include <cassert>
-#include "common/debuglog.h"
 #include "common/ThreadLocalPool.h"
-#include "common/executorcontext.hpp"
-#include "common/SynchronizedThreadLock.h"
 
 
 using namespace voltdb;

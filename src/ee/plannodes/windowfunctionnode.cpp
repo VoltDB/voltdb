@@ -20,7 +20,6 @@
 #include "windowfunctionnode.h"
 
 #include <sstream>
-#include "common/SerializableEEException.h"
 
 namespace voltdb {
 WindowFunctionPlanNode::~WindowFunctionPlanNode()

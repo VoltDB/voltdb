@@ -17,16 +17,7 @@
 
 #include "executors/windowfunctionexecutor.h"
 
-#include <sstream>
-#include <memory>
-#include <limits.h>
-
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
-#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
-#include "expressions/dateconstants.h"
-#include "plannodes/windowfunctionnode.h"
 #include "storage/tableiterator.h"
 
 namespace voltdb {

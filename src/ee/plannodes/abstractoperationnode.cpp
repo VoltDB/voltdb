@@ -45,12 +45,6 @@
 
 #include "abstractoperationnode.h"
 
-#include "common/debuglog.h"
-#include "execution/VoltDBEngine.h"
-#include "storage/TableCatalogDelegate.hpp"
-
-#include <sstream>
-
 namespace voltdb {
 
 AbstractOperationPlanNode::~AbstractOperationPlanNode() { }

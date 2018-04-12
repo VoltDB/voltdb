@@ -18,14 +18,9 @@
 #include "stats/StatsSource.h"
 
 #include "common/executorcontext.hpp"
-#include "common/types.h"
-#include "common/ValueFactory.hpp"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include <vector>
-#include <string>
-#include <cassert>
 
 using namespace voltdb;
 using namespace std;

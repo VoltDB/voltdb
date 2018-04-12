@@ -45,13 +45,11 @@
 
 #include <stdexcept>
 #include <sstream>
-#include <memory>
 
 #include <boost/foreach.hpp>
 
 #include "common/FatalException.hpp"
 #include "plannodefragment.h"
-#include "catalog/catalog.h"
 #include "abstractplannode.h"
 
 using namespace std;
