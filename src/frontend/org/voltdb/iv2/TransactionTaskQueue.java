@@ -19,11 +19,16 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -41,11 +46,33 @@ public class TransactionTaskQueue
     // sites within a node to receive a fragment, but due to node failure the failed remote leader may never forward the
     // fragment to the rest of sites on the given node, causes deadlock and can't be recovered from repair.
     private static class QueuedTasks {
-        public CompleteTransactionTask m_lastCompleteTxnTask;
+        // We need to track 2 completions because during restart repairlog may resend a completion for
+        // a transaction that has been processed as well as an abort for the actual transaction in progress.
+        public Deque<Pair<CompleteTransactionTask, Boolean>> m_lastCompleteTxnTasks = new ArrayDeque<>(2);
         public TransactionTask m_lastFragTask;
 
-        public void addCompletedTransactionTask(CompleteTransactionTask task) {
-            m_lastCompleteTxnTask = task;
+        public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
+            if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP) {
+                // This is a submission of a completion. In case this is a resubmission of a completion that not
+                // all sites received clear the whole queue. The Completion may or may not be for a transaction
+                // that has already been completed (if it was completed missingTxn will be true)
+                m_lastCompleteTxnTasks.clear();
+                m_lastCompleteTxnTasks.addLast(Pair.of(task, missingTxn));
+            }
+            else {
+                // This is an abort completion that will be followed with a resubmitted fragment,
+                // so step on any fragment that is pending
+                Pair<CompleteTransactionTask, Boolean> lastTaskPair = m_lastCompleteTxnTasks.peekLast();
+                if (lastTaskPair != null && lastTaskPair.getFirst().getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP) {
+                    assert(lastTaskPair.getFirst().getMsgTxnId() == task.getMsgTxnId());
+                    m_lastCompleteTxnTasks.removeLast();
+                }
+                else {
+                    assert(m_lastCompleteTxnTasks.size() <= 1);
+                }
+                m_lastCompleteTxnTasks.addLast(Pair.of(task, missingTxn));
+                m_lastFragTask = null;
+            }
         }
 
         public void addFragmentTask(TransactionTask task) {
@@ -53,11 +80,12 @@ public class TransactionTaskQueue
         }
 
         public String toString() {
-            return "CompleteTransactionTask: " + m_lastCompleteTxnTask + "\nFragmentTask: " + m_lastFragTask;
+            return "CompleteTransactionTasks: " + m_lastCompleteTxnTasks.peekFirst() +
+                    (m_lastCompleteTxnTasks.size() == 2 ? "\n" + m_lastCompleteTxnTasks.peekLast() : "") +
+                    "\nFragmentTask: " + m_lastFragTask;
         }
     }
-    static NonBlockingHashMap<SiteTaskerQueue, QueuedTasks> stashedMpWrites = new NonBlockingHashMap<>();
-    static long bestCompletionTimestamp = CompleteTransactionMessage.INITIAL_TIMESTAMP;
+    final static HashMap<SiteTaskerQueue, QueuedTasks> stashedMpWrites = new HashMap<>();
     static Object lock = new Object();
 
     final private int m_siteCount;
@@ -158,16 +186,26 @@ public class TransactionTaskQueue
     }
 
     // All sites receives CompletedTransactionTask messages, time to fire the task.
-    static private void releaseStashedComleteTxns()
+    static private void releaseStashedComleteTxns(boolean missingTxn)
     {
         if (hostLog.isDebugEnabled()) {
-            hostLog.debug("release stashed complete transaction message");
+            if (missingTxn) {
+                hostLog.debug("skipped incomplete rollback transaction message");
+            }
+            else {
+                hostLog.debug("release stashed complete transaction message");
+            }
         }
-        stashedMpWrites.forEach((queue, task) -> {
-            Iv2Trace.logSiteTaskerQueueOffer(task.m_lastCompleteTxnTask);
-            queue.offer(task.m_lastCompleteTxnTask);
-            task.m_lastCompleteTxnTask = null;
-        });
+        long lastTxnId = 0;
+        for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
+            CompleteTransactionTask completion = e.getValue().m_lastCompleteTxnTasks.poll().getFirst();
+            assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
+            lastTxnId = completion.getMsgTxnId();
+            if (!missingTxn) {
+                Iv2Trace.logSiteTaskerQueueOffer(completion);
+                e.getKey().offer(completion);
+            }
+        }
     }
 
     private void coordinatedTaskQueueOffer(TransactionTask task) {
@@ -178,37 +216,35 @@ public class TransactionTaskQueue
                 stashedMpWrites.put(m_taskQueue, queuedTask);
             }
 
+            long matchingCompletionTime = -1;
             if (task instanceof CompleteTransactionTask) {
-                if (queuedTask.m_lastCompleteTxnTask == null ||
-                        bestCompletionTimestamp >= ((CompleteTransactionTask)task).getTimestamp()) {
-                    // Queue CompleteTxn task if there is no queued CompleteTxn task.
-                    // If CompleteTxn exists, only keep latest CT task.
-                    bestCompletionTimestamp = ((CompleteTransactionTask)task).getTimestamp();
-                    queuedTask.addCompletedTransactionTask((CompleteTransactionTask)task);
-                    queuedTask.m_lastFragTask = null;
-                }
+                matchingCompletionTime = ((CompleteTransactionTask)task).getTimestamp();
+                queuedTask.addCompletedTransactionTask((CompleteTransactionTask)task, false);
+
             } else if (task instanceof FragmentTask ||
                        task instanceof SysprocFragmentTask) {
-                if (queuedTask.m_lastCompleteTxnTask == null ||
-                        queuedTask.m_lastCompleteTxnTask.getSpHandle() < task.getSpHandle()) {
-                    // Queue Fragment task if there is no queued CompleteTxn task.
-                    // If CompleteTxn exists, only queue fragment task newer than CompleteTxn.
+//                if (queuedTask.m_lastCompleteTxnTasks.isEmpty() ||
+//                        queuedTask.m_lastCompleteTxnTasks.peekLast().getFirst().getMsgTxnId() == task.getTxnId()) {
+//                    // Queue Fragment task if there is no queued CompleteTxn task.
+//                    // If CompleteTxn exists, only queue fragment task newer than CompleteTxn.
                     queuedTask.addFragmentTask(task);
-                }
+//                }
+//                else {
+//                    if (hostLog.isDebugEnabled()) {
+//                        hostLog.debug("MP Write Scoreboard ignored task:\n" + task);
+//                    }
+//                }
             }
 
             int receivedFrags = 0;
             int receivedCompleteTxns = 0;
-            long completeTxnsTimestamp = CompleteTransactionMessage.INITIAL_TIMESTAMP;
-            boolean first = true;
+            boolean missingTxn = false;
             for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
-                if (e.getValue().m_lastCompleteTxnTask != null) {
-                    if (bestCompletionTimestamp > e.getValue().m_lastCompleteTxnTask.getTimestamp()) {
-                        // We have received an abort/completion more recent no another site so invalidate this entry
-                        e.getValue().m_lastCompleteTxnTask = null;
-                        e.getValue().m_lastFragTask = null;
+                if (!e.getValue().m_lastCompleteTxnTasks.isEmpty()) {
+                    if (matchingCompletionTime != e.getValue().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
                         continue;
                     }
+                    missingTxn |= e.getValue().m_lastCompleteTxnTasks.peekFirst().getSecond();
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                     // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
@@ -220,16 +256,50 @@ public class TransactionTaskQueue
             }
 
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("Received " + task + " " + receivedFrags + "/" + m_siteCount);
+                hostLog.debug("MP Write Scoreboard Received " + task + "\nFrags: " + receivedFrags + "/" + m_siteCount +
+                        " Comps: " + receivedCompleteTxns + "/" + m_siteCount);
                 dumpStashedMpWrites();
             }
             if (receivedCompleteTxns == m_siteCount) {
-                releaseStashedComleteTxns();
-                bestCompletionTimestamp = CompleteTransactionMessage.INITIAL_TIMESTAMP;
+                releaseStashedComleteTxns(missingTxn);
             }
             else
-            if (receivedFrags == m_siteCount) {
+            if (receivedFrags == m_siteCount && receivedCompleteTxns == 0) {
                 releaseStashedFragments();
+            }
+        }
+    }
+
+    public void handleCompletionForMissingTxn(CompleteTransactionTask missingTxnCompletion) {
+        synchronized (lock) {
+            QueuedTasks queuedTask;
+            if ((queuedTask = stashedMpWrites.get(m_taskQueue)) == null) {
+                queuedTask =  new QueuedTasks();
+                stashedMpWrites.put(m_taskQueue, queuedTask);
+            }
+
+            long matchingCompletionTime = missingTxnCompletion.getTimestamp();
+            queuedTask.addCompletedTransactionTask(missingTxnCompletion, true);
+            int receivedCompleteTxns = 0;
+            for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
+                if (!e.getValue().m_lastCompleteTxnTasks.isEmpty()) {
+                    if (matchingCompletionTime != e.getValue().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
+                        continue;
+                    }
+                    // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
+                    // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
+                    // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
+                    receivedCompleteTxns++;
+                }
+            }
+
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("MP Write Scoreboard Received unmatched " + missingTxnCompletion +
+                        "\nComps: " + receivedCompleteTxns + "/" + m_siteCount);
+                dumpStashedMpWrites();
+            }
+            if (receivedCompleteTxns == m_siteCount) {
+                releaseStashedComleteTxns(true);
             }
         }
     }
@@ -237,10 +307,10 @@ public class TransactionTaskQueue
     private void dumpStashedMpWrites() {
         StringBuilder builder = new StringBuilder();
         for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
-            builder.append("Queue " + e.getKey().getPartitionId() + ": " + e.getValue());
+            builder.append("Queue " + e.getKey().getPartitionId() + ":\n" + e.getValue());
             builder.append("\n");
         }
-        hostLog.info(builder.toString());
+        hostLog.debug(builder.toString());
     }
 
     /**
@@ -312,7 +382,12 @@ public class TransactionTaskQueue
      */
     synchronized void restart()
     {
-        taskQueueOffer(m_backlog.getFirst());
+        TransactionTask task = m_backlog.getFirst();
+        if (task.needCoordination()) {
+            coordinatedTaskQueueOffer(task);
+        } else {
+            taskQueueOffer(task);
+        }
     }
 
     /**

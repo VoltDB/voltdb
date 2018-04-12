@@ -396,6 +396,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void deliver(VoltMessage message)
     {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("DELIVER: " + message.toString());
+        }
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
         }
@@ -1255,6 +1258,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg);
             queueOrOfferMPTask(task);
         } else {
+            if (!msg.isReadOnly()) {
+                final CompleteTransactionTask missingTxnCompletion =
+                        new CompleteTransactionTask(m_mailbox, null, m_pendingTasks, msg);
+                m_pendingTasks.handleCompletionForMissingTxn(missingTxnCompletion);
+            }
             // Generate a dummy response message when this site has not seen previous FragmentTaskMessage,
             // the leader may have started to wait for replicas' response messages.
             // This can happen in the early phase of site rejoin before replica receiving the snapshot initiation,
