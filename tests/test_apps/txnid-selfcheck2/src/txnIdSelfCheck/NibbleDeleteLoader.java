@@ -129,9 +129,9 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             try {
             while ( true ) {
                 // give a little wiggle room when checking if rows shoul've been deleted.
-                long ttl = new Double(Math.ceil(TTL*1.2)).longValue();
+                long ttl = new Double(Math.ceil(TTL*1.5)).longValue();
 
-                ClientResponse response = TxnId2Utils.doProcCall(client, "@AdHoc", "select *,now from "+tableName+" where DATEADD(SECOND,"+ttl+","+tsColumnName+") < NOW");
+                ClientResponse response = TxnId2Utils.doProcCall(client, "@AdHoc", "select *,now from "+tableName+" where "+tsColumnName+" < DATEADD(SECOND,-"+ttl+",NOW) ");
 
                 if (response.getStatus() == ClientResponse.SUCCESS ) {
                     VoltTable[] t = response.getResults();
