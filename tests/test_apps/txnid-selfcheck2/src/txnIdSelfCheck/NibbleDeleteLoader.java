@@ -51,10 +51,12 @@ public class NibbleDeleteLoader extends BenchmarkThread {
     final Semaphore m_permits;
     long insertsTried = 0;
     long rowsLoaded = 0;
-    long deletesTried = 0;
+    long deletesRemaining = 0;
     long deletesSucceeded = 0;
-    NibbleDeleter deleter = null;
     long rowsDeletedTotal = 0;
+    NibbleDeleteMonitor monitor = null;
+    /* this is the ttl configured on each of the tables in the ddl */
+    long TTL = 30;
 
     NibbleDeleteLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount) {
         setName("NibbleDeleteLoader-"+tableName);
@@ -68,14 +70,13 @@ public class NibbleDeleteLoader extends BenchmarkThread {
 
         // make this run more than other threads
         setPriority(getPriority() + 1);
-        log.info("NibbleDeleteLoader table: "+ tableName + " targetCount: " + targetCount + " storage required: " + targetCount*rowSize + " bytes");
-        this.deleter = new NibbleDeleter(this.tableName, "ts", "75", ">", 1000, 2000);
+        this.monitor = new NibbleDeleteMonitor(this.tableName,"ts");
     }
 
     void shutdown() {
         m_shouldContinue.set(false);
         log.info("NibbleDeleteLoader " + tableName + " shutdown: inserts tried: " + insertsTried + " rows loaded: " + rowsLoaded +
-                " deletes tried: " + deletesTried + " deletes succeeded: " + deletesSucceeded);
+                " deletes remaining: " + deletesRemaining);
         this.interrupt();
     }
 
@@ -96,7 +97,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             if (status == ClientResponse.GRACEFUL_FAILURE ||
                     status == ClientResponse.USER_ABORT) {
                 // log what happened
-                hardStop("NibbleDeleteLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
+                Benchmark.hardStop("NibbleDeleteLoader gracefully failed to insert into table " + tableName + " and this shoudn't happen. Exiting.");
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
@@ -111,73 +112,78 @@ public class NibbleDeleteLoader extends BenchmarkThread {
         }
     }
 
-
-    class NibbleDeleter extends Thread {
-
-        final String columnName;
+    class NibbleDeleteMonitor extends Thread {
         final String tableName;
-        final String columnThresholdInMicros;
-        final String comparisonOp;
-        final int chunksize;
-        final int timeoutms;
+        final String tsColumnName;
+        int deleteCnt = 0;
+        int currentCnt = 0;
 
-        NibbleDeleter(String tableName, String columnName, String columnThresholdInMicros, String comparisonOp, int chunksize, int timeoutms) {
+        NibbleDeleteMonitor(String tableName,String tsColumnName) {
             this.tableName = tableName;
-            this.columnName = columnName;
-            this.columnThresholdInMicros = columnThresholdInMicros;
-            this.comparisonOp = comparisonOp;
-            this.chunksize = chunksize;
-            this.timeoutms = timeoutms;
+            this.tsColumnName = tsColumnName;
+            setName("NibbleDeleteMonitor-"+tableName);
         }
 
         @Override
         public void run() {
-            while (m_shouldContinue.get()) {
-                try { Thread.sleep(1000); } catch (Exception e) { }
-                try {
-                    m_permits.acquire(1000);
-                } catch (InterruptedException e) {
-                    if (!m_shouldContinue.get()) {
-                        return;
-                    }
-                    log.error("NibbleDeleter thread interrupted while waiting for permits. " + e.getMessage());
-                }
-                try {
-                    deletesTried++;
-                    // this sysproc is synchronous
-                    ClientResponse response = TxnId2Utils.doProcCall(client, "@LowImpactDelete", tableName, columnName, columnThresholdInMicros, comparisonOp, chunksize, timeoutms);
-                    if (response.getStatus() == ClientResponse.SUCCESS) {
-                        VoltTable[] t = response.getResults();
-                        VoltTable data = t[0];
-                        if (data.getRowCount() <= 0) {
-                            hardStop("No rows");
-                        }
-                        VoltTableRow row = data.fetchRow(0);
-                        long rowsDeleted = row.getLong(0);
-                        long rowsLeft = row.getLong(1);
-                        long rounds = row.getLong(2);
-                        long deletedLastRound = row.getLong(3);
-                        String note = row.getString(4);
-                        deletesSucceeded++;
-                        rowsDeletedTotal += rowsDeleted;
-                    } else {
+            try {
+            while ( true ) {
+                // give a little wiggle room when checking if rows shoul've been deleted.
+                long ttl = new Double(Math.ceil(TTL*1.2)).longValue();
 
+                ClientResponse response = TxnId2Utils.doProcCall(client, "@AdHoc", "select *,now from "+tableName+" where DATEADD(SECOND,"+ttl+","+tsColumnName+") < NOW");
+
+                if (response.getStatus() == ClientResponse.SUCCESS ) {
+                    VoltTable[] t = response.getResults();
+                    VoltTable data = t[0];
+                    long unDeletedRows = data.getRowCount();
+                    log.info("Rows behind from being deleted:"+unDeletedRows);
+
+                    // print some debugging info before we error out.
+                    if (unDeletedRows > 0 ) {
+                        for ( int c = 0; c < data.getColumnCount(); c++) {
+                            System.out.print(data.getColumnName(c)+" ");
+                        }
+                        System.out.print("\n");
+                        while ( data.advanceRow() ) {
+                            for ( int c = 0; c < data.getColumnCount(); c++) {
+                                System.out.print(data.get(c,data.getColumnType(c)).toString() + " ") ;
+                            }
+                            System.out.print("\n");
+                        }
+                        Benchmark.hardStop("Nibble Delete failed to delete "+unDeletedRows+" from " + tableName + " and this shoudn't happen. Exiting.");
                     }
-                } catch (ProcCallException e) {
-                    if (! m_shouldContinue.get())
-                        return;
-                    hardStop("NibbleDeleter failed a '@LowImpactDelete' procedure call for table '" + tableName + "' " + e.getMessage());
-                } catch (Exception e) {
-                    hardStop("NibbleDeleter failed a '@LowImpactDelete' for table '" + tableName + "' " + e.getMessage());
+                } else {
+                   log.error("Response failed:"+response.getAppStatusString()+" status:"+response.getStatusString());
+                   Benchmark.hardStop("Nibble Delete failed");
                 }
+
+                response = TxnId2Utils.doProcCall(client, "@AdHoc", "select count(*) from "+tableName);
+                if (response.getStatus() == ClientResponse.SUCCESS ) {
+                    VoltTable[] t = response.getResults();
+                    VoltTable data = t[0];
+                    VoltTableRow row = data.fetchRow(0);
+                    deletesRemaining = row.getLong(0);
+                    if ( deletesRemaining > 0 ) {
+                        log.info("Nibble Delete has "+deletesRemaining+" rows from " + tableName + " to be deleted eventually.");
+                    }
+                }
+
+                Thread.sleep(2000);
+
             }
+            } catch(InterruptedException e) {
+                log.info("Thread is interrupted");
+            } catch(ProcCallException pe) {
+                pe.printStackTrace();
+                Benchmark.hardStop("Error executing procedure:"+pe.getMessage());
+            }
+
         }
     }
-
-
     @Override
     public void run() {
-        this.deleter.start();  // start the nibbler
+        this.monitor.start();
         byte[] data = new byte[rowSize];
         long currentRowCount;
         while (m_shouldContinue.get()) {
@@ -216,19 +222,27 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
                     }
                     currentRowCount = nextRowCount;
-                    log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " current count: " + currentRowCount + " rows deleted: " + rowsDeletedTotal);
+                    log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " current count: " + currentRowCount + " tried:" + insertsTried);
                 }
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 if ( e instanceof InterruptedIOException && ! m_shouldContinue.get()) {
                     continue;
                 }
                 // on exception, log and end the thread, but don't kill the process
-                hardStop("NibbleDeleteLoader failed a 'TableInsert' procedure call for table '" + tableName + "' " + e.getMessage());
+                Benchmark.hardStop("NibbleDeleteLoader failed a 'TableInsert' procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
         }
-        log.info("NibbleDeleteLoader exit for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
-        hardStop("NibbleDeleteLoader exit");
+
+        log.info("NibbleDeleteLoader completed for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
+        long maxTime = System.nanoTime() + 75*1000000;
+        while ( deletesRemaining > 0 ) {
+               if ( System.nanoTime() > maxTime) {
+                    Benchmark.hardStop("Nibble Delete hasn't finished on table '" + tableName + "' after a TTL of "+TTL+" seconds" );
+               }
+
+                try { Thread.sleep(3000); } catch (Exception e2) {}
+        }
+        Benchmark.hardStop("NibbleDeleteLoader exit");
     }
 }
