@@ -313,4 +313,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public Scheduler getScheduler() {
         return m_scheduler;
     }
+
+    //This will be called from Snapshot in elastic joining or rejoining cases.
+    public void updateReplicasForJoin() {
+        if (m_term != null) {
+            ((SpTerm)m_term).updateReplicas();
+        }
+    }
 }

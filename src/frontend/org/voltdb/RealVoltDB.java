@@ -4857,5 +4857,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public int getLowestPartitionId() {
         return m_iv2Initiators.firstKey();
     }
+
+    public void updateReplicaForJoin(long siteId) {
+        m_iv2Initiators.values().stream().filter(p->p.getInitiatorHSId() == siteId)
+            .forEach(s->((SpInitiator)s).updateReplicasForJoin());
+    }
 }
 

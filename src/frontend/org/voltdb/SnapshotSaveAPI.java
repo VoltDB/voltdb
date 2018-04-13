@@ -294,6 +294,9 @@ public class SnapshotSaveAPI
                                     VoltDB.crashLocalVoltDB("Unexpected exception while attempting to create truncation snapshot headers",
                                             true, deferredSnapshotSetup.getError());
                                 }
+                                if(format == SnapshotFormat.STREAM) {
+                                    ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId());
+                                }
                                 context.getSiteSnapshotConnection().startSnapshotWithTargets(
                                         deferredSnapshotSetup.getPlan().getSnapshotDataTargets());
                             }
