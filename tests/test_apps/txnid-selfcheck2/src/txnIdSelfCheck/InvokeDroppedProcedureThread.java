@@ -24,10 +24,7 @@
 package txnIdSelfCheck;
 
 import org.voltdb.VoltTable;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.*;
 
 import java.util.Random;
 import java.util.concurrent.Semaphore;
@@ -43,11 +40,13 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
     final Client client;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicBoolean m_needsBlock = new AtomicBoolean(false);
-    final Semaphore txnsOutstanding = new Semaphore(3);
+    final Semaphore m_permits;  // we don't need to release the permits
 
-    public InvokeDroppedProcedureThread(Client client) {
+
+    public InvokeDroppedProcedureThread(Client client, Semaphore permits) {
         setName("InvokeDroppedProcedureThread");
         this.client = client;
+        this.m_permits = permits;
     }
 
     void shutdown() {
@@ -65,15 +64,14 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
             m_expectFailure = expectFailure;
         }
         @Override
-        public void clientCallback(ClientResponse clientResponse) throws Exception {
-            txnsOutstanding.release();
-            log.info("InvokeDroppedProcedureThread response '" + clientResponse.getStatusString() + "' (" +  clientResponse.getStatus() + ")");
+        public void clientCallback(ClientResponse clientResponse) {
+            //m_permits.release();
+            log.info("Response '" + clientResponse.getStatusString() + "' (" +  clientResponse.getStatus() + ")");
             // (! m_expectFailure) == "expect success".  So, if
             // we expect success but the result is not successful then we want
             // to crash.
             if ((! m_expectFailure) != (clientResponse.getStatus() == ClientResponse.SUCCESS)) {
-                Benchmark.txnCount.incrementAndGet();
-                hardStop(String.format("InvokeDroppedProcedureThread returned an unexpected status %d, %s failure.",
+                hardStop(String.format("Returned an unexpected status %d, %s failure.",
                                        clientResponse.getStatus(),
                                        (m_expectFailure ? "expected" : "did not expect")));
                 //The procedure/udf may be dropped so we don't really care, just want to test the server with dropped procedure invocations in flight
@@ -82,8 +80,12 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
             }
         }
         public void validate(ClientResponse cr) {
-            // Do nothing here.
+            countTxn();
         }
+    }
+
+    private void countTxn() {
+        Benchmark.txnCount.incrementAndGet();
     }
 
     String[] reasons = new String[] {
@@ -103,27 +105,6 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
             "call simpleUDF10 (should succeed)",
     };
 
-    private void callProcedure(Client client, InvokeDroppedCallback callback, String proc, Object... args) {
-        boolean shouldfail = callback.m_expectFailure;
-        ClientResponse response = null;
-        try {
-            response = TxnId2Utils.doProcCall(client, proc, args);
-        }
-        catch (ProcCallException e) {
-            if (shouldfail)
-                return;
-            hardStop(e);
-        }
-        catch (Exception e) {
-            hardStop(e);
-        }
-        try {
-            callback.clientCallback(response);
-        }
-        catch (Exception e) {
-            hardStop(e);
-        }
-    }
 
     @Override
     public void run() {
@@ -167,9 +148,9 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
 
             // get a permit to send a transaction
             try {
-                txnsOutstanding.acquire();
+                m_permits.acquire();
             } catch (InterruptedException e) {
-                hardStop("InvokeDroppedProcedureThread interrupted while waiting for permit. Will end.", e);
+                hardStop("Interrupted while waiting for permit. Will end.", e);
             }
 
             // call a transaction
@@ -178,51 +159,79 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
                 // Plus (MAXIMUM_EXPONENT - MINIMUM_EXPONENT + 1) exponents
                 // for simpleUDF cases.
                 final int caseNumber = r.nextInt(numberCases);
-                log.info(String.format("InvokeDroppedProcedureThread running case %d: %s",
+                log.info(String.format("Running case %d: %s",
                                        caseNumber,
                                        reasons[caseNumber]));
                 switch (caseNumber) {
                 case 0:
                     // try to run a read procedure that has been droppped (or does not exist)
-                    callProcedure(client, new InvokeDroppedCallback(true), "droppedRead", r.nextInt());
+                    TxnId2Utils.doProcCallAsyncAdapter(client, new InvokeDroppedCallback(true), "droppedRead", r.nextInt());
                     break;
 
                 case 1:
                     // try to run a write procedure that has been dropped (or does not exist)
-                    callProcedure(client, new InvokeDroppedCallback(true), "droppedWrite", r.nextInt());
+                    TxnId2Utils.doProcCallAsyncAdapter(client, new InvokeDroppedCallback(true), "droppedWrite", r.nextInt());
                     break;
 
                 case 2:
                     // run a udf that throws an exception
-                    callProcedure(client, new InvokeDroppedCallback(true), "exceptionUDF");
+                    TxnId2Utils.doProcCallAsyncAdapter(client, new InvokeDroppedCallback(true), "exceptionUDF");
                     break;
 
                 case 3:
                     // run a statement using a function that is non-existent/dropped
+                    ProcedureCallback cb = new InvokeDroppedCallback(true) {
+                        @Override
+                        public void validate(ClientResponse cr) {
+                            if (cr.getStatus() != ClientResponse.GRACEFUL_FAILURE ||
+                                    !cr.getStatusString().endsWith("user lacks privilege or object not found: MISSINGUDF"))
+                                hardStop("Case 3 Unexpected Proc Call Exception", cr);
+                            super.validate(cr);
+                        }
+                    };
                     try {
                         ClientResponse cr = TxnId2Utils.doAdHoc(client,
                                 "select missingUDF(cid) FROM partitioned where cid=? order by cid, rid desc");
+                        hardStop("Case 3 Unexpected response the function used is missing: " + cr.getStatusString());
                     }
                     catch (ProcCallException e) {
-                        log.info(e.getClientResponse().getStatus());
-                        if (e.getClientResponse().getStatus() != ClientResponse.GRACEFUL_FAILURE)
-                            hardStop(e);
+                        ClientResponse cr = e.getClientResponse();
+                        //log.info(cr.getStatus());
+                        cb.clientCallback(cr);
+                    }
+                    catch (Exception e) {
+                        //log.info(e.getClientResponse().getStatus());
+                        hardStop("Case 3 Unexpected Exception", e);
                     }
                     break;
 
                 case 4:
                     // try to drop a function which is used in the schema
                     // drop udf will put a planning error in the server log
+                    cb = new InvokeDroppedCallback(true) {
+                        @Override
+                        public void validate(ClientResponse cr) {
+                            if (cr.getStatus() != ClientResponse.GRACEFUL_FAILURE ||
+                                    !cr.getStatusString().contains("Cannot drop user defined function \"excudf\""))
+                                hardStop("Case 4 Unexpected Proc Call Exception", cr);
+                            super.validate(cr);
+                        }
+                    };
                     try {
                         ClientResponse cr = TxnId2Utils.doAdHoc(client, "drop function excUDF;");
                         log.info(cr.getStatusString() + " (" + cr.getStatus() + ")");
-                        if (cr.getStatus() == ClientResponse.SUCCESS)
-                            hardStop("Should not succeed, the function is used in a stored procedure");
+                        hardStop("Case 4 Unexpected response the function is used in a stored procedure: " + cr.getStatusString());
+                    }
+                    catch (ProcCallException e) {
+                        ClientResponse cr = e.getClientResponse();
+                        cb.clientCallback(cr);
                     }
                     catch (Exception e) {
-                        log.info("exception: ", e);
+                        //log.info(e.getClientResponse().getStatus());
+                        hardStop("Case 4 Unexpected Exception", e);
                     }
                     break;
+
                 default:
                     int exponent = numberCases - SIMPLE_UDF_BASE;
                     /*
@@ -231,48 +240,49 @@ public class InvokeDroppedProcedureThread extends BenchmarkThread {
                      */
                     final long t = (long)r.nextInt(1000);
                     final long expected = getExpected(t, exponent);
-                    if (2 <= exponent && exponent <= 10) {
-                        callProcedure(client,
-                                new InvokeDroppedCallback(false) {
-                                    @Override
-                                    public void validate(ClientResponse cr) {
-                                        if (cr.getStatus() != ClientResponse.SUCCESS) {
-                                            hardStop(String.format("simpleUDF(%d, %d) failed with status %d", t, exponent, cr.getStatus()));
+                    TxnId2Utils.doProcCallAsyncAdapter(client,
+                            new InvokeDroppedCallback(false) {
+                                @Override
+                                public void validate(ClientResponse cr) {
+                                    if (cr.getStatus() != ClientResponse.SUCCESS) {
+                                        hardStop(String.format("simpleUDF(%d, %d) failed with status %d", t, exponent, cr.getStatus()));
+                                    }
+                                    VoltTable vt = cr.getResults()[0];
+                                    // I think it's ok if there are no rows.  That
+                                    // just means the table is not populated.  But if
+                                    // it happens too often, that means there is some
+                                    // problem with the test, and the test should fail.
+                                    if (vt.advanceRow()) {
+                                        long computed = vt.getLong(0);
+                                        if (computed != expected) {
+                                            hardStop(String.format("simpleUDF(%d, %d): expected %d, got %d.",
+                                                    t, exponent, expected, computed));
                                         }
-                                        VoltTable vt = cr.getResults()[0];
-                                        // I think it's ok if there are no rows.  That
-                                        // just means the table is not populated.  But if
-                                        // it happens too often, that means there is some
-                                        // problem with the test, and the test should fail.
-                                        if (vt.advanceRow()) {
-                                            long computed = vt.getLong(0);
-                                            if (computed != expected) {
-                                                hardStop(String.format("simpleUDF(%d, %d): expected %d, got %d.",
-                                                        t, exponent, expected, computed));
-                                            }
-                                            failures.set(0);
-                                        } else {
-                                            int numFailures = failures.incrementAndGet();
-                                            if (numFailures >= MAX_SIMPLE_UDF_EMPTY_TABLES) {
-                                                hardStop("Too many empty tables for simpleUDF calls.");
-                                            }
+                                        failures.set(0);
+                                    } else {
+                                        int numFailures = failures.incrementAndGet();
+                                        if (numFailures >= MAX_SIMPLE_UDF_EMPTY_TABLES) {
+                                            hardStop("Too many empty tables for simpleUDF calls.");
                                         }
                                     }
-                                },
-                                "SimpleUDF",
-                                t,
-                                exponent);
+                                super.validate(cr);
+                                }
+                            },
+                            "SimpleUDF", t, exponent);
                     }
-                }
-
+                    //m_permits.release();
                 // don't flood the system with these
                 Thread.sleep(r.nextInt(1000));
-                txnsOutstanding.release();
+            }
+            catch (NoConnectionsException e) {
+                log.warn("Got NoConnectionsException on proc call. Will sleep.");
+                m_needsBlock.set(true);
             }
             catch (Exception e) {
-                hardStop("InvokeDroppedProcedureThread failed to run client. Will exit.", e);
+                hardStop("Failed to run client. Will exit.", e);
             }
         }
+        log.info("Has terminated");
     }
 
     private long getExpected(long t, int exponent) {

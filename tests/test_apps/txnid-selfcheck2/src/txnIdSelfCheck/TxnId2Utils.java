@@ -44,7 +44,9 @@ public enum TxnId2Utils {;
                 statusString.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
                 statusString.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*") ||
                 statusString.matches("(?s).*Ad Hoc Planner task queue is full.*") ||
-                statusString.matches("(?s).*Transaction Interrupted.*");
+                statusString.matches("(?s).*Transaction Interrupted.*") ||
+                statusString.matches("(?s).*Can't do catalog update\\(.AdHoc\\) while a node rejoin is active.*") ||
+                statusString.matches("(?s).*Can't do catalog update\\(@AdHoc\\) while another one is in progress.*");
     }
 
     static boolean isServerUnavailableIssue(String statusString) {
@@ -66,6 +68,26 @@ public enum TxnId2Utils {;
                 statusString.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*"));
     }
 
+    static void doProcCallAsyncAdapter(Client client, ProcedureCallback callback, String proc, Object... args) {
+        /* this adapts a async procCall to use doProcCall which is a sync call */
+        ClientResponse response;
+        try {
+            response = doProcCall(client, proc, args);
+        } catch (ProcCallException e) {
+            try {
+                callback.clientCallback(e.getClientResponse());
+            } catch (Exception ex) {
+                Benchmark.hardStop(ex);
+            }
+            ;
+            return;
+        }
+        try {
+            callback.clientCallback(response);
+        } catch (Exception e) {
+            Benchmark.hardStop(e);
+        }
+    }
 
     static ClientResponse doProcCall(Client client, String proc, Object... parms) throws ProcCallException {
         return doProcCall(client, proc, false, parms);
@@ -113,7 +135,8 @@ public enum TxnId2Utils {;
                 try { Thread.sleep(3000); } catch (Exception f) { }
                 sleep = false;
                 if (noConnections)
-                    while (client.getConnectedHostList().size() == 0);
+                    while (client.getConnectedHostList().size() == 0)
+                        try { Thread.sleep(3000); } catch (Exception e) {} // sleep for 3s;
                 noConnections = false;
             }
         }

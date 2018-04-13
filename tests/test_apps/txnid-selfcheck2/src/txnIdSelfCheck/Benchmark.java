@@ -711,7 +711,7 @@ public class Benchmark {
             }
         }
         if (!config.disabledThreads.contains("idpt")) {
-            idpt = new InvokeDroppedProcedureThread(client);
+            idpt = new InvokeDroppedProcedureThread(client, permits);
             idpt.start();
         } if (!config.disabledThreads.contains("ddlt")) {
             ddlt = new DdlThread(client);
