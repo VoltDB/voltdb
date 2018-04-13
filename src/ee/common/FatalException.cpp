@@ -17,16 +17,11 @@
 
 #include "common/FatalException.hpp"
 
-#include <cstring> // for strn*
-#include <dlfcn.h>
-#include <stdio.h> // for fopen, fprintf, fclose
-#include <string.h>
-#include "common/debuglog.h"
+#include <cxxabi.h>   // for abi
 
 #ifdef MACOSX // mac os requires _XOPEN_SOURCE for ucontext for some reason
 #define _XOPEN_SOURCE
 #endif
-#include <ucontext.h>
 
 namespace voltdb {
 FatalException::FatalException(std::string message,

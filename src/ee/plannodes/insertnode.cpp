@@ -44,8 +44,6 @@
  */
 #include "insertnode.h"
 
-#include <sstream>
-
 namespace voltdb {
 
 PlanNodeType InsertPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INSERT; }

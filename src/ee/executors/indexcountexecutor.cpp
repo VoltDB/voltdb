@@ -17,18 +17,10 @@
 
 #include "indexcountexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/ValueFactory.hpp"
-#include "execution/ExecutorVector.h"
-#include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "plannodes/indexcountnode.h"
-#include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;

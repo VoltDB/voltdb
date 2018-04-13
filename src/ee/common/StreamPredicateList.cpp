@@ -16,12 +16,9 @@
  */
 
 #include <string>
-#include <limits>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include "StreamPredicateList.h"
-#include "expressions/abstractexpression.h"
-#include "common/PlannerDomValue.h"
 
 namespace voltdb
 {

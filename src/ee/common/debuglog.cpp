@@ -19,10 +19,10 @@
 // These do not appear to work on the Mac in a JNI library
 #include <cxxabi.h>
 #include <execinfo.h>
-
-#include <cstdlib> // for malloc/free
 #include <cstring>
-#include <sstream> // for std::ostringstream
+#include <cxxabi.h>   // for abi
+#include <cstdlib>    // for malloc/free
+#include <sstream>    // for std::ostringstream
 
 #include "common/debuglog.h"
 #include "common/executorcontext.hpp"

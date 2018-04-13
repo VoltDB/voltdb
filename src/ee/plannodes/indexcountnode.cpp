@@ -18,8 +18,6 @@
 
 #include "indexcountnode.h"
 
-#include "expressions/abstractexpression.h"
-
 #include <sstream>
 
 namespace voltdb {

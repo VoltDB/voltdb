@@ -17,12 +17,9 @@
 
 #include "SegvException.hpp"
 
-#include <cstdlib>
 #include <cstring> // for strcmp
 #include <cxxabi.h>
 #include <dlfcn.h>
-#include <string>
-
 
 using namespace std;
 using namespace voltdb;
