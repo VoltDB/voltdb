@@ -66,6 +66,7 @@ public class SpTerm implements Term
             if (m_replicas.isEmpty() || replicas.size() < m_replicas.size()) {
                 //The cases for startup or host failure
                 m_mailbox.updateReplicas(replicas, null);
+                m_replicasUpdatedRequired = false;
             } else {
                 //The case for join or rejoin
                 m_replicasUpdatedRequired = true;
