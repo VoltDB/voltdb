@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rules;
 
+import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.volcano.AbstractConverter;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
@@ -27,14 +28,16 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
+import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalAggregateRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalCalcRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalSortRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalTableScanRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBCalcMergeRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBCalcAggregateMergeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBCalcScanToIndexRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBLimitScanMergeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBLimitSortMergeRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalAggregateRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalCalcRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalLimitRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSeqScanRule;
@@ -46,7 +49,7 @@ import org.voltdb.calciteadapter.rules.physical.VoltDBSortScanToIndexRule;
 
 public class VoltDBRules {
 
-    public static Program RULES_SET_0 = Programs.ofRules(
+    public static RelOptRule[] VOLCANO_RULES_0 = {
             // Calcite's Logical Rules
             CalcMergeRule.INSTANCE
             , FilterCalcMergeRule.INSTANCE
@@ -60,10 +63,10 @@ public class VoltDBRules {
             , VoltDBLogicalSortRule.INSTANCE
             , VoltDBLogicalTableScanRule.INSTANCE
             , VoltDBLogicalCalcRule.INSTANCE
+            , VoltDBLogicalAggregateRule.INSTANCE
+    };
 
-            );
-
-    public static Program RULES_SET_1 = Programs.ofRules(
+    public static RelOptRule[] VOLCANO_RULES_1 = {
             // Calcite's Rules
             AbstractConverter.ExpandConversionRule.INSTANCE
 
@@ -83,20 +86,36 @@ public class VoltDBRules {
             , VoltDBSortConvertRule.INSTANCE_NONE
             , VoltDBSortConvertRule.INSTANCE_VOLTDB
             , VoltDBPhysicalLimitRule.INSTANCE
+            , VoltDBPhysicalAggregateRule.INSTANCE
+    };
 
-            );
-
-    public static Program RULES_SET_2 = Programs.ofRules(
+    public static RelOptRule[] HEP_RULES = {
             // VoltDB Inline Rules
 
             VoltDBCalcScanMergeRule.INSTANCE
             , VoltDBLimitScanMergeRule.INSTANCE
             , VoltDBLimitSortMergeRule.INSTANCE
+            , VoltDBCalcAggregateMergeRule.INSTANCE
+    };
 
+    public static Program VOLCANO_PROGRAM_0 = Programs.ofRules(
+            VOLCANO_RULES_0
             );
 
-    public static Program[] getProgram() {
+    public static Program VOLCANO_PROGRAM_1 = Programs.ofRules(
+            VOLCANO_RULES_1
+            );
 
-        return new Program[] {RULES_SET_0, RULES_SET_1, RULES_SET_2};
+    public static Program HEP_PROGRAM = Programs.ofRules(
+            HEP_RULES
+            );
+
+    public static Program[] getVolcanoPrograms() {
+        return new Program[] {VOLCANO_PROGRAM_0, VOLCANO_PROGRAM_1};
     }
+
+    public static Program getHepProgram() {
+        return HEP_PROGRAM;
+    }
+
 }

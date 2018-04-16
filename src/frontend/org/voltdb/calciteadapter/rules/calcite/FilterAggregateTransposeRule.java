@@ -40,6 +40,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;
@@ -52,6 +53,8 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.ImmutableBitSet;
 //import org.voltdb.calciteadapter.rel.physicalOld.VoltDBAggregate;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalAggregate;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
 
 import com.google.common.collect.Lists;
 
@@ -60,7 +63,7 @@ import com.google.common.collect.Lists;
  * Planner rule that pushes a {@link org.apache.calcite.rel.core.Filter}
  * past a {@link org.apache.calcite.rel.core.Aggregate}.
  * The remaining Filter representing HAVING expressions is merged with
- * the Aggregate to a single {@link org.voltdb.calciteadapter.rel.physical.VoltDBAggregate}.
+ * the Aggregate to a single {@link org.voltdb.calciteadapter.rel.physical.AbstractVoltDBAggregate}.
  *
  */
 public class FilterAggregateTransposeRule extends RelOptRule {
@@ -122,7 +125,9 @@ public class FilterAggregateTransposeRule extends RelOptRule {
         adjustments[j] = i - j;
         j++;
       }
+      // Filter conditions that can be pushed through the aggregate
       final List<RexNode> pushedConditions = Lists.newArrayList();
+      // Filter conditions that can not be pushed through the aggregate
       final List<RexNode> remainingConditions = Lists.newArrayList();
 
       for (RexNode condition : conditions) {
@@ -139,20 +144,33 @@ public class FilterAggregateTransposeRule extends RelOptRule {
       }
 
       final RelBuilder builder = call.builder();
-      RelNode rel =
+      RelNode newAggrInput =
           builder.push(aggRel.getInput()).filter(pushedConditions).build();
       RexNode aggrPostPredicate = null;
-      if (rel == aggRel.getInput(0)) {
+      if (newAggrInput == aggRel.getInput(0)) {
+          // The new Rel node matches the initial aggregate input -
+          // non of the filter's conditions were pushed through
           aggrPostPredicate = filterRel.getCondition();
       } else {
+          // Add remaining filters that couldn't be pushed through to the post predicate
           aggrPostPredicate = RexUtil.composeConjunction(rexBuilder, remainingConditions, true);
       }
-//      VoltDBAggregate newAggr = VoltDBAggregate.createFrom(
-//              aggRel,
-//              rel,
+      RelTraitSet convertedTraits = aggRel.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL);
+      RelNode convertedInput = convert(newAggrInput, newAggrInput.getTraitSet().replace(VoltDBLogicalRel.VOLTDB_LOGICAL));
+
+//      VoltDBLogicalAggregate newAggr = VoltDBLogicalAggregate.create(
+//              aggRel.getCluster(),
+//              convertedTraits,
+//              convertedInput,
+//              aggRel.indicator,
+//              aggRel.getGroupSet(),
+//              aggRel.getGroupSets(),
+//              aggRel.getAggCallList(),
 //              aggrPostPredicate);
 //
 //      call.transformTo(newAggr);
+//      // Make sure the initial aggregate is out of the Calcite's search space
+//      call.getPlanner().setImportance(aggRel, 0);
     }
 
     private boolean canPush(Aggregate aggregate, ImmutableBitSet rCols) {

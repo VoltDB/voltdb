@@ -17,15 +17,10 @@
 
 package org.voltdb.calciteadapter.rel.logical;
 
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
-import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 
 public class VoltDBLogicalCalc extends Calc implements VoltDBLogicalRel {
