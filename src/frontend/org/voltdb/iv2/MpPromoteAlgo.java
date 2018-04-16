@@ -288,8 +288,6 @@ public class MpPromoteAlgo implements RepairAlgo
     //  Specialization
     //
     //
-
-
     VoltMessage makeRepairLogRequestMessage(long requestId)
     {
         return new Iv2RepairLogRequestMessage(requestId, Iv2RepairLogRequestMessage.MPIREQUEST);
@@ -313,7 +311,7 @@ public class MpPromoteAlgo implements RepairAlgo
         }
         else if (msg.getPayload() instanceof CompleteTransactionMessage) {
             // prefer complete messages to fragment tasks.
-            m_repairLogUnion.remove(prev);
+            m_repairLogUnion.removeIf((p) -> p.getTxnId() < msg.getTxnId());
             m_repairLogUnion.add(msg);
         }
     }
