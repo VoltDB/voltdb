@@ -872,7 +872,12 @@ public class ProcedureRunner {
                     clusterName, databaseName,
                     tableName, data, returnUniqueViolations, shouldDRStream, undo);
         } catch (EEException e) {
-            throw new VoltAbortException("Failed to load table: " + tableName);
+            String msg = "Failed to load table \"" + tableName + "\"";
+            if (e.getMessage() != null) {
+                msg += ": " + e.getMessage();
+            }
+
+            throw new VoltAbortException(msg);
         }
     }
 
