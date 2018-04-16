@@ -270,7 +270,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        int64_t spHandle,
                        int64_t lastCommittedSpHandle,
                        int64_t uniqueId,
-                       bool returnUniqueViolations,
+                       bool throwUniqueViolations,
                        bool shouldDRStream,
                        int64_t undoToken);
 

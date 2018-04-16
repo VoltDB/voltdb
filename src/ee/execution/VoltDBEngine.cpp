@@ -1551,7 +1551,7 @@ VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInputBE &serializeIn,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
                         int64_t uniqueId,
-                        bool returnUniqueViolations,
+                        bool throwUniqueViolations,
                         bool shouldDRStream,
                         int64_t undoToken) {
     //Not going to thread the unique id through.
@@ -1584,43 +1584,43 @@ VoltDBEngine::loadTable(int32_t tableId,
                    (int) tableId, ret->name().c_str());
         return false;
     }
-    try {
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                table->isCatalogTableReplicated(), isLowestSite(), s_loadTableResult);
-        if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            try {
-                table->loadTuplesForLoadTable(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, ExecutorContext::currentUndoQuantum() == NULL);
-            } catch (ConstraintFailureException &cfe) {
-                if (!returnUniqueViolations) {
-                    // pre-serialize the exception here since we need to cleanup tuple memory within this sync block
-                    resetReusedResultOutputBuffer();
-                    cfe.serialize(getExceptionOutputSerializer());
-                    return false;
-                } else {
-                    throw;
-                }
+
+    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+            table->isCatalogTableReplicated(), isLowestSite(), s_loadTableResult);
+    if (possiblySynchronizedUseMpMemory.okToExecute()) {
+        try {
+            table->loadTuplesForLoadTable(serializeIn, NULL, throwUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, ExecutorContext::currentUndoQuantum() == NULL);
+        } catch (ConstraintFailureException &cfe) {
+            if (throwUniqueViolations) {
+                throw;
             }
-            s_loadTableResult = 0;
+            else {
+                // pre-serialize the exception here since we need to cleanup tuple memory within this sync block
+                resetReusedResultOutputBuffer();
+                cfe.serialize(getExceptionOutputSerializer());
+                return false;
+            }
+        }
+        s_loadTableResult = 0;
+    }
+    else if (s_loadTableResult == -1) {
+        // An exception was thrown on the lowest site thread and we need to throw here as well so
+        // all threads are in the same state
+        char msg[1024];
+        snprintf(msg, 1024, "Replicated load table threw an unknown exception on other thread for table %s",
+                 table->name().c_str());
+        VOLT_DEBUG("%s", msg);
+        SerializableEEException exc(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+        if (throwUniqueViolations) {
+            throw exc;
         }
         else {
-            if (s_loadTableResult == -1) {
-                // An exception was thrown on the lowest site thread and we need to throw here as well so
-                // all threads are in the same state
-                char msg[1024];
-                snprintf(msg, 1024, "Replicated load table threw an unknown exception on other thread for table %s",
-                           table->name().c_str());
-                VOLT_DEBUG("%s", msg);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
-            }
+            resetReusedResultOutputBuffer();
+            exc.serialize(getExceptionOutputSerializer());
+            return false;
         }
     }
-    catch (const SerializableEEException &e) {
-        assert(!SynchronizedThreadLock::isInSingleThreadMode());
-        if (returnUniqueViolations) {
-            throwFatalException("%s", e.message().c_str());
-        }
-        throw;
-    }
+
     return true;
 }
 
