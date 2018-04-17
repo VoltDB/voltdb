@@ -98,8 +98,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
                 m_replicatedTableOperation, m_engine->isLowestSite());
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            s_modifiedTuples = -1;
             if (m_truncate) {
-                s_modifiedTuples = -1;
                 VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
                 // count the truncated tuples as deleted
                 modified_tuples = targetTable->visibleTupleCount();

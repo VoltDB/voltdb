@@ -1650,8 +1650,8 @@ VoltDBEngine::loadTable(int32_t tableId,
         // This is fatal.
         std::ostringstream oss;
         oss << "An unknown exception occurred on another thread when loading table \"" << table->name() << "\".";
-        throwFatalException("An unknown exception occurred on another thread when loading table \"%s\".",
-                            table->name().c_str());
+        VOLT_DEBUG("%s", oss.str().c_str());
+        throwFatalException("%s", oss.str().c_str());
     }
 
     return true;
