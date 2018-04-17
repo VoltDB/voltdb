@@ -19,6 +19,7 @@
 #include "storage/tablefactory.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/TupleOutputStream.h"
 #include "common/FatalException.hpp"
 #include "common/StreamPredicateList.h"
@@ -39,8 +40,6 @@ CopyOnWriteContext::CopyOnWriteContext(
         const std::vector<std::string> &predicateStrings,
         int64_t totalTuples) :
              TableStreamerContext(table, surgeon, partitionId, predicateStrings),
-             m_backedUpTuples(TableFactory::buildCopiedTempTable("COW of " + table.name(),
-                                                                 &table)),
              m_pool(2097152, 320),
              m_tuple(table.schema()),
              m_finishedTableScan(false),
@@ -52,15 +51,36 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_deletes(0),
              m_updates(0),
              m_skippedDirtyRows(0),
-             m_skippedInactiveRows(0)
+             m_skippedInactiveRows(0),
+             m_replicated(table.isCatalogTableReplicated())
 {
+    if (m_replicated) {
+        // There is a corner case where a replicated table is streamed from a thread other than the lowest
+        // site thread. The only known case is rejoin snapshot where none of the target partitions are on
+        // the lowest site thread.
+        ScopedReplicatedResourceLock scopedLock;
+        ExecuteWithMpMemory useMpMemory;
+        m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table));
+    }
+    else {
+        m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table));
+    }
 }
 
 /**
  * Destructor.
  */
 CopyOnWriteContext::~CopyOnWriteContext()
-{}
+{
+    if (m_replicated) {
+        ScopedReplicatedResourceLock scopedLock;
+        ExecuteWithMpMemory useMpMemory;
+        m_backedUpTuples.reset();
+    }
+    else {
+        m_backedUpTuples.reset();
+    }
+}
 
 
 /**
@@ -87,13 +107,27 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
     return ACTIVATION_SUCCEEDED;
 }
 
+/**
+* Reactivation handler.
+*/
+TableStreamerContext::ActivationReturnCode
+CopyOnWriteContext::handleReactivation(TableStreamType streamType)
+{
+    // Not support multiple snapshot streams.
+    assert(m_tuplesRemaining == 0);
+    if (streamType == TABLE_STREAM_SNAPSHOT) {
+     return ACTIVATION_FAILED;
+    }
+    return ACTIVATION_UNSUPPORTED;
+}
+
 /*
  * Serialize to multiple output streams.
  * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                              std::vector<int> &retPositions) {
-    assert(m_iterator != NULL);
+    assert(m_iterator.get() != NULL);
 
     // Don't expect to be re-called after streaming all the tuples.
     if (m_totalTuples != 0 && m_tuplesRemaining == 0) {
@@ -167,10 +201,10 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * table with the tuples that were backed up.
              */
             m_finishedTableScan = true;
-            m_skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
-            m_skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
+            m_skippedDirtyRows = static_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
+            m_skippedInactiveRows = static_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
             // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
-            m_iterator.reset(m_backedUpTuples->makeIterator());
+            m_iterator.reset(new TableIterator(m_backedUpTuples->iterator()));
         } else {
             /*
              * No more tuples in the temp table and had previously finished the
@@ -252,6 +286,29 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * is still hanging around. So we need to call it again to return
              * the block here.
              */
+
+            VOLT_TRACE("serializeMore(): Finish streaming"
+                                  "Table name: %s\n"
+                                  "Table type: %s\n"
+                                  "Original tuple count: %jd\n"
+                                  "Active tuple count: %jd\n"
+                                  "Remaining tuple count: %jd\n"
+                                  "Compacted block count: %jd\n"
+                                  "Dirty insert count: %jd\n"
+                                  "Dirty delete count: %jd\n"
+                                  "Dirty update count: %jd\n"
+                                  "Partition column: %d\n",
+                                  table.name().c_str(),
+                                  table.tableType().c_str(),
+                                  (intmax_t)m_totalTuples,
+                                  (intmax_t)table.activeTupleCount(),
+                                  (intmax_t)m_tuplesRemaining,
+                                  (intmax_t)m_blocksCompacted,
+                                  (intmax_t)m_inserts,
+                                  (intmax_t)m_deletes,
+                                  (intmax_t)m_updates,
+                                  table.partitionColumn());
+
             if (hasMore) {
                 hasMore = m_iterator->next(tuple);
                 if (hasMore) {
@@ -287,7 +344,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 }
 
 bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
-    assert(m_iterator != NULL);
+    assert(m_iterator.get() != NULL);
 
     if (tuple.isDirty() || m_finishedTableScan) {
         return true;
@@ -299,12 +356,23 @@ bool CopyOnWriteContext::notifyTupleDelete(TableTuple &tuple) {
     /**
      * Now check where this is relative to the COWIterator.
      */
-    CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
-    return !iter->needToDirtyTuple(tuple.address());
+    CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+    if (iter->needToDirtyTuple(tuple.address())) {
+        // For replicated table
+        // preserve the deleted tuples to tempTable instead of mark deletePending
+        if (m_replicated) {
+            m_backedUpTuples->insertTempTupleDeepCopy(tuple, &m_pool);
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        return true;
+    }
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
-    assert(m_iterator != NULL);
+    assert(m_iterator.get() != NULL);
 
     /**
      * If this an update or a delete of a tuple that is already dirty then no further action is
@@ -326,7 +394,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     /**
      * Now check where this is relative to the COWIterator.
      */
-    CopyOnWriteIterator *iter = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get());
+    CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
     if (iter->needToDirtyTuple(tuple.address())) {
         tuple.setDirtyTrue();
 
@@ -347,7 +415,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
 }
 
 void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
-    assert(m_iterator != NULL);
+    assert(m_iterator.get() != NULL);
     if (m_finishedTableScan) {
         // There was a compaction while we are iterating through the m_backedUpTuples
         // TempTable. Don't do anything because the passed in block is a PersistentTable
@@ -377,13 +445,13 @@ bool CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
  * Only call it while m_finishedTableScan==false.
  */
 void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
-    assert(m_iterator != NULL);
+    assert(m_iterator.get() != NULL);
     assert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
     TableTuple tuple(getTable().schema());
-    boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples->makeIterator());
+    TableIterator iter = m_backedUpTuples->iterator();
     intmax_t count2 = 0;
-    while (iter->next(tuple)) {
+    while (iter.next(tuple)) {
         count2++;
     }
     if (m_tuplesRemaining != count1 + count2) {

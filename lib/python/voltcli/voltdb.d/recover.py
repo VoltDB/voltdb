@@ -33,4 +33,5 @@
     hideverb=True
 )
 def recover(runner):
-    runner.abort('voltdb recover is no longer supported, please use \'init\' to initialize and \'start\' to start the database.')
+    runner.warning('voltdb recover is no longer supported, please use \'init\' to initialize and \'start\' to start the database.')
+    runner.go()

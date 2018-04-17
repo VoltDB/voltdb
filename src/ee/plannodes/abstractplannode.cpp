@@ -50,9 +50,6 @@
 #include "storage/persistenttable.h"
 #include "storage/TableCatalogDelegate.hpp"
 
-#include <sstream>
-#include <vector>
-
 namespace voltdb {
 
 AbstractPlanNode::AbstractPlanNode()

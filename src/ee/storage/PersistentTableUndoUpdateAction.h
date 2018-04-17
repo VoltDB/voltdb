@@ -18,12 +18,12 @@
 #ifndef PERSISTENTTABLEUNDOUPDATEACTION_H_
 #define PERSISTENTTABLEUNDOUPDATEACTION_H_
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
-class PersistentTableUndoUpdateAction: public UndoAction {
+class PersistentTableUndoUpdateAction: public UndoReleaseAction {
 public:
     PersistentTableUndoUpdateAction(char* oldTuple,
                                     char* newTuple,

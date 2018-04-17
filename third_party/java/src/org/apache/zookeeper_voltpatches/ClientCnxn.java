@@ -1347,7 +1347,19 @@ public class ClientCnxn {
     private int xid = 1;
 
     synchronized private int getXid() {
-        return xid++;
+        int currentXid = xid;
+        xid++;
+
+        //xids are assumed to be non-negative, except as special xids, -2 for ping, and -4 for auth.
+        //If the xid overflows, the system could hang when a non-auth packet uses -4 for xid.
+        //xids are only used to match requests and responses. So resetting it to 1 as it overflows
+        //should be safe. The odds of an existing in-flight operation that happened 2147483647 operations ago still
+        //lingering around or causing any confusion seems beyond unlikely.
+        if (xid < 0) {
+            xid = 1;
+        }
+
+        return currentXid;
     }
 
     public ReplyHeader submitRequest(RequestHeader h, Record request,

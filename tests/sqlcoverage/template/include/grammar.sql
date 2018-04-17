@@ -60,6 +60,12 @@
 {_sortorder |= " ASC "}
 {_sortorder |= " DESC "}
 
+{_optionallimit |= ""}
+{_optionallimit |= "LIMIT 4"}
+{_optionaloffset |= ""}
+{_optionaloffset |= "OFFSET 2"}
+{_optionallimitoffset |= "_optionallimit _optionaloffset"}
+
 {_math |= " + "}
 {_math |= " - "}
 {_math |= " * "}
@@ -84,10 +90,15 @@
 {_somecmp |= " < "}
 {_somecmp |= " >= "}
 
-{_jointype |= " "}
-{_jointype |= " INNER "}
-{_jointype |= " LEFT "}
-{_jointype |= " RIGHT "}
+-- In some circumstances, a FULL JOIN is not supported by PostgreSQL
+{_innerjointype |= " "}
+{_innerjointype |= " INNER "}
+
+{_nonfulljointype |= "_innerjointype"}
+{_nonfulljointype |= " LEFT "}
+{_nonfulljointype |= " RIGHT "}
+
+{_jointype |= "_nonfulljointype"}
 {_jointype |= " FULL "}
 
 {_setop |= " UNION "}

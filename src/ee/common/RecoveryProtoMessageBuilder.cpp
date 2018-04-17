@@ -16,9 +16,6 @@
  */
 
 #include "common/RecoveryProtoMessageBuilder.h"
-#include "common/FatalException.hpp"
-#include "common/types.h"
-#include "common/Pool.hpp"
 
 namespace voltdb {
 /*

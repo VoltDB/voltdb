@@ -50,8 +50,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -59,6 +61,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -559,7 +562,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId, String tableSignature)
     {
@@ -621,6 +624,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         return m_loadedProcedures.getProcByName(procedureName);
     }
 
+    @Override
+    public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
+                                                     Table catTable,
+                                                     Column column,
+                                                     ComparisonOperation op)
+    {
+        return m_loadedProcedures.getNibbleDeleteProc(
+                    procedureName, catTable, column, op);
+    }
+
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
@@ -672,7 +685,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte log[]) {
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, int remotePartitionId, byte log[]) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 

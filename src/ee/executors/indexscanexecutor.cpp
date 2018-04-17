@@ -45,19 +45,9 @@
 
 #include "indexscanexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "common/ValueFactory.hpp"
 #include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
 #include "executors/insertexecutor.h"
-#include "execution/ExecutorVector.h"
-#include "execution/ProgressMonitorProxy.h"
-#include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
-#include "indexes/tableindex.h"
 
 // Inline PlanNodes
 #include "plannodes/indexscannode.h"
@@ -65,9 +55,7 @@
 #include "plannodes/limitnode.h"
 #include "plannodes/aggregatenode.h"
 
-#include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/AbstractTempTable.hpp"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
@@ -154,6 +142,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_lookupType = m_node->getLookupType();
     m_sortDirection = m_node->getSortDirection();
 
+    m_hasOffsetRankOptimization = m_node->hasOffsetRankOptimization();
+
     VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
 
     return true;
@@ -201,8 +191,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     }
 
     // Initialize the postfilter
-    CountingPostfilter postfilter(m_outputTable, post_expression, limit, offset);
+    int postfilterOffset = offset;
+    if (m_hasOffsetRankOptimization) {
+        postfilterOffset = CountingPostfilter::NO_OFFSET;
+    }
+    CountingPostfilter postfilter(m_outputTable, post_expression, limit, postfilterOffset);
 
+    // Progress monitor
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     //
@@ -237,7 +232,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         } else {
             // We may actually find out during initialization
             // that we are done.  The p_execute_init function
-            // returns true if this is so.  See the definition
+            // returns false if this is so.  See the definition
             // of InsertExecutor::p_execute_init.
             //
             // We know we're in an insert from select statement.
@@ -253,7 +248,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // happy with.  The p_execute_init knows
             // how to do this.  Note that temp_tuple will
             // not be initialized if this returns false.
-            if (m_insertExec->p_execute_init(temp_tuple_schema, m_tmpOutputTable, temp_tuple)) {
+            if (!m_insertExec->p_execute_init(temp_tuple_schema, m_tmpOutputTable, temp_tuple)) {
                 return true;
             }
             // We should have as many expressions in the
@@ -499,10 +494,21 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         else {
             return false;
         }
-    }
-    else {
-        bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-        tableIndex->moveToEnd(toStartActually, indexCursor);
+    } else {
+        bool forward = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
+        if (m_hasOffsetRankOptimization) {
+            int rankOffset = offset + 1;
+            if (!forward) {
+                rankOffset = static_cast<int>(tableIndex->getSize() - offset);
+            }
+            // when rankOffset is not greater than 0, it means there are no matching tuples
+            // then we do not need to update the IndexCursor which points to NULL tuple by default
+            if (rankOffset > 0) {
+                tableIndex->moveToRankTuple(rankOffset, forward, indexCursor);
+            }
+        } else {
+            tableIndex->moveToEnd(forward, indexCursor);
+        }
     }
 
     //

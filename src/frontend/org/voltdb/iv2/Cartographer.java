@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.util.AbstractMap;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -419,6 +420,21 @@ public class Cartographer extends StatsSource
     }
 
     /**
+     * @return a multi map of a pair of Partition to HSIDs to all Hosts
+     */
+    public Multimap<Integer, Entry<Integer,Long>> getHostToPartition2HSIdMap() {
+        Multimap<Integer, Entry<Integer,Long>> hostToHSId = ArrayListMultimap.create();
+        for (int pId : getPartitions()) {
+            if (pId == MpInitiator.MP_INIT_PID) {
+                continue;
+            }
+            List<Long> hsIDs = getReplicasForPartition(pId);
+            hsIDs.forEach(hsId -> hostToHSId.put(CoreUtils.getHostIdFromHSId(hsId),  new AbstractMap.SimpleEntry<>(pId, hsId)));
+        }
+        return hostToHSId;
+    }
+
+    /**
      * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
      */
     public List<Long> getReplicasForPartition(int partition) {
@@ -578,14 +594,14 @@ public class Cartographer extends StatsSource
         existingParts.remove(MpInitiator.MP_INIT_PID);
         int partsToAdd = newPartitionTotalCount - existingParts.size();
 
+        hostLog.info("Computing " + partsToAdd + " new partitions to add. Total partitions: " + newPartitionTotalCount);
         if (partsToAdd > 0) {
-            hostLog.info("Computing new partitions to add. Total partitions: " + newPartitionTotalCount);
             for (int i = 0; newPartitions.size() != partsToAdd; i++) {
                 if (!existingParts.contains(i)) {
                     newPartitions.add(i);
                 }
             }
-            hostLog.info("Adding " + partsToAdd + " partitions: " + newPartitions);
+            hostLog.info("Adding new partitions: " + newPartitions);
         }
         return newPartitions;
     }

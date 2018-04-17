@@ -300,7 +300,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.drain();
         waitForStreamedAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
-        exportVerify(true, 100);
+        exportVerify(false, 100);
 
         config.killSingleHost(2);
         config.recoverOne(2, 0, "");
@@ -313,7 +313,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.drain();
         waitForStreamedAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
-        exportVerify(true, 150);
+        exportVerify(false, 150);
 
         //Kill host with all masters now.
         config.killSingleHost(0);
@@ -329,7 +329,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.drain();
         waitForStreamedAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
-        exportVerify(true, 2000);
+        exportVerify(false, 2000);
     }
 
     public TestExportSuiteReplicatedSocketExport(final String name) {

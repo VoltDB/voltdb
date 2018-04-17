@@ -44,9 +44,6 @@
  */
 #include "swaptablesnode.h"
 
-#include "common/executorcontext.hpp"
-#include "storage/TableCatalogDelegate.hpp"
-
 namespace voltdb {
 
 SwapTablesPlanNode::~SwapTablesPlanNode() { }

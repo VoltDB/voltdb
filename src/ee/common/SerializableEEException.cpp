@@ -20,8 +20,6 @@
 #include "common/serializeio.h"
 #include "execution/VoltDBEngine.h"
 
-#include <stdint.h>
-
 namespace voltdb {
 
 #ifdef VOLT_DEBUG_ENABLED
@@ -38,6 +36,7 @@ static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exce
     case VOLT_EE_EXCEPTION_TYPE_SPECIFIED: return "VOLT_EE_EXCEPTION_TYPE_SPECIFIED";
     case VOLT_EE_EXCEPTION_TYPE_GENERIC: return "VOLT_EE_EXCEPTION_TYPE_GENERIC";
     case VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED: return "VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED";
+    case VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE: return "VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE";
     default: return "UNKNOWN";
     }
 }

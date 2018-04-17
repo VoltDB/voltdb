@@ -73,16 +73,11 @@ namespace voltdb {
 
 // Compile Option
 #ifndef VOLT_LOG_LEVEL
-    // TODO : any way to use pragma message in GCC?
-    //#pragma message("Warning: VOLT_LOG_LEVEL compile option was not explicitly given.")
-    #if defined(DEBUG) || defined(_DEBUG) || defined(_DEBUG_)
-        //#pragma message("VOLT_LEVEL_DEBUG is used instead as DEBUG option is on.")
-        #define VOLT_LOG_LEVEL VOLT_LEVEL_DEBUG
-    #else
-        //#pragma message("VOLT_LEVEL_WARN is used instead as DEBUG option is off.")
-        #define VOLT_LOG_LEVEL VOLT_LEVEL_WARN
+    #ifndef NDEBUG
+        #define VOLT_LOG_LEVEL VOLT_LEVEL_ERROR
+    #else // release builds
+        #define VOLT_LOG_LEVEL VOLT_LEVEL_OFF
     #endif
-    //#pragma message("Give VOLT_LOG_LEVEL compile option to overwrite the default level.")
 #endif
 
 
@@ -171,57 +166,12 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
     #define VOLT_TRACE_STACK() ((void)0)
 #endif
 
-// Output log message header in this format: [type] [file:line:function] time -
-// ex: [ERROR] [somefile.cpp:123:doSome()] 2008/07/06 10:00:00 -
-inline void outputLogHeader(const char *file, int line, const char *func, int level) {
-    time_t t = ::time(NULL) ;
-    tm *curTime = localtime(&t);
-    char time_str[32]; // FIXME
-    ::strftime(time_str, 32, VOLT_LOG_TIME_FORMAT, curTime);
-    const char* type;
-    switch (level) {
-        case VOLT_LEVEL_ERROR:
-            type = "ERROR";
-            break;
-        case VOLT_LEVEL_WARN:
-            type = "WARN ";
-            break;
-        case VOLT_LEVEL_INFO:
-            type = "INFO ";
-            break;
-        case VOLT_LEVEL_DEBUG:
-            type = "DEBUG";
-            break;
-        case VOLT_LEVEL_TRACE:
-            type = "TRACE";
-            break;
-        default:
-            type = "UNKWN";
-    }
-    printf("[%s] [%s:%d:%s()] %s - ", type, file, line, func, time_str);
-}
-
 class StackTrace {
 public:
     StackTrace();
     ~StackTrace();
 
-    static void printMangledAndUnmangledToFile(FILE *targetFile) {
-        StackTrace st;
-        // write header for backtrace file
-        int numFrames = (int)st.m_traces.size();
-        // Ignore the stack frames specific to StackTrace object
-        fprintf(targetFile, "VoltDB Backtrace (%d stack frames)\n", numFrames-2);
-        for (int ii = 2; ii < numFrames; ii++) {
-            // write original symbol to file.
-            fprintf(targetFile, "raw[%d]: %s\n", ii, st.m_traceSymbols[ii]);
-        }
-        for (int ii=2; ii < numFrames; ii++) {
-            const char* str = st.m_traces[ii].c_str();
-            fprintf(targetFile, "demangled[%d]: %s\n", ii, str);
-        }
-    }
-
+    static void printMangledAndUnmangledToFile(FILE *targetFile);
 
     static void printStackTrace() {
         StackTrace st;
@@ -231,6 +181,12 @@ public:
     }
 
     static std::string stringStackTrace();
+
+    void printLocalTrace() {
+        for (int ii=1; ii < m_traces.size(); ii++) {
+            printf("   %s\n", m_traces[ii].c_str());
+        }
+    }
 
 private:
     char** m_traceSymbols;

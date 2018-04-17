@@ -19,9 +19,6 @@
 
 #include "indexes/CoveringCellIndex.h"
 
-#include "common/GeographyValue.hpp"
-#include "common/NValue.hpp"
-#include "common/tabletuple.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {

@@ -44,11 +44,7 @@
  */
 #include "abstractjoinexecutor.h"
 #include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
-#include "execution/ExecutorVector.h"
-#include "execution/ProgressMonitorProxy.h"
 #include "plannodes/abstractjoinnode.h"
-#include "storage/table.h"
 
 using namespace std;
 using namespace voltdb;

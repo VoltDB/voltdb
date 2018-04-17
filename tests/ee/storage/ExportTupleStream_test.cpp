@@ -125,6 +125,7 @@ public:
         delete m_tuple;
         if (m_schema)
             TupleSchema::freeTupleSchema(m_schema);
+        voltdb::globalDestroyOncePerProcess();
     }
 
 protected:

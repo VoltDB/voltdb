@@ -24,6 +24,7 @@
 #include "harness.h"
 
 #include "common/NValue.hpp"
+#include "common/SynchronizedThreadLock.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/TupleSchema.h"
@@ -72,8 +73,9 @@ public:
         m_tuplesInsertedInLastUndo = 0;
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
-        int partitionCount = htonl(1);
-        m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
+        int partitionCount = 1;
+        m_engine->initialize(1, 1, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
+        partitionCount = htonl(partitionCount);
         m_engine->updateHashinator((char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
@@ -129,6 +131,7 @@ public:
     ~CompactionTest() {
         delete m_engine;
         delete m_table;
+        voltdb::globalDestroyOncePerProcess();
     }
 
     void initTable() {

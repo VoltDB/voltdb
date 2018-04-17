@@ -16,7 +16,6 @@
  */
 
 #include <sstream>
-#include <cstdio>
 #include "common/TupleSchema.h"
 #include "common/NValue.hpp"
 #include "expressions/abstractexpression.h"

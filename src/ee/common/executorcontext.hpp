@@ -27,6 +27,7 @@
 #include "common/UniqueId.hpp"
 #include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
+#include "common/ThreadLocalPool.h"
 
 #include <vector>
 #include <stack>
@@ -44,8 +45,12 @@ const int64_t LONG_OP_THRESHOLD = 10000;
 class AbstractExecutor;
 class AbstractDRTupleStream;
 class VoltDBEngine;
+class UndoQuantum;
+struct EngineLocals;
 
 class TempTable;
+
+void globalDestroyOncePerProcess();
 
 struct ProgressStats {
     int64_t TuplesProcessedInBatch;
@@ -100,10 +105,16 @@ class ExecutorContext {
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
+    static void assignThreadLocals(const EngineLocals& mapping);
+    static void resetStateForTest();
 
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
         m_partitionId = partitionId;
+    }
+
+    int32_t getPartitionId() {
+        return static_cast<int32_t>(m_partitionId);
     }
 
     // helper to configure the context for a new jni call
@@ -180,9 +191,13 @@ class ExecutorContext {
         return getExecutorContext()->m_undoQuantum;
     }
 
-    Topend* getTopend() {
-        return m_topend;
-    }
+    /*
+     * This returns the topend for the currently running
+     * thread.  This may be a thread working on behalf of
+     * some other thread.  Calls to the jni have to use
+     * this function to get the topend.
+     */
+    static Topend* getPhysicalTopend();
 
     /** Current or most recent sp handle */
     int64_t currentSpHandle() {
@@ -223,6 +238,10 @@ class ExecutorContext {
         return m_traceOn;
     }
 
+    VoltDBEngine* getContextEngine() {
+        return m_engine;
+    }
+
     /** Executor List for a given sub statement id */
     const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const
     {
@@ -245,7 +264,7 @@ class ExecutorContext {
     SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams)
     {
         SubqueryContext fromCopy(lastParams);
-#ifdef DEBUG
+#ifndef NDEBUG
         std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
 #endif
             m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy));
@@ -311,7 +330,25 @@ class ExecutorContext {
         return m_drReplicatedStream;
     }
 
+    /**
+     * Get the executor context of the site which is
+     * currently the logically executing thread.
+     *
+     * @return The executor context of the logical site.
+     */
     static ExecutorContext* getExecutorContext();
+
+    /**
+     * Get the top end of the site which is currently
+     * working.  This is generally the same as getExecutorContext()->getTopend().
+     * But sometimes, when updating a shared replicated table, the
+     * site doing the updating does work on behalf of all other
+     * sites.  In this case the other sites, not the sites doing
+     * the work, are acting as free riders.
+     *
+     * @return The ExecutorContext of the working site.
+     */
+    static Topend *getThreadTopend();
 
     static Pool* getTempStringPool() {
         ExecutorContext* singleton = getExecutorContext();
@@ -411,6 +448,14 @@ class ExecutorContext {
     }
 
   private:
+    /**
+     * This holds the top end for this executor context.  Don't
+     * use this, however.  Use the result of calling getPhysicalTopend().
+     * This is because sometimes this ExecutorContext is used by some
+     * other site when this site is a free rider.  In this case we will
+     * always, always, always want to use the top end of the site
+     * actually doing the work.
+     */
     Topend *m_topend;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
@@ -452,6 +497,21 @@ class ExecutorContext {
     ProgressStats m_progressStats;
 };
 
+struct EngineLocals : public PoolLocals {
+    inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
+    inline explicit EngineLocals(bool dummyEntry) : PoolLocals(dummyEntry), context(NULL) {}
+    inline explicit EngineLocals(ExecutorContext* ctxt) : PoolLocals(), context(ctxt) {}
+    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context)
+    {}
+
+    inline EngineLocals& operator = (EngineLocals const& rhs) {
+        PoolLocals::operator = (rhs);
+        context = rhs.context;
+        return *this;
+    }
+
+    ExecutorContext* context;
+};
 }
 
 #endif

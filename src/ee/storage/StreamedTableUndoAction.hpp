@@ -18,11 +18,11 @@
 #ifndef STREAMEDTABLEUNDOACTION_HPP
 #define STREAMEDTABLEUNDOACTION_HPP
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 
 namespace voltdb {
 
-class StreamedTableUndoAction : public voltdb::UndoAction {
+class StreamedTableUndoAction : public UndoOnlyAction {
 
   public:
 
@@ -33,9 +33,6 @@ class StreamedTableUndoAction : public voltdb::UndoAction {
 
     void undo() {
         m_table->undo(m_mark);
-    }
-
-    void release() {
     }
 
   private:

@@ -44,9 +44,6 @@
  */
 #include "indexscannode.h"
 
-#include "common/debuglog.h"
-#include "expressions/abstractexpression.h"
-
 #include <sstream>
 
 namespace voltdb {
@@ -104,6 +101,10 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 
     std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();
     m_lookup_type = stringToIndexLookup(lookupTypeString);
+
+    if (obj.hasKey("HAS_OFFSET_RANK")) {
+        m_hasOffsetRank = obj.valueForKey("HAS_OFFSET_RANK").asBool();
+    }
 
     std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
     m_sort_direction = stringToSortDirection(sortDirectionString);

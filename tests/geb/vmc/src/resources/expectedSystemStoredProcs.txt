@@ -3,6 +3,7 @@
 @Explain
 @ExplainProc
 @ExplainView
+@Ping
 @Pause
 @Quiesce
 @Resume

@@ -38,6 +38,8 @@
 {@updatecolumn = "NUM"}
 {@updatesource = "ID"}
 {@updatevalue = "_value[int:0,100]"}
+{@updatecolumn2 = "RATIO"} -- rarely used; so far, only in CTE tests
+{@maxdepth = "6"} -- maximum depth, in Recursive CTE tests
 
 --{@jointype = "INNER"}
 {@jointype = "_jointype"}

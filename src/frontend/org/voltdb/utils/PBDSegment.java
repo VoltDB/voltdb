@@ -226,7 +226,9 @@ public abstract class PBDSegment {
                         final long partialEntryBeginOffset = reader.readOffset();
                         m_fc.position(partialEntryBeginOffset);
 
-                        final int written = writeTruncatedEntry(retval, compressedLength);
+                        // It is conceivable that a truncated buffer uses up more compressed space than the original
+                        // compressed buffer, but we won't worry about that until it happens.
+                        final int written = writeTruncatedEntry(retval, compressedLength + OBJECT_HEADER_BYTES);
                         sizeInBytes += written;
 
                         initNumEntries(reader.readIndex(), sizeInBytes);

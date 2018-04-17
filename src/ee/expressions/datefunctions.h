@@ -686,12 +686,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_YEAR>(const std::vector<
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     const NValue& date = arguments[1];
     if (date.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
@@ -730,12 +730,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_QUARTER>(const std::vect
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     const NValue& date = arguments[1];
     if (date.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
@@ -765,12 +765,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MONTH>(const std::vector
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     const NValue& date = arguments[1];
     if (date.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
@@ -800,12 +800,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_DAY>(const std::vector<N
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     const NValue& date = arguments[1];
     if (date.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
@@ -844,12 +844,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_HOUR>(const std::vector<
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     const NValue& date = arguments[1];
     if (date.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
@@ -888,12 +888,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MINUTE>(const std::vecto
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     const NValue& date = arguments[1];
     if (date.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
@@ -932,12 +932,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_SECOND>(const std::vecto
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     const NValue& date = arguments[1];
     if (date.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
@@ -976,12 +976,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(const std::
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     const NValue& date = arguments[1];
     if (date.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
@@ -1020,12 +1020,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::
 
     const NValue& number = arguments[0];
     if (number.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     const NValue& date = arguments[1];
     if (date.isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
@@ -1076,7 +1076,7 @@ template<> inline NValue NValue::callConstant<FUNC_VOLT_MAX_VALID_TIMESTAMP>() {
 
 template<> inline NValue NValue::callUnary<FUNC_VOLT_IS_VALID_TIMESTAMP>() const {
     if (isNull()) {
-        return getNullValue();
+        return getNullValue(VALUE_TYPE_BOOLEAN);
     }
     int64_t timestamp_number = castAsBigIntAndGetValue();
     return getBooleanValue(timestampIsValid(timestamp_number));

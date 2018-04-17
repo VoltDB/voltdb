@@ -17,7 +17,8 @@
 
 #include "ContiguousAllocator.h"
 
-#include <cassert>
+#include "common/ThreadLocalPool.h"
+
 
 using namespace voltdb;
 
@@ -84,7 +85,6 @@ void *ContiguousAllocator::last() const {
 void ContiguousAllocator::trim() {
     // for debugging
     //memset(last(), 0, allocSize);
-
     assert(m_count > 0);
     assert(m_tail != NULL);
 
