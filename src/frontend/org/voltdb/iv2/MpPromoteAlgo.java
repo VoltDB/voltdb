@@ -310,8 +310,8 @@ public class MpPromoteAlgo implements RepairAlgo
            m_repairLogUnion.add(msg);
         }
         else if (msg.getPayload() instanceof CompleteTransactionMessage) {
-            // prefer complete messages to fragment tasks.
-            m_repairLogUnion.removeIf((p) -> p.getTxnId() < msg.getTxnId());
+            // prefer complete messages to fragment tasks. Completion message also erases prior staled messages
+            m_repairLogUnion.removeIf((p) -> p.getTxnId() <= msg.getTxnId());
             m_repairLogUnion.add(msg);
         }
     }
