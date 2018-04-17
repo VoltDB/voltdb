@@ -78,5 +78,5 @@ tools/meshmonitor/build/
 tools/meshmonitor/dist/
 
 # IntelliJ excluded files.
-.idea/workspace.iml
+.idea/workspace.xml
 .idea/tasks.xml
