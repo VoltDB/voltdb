@@ -60,18 +60,14 @@ ConditionalExecuteOutsideMpMemory::~ConditionalExecuteOutsideMpMemory() {
 }
 
 ConditionalSynchronizedExecuteWithMpMemory::ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread,
-                                                                                       bool isLowestSite,
-                                                                                       int64_t& exceptionTracker) :
-        m_usingMpMemoryOnLowestThread(needMpMemoryOnLowestThread && isLowestSite),
-        m_okToExecute(!needMpMemoryOnLowestThread || m_usingMpMemoryOnLowestThread)
+                                                                                       bool isLowestSite)
+        : m_usingMpMemoryOnLowestThread(needMpMemoryOnLowestThread && isLowestSite)
+        , m_okToExecute(!needMpMemoryOnLowestThread || m_usingMpMemoryOnLowestThread)
 {
     if (needMpMemoryOnLowestThread) {
         if (SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite)) {
-            // Call the execute method to actually perform whatever action
             VOLT_DEBUG("Entering UseMPmemory");
             SynchronizedThreadLock::assumeMpMemoryContext();
-            // Trap exceptions for replicated tables by initializing to an invalid value
-            exceptionTracker = -1;
         }
     }
 }

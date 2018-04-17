@@ -55,7 +55,7 @@ private:
 class ConditionalSynchronizedExecuteWithMpMemory {
 public:
     ConditionalSynchronizedExecuteWithMpMemory(bool needMpMemoryOnLowestThread,
-                                               bool isLowestSite, int64_t &exceptionTracker);
+                                               bool isLowestSite);
 
     ~ConditionalSynchronizedExecuteWithMpMemory();
 

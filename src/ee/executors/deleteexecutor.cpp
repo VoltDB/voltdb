@@ -96,9 +96,10 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         assert(targetTable->isCatalogTableReplicated() ==
                 (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite(), s_modifiedTuples);
+                m_replicatedTableOperation, m_engine->isLowestSite());
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             if (m_truncate) {
+                s_modifiedTuples = -1;
                 VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
                 // count the truncated tuples as deleted
                 modified_tuples = targetTable->visibleTupleCount();
