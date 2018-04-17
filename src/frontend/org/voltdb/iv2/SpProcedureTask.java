@@ -161,7 +161,7 @@ public class SpProcedureTask extends ProcedureTask
     {
         LatencyWatchdog.pet();
 
-        if (HOST_TRACE_ENABLED) {
+        if (HOST_DEBUG_ENABLED) {
             hostLog.trace("START replaying txn: " + this);
         }
         if (!m_txnState.isReadOnly()) {
@@ -195,7 +195,7 @@ public class SpProcedureTask extends ProcedureTask
         if (EXEC_TRACE_ENABLED) {
             execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         }
-        if (HOST_TRACE_ENABLED) {
+        if (HOST_DEBUG_ENABLED) {
             hostLog.trace("COMPLETE replaying txn: " + this);
         }
 

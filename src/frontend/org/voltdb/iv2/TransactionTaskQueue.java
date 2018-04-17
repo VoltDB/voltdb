@@ -20,13 +20,9 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
-import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
@@ -178,11 +174,15 @@ public class TransactionTaskQueue
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("release stashed fragment messages");
         }
-        stashedMpWrites.forEach((queue, task) -> {
-            Iv2Trace.logSiteTaskerQueueOffer(task.m_lastFragTask);
-            queue.offer(task.m_lastFragTask);
-            task.m_lastFragTask = null;
-        });
+        long lastTxnId = 0;
+        for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
+            TransactionTask task = e.getValue().m_lastFragTask;
+            assert(lastTxnId == 0 || lastTxnId == task.getTxnId());
+            lastTxnId = task.getTxnId();
+            Iv2Trace.logSiteTaskerQueueOffer(task);
+            e.getKey().offer(task);
+            e.getValue().m_lastFragTask = null;
+        }
     }
 
     // All sites receives CompletedTransactionTask messages, time to fire the task.
