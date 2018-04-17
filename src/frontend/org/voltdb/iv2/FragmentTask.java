@@ -210,6 +210,9 @@ public class FragmentTask extends FragmentTaskBase
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("START replaying txn: " + this);
+        }
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
@@ -222,6 +225,9 @@ public class FragmentTask extends FragmentTaskBase
         // ignore response.
         processFragmentTask(siteConnection);
         completeFragment();
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE replaying txn: " + this);
+        }
     }
 
     private void completeFragment()

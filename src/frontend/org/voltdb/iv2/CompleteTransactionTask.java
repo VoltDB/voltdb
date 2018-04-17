@@ -151,6 +151,9 @@ public class CompleteTransactionTask extends TransactionTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("START replaying txn: " + this);
+        }
         if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
             // legacy interaces don't work this way and IV2 hasn't changed this
@@ -168,6 +171,9 @@ public class CompleteTransactionTask extends TransactionTask
         }
         else {
             m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
+        }
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE replaying txn: " + this);
         }
     }
 
