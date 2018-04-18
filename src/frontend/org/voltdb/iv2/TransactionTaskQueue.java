@@ -18,9 +18,11 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
@@ -34,6 +36,18 @@ public class TransactionTaskQueue
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final protected SiteTaskerQueue m_taskQueue;
+
+    final private int m_siteCount;
+
+    /*
+     * Multi-part transactions create a backlog of tasks behind them. A queue is
+     * created for each multi-part task to maintain the backlog until the next
+     * multi-part task.
+     */
+    private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
+
+    final static HashMap<SiteTaskerQueue, QueuedTasks> s_stashedMpWrites = new HashMap<>();
+    static Object s_lock = new Object();
 
     // The purpose of having it is to synchronize all MP write messages (FragmentTask, CompleteTransactionTask)
     // across sites on the same node. Why? First reason is synchronized MP writes prevent
@@ -81,17 +95,6 @@ public class TransactionTaskQueue
                     "\nFragmentTask: " + m_lastFragTask;
         }
     }
-    final static HashMap<SiteTaskerQueue, QueuedTasks> stashedMpWrites = new HashMap<>();
-    static Object lock = new Object();
-
-    final private int m_siteCount;
-
-    /*
-     * Multi-part transactions create a backlog of tasks behind them. A queue is
-     * created for each multi-part task to maintain the backlog until the next
-     * multi-part task.
-     */
-    private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
     TransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -175,7 +178,7 @@ public class TransactionTaskQueue
             hostLog.debug("release stashed fragment messages");
         }
         long lastTxnId = 0;
-        for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
+        for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
             TransactionTask task = e.getValue().m_lastFragTask;
             assert(lastTxnId == 0 || lastTxnId == task.getTxnId());
             lastTxnId = task.getTxnId();
@@ -197,7 +200,7 @@ public class TransactionTaskQueue
             }
         }
         long lastTxnId = 0;
-        for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
+        for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
             CompleteTransactionTask completion = e.getValue().m_lastCompleteTxnTasks.poll().getFirst();
             assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
             lastTxnId = completion.getMsgTxnId();
@@ -209,11 +212,11 @@ public class TransactionTaskQueue
     }
 
     private void coordinatedTaskQueueOffer(TransactionTask task) {
-        synchronized (lock) {
+        synchronized (s_lock) {
             QueuedTasks queuedTask;
-            if ((queuedTask = stashedMpWrites.get(m_taskQueue)) == null) {
+            if ((queuedTask = s_stashedMpWrites.get(m_taskQueue)) == null) {
                 queuedTask =  new QueuedTasks();
-                stashedMpWrites.put(m_taskQueue, queuedTask);
+                s_stashedMpWrites.put(m_taskQueue, queuedTask);
             }
 
             long matchingCompletionTime = -1;
@@ -239,7 +242,7 @@ public class TransactionTaskQueue
             int receivedFrags = 0;
             int receivedCompleteTxns = 0;
             boolean missingTxn = false;
-            for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
+            for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
                 if (!e.getValue().m_lastCompleteTxnTasks.isEmpty()) {
                     if (matchingCompletionTime != e.getValue().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
                         continue;
@@ -271,17 +274,17 @@ public class TransactionTaskQueue
     }
 
     public void handleCompletionForMissingTxn(CompleteTransactionTask missingTxnCompletion) {
-        synchronized (lock) {
+        synchronized (s_lock) {
             QueuedTasks queuedTask;
-            if ((queuedTask = stashedMpWrites.get(m_taskQueue)) == null) {
+            if ((queuedTask = s_stashedMpWrites.get(m_taskQueue)) == null) {
                 queuedTask =  new QueuedTasks();
-                stashedMpWrites.put(m_taskQueue, queuedTask);
+                s_stashedMpWrites.put(m_taskQueue, queuedTask);
             }
 
             long matchingCompletionTime = missingTxnCompletion.getTimestamp();
             queuedTask.addCompletedTransactionTask(missingTxnCompletion, true);
             int receivedCompleteTxns = 0;
-            for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
+            for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
                 if (!e.getValue().m_lastCompleteTxnTasks.isEmpty()) {
                     if (matchingCompletionTime != e.getValue().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
                         continue;
@@ -306,7 +309,7 @@ public class TransactionTaskQueue
 
     private void dumpStashedMpWrites() {
         StringBuilder builder = new StringBuilder();
-        for (Entry<SiteTaskerQueue, QueuedTasks> e : stashedMpWrites.entrySet()) {
+        for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
             builder.append("Queue " + e.getKey().getPartitionId() + ":\n" + e.getValue());
             builder.append("\n");
         }
@@ -409,5 +412,24 @@ public class TransactionTaskQueue
             sb.append("\tHEAD: ").append(m_backlog.getFirst());
         }
         return sb.toString();
+    }
+
+    // Called from streaming snapshot execution
+    public List<TransactionTask> getBacklogTasks() {
+        List<TransactionTask> pendingTasks = new ArrayList<>();
+        Iterator<TransactionTask> iter = m_backlog.iterator();
+        // skip the first fragments which is streaming snapshot
+        TransactionTask mpTask = iter.next();
+        assert (!mpTask.getTransactionState().isSinglePartition());
+        while (iter.hasNext()) {
+            TransactionTask task = iter.next();
+            // Skip all fragments of current transaction
+            if (task.getTxnId() == mpTask.getTxnId()) {
+                continue;
+            }
+            assert (task.getTransactionState().isSinglePartition());
+            pendingTasks.add(iter.next());
+        }
+        return pendingTasks;
     }
 }

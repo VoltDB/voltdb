@@ -319,5 +319,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
         if (m_term != null) {
             ((SpTerm)m_term).updateReplicas();
         }
+        ((SpScheduler)m_scheduler).forwardPendingTaskToRejoinNode();
     }
 }

@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -68,6 +69,7 @@ import org.voltdb.messaging.RepairLogTruncationMessage;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
+import com.google.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -142,6 +144,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     List<Long> m_replicaHSIds = new ArrayList<Long>();
+    long m_recentRejoinHSIds[] = new long[0];
     long m_sendToHSIds[] = new long[0];
     private final TransactionTaskQueue m_pendingTasks;
     private final Map<Long, TransactionState> m_outstandingTxns =
@@ -239,6 +242,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              + " from " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
         }
 
+        if (m_replicaHSIds.size() > 0 && replicas.size() > m_replicaHSIds.size()) {
+            // Remember the rejoin sites before update replicas set
+            Set<Long> rejoinHSIds = Sets.difference(new HashSet<Long>(replicas),
+                                                  new HashSet<Long>(m_replicaHSIds));
+            m_recentRejoinHSIds = Longs.toArray(rejoinHSIds);
+        }
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
         // Update the list of remote replicas that we'll need to send to
@@ -1689,5 +1698,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         ((InitiatorMailbox)m_mailbox).updateReplicas(replicas, null);
+    }
+
+    // Because now in rejoin we rely on first fragment of stream snapshot to update the replica
+    // set of every partition, it creates a window that may cause task log on rejoin node miss sp txns.
+    // To fix it, leader forwards to rejoin node any sp txn that are queued in backlog between leader receives the
+    // first fragment of stream snapshot and site runs the first fragment.
+    public void forwardPendingTaskToRejoinNode() {
+        for (TransactionTask t : m_pendingTasks.getBacklogTasks()) {
+            assert (t instanceof SpProcedureTask);
+            TransactionInfoBaseMessage msg = ((SpProcedureTask)t).m_txnState.getNotice();
+            if (m_isLeader && !msg.isReadOnly() && m_recentRejoinHSIds.length > 0) {
+                m_mailbox.send(m_recentRejoinHSIds, msg);
+            }
+        }
     }
 }
