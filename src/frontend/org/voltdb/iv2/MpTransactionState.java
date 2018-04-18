@@ -34,8 +34,10 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.ReplicatedTableException;
+import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.exceptions.TransactionTerminationException;
@@ -54,6 +56,11 @@ import com.google_voltpatches.common.collect.Maps;
 public class MpTransactionState extends TransactionState
 {
     static VoltLogger tmLog = new VoltLogger("TM");
+
+    private static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
+    private static final String dr_max_consumer_partitionCount_str = "DR_MAX_CONSUMER_PARTITIONCOUNT";
+    private static final String volt_output_buffer_overflow = "V0001";
+
     /**
      *  This is thrown by the TransactionState instance when something
      *  goes wrong mid-fragment, and execution needs to back all the way
@@ -70,6 +77,10 @@ public class MpTransactionState extends TransactionState
     Map<Integer, Set<Long>> m_remoteDeps;
     Map<Integer, List<VoltTable>> m_remoteDepTables =
         new HashMap<Integer, List<VoltTable>>();
+    private int m_drBufferChangedAgg = 0;
+    private int m_localPartitionCount;
+    private final boolean m_drProducerActive = VoltDB.instance().getNodeDRGateway() != null && VoltDB.instance().getNodeDRGateway().isActive();
+
     final List<Long> m_useHSIds = new ArrayList<Long>();
     final Map<Integer, Long> m_masterHSIds = Maps.newHashMap();
     long m_buddyHSId;
@@ -101,6 +112,51 @@ public class MpTransactionState extends TransactionState
         m_buddyHSId = buddyHSId;
         m_isRestart = isRestart;
         m_nPartTxn = nPartTxn;
+        m_localPartitionCount = m_masterHSIds.size();
+    }
+
+    static final int StoreProcedureInvocationHeaderSize;
+    static final int InitiateTaskMessageHeaderSize;
+    static final int FragmentTaskMessageHeaderSize;
+
+    static {
+        StoredProcedureInvocation mpSpi = new StoredProcedureInvocation();
+        mpSpi.setProcName("@ApplyBinaryLogMP");
+        StoreProcedureInvocationHeaderSize = mpSpi.getSerializedSizeWithoutParams();
+        InitiateTaskMessageHeaderSize = (new Iv2InitiateTaskMessage()).getSerializedSizeForHeader();
+        FragmentTaskMessageHeaderSize = (new FragmentTaskMessage()).getSerializedSizeForHeader();
+    }
+
+    private int getDRMessageSizeEstimation() {
+        // we could get accurate remote cluster(s) partition count through query dr producer (which get through sync snapshot request)
+        // however that is too heavy weight for the txn path
+        // default assume homogenous dr, i.e remote partition count equals to local partition count
+        // user can also override this via system property
+        int remotePartitionCount = Integer.getInteger(dr_max_consumer_partitionCount_str, m_localPartitionCount);
+
+        // assume still has replicated stream for upper bound estimation
+        // avoid check the dr system for performance concern
+        int streamCount = m_localPartitionCount + 1;
+        int concatLogSize = m_drBufferChangedAgg + 13 * streamCount; // adding END_Transaction Size
+
+        // estimate of ParametersSet Size of @ApplyBinaryLogMP on the consumer side
+        int serializedParamSize = getSerializedParamSizeForApplyBinaryLog(streamCount, remotePartitionCount, concatLogSize);
+
+        return serializedParamSize + StoreProcedureInvocationHeaderSize + InitiateTaskMessageHeaderSize + FragmentTaskMessageHeaderSize;
+    }
+
+    // calculate based on BinaryLogHelper and ParameterSet.fromArrayNoCopy
+    private static int getSerializedParamSizeForApplyBinaryLog(int streamCount, int remotePartitionCount, int concatLogSize) {
+        int serializedParamSize = 2
+                + 1 + 4                                                             // placeholder byte[0]
+                + 1 + 4                                                             // producerClusterId Integer
+                + 1 + 4 + 4 +  (4 + 8 * remotePartitionCount) * streamCount         // concatLogIds byte[]
+                + 1 + 4 + 4  + (4 + 8 + 8 + 4 + 4 + 16) * streamCount               // concatTrackerBufs (DRConsumerDrIdTracker) byte[]
+                + 1 + 4 + 4 + 4 * streamCount + concatLogSize                       // concatLogs byte[]
+                + 1 + 1                                                             // extraOption Byte
+                + 1 + 4;                                                            // extraParameters byte[0]
+
+        return serializedParamSize;
     }
 
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
@@ -113,6 +169,7 @@ public class MpTransactionState extends TransactionState
         m_useHSIds.addAll(masters);
         m_masterHSIds.clear();
         m_masterHSIds.putAll(partitionMasters);
+        m_localPartitionCount = m_masterHSIds.size();
     }
 
     /**
@@ -150,6 +207,7 @@ public class MpTransactionState extends TransactionState
         m_remoteWork = null;
         m_remoteDeps = null;
         m_remoteDepTables.clear();
+        m_drBufferChangedAgg = 0;
     }
 
     // I met this List at bandcamp...
@@ -265,6 +323,9 @@ public class MpTransactionState extends TransactionState
             // Create some record of expected dependencies for tracking
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
                                                              m_useHSIds);
+
+            // clear up DR buffer size tracker
+            m_drBufferChangedAgg = 0;
             // if there are remote deps, block on them
             // FragmentResponses indicating failure will throw an exception
             // which will propagate out of handleReceivedFragResponse and
@@ -291,6 +352,7 @@ public class MpTransactionState extends TransactionState
                     checkForException(msg);
                 }
             }
+            checkForDRBufferLimit();
         }
         // satisfied. Clear this defensively. Procedure runner is sloppy with
         // cleaning up if it decides new work is necessary that is local-only.
@@ -417,7 +479,24 @@ public class MpTransactionState extends TransactionState
         }
     }
 
-    private boolean trackDependency(long hsid, int depId, VoltTable table)
+    private void checkForDRBufferLimit() {
+        if (!m_drProducerActive) {
+            return;
+        }
+        if (tmLog.isTraceEnabled()) {
+            tmLog.trace("Total DR buffer allocate for this txn: " + m_drBufferChangedAgg + " limit:" + DR_MAX_AGGREGATE_BUFFERSIZE);
+        }
+        if (getDRMessageSizeEstimation() >= DR_MAX_AGGREGATE_BUFFERSIZE) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Transaction txnid: " + TxnEgo.txnIdToString(txnId) + " exceeding DR Buffer Limit, need rollback.");
+            }
+            setNeedsRollback(true);
+            throw new SQLException(volt_output_buffer_overflow,
+                    "Aggregate MP Transaction requiring " + m_drBufferChangedAgg + " bytes exceeds max DR Buffer size of " + DR_MAX_AGGREGATE_BUFFERSIZE + " bytes.");
+        }
+    }
+
+    private boolean trackDependency(long hsid, int depId, VoltTable table, int drBufferSize)
     {
         // Remove the distributed fragment for this site from remoteDeps
         // for the dependency Id depId.
@@ -450,6 +529,15 @@ public class MpTransactionState extends TransactionState
             // null dependency table is from a joining node, has no content, drop it
             if (table.getStatusCode() != VoltTableUtil.NULL_DEPENDENCY_STATUS) {
                 tables.add(table);
+                // aggregate dr buffer change size
+                m_drBufferChangedAgg += drBufferSize;
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("[trackDependency]:  drBufferSize added :" + drBufferSize +
+                            " aggregated drBufferSize: " + m_drBufferChangedAgg +
+                            " for transaction: " + TxnEgo.txnIdToString(txnId) +
+                            " for depId: " + depId +
+                            " for partition: " + CoreUtils.hsIdToString(hsid));
+                }
             }
         }
         else if (tmLog.isDebugEnabled()){
@@ -466,7 +554,8 @@ public class MpTransactionState extends TransactionState
             int this_depId = msg.getTableDependencyIdAtIndex(i);
             VoltTable this_dep = msg.getTableAtIndex(i);
             long src_hsid = msg.getExecutorSiteId();
-            expectedMsg |= trackDependency(src_hsid, this_depId, this_dep);
+            int drBufferChanged = msg.getDRBufferChangedAtIndex(i);
+            expectedMsg |= trackDependency(src_hsid, this_depId, this_dep, drBufferChanged);
         }
         return expectedMsg;
     }
