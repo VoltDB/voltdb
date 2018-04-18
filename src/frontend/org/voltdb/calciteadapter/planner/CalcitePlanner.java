@@ -193,7 +193,7 @@ public class CalcitePlanner {
         RelTraitSet traitSet = planner.getEmptyTraitSet().replace(outConvention);
         RelTrait collationTrait = rel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
         // If a RelNode does not have a real RelCollation trait Calcite returns
-        // an empty collation (RelCompositeTrait$EmptyCompositeTrait<T>) 
+        // an empty collation (RelCompositeTrait$EmptyCompositeTrait<T>)
         // which is not an instance of the RelCollation class (RelCollations.EMPTY) as
         // a T RelTraitSet.getTrait(RelTraitDef<T> traitDef) method declaration implies
         // resulting in a ClassCastExpretion
