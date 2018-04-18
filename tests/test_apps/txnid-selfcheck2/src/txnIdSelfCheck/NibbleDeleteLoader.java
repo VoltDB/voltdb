@@ -166,6 +166,8 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                     deletesRemaining = row.getLong(0);
                     if ( deletesRemaining > 0 ) {
                         log.info("Nibble Delete has "+deletesRemaining+" rows from " + tableName + " to be deleted eventually.");
+                    } else {
+                        log.info("Nibble Delete has nothing to do");
                     }
                 }
 
@@ -186,6 +188,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
         this.monitor.start();
         byte[] data = new byte[rowSize];
         long currentRowCount;
+        boolean diedEarly = false;
         while (m_shouldContinue.get()) {
             r.nextBytes(data);
             try {
@@ -224,25 +227,30 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                     currentRowCount = nextRowCount;
                     log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " current count: " + currentRowCount + " tried:" + insertsTried);
                 }
+                log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " has nothing to do and completed successfully")
             } catch (Exception e) {
                 if ( e instanceof InterruptedIOException && ! m_shouldContinue.get()) {
                     continue;
                 }
+                diedEarly = true;
                 // on exception, log and end the thread, but don't kill the process
-                Benchmark.hardStop("NibbleDeleteLoader failed a 'TableInsert' procedure call for table '" + tableName + "' " + e.getMessage());
-                try { Thread.sleep(3000); } catch (Exception e2) {}
+                log.error("NibbleDeleteLoader failed a 'TableInsert' procedure call for table '" + tableName + "' " + e.getMessage());
+                break;
             }
         }
 
         log.info("NibbleDeleteLoader completed for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded);
-        long maxTime = System.nanoTime() + 75*1000000;
-        while ( deletesRemaining > 0 ) {
+        long maxTime = System.nanoTime() + TTL*1000000+10;
+        // only check if we all the rows were deleted if we ended gracefully
+        if ( ! diedEarly ) {
+            while ( deletesRemaining > 0 ) {
                if ( System.nanoTime() > maxTime) {
                     Benchmark.hardStop("Nibble Delete hasn't finished on table '" + tableName + "' after a TTL of "+TTL+" seconds" );
                }
 
-                try { Thread.sleep(3000); } catch (Exception e2) {}
+
+               try { Thread.sleep(3000); } catch (Exception e2) {}
+            }
         }
-        Benchmark.hardStop("NibbleDeleteLoader exit");
     }
 }
