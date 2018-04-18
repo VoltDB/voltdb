@@ -253,9 +253,7 @@ public:
             throw std::logic_error(oss.str());
         }
         assert(pTable != NULL);
-        int64_t dummyTrackerForExceptions = 0;
-        voltdb::ConditionalSynchronizedExecuteWithMpMemory
-                setMpMemoryIfNeeded(pTable->isCatalogTableReplicated(), true, dummyTrackerForExceptions);
+        voltdb::ConditionalSynchronizedExecuteWithMpMemory setMpMemoryIfNeeded(pTable->isCatalogTableReplicated(), true);
         for (int row = 0; row < nRows; row += 1) {
             if (row > 0 && (row % 100 == 0)) {
                 std::cout << '.';
