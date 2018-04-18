@@ -1036,7 +1036,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
-            txn = new ParticipantTransactionState(msg.getSpHandle(), msg, msg.isReadOnly());
+            txn = new ParticipantTransactionState(msg.getSpHandle(), msg, msg.isReadOnly(),
+                    msg.getInitiateTask().isN_Partition());
             m_outstandingTxns.put(msg.getTxnId(), txn);
             // Only want to send things to the command log if it satisfies this predicate
             // AND we've never seen anything for this transaction before.  We can't
