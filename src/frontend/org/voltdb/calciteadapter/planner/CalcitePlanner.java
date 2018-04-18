@@ -149,13 +149,6 @@ public class CalcitePlanner {
             // Apply Rule Set 2 - VoltDB inlining
             prepareHepOutputTraitSet(hepPlanner, traitSet);
 
-            // RelMetadataProvider
-//            List<RelMetadataProvider> list = Lists.newArrayList();
-//            hepPlanner.registerMetadataProviders(list);
-//            RelMetadataProvider plannerChain =
-//                ChainedRelMetadataProvider.of(list);
-//            phaseTwoRel.getCluster().setMetadataProvider(plannerChain);
-
             hepPlanner.setRoot(phaseTwoRel);
             phaseThreeRel = hepPlanner.findBestExp();
 
@@ -191,16 +184,21 @@ public class CalcitePlanner {
         return compiledPlan;
     }
 
+    // Prepare a trait set that would contains traits that we want to see in the root node
+    // at the termination of the planning cycle.
     private static RelTraitSet prepareOutputTraitSet(
             Planner planner,
             Convention outConvention,
-            RelNode topRel) {
+            RelNode rel) {
         RelTraitSet traitSet = planner.getEmptyTraitSet().replace(outConvention);
-        if (topRel != null) {
-            RelTrait collationTrait = topRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
-            if (collationTrait instanceof RelCollation) {
-                traitSet = traitSet.plus(collationTrait);
-            }
+        RelTrait collationTrait = rel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+        // If a RelNode does not have a real RelCollation trait Calcite returns
+        // an empty collation (RelCompositeTrait$EmptyCompositeTrait<T>) 
+        // which is not an instance of the RelCollation class (RelCollations.EMPTY) as
+        // a T RelTraitSet.getTrait(RelTraitDef<T> traitDef) method declaration implies
+        // resulting in a ClassCastExpretion
+        if (collationTrait instanceof RelCollation) {
+            traitSet = traitSet.plus(collationTrait);
         }
         return traitSet;
     }

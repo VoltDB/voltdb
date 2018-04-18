@@ -15,36 +15,30 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rules.physical;
+package org.voltdb.calciteadapter.rules.hep;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
-
+import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPhysicalTableScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBLimit;
-import org.voltdb.calciteadapter.rel.physical.VoltDBSort;
 
-public class VoltDBLimitSortMergeRule extends RelOptRule {
+public class VoltDBLimitScanMergeRule extends RelOptRule {
 
-    public static final VoltDBLimitSortMergeRule INSTANCE = new VoltDBLimitSortMergeRule();
+    public static final VoltDBLimitScanMergeRule INSTANCE = new VoltDBLimitScanMergeRule();
 
-    private VoltDBLimitSortMergeRule() {
+    private VoltDBLimitScanMergeRule() {
         super(operand(VoltDBLimit.class,
-                operand(VoltDBSort.class, any())));
+                operand(AbstractVoltDBPhysicalTableScan.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltDBLimit limitOffset = call.rel(0);
-        VoltDBSort sort = call.rel(1);
+        AbstractVoltDBPhysicalTableScan scan = call.rel(1);
 
-        RelNode newSort = sort.copy(
-                sort.getTraitSet(),
-                sort.getInput(),
-                sort.getCollation(),
-                limitOffset.getOffset(),
-                limitOffset.getLimit());
-        call.transformTo(newSort);
+        RelNode newScan = scan.copy(scan.getTraitSet(), limitOffset.getOffset(), limitOffset.getLimit());
+        call.transformTo(newScan);
     }
 
 }
