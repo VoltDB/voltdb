@@ -34,6 +34,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
@@ -115,6 +116,9 @@ public class SnapshotSave extends VoltSystemProcedure
             SnapshotFormat format =
                     SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[5]);
 
+            if(format == SnapshotFormat.STREAM) {
+                ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId());
+            }
             /*
              * Filter out the partitions that are active in the cluster
              * and include values for all partitions that aren't part of the current cluster.

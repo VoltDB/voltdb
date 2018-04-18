@@ -34,7 +34,6 @@ import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.exceptions.TransactionRestartException;
-import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -44,8 +43,10 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
+
 import com.google_voltpatches.common.base.Supplier;
 
 /**
@@ -247,12 +248,12 @@ public class InitiatorMailbox implements Mailbox
     }
 
     // Change the replica set configuration (during or after promotion)
-    public synchronized void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
+    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
     {
-        updateReplicasInternal(replicas, partitionMasters);
+        return updateReplicasInternal(replicas, partitionMasters);
     }
 
-    protected void updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters) {
+    protected long[] updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters) {
         assert(lockingVows());
         Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
@@ -260,7 +261,7 @@ public class InitiatorMailbox implements Mailbox
         if (m_algo != null) {
             m_algo.cancel();
         }
-        m_scheduler.updateReplicas(replicas, partitionMasters);
+        return m_scheduler.updateReplicas(replicas, partitionMasters);
     }
 
     public long getMasterHsId(int partitionId)

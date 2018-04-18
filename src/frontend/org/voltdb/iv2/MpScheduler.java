@@ -123,12 +123,12 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters)
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters)
     {
-        updateReplicas(replicas, partitionMasters, false);
+        return updateReplicas(replicas, partitionMasters, false);
     }
 
-    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,  boolean balanceSPI)
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,  boolean balanceSPI)
     {
         // Handle startup and promotion semi-gracefully
         m_iv2Masters.clear();
@@ -137,7 +137,7 @@ public class MpScheduler extends Scheduler
         m_partitionMasters.putAll(partitionMasters);
 
         if (!m_isLeader) {
-            return;
+            return new long[0];
         }
 
         // Stolen from SpScheduler.  Need to update the duplicate counters associated with any EveryPartitionTasks
@@ -174,6 +174,7 @@ public class MpScheduler extends Scheduler
 
         MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI);
         m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
+        return new long[0];
     }
 
     /**

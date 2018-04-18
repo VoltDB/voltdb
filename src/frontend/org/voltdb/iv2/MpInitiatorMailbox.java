@@ -27,7 +27,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -235,13 +234,14 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
 
     @Override
-    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters) {
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters) {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {
                 updateReplicasInternal(replicas, partitionMasters);
             }
         });
+        return new long[0];
     }
 
     public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, boolean balanceSPI) {
