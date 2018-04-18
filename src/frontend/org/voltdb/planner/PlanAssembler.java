@@ -2642,7 +2642,7 @@ public class PlanAssembler {
                 else if ( m_isLargeQuery ) {
                     aggNode = new AggregatePlanNode();
                     topAggNode = new AggregatePlanNode();
-                    m_needOrderBy = true;
+                    m_needOrderByForAggregates = true;
                 }
                 else {
                     if (gbInfo.isChangedToSerialAggregate()) {

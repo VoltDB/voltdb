@@ -965,7 +965,7 @@ public class PlannerTestCase extends TestCase {
         }
         for (int idx = 0; idx < fragments.size(); idx += 1) {
             AbstractPlanNode node = fragments.get(idx);
-            System.out.printf("Node %d/%d:\n%s\n", idx, fragments.size(), node.toExplainPlanString());
+            System.out.printf("Node %d/%d:\n%s\n", idx + 1, fragments.size(), node.toExplainPlanString());
         }
         assertEquals(String.format("Expected %d fragments, not %d",
                                    spec.length,
