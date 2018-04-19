@@ -1705,7 +1705,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // set of every partition, it creates a window that may cause task log on rejoin node miss sp txns.
     // To fix it, leader forwards to rejoin node any sp txn that are queued in backlog between leader receives the
     // first fragment of stream snapshot and site runs the first fragment.
-    public void forwardPendingTaskToRejoinNode(long[] replicasAdded) {
+    public synchronized void forwardPendingTaskToRejoinNode(long[] replicasAdded) {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Forward pending tasks in backlog to rejoin node: " + replicasAdded);
+        }
         for (TransactionTask t : m_pendingTasks.getBacklogTasks()) {
             assert (t instanceof SpProcedureTask);
             TransactionInfoBaseMessage msg = ((SpProcedureTask)t).m_txnState.getNotice();

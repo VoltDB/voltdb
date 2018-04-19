@@ -34,6 +34,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 public class TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
+    protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     final protected SiteTaskerQueue m_taskQueue;
 
@@ -323,6 +324,11 @@ public class TransactionTaskQueue
      */
     synchronized int flush(long txnId)
     {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Flush backlog with txnId:" + TxnEgo.txnIdToString(txnId) +
+                    ", backlog head txnId is:" + (m_backlog.isEmpty()? "empty" : TxnEgo.txnIdToString(m_backlog.getFirst().getTxnId()))
+                    );
+        }
         int offered = 0;
         // If the first entry of the backlog is a completed transaction, clear it so it no longer
         // blocks the backlog then iterate the backlog for more work.
