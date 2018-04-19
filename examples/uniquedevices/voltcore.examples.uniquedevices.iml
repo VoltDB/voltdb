@@ -10,6 +10,7 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="voltcore" />
-    <orderEntry type="library" name="jars" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="voltcore_deps" level="project" />
+    <orderEntry type="library" name="3pty_jars" level="project" />
   </component>
 </module>

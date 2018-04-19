@@ -1,5 +1,5 @@
 <component name="libraryTable">
-  <library name="extension">
+  <library name="lib_extension">
     <CLASSES>
       <root url="file://$PROJECT_DIR$/../../lib/extension" />
     </CLASSES>
