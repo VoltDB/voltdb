@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
@@ -41,6 +43,8 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.largequery.BlockId;
 import org.voltdb.largequery.LargeBlockManager;
+import org.voltdb.largequery.LargeBlockResponse;
+import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.types.GeographyValue;
@@ -840,6 +844,36 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         return -1;
     }
 
+    /*
+     * Execute a large block task synchronously.  Log errors if they occur.
+     * Return true if successful and false otherwise.
+     */
+    private boolean executeLargeBlockTask(LargeBlockTask task) {
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
+        assert (lbm != null);
+
+        LargeBlockResponse response = null;
+        try {
+            // The call to get() will block until the task completes.
+            response = lbm.submitTask(task).get();
+        }
+        catch (RejectedExecutionException ree) {
+            LOG.error("Could not queue large block task: " + ree.getMessage());
+        }
+        catch (ExecutionException ee) {
+            LOG.error("Could not execute large block task: " + ee.getMessage());
+        }
+        catch (InterruptedException ie) {
+            LOG.error("Large block task was interrupted: " + ie.getMessage());
+        }
+
+        if (response != null && !response.wasSuccessful()) {
+            LOG.error("Large block task failed: " + response.getException().getMessage());
+        }
+
+        return response == null ? false : response.wasSuccessful();
+    }
+
     /**
      * Store a large temp table block to disk.
      *
@@ -849,66 +883,34 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @return true if operation succeeded, false otherwise
      */
     public boolean storeLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-        boolean success = true;
-
-        try {
-            lbm.storeBlock(new BlockId(siteId, blockCounter), block);
-        }
-        catch (IOException ioe) {
-            LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
-            success = false;
-        }
-
-        return success;
+        LargeBlockTask task = LargeBlockTask.getStoreTask(new BlockId(siteId, blockCounter), block);
+        return executeLargeBlockTask(task);
     }
 
     /**
      * Read a large table block from disk and write it to a ByteBuffer.
      * Block will still be stored on disk when this operation completes.
      *
-     * @param id     The id of the block to load
-     * @param block  The buffer to write the block to
+     * @param siteId         The originating site id of the block to load
+     * @param blockCounter   The id of the block to load
+     * @param block          The buffer to write the block to
      * @return The original address of the block (so that its internal pointers may get updated)
      */
     public boolean loadLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-        boolean success = true;
-
-        try {
-            lbm.loadBlock(new BlockId(siteId, blockCounter), block);
-        }
-        catch (IOException ioe) {
-            LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
-            success = false;
-        }
-
-        return success;
+        LargeBlockTask task = LargeBlockTask.getLoadTask(new BlockId(siteId, blockCounter), block);
+        return executeLargeBlockTask(task);
     }
 
     /**
      * Delete the block with the given id from disk.
      *
-     * @param siteId        The site id of the block to release
+     * @param siteId        The originating site id of the block to release
      * @param blockCounter  The serial number of the block to release
      * @return True if the operation succeeded, and false otherwise
      */
     public boolean releaseLargeTempTableBlock(long siteId, long blockCounter) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-        boolean success = true;
-
-        try {
-            lbm.releaseBlock(new BlockId(siteId, blockCounter));
-        }
-        catch (IOException ioe) {
-            LOG.error("Could not release large temp table block on disk: " + ioe.getMessage());
-            success = false;
-        }
-
-        return success;
+        LargeBlockTask task = LargeBlockTask.getReleaseTask(new BlockId(siteId, blockCounter));
+        return executeLargeBlockTask(task);
     }
 
     @Override
