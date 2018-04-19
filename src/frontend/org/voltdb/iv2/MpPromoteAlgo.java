@@ -55,6 +55,8 @@ public class MpPromoteAlgo implements RepairAlgo
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
     private final boolean m_isMigratePartitionLeader;
+    private final MpRestartSequenceGenerator m_restartSeqGenerator;
+
     long getRequestId()
     {
         return m_requestId;
@@ -116,6 +118,7 @@ public class MpPromoteAlgo implements RepairAlgo
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = false;
         m_whoami = whoami;
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId());
     }
 
     /**
@@ -128,6 +131,7 @@ public class MpPromoteAlgo implements RepairAlgo
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId());
     }
 
     @Override
@@ -322,6 +326,7 @@ public class MpPromoteAlgo implements RepairAlgo
             CompleteTransactionMessage message = (CompleteTransactionMessage)msg.getPayload();
             message.setForReplica(false);
             message.setRequireAck(false);
+            message.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
             return message;
         } else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();

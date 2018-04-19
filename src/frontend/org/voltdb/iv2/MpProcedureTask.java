@@ -59,7 +59,7 @@ public class MpProcedureTask extends ProcedureTask
     final Iv2InitiateTaskMessage m_msg;
     // Generator uses node id under ZK.leaders_globalservice directory, not host id.
     // Only used for MP scoreboard at TransactionTaskQueue to track restarted MP transactions.
-    final private MpRestartSequenceGenerator m_resartSeqGenerator;
+    final private MpRestartSequenceGenerator m_restartSeqGenerator;
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters,
@@ -74,7 +74,7 @@ public class MpProcedureTask extends ProcedureTask
         m_initiatorHSIds.addAll(pInitiators);
         m_restartMasters.set(new ArrayList<Long>());
         m_restartMastersMap.set(new HashMap<Integer, Long>());
-        m_resartSeqGenerator = new MpRestartSequenceGenerator(leaderNodeId);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(leaderNodeId);
     }
 
     /**
@@ -163,7 +163,7 @@ public class MpProcedureTask extends ProcedureTask
                     !m_txnState.isReadOnly(),
                     m_msg.isForReplay());
             // TransactionTaskQueue uses it to find matching CompleteTransactionMessage
-            long ts = m_resartSeqGenerator.getNextSeqNum();
+            long ts = m_restartSeqGenerator.getNextSeqNum();
             restart.setTimestamp(ts);
             // Update the timestamp to txnState so following restarted fragments could use it
             m_txnState.setTimestamp(ts);
