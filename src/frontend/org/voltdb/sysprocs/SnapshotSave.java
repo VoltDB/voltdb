@@ -116,9 +116,6 @@ public class SnapshotSave extends VoltSystemProcedure
             SnapshotFormat format =
                     SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[5]);
 
-            if(format == SnapshotFormat.STREAM) {
-                ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId());
-            }
             /*
              * Filter out the partitions that are active in the cluster
              * and include values for all partitions that aren't part of the current cluster.
@@ -149,6 +146,14 @@ public class SnapshotSave extends VoltSystemProcedure
             // with hostID and success so that the MPI has the correct participant count.
             if (result.getRowCount() == 0) {
                 result.addRow(context.getHostId(), hostname, "", "SUCCESS", "");
+            }
+            if (format == SnapshotFormat.STREAM) {
+                result.resetRowPosition();
+                result.advanceRow();
+                String success = result.getString("RESULT");
+                if (success.equals("SUCCESS")) {
+                    ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId());
+                }
             }
             return new DependencyPair.TableDependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }

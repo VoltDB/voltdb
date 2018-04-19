@@ -421,7 +421,7 @@ public class TransactionTaskQueue
     }
 
     // Called from streaming snapshot execution
-    public List<TransactionTask> getBacklogTasks() {
+    public synchronized List<TransactionTask> getBacklogTasks() {
         List<TransactionTask> pendingTasks = new ArrayList<>();
         Iterator<TransactionTask> iter = m_backlog.iterator();
         // skip the first fragments which is streaming snapshot
@@ -434,7 +434,7 @@ public class TransactionTaskQueue
                 continue;
             }
             assert (task.getTransactionState().isSinglePartition());
-            pendingTasks.add(iter.next());
+            pendingTasks.add(task);
         }
         return pendingTasks;
     }
