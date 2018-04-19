@@ -194,6 +194,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             try {
                 currentRowCount = TxnId2Utils.getRowCount(client, tableName);
                 // insert some batches...
+                boolean isDone = false;
                 while ((currentRowCount < targetCount) && (m_shouldContinue.get())) {
                     CountDownLatch latch = new CountDownLatch(batchSize);
                     // try to insert batchSize random rows
@@ -204,18 +205,22 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                             m_permits.acquire();
                         } catch (InterruptedException e) {
                             if (!m_shouldContinue.get()) {
-                                return;
+                                isDone = true;
+                                break;
                             }
                             log.error("NibbleDeleteLoader thread interrupted while waiting for permit. " + e.getMessage());
                         }
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                     }
+                    if (isDone ) {
+                        break;
+                    }
                     try {
                         latch.await(10, TimeUnit.SECONDS);
                     } catch (InterruptedException e) {
                         if (!m_shouldContinue.get()) {
-                            return;
+                            break;
                         }
                         log.error("NibbleDeleteLoader thread interrupted while waiting." + e.getMessage());
                     }
@@ -227,7 +232,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                     currentRowCount = nextRowCount;
                     log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " current count: " + currentRowCount + " tried:" + insertsTried);
                 }
-                log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " has nothing to do and completed successfully")
+                log.info("NibbleDeleteLoader " + tableName.toUpperCase() + " has nothing to do and completed successfully");
             } catch (Exception e) {
                 if ( e instanceof InterruptedIOException && ! m_shouldContinue.get()) {
                     continue;
