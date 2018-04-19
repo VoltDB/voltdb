@@ -67,7 +67,7 @@ public class CalcitePlanner {
 
     private static HepPlanner getHepPlanner() {
         final HepProgramBuilder hepPgmBldr = new HepProgramBuilder();
-        for (RelOptRule hepRule : VoltDBRules.HEP_RULES) {
+        for (RelOptRule hepRule : VoltDBRules.INLINING_RULES) {
             hepPgmBldr.addRuleInstance(hepRule);
         }
         final HepPlanner planner = new HepPlanner(hepPgmBldr.build());

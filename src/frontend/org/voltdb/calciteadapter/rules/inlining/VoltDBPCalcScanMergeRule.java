@@ -15,29 +15,40 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rules.hep;
+package org.voltdb.calciteadapter.rules.inlining;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPTableScan;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPLimit;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
 
-public class VoltDBPLimitScanMergeRule extends RelOptRule {
+/**
+ * This simply merges/inline Calc(project and/or Condition) into a Scan.
+ * It does not attempt to convert a Sequential scan into a Index scan.
+ * This should be done by the VoltDBCalcToIndexRule
+ *
+ * @author mikealexeev
+ *
+ */
+public class VoltDBPCalcScanMergeRule extends RelOptRule {
 
-    public static final VoltDBPLimitScanMergeRule INSTANCE = new VoltDBPLimitScanMergeRule();
+    public static final VoltDBPCalcScanMergeRule INSTANCE = new VoltDBPCalcScanMergeRule();
 
-    private VoltDBPLimitScanMergeRule() {
-        super(operand(VoltDBPLimit.class,
+    private VoltDBPCalcScanMergeRule() {
+        super(operand(VoltDBPCalc.class,
                 operand(AbstractVoltDBPTableScan.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBPLimit limitOffset = call.rel(0);
+        VoltDBPCalc calc= call.rel(0);
         AbstractVoltDBPTableScan scan = call.rel(1);
 
-        RelNode newScan = scan.copy(scan.getTraitSet(), limitOffset.getOffset(), limitOffset.getLimit());
+        // Merge trait sets to make sure we are not loosing any required traits if any
+        RelTraitSet mergedTraitSet = scan.getTraitSet().merge(calc.getTraitSet());
+        RelNode newScan = scan.copy(mergedTraitSet, calc.getProgram(), calc.getCluster().getRexBuilder());
         call.transformTo(newScan);
     }
 
