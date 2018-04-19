@@ -1597,10 +1597,9 @@ VoltDBEngine::loadTable(int32_t tableId,
     //   For all other kinds of exceptions, throw a FatalException.  This is legacy behavior.
     //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
 
-    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(table->isCatalogTableReplicated(),
-                                                                               isLowestSite());
+    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
+            (table->isCatalogTableReplicated(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
-        s_loadTableException = VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE;
         try {
             table->loadTuplesForLoadTable(serializeIn,
                                           NULL,

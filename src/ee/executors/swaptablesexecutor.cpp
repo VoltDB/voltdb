@@ -88,9 +88,8 @@ bool SwapTablesExecutor::p_execute(NValueArray const& params) {
     {
         assert(m_replicatedTableOperation == theTargetTable->isCatalogTableReplicated());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite());
+                m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            s_modifiedTuples = -1;
             // count the active tuples in both tables as modified
             modified_tuples = theTargetTable->visibleTupleCount() +
                     otherTargetTable->visibleTupleCount();
