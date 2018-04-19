@@ -48,8 +48,8 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedDeleteStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
-        super(parent, paramValues, db);
+    public ParsedDeleteStmt(AbstractParsedStmt parent, String[] paramValues, Database db, boolean isLargeQuery) {
+        super(parent, paramValues, db, isLargeQuery);
     }
 
     /** Given XML for ORDER BY, add each column to m_orderColumns */

@@ -38,8 +38,8 @@ public class ParsedSwapStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedSwapStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
-        super(parent, paramValues, db);
+    public ParsedSwapStmt(AbstractParsedStmt parent, String[] paramValues, Database db, boolean isLargeQuery) {
+        super(parent, paramValues, db, isLargeQuery);
     }
 
     /**

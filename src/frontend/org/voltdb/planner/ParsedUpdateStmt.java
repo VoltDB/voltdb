@@ -41,8 +41,8 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedUpdateStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
-        super(parent, paramValues, db);
+    public ParsedUpdateStmt(AbstractParsedStmt parent, String[] paramValues, Database db, boolean isLargeQuery) {
+        super(parent, paramValues, db, isLargeQuery);
     }
 
     @Override

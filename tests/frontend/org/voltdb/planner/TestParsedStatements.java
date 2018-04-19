@@ -83,7 +83,7 @@ public class TestParsedStatements extends TestCase {
         BuildDirectoryUtils.writeFile("statement-hsql-xml", stmtName + ".xml", xmlSQL.toString(), true);
 
         // get a parsed statement from the xml
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null, stmtSQL, xmlSQL, null, m_db, null);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null, stmtSQL, xmlSQL, null, m_db, null, false);
         // analyze expressions
         // except for "insert" statements that currently do without a joinTree.
         if (parsedStmt.m_joinTree != null) {

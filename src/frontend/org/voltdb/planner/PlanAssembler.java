@@ -132,14 +132,7 @@ public class PlanAssembler {
     /** plan selector */
     private final PlanSelector m_planSelector;
 
-    private final boolean m_isLargeQuery;
-
-    /**
-     * If this is a large query, and there are aggregates
-     * then we may need to add an order by to get serial
-     * aggregation working.
-     */
-    private boolean m_needOrderByForAggregates = false;
+    private final boolean m_isLargeQuery = false;
 
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
@@ -1974,8 +1967,10 @@ public class PlanAssembler {
      * @return true if the plan needs an OrderByPlanNode, false otherwise
      */
     private static boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
-        // Only sort when the statement has an ORDER BY.
-        if ( ! parsedStmt.hasOrderByColumns()) {
+        // Sort when the statement has an ORDER BY.
+        // We also need to sort if we need to do serial
+        // aggregation for large queries.
+        if ( ! parsedStmt.hasOrderByColumns() ) {
             return false;
         }
 
@@ -2612,6 +2607,12 @@ public class PlanAssembler {
      * @return A plan altered to compute aggregate functions and group by expressions.
      */
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
+        /*
+         * If this is a large query, and there are aggregates
+         * then we may need to add an order by to get serial
+         * aggregation working.
+         */
+        boolean needOrderByForAggregates = false;
         if (m_parsedSelect.hasAggregateOrGroupby()) {
             AggregatePlanNode aggNode = null;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
@@ -2632,7 +2633,10 @@ public class PlanAssembler {
             }
             boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
 
-            // Construct the aggregate nodes
+            // Construct the aggregate nodes.
+            // The variable needHashAgg should really be
+            // something like needHashAggIfNotLTT, but how
+            // do you pronounce that?
             if (needHashAgg) {
                 if ( m_parsedSelect.m_mvFixInfo.needed() ) {
                     // TODO: may optimize this edge case in future
@@ -2642,7 +2646,11 @@ public class PlanAssembler {
                 else if ( m_isLargeQuery ) {
                     aggNode = new AggregatePlanNode();
                     topAggNode = new AggregatePlanNode();
-                    m_needOrderByForAggregates = true;
+                    // If we changed to use an index scan, then
+                    // we don't need an order by.  We found an
+                    // index which will do the work for us.
+                    // We'll need this at the end.
+                    needOrderByForAggregates = ! gbInfo.isChangedToSerialAggregate();
                 }
                 else {
                     if (gbInfo.isChangedToSerialAggregate()) {
@@ -2730,10 +2738,10 @@ public class PlanAssembler {
                          * the same as the output schema of the push-down
                          * aggregate node.
                          *
-                         * If DISTINCT is specified, don't do push-down for
-                         * count() and sum() when not group by partition column.
-                         * An exception is the aggregation arguments are the
-                         * partition column (ENG-4980).
+                         * If DISTINCT is specified and the aggregation
+                         * arguments are *not* the partition column (ENG-4980),
+                         * then don't do push-down for count() and sum() when not
+                         * grouping by the partition column.
                          */
                         if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
                             agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
@@ -2835,7 +2843,7 @@ public class PlanAssembler {
             }
 
             // Never push down aggregation for MV fix case.
-            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect);
+            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect, needOrderByForAggregates);
         }
 
         return handleDistinctWithGroupby(root);
@@ -3063,9 +3071,10 @@ public class PlanAssembler {
      * @return The new root node.
      */
     private static AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
-                                       AggregatePlanNode distNode,
-                                       AggregatePlanNode coordNode,
-                                       ParsedSelectStmt selectStmt) {
+                                                      AggregatePlanNode distNode,
+                                                      AggregatePlanNode coordNode,
+                                                      ParsedSelectStmt selectStmt,
+                                                      boolean needOrderByForAggregates) {
         AggregatePlanNode rootAggNode;
 
         // remember that coordinating aggregation has a pushed-down
@@ -3083,9 +3092,20 @@ public class PlanAssembler {
          */
         if (coordNode != null && root instanceof ReceivePlanNode) {
             AbstractPlanNode accessPlanTemp = root;
+            // Pop off the receive and send plan nodes.
             root = accessPlanTemp.getChild(0).getChild(0);
+            // Clear the parents of the result.  This will be
+            // the subplan, or close to it.
             root.clearParents();
+            // Clear the children of the send plan.  We will
+            // be using it again below.
             accessPlanTemp.getChild(0).clearChildren();
+            // If this is a large temp table query we will have
+            // converted the aggregation to serial aggregation.
+            // So we need to add an order by.
+            if (needOrderByForAggregates) {
+                root = handleLTTSortForGroupBy(root);
+            }
             distNode.addAndLinkChild(root);
 
             if (selectStmt.hasPartitionColumnInGroupby()) {
@@ -3131,6 +3151,24 @@ public class PlanAssembler {
         rootAggNode.setPostPredicate(selectStmt.getHavingPredicate());
         root = processComplexAggProjectionNode(selectStmt, rootAggNode);
         return root;
+    }
+
+    /**
+     * Add an order by node for serial aggregation for Large
+     * Temp Tables. We can't do hash aggregation, so we have
+     * to do do serial aggregation.  The sort keys are the group
+     * by columns.
+     *
+     * @param root
+     * @param stmt
+     * @return
+     */
+    private static AbstractPlanNode handleLTTSortForGroupBy(AbstractPlanNode root,
+                                                            ParsedSelectStmt stmt) {
+        OrderByPlanNode orderByNode = buildOrderByPlanNode(stmt.groupByColumns());
+
+        orderByNode.addAndLinkChild(root);
+        return orderByNode;
     }
 
     private static AbstractPlanNode processComplexAggProjectionNode(
