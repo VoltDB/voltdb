@@ -2317,11 +2317,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 } else {
                     VoltTable t = resp.getResults()[0];
                     while (t.advanceRow()) {
-                        String error = t.getString("note");
+                        String error = t.getString("MESSAGE");
                         if (error != null && !"".equals(error)) {
                             hostLog.warn("Errors occured when running TTL one table " + tableName + ":" +  error);
                         }
-                        stats.update(t.getLong("deletedLastRound"), t.getLong("rowsleft"));
+                        stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"),
+                                t.getLong("DELETED_LAST_ROUND"),  t.getLong("ROUNDS"));
                     }
                 }
                 latch.countDown();

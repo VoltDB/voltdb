@@ -4078,7 +4078,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         m_timeToLiveProcessor = new TimeToLiveProcessor(m_myHostId, m_messenger, m_clientInterface);
         m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
-
+        getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, m_timeToLiveProcessor);
+        m_timeToLiveProcessor.readTTLStats(m_messenger.getZK());
         hostLog.info("Logging host rejoin completion to ZK");
         m_statusTracker.setNodeState(NodeState.UP);
         Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
@@ -4292,6 +4293,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
         m_timeToLiveProcessor = new TimeToLiveProcessor(m_myHostId, m_messenger, m_clientInterface);
         m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
+        getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, m_timeToLiveProcessor);
     }
 
     private void databaseIsRunning() {

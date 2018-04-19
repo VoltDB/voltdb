@@ -344,6 +344,17 @@ public class StatsAgent extends OpsAgent
             collectTopoStats(psr,jsonConfig);
             return;
         }
+        else if (subselector.equalsIgnoreCase("TTL")) {
+            PendingOpsRequest psr = new PendingOpsRequest(
+                    selector,
+                    subselector,
+                    c,
+                    clientHandle,
+                    System.currentTimeMillis(),
+                    obj);
+            collectTTLStats(psr);
+            return;
+        }
         else if (subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
             PendingOpsRequest psr = new PendingOpsRequest(
                     selector,
@@ -449,6 +460,18 @@ public class StatsAgent extends OpsAgent
             sendClientResponse(psr);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to return TOPO results to client.", true, e);
+        }
+    }
+
+    private void collectTTLStats(PendingOpsRequest psr)
+    {
+        VoltTable[] ttlTable = new VoltTable[1];
+        ttlTable[0] = getStatsAggregate(StatsSelector.TTL, false, psr.startTime);
+        psr.aggregateTables  = ttlTable;
+        try {
+            sendClientResponse(psr);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to return TTL results to client.", true, e);
         }
     }
 
