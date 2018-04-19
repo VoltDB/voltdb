@@ -40,7 +40,7 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalTableScan;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 import org.voltdb.catalog.Column;
 import org.voltdb.utils.CatalogUtil;
 
@@ -126,7 +126,7 @@ public class VoltDBTable implements TranslatableTable {
     public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
         RelOptCluster cluster = context.getCluster();
         // Start conservatively with a Logical Scan
-        RelNode node = new VoltDBLogicalTableScan(cluster,
+        RelNode node = new VoltDBLTableScan(cluster,
                 cluster.traitSet(),
                 relOptTable,
                 this);

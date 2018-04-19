@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rules;
 
+import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.volcano.AbstractConverter;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
@@ -27,26 +28,28 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
-import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalCalcRule;
-import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalSortRule;
-import org.voltdb.calciteadapter.rules.logical.VoltDBLogicalTableScanRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBCalcMergeRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBCalcScanMergeRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBCalcScanToIndexRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBLimitScanMergeRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBLimitSortMergeRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalCalcRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalLimitRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSeqScanRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBPhysicalSortRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBSortCalcTransposeRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBSortConvertRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBSortIndexScanRemoveRule;
-import org.voltdb.calciteadapter.rules.physical.VoltDBSortScanToIndexRule;
+import org.voltdb.calciteadapter.rules.inlining.VoltDBPCalcAggregateMergeRule;
+import org.voltdb.calciteadapter.rules.inlining.VoltDBPCalcScanMergeRule;
+import org.voltdb.calciteadapter.rules.inlining.VoltDBPLimitScanMergeRule;
+import org.voltdb.calciteadapter.rules.inlining.VoltDBPLimitSortMergeRule;
+import org.voltdb.calciteadapter.rules.logical.VoltDBLAggregateRule;
+import org.voltdb.calciteadapter.rules.logical.VoltDBLCalcRule;
+import org.voltdb.calciteadapter.rules.logical.VoltDBLSortRule;
+import org.voltdb.calciteadapter.rules.logical.VoltDBLTableScanRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPAggregateRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPCalcRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPCalcScanToIndexRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPLimitRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPSeqScanRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPSortCalcTransposeRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPSortConvertRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPSortIndexScanRemoveRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPSortRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPSortScanToIndexRule;
 
 public class VoltDBRules {
 
-    public static Program RULES_SET_0 = Programs.ofRules(
+    public static RelOptRule[] VOLCANO_RULES_0 = {
             // Calcite's Logical Rules
             CalcMergeRule.INSTANCE
             , FilterCalcMergeRule.INSTANCE
@@ -57,46 +60,62 @@ public class VoltDBRules {
             , FilterProjectTransposeRule.INSTANCE
 
             // VoltDBLogical Conversion Rules
-            , VoltDBLogicalSortRule.INSTANCE
-            , VoltDBLogicalTableScanRule.INSTANCE
-            , VoltDBLogicalCalcRule.INSTANCE
+            , VoltDBLSortRule.INSTANCE
+            , VoltDBLTableScanRule.INSTANCE
+            , VoltDBLCalcRule.INSTANCE
+            , VoltDBLAggregateRule.INSTANCE
+    };
 
-            );
-
-    public static Program RULES_SET_1 = Programs.ofRules(
+    public static RelOptRule[] VOLCANO_RULES_1 = {
             // Calcite's Rules
             AbstractConverter.ExpandConversionRule.INSTANCE
 
             // VoltDB Logical Rules
 
             // VoltDB Physical Rules
-            , VoltDBSortScanToIndexRule.INSTANCE
-            , VoltDBCalcScanToIndexRule.INSTANCE
-            , VoltDBSortCalcTransposeRule.INSTANCE
-            , VoltDBSortIndexScanRemoveRule.INSTANCE
+            , VoltDBPSortScanToIndexRule.INSTANCE
+            , VoltDBPCalcScanToIndexRule.INSTANCE
+            , VoltDBPSortCalcTransposeRule.INSTANCE
+            , VoltDBPSortIndexScanRemoveRule.INSTANCE
 //            , VoltDBCalcMergeRule.INSTANCE
 
             // VoltDB Physical Conversion Rules
-            , VoltDBPhysicalCalcRule.INSTANCE
-            , VoltDBPhysicalSeqScanRule.INSTANCE
-            , VoltDBPhysicalSortRule.INSTANCE
-            , VoltDBSortConvertRule.INSTANCE_NONE
-            , VoltDBSortConvertRule.INSTANCE_VOLTDB
-            , VoltDBPhysicalLimitRule.INSTANCE
+            , VoltDBPCalcRule.INSTANCE
+            , VoltDBPSeqScanRule.INSTANCE
+            , VoltDBPSortRule.INSTANCE
+            , VoltDBPSortConvertRule.INSTANCE_NONE
+            , VoltDBPSortConvertRule.INSTANCE_VOLTDB
+            , VoltDBPLimitRule.INSTANCE
+            , VoltDBPAggregateRule.INSTANCE
+    };
 
-            );
-
-    public static Program RULES_SET_2 = Programs.ofRules(
+    public static RelOptRule[] INLINING_RULES = {
             // VoltDB Inline Rules
 
-            VoltDBCalcScanMergeRule.INSTANCE
-            , VoltDBLimitScanMergeRule.INSTANCE
-            , VoltDBLimitSortMergeRule.INSTANCE
+            VoltDBPCalcScanMergeRule.INSTANCE
+            , VoltDBPLimitScanMergeRule.INSTANCE
+            , VoltDBPLimitSortMergeRule.INSTANCE
+            , VoltDBPCalcAggregateMergeRule.INSTANCE
+    };
 
+    public static Program VOLCANO_PROGRAM_0 = Programs.ofRules(
+            VOLCANO_RULES_0
             );
 
-    public static Program[] getProgram() {
+    public static Program VOLCANO_PROGRAM_1 = Programs.ofRules(
+            VOLCANO_RULES_1
+            );
 
-        return new Program[] {RULES_SET_0, RULES_SET_1, RULES_SET_2};
+    public static Program INLINING_PROGRAM = Programs.ofRules(
+            INLINING_RULES
+            );
+
+    public static Program[] getVolcanoPrograms() {
+        return new Program[] {VOLCANO_PROGRAM_0, VOLCANO_PROGRAM_1};
     }
+
+    public static Program getInliningProgram() {
+        return INLINING_PROGRAM;
+    }
+
 }

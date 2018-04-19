@@ -18,8 +18,11 @@
 package org.voltdb.calciteadapter.planner;
 
 import org.apache.calcite.plan.Convention;
+import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
@@ -31,8 +34,8 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
 import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLogicalRel;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPhysicalRel;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.calciteadapter.rules.VoltDBRules;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -53,18 +56,27 @@ public class CalcitePlanner {
         return rootSchema;
     }
 
-    private static Planner getPlanner(SchemaPlus schema) {
+    private static Planner getVolcanoPlanner(SchemaPlus schema) {
         final FrameworkConfig config = Frameworks.newConfigBuilder()
                 .parserConfig(SqlParser.Config.DEFAULT)
                 .defaultSchema(schema)
-                .programs(VoltDBRules.getProgram())
+                .programs(VoltDBRules.getVolcanoPrograms())
                 .build();
           return Frameworks.getPlanner(config);
+    }
 
+    private static HepPlanner getHepPlanner() {
+        final HepProgramBuilder hepPgmBldr = new HepProgramBuilder();
+        for (RelOptRule hepRule : VoltDBRules.INLINING_RULES) {
+            hepPgmBldr.addRuleInstance(hepRule);
+        }
+        final HepPlanner planner = new HepPlanner(hepPgmBldr.build());
+        planner.addRelTraitDef(VoltDBPRel.VOLTDB_PHYSICAL.getTraitDef());
+        return planner;
     }
 
 
-    private static CompiledPlan calciteToVoltDBPlan(VoltDBPhysicalRel rel, CompiledPlan compiledPlan) {
+    private static CompiledPlan calciteToVoltDBPlan(VoltDBPRel rel, CompiledPlan compiledPlan) {
 
         RexConverter.resetParameterIndex();
 
@@ -98,7 +110,8 @@ public class CalcitePlanner {
             sql = sql.substring(0, sql.length() - 1);
         }
         SchemaPlus schema = schemaPlusFromDatabase(db);
-        Planner planner = getPlanner(schema);
+        Planner volcanoPlanner = getVolcanoPlanner(schema);
+        HepPlanner hepPlanner = null;
         CompiledPlan compiledPlan = new CompiledPlan(isLargeQuery);
 
         compiledPlan.sql = sql;
@@ -114,30 +127,32 @@ public class CalcitePlanner {
 
         try {
             // Parse the input sql
-            parsedSql = planner.parse(sql);
+            parsedSql = volcanoPlanner.parse(sql);
 
             // Validate the input sql
-            validatedSql = planner.validate(parsedSql);
+            validatedSql = volcanoPlanner.validate(parsedSql);
 
             // Convert the input sql to a relational expression
-            convertedRel = planner.rel(validatedSql).project();
+            convertedRel = volcanoPlanner.rel(validatedSql).project();
 
             // Transform the relational expression
 
             // Apply Rule set 0 - standard Calcite transformations and convert to the VOLTDB Logical convention
-            traitSet = prepareFinalTraitSet(planner, VoltDBLogicalRel.VOLTDB_LOGICAL, convertedRel.getTraitSet());
-            phaseOneRel = planner.transform(0, traitSet, convertedRel);
+            traitSet = prepareOutputTraitSet(volcanoPlanner, VoltDBLRel.VOLTDB_LOGICAL, convertedRel);
+            phaseOneRel = volcanoPlanner.transform(0, traitSet, convertedRel);
 
             // Apply Rule Set 1 - VoltDB transformations
             // Add traits that the transformed relNode must have
-            traitSet = prepareFinalTraitSet(planner, VoltDBPhysicalRel.VOLTDB_PHYSICAL, phaseOneRel.getTraitSet());
-            phaseTwoRel = planner.transform(1, traitSet, phaseOneRel);
+            traitSet = prepareOutputTraitSet(volcanoPlanner, VoltDBPRel.VOLTDB_PHYSICAL, phaseOneRel);
+            phaseTwoRel = volcanoPlanner.transform(1, traitSet, phaseOneRel);
 
-            // Apply Rule Set 2 - VoltDB transformations
-            phaseThreeRel = planner.transform(2, traitSet, phaseTwoRel);
+            // Apply Rule Set 2 - VoltDB inlining
+            hepPlanner = getHepPlanner();
+            hepPlanner.setRoot(phaseTwoRel);
+            phaseThreeRel = hepPlanner.findBestExp();
 
             // Convert To VoltDB plan
-            calciteToVoltDBPlan((VoltDBPhysicalRel)phaseThreeRel, compiledPlan);
+            calciteToVoltDBPlan((VoltDBPRel)phaseThreeRel, compiledPlan);
 
             String explainPlan = compiledPlan.rootPlanGraph.toExplainPlanString();
 
@@ -157,8 +172,12 @@ public class CalcitePlanner {
             System.out.println("And here's how far we have gotten:\n");
             throw new PlanningErrorException(e.getMessage());
         } finally {
-            planner.close();
-            planner.reset();
+            volcanoPlanner.close();
+            volcanoPlanner.reset();
+
+            if (hepPlanner != null) {
+                hepPlanner.clear();
+            }
 
             PlanDebugOutput.outputCalcitePlanningDetails(
                     sql, dirName, "DEBUG", errMsg,
@@ -168,17 +187,23 @@ public class CalcitePlanner {
         return compiledPlan;
     }
 
-    private static RelTraitSet prepareFinalTraitSet(
+    // Prepare a trait set that would contains traits that we want to see in the root node
+    // at the termination of the planning cycle.
+    private static RelTraitSet prepareOutputTraitSet(
             Planner planner,
             Convention outConvention,
-            RelTraitSet traceSetIn) {
+            RelNode rel) {
         RelTraitSet traitSet = planner.getEmptyTraitSet().replace(outConvention);
-        if (traceSetIn != null) {
-            RelTrait collationTrait = traceSetIn.getTrait(RelCollationTraitDef.INSTANCE);
-            if (collationTrait instanceof RelCollation) {
-                traitSet = traitSet.plus(collationTrait);
-            }
+        RelTrait collationTrait = rel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+        // If a RelNode does not have a real RelCollation trait Calcite returns
+        // an empty collation (RelCompositeTrait$EmptyCompositeTrait<T>)
+        // which is not an instance of the RelCollation class (RelCollations.EMPTY) as
+        // a T RelTraitSet.getTrait(RelTraitDef<T> traitDef) method declaration implies
+        // resulting in a ClassCastExpretion
+        if (collationTrait instanceof RelCollation) {
+            traitSet = traitSet.plus(collationTrait);
         }
         return traitSet;
     }
+
 }
