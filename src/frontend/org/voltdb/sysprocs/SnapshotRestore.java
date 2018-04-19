@@ -2354,7 +2354,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         aggregatorFragment.parameters = ParameterSet.fromArrayNoCopy(
                                 result_dependency_id,
                                 "Received confirmation of successful partitioned-to-replicated table load");
-                        pfs[sites_to_partitions.size()] = aggregatorFragment;
+                        pfs[pfs_index] = aggregatorFragment;
                     }
                     else {
                         byte compressedTable[] = TableCompressor.getCompressedTableBytes(table);

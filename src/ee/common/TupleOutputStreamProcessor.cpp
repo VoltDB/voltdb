@@ -18,7 +18,6 @@
 #include "TupleOutputStream.h"
 #include "TupleOutputStreamProcessor.h"
 #include "tabletuple.h"
-#include <limits>
 
 namespace voltdb {
 

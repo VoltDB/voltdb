@@ -75,7 +75,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     private void truncateBeforeTest(Client client) {
-        // TODO Auto-generated method stub
         VoltTable[] results = null;
         try {
             results = client.callProcedure("TruncateMatViewDataMP").getResults();
@@ -2349,6 +2348,43 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 + "WHERE T3.f4 = ? "
                 + "group by t3.f5;",
                 expectedMsg);
+    }
+
+    public void testEng13694() throws Exception {
+        // We used to sometimes fail when updating a materialized view
+        // which was the join of a replicated table and a partitioned
+        // table.  This only happened with fairly large tables.
+        // We don't run this with valgrind.  It's too slow, and
+        // it's not likely to cause uncaught memory leaks anyway.
+        if (!isValgrind()) {
+            Client client = getClient();
+            final int num_prows = 10000;
+            final int num_rrows = 1000;
+            Long[][] prows = new Long[num_prows][2];
+            for (int idx = 0; idx < num_prows; idx += 1) {
+                prows[idx][0] = (long) idx;
+                prows[idx][1] = (long) (idx + 100);
+            }
+            Long[][] rrows = new Long[num_rrows][2];
+            for (int idx = 0; idx < num_rrows; idx +=1) {
+                rrows[idx][0] = (long) idx;
+                rrows[idx][1] = (long) (idx + 100);
+            }
+            shuffleArray(prows);
+            shuffleArray(rrows);
+            // Load up the P1 table.
+            for (int idx = 0; idx < num_prows; idx += 1) {
+                client.callProcedure("ENG13694_P1.insert", prows[idx][0], prows[idx][1]);
+            }
+            // Load up the R1 table.  This is where we expect a crash.
+            for (int idx = 0; idx < num_rrows; idx += 1) {
+                client.callProcedure("ENG13694_R1.insert", rrows[idx][0], rrows[idx][1]);
+            }
+            // Delete the R1 table.  We could see a crash here as well.
+            for (int idx = 0; idx < num_rrows; idx += 1) {
+                client.callProcedure("ENG13694_R1.delete", rrows[idx][0]);
+            }
+        }
     }
 
     public void testEng11203() throws Exception {

@@ -18,11 +18,6 @@
 #include <vector>
 #include <string>
 #include "indexes/IndexStats.h"
-#include "stats/StatsSource.h"
-#include "common/TupleSchema.h"
-#include "common/ids.h"
-#include "common/ValueFactory.hpp"
-#include "common/tabletuple.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
@@ -129,15 +124,10 @@ IndexStats::IndexStats(TableIndex* index)
  * Configure a StatsSource superclass for a set of statistics. Since this class is only used in
  * the EE it can be assumed that it is part of an Execution Site and that there is a site Id.
  * @parameter name Name of this set of statistics
- * @parameter hostId id of the host this partition is on
- * @parameter hostname name of the host this partition is on
- * @parameter siteId this stat source is associated with
- * @parameter partitionId this stat source is associated with
- * @parameter databaseId Database this source is associated with
+ * @parameter tableName Name of the indexed table
  */
-void IndexStats::configure(
-        string name,
-        string tableName) {
+void IndexStats::configure(string name, string tableName) {
+    VOLT_TRACE("Configuring stats for index %s in table %s.", name.c_str(), tableName.c_str());
     StatsSource::configure(name);
     m_indexName = ValueFactory::getStringValue(m_index->getName());
     m_tableName = ValueFactory::getStringValue(tableName);

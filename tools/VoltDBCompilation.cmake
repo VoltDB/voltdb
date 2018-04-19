@@ -50,10 +50,10 @@ FUNCTION (VOLTDB_ADD_EXECUTABLE NAME)
 ENDFUNCTION()
 
 IF (IS_VALGRIND_BUILD)
-  VOLTDB_ADD_COMPILE_OPTIONS(-g3 -DDEBUG -DMEMCHECK )
+  VOLTDB_ADD_COMPILE_OPTIONS(-g3 -DMEMCHECK)
   SET (VOLTDB_USE_VALGRIND --valgrind)
 ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "DEBUG")
-  VOLTDB_ADD_COMPILE_OPTIONS(-g3 -DDEBUG)
+  VOLTDB_ADD_COMPILE_OPTIONS(-g3)
 ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "RELEASE")
   VOLTDB_ADD_COMPILE_OPTIONS(-O3 -g3 -mmmx -msse -msse2 -msse3 -DNDEBUG)
 ELSE()
@@ -74,6 +74,10 @@ VOLTDB_ADD_COMPILE_OPTIONS(
   -D_USE_MATH_DEFINES
 )
 
+IF ( ${VOLT_POOL_CHECKING} )
+  VOLTDB_ADD_COMPILE_OPTIONS(-DVOLT_POOL_CHECKING=1)
+ENDIF()
+
 # Set coverage and profiling options
 IF ( ${VOLTDB_USE_COVERAGE} )
   SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} -ftest-coverage -fprofile-arcs)
@@ -89,8 +93,8 @@ ENDIF ()
 SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} ${VOLTDB_LDFLAGS})
 
 ########################################################################
-# 
-# These are the compiler version specific options. 
+#
+# These are the compiler version specific options.
 # We calculate the compiler versions, and the options needed
 # for each of them. These are the versions of gcc and cmake for
 # each version of Linux we support.
@@ -186,7 +190,7 @@ ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   # All versions of clang use C++11.
   SET (CXX_VERSION_FLAG -std=c++11)
   MESSAGE("CXX_VERSION_FLAG is ${CXX_VERSION_FLAG}")
-  IF ( ( "3.4.0" VERSION_LESS CMAKE_CXX_COMPILER_VERSION ) 
+  IF ( ( "3.4.0" VERSION_LESS CMAKE_CXX_COMPILER_VERSION )
        AND ( CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.0.0" ) )
     # Some clang 3.4.x version
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-varargs)
@@ -194,6 +198,9 @@ ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     # This is some odd mac version number.  It's not
     # related to the LLVM versioning numbers.
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-absolute-value)
+  ENDIF()
+  IF ( "9.0.0" VERSION_LESS ${CMAKE_CXX_COMPILER_VERSION} )
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-user-defined-warnings)
   ENDIF()
 ELSE()
   MESSAGE (FATAL_ERROR "Unknown compiler family ${CMAKE_CXX_COMPILER_ID}.  We only support GNU and Clang.")
@@ -221,4 +228,3 @@ ELSEIF( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
 ELSE()
   MESSAGE(FATAL_ERROR "System nameed ${CMAKE_SYSTEM_NAME} is unknown")
 ENDIF()
-

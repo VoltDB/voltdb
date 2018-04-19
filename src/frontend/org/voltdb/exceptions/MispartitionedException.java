@@ -41,7 +41,7 @@ public class MispartitionedException extends SerializableException {
 
     @Override
     protected int p_getSerializedSize() {
-        return 4;
+        return 0;
     }
 
     @Override

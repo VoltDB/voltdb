@@ -227,8 +227,8 @@ public:
     {
         VOLT_TRACE("eval %s. left %s, right %s. ret=%s",
                    OP::op_name(),
-                   typeid(*(m_left)).name(),
-                   typeid(*(m_right)).name(),
+                   typeid(m_left).name(),
+                   typeid(m_right).name(),
                    traceEval(tuple1, tuple2));
 
         assert(m_left != NULL);

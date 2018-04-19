@@ -44,25 +44,15 @@
  */
 
 #include "seqscanexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
 #include "executors/insertexecutor.h"
-#include "execution/ExecutorVector.h"
-#include "execution/ProgressMonitorProxy.h"
-#include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/insertnode.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 
 using namespace voltdb;
 
@@ -128,6 +118,7 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
 bool SeqScanExecutor::p_execute(const NValueArray &params) {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
+
 
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
@@ -229,7 +220,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             else {
                 // We may actually find out during initialization
                 // that we are done.  The p_execute_init operation
-                // will tell us by returning true if so.  See the
+                // will tell us by returning false if so.  See the
                 // definition of InsertExecutor::p_execute_init.
                 //
                 // We know we have an inline insert here.  So there
@@ -245,7 +236,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 // this and tell us by setting temp_tuple.  Note
                 // that temp_tuple is initialized if this returns
                 // false.  If it returns true all bets are off.
-                if (m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable, temp_tuple)) {
+                if (!m_insertExec->p_execute_init(inputSchema, m_tmpOutputTable, temp_tuple)) {
                     return true;
                 }
                 // We should have as many expressions in the

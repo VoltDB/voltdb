@@ -46,11 +46,8 @@
 #include "abstractjoinnode.h"
 
 #include "common/TupleSchema.h"
-#include "expressions/abstractexpression.h"
 
 #include "boost/foreach.hpp"
-
-#include <sstream>
 
 namespace voltdb {
 

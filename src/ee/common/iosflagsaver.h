@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef IOSFLAGSAVER_H
+#define IOSFLAGSAVER_H
 
 #include <ostream>
 
@@ -50,3 +52,5 @@ private:
     std::ios::fmtflags f;
 };
 }
+
+#endif /* not(defined(IOSFLAGSAVER_H)) */

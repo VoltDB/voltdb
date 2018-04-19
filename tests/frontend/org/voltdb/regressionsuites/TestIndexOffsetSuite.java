@@ -124,7 +124,7 @@ public class TestIndexOffsetSuite extends RegressionSuite {
         // check expression index
 
         // non-deterministic query, but our index is compacting index without holes
-        if (!isHSQL()) {
+        if (!isHSQL() && !isValgrind()) {
             callWithExpectedTupleId(client, 10, "TU1_ABS_POINTS", 0, 0);
             callWithExpectedTupleId(client, 1, "TU1_ABS_POINTS", 0, 1);
             callWithExpectedTupleId(client, 8, "TU1_ABS_POINTS", 0, 5);
@@ -137,31 +137,35 @@ public class TestIndexOffsetSuite extends RegressionSuite {
             callWithExpectedTupleId(client, Integer.MIN_VALUE, "TU1_ABS_POINTS_DESC", 0, 6);
         }
 
-        // Multi-map
-        client.callProcedure("TM1.insert", 1, 1);
-        client.callProcedure("TM1.insert", 2, 2);
-        client.callProcedure("TM1.insert", 3, 2);
-        client.callProcedure("TM1.insert", 4, 2);
-        client.callProcedure("TM1.insert", 5, 3);
-        client.callProcedure("TM1.insert", 6, 6);
-        client.callProcedure("TM1.insert", 7, 6);
-        client.callProcedure("TM1.insert", 8, 8);
-        client.callProcedure("TM1.insert", 9, null);
-        client.callProcedure("TM1.insert", 10, null);
+        if (!isValgrind()) {
+            // Non-deterministic storage makes this fail in MEMCHECK builds
+
+            // Multi-map
+            client.callProcedure("TM1.insert", 1, 1);
+            client.callProcedure("TM1.insert", 2, 2);
+            client.callProcedure("TM1.insert", 3, 2);
+            client.callProcedure("TM1.insert", 4, 2);
+            client.callProcedure("TM1.insert", 5, 3);
+            client.callProcedure("TM1.insert", 6, 6);
+            client.callProcedure("TM1.insert", 7, 6);
+            client.callProcedure("TM1.insert", 8, 8);
+            client.callProcedure("TM1.insert", 9, null);
+            client.callProcedure("TM1.insert", 10, null);
 
 
-        // non-deterministic query, but our index is compacting index without holes
-        callWithExpectedTupleId(client, 9, "TM1_POINTS", 0, 0);
-        callWithExpectedTupleId(client, 10, "TM1_POINTS", 0, 1);
-        callWithExpectedTupleId(client, 1, "TM1_POINTS", 0, 2);
-        callWithExpectedTupleId(client, 2, "TM1_POINTS", 0, 3);
-        callWithExpectedTupleId(client, 3, "TM1_POINTS", 0, 4);
-        callWithExpectedTupleId(client, 4, "TM1_POINTS", 0, 5);
-        callWithExpectedTupleId(client, 5, "TM1_POINTS", 0, 6);
-        callWithExpectedTupleId(client, 6, "TM1_POINTS", 0, 7);
-        callWithExpectedTupleId(client, 7, "TM1_POINTS", 0, 8);
-        callWithExpectedTupleId(client, 8, "TM1_POINTS", 0, 9);
-        callWithExpectedTupleId(client, Integer.MIN_VALUE, "TM1_POINTS", 0, 10);
+            // non-deterministic query, but our index is compacting index without holes
+            callWithExpectedTupleId(client, 9, "TM1_POINTS", 0, 0);
+            callWithExpectedTupleId(client, 10, "TM1_POINTS", 0, 1);
+            callWithExpectedTupleId(client, 1, "TM1_POINTS", 0, 2);
+            callWithExpectedTupleId(client, 2, "TM1_POINTS", 0, 3);
+            callWithExpectedTupleId(client, 3, "TM1_POINTS", 0, 4);
+            callWithExpectedTupleId(client, 4, "TM1_POINTS", 0, 5);
+            callWithExpectedTupleId(client, 5, "TM1_POINTS", 0, 6);
+            callWithExpectedTupleId(client, 6, "TM1_POINTS", 0, 7);
+            callWithExpectedTupleId(client, 7, "TM1_POINTS", 0, 8);
+            callWithExpectedTupleId(client, 8, "TM1_POINTS", 0, 9);
+            callWithExpectedTupleId(client, Integer.MIN_VALUE, "TM1_POINTS", 0, 10);
+        }
     }
 
     public void testTwoOrMoreColumnsUniqueIndex() throws Exception {

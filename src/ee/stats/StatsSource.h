@@ -71,6 +71,8 @@ public:
      */
     void configure(std::string name);
 
+    void updateTableName(const std::string& tableName);
+
     /*
      * Destructor that frees tupleSchema_, and statsTable_
      */
@@ -83,22 +85,24 @@ public:
      * @param now Timestamp to return with each row
      * @return Pointer to a table containing the statistics.
      */
-    voltdb::Table* getStatsTable(bool interval, int64_t now);
+    voltdb::Table* getStatsTable(int64_t siteId, int32_t partitionId, bool interval, int64_t now);
 
     /*
      * Retrieve tuple containing the latest statistics available. An updated stat is requested from the derived class by calling
      * StatsSource::updateStatsTuple
+     * @param siteId for the generated tuple
+     * @param partitionId for the generated tuple
      * @param interval Whether to return counters since the beginning or since the last time this was called
      * @param Timestamp to embed in each row
      * @return Pointer to a table tuple containing the latest version of the statistics.
      */
-    voltdb::TableTuple* getStatsTuple(bool interval, int64_t now);
+    voltdb::TableTuple* getStatsTuple(int64_t siteId, int32_t partitionId, bool interval, int64_t now);
 
     /**
-     * Retrieve the name of this set of statistics
-     * @return Name of statistics
+     * Retrieve the name of the table that this set of statistics is associated with.
+     * @return Table name.
      */
-    std::string getName();
+    const string getTableName();
 
     /**
      * String representation of the statistics. Default implementation is to print the stats table.
@@ -133,6 +137,8 @@ protected:
      */
     std::map<std::string, int> m_columnName2Index;
 
+    NValue m_tableName;
+
     bool interval() { return m_interval; }
 
 private:
@@ -147,17 +153,6 @@ private:
      */
     voltdb::TableTuple m_statsTuple;
 
-    /**
-     * Name of this set of statistics.
-     */
-    std::string m_name;
-
-    /**
-     * CatalogId of the partition this StatsSource is associated with.
-     */
-    voltdb::CatalogId m_partitionId;
-
-    int64_t m_siteId;
     voltdb::CatalogId m_hostId;
 
     voltdb::NValue m_hostname;

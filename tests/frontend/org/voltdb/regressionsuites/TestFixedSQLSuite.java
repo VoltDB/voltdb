@@ -3063,6 +3063,31 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {}, vt);
     }
 
+    public void testSwapTablesTruncateReplicated() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "insert into swapper_table_foo values (0, 'dog');");
+        client.callProcedure("@AdHoc", "insert into swapper_table_foo values (1, 'cat');");
+        client.callProcedure("@SwapTables", "Swapper_Table_Foo", "Swapper_Table_BAR");
+        client.callProcedure("@AdHoc", "drop table swapper_table_foo;");
+        client.callProcedure("@AdHoc", "drop table swapper_table_bar;");
+
+        // Restore the catalog so that the junit re-init optimization won't complain.
+        client.callProcedure("@AdHoc", "create table swapper_table_foo (\n" +
+                                       "       i integer,\n" +
+                                       "       j varchar(32),\n" +
+                                       "       primary key (i)\n" +
+                                       ");\n" +
+                                       "\n" +
+                                       "create table swapper_table_bar (\n" +
+                                       "       i integer,\n" +
+                                       "       j varchar(32),\n" +
+                                       "       primary key (i)\n" +
+                                       ");");
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -3093,6 +3118,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addStmtProcedure("Eng1316Update_P", "update P1 set num = num + 1 where id < 104");
         project.addStmtProcedure("Eng1316Insert_P1", "insert into P1 values (?, ?, ?, ?);", "P1.ID: 0");
         project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
+
+        project.setUseDDLSchema(true);
 
         //* CONFIG #1: JNI -- keep this enabled by default with / / vs. / *
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);

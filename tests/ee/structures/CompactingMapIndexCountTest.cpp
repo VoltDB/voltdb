@@ -44,6 +44,10 @@ public:
         *comp = comparisons + 1;
         return lhs.compare(rhs);
     }
+
+    int compareWithoutPointer(const std::string &lhs, const std::string &rhs) const {
+        return operator()(lhs, rhs);
+    }
 };
 
 class IntComparator {
@@ -52,6 +56,10 @@ public:
         if (lhs > rhs) return 1;
         else if (lhs < rhs) return -1;
         else return 0;
+    }
+
+    int compareWithoutPointer(const int &lhs, const int &rhs) const {
+        return operator()(lhs, rhs);
     }
 };
 

@@ -82,7 +82,7 @@ public:
         m_engine.setBuffers(NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
         m_engine.resetReusedResultOutputBuffer();
         int partitionCount = htonl(1);
-        m_engine.initialize(0, 0, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
+        m_engine.initialize(0, 0, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, true);
         m_engine.updateHashinator((char*)&partitionCount, NULL, 0);
     }
     ~ConstraintTest() {

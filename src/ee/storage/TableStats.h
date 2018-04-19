@@ -28,7 +28,7 @@ class TempTable;
 /**
  * StatsSource extension for tables.
  */
-class TableStats : public voltdb::StatsSource {
+class TableStats : public StatsSource {
 public:
     /**
      * Static method to generate the column names for the tables which
@@ -90,8 +90,6 @@ private:
      * Table whose stats are being collected.
      */
     voltdb::Table* m_table;
-
-    voltdb::NValue m_tableName;
 
     voltdb::NValue m_tableType;
 

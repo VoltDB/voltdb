@@ -50,7 +50,6 @@
 
 #include "common/tabletuple.h"
 #include "executors/OptimizedProjector.hpp"
-#include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 
 namespace voltdb {

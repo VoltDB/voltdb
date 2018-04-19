@@ -45,17 +45,10 @@
 
 #include <sstream>
 #include "tablefactory.h"
-#include "common/executorcontext.hpp"
-#include "common/debuglog.h"
-#include "common/tabletuple.h"
-#include "storage/table.h"
 #include "storage/LargeTempTable.h"
-#include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/temptable.h"
-#include "storage/TempTableLimits.h"
 #include "indexes/tableindexfactory.h"
-#include "common/Pool.hpp"
 
 namespace voltdb {
 Table* TableFactory::getPersistentTable(
@@ -71,7 +64,8 @@ Table* TableFactory::getPersistentTable(
             int tableAllocationTargetSize,
             int tupleLimit,
             int32_t compactionThreshold,
-            bool drEnabled)
+            bool drEnabled,
+            bool isReplicated)
 {
     Table *table = NULL;
     StreamedTable *streamedTable = NULL;
@@ -86,7 +80,8 @@ Table* TableFactory::getPersistentTable(
                                                       tableIsMaterialized,
                                                       tableAllocationTargetSize,
                                                       tupleLimit,
-                                                      drEnabled);
+                                                      drEnabled,
+                                                      isReplicated);
     }
 
     initCommon(databaseId,

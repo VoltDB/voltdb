@@ -47,7 +47,7 @@ public:
     void setBytesUsed(size_t count) {
         assert(m_uso == 0);
         StreamBlock *sb = new StreamBlock(new char[1], 0, 0, count);
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+        ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                                 m_partitionId, m_signature, sb, false);
         delete sb;
         m_uso = count;
@@ -65,7 +65,7 @@ public:
 
     int64_t allocatedByteCount() const {
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
-                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes(m_partitionId, m_signature);
+                ExecutorContext::getPhysicalTopend()->getQueuedExportBytes(m_partitionId, m_signature);
     }
 
     void pushStreamBuffer(StreamBlock *block, bool sync);

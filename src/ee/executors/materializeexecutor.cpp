@@ -44,17 +44,8 @@
  */
 
 #include "materializeexecutor.h"
-#include "common/debuglog.h"
-#include "common/executorcontext.hpp"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "execution/ExecutorVector.h"
-#include "execution/VoltDBEngine.h"
-#include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "plannodes/materializenode.h"
-#include "storage/table.h"
-#include "storage/AbstractTempTable.hpp"
 
 namespace voltdb {
 

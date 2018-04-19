@@ -37,12 +37,16 @@
 #include "common/RecoveryProtoMessage.h"
 #include "common/serializeio.h"
 #include "common/SegvException.hpp"
+#include "common/SynchronizedThreadLock.h"
 #include "common/types.h"
 
 // Please don't make this different from the JNI result buffer size.
 // This determines the size of the EE results buffer and it's nice
 // if IPC and JNI are matched.
 #define MAX_MSG_SZ (1024*1024*10)
+
+static int g_cleanUpCountdownLatch = -1;
+static pthread_mutex_t g_cleanUpMutex = PTHREAD_MUTEX_INITIALIZER;
 
 namespace voltdb {
 class Pool;
@@ -80,6 +84,10 @@ public:
     VoltDBIPC(int fd);
 
     ~VoltDBIPC();
+
+    const voltdb::VoltDBEngine* getEngine() const {
+        return m_engine;
+    }
 
     int loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, voltdb::Table* destination);
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { }
@@ -153,8 +161,6 @@ public:
 
 
 private:
-    voltdb::VoltDBEngine *m_engine;
-    long int m_counter;
 
     int8_t stub(struct ipc_command *cmd);
 
@@ -173,6 +179,8 @@ private:
     int8_t tick(struct ipc_command *cmd);
 
     int8_t quiesce(struct ipc_command *cmd);
+
+    int8_t shutDown();
 
     int8_t setLogLevels(struct ipc_command *cmd);
 
@@ -216,6 +224,9 @@ private:
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);
     void setupSigHandler(void) const;
+
+    voltdb::VoltDBEngine *m_engine;
+    long int m_counter;
 
     int m_fd;
     char *m_perFragmentStatsBuffer;
@@ -372,6 +383,7 @@ typedef struct {
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
     int32_t remoteClusterId;
+    int32_t remotePartitionId;
     int64_t undoToken;
     char log[0];
 }__attribute__((packed)) apply_binary_log;
@@ -424,32 +436,28 @@ void deserializeParameterSetCommon(int cnt, ReferenceSerializeInputBE &serialize
     }
 }
 
-VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
+VoltDBIPC::VoltDBIPC(int fd)
+    : m_engine(NULL)
+    , m_counter(0)
+    , m_fd(fd)
+    , m_perFragmentStatsBuffer(NULL)
+    , m_reusedResultBuffer(NULL)
+    , m_exceptionBuffer(NULL)
+    , m_udfBuffer(NULL)
+    , m_terminate(false)
+    , m_tupleBuffer(NULL)
+    , m_tupleBufferSize(0)
+{
     currentVolt = this;
-    m_engine = NULL;
-    m_counter = 0;
-    m_reusedResultBuffer = NULL;
-    m_perFragmentStatsBuffer = NULL;
-    m_udfBuffer = NULL;
-    m_tupleBuffer = NULL;
-    m_tupleBufferSize = 0;
-    m_terminate = false;
-
     setupSigHandler();
 }
 
 VoltDBIPC::~VoltDBIPC() {
-    // If m_engine is NULL, the voltdbipc process did not even
-    // receive an initialize command and all those buffer pointers remain NULL.
-    // Attempting to release those NULL buffer pointers will cause valgrind to
-    // throw "Conditional jump or move depends on uninitialised value(s)" error.
+    // Normally, all resources should be freed by the server calling "shutDown".
     if (m_engine != NULL) {
-        delete m_engine;
-        delete [] m_reusedResultBuffer;
-        delete [] m_perFragmentStatsBuffer;
-        delete [] m_udfBuffer;
-        delete [] m_tupleBuffer;
-        delete [] m_exceptionBuffer;
+        // If the server simulates a crash, shutDown message may never get sent.
+        // Clean up here so that valgrind doesn't complain
+        shutDown();
     }
 }
 
@@ -544,6 +552,9 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           applyBinaryLog(cmd);
           result = kErrorCode_None;
           break;
+      case 30:
+          result = shutDown();
+          break;
       default:
         result = stub(cmd);
     }
@@ -627,12 +638,13 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int clusterId;
         long siteId;
         int partitionId;
+        int sitesPerHost;
         int hostId;
         int drClusterId;
         int defaultDrBufferSize;
         int64_t logLevels;
         int64_t tempTableMemory;
-        int32_t createDrReplicatedStream;
+        int32_t isLowestSiteId;
         int32_t hostnameLength;
         char data[0];
     }__attribute__((packed));
@@ -645,13 +657,14 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->clusterId = ntohl(cs->clusterId);
     cs->siteId = ntohll(cs->siteId);
     cs->partitionId = ntohl(cs->partitionId);
+    cs->sitesPerHost = ntohl(cs->sitesPerHost);
     cs->hostId = ntohl(cs->hostId);
     cs->drClusterId = ntohl(cs->drClusterId);
     cs->defaultDrBufferSize = ntohl(cs->defaultDrBufferSize);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
-    cs->createDrReplicatedStream = ntohl(cs->createDrReplicatedStream);
-    bool createDrReplicatedStream = cs->createDrReplicatedStream != 0;
+    cs->isLowestSiteId = ntohl(cs->isLowestSiteId);
+    bool isLowestSiteId = cs->isLowestSiteId != 0;
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
     std::string hostname(cs->data, cs->hostnameLength);
@@ -676,12 +689,13 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_engine->initialize(cs->clusterId,
                              cs->siteId,
                              cs->partitionId,
+                             cs->sitesPerHost,
                              cs->hostId,
                              hostname,
                              cs->drClusterId,
                              cs->defaultDrBufferSize,
                              cs->tempTableMemory,
-                             createDrReplicatedStream);
+                             isLowestSiteId);
         return kErrorCode_Success;
     }
     catch (const FatalException &e) {
@@ -783,6 +797,19 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
+
+    return kErrorCode_Success;
+}
+
+int8_t VoltDBIPC::shutDown() {
+    delete m_engine;
+    delete [] m_reusedResultBuffer;
+    delete [] m_perFragmentStatsBuffer;
+    delete [] m_udfBuffer;
+    delete [] m_tupleBuffer;
+    delete [] m_exceptionBuffer;
+
+    m_engine = NULL;
 
     return kErrorCode_Success;
 }
@@ -942,11 +969,10 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
     try {
         ReferenceSerializeInputBE serialize_in(offset, sz);
-        m_engine->setUndoToken(undoToken);
 
         bool success = m_engine->loadTable(tableId, serialize_in,
                                            txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                           returnUniqueViolations, shouldDRStream);
+                                           returnUniqueViolations, shouldDRStream, undoToken);
         if (success) {
             return kErrorCode_Success;
         } else {
@@ -1643,6 +1669,7 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
                                         ntohll(params->lastCommittedSpHandle),
                                         ntohll(params->uniqueId),
                                         ntohl(params->remoteClusterId),
+                                        ntohl(params->remotePartitionId),
                                         ntohll(params->undoToken),
                                         params->log);
         char response[9];
@@ -1688,6 +1715,31 @@ bool VoltDBIPC::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {
     return false;
 }
 
+struct VoltDBIPCDeleter {
+    void operator()(VoltDBIPC* voltipc) {
+        if (voltipc->getEngine() == NULL || !voltipc->getEngine()->isLowestSite()) {
+            // if the engine was already destroyed, or if it's not the lowest site,
+            // just decrement the latch.
+            pthread_mutex_lock(&g_cleanUpMutex);
+            --g_cleanUpCountdownLatch;
+            pthread_mutex_unlock(&g_cleanUpMutex);
+        }
+        else {
+            // The lowest site: wait for the other sites to shut down before exiting.
+            while (true) {
+                pthread_mutex_lock(&g_cleanUpMutex);
+                volatile int latchVal = g_cleanUpCountdownLatch;
+                pthread_mutex_unlock(&g_cleanUpMutex);
+                if (latchVal <= 1) {
+                    break;
+                }
+            }
+        }
+
+        delete voltipc;
+    }
+};
+
 void *eethread(void *ptr) {
     // copy and free the file descriptor ptr allocated by the select thread
     int *fdPtr = static_cast<int*>(ptr);
@@ -1704,7 +1756,7 @@ void *eethread(void *ptr) {
     memset(data.get(), 0, max_ipc_message_size);
 
     // instantiate voltdbipc to interface to EE.
-    boost::shared_ptr<VoltDBIPC> voltipc(new VoltDBIPC(fd));
+    std::unique_ptr<VoltDBIPC, VoltDBIPCDeleter> voltipc(new VoltDBIPC(fd));
 
     // loop until the terminate/shutdown command is seen
     bool terminated = false;
@@ -1852,6 +1904,8 @@ int main(int argc, char **argv) {
     printf("listening\n");
     fflush(stdout);
 
+    g_cleanUpCountdownLatch = eecount;
+
     // connect to each Site from Java over a new socket
     for (int ee = 0; ee < eecount; ee++) {
         struct sockaddr_in client_addr;
@@ -1890,6 +1944,7 @@ int main(int argc, char **argv) {
         }
     }
 
+    SynchronizedThreadLock::destroy();
     fflush(stdout);
     return 0;
 }

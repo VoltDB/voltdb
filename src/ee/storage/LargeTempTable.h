@@ -61,11 +61,7 @@ public:
 
     /** return an iterator that will automatically delete blocks after
         they are scanned. */
-    TableIterator iteratorDeletingAsWeGo() {
-        m_iter.reset(m_blockIds.begin());
-        m_iter.setTempTableDeleteAsGo(true);
-        return m_iter;
-    }
+    TableIterator iteratorDeletingAsWeGo();
 
     /** Delete all the tuples in this table */
     void deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
@@ -170,8 +166,6 @@ private:
     void getEmptyBlock();
 
     std::vector<LargeTempTableBlockId> m_blockIds;
-
-    TableIterator m_iter;
 
     LargeTempTableBlock* m_blockForWriting;
 };
