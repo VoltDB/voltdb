@@ -1729,10 +1729,21 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // First find the mp fragment currently running
             if (entry.getKey().m_txnId == txnId) {
                 forwarding = true;
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Start forwarding pending tasks to rejoin node.");
+                }
             }
             // Then forward any message after the MP txn, I expect them are all Iv2InitiateMessages
             if (forwarding && entry.getKey().m_txnId != txnId) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(entry.getValue().getOpenMessage().getMessageInfo());
+                }
                 m_mailbox.send(replicasAdded, entry.getValue().getOpenMessage());
+            }
+        }
+        if (forwarding) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Finish forwarding pending tasks to rejoin node.");
             }
         }
     }
