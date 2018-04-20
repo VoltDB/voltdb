@@ -595,4 +595,8 @@ public class MpScheduler extends Scheduler
         }
         return null;
     }
+
+    public int getLeaderNodeId() {
+        return m_leaderNodeId;
+    }
 }

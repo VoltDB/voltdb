@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 public class MpRestartSequenceGenerator {
     // bit sizes for each of the fields in the 64-bit id
     // note, these add up to 63 bits to make dealing with
@@ -30,14 +28,15 @@ public class MpRestartSequenceGenerator {
     static final long NODEID_MAX_VALUE = (1L << NODEID_BITS) - 1L;
     static final long COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
     private int m_leaderElectorId;
-    private AtomicLong m_counter = new AtomicLong(0);
+    private long m_counter = 0;
 
     public MpRestartSequenceGenerator(int nodeId) {
         m_leaderElectorId = nodeId;
     }
 
     public long getNextSeqNum() {
-        long counter = m_counter.incrementAndGet();
+        m_counter++;
+        long counter = m_counter;
         return makeSequenceNumber(m_leaderElectorId, counter);
     }
 
