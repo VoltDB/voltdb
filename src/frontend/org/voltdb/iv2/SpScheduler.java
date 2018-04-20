@@ -181,8 +181,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     //are to be added to the repair log when these messages get updated transaction ids.
     protected RepairLog m_repairLog;
 
-    private static final boolean IS_KSAFE_CLUSTER =
-            VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor() > 0;
+    private final boolean IS_KSAFE_CLUSTER;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -195,6 +194,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_repairLogTruncationHandle = getCurrentTxnId();
         // initialized as current txn id in order to release the initial reads into the system
         m_maxScheduledTxnSpHandle = getCurrentTxnId();
+        IS_KSAFE_CLUSTER = VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor() > 0;
     }
 
     @Override
@@ -1265,7 +1265,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             final boolean isSysproc = ((FragmentTaskMessage) txn.getNotice()).isSysProcTask();
-            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc) && !message.isForReplica()) {
+            if (IS_KSAFE_CLUSTER && !msg.isRestart() && (!msg.isReadOnly() || isSysproc) && !message.isForReplica()) {
 
                 DuplicateCounter counter;
                 counter = new DuplicateCounter(msg.getCoordinatorHSId(),
@@ -1727,11 +1727,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         boolean forwarding = false;
         for (Map.Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
             // First find the mp fragment currently running
-            if (entry.getKey().m_txnId == txnId) {
+            if (!forwarding && entry.getKey().m_txnId == txnId) {
                 forwarding = true;
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug("Start forwarding pending tasks to rejoin node.");
                 }
+                continue;
             }
             // Then forward any message after the MP txn, I expect them are all Iv2InitiateMessages
             if (forwarding && entry.getKey().m_txnId != txnId) {
