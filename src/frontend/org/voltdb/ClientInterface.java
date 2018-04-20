@@ -2316,14 +2316,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             tableName, columnName, resp.getStatusString()));
                 } else {
                     VoltTable t = resp.getResults()[0];
-                    while (t.advanceRow()) {
-                        String error = t.getString("MESSAGE");
-                        if (error != null && !"".equals(error)) {
-                            hostLog.warn("Errors occured when running TTL one table " + tableName + ":" +  error);
-                        }
-                        stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"),
-                                t.getLong("DELETED_LAST_ROUND"),  t.getLong("ROUNDS"));
+                    t.advanceRow();
+                    String error = t.getString("MESSAGE");
+                    if (error != null && !"".equals(error)) {
+                        hostLog.warn("Errors occured when running TTL one table " + tableName + ":" +  error);
                     }
+                    stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"),
+                            t.getLong("DELETED_LAST_ROUND"),  t.getLong("ROUNDS"));
                 }
                 latch.countDown();
             }
@@ -2331,7 +2330,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
                 true, 1000 * 120, cb, "@LowImpactDelete", new Object[] {tableName, columnName, ttlValue, "<", chunkSize, timeout});
         try {
-            latch.await();
+            latch.await(5, TimeUnit.MINUTES);
         } catch (InterruptedException e) {
         }
     }

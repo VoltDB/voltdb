@@ -78,10 +78,15 @@ public class TimeToLiveProcessor extends StatsSource{
         }
         public void update(long deleted, long rowRemaining, long deletedLastRound, long round) {
             totalRowsDeleted += deleted;
-            rowsLeft = rowRemaining;
-            rowsDeletedLastRound = deletedLastRound;
-            rounds += round;
-            updateTTLStats(this);
+            if (deleted > 0) {
+                rowsDeletedLastRound = deletedLastRound;
+                rounds += round;
+                rowsLeft = rowRemaining;
+                updateTTLStats(this);
+            } else if (rowsLeft != rowRemaining){
+                rowsLeft = rowRemaining;
+                updateTTLStats(this);
+            }
         }
         @Override
         public String toString() {
@@ -99,8 +104,7 @@ public class TimeToLiveProcessor extends StatsSource{
                 js.keySymbolValuePair(JSON_DELETED_LAST_ROUND_KEY, rowsDeletedLastRound);
                 js.keySymbolValuePair(JSON_ROWS_LEFT_KEY, rowsLeft);
                 js.endObject();
-            }
-            catch (JSONException e) {
+            } catch (JSONException e) {
                 throw new RuntimeException("Failed to serialize a parameter set to JSON.", e);
             }
             return js.toString();
