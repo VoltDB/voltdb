@@ -801,12 +801,7 @@ void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
                 nowFields.push_back(col->index());
                 break;
             }
-            // Don't delete this FALLTHRU comment.  GCC-7 needs it to
-            // avoid a warning.  There is a platform neutral C++17
-            // for this, but it doesn't work for C++03 on the
-            // Centos5 platform, or C++11 or C++14.  This works
-            // with G++.
-            /* FALLTHRU */
+            /* fall through */ // gcc-7 needs this comment.
             // else, fall through to default case
         default:
             NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
