@@ -1725,9 +1725,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             return;
         }
         boolean forwarding = false;
+        // HACKY HACKY HACKY, we know at this time there will be only one fragment with this txnId, so it's safe to use
+        // Long.MAX_VALUE to match the duplicate counter key with the given txn id (there is only one!)
+        DuplicateCounterKey snapshotFragment = ((TreeMap<DuplicateCounterKey, DuplicateCounter>)m_duplicateCounters)
+                .floorKey(new DuplicateCounterKey(txnId, Long.MAX_VALUE));
+        assert (snapshotFragment != null);
+        long snapshotSpHandle = snapshotFragment.m_spHandle;
         for (Map.Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
             // First find the mp fragment currently running
-            if (!forwarding && entry.getKey().m_txnId == txnId) {
+            if (!forwarding && entry.getKey().m_spHandle > snapshotSpHandle) {
                 forwarding = true;
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug("Start forwarding pending tasks to rejoin node.");
@@ -1735,7 +1741,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 continue;
             }
             // Then forward any message after the MP txn, I expect them are all Iv2InitiateMessages
-            if (forwarding && entry.getKey().m_txnId != txnId) {
+            if (forwarding && entry.getKey().m_txnId != snapshotFragment.m_txnId) {
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug(entry.getValue().getOpenMessage().getMessageInfo());
                 }
