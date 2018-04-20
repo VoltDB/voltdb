@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -179,6 +180,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     //Iv2IniatiateTaskMessage, FragmentTaskMessage and CompleteTransactionMessage
     //are to be added to the repair log when these messages get updated transaction ids.
     protected RepairLog m_repairLog;
+
+    private static final boolean IS_KSAFE_CLUSTER =
+            VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor() > 0;
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -540,7 +544,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             // The leader will be responsible to replicate messages to replicas.
             // Don't replicate reads, not matter FAST or SAFE.
-            if (m_isLeader && (!msg.isReadOnly()) && (m_sendToHSIds.length > 0)) {
+            if (m_isLeader && (!msg.isReadOnly()) && IS_KSAFE_CLUSTER ) {
                 for (long hsId : m_sendToHSIds) {
                     Iv2InitiateTaskMessage finalMsg = msg;
                     final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
@@ -566,13 +570,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             true);
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
-                m_mailbox.send(m_sendToHSIds, replmsg);
+                // K-safety cluster doesn't always mean partition has replicas,
+                // node failure may reduce the number of replicas for each partition
+                if (m_sendToHSIds.length > 0) {
+                    m_mailbox.send(m_sendToHSIds, replmsg);
+                }
 
                 DuplicateCounter counter = new DuplicateCounter(
                         msg.getInitiatorHSId(),
                         msg.getTxnId(),
                         m_replicaHSIds,
-                        msg);
+                        replmsg);
 
                 safeAddToDuplicateCounterMap(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
@@ -940,7 +948,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * everywhere.
              * In that case don't propagate it to avoid a determinism check and extra messaging overhead
              */
-            if (m_sendToHSIds.length > 0 && (!message.isReadOnly() || msg.isSysProcTask())) {
+            if (IS_KSAFE_CLUSTER && (!message.isReadOnly() || msg.isSysProcTask())) {
                 for (long hsId : m_sendToHSIds) {
                     FragmentTaskMessage finalMsg = msg;
                     final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
@@ -957,7 +965,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             m_mailbox.getHSId(), msg);
                 replmsg.setForReplica(true);
                 replmsg.setTimestamp(msg.getTimestamp());
-                m_mailbox.send(m_sendToHSIds,replmsg);
+                // K-safety cluster doesn't always mean partition has replicas,
+                // node failure may reduce the number of replicas for each partition.
+                if (m_sendToHSIds.length > 0) {
+                    m_mailbox.send(m_sendToHSIds,replmsg);
+                }
                 DuplicateCounter counter;
                 /*
                  * Non-determinism should be impossible to happen with MP fragments.
@@ -969,14 +981,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getCoordinatorHSId(),
                             msg.getTxnId(),
                             m_replicaHSIds,
-                            message);
+                            replmsg);
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
                             msg.getCoordinatorHSId(),
                             msg.getTxnId(),
                             m_replicaHSIds,
-                            message);
+                            replmsg);
                 }
                 safeAddToDuplicateCounterMap(new DuplicateCounterKey(message.getTxnId(), newSpHandle), counter);
             }
@@ -1705,15 +1717,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // set of every partition, it creates a window that may cause task log on rejoin node miss sp txns.
     // To fix it, leader forwards to rejoin node any sp txn that are queued in backlog between leader receives the
     // first fragment of stream snapshot and site runs the first fragment.
-    public void forwardPendingTaskToRejoinNode(long[] replicasAdded) {
+    public void forwardPendingTaskToRejoinNode(long[] replicasAdded, long txnId) {
         if (tmLog.isDebugEnabled()) {
-            tmLog.debug("Forward pending tasks in backlog to rejoin node: " + replicasAdded);
+            tmLog.debug("Forward pending tasks in backlog to rejoin node: " + Arrays.toString(replicasAdded));
         }
-        for (TransactionTask t : m_pendingTasks.getBacklogTasks()) {
-            assert (t instanceof SpProcedureTask);
-            TransactionInfoBaseMessage msg = ((SpProcedureTask)t).m_txnState.getNotice();
-            if (m_isLeader && !msg.isReadOnly() && replicasAdded.length > 0) {
-                m_mailbox.send(replicasAdded, msg);
+        if (replicasAdded.length == 0) {
+            return;
+        }
+        boolean forwarding = false;
+        for (Map.Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
+            // First find the mp fragment currently running
+            if (entry.getKey().m_txnId == txnId) {
+                forwarding = true;
+            }
+            // Then forward any message after the MP txn, I expect them are all Iv2InitiateMessages
+            if (forwarding && entry.getKey().m_txnId != txnId) {
+                m_mailbox.send(replicasAdded, entry.getValue().getOpenMessage());
             }
         }
     }

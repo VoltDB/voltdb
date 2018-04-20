@@ -152,7 +152,7 @@ public class SnapshotSave extends VoltSystemProcedure
                 result.advanceRow();
                 String success = result.getString("RESULT");
                 if (success.equals("SUCCESS")) {
-                    ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId());
+                    ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId(), txnId);
                 }
             }
             return new DependencyPair.TableDependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
