@@ -132,7 +132,7 @@ public class PlanAssembler {
     /** plan selector */
     private final PlanSelector m_planSelector;
 
-    private final boolean m_isLargeQuery = false;
+    private boolean m_isLargeQuery = false;
 
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
@@ -3104,7 +3104,7 @@ public class PlanAssembler {
             // converted the aggregation to serial aggregation.
             // So we need to add an order by.
             if (needOrderByForAggregates) {
-                root = handleLTTSortForGroupBy(root);
+                root = handleLTTSortForGroupBy(root, selectStmt);
             }
             distNode.addAndLinkChild(root);
 
@@ -3164,7 +3164,7 @@ public class PlanAssembler {
      * @return
      */
     private static AbstractPlanNode handleLTTSortForGroupBy(AbstractPlanNode root,
-                                                            ParsedSelectStmt stmt) {
+                                                     ParsedSelectStmt stmt) {
         OrderByPlanNode orderByNode = buildOrderByPlanNode(stmt.groupByColumns());
 
         orderByNode.addAndLinkChild(root);
