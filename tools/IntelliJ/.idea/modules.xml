@@ -60,7 +60,6 @@
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/ycsb/voltcore.testapps.ycsb.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/ycsb/voltcore.testapps.ycsb.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/ycsb-zipfian/voltcore.testapps.ycsb-zipfian.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/ycsb-zipfian/voltcore.testapps.ycsb-zipfian.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../../pro/voltpro.iml" filepath="$PROJECT_DIR$/../../../pro/voltpro.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/voter-daemons/voter-daemons.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/voter-daemons/voter-daemons.iml" />
     </modules>
   </component>
 </project>

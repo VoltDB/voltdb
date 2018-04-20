@@ -7,7 +7,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="module" module-name="voltcore" />
-    <orderEntry type="library" name="extension" level="project" />
+    <orderEntry type="library" name="lib_extension" level="project" />
+    <orderEntry type="library" name="3pty_jars" level="project" />
   </component>
 </module>
