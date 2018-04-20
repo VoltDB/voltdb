@@ -334,6 +334,8 @@ public class TestLowImpactDelete extends TestCase {
         try {
             Thread.sleep(60*1000);
             VoltTable vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
+            System.out.println(vt.toFormattedString());
+            vt.resetRowPosition();
             vt.advanceRow();
             assertEquals(500, vt.getLong("ROWS_DELETED"));
 
@@ -346,6 +348,8 @@ public class TestLowImpactDelete extends TestCase {
             }
             Thread.sleep(60*1000);
             vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
+            System.out.println(vt.toFormattedString());
+            vt.resetRowPosition();
             vt.advanceRow();
             assertEquals(1000, vt.getLong("ROWS_DELETED"));
         } catch (Exception e) {

@@ -80,7 +80,7 @@ public class TimeToLiveProcessor extends StatsSource{
             totalRowsDeleted += deleted;
             rowsLeft = rowRemaining;
             rowsDeletedLastRound = deletedLastRound;
-            rounds += rounds;
+            rounds += round;
             updateTTLStats(this);
         }
         @Override
@@ -306,6 +306,7 @@ public class TimeToLiveProcessor extends StatsSource{
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+        readTTLStats();
         Set<String> stats = new HashSet<>();
         stats.addAll(m_stats.keySet());
         return new DummyIterator(stats.iterator());
@@ -329,9 +330,12 @@ public class TimeToLiveProcessor extends StatsSource{
             byte[] payload = stats.toJSONString().getBytes(Charsets.UTF_8);
             String path = ZKUtil.joinZKPath(VoltZK.ttl_statistics, stats.tableName);
             zk.create(path, payload, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException nee) {
-        } catch (KeeperException | InterruptedException  e) {
-            VoltDB.crashLocalVoltDB("Unable to write topology to ZK, dying", true, e);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NODEEXISTS) {
+                VoltDB.crashLocalVoltDB("Unable to create TTL stats for " + stats.tableName, true, e);
+            }
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Unable to create TTL stats for " + stats.tableName, true, e);
         }
     }
 
@@ -340,12 +344,18 @@ public class TimeToLiveProcessor extends StatsSource{
         try {
             String path = ZKUtil.joinZKPath(VoltZK.ttl_statistics, tableName);
             zk.delete(path, -1);
-        } catch (KeeperException | InterruptedException  e) {
-            VoltDB.crashLocalVoltDB("Unable to delete TTL stats on ZK, dying", true, e);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NONODE) {
+                hostLog.warn("Failed to remove TTL stats " + e.getMessage(), e);
+            }
+        } catch (InterruptedException e) {
+            hostLog.warn("Failed to remove TTL stats " + e.getMessage(), e);
         }
     }
 
-    public void readTTLStats(ZooKeeper zk) {
+    private void readTTLStats() {
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        m_stats.clear();
         try {
             List<String> tables = zk.getChildren(VoltZK.ttl_statistics, false);
             if (tables == null || tables.isEmpty()) {
@@ -361,6 +371,7 @@ public class TimeToLiveProcessor extends StatsSource{
                 }
             }
         } catch (KeeperException | InterruptedException e) {
+            hostLog.warn("Failed to read TTL stats " + e.getMessage(), e);
         }
     }
 }
