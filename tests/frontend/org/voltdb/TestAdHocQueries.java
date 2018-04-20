@@ -461,7 +461,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         try {
             StringBuffer adHocQueryTemp = new StringBuffer("SELECT * FROM VOTES WHERE PHONE_NUMBER IN (");
             int i = 0;
-            while (adHocQueryTemp.length() <= Short.MAX_VALUE*10) {
+            while (adHocQueryTemp.length() <= Short.MAX_VALUE * 2) {
                 String randPhone = RandomStringUtils.randomNumeric(10);
                 VoltTable result = env.m_client.callProcedure("@AdHoc", "INSERT INTO VOTES VALUES(?, ?, ?);", randPhone, "MA", i).getResults()[0];
                 assertEquals(1, result.getRowCount());

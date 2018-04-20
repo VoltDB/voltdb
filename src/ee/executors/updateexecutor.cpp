@@ -49,24 +49,12 @@
 
 #include "updateexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
 #include "common/ExecuteWithMpMemory.h"
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
-#include "common/types.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "execution/ExecutorVector.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/projectionnode.h"
-#include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
 #include "storage/tableutil.h"
-#include "storage/AbstractTempTable.hpp"
-#include "storage/persistenttable.h"
 #include "storage/ConstraintFailureException.h"
 
 

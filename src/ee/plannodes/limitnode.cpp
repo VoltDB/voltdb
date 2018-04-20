@@ -44,10 +44,7 @@
  */
 #include "limitnode.h"
 
-#include "common/SQLException.h"
 #include "common/ValuePeeker.hpp"
-
-#include <sstream>
 
 namespace voltdb {
 

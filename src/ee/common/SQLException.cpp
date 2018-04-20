@@ -15,11 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/SQLException.h"
-#include "common/SerializableEEException.h"
 #include "common/serializeio.h"
-#include <iostream>
-#include <cassert>
-#include <sstream>
 
 using namespace voltdb;
 

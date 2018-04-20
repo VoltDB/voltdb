@@ -44,17 +44,10 @@
  */
 
 #include "projectionexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "execution/ExecutorVector.h"
-#include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "plannodes/projectionnode.h"
-#include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
-#include "storage/temptable.h"
 
 namespace voltdb {
 

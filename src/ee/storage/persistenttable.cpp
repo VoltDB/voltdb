@@ -711,6 +711,8 @@ void PersistentTable::swapTableState(PersistentTable* otherTable) {
     // instead of PersistentTable?
 
     std::swap(m_name, otherTable->m_name);
+    m_stats.updateTableName(m_name);
+    otherTable->m_stats.updateTableName(otherTable->m_name);
 
     if (m_tableStreamer &&
             m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
@@ -746,7 +748,10 @@ void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
 
         auto heldName = theIndex->getName();
         theIndex->rename(otherIndex->getName());
+        // The table names are already swapped before we swap the indexes.
+        theIndex->getIndexStats()->updateTableName(m_name);
         otherIndex->rename(heldName);
+        otherIndex->getIndexStats()->updateTableName(otherTable->m_name);
     }
 }
 

@@ -3526,9 +3526,6 @@ inline void NValue::hashCombine(std::size_t &seed) const {
 }
 
 inline NValue NValue::castAs(ValueType type) const {
-    VOLT_TRACE("Converting from %s to %s",
-            voltdb::getTypeName(getValueType()).c_str(),
-            voltdb::getTypeName(type).c_str());
     if (getValueType() == type) {
         return *this;
     }

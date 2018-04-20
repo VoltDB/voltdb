@@ -18,14 +18,9 @@
 #include "stats/StatsSource.h"
 
 #include "common/executorcontext.hpp"
-#include "common/types.h"
-#include "common/ValueFactory.hpp"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include <vector>
-#include <string>
-#include <cassert>
 
 using namespace voltdb;
 using namespace std;
@@ -83,16 +78,17 @@ void StatsSource::configure(string name) {
     m_statsTuple = m_statsTable->tempTuple();
 }
 
+void StatsSource::updateTableName(const std::string& tableName) {
+    m_tableName.free();
+    m_tableName = ValueFactory::getStringValue(tableName);
+}
+
 StatsSource::~StatsSource() {
     m_hostname.free();
 }
 
-/**
- * Retrieve the name of this set of statistics
- * @return Name of statistics
- */
-string StatsSource::getName() {
-    return m_name;
+const string StatsSource::getTableName() {
+    return m_tableName.toString();
 }
 
 /**

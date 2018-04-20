@@ -44,8 +44,6 @@
  */
 #include "unionnode.h"
 
-#include "common/SerializableEEException.h"
-
 #include <sstream>
 
 namespace voltdb {

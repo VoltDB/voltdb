@@ -18,19 +18,12 @@
 //#include "common/UndoQuantum.h"
 #include "common/SynchronizedThreadLock.h"
 
-#include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
-#include "storage/DRTupleStream.h"
 #include "storage/DRTupleStreamUndoAction.h"
 #include "storage/persistenttable.h"
 #include "plannodes/insertnode.h"
 
-#include "boost/foreach.hpp"
-
-#include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
-
-#include <pthread.h>
 #ifdef LINUX
 #include <malloc.h>
 #endif // LINUX
@@ -161,10 +154,10 @@ void ExecutorContext::assignThreadLocals(const EngineLocals& mapping)
     ThreadLocalPool::assignThreadLocals(mapping);
 }
 
-void ExecutorContext::resetStateForDebug() {
+void ExecutorContext::resetStateForTest() {
     pthread_setspecific(logical_executor_context_static_key, NULL);
     pthread_setspecific(physical_topend_static_key, NULL);
-    ThreadLocalPool::resetStateForDebug();
+    ThreadLocalPool::resetStateForTest();
 }
 
 void ExecutorContext::bindToThread()

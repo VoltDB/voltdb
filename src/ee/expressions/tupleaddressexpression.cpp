@@ -45,9 +45,6 @@
 
 #include "tupleaddressexpression.h"
 
-#include "common/debuglog.h"
-#include "expressions/abstractexpression.h"
-
 namespace voltdb {
 
 TupleAddressExpression::TupleAddressExpression()

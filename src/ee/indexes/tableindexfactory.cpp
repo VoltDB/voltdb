@@ -46,12 +46,7 @@
 #include <cassert>
 #include <iostream>
 #include "indexes/tableindexfactory.h"
-#include "common/SerializableEEException.h"
-#include "common/types.h"
 #include "common/TupleSchemaBuilder.h"
-#include "catalog/index.h"
-#include "expressions/tuplevalueexpression.h"
-#include "indexes/tableindex.h"
 #include "indexes/indexkey.h"
 #include "indexes/CompactingTreeUniqueIndex.h"
 #include "indexes/CompactingTreeMultiMapIndex.h"

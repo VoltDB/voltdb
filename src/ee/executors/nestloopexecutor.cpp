@@ -44,27 +44,11 @@
  */
 #include "nestloopexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
-#include "execution/ExecutorVector.h"
-#include "execution/ProgressMonitorProxy.h"
-#include "expressions/abstractexpression.h"
-#include "expressions/tuplevalueexpression.h"
-#include "storage/table.h"
-#include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 #include "storage/tabletuplefilter.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/limitnode.h"
-#include "plannodes/aggregatenode.h"
-
-#include <vector>
-#include <string>
-#include <stack>
 
 #ifdef VOLT_DEBUG_ENABLED
 #include <ctime>

@@ -1188,11 +1188,7 @@ template<typename KeyValuePair, typename Compare, bool hasRank>
 inline int
 CompactingMap<KeyValuePair, Compare, hasRank>::compareKeyRegardlessOfPointer(const Key& key, TreeNode *node) const
 {
-    // assume key's pointer field is NULL, if there is a pointer field in key
-    const void *tmp = node->kv.setPointerValue(NULL);
-    int rv = m_comper(key, node->key());
-    node->kv.setPointerValue(tmp);
-    return rv;
+    return m_comper.compareWithoutPointer(key, node->key());
 }
 
 } // namespace voltdb

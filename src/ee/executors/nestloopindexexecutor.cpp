@@ -45,20 +45,11 @@
 
 #include "nestloopindexexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-
-#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
-#include "execution/VoltDBEngine.h"
 
 #include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
-#include "executors/executorutil.h"
 #include "executors/indexscanexecutor.h"
 
-#include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 
 #include "plannodes/nestloopindexnode.h"
@@ -66,17 +57,9 @@
 #include "plannodes/limitnode.h"
 #include "plannodes/aggregatenode.h"
 
-#include "storage/table.h"
 #include "storage/tabletuplefilter.h"
 #include "storage/persistenttable.h"
 #include "storage/temptable.h"
-#include "storage/tableiterator.h"
-
-#include "indexes/tableindex.h"
-
-#include <vector>
-#include <string>
-#include <stack>
 
 using namespace std;
 using namespace voltdb;

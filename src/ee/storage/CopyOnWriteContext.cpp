@@ -58,10 +58,9 @@ CopyOnWriteContext::CopyOnWriteContext(
         // There is a corner case where a replicated table is streamed from a thread other than the lowest
         // site thread. The only known case is rejoin snapshot where none of the target partitions are on
         // the lowest site thread.
-        SynchronizedThreadLock::lockReplicatedResource();
+        ScopedReplicatedResourceLock scopedLock;
         ExecuteWithMpMemory useMpMemory;
         m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table));
-        SynchronizedThreadLock::unlockReplicatedResource();
     }
     else {
         m_backedUpTuples.reset(TableFactory::buildCopiedTempTable("COW of " + table.name(), &table));
@@ -74,10 +73,9 @@ CopyOnWriteContext::CopyOnWriteContext(
 CopyOnWriteContext::~CopyOnWriteContext()
 {
     if (m_replicated) {
-        SynchronizedThreadLock::lockReplicatedResource();
+        ScopedReplicatedResourceLock scopedLock;
         ExecuteWithMpMemory useMpMemory;
         m_backedUpTuples.reset();
-        SynchronizedThreadLock::unlockReplicatedResource();
     }
     else {
         m_backedUpTuples.reset();

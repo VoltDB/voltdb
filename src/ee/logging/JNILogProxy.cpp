@@ -16,7 +16,6 @@
  */
 #include "JNILogProxy.h"
 #include <cassert>
-#include <stdlib.h>
 #include <iostream>
 
 namespace voltdb {

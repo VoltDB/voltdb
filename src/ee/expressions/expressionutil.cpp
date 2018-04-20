@@ -45,16 +45,8 @@
 
 #include "expressionutil.h"
 
-#include "common/debuglog.h"
 #include "common/ValueFactory.hpp"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
 #include "expressions/expressions.h"
-
-#include <cassert>
-#include <sstream>
-#include <cstdlib>
-#include <stdexcept>
 
 namespace voltdb {
 
