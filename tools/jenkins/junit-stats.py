@@ -55,7 +55,7 @@ class Stats(object):
         except IOError:
             logging.exception('Could not read data from url: %s. The data at the url may not be readable.' % url)
         except:
-            logging.exception('Something unexpected went wrong.')
+            logging.exception('Something unexpected went wrong accessing url: %s' % url)
         return data
 
     def get_build_data(self, job, build_range):
@@ -76,9 +76,10 @@ class Stats(object):
             build_low = int(builds[0])
             build_high = int(builds[1])
             if build_high < build_low:
-                raise Exception('Error: Left number must be lesser than or equal to right number.')
+                raise Exception('Error: Build range left number (%d) must be less than or '
+                                + 'equal to right number (%d).' % (build_low, build_high))
         except:
-            logging.exception('Couldn\'t extrapolate build range.')
+            logging.exception('Couldn\'t extrapolate build range: %s' % build_range)
             print(self.cmdhelp)
             return
 
@@ -163,7 +164,8 @@ class Stats(object):
                     cursor.execute(add_job, job_data)
                     db.commit()
                 except MySQLError:
-                    logging.exception('Could not add job data to database')
+                    logging.exception('Could not add job data to database:\n%s\n%s'
+                                      % (str(add_job), str(job_data)))
 
                 # Some of the test results are structured differently, depending on the matrix configurations.
                 child_reports = test_report.get('childReports', None)
@@ -261,8 +263,16 @@ class Stats(object):
                                     output2 = cursor.fetchone()
                                     output2 = output2[0]
                                     # if next most recent in job is a fail and two most recent in alt-job are not fails
-                                    if output1 ==1 and output2 != 2:
+                                    if output1 == 1 and output2 != 2:
                                         issues.append(test_data)
+                                    elif output1 != 1:
+                                        logging.info('No Jira ticket filed because previous build did not fail:\n%s'
+                                                     % str(test_data))
+                                        logging.info('(query output1: %s; output2: %s)' % (str(output1), str(output2)))
+                                    else:
+                                        logging.info('No Jira ticket filed because 2 previous %s builds failed:\n%s'
+                                                     % (str(params2.get('job')), str(test_data)))
+                                        logging.info('(query output1: %s; output2: %s)' % (str(output1), str(output2)))
 
                                 add_test = ('INSERT INTO `junit-test-failures` '
                                             '(name, job, status, stamp, url, build, host) '
@@ -273,14 +283,16 @@ class Stats(object):
                                     cursor.execute(add_test, test_data)
                                     db.commit()
                                 except MySQLError:
-                                    logging.exception('Could not add test data to database')
+                                    logging.exception('Could not add test data to database:\n%s\n%s\n%s'
+                                                      % (str(add_test), str(test_data), str(MySQLError)))
 
             except KeyError:
                 logging.exception('Error retrieving test data for this particular build: %d\n' % build)
             except Exception:
                 # Catch all errors to avoid causing a failing build for the upstream job in case this is being
                 # called from the junit-test-branch on Jenkins
-                logging.exception('Catching unexpected errors to avoid causing a failing build for the upstream job')
+                logging.exception('Catching unexpected errors to avoid causing a failing '
+                                  + 'build for the upstream job:\n%s' % str(Exception))
 
         cursor.close()
         db.close()
@@ -295,6 +307,8 @@ class Stats(object):
                 error_url = issue['url']
                 error_report = self.read_url(error_url + '/api/python')
                 if error_report is None:
+                    logging.info('No Jira ticket filed because URL %s not found, for issue:\n%s'
+                                 % (error_url + '/api/python', str(issue)))
                     continue
 
                 age = error_report['age']
@@ -307,9 +321,20 @@ class Stats(object):
                 description = error_url + '\n' + str(error_report['errorStackTrace'])
                 current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
                                                     'master/version.txt'))
-                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version, ['junit-consistent-failure', 'automatic'])
-        except:
-            logging.exception('Error with creating issue')
+                logging.info('Filing Jira ticket:\n'
+                             '  channel    :  %s'
+                             '  summary    :  %s'
+                             '  description:  %s'
+                             '  component  :  Core'
+                             '  version    :  %s'
+                             '  labels     :  junit-consistent-failure, automatic'
+                             % (JUNIT, summary, description, current_version))
+                # channel, summary, description, component, version, labels,
+                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version,
+                                            ['junit-consistent-failure', 'automatic'])
+                logging.info('Jira ticket filed.')
+        except Exception:
+            logging.exception('Error with creating issue:\n%s\n%s' % (str(issue), str(Exception)))
 
 
 if __name__ == '__main__':
