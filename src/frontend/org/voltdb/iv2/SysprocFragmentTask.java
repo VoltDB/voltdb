@@ -120,6 +120,9 @@ public class SysprocFragmentTask extends FragmentTaskBase
     public void run(SiteProcedureConnection siteConnection)
     {
         waitOnDurabilityBackpressureFuture();
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + this);
+        }
         if (!m_txnState.isReadOnly()) {
             if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
@@ -146,6 +149,9 @@ public class SysprocFragmentTask extends FragmentTaskBase
         response.setRespBufferable(m_respBufferable);
         response.setForOldLeader(m_fragmentMsg.isForOldLeader());
         m_initiator.deliver(response);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE: " + this);
+        }
     }
 
     /**
@@ -169,6 +175,9 @@ public class SysprocFragmentTask extends FragmentTaskBase
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("START replaying txn: " + this);
+        }
         if (!m_txnState.isReadOnly()) {
             if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
@@ -176,6 +185,9 @@ public class SysprocFragmentTask extends FragmentTaskBase
         }
 
         processFragmentTask(siteConnection);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE replaying txn: " + this);
+        }
     }
 
 
