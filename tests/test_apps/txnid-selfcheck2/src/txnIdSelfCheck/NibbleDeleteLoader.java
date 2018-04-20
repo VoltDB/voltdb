@@ -127,8 +127,9 @@ public class NibbleDeleteLoader extends BenchmarkThread {
         @Override
         public void run() {
             try {
+            int retries = 0;
             while ( true ) {
-                // give a little wiggle room when checking if rows shoul've been deleted.
+                // give a little wiggle room when checking if rows should've been deleted.
                 long ttl = new Double(Math.ceil(TTL*1.5)).longValue();
 
                 ClientResponse response = TxnId2Utils.doProcCall(client, "@AdHoc", "select *,now from "+tableName+" where "+tsColumnName+" < DATEADD(SECOND,-"+ttl+",NOW) ");
@@ -140,7 +141,14 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                     log.info("Rows behind from being deleted:"+unDeletedRows);
 
                     // print some debugging info before we error out.
-                    if (unDeletedRows > 0 ) {
+                    if ( unDeletedRows > 0 ) {
+                        retries++;
+                        if ( retries <= 2 ) {
+                            // We need to handle the case where we have just recovered and the nibble deleter hasn't caught up,
+                            // don't fail completely unless we have failed two times consecutively after receiving valid responses
+                            Thread.sleep(2000);
+                            continue;
+                        }
                         for ( int c = 0; c < data.getColumnCount(); c++) {
                             System.out.print(data.getColumnName(c)+" ");
                         }
@@ -152,6 +160,8 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                             System.out.print("\n");
                         }
                         Benchmark.hardStop("Nibble Delete failed to delete "+unDeletedRows+" from " + tableName + " and this shoudn't happen. Exiting.");
+                    } else {
+                        retries = 0;
                     }
                 } else {
                    log.error("Response failed:"+response.getAppStatusString()+" status:"+response.getStatusString());
