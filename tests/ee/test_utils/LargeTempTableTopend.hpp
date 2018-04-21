@@ -50,19 +50,15 @@ private:
 
     class Block {
     public:
-        Block(char* data, int64_t activeTupleCount, const voltdb::TupleSchema *schema)
-            : m_origAddress(data)
-            , m_data(new char[voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES])
-            , m_activeTupleCount(activeTupleCount)
+        Block(char* data, const voltdb::TupleSchema *schema)
+            : m_data(new char[voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES])
             , m_schema(schema)
         {
             ::memcpy(m_data.get(), data, voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES);
         }
 
         Block()
-            : m_origAddress(NULL)
-            , m_data()
-            , m_activeTupleCount(0)
+            : m_data()
             , m_schema(NULL)
         {
         }
@@ -71,12 +67,9 @@ private:
             return m_data.get();
         }
 
-        char* origAddress() {
-            return m_origAddress;
-        }
-
         int64_t activeTupleCount() {
-            return m_activeTupleCount;
+            int32_t* countPtr = reinterpret_cast<int32_t*>(&(m_data[sizeof(char*)]));
+            return int64_t(*countPtr);
         }
 
         std::string debug() const {
@@ -87,9 +80,7 @@ private:
         }
 
     private:
-        char* m_origAddress;
         std::unique_ptr<char[]> m_data;
-        int64_t m_activeTupleCount;
         const voltdb::TupleSchema* m_schema;
     };
 
@@ -99,7 +90,7 @@ public:
         assert (m_map.count(block->id()) == 0);
 
         std::unique_ptr<char[]> storage = block->releaseData();
-        Block *newBlock = new Block{storage.get(), block->activeTupleCount(), block->schema()};
+        Block *newBlock = new Block{storage.get(), block->schema()};
         m_map[block->id()] = newBlock;
 
         return true;
@@ -112,7 +103,7 @@ public:
 
         std::unique_ptr<char[]> storage{new char[voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES]};
         ::memcpy(storage.get(), storedBlock->data(), voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES);
-        block->setData(storedBlock->origAddress(), std::move(storage));
+        block->setData(std::move(storage));
         assert(block->activeTupleCount() == storedBlock->activeTupleCount());
 
         return true;
