@@ -21,29 +21,32 @@ public class MpRestartSequenceGenerator {
     // bit sizes for each of the fields in the 64-bit id
     // note, these add up to 63 bits to make dealing with
     // signed / unsigned conversions easier.
-    // scale up to 1024-node cluster, should be enough for now.
-    static final long NODEID_BITS = 10;
-    static final long COUNTER_BITS = 54;
+    // having up to 1,000,000 MPI promotions, should be enough for now.
+    static final long NODEID_BITS = 20;
+    static final long REPAIR_BITS = 1;
+    static final long COUNTER_BITS = 22;
 
     static final long NODEID_MAX_VALUE = (1L << NODEID_BITS) - 1L;
+    static final long REPAIR_MAX_VALUE = (1L << REPAIR_BITS) - 1L;
     static final long COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
-    private int m_leaderElectorId;
+    private final long m_highOrderFields;
     private long m_counter = 0;
 
-    public MpRestartSequenceGenerator(int nodeId) {
-        m_leaderElectorId = nodeId;
+    public MpRestartSequenceGenerator(int nodeId, boolean forRestart) {
+        assert (nodeId <= NODEID_MAX_VALUE);
+        m_highOrderFields = nodeId << (COUNTER_BITS + REPAIR_BITS)
+                          | (forRestart ? (1 << NODEID_BITS) : 0);
     }
 
     public long getNextSeqNum() {
         m_counter++;
         long counter = m_counter;
-        return makeSequenceNumber(m_leaderElectorId, counter);
+        return makeSequenceNumber(counter);
     }
 
-    private long makeSequenceNumber(int nodeId, long counter) {
-        assert (nodeId <= NODEID_MAX_VALUE);
+    private long makeSequenceNumber(long counter) {
         assert (counter <= COUNTER_MAX_VALUE);
-        long seq = nodeId << COUNTER_BITS;
+        long seq = m_highOrderFields;
         seq |= counter;
         return seq;
     }
@@ -52,8 +55,12 @@ public class MpRestartSequenceGenerator {
         return restartSeqId & COUNTER_MAX_VALUE;
     }
 
+    public static boolean isForRestart(long restartSeqId) {
+        return ((restartSeqId >> COUNTER_BITS) & REPAIR_MAX_VALUE) == 1;
+    }
+
     public static int getNodeId(long restartSeqId) {
-        return (int) (restartSeqId >> COUNTER_BITS);
+        return (int) (restartSeqId >> (COUNTER_BITS + REPAIR_BITS));
     }
 
     public static String restartSeqIdToString(long restartSeqId)
@@ -61,9 +68,16 @@ public class MpRestartSequenceGenerator {
         return "(" + MpRestartSequenceGenerator.getNodeId(restartSeqId) + ":" +
                 MpRestartSequenceGenerator.getSequence(restartSeqId) + ")";
     }
+
     public static void restartSeqIdToString(long restartSeqId, StringBuilder sb)
     {
         sb.append("(").append(MpRestartSequenceGenerator.getNodeId(restartSeqId)).append(":");
-        sb.append(MpRestartSequenceGenerator.getSequence(restartSeqId)).append(")");
+        sb.append(MpRestartSequenceGenerator.getSequence(restartSeqId));
+        if (isForRestart(restartSeqId)) {
+            sb.append("R)");
+        }
+        else {
+            sb.append(")");
+        }
     }
 }
