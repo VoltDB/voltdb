@@ -328,7 +328,7 @@ public class InitiateResponseMessage extends VoltMessage {
             // TestSpSchedulerDedupe
             sb.append( "NULL" );
         } else {
-            sb.append(m_response.toJSONString());
+            sb.append(m_response.toStatusJSONString());
         }
 
         return sb.toString();
