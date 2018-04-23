@@ -256,9 +256,10 @@ public class TransactionTaskQueue
             }
 
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("MP Write Scoreboard Received " + task + "\nFrags: " + receivedFrags + "/" + m_siteCount +
-                        " Comps: " + receivedCompleteTxns + "/" + m_siteCount);
-                dumpStashedMpWrites();
+                StringBuilder sb = new StringBuilder("MP Write Scoreboard Received " + task + "\nFrags: " + receivedFrags + "/" + m_siteCount +
+                        " Comps: " + receivedCompleteTxns + "/" + m_siteCount + ".\n");
+                dumpStashedMpWrites(sb);
+                hostLog.debug(sb.toString());
             }
             if (receivedCompleteTxns == m_siteCount) {
                 releaseStashedComleteTxns(missingTxn);
@@ -288,9 +289,10 @@ public class TransactionTaskQueue
             }
 
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("MP Write Scoreboard Received unmatched " + missingTxnCompletion +
-                        "\nComps: " + receivedCompleteTxns + "/" + m_siteCount);
-                dumpStashedMpWrites();
+                StringBuilder sb = new StringBuilder("MP Write Scoreboard Received unmatched " + missingTxnCompletion +
+                        "\nComps: " + receivedCompleteTxns + "/" + m_siteCount + ".\n");
+                dumpStashedMpWrites(sb);
+                hostLog.debug(sb.toString());
             }
             if (receivedCompleteTxns == m_siteCount) {
                 releaseStashedComleteTxns(true);
@@ -298,13 +300,12 @@ public class TransactionTaskQueue
         }
     }
 
-    private void dumpStashedMpWrites() {
-        StringBuilder builder = new StringBuilder();
+    // should only be used for debugging purpose
+    private void dumpStashedMpWrites(StringBuilder builder) {
         for (Entry<SiteTaskerQueue, ScoreboardTasks> e : s_stashedMpWrites.entrySet()) {
             builder.append("Queue " + e.getKey().getPartitionId() + ":\n" + e.getValue());
             builder.append("\n");
         }
-        hostLog.debug(builder.toString());
     }
 
     /**
