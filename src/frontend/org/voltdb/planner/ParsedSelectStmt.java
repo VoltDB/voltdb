@@ -146,6 +146,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean m_distinct = false;
     private boolean m_hasComplexAgg = false;
+    // A complex group by is one which has non-column
+    // group by expressions.  For example,
+    //   select count(aa + bb) from alpha group by (aa + bb);
     private boolean m_hasComplexGroupby = false;
     private boolean m_hasAggregateExpression = false;
     private boolean m_hasAverage = false;

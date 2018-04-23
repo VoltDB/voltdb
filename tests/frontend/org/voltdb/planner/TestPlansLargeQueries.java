@@ -46,6 +46,7 @@ import org.voltdb.types.PlanNodeType;
 public class TestPlansLargeQueries extends PlannerTestCase {
     public void testPlansSerialAggregates() {
         planForLargeQueries(true);
+        //
         validatePlan("select nm from t1 group by nm",
                      fragSpec(PlanNodeType.SEND,
                               PlanNodeType.AGGREGATE,

@@ -1969,7 +1969,8 @@ public class PlanAssembler {
     private static boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
         // Sort when the statement has an ORDER BY.
         // We also need to sort if we need to do serial
-        // aggregation for large queries.
+        // aggregation for large queries.  But that is
+        // handled elsewhere.
         if ( ! parsedStmt.hasOrderByColumns() ) {
             return false;
         }
@@ -2636,7 +2637,7 @@ public class PlanAssembler {
             // Construct the aggregate nodes.
             // The variable needHashAgg should really be
             // something like needHashAggIfNotLTT, but how
-            // do you pronounce that?
+            // do you pronounce THAT?
             if (needHashAgg) {
                 if ( m_parsedSelect.m_mvFixInfo.needed() ) {
                     // TODO: may optimize this edge case in future
@@ -2739,9 +2740,35 @@ public class PlanAssembler {
                          * aggregate node.
                          *
                          * If DISTINCT is specified and the aggregation
-                         * arguments are *not* the partition column (ENG-4980),
-                         * then don't do push-down for count() and sum() when not
-                         * grouping by the partition column.
+                         * arguments are *not* the partition column (ENG-4980) and
+                         * we are not grouping by the partition column,
+                         * then don't do push-down for count() and sum().
+                         *
+                         *
+                         * create table alpha (
+                         *       id        bigint not null,
+                         *       aa        bigint
+                         * );
+                         * partition table alpha on column id;
+                         * select distinct count(aa) from alpha group by aa;
+                         * -- In this case we *cannot* do the push down,
+                         *    because the groups may have non-empty
+                         *    intersection on the sites.  Some rows
+                         *    with aa == 100, say, may be on different
+                         *    sites.  So the sites cannot count all
+                         *    rows by themselves.
+                         * select distinct count(aa) from alpha group by aa, id;
+                         * -- In this case we cannot do the push down.
+                         *    The groups will be disjoint on each site.
+                         *    But rows with aa = 100, say, may be on
+                         *    different sites, and so the individual
+                         *    sites cannot count them all.
+                         * select distinct sum(id) from alpha group by aa, id;
+                         * -- In this case, we *can* do the push down,
+                         *    because the groups will be a disjoint union
+                         *    of groups on the site, and all rows
+                         *    on which a sum will act will be on a
+                         *    single site.
                          */
                         if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
                             agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
