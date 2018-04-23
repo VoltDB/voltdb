@@ -105,8 +105,13 @@ public class TransactionTaskQueue
         m_taskQueue = queue;
         m_siteCount = VoltDB.instance().getCatalogContext().getNodeSettings().getLocalSitesCount();
         synchronized (s_lock) {
-            m_scoreboard =  new ScoreboardTasks();
-            s_stashedMpWrites.put(m_taskQueue, m_scoreboard);
+            if (queue.getPartitionId() != MpInitiator.MP_INIT_PID) {
+                m_scoreboard = new ScoreboardTasks();
+                s_stashedMpWrites.put(m_taskQueue, m_scoreboard);
+            }
+            else {
+                m_scoreboard = null;
+            }
         }
     }
 
