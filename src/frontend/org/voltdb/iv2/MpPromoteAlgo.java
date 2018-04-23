@@ -118,7 +118,7 @@ public class MpPromoteAlgo implements RepairAlgo
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = false;
         m_whoami = whoami;
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId(), true);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId(), false);
     }
 
     /**
@@ -131,7 +131,7 @@ public class MpPromoteAlgo implements RepairAlgo
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId(), true);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId(), false);
     }
 
     @Override
