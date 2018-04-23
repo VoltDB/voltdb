@@ -48,4 +48,22 @@ public class MpRestartSequenceGenerator {
         return seq;
     }
 
+    public static long getSequence(long restartSeqId) {
+        return restartSeqId & COUNTER_MAX_VALUE;
+    }
+
+    public static int getNodeId(long restartSeqId) {
+        return (int) (restartSeqId >> COUNTER_BITS);
+    }
+
+    public static String restartSeqIdToString(long restartSeqId)
+    {
+        return "(" + MpRestartSequenceGenerator.getNodeId(restartSeqId) + ":" +
+                MpRestartSequenceGenerator.getSequence(restartSeqId) + ")";
+    }
+    public static void restartSeqIdToString(long restartSeqId, StringBuilder sb)
+    {
+        sb.append("(").append(MpRestartSequenceGenerator.getNodeId(restartSeqId)).append(":");
+        sb.append(MpRestartSequenceGenerator.getSequence(restartSeqId)).append(")");
+    }
 }
