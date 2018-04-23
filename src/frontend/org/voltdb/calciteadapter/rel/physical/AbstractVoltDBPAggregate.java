@@ -48,13 +48,13 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
 import org.voltdb.types.ExpressionType;
 
-public class VoltDBPAggregate extends Aggregate implements VoltDBPRel {
+public abstract class AbstractVoltDBPAggregate extends Aggregate implements VoltDBPRel {
 
     // HAVING expression
     final protected RexNode m_postPredicate;
 
     /** Constructor */
-    private VoltDBPAggregate(
+    protected AbstractVoltDBPAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -83,41 +83,6 @@ public class VoltDBPAggregate extends Aggregate implements VoltDBPRel {
             digest += m_postPredicate.toString();
         }
         return digest;
-    }
-
-    @Override
-    public VoltDBPAggregate copy(RelTraitSet traitSet, RelNode input,
-            boolean indicator, ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        return VoltDBPAggregate.create(
-                getCluster(),
-                traitSet,
-                input,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                m_postPredicate);
-    }
-
-    public static VoltDBPAggregate create(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls,
-            RexNode postPredicate) {
-        return new VoltDBPAggregate(
-                cluster,
-                traitSet,
-                child,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                postPredicate);
     }
 
     @Override

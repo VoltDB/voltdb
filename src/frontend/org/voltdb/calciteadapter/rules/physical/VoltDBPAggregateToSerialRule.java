@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rules.logical;
+package org.voltdb.calciteadapter.rules.physical;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,35 +29,35 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLAggregate;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLSerialAggregate;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPHashAggregate;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPSerialAggregate;
 
-public class VoltDBLAggregateToSerialRule extends RelOptRule {
+public class VoltDBPAggregateToSerialRule extends RelOptRule {
 
-    public static final VoltDBLAggregateToSerialRule INSTANCE = new VoltDBLAggregateToSerialRule();
+    public static final VoltDBPAggregateToSerialRule INSTANCE = new VoltDBPAggregateToSerialRule();
 
-    VoltDBLAggregateToSerialRule() {
-        super(operand(VoltDBLAggregate.class, any()));
+    VoltDBPAggregateToSerialRule() {
+        super(operand(VoltDBPHashAggregate.class, any()));
     }
 
     @Override
     public boolean matches(RelOptRuleCall call) {
-        VoltDBLAggregate aggr = call.rel(0);
+        VoltDBPHashAggregate aggr = call.rel(0);
         return aggr.getGroupCount() != 0;
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLAggregate aggr = call.rel(0);
+        VoltDBPHashAggregate aggr = call.rel(0);
         RelNode input = aggr.getInput();
         RelTraitSet traitSet = aggr.getTraitSet();
-        if (input.getConvention() != VoltDBLRel.VOLTDB_LOGICAL) {
-            traitSet = traitSet.replace(VoltDBLRel.VOLTDB_LOGICAL);
-            input = convert(input, input.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL));
+
+        if (input.getConvention() != VoltDBPRel.VOLTDB_PHYSICAL) {
+            input = convert(input, input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
         }
         RelCollation groupByCollation = buildGroupByCollation(aggr);
-        VoltDBLSerialAggregate serialAggr = VoltDBLSerialAggregate.create(
+        VoltDBPSerialAggregate serialAggr = VoltDBPSerialAggregate.create(
                 aggr.getCluster(),
                 traitSet,
                 input,
@@ -65,11 +65,12 @@ public class VoltDBLAggregateToSerialRule extends RelOptRule {
                 aggr.getGroupSet(),
                 aggr.getGroupSets(),
                 aggr.getAggCallList(),
-                groupByCollation);
+                groupByCollation,
+                null);
         call.transformTo(serialAggr);
     }
 
-    RelCollation buildGroupByCollation(VoltDBLAggregate aggr) {
+    RelCollation buildGroupByCollation(VoltDBPHashAggregate aggr) {
         // Build a collation that represents each GROUP BY expression.
         // This collation implies that this serial aggregate requires its input
         // to be sorted in an order that is one of permutations of the fields from this collation
