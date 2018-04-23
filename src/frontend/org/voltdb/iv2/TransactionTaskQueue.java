@@ -39,6 +39,7 @@ public class TransactionTaskQueue
     final protected SiteTaskerQueue m_taskQueue;
 
     final private int m_siteCount;
+    final private ScoreboardTasks m_scoreboard;
 
     /*
      * Multi-part transactions create a backlog of tasks behind them. A queue is
@@ -47,7 +48,7 @@ public class TransactionTaskQueue
      */
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
-    final static HashMap<SiteTaskerQueue, QueuedTasks> s_stashedMpWrites = new HashMap<>();
+    final static HashMap<SiteTaskerQueue, ScoreboardTasks> s_stashedMpWrites = new HashMap<>();
     static Object s_lock = new Object();
 
     // The purpose of having it is to synchronize all MP write messages (FragmentTask, CompleteTransactionTask)
@@ -56,7 +57,7 @@ public class TransactionTaskQueue
     // table writes from blocking sites partially, e.g. some sites wait on countdown latch for all
     // sites within a node to receive a fragment, but due to node failure the failed remote leader may never forward the
     // fragment to the rest of sites on the given node, causes deadlock and can't be recovered from repair.
-    private static class QueuedTasks {
+    private static class ScoreboardTasks {
         // We need to track 2 completions because during restart repairlog may resend a completion for
         // a transaction that has been processed as well as an abort for the actual transaction in progress.
         public Deque<Pair<CompleteTransactionTask, Boolean>> m_lastCompleteTxnTasks = new ArrayDeque<>(2);
@@ -103,6 +104,10 @@ public class TransactionTaskQueue
     {
         m_taskQueue = queue;
         m_siteCount = VoltDB.instance().getCatalogContext().getNodeSettings().getLocalSitesCount();
+        synchronized (s_lock) {
+            m_scoreboard =  new ScoreboardTasks();
+            s_stashedMpWrites.put(m_taskQueue, m_scoreboard);
+        }
     }
 
     /**
@@ -181,7 +186,7 @@ public class TransactionTaskQueue
             hostLog.debug("release stashed fragment messages");
         }
         long lastTxnId = 0;
-        for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
+        for (Entry<SiteTaskerQueue, ScoreboardTasks> e : s_stashedMpWrites.entrySet()) {
             TransactionTask task = e.getValue().m_lastFragTask;
             assert(lastTxnId == 0 || lastTxnId == task.getTxnId());
             lastTxnId = task.getTxnId();
@@ -203,7 +208,7 @@ public class TransactionTaskQueue
             }
         }
         long lastTxnId = 0;
-        for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
+        for (Entry<SiteTaskerQueue, ScoreboardTasks> e : s_stashedMpWrites.entrySet()) {
             CompleteTransactionTask completion = e.getValue().m_lastCompleteTxnTasks.poll().getFirst();
             assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
             lastTxnId = completion.getMsgTxnId();
@@ -216,26 +221,20 @@ public class TransactionTaskQueue
 
     private void coordinatedTaskQueueOffer(TransactionTask task) {
         synchronized (s_lock) {
-            QueuedTasks queuedTask;
-            if ((queuedTask = s_stashedMpWrites.get(m_taskQueue)) == null) {
-                queuedTask =  new QueuedTasks();
-                s_stashedMpWrites.put(m_taskQueue, queuedTask);
-            }
-
             long matchingCompletionTime = -1;
             if (task instanceof CompleteTransactionTask) {
                 matchingCompletionTime = ((CompleteTransactionTask)task).getTimestamp();
-                queuedTask.addCompletedTransactionTask((CompleteTransactionTask)task, false);
+                m_scoreboard.addCompletedTransactionTask((CompleteTransactionTask)task, false);
 
             } else if (task instanceof FragmentTask ||
                        task instanceof SysprocFragmentTask) {
-                queuedTask.addFragmentTask(task);
+                m_scoreboard.addFragmentTask(task);
             }
 
             int receivedFrags = 0;
             int receivedCompleteTxns = 0;
             boolean missingTxn = false;
-            for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
+            for (Entry<SiteTaskerQueue, ScoreboardTasks> e : s_stashedMpWrites.entrySet()) {
                 if (!e.getValue().m_lastCompleteTxnTasks.isEmpty()) {
                     if (matchingCompletionTime != e.getValue().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
                         continue;
@@ -268,16 +267,10 @@ public class TransactionTaskQueue
 
     public void handleCompletionForMissingTxn(CompleteTransactionTask missingTxnCompletion) {
         synchronized (s_lock) {
-            QueuedTasks queuedTask;
-            if ((queuedTask = s_stashedMpWrites.get(m_taskQueue)) == null) {
-                queuedTask =  new QueuedTasks();
-                s_stashedMpWrites.put(m_taskQueue, queuedTask);
-            }
-
             long matchingCompletionTime = missingTxnCompletion.getTimestamp();
-            queuedTask.addCompletedTransactionTask(missingTxnCompletion, true);
+            m_scoreboard.addCompletedTransactionTask(missingTxnCompletion, true);
             int receivedCompleteTxns = 0;
-            for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
+            for (Entry<SiteTaskerQueue, ScoreboardTasks> e : s_stashedMpWrites.entrySet()) {
                 if (!e.getValue().m_lastCompleteTxnTasks.isEmpty()) {
                     if (matchingCompletionTime != e.getValue().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
                         continue;
@@ -302,7 +295,7 @@ public class TransactionTaskQueue
 
     private void dumpStashedMpWrites() {
         StringBuilder builder = new StringBuilder();
-        for (Entry<SiteTaskerQueue, QueuedTasks> e : s_stashedMpWrites.entrySet()) {
+        for (Entry<SiteTaskerQueue, ScoreboardTasks> e : s_stashedMpWrites.entrySet()) {
             builder.append("Queue " + e.getKey().getPartitionId() + ":\n" + e.getValue());
             builder.append("\n");
         }
@@ -408,6 +401,10 @@ public class TransactionTaskQueue
         sb.append("\tSIZE: ").append(size());
         if (!m_backlog.isEmpty()) {
             sb.append("\tHEAD: ").append(m_backlog.getFirst());
+        }
+        sb.append("\tScoreboard:").append("\n");
+        synchronized (s_lock) {
+            sb.append("\t").append(m_scoreboard.toString());
         }
         return sb.toString();
     }
