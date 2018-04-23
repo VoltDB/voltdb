@@ -909,9 +909,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("SpScheduler receives: " + message);
-        }
         FragmentTaskMessage msg = message;
         long newSpHandle;
         //The site has been marked as non-leader. The follow-up batches or fragments are processed here
@@ -1228,9 +1225,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("SpScheduler receives :" + message);
-        }
         CompleteTransactionMessage msg = message;
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
 
@@ -1296,9 +1290,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(msg);
             resp.m_sourceHSId = m_mailbox.getHSId();
             handleCompleteTransactionResponseMessage(resp);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("SpScheduler discards: " + message);
-            }
         }
     }
 
