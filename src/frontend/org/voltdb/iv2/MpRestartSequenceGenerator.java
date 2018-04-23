@@ -22,19 +22,20 @@ public class MpRestartSequenceGenerator {
     // note, these add up to 63 bits to make dealing with
     // signed / unsigned conversions easier.
     // having up to 1,000,000 MPI promotions, should be enough for now.
+    // Restart flag reset means that this came from a SPI leader promotion
     static final long NODEID_BITS = 20;
-    static final long REPAIR_BITS = 1;
+    static final long RESTART_BITS = 1;
     static final long COUNTER_BITS = 22;
 
     static final long NODEID_MAX_VALUE = (1L << NODEID_BITS) - 1L;
-    static final long REPAIR_MAX_VALUE = (1L << REPAIR_BITS) - 1L;
+    static final long RESTART_MAX_VALUE = (1L << RESTART_BITS) - 1L;
     static final long COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
     private final long m_highOrderFields;
     private long m_counter = 0;
 
     public MpRestartSequenceGenerator(int nodeId, boolean forRestart) {
         assert (nodeId <= NODEID_MAX_VALUE);
-        m_highOrderFields = nodeId << (COUNTER_BITS + REPAIR_BITS)
+        m_highOrderFields = nodeId << (COUNTER_BITS + RESTART_BITS)
                           | (forRestart ? (1 << NODEID_BITS) : 0);
     }
 
@@ -56,11 +57,11 @@ public class MpRestartSequenceGenerator {
     }
 
     public static boolean isForRestart(long restartSeqId) {
-        return ((restartSeqId >> COUNTER_BITS) & REPAIR_MAX_VALUE) == 1;
+        return ((restartSeqId >> COUNTER_BITS) & RESTART_MAX_VALUE) == 1;
     }
 
     public static int getNodeId(long restartSeqId) {
-        return (int) (restartSeqId >> (COUNTER_BITS + REPAIR_BITS));
+        return (int) (restartSeqId >> (COUNTER_BITS + RESTART_BITS));
     }
 
     public static String restartSeqIdToString(long restartSeqId)
