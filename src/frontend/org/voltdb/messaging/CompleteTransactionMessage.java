@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.iv2.MpRestartSequenceGenerator;
 import org.voltdb.iv2.TxnEgo;
 
 public class CompleteTransactionMessage extends TransactionInfoBaseMessage
@@ -161,10 +162,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("\n SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
-        sb.append("\n  TIMESTAMP: ").append(m_timestamp);
+        sb.append("\n  TIMESTAMP: ");
+        MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
         sb.append("\n  TRUNCATION HANDLE:" + getTruncationHandle());
         sb.append("\n  HASH: " + String.valueOf(m_hash));
-        sb.append("\n  TIMESTAMP: " + getTimestamp());
 
         if (isRollback())
             sb.append("\n  THIS IS AN ROLLBACK REQUEST");

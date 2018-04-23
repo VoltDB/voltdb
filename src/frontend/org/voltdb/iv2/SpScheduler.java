@@ -1580,8 +1580,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void dump()
     {
         m_replaySequencer.dump(m_mailbox.getHSId());
-        tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
-        tmLog.info("[dump] current truncation handle: " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " "
+        hostLog.warn("[dump] current truncation handle: " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " "
                 + m_bufferedReadLog.toString());
     }
 
