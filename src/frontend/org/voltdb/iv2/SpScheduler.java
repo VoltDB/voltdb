@@ -1390,7 +1390,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         hostLog.warn(who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
         hostLog.warn(who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
                 TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
-        hostLog.warn(who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
+        hostLog.warn(who + ": " + m_pendingTasks.toString());
         if (m_duplicateCounters.size() > 0) {
             hostLog.warn(who + ": duplicate counters: ");
             for (Entry<DuplicateCounterKey, DuplicateCounter> e : m_duplicateCounters.entrySet()) {
