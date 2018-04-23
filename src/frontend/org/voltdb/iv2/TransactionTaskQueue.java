@@ -304,7 +304,9 @@ public class TransactionTaskQueue
             builder.append("Queue " + e.getKey().getPartitionId() + ":\n" + e.getValue());
             builder.append("\n");
         }
-        hostLog.debug(builder.toString());
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug(builder.toString());
+        }
     }
 
     /**

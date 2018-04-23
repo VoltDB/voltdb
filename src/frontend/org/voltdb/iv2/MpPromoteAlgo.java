@@ -267,7 +267,9 @@ public class MpPromoteAlgo implements RepairAlgo
             return;
         }
 
-        tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        }
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             // send the repair log union to all the survivors. SPIs will ignore
             // CompleteTransactionMessages for transactions which have already
