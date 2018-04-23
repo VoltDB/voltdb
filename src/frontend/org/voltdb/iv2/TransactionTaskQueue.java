@@ -66,7 +66,7 @@ public class TransactionTaskQueue
         public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
             if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP ||
                     (m_lastCompleteTxnTasks.peekFirst() != null &&
-                     m_lastCompleteTxnTasks.peekFirst().getFirst().getMsgTxnId() == task.getMsgTxnId())) {
+                    !MpRestartSequenceGenerator.isForRestart(task.getTimestamp()))) {
                 // This is a submission of a completion. In case this is a resubmission of a completion that not
                 // all sites received clear the whole queue. The Completion may or may not be for a transaction
                 // that has already been completed (if it was completed missingTxn will be true)

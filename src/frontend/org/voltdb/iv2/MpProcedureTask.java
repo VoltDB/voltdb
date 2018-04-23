@@ -74,7 +74,7 @@ public class MpProcedureTask extends ProcedureTask
         m_initiatorHSIds.addAll(pInitiators);
         m_restartMasters.set(new ArrayList<Long>());
         m_restartMastersMap.set(new HashMap<Integer, Long>());
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(leaderNodeId);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(leaderNodeId, true);
     }
 
     /**
