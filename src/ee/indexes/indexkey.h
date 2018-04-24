@@ -371,6 +371,11 @@ struct IntsComparator
         }
         return 0;
     }
+
+    // This method is provided to be compatible with ComparatorWithPointer.
+    int compareWithoutPointer(const IntsKey<keySize> &lhs, const IntsKey<keySize> &rhs) const {
+        return operator()(lhs, rhs);
+    }
 };
 
 /**
@@ -601,6 +606,11 @@ struct GenericComparator
         // lexographical compare could be faster for fixed N
         return lhTuple.compare(rhTuple);
     }
+
+    // This method is provided to be compatible with ComparatorWithPointer.
+    int compareWithoutPointer(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
+        return operator()(lhs, rhs);
+    }
 private:
     const TupleSchema *m_keySchema;
 };
@@ -762,6 +772,12 @@ struct TupleKeyComparator
         }
         return VALUE_COMPARE_EQUAL;
     }
+
+    // This method is provided to be compatible with ComparatorWithPointer.
+    int compareWithoutPointer(const TupleKey &lhs, const TupleKey &rhs) const {
+        return operator()(lhs, rhs);
+    }
+
 private:
     const TupleSchema *m_keySchema;
 };
@@ -838,6 +854,11 @@ struct ComparatorWithPointer : public KeyType::KeyComparator {
     int operator()(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
         int rv = KeyType::KeyComparator::operator()(lhs, rhs);
         return rv == 0 ? comparePointer(lhs.m_keyTuple, rhs.m_keyTuple) : rv;
+    }
+
+    // Do a comparison, but don't compare pointers to tuple storage.
+    int compareWithoutPointer(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
+        return KeyType::KeyComparator::operator()(lhs, rhs);
     }
 };
 

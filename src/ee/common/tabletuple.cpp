@@ -45,11 +45,7 @@
 
 #include <cstdlib>
 #include <sstream>
-#include <cassert>
 #include "common/tabletuple.h"
-#include "common/common.h"
-#include "common/debuglog.h"
-#include "common/FatalException.hpp"
 
 namespace voltdb {
 

@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.Random;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -786,8 +785,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    private final static Object[][] THE_SWAP_CONTENTS = {{"1", 1.0, 1, 1}};
-    private static Object[][] OTHER_SWAP_CONTENTS = {{"2", null, 2, 2}, {"3", 3.0, 3, 3}};
+    private static final Object[][] THE_SWAP_CONTENTS = {{"1", 1.0, 1, 1}};
+    private static final int THE_SWAP_COUNT = 1;
+    private static final Object[][] OTHER_SWAP_CONTENTS = {{"2", null, 2, 2}, {"3", 3.0, 3, 3}};
+    private static final int OTHER_SWAP_COUNT = 2;
 
     private void populateSwappyTables(Client client, String thisTable, String thatTable) throws Exception {
         for (Object[] row : THE_SWAP_CONTENTS) {
@@ -847,6 +848,24 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     contents = client.callProcedure("@AdHoc", "select * from " + otherTable + " order by id").getResults()[0];
                     assertContentOfTable(THE_SWAP_CONTENTS, contents);
 
+                    // Just to verify the statistics are correct for normal case
+                    // In some of the pairs we are involving partitioned tables where the
+                    // statistics we get from some partitions may be zero.
+                    if (ii == jj && ii == 0) {
+                        // Hacky, we need to sleep long enough so the internal server tick
+                        // updates the memory stats.
+                        Thread.sleep(1000);
+                        VoltTable stats = client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+                        while (stats.advanceRow()) {
+                            if (stats.getString("TABLE_NAME").equals(theTable)) {
+                                assertEquals(OTHER_SWAP_COUNT, stats.getLong("TUPLE_COUNT"));
+                            }
+                            else if (stats.getString("TABLE_NAME").equals(otherTable)) {
+                                assertEquals(THE_SWAP_COUNT, stats.getLong("TUPLE_COUNT"));
+                            }
+                        }
+                    }
+
                     // Swap again to restore the baseline populations.
                     results = client.callProcedure("@SwapTables",
                             otherTable, theTable).getResults();
@@ -861,6 +880,22 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
                     contents = client.callProcedure("@AdHoc", "select * from " + otherTable + " order by id").getResults()[0];
                     assertContentOfTable(OTHER_SWAP_CONTENTS, contents);
+
+                    // Just to verify the statistics are correct for normal case
+                    if (ii == jj && ii == 0) {
+                        // Hacky, we need to sleep long enough so the internal server tick
+                        // updates the memory stats.
+                        Thread.sleep(1000);
+                        VoltTable stats = client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+                        while (stats.advanceRow()) {
+                            if (stats.getString("TABLE_NAME").equals(theTable)) {
+                                assertEquals(THE_SWAP_COUNT, stats.getLong("TUPLE_COUNT"));
+                            }
+                            else if (stats.getString("TABLE_NAME").equals(otherTable)) {
+                                assertEquals(OTHER_SWAP_COUNT, stats.getLong("TUPLE_COUNT"));
+                            }
+                        }
+                    }
 
                     results = client.callProcedure("@AdHoc",
                             "TRUNCATE TABLE " + theTable).getResults();

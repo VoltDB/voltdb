@@ -19,12 +19,6 @@
 #include "common/StlFriendlyNValue.h"
 #include "common/executorcontext.hpp"
 #include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
-#include "logging/LogManager.h"
-
-#include <cstdio>
-#include <sstream>
-#include <algorithm>
-#include <set>
 
 namespace voltdb {
 Pool* NValue::getTempStringPool() {

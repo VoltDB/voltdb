@@ -20,8 +20,6 @@
 #include "common/serializeio.h"
 #include "execution/VoltDBEngine.h"
 
-#include <stdint.h>
-
 namespace voltdb {
 
 #ifdef VOLT_DEBUG_ENABLED

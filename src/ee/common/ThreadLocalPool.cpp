@@ -64,9 +64,6 @@ void createThreadLocalKey() {
 }
 
 ThreadLocalPool::ThreadLocalPool()
-#ifdef VOLT_POOL_CHECKING
-    : m_allocationTrace()
-#endif
 {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
     if (pthread_getspecific(m_key) == NULL) {
@@ -124,8 +121,7 @@ ThreadLocalPool::~ThreadLocalPool() {
             if (m_allocatingThread != -1 && *enginePartitionIdPtr != m_allocatingEngine) {
                 // Only the VoltDBEngine's ThreadLocalPool instance will have a -1 allocating thread because the threadId
                 // has not been assigned yet. Normally the last ThreadLocalPool instance to be deallocated is the VoltDBEngine.
-                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", m_allocatingEngine, m_allocatingThread);
-                m_allocationTrace.printLocalTrace();
+                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d", m_allocatingEngine, m_allocatingThread);
                 VOLT_ERROR("deallocation from:");
                 VOLT_ERROR_STACK();
                 assert(false);
@@ -170,8 +166,7 @@ ThreadLocalPool::~ThreadLocalPool() {
             // but deallocated on partition that cleans up the last view handler so we can't enforce thread-based allocation validation below:
             // if (m_allocatingThread != -1 && (getThreadPartitionId() != m_allocatingThread || getEnginePartitionId() != m_allocatingEngine)) {
             if (m_allocatingThread != -1 && getEnginePartitionId() != m_allocatingEngine) {
-                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d:", m_allocatingEngine, m_allocatingThread);
-                m_allocationTrace.printLocalTrace();
+                VOLT_ERROR("Unmatched deallocation allocated from partition %d on thread %d", m_allocatingEngine, m_allocatingThread);
                 VOLT_ERROR("deallocation from partition %d on thread %d:", getEnginePartitionId(), getThreadPartitionId());
                 VOLT_ERROR_STACK();
                 assert(false);
@@ -191,14 +186,18 @@ void ThreadLocalPool::assignThreadLocals(const PoolLocals& mapping)
     pthread_setspecific(m_enginePartitionIdKey, static_cast<const void*>(mapping.enginePartitionId));
 }
 
-void ThreadLocalPool::resetStateForDebug() {
+void ThreadLocalPool::resetStateForTest() {
     pthread_setspecific(m_allocatedKey, NULL);
     pthread_setspecific(m_key, NULL);
     pthread_setspecific(m_stringKey, NULL);
     pthread_setspecific(m_enginePartitionIdKey, NULL);
-
-    delete static_cast<int32_t*>(pthread_getspecific(m_threadPartitionIdKey));
     pthread_setspecific(m_threadPartitionIdKey, NULL);
+}
+int32_t* ThreadLocalPool::getThreadPartitionIdForTest() {
+    return static_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
+}
+void ThreadLocalPool::setThreadPartitionIdForTest(int32_t* partitionId) {
+    pthread_setspecific(m_threadPartitionIdKey, static_cast<const void*>(partitionId));
 }
 
 namespace {
@@ -596,6 +595,18 @@ void ThreadLocalPool::setPartitionIds(int32_t partitionId) {
 }
 
 int32_t ThreadLocalPool::getThreadPartitionId() {
+    int32_t partitionId =
+        *static_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
+    return partitionId;
+}
+
+int32_t ThreadLocalPool::getEnginePartitionId() {
+    int32_t partitionId =
+        *static_cast< int32_t* >(pthread_getspecific(m_enginePartitionIdKey));
+    return partitionId;
+}
+
+int32_t ThreadLocalPool::getThreadPartitionIdWithNullCheck() {
     int32_t *ptrToPartitionId = static_cast< int32_t* >(pthread_getspecific(m_threadPartitionIdKey));
     if (ptrToPartitionId == NULL) {
         return -1;
@@ -604,10 +615,13 @@ int32_t ThreadLocalPool::getThreadPartitionId() {
     return *ptrToPartitionId;
 }
 
-int32_t ThreadLocalPool::getEnginePartitionId() {
-    int32_t partitionId =
-        *static_cast< int32_t* >(pthread_getspecific(m_enginePartitionIdKey));
-    return partitionId;
+int32_t ThreadLocalPool::getEnginePartitionIdWithNullCheck() {
+    int32_t *ptrToPartitionId = static_cast< int32_t* >(pthread_getspecific(m_enginePartitionIdKey));
+    if (ptrToPartitionId == NULL) {
+        return -1;
+    }
+
+    return *ptrToPartitionId;
 }
 
 char * voltdb_pool_allocator_new_delete::malloc(const size_type bytes) {

@@ -75,7 +75,6 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
             default:
                 return null;
             }
-
         }
     }
 
@@ -110,8 +109,6 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                     type.classFromType().getCanonicalName()));
         }
     }
-
-
 
     static class NibbleStatus {
         final long rowsLeft;
@@ -209,11 +206,12 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
         // picked nanotime because it's momotonic and that's just easier
         long startTimeStampNS = System.nanoTime();
 
-        VoltTable returnTable = new VoltTable(new VoltTable.ColumnInfo("rowsdeleted", VoltType.BIGINT),
-                                new VoltTable.ColumnInfo("rowsleft", VoltType.BIGINT),
-                                new VoltTable.ColumnInfo("rounds", VoltType.INTEGER),
-                                new VoltTable.ColumnInfo("deletedLastRound", VoltType.BIGINT),
-                                new VoltTable.ColumnInfo("note", VoltType.STRING));
+        VoltTable returnTable = new VoltTable(new ColumnInfo("ROWS_DELETED", VoltType.BIGINT),
+                                new ColumnInfo("ROWS_LEFT", VoltType.BIGINT),
+                                new ColumnInfo("ROUNDS", VoltType.INTEGER),
+                                new ColumnInfo("DELETED_LAST_ROUND", VoltType.BIGINT),
+                                new ColumnInfo("STATUS", VoltType.BIGINT),
+                                new ColumnInfo("MESSAGE", VoltType.STRING));
 
         // collect all the validated info and metadata needed
         // these throw helpful errors if they run into problems
@@ -230,10 +228,10 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
 
         // always run nibble delete at least once
         NibbleStatus status = runNibbleDeleteOperation(tableName, columnName, comparisonOp, value, chunksize, catTable.getIsreplicated());
-        rowsDeleted += status.rowsJustDeleted;
+        rowsDeleted = status.rowsJustDeleted;
         // If any partition receive failure, report the delete status plus the error message back.
         if (!status.errorMessages.isEmpty()) {
-            returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, status.errorMessages);
+            returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, ClientResponse.GRACEFUL_FAILURE, status.errorMessages);
             return returnTable;
         }
         // handle the case where we're jammed from the start (no rows deleted)
@@ -252,15 +250,14 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
             rounds++;
             // If any partition receive failure, report the delete status plus the error message back.
             if (!status.errorMessages.isEmpty()) {
-                returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, status.errorMessages);
+                returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, ClientResponse.GRACEFUL_FAILURE, status.errorMessages);
                 return returnTable;
             }
 
             now = System.nanoTime();
         }
 
-        returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, "");
+        returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, ClientResponse.SUCCESS, "");
         return returnTable;
     }
-
 }

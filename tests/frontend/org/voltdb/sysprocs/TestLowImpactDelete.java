@@ -239,14 +239,14 @@ public class TestLowImpactDelete extends TestCase {
         VoltTable result = response.getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
-        long deleted = result.getLong("rowsdeleted");
+        long deleted = result.getLong("ROWS_DELETED");
         assertTrue (deleted == 9000);
 
         response = m_client.callProcedure("@LowImpactDelete", "rep", "ts", "9000", "<", 500, 1000 * 1000);
         result = response.getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
-        deleted = result.getLong("rowsdeleted");
+        deleted = result.getLong("ROWS_DELETED");
         assertTrue (deleted == 9000);
     }
 
@@ -295,8 +295,8 @@ public class TestLowImpactDelete extends TestCase {
                 VoltTable result = response.getResults()[0];
                 assertEquals(1, result.getRowCount());
                 result.advanceRow();
-                long deleted = result.getLong("rowsdeleted");
-                long rowsLeft = result.getLong("rowsLeft");
+                long deleted = result.getLong("ROWS_DELETED");
+                long rowsLeft = result.getLong("ROWS_LEFT");
                 assertTrue (rowsLeft == 0);
                 try {
                     Thread.sleep(1000);
@@ -332,13 +332,28 @@ public class TestLowImpactDelete extends TestCase {
         }
         //allow TTL to work, the inserted rows should be deleted after 10 seconds
         try {
-            long rowCount = m_client.callProcedure("ttlcount").getResults()[0].asScalarLong();
-            assertEquals(500, rowCount);
             Thread.sleep(60*1000);
-            rowCount = m_client.callProcedure("ttlcount").getResults()[0].asScalarLong();
-            assertEquals(0, rowCount);
+            VoltTable vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
+            System.out.println(vt.toFormattedString());
+            vt.resetRowPosition();
+            vt.advanceRow();
+            assertEquals(500, vt.getLong("ROWS_DELETED"));
+
+            for (int i = 500; i < 1000; i++) {
+                try {
+                    m_client.callProcedure("@AdHoc", "INSERT INTO TTL VALUES(" + i + ",CURRENT_TIMESTAMP())");
+                } catch (IOException | ProcCallException e) {
+                    fail("fail to insert data for TTL testing.");
+                }
+            }
+            Thread.sleep(60*1000);
+            vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
+            System.out.println(vt.toFormattedString());
+            vt.resetRowPosition();
+            vt.advanceRow();
+            assertEquals(1000, vt.getLong("ROWS_DELETED"));
         } catch (Exception e) {
-            fail("Failed to get row count from Table ttl");
+            fail("Failed to get row count from Table ttl:" + e.getMessage());
         }
     }
 }

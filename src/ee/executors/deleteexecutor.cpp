@@ -45,22 +45,10 @@
 
 #include "deleteexecutor.h"
 
-#include "common/ValueFactory.hpp"
-#include "common/debuglog.h"
 #include "common/ExecuteWithMpMemory.h"
-#include "common/tabletuple.h"
 
-#include "execution/ExecutorVector.h"
-
-#include "storage/table.h"
-#include "storage/tableiterator.h"
 #include "indexes/tableindex.h"
-#include "storage/AbstractTempTable.hpp"
 #include "storage/tableutil.h"
-#include "storage/persistenttable.h"
-
-#include <vector>
-#include <cassert>
 
 namespace voltdb {
 int64_t DeleteExecutor::s_modifiedTuples;

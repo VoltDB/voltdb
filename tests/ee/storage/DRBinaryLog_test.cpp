@@ -69,10 +69,12 @@ static int64_t addPartitionId(int64_t value) {
 struct ClusterCtx {
     ClusterCtx(VoltDBEngine* engine,
                EngineLocals mpEngineLocals,
-               SharedEngineLocalsType enginesByPartitionId)
+               SharedEngineLocalsType enginesByPartitionId,
+               int32_t* threadPartitionId)
     : m_engine(engine)
     , m_mpEngineLocals(mpEngineLocals)
     , m_enginesByPartitionId(enginesByPartitionId)
+    , m_threadPartitionId(threadPartitionId)
     {
     }
 
@@ -80,6 +82,7 @@ struct ClusterCtx {
     : m_engine(NULL)
     , m_mpEngineLocals()
     , m_enginesByPartitionId()
+    , m_threadPartitionId(NULL)
     {
     }
 
@@ -95,10 +98,14 @@ struct ClusterCtx {
         return m_enginesByPartitionId;
     }
 
+    int32_t* getThreadPartitionId() {
+        return m_threadPartitionId;
+    }
 private:
     VoltDBEngine* m_engine;
     EngineLocals m_mpEngineLocals;
     SharedEngineLocalsType m_enginesByPartitionId;
+    int32_t* m_threadPartitionId;
 };
 
 static std::map<int, ClusterCtx> s_clusterMap;
@@ -149,7 +156,7 @@ protected:
 
     int32_t partitionForToken(int32_t hashCode) const {
         // partition of VoltDBEngine super of MockVoltDBEngine is 0
-        return -1;
+        return 0;
     }
 };
 
@@ -160,7 +167,8 @@ public:
       : m_context(new ExecutorContext(0, 0, NULL, topend, pool, this,
                                       "localhost", 2, drStream, drReplicatedStream, clusterId))
     {
-
+        setPartitionIdForTest(0);
+        ThreadLocalPool::setPartitionIds(0);
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
         std::vector<bool> exportColumnAllowNull(12, false);
@@ -200,8 +208,7 @@ public:
         // Add the engine to the global list tracking replicated tables
         setLowestSiteForTest();
         ThreadLocalPool::setPartitionIds(getPartitionId());
-        VOLT_DEBUG("Initializing partition %d (tid %ld) with context %p", m_partitionId,
-                SynchronizedThreadLock::getThreadId(), m_context);
+        VOLT_DEBUG("Initializing context %p", m_context.get());
         EngineLocals newLocals = EngineLocals(ExecutorContext::getExecutorContext());
         SynchronizedThreadLock::init(1, newLocals);
     }
@@ -226,6 +233,7 @@ class ReplicaProcessContextSwitcher {
 public:
     ReplicaProcessContextSwitcher() {
         ClusterCtx cc = s_clusterMap[CLUSTER_ID_REPLICA];
+        ThreadLocalPool::setThreadPartitionIdForTest(cc.getThreadPartitionId());
         SynchronizedThreadLock::setEngineLocalsForTest(cc.getEngine()->getPartitionId(),
                                                        cc.getMpEngineLocals(),
                                                        cc.getEnginesByPartitionId());
@@ -233,6 +241,7 @@ public:
 
     ~ReplicaProcessContextSwitcher() {
         ClusterCtx cc = s_clusterMap[CLUSTER_ID];
+        ThreadLocalPool::setThreadPartitionIdForTest(cc.getThreadPartitionId());
         SynchronizedThreadLock::setEngineLocalsForTest(cc.getEngine()->getPartitionId(),
                                                        cc.getMpEngineLocals(),
                                                        cc.getEnginesByPartitionId());
@@ -253,16 +262,19 @@ public:
         m_engine = new MockVoltDBEngine(CLUSTER_ID, &m_topend, &m_enginesPool, &m_drStream, &m_drReplicatedStream);
         s_clusterMap[CLUSTER_ID] = ClusterCtx(m_engine,
                                               SynchronizedThreadLock::s_mpEngine,
-                                              SynchronizedThreadLock::s_enginesByPartitionId);
+                                              SynchronizedThreadLock::s_enginesByPartitionId,
+                                              ThreadLocalPool::getThreadPartitionIdForTest());
         SynchronizedThreadLock::resetEngineLocalsForTest();
 
         m_engineReplica = new MockVoltDBEngine(CLUSTER_ID_REPLICA, &m_topend, &m_enginesPool, &m_drStreamReplica, &m_drReplicatedStreamReplica);
         s_clusterMap[CLUSTER_ID_REPLICA] = ClusterCtx(m_engineReplica,
                                                       SynchronizedThreadLock::s_mpEngine,
-                                                      SynchronizedThreadLock::s_enginesByPartitionId);
+                                                      SynchronizedThreadLock::s_enginesByPartitionId,
+                                                      ThreadLocalPool::getThreadPartitionIdForTest());
 
         // Make the master cluster the default, starting now.
         ClusterCtx cc = s_clusterMap[CLUSTER_ID];
+        ThreadLocalPool::setThreadPartitionIdForTest(cc.getThreadPartitionId());
         SynchronizedThreadLock::setEngineLocalsForTest(cc.getEngine()->getPartitionId(),
                                                        cc.getMpEngineLocals(),
                                                        cc.getEnginesByPartitionId());
@@ -320,7 +332,7 @@ public:
 
         m_table = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE", m_schema, columnNames, tableHandle, false, 0));
         {
-            SynchronizedThreadLock::lockReplicatedResource();
+            ScopedReplicatedResourceLock scopedLock;
             ExecuteWithMpMemory useMpMemory;
             m_replicatedTable = reinterpret_cast<PersistentTable *>(voltdb::TableFactory::getPersistentTable(0,
                                                                                                              "R_TABLE",
@@ -333,17 +345,15 @@ public:
                                                                                                              INT_MAX,
                                                                                                              95, true,
                                                                                                              true));
-            SynchronizedThreadLock::unlockReplicatedResource();
         }
 
         {
             ReplicaProcessContextSwitcher switcher;
             m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE_REPLICA", m_schemaReplica, columnNames, tableHandle, false, 0));
-            SynchronizedThreadLock::lockReplicatedResource();
+            ScopedReplicatedResourceLock scopedLock;
             ExecuteWithMpMemory useMpMemory;
             m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE_REPLICA", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1,
                 false, false, 0, INT_MAX, 95, false, true));
-            SynchronizedThreadLock::unlockReplicatedResource();
         }
         m_table->setDR(true);
 
@@ -419,19 +429,17 @@ public:
 
         {
             delete m_table;
-            SynchronizedThreadLock::lockReplicatedResource();
+            ScopedReplicatedResourceLock scopedLock;
             ExecuteWithMpMemory usingMpMemory;
             delete m_replicatedTable;
-            SynchronizedThreadLock::unlockReplicatedResource();
         }
 
         {
             ReplicaProcessContextSwitcher switcher;
             delete m_tableReplica;
-            SynchronizedThreadLock::lockReplicatedResource();
+            ScopedReplicatedResourceLock scopedLock;
             ExecuteWithMpMemory usingMpMemory;
             delete m_replicatedTableReplica;
-            SynchronizedThreadLock::unlockReplicatedResource();
         }
 
         delete m_singleColumnTable;
@@ -440,6 +448,7 @@ public:
         delete m_engine;
 
         ClusterCtx cc = s_clusterMap[CLUSTER_ID_REPLICA];
+        ThreadLocalPool::setThreadPartitionIdForTest(cc.getThreadPartitionId());
         SynchronizedThreadLock::setEngineLocalsForTest(cc.getEngine()->getPartitionId(),
                                                        cc.getMpEngineLocals(),
                                                        cc.getEnginesByPartitionId());
@@ -483,42 +492,57 @@ public:
         }
     }
 
-    TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple, bool forReplicated = false) {
-        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplicated);
+    TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple) {
+        if (table->isCatalogTableReplicated()) {
+            return insertTupleForReplicated(table, temp_tuple);
+        }
         table->insertTuple(temp_tuple);
         if (table->schema()->hiddenColumnCount() > 0) {
             int64_t expectedTimestamp = ExecutorContext::createDRTimestampHiddenValue(static_cast<int64_t>(CLUSTER_ID), m_currTxnUniqueId);
             temp_tuple.setHiddenNValue(table->getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(expectedTimestamp));
         }
         TableTuple tuple = table->lookupTupleForDR(temp_tuple);
-        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
         assert(!tuple.isNullTuple());
         return tuple;
     }
 
-    TableTuple updateTuple(PersistentTable* table, TableTuple oldTuple, TableTuple newTuple, bool forReplicated=false) {
-        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplicated);
+    TableTuple insertTupleForReplicated(PersistentTable* table, TableTuple temp_tuple) {
+        SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+        TableTuple tuple;
+        {
+            ExecuteWithMpMemory usingMpMemory;
+            table->insertTuple(temp_tuple);
+            if (table->schema()->hiddenColumnCount() > 0) {
+                int64_t expectedTimestamp = ExecutorContext::createDRTimestampHiddenValue(
+                        static_cast<int64_t>(CLUSTER_ID), m_currTxnUniqueId);
+                temp_tuple.setHiddenNValue(table->getDRTimestampColumnIndex(),
+                                           ValueFactory::getBigIntValue(expectedTimestamp));
+            }
+            tuple = table->lookupTupleForDR(temp_tuple);
+        }
+
+        SynchronizedThreadLock::signalLowestSiteFinished();
+        assert(!tuple.isNullTuple());
+        return tuple;
+    }
+
+    TableTuple updateTuple(PersistentTable* table, TableTuple oldTuple, TableTuple newTuple) {
+        assert(!table->isCatalogTableReplicated());
         table->updateTuple(oldTuple, newTuple);
         TableTuple tuple = table->lookupTupleByValues(newTuple);
         assert(!tuple.isNullTuple());
-        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
         return tuple;
     }
 
-    void deleteTuple(PersistentTable* table, TableTuple tuple, bool forReplicated=false) {
-        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplicated);
+    void deleteTuple(PersistentTable* table, TableTuple tuple) {
+        assert(!table->isCatalogTableReplicated());
         TableTuple tuple_to_delete = table->lookupTupleForDR(tuple);
         ASSERT_FALSE(tuple_to_delete.isNullTuple());
         table->deleteTuple(tuple_to_delete, true);
-        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
     }
 
-    TableTuple updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value, bool forReplicated=false) {
-        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-        ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(forReplicated);
+    TableTuple updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value) {
+        assert(!table->isCatalogTableReplicated());
         TableTuple tuple_to_update = table->lookupTupleForDR(tuple);
         assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();
@@ -526,11 +550,11 @@ public:
         new_tuple.setNValue(0, ValueFactory::getTinyIntValue(new_index_value));
         new_tuple.setNValue(3, ValueFactory::getStringValue(new_nonindex_value, &m_longLivedPool));
         table->updateTuple(tuple_to_update, new_tuple);
-        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
         return table->lookupTupleForDR(new_tuple);
     }
 
-    TableTuple updateTupleFirstAndSecondColumn(PersistentTable* table, TableTuple tuple, int8_t new_tinyint_value, int64_t new_bigint_value, bool forReplica=false) {
+    TableTuple updateTupleFirstAndSecondColumn(PersistentTable* table, TableTuple tuple, int8_t new_tinyint_value, int64_t new_bigint_value) {
+        assert(!table->isCatalogTableReplicated());
         TableTuple tuple_to_update = table->lookupTupleByValues(tuple);
         assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();
@@ -879,7 +903,7 @@ public:
             beginTxn(m_engine, 109, 99, 98, 70);
             first_tuple = insertTuple(m_replicatedTable,
                     prepareTempTuple(m_replicatedTable, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to "
-                            "use outline storage for the underlying data. It should be longer than 64 bytes.", 5433), true);
+                            "use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
             endTxn(m_engine, true);
         }
 
@@ -898,7 +922,7 @@ public:
             beginTxn(m_engine, 110, 100, 99, 71);
             first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
             second_tuple = prepareTempTuple(m_replicatedTable, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342);
-            second_tuple = insertTuple(m_replicatedTable, second_tuple, true);
+            second_tuple = insertTuple(m_replicatedTable, second_tuple);
             endTxn(m_engine, true);
         }
 
@@ -919,7 +943,7 @@ public:
             beginTxn(m_engine, 111, 101, 100, 72);
             first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 11, 34534, "3453.4545", "another", "blah blah blah blah blah blah", 2344));
             second_tuple = prepareTempTuple(m_replicatedTable, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222);
-            second_tuple = insertTuple(m_replicatedTable, second_tuple, true);
+            second_tuple = insertTuple(m_replicatedTable, second_tuple);
             endTxn(m_engine, false);
         }
 
@@ -929,7 +953,7 @@ public:
         {
             // one more write to the replicated table for good measure
             beginTxn(m_engine, 112, 102, 101, 73);
-            second_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455), true);
+            second_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
             endTxn(m_engine, true);
         }
 
@@ -1189,8 +1213,8 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWritesWithReplicatedStream) {
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {
     beginTxn(m_engine, 109, 99, 98, 70);
-    TableTuple first_tuple = insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable), true);
-    TableTuple second_tuple = insertTuple(m_replicatedTable, secondTupleWithNulls(m_replicatedTable), true);
+    TableTuple first_tuple = insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable));
+    TableTuple second_tuple = insertTuple(m_replicatedTable, secondTupleWithNulls(m_replicatedTable));
     endTxn(m_engine, true);
 
     {
@@ -1207,11 +1231,11 @@ TEST_F(DRBinaryLogTest, SerializeNulls) {
 
 TEST_F(DRBinaryLogTest, RollbackNulls) {
     beginTxn(m_engine, 109, 99, 98, 70);
-    insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable), true);
+    insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable));
     endTxn(m_engine, false);
 
     beginTxn(m_engine, 110, 100, 99, 71);
-    TableTuple source_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455), true);
+    TableTuple source_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
     endTxn(m_engine, true);
 
     {

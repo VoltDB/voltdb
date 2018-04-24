@@ -44,21 +44,11 @@
  */
 
 #include "orderbyexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
-#include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
-
-#include <algorithm>
-#include <vector>
 
 namespace voltdb {
 

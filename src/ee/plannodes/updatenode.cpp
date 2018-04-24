@@ -44,8 +44,6 @@
  */
 #include "updatenode.h"
 
-#include <sstream>
-
 namespace voltdb {
 
 PlanNodeType UpdatePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UPDATE; }

@@ -82,6 +82,12 @@ private:
 #endif
 };
 
+class ScopedReplicatedResourceLock {
+public:
+    ScopedReplicatedResourceLock();
+    ~ScopedReplicatedResourceLock();
+};
+
 } // end namespace voltdb
 
 #endif //VOLTDB_EXECUTEWITHMPMEMORY_H

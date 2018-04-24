@@ -44,29 +44,15 @@
  */
 
 #include "mergereceiveexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
 #include "plannodes/mergereceivenode.h"
-#include "execution/ExecutorVector.h"
-#include "execution/VoltDBEngine.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "executors/aggregateexecutor.h"
-#include "executors/executorutil.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 #include "plannodes/receivenode.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
-
-#include <boost/lexical_cast.hpp>
-
-#include <vector>
-#include <utility>
-#include <algorithm>
 
 namespace voltdb {
 

@@ -89,6 +89,7 @@ ExecuteWithAllSitesMemory::ExecuteWithAllSitesMemory()
         , m_wasUsingMpMemory(SynchronizedThreadLock::usingMpMemory())
 #endif
 {
+    assert(SynchronizedThreadLock::isInSingleThreadMode() || SynchronizedThreadLock::isHoldingResourceLock());
     assert(SynchronizedThreadLock::isLowestSiteContext());
 }
 
@@ -106,6 +107,14 @@ SharedEngineLocalsType::iterator ExecuteWithAllSitesMemory::begin() {
 
 SharedEngineLocalsType::iterator ExecuteWithAllSitesMemory::end() {
     return SynchronizedThreadLock::s_enginesByPartitionId.end();
+}
+
+ScopedReplicatedResourceLock::ScopedReplicatedResourceLock() {
+    SynchronizedThreadLock::lockReplicatedResource();
+}
+
+ScopedReplicatedResourceLock::~ScopedReplicatedResourceLock() {
+    SynchronizedThreadLock::unlockReplicatedResource();
 }
 
 } // end namespace voltdb

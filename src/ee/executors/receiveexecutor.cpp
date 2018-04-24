@@ -44,15 +44,8 @@
  */
 
 #include "receiveexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
 #include "plannodes/receivenode.h"
-#include "execution/ExecutorVector.h"
-#include "execution/VoltDBEngine.h"
-#include "storage/table.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 
 namespace voltdb {

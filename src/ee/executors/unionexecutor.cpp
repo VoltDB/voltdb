@@ -45,16 +45,10 @@
 
 #include "unionexecutor.h"
 
-#include "common/tabletuple.h"
-#include "execution/ExecutorVector.h"
 #include "plannodes/unionnode.h"
-#include "storage/AbstractTempTable.hpp"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
-
-#include "boost/unordered_set.hpp"
-#include "boost/unordered_map.hpp"
 
 namespace voltdb {
 

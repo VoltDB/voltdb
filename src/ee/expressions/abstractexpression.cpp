@@ -45,14 +45,8 @@
 
 #include "abstractexpression.h"
 
-#include "common/debuglog.h"
 #include "common/serializeio.h"
-#include "common/types.h"
 #include "expressions/expressionutil.h"
-
-#include <sstream>
-#include <cassert>
-#include <stdexcept>
 
 namespace voltdb {
 
