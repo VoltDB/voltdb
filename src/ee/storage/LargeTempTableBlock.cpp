@@ -131,6 +131,7 @@ void LargeTempTableBlock::setData(std::unique_ptr<char[]> storage) {
 }
 
 std::unique_ptr<char[]> LargeTempTableBlock::releaseData() {
+    assert (*getStorageAddressPointer() == m_storage.get());
     std::unique_ptr<char[]> storage;
     storage.swap(m_storage);
     m_isStored = true;

@@ -53,6 +53,7 @@ private:
         Block(char* data, const voltdb::TupleSchema *schema)
             : m_data(new char[voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES])
             , m_schema(schema)
+            , m_origAddress(data)
         {
             ::memcpy(m_data.get(), data, voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES);
         }
@@ -60,6 +61,7 @@ private:
         Block()
             : m_data()
             , m_schema(NULL)
+            , m_origAddress(NULL)
         {
         }
 
@@ -79,9 +81,14 @@ private:
             return oss.str();
         }
 
+        char* origAddress() const {
+            return m_origAddress;
+        }
+
     private:
         std::unique_ptr<char[]> m_data;
         const voltdb::TupleSchema* m_schema;
+        char* m_origAddress;
     };
 
 public:
@@ -101,6 +108,7 @@ public:
         assert (it != m_map.end());
         Block *storedBlock = it->second;
 
+        assert (*(reinterpret_cast<char**>(storedBlock->data())) == storedBlock->origAddress());
         std::unique_ptr<char[]> storage{new char[voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES]};
         ::memcpy(storage.get(), storedBlock->data(), voltdb::LargeTempTableBlock::BLOCK_SIZE_IN_BYTES);
         block->setData(std::move(storage));
