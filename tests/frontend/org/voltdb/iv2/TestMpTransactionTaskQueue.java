@@ -37,9 +37,9 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
+
+import junit.framework.TestCase;
 
 public class TestMpTransactionTaskQueue extends TestCase
 {
@@ -64,7 +64,7 @@ public class TestMpTransactionTaskQueue extends TestCase
         m_MPpool = mock(MpRoSitePool.class);
         // Accept work for a while
         when(m_MPpool.canAcceptWork()).thenReturn(true);
-        m_dut = new MpTransactionTaskQueue(m_writeQueue);
+        m_dut = new MpTransactionTaskQueue(m_writeQueue, 2);
         m_dut.setMpRoSitePool(m_MPpool);
     }
 

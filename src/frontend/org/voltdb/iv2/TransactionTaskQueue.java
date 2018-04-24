@@ -25,9 +25,7 @@ import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.CompleteTransactionMessage;
 
 public class TransactionTaskQueue
 {
@@ -37,7 +35,7 @@ public class TransactionTaskQueue
     final protected SiteTaskerQueue m_taskQueue;
 
     final private int m_siteCount;
-    final private ScoreboardTasks m_scoreboard;
+    final private Scoreboard m_scoreboard;
 
     /*
      * Multi-part transactions create a backlog of tasks behind them. A queue is
@@ -46,74 +44,18 @@ public class TransactionTaskQueue
      */
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
-    final static ArrayList<Pair<SiteTaskerQueue, ScoreboardTasks>> s_stashedMpWrites = new ArrayList<>(0);
+    final static ArrayList<Pair<SiteTaskerQueue, Scoreboard>> s_stashedMpWrites = new ArrayList<>(0);
     static Object s_lock = new Object();
 
-    // The purpose of having it is to synchronize all MP write messages (FragmentTask, CompleteTransactionTask)
-    // across sites on the same node. Why? First reason is synchronized MP writes prevent
-    // partial commit that we've observed in some rare cases. Second reason is prevent shared-replicated
-    // table writes from blocking sites partially, e.g. some sites wait on countdown latch for all
-    // sites within a node to receive a fragment, but due to node failure the failed remote leader may never forward the
-    // fragment to the rest of sites on the given node, causes deadlock and can't be recovered from repair.
-    private static class ScoreboardTasks {
-        // We need to track 2 completions because during restart repairlog may resend a completion for
-        // a transaction that has been processed as well as an abort for the actual transaction in progress.
-        public Deque<Pair<CompleteTransactionTask, Boolean>> m_lastCompleteTxnTasks = new ArrayDeque<>(2);
-        public TransactionTask m_lastFragTask;
-
-        public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
-            if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP &&
-                    (m_lastCompleteTxnTasks.peekFirst() != null || missingTxn)) {
-                // This is an extremely rare case were a MPI repair arrives before the dead MPI's completion
-                // Ignore this message because the repair completion is more recent and should step on the initial completion
-                assert(MpRestartSequenceGenerator.isForRestart(m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()));
-            }
-            else
-            if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP ||
-                    (m_lastCompleteTxnTasks.peekFirst() != null &&
-                    !MpRestartSequenceGenerator.isForRestart(task.getTimestamp()))) {
-                // This is a submission of a completion. In case this is a resubmission of a completion that not
-                // all sites received clear the whole queue. The Completion may or may not be for a transaction
-                // that has already been completed (if it was completed missingTxn will be true)
-                m_lastCompleteTxnTasks.clear();
-                m_lastCompleteTxnTasks.addLast(Pair.of(task, missingTxn));
-            }
-            else {
-                // This is an abort completion that will be followed with a resubmitted fragment,
-                // so step on any fragment that is pending
-                Pair<CompleteTransactionTask, Boolean> lastTaskPair = m_lastCompleteTxnTasks.peekLast();
-                if (lastTaskPair != null && lastTaskPair.getFirst().getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP) {
-                    assert(lastTaskPair.getFirst().getMsgTxnId() == task.getMsgTxnId());
-                    m_lastCompleteTxnTasks.removeLast();
-                }
-                else {
-                    assert(m_lastCompleteTxnTasks.size() <= 1);
-                }
-                m_lastCompleteTxnTasks.addLast(Pair.of(task, missingTxn));
-                m_lastFragTask = null;
-            }
-        }
-
-        public void addFragmentTask(TransactionTask task) {
-            m_lastFragTask = task;
-        }
-
-        public String toString() {
-            return "CompleteTransactionTasks: " + m_lastCompleteTxnTasks.peekFirst() +
-                    (m_lastCompleteTxnTasks.size() == 2 ? "\n" + m_lastCompleteTxnTasks.peekLast() : "") +
-                    "\nFragmentTask: " + m_lastFragTask;
-        }
-    }
-
-    TransactionTaskQueue(SiteTaskerQueue queue)
+    TransactionTaskQueue(SiteTaskerQueue queue, int localSitesCount)
     {
         m_taskQueue = queue;
-        m_siteCount = VoltDB.instance().getCatalogContext().getNodeSettings().getLocalSitesCount();
+        m_siteCount = localSitesCount;
         if (queue.getPartitionId() == MpInitiator.MP_INIT_PID) {
             m_scoreboard = null;
         }
         else {
-            m_scoreboard = new ScoreboardTasks();
+            m_scoreboard = new Scoreboard();
         }
     }
 
@@ -123,7 +65,6 @@ public class TransactionTaskQueue
                 if (s_stashedMpWrites.isEmpty()) {
                     s_stashedMpWrites.ensureCapacity(m_siteCount);
                 }
-                assert(s_stashedMpWrites.get(siteId) == null);
                 s_stashedMpWrites.add(siteId, Pair.of(m_taskQueue, m_scoreboard));
             }
         }
@@ -205,13 +146,13 @@ public class TransactionTaskQueue
             hostLog.debug("release stashed fragment messages");
         }
         long lastTxnId = 0;
-        for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
-            TransactionTask task = p.getSecond().m_lastFragTask;
+        for (Pair<SiteTaskerQueue, Scoreboard> p : s_stashedMpWrites) {
+            TransactionTask task = p.getSecond().getFragmentTask();
             assert(lastTxnId == 0 || lastTxnId == task.getTxnId());
             lastTxnId = task.getTxnId();
             Iv2Trace.logSiteTaskerQueueOffer(task);
             p.getFirst().offer(task);
-            p.getSecond().m_lastFragTask = null;
+            p.getSecond().clearFragment();
         }
     }
 
@@ -227,8 +168,8 @@ public class TransactionTaskQueue
             }
         }
         long lastTxnId = 0;
-        for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
-            CompleteTransactionTask completion = p.getSecond().m_lastCompleteTxnTasks.poll().getFirst();
+        for (Pair<SiteTaskerQueue, Scoreboard> p : s_stashedMpWrites) {
+            CompleteTransactionTask completion = p.getSecond().getCompletionTasks().poll().getFirst();
             assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
             lastTxnId = completion.getMsgTxnId();
             if (!missingTxn) {
@@ -250,36 +191,36 @@ public class TransactionTaskQueue
                 m_scoreboard.addFragmentTask(task);
             }
 
-            int receivedFrags = 0;
-            int receivedCompleteTxns = 0;
+            int fragmentScore = 0;
+            int completionScore = 0;
             boolean missingTxn = false;
-            for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
-                if (!p.getSecond().m_lastCompleteTxnTasks.isEmpty()) {
-                    if (matchingCompletionTime != p.getSecond().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
+            for (Pair<SiteTaskerQueue, Scoreboard> p : s_stashedMpWrites) {
+                if (!p.getSecond().getCompletionTasks().isEmpty()) {
+                    if (matchingCompletionTime != p.getSecond().getCompletionTasks().peekFirst().getFirst().getTimestamp()) {
                         continue;
                     }
-                    missingTxn |= p.getSecond().m_lastCompleteTxnTasks.peekFirst().getSecond();
+                    missingTxn |= p.getSecond().getCompletionTasks().peekFirst().getSecond();
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                     // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
-                    receivedCompleteTxns++;
+                    completionScore++;
                 }
-                if (p.getSecond().m_lastFragTask != null) {
-                    receivedFrags++;
+                if (p.getSecond().getFragmentTask() != null) {
+                    fragmentScore++;
                 }
             }
 
             if (hostLog.isDebugEnabled()) {
-                StringBuilder sb = new StringBuilder("MP Write Scoreboard Received " + task + "\nFrags: " + receivedFrags + "/" + m_siteCount +
-                        " Comps: " + receivedCompleteTxns + "/" + m_siteCount + ".\n");
+                StringBuilder sb = new StringBuilder("MP Write Scoreboard Received " + task + "\nFrags: " + fragmentScore + "/" + m_siteCount +
+                        " Comps: " + completionScore + "/" + m_siteCount + ".\n");
                 dumpStashedMpWrites(sb);
                 hostLog.debug(sb.toString());
             }
-            if (receivedCompleteTxns == m_siteCount) {
+            if (completionScore == m_siteCount) {
                 releaseStashedComleteTxns(missingTxn);
             }
             else
-            if (receivedFrags == m_siteCount && receivedCompleteTxns == 0) {
+            if (fragmentScore == m_siteCount && completionScore == 0) {
                 releaseStashedFragments();
             }
         }
@@ -289,26 +230,26 @@ public class TransactionTaskQueue
         synchronized (s_lock) {
             long matchingCompletionTime = missingTxnCompletion.getTimestamp();
             m_scoreboard.addCompletedTransactionTask(missingTxnCompletion, true);
-            int receivedCompleteTxns = 0;
-            for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
-                if (!p.getSecond().m_lastCompleteTxnTasks.isEmpty()) {
-                    if (matchingCompletionTime != p.getSecond().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
+            int completionScore = 0;
+            for (Pair<SiteTaskerQueue, Scoreboard> p : s_stashedMpWrites) {
+                if (!p.getSecond().getCompletionTasks().isEmpty()) {
+                    if (matchingCompletionTime != p.getSecond().getCompletionTasks().peekFirst().getFirst().getTimestamp()) {
                         continue;
                     }
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                     // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
-                    receivedCompleteTxns++;
+                    completionScore++;
                 }
             }
 
             if (hostLog.isDebugEnabled()) {
                 StringBuilder sb = new StringBuilder("MP Write Scoreboard Received unmatched " + missingTxnCompletion +
-                        "\nComps: " + receivedCompleteTxns + "/" + m_siteCount + ".\n");
+                        "\nComps: " + completionScore + "/" + m_siteCount + ".\n");
                 dumpStashedMpWrites(sb);
                 hostLog.debug(sb.toString());
             }
-            if (receivedCompleteTxns == m_siteCount) {
+            if (completionScore == m_siteCount) {
                 releaseStashedComleteTxns(true);
             }
         }
@@ -316,7 +257,7 @@ public class TransactionTaskQueue
 
     // should only be used for debugging purpose
     private void dumpStashedMpWrites(StringBuilder builder) {
-        for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
+        for (Pair<SiteTaskerQueue, Scoreboard> p : s_stashedMpWrites) {
             builder.append("Queue " + p.getFirst().getPartitionId() + ":\n" + p.getSecond());
             builder.append("\n");
         }

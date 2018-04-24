@@ -27,7 +27,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.List;
 
 import org.junit.Test;
 import org.voltdb.StarvationTracker;
@@ -40,6 +42,12 @@ import junit.framework.TestCase;
 
 public class TestTransactionTaskQueue extends TestCase
 {
+    private static final int SITE_COUNT = 2;
+    private List<TransactionTaskQueue> m_txnTaskQueues = new ArrayList<>();
+    private List<SiteTaskerQueue> m_siteTaskQueues = new ArrayList<>();
+    List<Deque<TransactionTask>> m_expectedOrders = new ArrayList<>();
+    long[] m_localTxnId = new long[SITE_COUNT]; // for sp txn, txnId is spHandle
+    long m_mpTxnId = 0;
 
     private static SiteTaskerQueue getSiteTaskerQueue() {
         SiteTaskerQueue queue = new SiteTaskerQueue(0);
@@ -103,13 +111,41 @@ public class TestTransactionTaskQueue extends TestCase
     }
 
     private CompleteTransactionTask createComplete(TransactionState txn,
-                                                   long mpTxnId,
-                                                   TransactionTaskQueue queue)
+            long mpTxnId,
+            TransactionTaskQueue queue)
     {
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
+        when(msg.getTimestamp()).thenReturn(CompleteTransactionMessage.INITIAL_TIMESTAMP);
+        CompleteTransactionTask task =
+                new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
+        return task;
+    }
+    private CompleteTransactionTask createRepairComplete(TransactionState txn,
+                                                       long mpTxnId,
+                                                       TransactionTaskQueue queue)
+    {
+        CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
+        when(msg.getTxnId()).thenReturn(mpTxnId);
+        MpRestartSequenceGenerator generator = new MpRestartSequenceGenerator(0, false);
+        long seq = generator.getNextSeqNum();
+        when(msg.getTimestamp()).thenReturn(seq);
         CompleteTransactionTask task =
             new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
+        return task;
+    }
+
+    private CompleteTransactionTask createRestartComplete(TransactionState txn,
+                                                         long mpTxnId,
+                                                         TransactionTaskQueue queue)
+    {
+        CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
+        when(msg.getTxnId()).thenReturn(mpTxnId);
+        MpRestartSequenceGenerator generator = new MpRestartSequenceGenerator(0, true);
+        long seq = generator.getNextSeqNum();
+        when(msg.getTimestamp()).thenReturn(seq);
+        CompleteTransactionTask task =
+                new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
         return task;
     }
 
@@ -123,13 +159,165 @@ public class TestTransactionTaskQueue extends TestCase
         dut.flush(task.getTxnId());
     }
 
+    private void addMissingCompletionTask(TransactionTask task, TransactionTaskQueue dut) {
+        dut.handleCompletionForMissingTxn((CompleteTransactionTask) task);
+        dut.flush(task.getTxnId());
+    }
+
+    @Override
+    public void setUp() {
+        for (int i = 0; i < SITE_COUNT; i++) {
+            SiteTaskerQueue siteTaskQueue = getSiteTaskerQueue();
+            m_siteTaskQueues.add(siteTaskQueue);
+            TransactionTaskQueue txnTaskQueue = new TransactionTaskQueue(siteTaskQueue, SITE_COUNT);
+            txnTaskQueue.initializeScoreboard(i);
+            m_txnTaskQueues.add(txnTaskQueue);
+            Deque<TransactionTask> expectedOrder = new ArrayDeque<>();
+            m_expectedOrders.add(expectedOrder);
+            m_localTxnId[0] = 0;
+        }
+    }
+
+    @Override
+    public void tearDown() {
+        m_siteTaskQueues.clear();
+        m_txnTaskQueues.clear();
+        m_expectedOrders.clear();
+        for (int i = 0; i < SITE_COUNT; i++) {
+            m_localTxnId[i] = 0;
+        }
+        m_mpTxnId = 0;
+    }
+
+    // This is the most common case
+    @Test
+    public void testBasicMultiFragmentsMp() throws InterruptedException {
+        // Every site receives first fragment
+        long txnId = m_mpTxnId++;
+        TransactionTask firstFrag = null;
+        for (int i = 0; i < SITE_COUNT; i++) {
+            firstFrag = createFrag(m_localTxnId[i]++, txnId, m_txnTaskQueues.get(i));
+            addTask(firstFrag, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        // Every site receives second fragment
+        for (int i = 0; i < SITE_COUNT; i++) {
+            TransactionTask next = createFrag(firstFrag.getTransactionState(), txnId, m_txnTaskQueues.get(i));
+            addTask(next, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        // Every site receives a completion
+        TransactionTask comp = null;
+        for (int i = 0; i < SITE_COUNT; i++) {
+            comp = createComplete(firstFrag.getTransactionState(), firstFrag.getTxnId(), m_txnTaskQueues.get(i));
+            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        for (int i = 0; i < SITE_COUNT; i++) {
+            while (!m_expectedOrders.get(i).isEmpty()) {
+                TransactionTask next_poll = (TransactionTask)m_siteTaskQueues.get(i).take();
+                TransactionTask expected = m_expectedOrders.get(i).removeFirst();
+                assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
+                assertEquals(expected.getTxnId(), next_poll.getTxnId());
+            }
+        }
+    }
+
+    // In case MpProc doesn't generate any fragment, e.g. run() method is empty
+    @Test
+    public void testNoFragmentMp() throws InterruptedException {
+        long txnId = m_mpTxnId++;
+        // Every site receives a completion
+        TransactionTask comp = null;
+        for (int i = 0; i < SITE_COUNT; i++) {
+            MpTransactionState txnState = mock(MpTransactionState.class);
+            comp = createComplete(txnState, txnId, m_txnTaskQueues.get(i));
+            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        for (int i = 0; i < SITE_COUNT; i++) {
+            while (!m_expectedOrders.get(i).isEmpty()) {
+                TransactionTask next_poll = (TransactionTask)m_siteTaskQueues.get(i).take();
+                TransactionTask expected = m_expectedOrders.get(i).removeFirst();
+                assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
+                assertEquals(expected.getTxnId(), next_poll.getTxnId());
+            }
+        }
+    }
+
+    // MpProc is in progress, a node failure
+    @Test
+    public void testMpRepair() throws InterruptedException {
+        // Every site receives first fragment
+        long txnId = m_mpTxnId++;
+        TransactionTask[] firstFrag = new TransactionTask[SITE_COUNT];
+        for (int i = 0; i < SITE_COUNT; i++) {
+            firstFrag[i] = createFrag(m_localTxnId[i]++, txnId, m_txnTaskQueues.get(i));
+            addTask(firstFrag[i], m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        // Not all sites receive completion
+        TransactionTask comp = null;
+        for (int i = 0; i < SITE_COUNT - 1; i++) {
+            comp = createComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
+            addTask(comp, m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+        }
+
+        txnId = m_mpTxnId++;
+        // it will stay at backlog
+        TransactionTask firstFragOfNextTxn = null;
+        for (int i = 0; i < SITE_COUNT - 1; i++) {
+            firstFragOfNextTxn = createFrag(m_localTxnId[i]++, txnId, m_txnTaskQueues.get(i));
+            addTask(firstFragOfNextTxn, m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+        }
+
+        // failure occurs, MPI checks repair logs from everybody, decide to repair previous transaction,
+        // restart current transaction
+
+        // MPI sends repair completion
+        for (int i = 0; i < SITE_COUNT; i++) {
+            comp = createRepairComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
+            // Finish the transaction
+            firstFrag[i].getTransactionState().setDone();
+            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        // MPI sends restart completion
+        for (int i = 0; i < SITE_COUNT; i++) {
+            comp = createRestartComplete(firstFragOfNextTxn.getTransactionState(), firstFragOfNextTxn.getTxnId(), m_txnTaskQueues.get(i));
+            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        // Restart the framgments
+        TransactionTask restartFrag = null;
+        for (int i = 0; i < SITE_COUNT; i++) {
+            restartFrag = createFrag(m_localTxnId[i]++, firstFragOfNextTxn.getTxnId(), m_txnTaskQueues.get(i));
+            addTask(restartFrag, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        for (int i = 0; i < SITE_COUNT; i++) {
+            comp = createComplete(restartFrag.getTransactionState(), restartFrag.getTxnId(), m_txnTaskQueues.get(i));
+            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        for (int i = 0; i < SITE_COUNT; i++) {
+            while (!m_expectedOrders.get(i).isEmpty()) {
+                TransactionTask next_poll = (TransactionTask)m_siteTaskQueues.get(i).take();
+                TransactionTask expected = m_expectedOrders.get(i).removeFirst();
+                assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
+                assertEquals(expected.getTxnId(), next_poll.getTxnId());
+            }
+        }
+    }
+
+
     @Test
     public void testBasicParticipantOps() throws InterruptedException
     {
         long localTxnId = 0;
         long mpTxnId = 0;
         SiteTaskerQueue task_queue = getSiteTaskerQueue();
-        TransactionTaskQueue dut = new TransactionTaskQueue(task_queue);
+        TransactionTaskQueue dut = new TransactionTaskQueue(task_queue, 2);
         Deque<TransactionTask> expected_order =
             new ArrayDeque<TransactionTask>();
 
