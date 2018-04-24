@@ -123,7 +123,7 @@ public class TransactionTaskQueue
                 if (s_stashedMpWrites.isEmpty()) {
                     s_stashedMpWrites.ensureCapacity(m_siteCount);
                 }
-                 assert(s_stashedMpWrites.get(siteId) == null);
+                assert(s_stashedMpWrites.get(siteId) == null);
                 s_stashedMpWrites.add(siteId, Pair.of(m_taskQueue, m_scoreboard));
             }
         }
