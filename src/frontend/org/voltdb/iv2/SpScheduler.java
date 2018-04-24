@@ -197,6 +197,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         IS_KSAFE_CLUSTER = VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor() > 0;
     }
 
+    public void initializeScoreboard(int siteId) {
+        m_pendingTasks.initializeScoreboard(siteId);
+    }
+
     @Override
     public void setLeaderState(boolean isLeader)
     {

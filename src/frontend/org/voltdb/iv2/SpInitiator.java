@@ -102,6 +102,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue(partition), snapMonitor),
                 "SP", agent, startAction);
+        ((SpScheduler)m_scheduler).initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()));
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
         ((SpScheduler)m_scheduler).m_repairLog = m_repairLog;
