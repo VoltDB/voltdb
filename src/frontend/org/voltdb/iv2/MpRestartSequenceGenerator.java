@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import org.voltdb.messaging.CompleteTransactionMessage;
+
 public class MpRestartSequenceGenerator {
     // bit sizes for each of the fields in the 64-bit id
     // note, these add up to 63 bits to make dealing with
@@ -36,7 +38,7 @@ public class MpRestartSequenceGenerator {
     public MpRestartSequenceGenerator(int nodeId, boolean forRestart) {
         assert (nodeId <= NODEID_MAX_VALUE);
         m_highOrderFields = nodeId << (COUNTER_BITS + RESTART_BITS)
-                          | (forRestart ? (1 << NODEID_BITS) : 0);
+                          | (forRestart ? (1 << COUNTER_BITS) : 0);
     }
 
     public long getNextSeqNum() {
@@ -52,7 +54,7 @@ public class MpRestartSequenceGenerator {
         return seq;
     }
 
-    public static long getSequence(long restartSeqId) {
+    private static long getSequence(long restartSeqId) {
         return restartSeqId & COUNTER_MAX_VALUE;
     }
 
@@ -60,18 +62,25 @@ public class MpRestartSequenceGenerator {
         return ((restartSeqId >> COUNTER_BITS) & RESTART_MAX_VALUE) == 1;
     }
 
-    public static int getNodeId(long restartSeqId) {
+    private static int getNodeId(long restartSeqId) {
         return (int) (restartSeqId >> (COUNTER_BITS + RESTART_BITS));
     }
 
     public static String restartSeqIdToString(long restartSeqId)
     {
+        if (restartSeqId == CompleteTransactionMessage.INITIAL_TIMESTAMP) {
+            return "(INITIAL)";
+        }
         return "(" + MpRestartSequenceGenerator.getNodeId(restartSeqId) + ":" +
                 MpRestartSequenceGenerator.getSequence(restartSeqId) + ")";
     }
 
     public static void restartSeqIdToString(long restartSeqId, StringBuilder sb)
     {
+        if (restartSeqId == CompleteTransactionMessage.INITIAL_TIMESTAMP) {
+            sb.append("(INITIAL)");
+            return;
+        }
         sb.append("(").append(MpRestartSequenceGenerator.getNodeId(restartSeqId)).append(":");
         sb.append(MpRestartSequenceGenerator.getSequence(restartSeqId));
         if (isForRestart(restartSeqId)) {
