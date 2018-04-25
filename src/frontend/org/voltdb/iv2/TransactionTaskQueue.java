@@ -99,9 +99,15 @@ public class TransactionTaskQueue
         }
 
         public String toString() {
-            return "CompleteTransactionTasks: " + m_lastCompleteTxnTasks.peekFirst() +
-                    (m_lastCompleteTxnTasks.size() == 2 ? "\n" + m_lastCompleteTxnTasks.peekLast() : "") +
-                    "\nFragmentTask: " + m_lastFragTask;
+            StringBuilder builder = new StringBuilder();
+            if (!m_lastCompleteTxnTasks.isEmpty()){
+                builder.append("CompleteTransactionTasks: " + m_lastCompleteTxnTasks.peekFirst() +
+                        (m_lastCompleteTxnTasks.size() == 2 ? "\n" + m_lastCompleteTxnTasks.peekLast() : ""));
+            }
+            if (m_lastFragTask != null) {
+                builder.append("\nFragmentTask: " + m_lastFragTask);
+            }
+            return builder.toString();
         }
     }
 
@@ -123,7 +129,6 @@ public class TransactionTaskQueue
                 if (s_stashedMpWrites.isEmpty()) {
                     s_stashedMpWrites.ensureCapacity(m_siteCount);
                 }
-                assert(s_stashedMpWrites.get(siteId) == null);
                 s_stashedMpWrites.add(siteId, Pair.of(m_taskQueue, m_scoreboard));
             }
         }
@@ -199,10 +204,10 @@ public class TransactionTaskQueue
     }
 
     // All sites receives FragmentTask messages, time to fire the task.
-    static private void releaseStashedFragments()
+    static private void releaseStashedFragments(long txnId)
     {
         if (hostLog.isDebugEnabled()) {
-            hostLog.debug("release stashed fragment messages");
+            hostLog.debug("release stashed fragment messages:" + TxnEgo.txnIdToString(txnId));
         }
         long lastTxnId = 0;
         for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
@@ -216,14 +221,14 @@ public class TransactionTaskQueue
     }
 
     // All sites receives CompletedTransactionTask messages, time to fire the task.
-    static private void releaseStashedComleteTxns(boolean missingTxn)
+    static private void releaseStashedComleteTxns(boolean missingTxn, long txnId)
     {
         if (hostLog.isDebugEnabled()) {
             if (missingTxn) {
-                hostLog.debug("skipped incomplete rollback transaction message");
+                hostLog.debug("skipped incomplete rollback transaction message:" + TxnEgo.txnIdToString(txnId));
             }
             else {
-                hostLog.debug("release stashed complete transaction message");
+                hostLog.debug("release stashed complete transaction message:" + TxnEgo.txnIdToString(txnId));
             }
         }
         long lastTxnId = 0;
@@ -276,11 +281,11 @@ public class TransactionTaskQueue
                 hostLog.debug(sb.toString());
             }
             if (receivedCompleteTxns == m_siteCount) {
-                releaseStashedComleteTxns(missingTxn);
+                releaseStashedComleteTxns(missingTxn, task.getTxnId());
             }
             else
             if (receivedFrags == m_siteCount && receivedCompleteTxns == 0) {
-                releaseStashedFragments();
+                releaseStashedFragments(task.getTxnId());
             }
         }
     }
@@ -304,12 +309,12 @@ public class TransactionTaskQueue
 
             if (hostLog.isDebugEnabled()) {
                 StringBuilder sb = new StringBuilder("MP Write Scoreboard Received unmatched " + missingTxnCompletion +
-                        "\nComps: " + receivedCompleteTxns + "/" + m_siteCount + ".\n");
+                        "\nComps: " + receivedCompleteTxns + "/" + m_siteCount);
                 dumpStashedMpWrites(sb);
                 hostLog.debug(sb.toString());
             }
             if (receivedCompleteTxns == m_siteCount) {
-                releaseStashedComleteTxns(true);
+                releaseStashedComleteTxns(true, missingTxnCompletion.getTxnId());
             }
         }
     }
@@ -317,8 +322,7 @@ public class TransactionTaskQueue
     // should only be used for debugging purpose
     private void dumpStashedMpWrites(StringBuilder builder) {
         for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
-            builder.append("Queue " + p.getFirst().getPartitionId() + ":\n" + p.getSecond());
-            builder.append("\n");
+            builder.append("\nQueue " + p.getFirst().getPartitionId() + ":" + p.getSecond());
         }
     }
 
