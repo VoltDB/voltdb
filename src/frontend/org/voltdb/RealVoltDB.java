@@ -144,6 +144,7 @@ import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
@@ -2083,6 +2084,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                 List<Integer> m_partitionsToSitesAtStartupForExportInit)
     {
         TreeMap<Integer, Initiator> initiators = new TreeMap<>();
+        // Needed when static is reused by ServerThread
+        TransactionTaskQueue.resetScoreboards();
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
