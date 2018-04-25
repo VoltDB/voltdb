@@ -55,6 +55,8 @@ public class MpPromoteAlgo implements RepairAlgo
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
     private final boolean m_isMigratePartitionLeader;
+    private final MpRestartSequenceGenerator m_restartSeqGenerator;
+
     long getRequestId()
     {
         return m_requestId;
@@ -116,6 +118,7 @@ public class MpPromoteAlgo implements RepairAlgo
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = false;
         m_whoami = whoami;
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId(), false);
     }
 
     /**
@@ -128,6 +131,7 @@ public class MpPromoteAlgo implements RepairAlgo
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId(), false);
     }
 
     @Override
@@ -263,7 +267,9 @@ public class MpPromoteAlgo implements RepairAlgo
             return;
         }
 
-        tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        }
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             // send the repair log union to all the survivors. SPIs will ignore
             // CompleteTransactionMessages for transactions which have already
@@ -275,7 +281,9 @@ public class MpPromoteAlgo implements RepairAlgo
                 tmLog.debug(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(m_survivors) + " with: " + TxnEgo.txnIdToString(li.getTxnId()) +
                         " " + repairMsg);
             }
-            m_mailbox.repairReplicasWith(m_survivors, repairMsg);
+            if (repairMsg != null) {
+                m_mailbox.repairReplicasWith(m_survivors, repairMsg);
+            }
         }
 
         m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
@@ -286,8 +294,6 @@ public class MpPromoteAlgo implements RepairAlgo
     //  Specialization
     //
     //
-
-
     VoltMessage makeRepairLogRequestMessage(long requestId)
     {
         return new Iv2RepairLogRequestMessage(requestId, Iv2RepairLogRequestMessage.MPIREQUEST);
@@ -310,8 +316,8 @@ public class MpPromoteAlgo implements RepairAlgo
            m_repairLogUnion.add(msg);
         }
         else if (msg.getPayload() instanceof CompleteTransactionMessage) {
-            // prefer complete messages to fragment tasks.
-            m_repairLogUnion.remove(prev);
+            // prefer complete messages to fragment tasks. Completion message also erases prior staled messages
+            m_repairLogUnion.removeIf((p) -> p.getTxnId() <= msg.getTxnId());
             m_repairLogUnion.add(msg);
         }
     }
@@ -322,6 +328,7 @@ public class MpPromoteAlgo implements RepairAlgo
             CompleteTransactionMessage message = (CompleteTransactionMessage)msg.getPayload();
             message.setForReplica(false);
             message.setRequireAck(false);
+            message.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
             return message;
         } else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();
@@ -337,18 +344,7 @@ public class MpPromoteAlgo implements RepairAlgo
                 assert(ftm.getInitiateTask() != null);
                 m_interruptedTxns.add(ftm.getInitiateTask());
             }
-            CompleteTransactionMessage rollback =
-                new CompleteTransactionMessage(
-                        ftm.getInitiatorHSId(),
-                        ftm.getCoordinatorHSId(),
-                        ftm.getTxnId(),
-                        ftm.isReadOnly(),
-                        0,
-                        true,   // Force rollback as our repair operation.
-                        false,  // no acks in iv2.
-                        restart,   // Indicate rollback for repair as appropriate
-                        ftm.isForReplay());
-            return rollback;
+            return null;
         }
     }
 }

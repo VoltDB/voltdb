@@ -316,7 +316,12 @@ bool SynchronizedThreadLock::isHoldingResourceLock() {
 #endif
 
 void SynchronizedThreadLock::assumeMpMemoryContext() {
-    assert(!usingMpMemory());
+#ifndef  NDEBUG
+    if (usingMpMemory()) {
+        VOLT_ERROR_STACK();
+        assert(!usingMpMemory());
+    }
+#endif
     // We should either be running on the lowest site thread (in the lowest site context) or
     // or be holding the replicated resource lock (Note: This could be a false positive if
     // a different thread happens to have the Replicated Resource Lock)
