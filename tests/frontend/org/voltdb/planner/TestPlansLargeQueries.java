@@ -98,9 +98,11 @@ public class TestPlansLargeQueries extends PlannerTestCase {
         //       Select distinct.
         validatePlan("select max(aa) from r1;",
                      fragSpec(PlanNodeType.SEND,
-                              PlanNodeType.AGGREGATE,
-                              PlanNodeType.ORDERBY,
-                              PlanNodeType.SEQSCAN));
+                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                      PlanNodeType.AGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
+        validatePlan("select max(aa) from r1 group by aa",
+                     fragSpec(PlanNodeType.SEND));
     }
 
 

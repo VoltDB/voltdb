@@ -2335,6 +2335,14 @@ public class PlanAssembler {
 
         AbstractPlanNode m_indexAccess = null;
 
+        /**
+         * See if we have determined whether this set of group by
+         * expressions can be serialized by the index we are scanning.
+         * If so, we will use serial aggregation and not hash aggregation.
+         *
+         * We have already checked this.  We just want to look it up.
+         * @return true iff the scan can serialize the group bys.
+         */
         boolean isChangedToSerialAggregate() {
             return m_canBeFullySerialized && m_indexAccess != null;
         }
@@ -2343,6 +2351,29 @@ public class PlanAssembler {
             return !m_canBeFullySerialized && m_indexAccess != null;
         }
 
+        /**
+         * A hash aggregation is needed if all of these are true.
+         * 1. There are group by columns.
+         * 2. There is no useful index, or there is a useful index,
+         *    but this is a multi partition query.
+         * 3. There is no determinable sort order, set by the order by
+         *    expressions, or else the order by expressions determine
+         *    a sort order, and some order imposed by the group by
+         *    expressions is compatible with the order imposed by
+         *    the order by expressions.  The order of group by
+         *    expressions in the group by list is immaterial for
+         *    grouping, so any expression order which matches the order by
+         *    expressions will do.
+         *
+         * Note that we could just insert an order by node in this case,
+         * but sorting is slower than hashing.  We expect sorting to be
+         * O(n lg(n)), and hashing to be about O(n).  Hashing requires
+         * more memory.
+         *
+         * @param root
+         * @param parsedSelect
+         * @return
+         */
         boolean needHashAggregator(AbstractPlanNode root, ParsedSelectStmt parsedSelect) {
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
@@ -2380,10 +2411,8 @@ public class PlanAssembler {
                     return false;
                 }
             }
-
             return true;
         }
-
     }
 
     private static AbstractPlanNode findSeqScanCandidateForGroupBy(
@@ -2632,6 +2661,8 @@ public class PlanAssembler {
             else if (switchToIndexScanForGroupBy(root, gbInfo)) {
                 root = gbInfo.m_indexAccess;
             }
+            // See the definition of needHashAggregator for the
+            // conditions for hash aggregation.
             boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
 
             // Construct the aggregate nodes.

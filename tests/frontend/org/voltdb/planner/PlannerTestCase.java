@@ -24,15 +24,13 @@
 package org.voltdb.planner;
 
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.EmptyStackException;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
@@ -710,6 +708,17 @@ public class PlannerTestCase extends TestCase {
                 stack.isEmpty());
     }
 
+    private String planNodeListString(List<PlanNodeType> list) {
+        StringBuilder buf = new StringBuilder();
+        String sep = "";
+        for (PlanNodeType pnt : list) {
+            buf.append(sep)
+               .append(pnt.name());
+            sep = ", ";
+        }
+        return buf.toString();
+    }
+
     protected static class PlanWithInlineNodes implements PlanMatcher {
         PlanNodeType m_type = null;
 
@@ -736,7 +745,24 @@ public class PlannerTestCase extends TestCase {
                 }
             }
             if (m_branches.size() != node.getInlinePlanNodes().size()) {
-                return String.format("Expected %d inline nodes, found %d", m_branches.size(), node.getInlinePlanNodes().size());
+                StringBuilder buf = new StringBuilder();
+                String sep = "";
+                for (PlanNodeType pnt : m_branches) {
+                    buf.append(sep).append(pnt.name());
+                }
+                String expected = buf.toString();
+                buf = new StringBuilder();
+                sep = "";
+                for (Map.Entry<PlanNodeType, AbstractPlanNode> entry : node.getInlinePlanNodes().entrySet()) {
+                    buf.append(sep).append(entry.getKey().name());
+                    sep = ", ";
+                }
+                String found = buf.toString();
+                return String.format("Expected %d inline nodes (%s), found %d (%s)",
+                                     m_branches.size(),
+                                     expected,
+                                     node.getInlinePlanNodes().size(),
+                                     found);
             }
             return null;
         }
@@ -963,6 +989,7 @@ public class PlannerTestCase extends TestCase {
             fragments = new ArrayList<>();
             fragments.add(compileForSinglePartition(SQL));
         }
+        System.out.printf("SQL: %s\n", SQL);
         for (int idx = 0; idx < fragments.size(); idx += 1) {
             AbstractPlanNode node = fragments.get(idx);
             System.out.printf("Node %d/%d:\n%s\n", idx + 1, fragments.size(), node.toExplainPlanString());
