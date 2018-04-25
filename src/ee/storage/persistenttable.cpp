@@ -2212,7 +2212,7 @@ void PersistentTable::addViewHandler(MaterializedViewHandler* viewHandler) {
         assert(m_deltaTable == NULL);
         ConditionalExecuteWithMpMemory usingMpMemoryIfReplicated(m_isReplicated);
         TableCatalogDelegate* tcd = engine->getTableDelegate(m_name);
-        m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
+        m_deltaTable = tcd->createDeltaTable(*engine->getDatabase(), *engine->getCatalogTable(m_name), engine->getIsActiveActiveDREnabled());
         VOLT_DEBUG("Engine %p (%d) create delta table %p for table %s", engine,
                 engine->getPartitionId(), m_deltaTable, m_name.c_str());
     }
