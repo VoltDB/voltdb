@@ -73,7 +73,8 @@ public class TransactionTaskQueue
             else
             if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP ||
                     (m_lastCompleteTxnTasks.peekFirst() != null &&
-                    !MpRestartSequenceGenerator.isForRestart(task.getTimestamp()))) {
+                    !MpRestartSequenceGenerator.isForRestart(task.getTimestamp()) &&
+                    m_lastCompleteTxnTasks.peekFirst().getFirst().getMsgTxnId() == task.getMsgTxnId())) {
                 // This is a submission of a completion. In case this is a resubmission of a completion that not
                 // all sites received clear the whole queue. The Completion may or may not be for a transaction
                 // that has already been completed (if it was completed missingTxn will be true)
@@ -125,6 +126,12 @@ public class TransactionTaskQueue
         }
     }
 
+    public static void resetScoreboards() {
+        synchronized (s_lock) {
+            s_stashedMpWrites.clear();
+        }
+    }
+
     void initializeScoreboard(int siteId) {
         synchronized (s_lock) {
             if (m_taskQueue.getPartitionId() != MpInitiator.MP_INIT_PID) {
@@ -132,6 +139,7 @@ public class TransactionTaskQueue
                     s_stashedMpWrites.ensureCapacity(m_siteCount);
                 }
                 s_stashedMpWrites.add(siteId, Pair.of(m_taskQueue, m_scoreboard));
+                assert(s_stashedMpWrites.size() <= m_siteCount);
             }
         }
     }
@@ -261,18 +269,22 @@ public class TransactionTaskQueue
             int receivedCompleteTxns = 0;
             boolean missingTxn = false;
             for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
-                if (!p.getSecond().m_lastCompleteTxnTasks.isEmpty()) {
-                    if (matchingCompletionTime != p.getSecond().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
+                ScoreboardTasks st = p.getSecond();
+                if (st.m_lastFragTask == null && st.m_lastCompleteTxnTasks.isEmpty()) {
+                    break;
+                }
+                if (st.m_lastFragTask != null) {
+                    receivedFrags++;
+                }
+                if (!st.m_lastCompleteTxnTasks.isEmpty()) {
+                    if (matchingCompletionTime != st.m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
                         continue;
                     }
-                    missingTxn |= p.getSecond().m_lastCompleteTxnTasks.peekFirst().getSecond();
+                    missingTxn |= st.m_lastCompleteTxnTasks.peekFirst().getSecond();
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                     // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
                     receivedCompleteTxns++;
-                }
-                if (p.getSecond().m_lastFragTask != null) {
-                    receivedFrags++;
                 }
             }
 
@@ -298,9 +310,10 @@ public class TransactionTaskQueue
             m_scoreboard.addCompletedTransactionTask(missingTxnCompletion, true);
             int receivedCompleteTxns = 0;
             for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
-                if (!p.getSecond().m_lastCompleteTxnTasks.isEmpty()) {
-                    if (matchingCompletionTime != p.getSecond().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
-                        continue;
+                ScoreboardTasks st = p.getSecond();
+                if (!st.m_lastCompleteTxnTasks.isEmpty()) {
+                    if (matchingCompletionTime != st.m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
+                        break;
                     }
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
@@ -316,7 +329,7 @@ public class TransactionTaskQueue
                 hostLog.debug(sb.toString());
             }
             if (receivedCompleteTxns == m_siteCount) {
-                releaseStashedComleteTxns(true, missingTxnCompletion.getTxnId());
+                releaseStashedComleteTxns(true, missingTxnCompletion.getMsgTxnId());
             }
         }
     }

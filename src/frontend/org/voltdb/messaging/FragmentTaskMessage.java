@@ -645,7 +645,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         int msgsize = super.getSerializedSize();
 
         // Fixed header
-        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2;
+        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 8;
 
         // procname to load str if any
         if (m_procNameToLoad != null) {
@@ -729,8 +729,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 msgsize += 4 + item.m_stmtText.length;
             }
         }
-        // For the restarted transaction timestamp
-        msgsize += 8;
 
         return msgsize;
     }
@@ -791,6 +789,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         }
         buf.put(m_perFragmentStatsRecording ? (byte) 1 : (byte) 0);
         buf.put(m_coordinatorTask ? (byte) 1 : (byte) 0);
+        // timestamp for restarted transaction
+        buf.putLong(m_restartTimestamp);
 
         // Plan Hash block
         for (FragmentData item : m_items) {
@@ -889,8 +889,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.put(item.m_stmtText);
             }
         }
-        // timestamp for restarted transaction
-        buf.putLong(m_restartTimestamp);
     }
 
     @Override
@@ -927,6 +925,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         }
         m_perFragmentStatsRecording = buf.get() != 0;
         m_coordinatorTask = buf.get() != 0;
+        // timestamp for restarted transaction
+        m_restartTimestamp = buf.getLong();
 
         m_items = new ArrayList<FragmentData>(fragCount);
 
@@ -1056,8 +1056,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.get(item.m_stmtText);
             }
         }
-        // timestamp for restarted transaction
-        m_restartTimestamp = buf.getLong();
     }
 
     @Override

@@ -111,27 +111,27 @@ public class MpPromoteAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox, int zkNodeId,
             String whoami)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = false;
         m_whoami = whoami;
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId(), false);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(zkNodeId, false);
     }
 
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox, int zkNodeId,
             String whoami, boolean migratePartitionLeader)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(((MpScheduler)m_mailbox.m_scheduler).getLeaderNodeId(), false);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(zkNodeId, false);
     }
 
     @Override

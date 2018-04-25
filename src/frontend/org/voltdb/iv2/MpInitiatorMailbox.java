@@ -93,7 +93,8 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             FutureTask<RepairAlgo> ft = new FutureTask<RepairAlgo>(new Callable<RepairAlgo>() {
                 @Override
                 public RepairAlgo call() throws Exception {
-                    RepairAlgo ra = new MpPromoteAlgo( survivors.get(), MpInitiatorMailbox.this, whoami, balanceSPI);
+                    RepairAlgo ra = new MpPromoteAlgo(survivors.get(), MpInitiatorMailbox.this,
+                            ((MpScheduler)MpInitiatorMailbox.this.m_scheduler).getLeaderNodeId(), whoami, balanceSPI);
                     setRepairAlgoInternal(ra);
                     return ra;
                 }
@@ -105,7 +106,8 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 Throwables.propagate(e);
             }
         } else {
-            ra = new MpPromoteAlgo( survivors.get(), this, whoami, balanceSPI);
+            ra = new MpPromoteAlgo(survivors.get(), this, ((MpScheduler)this.m_scheduler).getLeaderNodeId(),
+                    whoami, balanceSPI);
             setRepairAlgoInternal(ra);
         }
         return ra;
