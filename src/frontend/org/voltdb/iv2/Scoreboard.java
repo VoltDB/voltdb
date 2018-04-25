@@ -37,53 +37,50 @@ public class Scoreboard {
     private Deque<Pair<CompleteTransactionTask, Boolean>> m_compTasks = new ArrayDeque<>(2);
     private TransactionTask m_fragTask;
 
-    public Deque<Pair<CompleteTransactionTask, Boolean>> m_lastCompleteTxnTasks = new ArrayDeque<>(2);
-    public TransactionTask m_lastFragTask;
-
     public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
         if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP &&
-                (m_lastCompleteTxnTasks.peekFirst() != null || missingTxn)) {
+                (m_compTasks.peekFirst() != null || missingTxn)) {
             // This is an extremely rare case were a MPI repair arrives before the dead MPI's completion
             // Ignore this message because the repair completion is more recent and should step on the initial completion
             if (!missingTxn) {
-                assert(MpRestartSequenceGenerator.isForRestart(m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()));
+                assert(MpRestartSequenceGenerator.isForRestart(m_compTasks.peekFirst().getFirst().getTimestamp()));
             }
         }
         else
         if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP ||
-                (m_lastCompleteTxnTasks.peekFirst() != null &&
+                (m_compTasks.peekFirst() != null &&
                 !MpRestartSequenceGenerator.isForRestart(task.getTimestamp()) &&
-                m_lastCompleteTxnTasks.peekFirst().getFirst().getMsgTxnId() == task.getMsgTxnId())) {
+                m_compTasks.peekFirst().getFirst().getMsgTxnId() == task.getMsgTxnId())) {
             // This is a submission of a completion. In case this is a resubmission of a completion that not
             // all sites received clear the whole queue. The Completion may or may not be for a transaction
             // that has already been completed (if it was completed missingTxn will be true)
-            m_lastCompleteTxnTasks.clear();
-            m_lastCompleteTxnTasks.addLast(Pair.of(task, missingTxn));
+            m_compTasks.clear();
+            m_compTasks.addLast(Pair.of(task, missingTxn));
         }
         else {
             // This is an abort completion that will be followed with a resubmitted fragment,
             // so step on any fragment that is pending
-            Pair<CompleteTransactionTask, Boolean> lastTaskPair = m_lastCompleteTxnTasks.peekLast();
+            Pair<CompleteTransactionTask, Boolean> lastTaskPair = m_compTasks.peekLast();
             if (lastTaskPair != null && lastTaskPair.getFirst().getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP) {
                 assert(lastTaskPair.getFirst().getMsgTxnId() == task.getMsgTxnId());
-                m_lastCompleteTxnTasks.removeLast();
+                m_compTasks.removeLast();
             }
             else {
-                assert(m_lastCompleteTxnTasks.size() <= 1);
+                assert(m_compTasks.size() <= 1);
             }
-            m_lastCompleteTxnTasks.addLast(Pair.of(task, missingTxn));
-            m_lastFragTask = null;
+            m_compTasks.addLast(Pair.of(task, missingTxn));
+            m_fragTask = null;
         }
     }
 
     public String toString() {
         StringBuilder builder = new StringBuilder();
-        if (!m_lastCompleteTxnTasks.isEmpty()){
-            builder.append("CompleteTransactionTasks: " + m_lastCompleteTxnTasks.peekFirst() +
-                    (m_lastCompleteTxnTasks.size() == 2 ? "\n" + m_lastCompleteTxnTasks.peekLast() : ""));
+        if (!m_compTasks.isEmpty()){
+            builder.append("CompleteTransactionTasks: " + m_compTasks.peekFirst() +
+                    (m_compTasks.size() == 2 ? "\n" + m_compTasks.peekLast() : ""));
         }
-        if (m_lastFragTask != null) {
-            builder.append("\nFragmentTask: " + m_lastFragTask);
+        if (m_fragTask != null) {
+            builder.append("\nFragmentTask: " + m_fragTask);
         }
         return builder.toString();
     }

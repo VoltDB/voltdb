@@ -203,17 +203,17 @@ public class TransactionTaskQueue
             boolean missingTxn = false;
             for (Pair<SiteTaskerQueue, Scoreboard> p : s_stashedMpWrites) {
                 Scoreboard st = p.getSecond();
-                if (st.m_lastFragTask == null && st.m_lastCompleteTxnTasks.isEmpty()) {
+                if (st.getFragmentTask() == null && st.getCompletionTasks().isEmpty()) {
                     break;
                 }
-                if (st.m_lastFragTask != null) {
+                if (st.getFragmentTask() != null) {
                     fragmentScore++;
                 }
-                if (!st.m_lastCompleteTxnTasks.isEmpty()) {
-                    if (matchingCompletionTime != st.m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
+                if (!st.getCompletionTasks().isEmpty()) {
+                    if (matchingCompletionTime != st.getCompletionTasks().peekFirst().getFirst().getTimestamp()) {
                         continue;
                     }
-                    missingTxn |= st.m_lastCompleteTxnTasks.peekFirst().getSecond();
+                    missingTxn |= st.getCompletionTasks().peekFirst().getSecond();
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                     // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
@@ -244,8 +244,8 @@ public class TransactionTaskQueue
             int completionScore = 0;
             for (Pair<SiteTaskerQueue, Scoreboard> p : s_stashedMpWrites) {
                 Scoreboard st = p.getSecond();
-                if (!st.m_lastCompleteTxnTasks.isEmpty()) {
-                    if (matchingCompletionTime != st.m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
+                if (!st.getCompletionTasks().isEmpty()) {
+                    if (matchingCompletionTime != st.getCompletionTasks().peekFirst().getFirst().getTimestamp()) {
                         break;
                     }
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
