@@ -66,7 +66,9 @@ public class TransactionTaskQueue
                     (m_lastCompleteTxnTasks.peekFirst() != null || missingTxn)) {
                 // This is an extremely rare case were a MPI repair arrives before the dead MPI's completion
                 // Ignore this message because the repair completion is more recent and should step on the initial completion
-                assert(MpRestartSequenceGenerator.isForRestart(m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()));
+                if (!missingTxn) {
+                    assert(MpRestartSequenceGenerator.isForRestart(m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()));
+                }
             }
             else
             if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP ||
