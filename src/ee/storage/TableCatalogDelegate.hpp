@@ -79,7 +79,7 @@ class TableCatalogDelegate {
               catalog::Table const &catalogTable,
               bool isXDCR);
     PersistentTable *createDeltaTable(catalog::Database const &catalogDatabase,
-            catalog::Table const &catalogTable, bool isXDCR);
+            catalog::Table const &catalogTable);
     void evaluateExport(catalog::Database const &catalogDatabase,
             catalog::Table const &catalogTable);
 

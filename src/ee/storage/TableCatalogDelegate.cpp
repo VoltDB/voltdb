@@ -447,8 +447,8 @@ void TableCatalogDelegate::init(catalog::Database const& catalogDatabase,
 }
 
 PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const& catalogDatabase,
-        catalog::Table const& catalogTable,
-        bool isXDCR) {
+        catalog::Table const& catalogTable) {
+    bool isXDCR = ExecutorContext::getEngine()->getIsActiveActiveDREnabled();
     // Delta table will only have one row (currently).
     // Set the table block size to 64KB to achieve better space efficiency.
     // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
