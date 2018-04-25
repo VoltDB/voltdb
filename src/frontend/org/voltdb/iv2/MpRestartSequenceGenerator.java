@@ -23,11 +23,11 @@ public class MpRestartSequenceGenerator {
     // bit sizes for each of the fields in the 64-bit id
     // note, these add up to 63 bits to make dealing with
     // signed / unsigned conversions easier.
-    // having up to 1,000,000 MPI promotions, should be enough for now.
-    // Restart flag reset means that this came from a SPI leader promotion
+    // having MPI promotions for up to 1,000,000 Rejoined nodes, should be enough
+    // for now. Restart flag reset means that this came from a SPI leader promotion
     static final long NODEID_BITS = 20;
     static final long RESTART_BITS = 1;
-    static final long COUNTER_BITS = 22;
+    static final long COUNTER_BITS = 42;
 
     static final long NODEID_MAX_VALUE = (1L << NODEID_BITS) - 1L;
     static final long RESTART_MAX_VALUE = (1L << RESTART_BITS) - 1L;
@@ -37,7 +37,7 @@ public class MpRestartSequenceGenerator {
 
     public MpRestartSequenceGenerator(int nodeId, boolean forRestart) {
         assert (nodeId <= NODEID_MAX_VALUE);
-        m_highOrderFields = nodeId << (COUNTER_BITS + RESTART_BITS)
+        m_highOrderFields = ((long)nodeId << (COUNTER_BITS + RESTART_BITS))
                           | (forRestart ? (1 << COUNTER_BITS) : 0);
     }
 

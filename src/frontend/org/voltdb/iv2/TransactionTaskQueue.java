@@ -269,18 +269,22 @@ public class TransactionTaskQueue
             int receivedCompleteTxns = 0;
             boolean missingTxn = false;
             for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
-                if (!p.getSecond().m_lastCompleteTxnTasks.isEmpty()) {
-                    if (matchingCompletionTime != p.getSecond().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
+                ScoreboardTasks st = p.getSecond();
+                if (st.m_lastFragTask == null && st.m_lastCompleteTxnTasks.isEmpty()) {
+                    break;
+                }
+                if (st.m_lastFragTask != null) {
+                    receivedFrags++;
+                }
+                if (!st.m_lastCompleteTxnTasks.isEmpty()) {
+                    if (matchingCompletionTime != st.m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
                         continue;
                     }
-                    missingTxn |= p.getSecond().m_lastCompleteTxnTasks.peekFirst().getSecond();
+                    missingTxn |= st.m_lastCompleteTxnTasks.peekFirst().getSecond();
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                     // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
                     receivedCompleteTxns++;
-                }
-                if (p.getSecond().m_lastFragTask != null) {
-                    receivedFrags++;
                 }
             }
 
@@ -306,9 +310,10 @@ public class TransactionTaskQueue
             m_scoreboard.addCompletedTransactionTask(missingTxnCompletion, true);
             int receivedCompleteTxns = 0;
             for (Pair<SiteTaskerQueue, ScoreboardTasks> p : s_stashedMpWrites) {
-                if (!p.getSecond().m_lastCompleteTxnTasks.isEmpty()) {
-                    if (matchingCompletionTime != p.getSecond().m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
-                        continue;
+                ScoreboardTasks st = p.getSecond();
+                if (!st.m_lastCompleteTxnTasks.isEmpty()) {
+                    if (matchingCompletionTime != st.m_lastCompleteTxnTasks.peekFirst().getFirst().getTimestamp()) {
+                        break;
                     }
                     // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
