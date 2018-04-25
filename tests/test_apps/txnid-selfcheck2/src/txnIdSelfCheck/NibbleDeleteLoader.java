@@ -32,6 +32,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
 import java.io.InterruptedIOException;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
@@ -127,27 +130,42 @@ public class NibbleDeleteLoader extends BenchmarkThread {
         @Override
         public void run() {
             try {
+            long deleteCount = 0;
             int retries = 0;
             while ( true ) {
                 // give a little wiggle room when checking if rows should've been deleted.
                 long ttl = new Double(Math.ceil(TTL*1.5)).longValue();
 
                 ClientResponse response = TxnId2Utils.doProcCall(client, "@AdHoc", "select *,now from "+tableName+" where "+tsColumnName+" < DATEADD(SECOND,-"+ttl+",NOW) ");
-
+                Map<String,Object> stats = getTTLStats(tableName);
                 if (response.getStatus() == ClientResponse.SUCCESS ) {
                     VoltTable[] t = response.getResults();
                     VoltTable data = t[0];
                     long unDeletedRows = data.getRowCount();
                     log.info("Rows behind from being deleted:"+unDeletedRows);
-
+                    log.info("Stats Rows behind from being deleted:" + String.valueOf(stats.get("ROWS_REMAINING")));
                     // print some debugging info before we error out.
                     if ( unDeletedRows > 0 ) {
-                        retries++;
+                        long deletes = (Long)stats.get("ROWS_DELETED");
                         if ( retries <= 2 ) {
                             // We need to handle the case where we have just recovered and the nibble deleter hasn't caught up,
                             // don't fail completely unless we have failed two times consecutively after receiving valid responses
+                            if (deletes > deleteCount) {
+                                // only fail if we we don't increase delete count two times in a row.
+                                log.info("nibble delete is making progress: "+String.valueOf(deletes)+" > "+String.valueOf(deleteCount));
+                                deleteCount = deletes;
+                                retries = 0;
+                            } else {
+                                log.info("nibble delete is not making progress, after attempt "+String.valueOf(retries)+" of 2");
+                                retries++;
+                            }
                             Thread.sleep(2000);
                             continue;
+                        }
+                        // nibble deletes are failing.
+                        log.info("Nibble delete is too far behind but thinks it's done. TTL stats:");
+                        for ( String key : stats.keySet() ) {
+                            log.info(key + ":"+ String.valueOf(stats.get(key)));
                         }
                         for ( int c = 0; c < data.getColumnCount(); c++) {
                             System.out.print(data.getColumnName(c)+" ");
@@ -190,6 +208,40 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                 pe.printStackTrace();
                 Benchmark.hardStop("Error executing procedure:"+pe.getMessage());
             }
+
+        }
+
+        public Map<String,Object> getTTLStats(String tableName ) {
+            Map<String,Object> stats = new HashMap<String,Object>();
+            ClientResponse cr = null;
+            try {
+                cr = client.callProcedure("@Statistics", "TTL");
+            } catch(IOException e) {
+                log.error(e.getMessage());
+                return stats;
+            } catch(ProcCallException pe) {
+                log.error(pe.getMessage());
+            }
+            if (cr.getStatus() != ClientResponse.SUCCESS) {
+                log.error("Failed to call Statistics TTL proc.");
+                log.error(((ClientResponseImpl) cr).toJSONString());
+                return stats;
+            }
+
+            VoltTable t = cr.getResults()[0];
+            while ( t.advanceRow() ) {
+                String table = t.getString(0);
+                if ( tableName.equalsIgnoreCase(table) ) {
+                    // ROWS_DELETED  ROUNDS  ROWS_DELETED_LAST_ROUND  ROWS_REMAINING
+                    stats.put("TABLE", table);
+                    stats.put("ROWS_DELETED", t.getLong(1));
+                    stats.put("ROUNDS", t.getLong(2));
+                    stats.put("ROWS_DELETED_LAST_ROUND", t.getLong(3));
+                    stats.put("ROWS_REMAINING",t.getLong(4));
+                    break;
+                }
+            }
+            return stats;
 
         }
     }
