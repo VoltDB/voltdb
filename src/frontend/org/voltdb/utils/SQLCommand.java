@@ -94,6 +94,12 @@ public class SQLCommand
     private static boolean m_testFrontEndOnly;
     private static String m_testFrontEndResult;
 
+    private static String[] describeAdjectives = {"beautiful", "very nice", "wonderful", "mischievous",
+                                                  "bothersome", "troubling", "magnificent", "friendly",
+                                                  "happy go lucky", "sad and lonely", "fine", "whiny little",
+                                                  "practically perfect", "very overrated", "very underrated",
+                                                  "forgiving", "lucky", "grateful", "devilish", "terrible"};
+
     // Special exception type to inform main to return m_exitCode and stop SQLCmd
     @SuppressWarnings("serial")
     private static class SQLCmdEarlyExitException extends RuntimeException {}
@@ -417,6 +423,93 @@ public class SQLCommand
         String echoErrorArgs = SQLParser.parseEchoErrorStatement(line);
         if (echoErrorArgs != null) {
             System.err.println(echoErrorArgs);
+            return true;
+        }
+
+        // DESCRIBE table
+        String describeArgs = SQLParser.parseDescribeStatement(line);
+        if (describeArgs != null) {
+
+            String tableName = "";
+            String type = "";
+            String remarks = "";
+            VoltTable tableData = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+            while (tableData.advanceRow()) {
+                String t = tableData.getString(2);
+                if (t.equalsIgnoreCase(describeArgs)) {
+                    tableName = t;
+                    type = tableData.getString(3);
+                    remarks = tableData.getString(4);
+                    break;
+                }
+            }
+
+            if (tableName.equals("")) {
+                System.err.println("Table does not exist");
+                return true;
+            }
+
+            VoltTable columnData = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+            // get max column name width
+            int maxNameWidth = 10;
+            while (columnData.advanceRow()) {
+                String tname = columnData.getString(2);
+                if (tname.equalsIgnoreCase(tableName)) {
+                    String colname = columnData.getString(3);
+                    if (colname.length() > maxNameWidth) {
+                        maxNameWidth = colname.length();
+                    }
+                }
+            }
+            columnData.resetRowPosition();
+            String headerFormat = "%-" + maxNameWidth + "s|%-16s|%-8s|%-9s|%-16s\n";
+            String rowFormat = "%-" + maxNameWidth + "s|%-16s|%8d|%-9s|%-16s\n";
+            System.out.printf(headerFormat,"COLUMN","DATATYPE","SIZE","NULLABLE","REMARKS");
+            String DASHES = new String(new char[53+maxNameWidth]).replace("\0", "-");
+            System.out.println(DASHES);
+            while (columnData.advanceRow()) {
+                String tname = columnData.getString(2);
+                if (tname.equalsIgnoreCase(tableName)) {
+                    String colName = columnData.getString(3);
+                    String dataType = columnData.getString(5);
+                    long size = columnData.getLong(6);
+                    String partitionColumn = columnData.getString(11);
+                    if (columnData.wasNull()) {
+                        partitionColumn = "";
+                    }
+                    String isNullable = columnData.getString(17);
+                    String notNull = "";
+                    if (isNullable.equals("NO")) {
+                        notNull = "NOT NULL";
+                    }
+                    System.out.printf(rowFormat,colName,dataType,size,notNull,partitionColumn);
+                }
+            }
+            System.out.println(DASHES);
+
+            // primary key
+            String primaryKey = "";
+            VoltTable keyData = m_client.callProcedure("@SystemCatalog", "PRIMARYKEYS").getResults()[0];
+            while (keyData.advanceRow()) {
+                String tname = keyData.getString(2);
+                if (tname.equalsIgnoreCase(tableName)) {
+                    String colName = keyData.getString(3);
+                    if (!primaryKey.equals("")) {
+                        primaryKey += ",";
+                    }
+                    primaryKey += colName;
+                }
+            }
+            if (!primaryKey.equals("")) {
+                System.out.println("Primary Key (" + primaryKey + ")");
+            }
+
+            // for fun
+            int h = tableName.hashCode();
+            int a = Math.abs(h) % describeAdjectives.length;
+            String adj = describeAdjectives[a];
+            System.out.println(tableName + " is a " + adj + " table");
+
             return true;
         }
 

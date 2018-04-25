@@ -498,6 +498,17 @@ public class SQLParser extends SQLPatternFactory
             "([^;\\s]*)" +    // non-space non-semicolon subcommand (group 2)
             InitiallyForgivingDirectiveTermination,
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern DescribeToken = Pattern.compile(
+            "^\\s*" +         // optional indent at start of line
+            "(?:desc|describe)" + // keyword alternatives, synonymous so don't bother capturing
+            "(\\W|$)" +       // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that desc/describe
+            // command diagnostics can "own" any line starting with the word
+            // desc or describe.
+            "\\s*" +          // extra spaces
+            "([^;\\s]*)" +    // non-space non-semicolon subcommand (group 2)
+            InitiallyForgivingDirectiveTermination,
+            Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile(
             "^\\s*" +      // optional indent at start of line
             "recall" +     // required RECALL command token
@@ -2002,6 +2013,34 @@ public class SQLParser extends SQLPatternFactory
                 return matcher.group(2);
             }
             return "";
+        }
+        return null;
+    }
+
+    /**
+     * Parse DESCRIBE statement for sqlcmd.
+     * The result will be "" if the user just typed DESCRIBE or DESC.
+     * @param statement  statement to parse
+     * @return           String containing possible table name
+     */
+    public static String parseDescribeStatement(String statement) {
+        Matcher matcher = DescribeToken.matcher(statement);
+        if (matcher.matches()) {
+            String commandWordTerminator = matcher.group(1);
+            if (OneWhitespace.matcher(commandWordTerminator).matches()) {
+                String trailings = matcher.group(3) + ";" + matcher.group(4);
+                // In a valid command, both "trailings" groups should be empty.
+                if (trailings.equals(";")) {
+                    // Return the subcommand keyword -- possibly a valid one.
+                    return matcher.group(2);
+                }
+                // For an invalid form of the command,
+                // return an approximation of the garbage input.
+                return matcher.group(2) + " " + trailings;
+            }
+            if (commandWordTerminator.equals("") || commandWordTerminator.equals(";")) {
+                return commandWordTerminator; // EOL or ; reached before subcommand
+            }
         }
         return null;
     }
