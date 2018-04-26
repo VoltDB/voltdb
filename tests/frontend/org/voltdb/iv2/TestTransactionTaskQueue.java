@@ -164,6 +164,31 @@ public class TestTransactionTaskQueue extends TestCase
         dut.flush(task.getTxnId());
     }
 
+    private void repairThenRestart(TransactionTask[] repairTask, TransactionTask restartTask, boolean missingCompletion) {
+        for (int i = 0; i < SITE_COUNT; i++) {
+            TransactionTask comp = createRepairComplete(repairTask[i].getTransactionState(), repairTask[i].getTxnId(), m_txnTaskQueues.get(i));
+            if (missingCompletion) {
+                addMissingCompletionTask(comp, m_txnTaskQueues.get(i));
+            } else {
+                addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+            }
+
+            comp = createRestartComplete(restartTask.getTransactionState(), restartTask.getTxnId(), m_txnTaskQueues.get(i));
+            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+
+            TransactionTask restartFrag = createFrag(m_localTxnId[i]++, restartTask.getTxnId(), m_txnTaskQueues.get(i));
+            addTask(restartFrag, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+    }
+
+    private void flushBacklog(TransactionTask[] task) {
+        // Finish the transaction, flush the backlog
+        for (int i = 0; i < SITE_COUNT; i++) {
+            task[i].getTransactionState().setDone();
+            m_txnTaskQueues.get(i).flush(task[i].getTxnId());
+        }
+    }
+
     private void verify() throws InterruptedException {
         for (int i = 0; i < SITE_COUNT; i++) {
             assertEquals(m_expectedOrders.get(i).size(), m_siteTaskQueues.get(i).size());
@@ -273,29 +298,11 @@ public class TestTransactionTaskQueue extends TestCase
         // failure occurs, MPI checks repair logs from everybody, decide to repair previous transaction,
         // restart current transaction
 
-        // MPI sends repair completion
-        for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRepairComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
-            // Finish the transaction
-            firstFrag[i].getTransactionState().setDone();
-            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
-        }
-
-        // MPI sends restart completion
-        for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRestartComplete(firstFragOfNextTxn.getTransactionState(), firstFragOfNextTxn.getTxnId(), m_txnTaskQueues.get(i));
-            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
-        }
-
-        // Restart the framgments
-        TransactionTask restartFrag = null;
-        for (int i = 0; i < SITE_COUNT; i++) {
-            restartFrag = createFrag(m_localTxnId[i]++, firstFragOfNextTxn.getTxnId(), m_txnTaskQueues.get(i));
-            addTask(restartFrag, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
-        }
+        repairThenRestart(firstFrag, firstFragOfNextTxn, false);
+        flushBacklog(firstFrag);
 
         for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createComplete(restartFrag.getTransactionState(), restartFrag.getTxnId(), m_txnTaskQueues.get(i));
+            comp = createComplete(firstFragOfNextTxn.getTransactionState(), firstFragOfNextTxn.getTxnId(), m_txnTaskQueues.get(i));
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
 
@@ -324,11 +331,10 @@ public class TestTransactionTaskQueue extends TestCase
 
         // Every site gets the repair completion message
         for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRestartComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
-            // Finish the transaction
-            firstFrag[i].getTransactionState().setDone();
+            comp = createRepairComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
+        flushBacklog(firstFrag);
 
         // But on one site, a staled completion arrives, it should be discarded.
         for (int i = SITE_COUNT - 1; i < SITE_COUNT; i++) {
@@ -371,133 +377,97 @@ public class TestTransactionTaskQueue extends TestCase
 
         // Every site gets the repair completion to close previous transaction,
         // and restart completion to restart the current one.
-        for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRepairComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
-            addMissingCompletionTask(comp, m_txnTaskQueues.get(i));
-
-            comp = createRestartComplete(firstFragOfNextTxn[i].getTransactionState(), firstFragOfNextTxn[i].getTxnId(), m_txnTaskQueues.get(i));
-            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
-
-            TransactionTask restartFrag = createFrag(m_localTxnId[i]++, firstFragOfNextTxn[i].getTxnId(), m_txnTaskQueues.get(i));
-            addTask(restartFrag, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
-        }
-
-        // Finish the transaction, flush the backlog
-        for (int i = 0; i < SITE_COUNT; i++) {
-            firstFrag[i].getTransactionState().setDone();
-            m_txnTaskQueues.get(i).flush(firstFrag[i].getTxnId());
-        }
+        repairThenRestart(firstFrag, firstFragOfNextTxn[0], true);
+        flushBacklog(firstFrag);
 
         // failure occurs, MPI repair current transaction
-
-        // Every site gets the repair completion and restart completion messages
-        for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRestartComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
-            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
-
-            TransactionTask restartFrag = createFrag(m_localTxnId[i]++, firstFragOfNextTxn[i].getTxnId(), m_txnTaskQueues.get(i));
-            addTask(restartFrag, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
-        }
-
-        // Finish the transaction, flush the backlog
-        for (int i = 0; i < SITE_COUNT; i++) {
-            firstFrag[i].getTransactionState().setDone();
-            m_txnTaskQueues.get(i).flush(firstFrag[i].getTxnId());
-        }
+        repairThenRestart(firstFrag, firstFragOfNextTxn[0], true);
+        flushBacklog(firstFrag);
 
         // failure occurs, MPI repair current transaction
+        repairThenRestart(firstFrag, firstFragOfNextTxn[0], true);
 
-        // Every site gets the repair completion and restart completion messages
+        // Transaction complete
         for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRestartComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
+            comp = createComplete(firstFragOfNextTxn[i].getTransactionState(), firstFragOfNextTxn[i].getTxnId(), m_txnTaskQueues.get(i));
+            // Finish the transaction
+            firstFragOfNextTxn[i].getTransactionState().setDone();
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
-
-            TransactionTask restartFrag = createFrag(m_localTxnId[i]++, firstFragOfNextTxn[i].getTxnId(), m_txnTaskQueues.get(i));
-            addTask(restartFrag, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
 
-        // Finish the transaction, flush the backlog
-        for (int i = 0; i < SITE_COUNT; i++) {
-            firstFrag[i].getTransactionState().setDone();
-            m_txnTaskQueues.get(i).flush(firstFrag[i].getTxnId());
-        }
 
         verify();
     }
 
+    @Test
+    public void testBasicParticipantOps() throws InterruptedException
+    {
+        // add a few SP procs to site 0
+        TransactionTask next = createSpProc(m_localTxnId[0]++, m_txnTaskQueues.get(0));
+        addTask(next, m_txnTaskQueues.get(0), m_expectedOrders.get(0));
+        next = createSpProc(m_localTxnId[0]++, m_txnTaskQueues.get(0));
+        addTask(next, m_txnTaskQueues.get(0), m_expectedOrders.get(0));
+        next = createSpProc(m_localTxnId[0]++, m_txnTaskQueues.get(0));
+        addTask(next, m_txnTaskQueues.get(0), m_expectedOrders.get(0));
+        // Should squirt on through the queue
+        assertEquals(0, m_txnTaskQueues.get(0).size());
 
-//    @Test
-//    public void testBasicParticipantOps() throws InterruptedException
-//    {
-//        long localTxnId = 0;
-//        long mpTxnId = 0;
-//        SiteTaskerQueue task_queue = getSiteTaskerQueue();
-//        TransactionTaskQueue dut = new TransactionTaskQueue(task_queue, 2);
-//        Deque<TransactionTask> expected_order =
-//            new ArrayDeque<TransactionTask>();
-//
-//        // add a few SP procs
-//        TransactionTask next = createSpProc(localTxnId++, dut);
-//        addTask(next, dut, expected_order);
-//        next = createSpProc(localTxnId++, dut);
-//        addTask(next, dut, expected_order);
-//        next = createSpProc(localTxnId++, dut);
-//        addTask(next, dut, expected_order);
-//        // Should squirt on through the queue
-//        assertEquals(0, dut.size());
-//
-//        // Now a fragment task to block things
-//        long blocking_mp_txnid = mpTxnId;
-//        next = createFrag(localTxnId++, mpTxnId++, dut);
-//        TransactionTask block = next;
-//        addTask(next, dut, expected_order);
-//        assertEquals(1, dut.size());
-//
-//        // Add some tasks that are going to be blocked
-//        // Manually track the should-be-blocked procedures
-//        // for comparison later.
-//        ArrayDeque<TransactionTask> blocked = new ArrayDeque<TransactionTask>();
-//        next = createSpProc(localTxnId++, dut);
-//        addTask(next, dut, blocked);
-//        next = createSpProc(localTxnId++, dut);
-//        addTask(next, dut, blocked);
-//
-//        // here's our next blocker
-//        next = createFrag(localTxnId++, mpTxnId++, dut);
-//        addTask(next, dut, blocked);
-//        assertEquals(blocked.size() + 1, dut.size());
-//
-//        // Add a completion for the next blocker, too.  Simulates rollback causing
-//        // an additional task for this TXN ID to appear before it's blocking the queue
-//        next = createComplete(next.getTransactionState(), next.getTxnId(), dut);
-//        addTask(next, dut, blocked);
-//        assertEquals(blocked.size() + 1, dut.size());
-//        System.out.println("blocked: " + blocked);
-//
-//        // now, do more work on the blocked task
-//        next = createFrag(block.getTransactionState(), blocking_mp_txnid, dut);
-//        addTask(next, dut, expected_order);
-//        // Should have passed through and not be in the queue
-//        assertEquals(blocked.size() + 1, dut.size());
-//
-//        // now, complete the blocked task
-//        next = createComplete(block.getTransactionState(), blocking_mp_txnid, dut);
-//        addTask(next, dut, expected_order);
-//        // Should have passed through and not be in the queue
-//        assertEquals(blocked.size() + 1, dut.size());
-//        // DONE!  Should flush everything to the next blocker
-//        block.getTransactionState().setDone();
-//        int offered = dut.flush(block.getTxnId());
-//        assertEquals(blocked.size(), offered);
-//        assertEquals(1, dut.size());
-//        expected_order.addAll(blocked);
-//
-//        while (!expected_order.isEmpty())
-//        {
-//            TransactionTask next_poll = (TransactionTask)task_queue.take();
-//            TransactionTask expected = expected_order.removeFirst();
-//            assertEquals(expected.getSpHandle(), next_poll.getSpHandle());
-//            assertEquals(expected.getTxnId(), next_poll.getTxnId());
-//        }
-//    }
+        // Now a fragment task to block things
+        long blocking_mp_txnid = m_mpTxnId++;
+        TransactionTask[] block = new TransactionTask[SITE_COUNT];
+        for (int i = 0 ; i < SITE_COUNT; i++) {
+            block[i] = createFrag(m_localTxnId[i]++, blocking_mp_txnid, m_txnTaskQueues.get(i));
+            addTask(block[i], m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+            assertEquals(1, m_txnTaskQueues.get(i).size());
+        }
+
+        long another_blocking_mp_txnid = m_mpTxnId++;
+        List<ArrayDeque<TransactionTask>> blocked = new ArrayList<>();
+        TransactionTask[] nextBlock = new TransactionTask[SITE_COUNT];
+        for (int i = 0 ; i < SITE_COUNT; i++) {
+            // Add some tasks that are going to be blocked
+            // Manually track the should-be-blocked procedures
+            // for comparison later.
+            ArrayDeque<TransactionTask> queue = new ArrayDeque<>();
+            blocked.add(queue);
+            next = createSpProc(m_localTxnId[i]++, m_txnTaskQueues.get(i));
+            addTask(next, m_txnTaskQueues.get(i), queue);
+            next = createSpProc(m_localTxnId[i]++, m_txnTaskQueues.get(i));
+            addTask(next, m_txnTaskQueues.get(i), queue);
+
+            // here's our next blocker
+            nextBlock[i] = createFrag(m_localTxnId[i]++, another_blocking_mp_txnid, m_txnTaskQueues.get(i));
+            addTask(nextBlock[i], m_txnTaskQueues.get(i), queue);
+            assertEquals(queue.size() + 1, m_txnTaskQueues.get(i).size());
+        }
+
+        // Add a completion for the next blocker, too.  Simulates rollback causing
+        // an additional task for this TXN ID to appear before it's blocking the queue
+        for (int i = 0 ; i < SITE_COUNT; i++) {
+            next = createComplete(nextBlock[i].getTransactionState(), nextBlock[i].getTxnId(), m_txnTaskQueues.get(i));
+            addTask(next, m_txnTaskQueues.get(i), blocked.get(i));
+            assertEquals(blocked.get(i).size() + 1, m_txnTaskQueues.get(i).size());
+            System.out.println("blocked: " + blocked.get(i));
+        }
+
+        // now, do more work on the blocked task
+        for (int i = 0 ; i < SITE_COUNT; i++) {
+            next = createComplete(block[i].getTransactionState(), blocking_mp_txnid, m_txnTaskQueues.get(i));
+            addTask(next, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+            // Should have passed through and not be in the queue
+            assertEquals(blocked.get(i).size() + 1, m_txnTaskQueues.get(i).size());
+        }
+
+        // now, complete the blocked task
+        for (int i = 0 ; i < SITE_COUNT; i++) {
+            // DONE!  Should flush everything to the next blocker
+            block[i].getTransactionState().setDone();
+            int offered = m_txnTaskQueues.get(i).flush(block[i].getTxnId());
+            assertEquals(blocked.get(i).size(), offered);
+            assertEquals(1, m_txnTaskQueues.get(i).size());
+            m_expectedOrders.get(i).addAll(blocked.get(i));
+        }
+
+        verify();
+    }
 }

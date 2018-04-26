@@ -61,7 +61,8 @@ public class Scoreboard {
             // This is an abort completion that will be followed with a resubmitted fragment,
             // so step on any fragment that is pending
             Pair<CompleteTransactionTask, Boolean> lastTaskPair = m_compTasks.peekLast();
-            if (lastTaskPair != null && lastTaskPair.getFirst().getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP) {
+            if (lastTaskPair != null && lastTaskPair.getFirst().getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP &&
+                    lastTaskPair.getFirst().getMsgTxnId() == task.getMsgTxnId()) {
                 assert(lastTaskPair.getFirst().getMsgTxnId() == task.getMsgTxnId());
                 m_compTasks.removeLast();
             }
