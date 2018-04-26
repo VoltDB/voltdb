@@ -2269,6 +2269,39 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return true;
     }
 
+    private boolean m_groupByIsOrderedByOrderByWasTested = false;
+    private boolean m_groupByIsOrderedByOrderByResult = true;
+
+    /**
+     * Return true iff all the order by expressions appear in
+     * the group by expression list.  If this is true, then the
+     * order induced by the order by expression list can be
+     * used for serial aggregation.
+     *
+     * @return true if all order by expressions appear in the
+     *         group by expression list.
+     */
+    boolean groupByIsOrderedByOrderBy() {
+        if (m_groupByIsOrderedByOrderByWasTested) {
+            return m_groupByIsOrderedByOrderByResult;
+        }
+        m_groupByIsOrderedByOrderByWasTested = true;
+        HashSet<AbstractExpression> groupSet = new HashSet<>();
+        if ( ! m_orderColumns.isEmpty()) {
+            for (ParsedColInfo gbCol : m_groupByColumns) {
+                groupSet.add(gbCol.expression);
+            }
+            for (ParsedColInfo orderCol : m_orderColumns) {
+                AbstractExpression orderExp = orderCol.expression;
+                if (!groupSet.contains(orderExp)) {
+                    m_groupAndOrderByPermutationResult = false;
+                    break;
+                }
+            }
+        }
+        return m_groupAndOrderByPermutationResult;
+    }
+
     boolean groupByIsAnOrderByPermutation() {
         if (m_groupAndOrderByPermutationWasTested) {
             return m_groupAndOrderByPermutationResult;
@@ -2671,5 +2704,53 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             SchemaColumn schemaColumn = new SchemaColumn(tableName, tableName, columnName, columnName, tve, idx);
             tableScan.addOutputColumn(schemaColumn);
         }
+    }
+
+    /**
+     * If there is a permutation of the group by columns, say {g1, ..., gk} such that
+     * the order by columns are {g1, ..., gj}, for j <= k, then sorting by
+     * the group by columns will necessarily provide the ordering for the
+     * order by columns.  If we do this we can avoid an order by node.
+     *
+     * Note that this is only relevant for large temp tables.  For
+     * normal sized temp tables we just do hash aggregation or else
+     * we scan an index, so we don't need a sort at all.
+     *
+     * @return A permutation of the group by columns which has
+     *         the order by columns are an initial sequence.  If
+     *         this is not possible, because there is an order by column
+     *         which does not appear in the group by list, then
+     *         we return null.
+     */
+    List<ParsedColInfo> getSortColumnsForSerialGroupBy() {
+        List<ParsedColInfo> answer = new ArrayList<>();
+        List<ParsedColInfo> gbCopy = new ArrayList<>(m_groupByColumns);
+        for (ParsedColInfo oColInfo : m_orderColumns) {
+            AbstractExpression oExpr = oColInfo.expression;
+            boolean foundIt = false;
+            for (int idx = 0; idx < gbCopy.size();) {
+                ParsedColInfo gColInfo = gbCopy.get(idx);
+                AbstractExpression gExpr = gColInfo.expression;
+                if (gExpr.equals(oExpr)) {
+                    answer.add(oColInfo);
+                    gbCopy.remove(idx);
+                    foundIt = true;
+                    break;
+                } else {
+                    idx += 1;
+                }
+            }
+            // If we didn't find the order by column
+            // we must quit now and return null.
+            if (! foundIt) {
+                return null;
+            }
+        }
+        // Add all the group by expressions we did
+        // not use yet.  We need to order by these
+        // for serial aggregation, but not for
+        // order by sorting.
+        answer.addAll(gbCopy);
+        return answer;
     }
 }

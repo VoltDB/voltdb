@@ -993,6 +993,7 @@ public class PlannerTestCase extends TestCase {
         for (int idx = 0; idx < fragments.size(); idx += 1) {
             AbstractPlanNode node = fragments.get(idx);
             System.out.printf("Node %d/%d:\n%s\n", idx + 1, fragments.size(), node.toExplainPlanString());
+            printJSONString(node);
         }
         assertEquals(String.format("Expected %d fragments, not %d",
                                    spec.length,
@@ -1002,6 +1003,15 @@ public class PlannerTestCase extends TestCase {
         for (int idx = 0; idx < fragments.size(); idx += 1) {
             String error = spec[idx].match(fragments.get(idx));
             assertNull(error, error);
+        }
+    }
+
+    private void printJSONString(AbstractPlanNode node) {
+        try {
+            String jsonString = PlanSelector.outputPlanDebugString(node);
+            System.out.printf("Json:\n%s\n", jsonString);
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
     }
 }

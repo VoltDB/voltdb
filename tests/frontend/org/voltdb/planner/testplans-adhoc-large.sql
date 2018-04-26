@@ -1,4 +1,9 @@
 create table r1 (
+    id  bigint not null,
+    aa  bigint not null
+);
+
+create table r1_idpk (
     id  bigint not null primary key,
     aa  bigint not null
 );
@@ -8,6 +13,12 @@ create table r1_aaidx (
     aa  bigint not null
 );
 create index index_r1_aaidx on r1_aaidx (aa);
+
+create table r1_allidx (
+    id  bigint not null primary key,
+    aa  bigint not null
+);
+create unique index index_r1_allidx on r1_allidx (aa, id);
 
 create table p1 (
     id  bigint not null primary key,

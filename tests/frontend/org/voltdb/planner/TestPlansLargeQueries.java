@@ -65,8 +65,6 @@ public class TestPlansLargeQueries extends PlannerTestCase {
         //           X \in {P, R} for Partitioned or Replicated.
         // -- Orderby Expressions
         //     NO - N Order By Expressions: 0, 1, + = many.
-        // -- Number of window functions:
-        //     NW for N \in {0, 1}.
         // -- Select Distinct.
         //     D for select distinct,
         //     ND for select [not distinct].
@@ -76,9 +74,8 @@ public class TestPlansLargeQueries extends PlannerTestCase {
         //   * 2 // Number Agg Functions.
         //   * 3 // Number Group Bys.
         //   * 3 // Number Order Bys.
-        //   * 2 // Number Window Functions.
         //   * 2 // Distinct or not.
-        //   == 1152 cases.
+        //   == 576 cases.
         //
         //  select sum(id) from R1;
         //  1R0P-IN-1A-0RG-0O-0W-ND
@@ -87,22 +84,104 @@ public class TestPlansLargeQueries extends PlannerTestCase {
         //       Not Indexable OB expressions.
         //       0 partitioned group by
         //       0 partitioned order by
-        //       0 window functions
         //       Not Distinct
         //  select distinct sum(R1.id), sum(P1.id) from R1, P1 group by P1.id order by P1.id
-        //  1R1P-NIOB-NIGB-1PGB-1P0B-1WF-D
+        //  1R1P-NIOB-NIGB-1PGB-1P0B-D
         //       1 Replicated Table, 1 Partitioned Table, Joined.
         //       1 Partitioned group by,
         //       1 Partitioned order by,
         //       1 Window Function,
         //       Select distinct.
+        //
+        // One table, no indexes, no group bys, no order bys.
         validatePlan("select max(aa) from r1;",
                      fragSpec(PlanNodeType.SEND,
                               new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
                                                       PlanNodeType.AGGREGATE,
                                                       PlanNodeType.PROJECTION)));
+        // One table, no indexes, one group by expression, no order by.
         validatePlan("select max(aa) from r1 group by aa",
-                     fragSpec(PlanNodeType.SEND));
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.ORDERBY,
+                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN, PlanNodeType.PROJECTION)));
+
+        // One table, no indexes, one group by expression, one order by expression, GB and OB are compatible.
+        validatePlan("select max(aa) from r1 group by aa, id order by aa",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.ORDERBY,
+                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN, PlanNodeType.PROJECTION)));
+        // One Table, no index, two group by expressions, order bys which equal the group by.
+        validatePlan("select count(*) from r1_idpk group by aa, id order by id, aa",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.ORDERBY,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION)));
+
+        // One table, primary key index, no group by or order by.
+        // We don't scan the primary key index because
+        // we are going to aggregate anyway, so it doesn't
+        // help in any way.
+        validatePlan("select max(aa) from r1_idpk;",
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                      PlanNodeType.AGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
+        // One table, primary key index, one non-index group by expression, no order by.
+        // We scan the PK index for determinism, so the groups are in a
+        // predictable order.
+        validatePlan("select max(aa) from r1_idpk group by aa",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.ORDERBY,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION)));
+        // One Table, primary key index, one index group by expression, no order by.
+        // The group by expression can optimize the group scan, so
+        // we will do serial aggregation.  This is the same as with
+        // small temp tables.
+        validatePlan("select max(id) from r1_idpk group by id",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION,
+                                                      PlanNodeType.AGGREGATE)));
+        // One Table, Primary Key index, two group by expressions, one
+        // indexed and one not, one non-indexed order by.
+        validatePlan("select count(*) from r1_idpk group by aa, id order by aa",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.ORDERBY,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION)));
+
+        // One Table, Primary Key index, two group by expressions, one
+        // indexed and one not, order bys which equal the group by.
+        validatePlan("select count(*) from r1_idpk group by aa, id order by id, aa",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.ORDERBY,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION)));
+
+        // One Table, Primary Key index, two group by expressions, one
+        // indexed and one not, order bys which equal the group by.
+        validatePlan("select count(*) from r1_allidx group by aa, id order by id, aa",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.ORDERBY,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.AGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
+
     }
 
 

@@ -1966,7 +1966,7 @@ public class PlanAssembler {
      * @param root          The subtree which may need its output tuples ordered
      * @return true if the plan needs an OrderByPlanNode, false otherwise
      */
-    private static boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+    private boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
         // Sort when the statement has an ORDER BY.
         // We also need to sort if we need to do serial
         // aggregation for large queries.  But that is
@@ -1975,6 +1975,15 @@ public class PlanAssembler {
             return false;
         }
 
+        // If we have already sorted by group by
+        // expressions to implement serial aggregation,
+        // and the order by expressions are an initial
+        // sub sequence, possibly improper, of the group
+        // by expressions, then we don't need to sort
+        // again.
+        if ( m_serialAggregationSortIsOrderBySort ) {
+            return false;
+        }
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
@@ -2114,7 +2123,7 @@ public class PlanAssembler {
      * @param root        The root of the plan needing ordering
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    private static AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+    private AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
         assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt ||
                 parsedStmt instanceof ParsedDeleteStmt);
 
@@ -2642,7 +2651,6 @@ public class PlanAssembler {
          * then we may need to add an order by to get serial
          * aggregation working.
          */
-        boolean needOrderByForAggregates = false;
         if (m_parsedSelect.hasAggregateOrGroupby()) {
             AggregatePlanNode aggNode = null;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
@@ -2678,11 +2686,10 @@ public class PlanAssembler {
                 else if ( m_isLargeQuery ) {
                     aggNode = new AggregatePlanNode();
                     topAggNode = new AggregatePlanNode();
-                    // If we changed to use an index scan, then
-                    // we don't need an order by.  We found an
-                    // index which will do the work for us.
-                    // We'll need this at the end.
-                    needOrderByForAggregates = ! gbInfo.isChangedToSerialAggregate();
+                    // If this is a large temp table query, we need
+                    // to convert this to serial aggregation by
+                    // adding an order by node.
+                    root = handleLTTSortForGroupBy(root);
                 }
                 else {
                     if (gbInfo.isChangedToSerialAggregate()) {
@@ -2901,7 +2908,7 @@ public class PlanAssembler {
             }
 
             // Never push down aggregation for MV fix case.
-            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect, needOrderByForAggregates);
+            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect);
         }
 
         return handleDistinctWithGroupby(root);
@@ -3107,7 +3114,7 @@ public class PlanAssembler {
     }
 
     /**
-     * Push the given aggregate if the plan is distributed, then add the
+     * Push down the given aggregate if the plan is distributed, then add the
      * coordinator node on top of the send/receive pair. If the plan
      * is not distributed, or coordNode is not provided, the distNode
      * is added at the top of the plan.
@@ -3131,8 +3138,7 @@ public class PlanAssembler {
     private static AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                                       AggregatePlanNode distNode,
                                                       AggregatePlanNode coordNode,
-                                                      ParsedSelectStmt selectStmt,
-                                                      boolean needOrderByForAggregates) {
+                                                      ParsedSelectStmt selectStmt) {
         AggregatePlanNode rootAggNode;
 
         // remember that coordinating aggregation has a pushed-down
@@ -3158,12 +3164,6 @@ public class PlanAssembler {
             // Clear the children of the send plan.  We will
             // be using it again below.
             accessPlanTemp.getChild(0).clearChildren();
-            // If this is a large temp table query we will have
-            // converted the aggregation to serial aggregation.
-            // So we need to add an order by.
-            if (needOrderByForAggregates) {
-                root = handleLTTSortForGroupBy(root, selectStmt);
-            }
             distNode.addAndLinkChild(root);
 
             if (selectStmt.hasPartitionColumnInGroupby()) {
@@ -3212,18 +3212,42 @@ public class PlanAssembler {
     }
 
     /**
+     * This is a breadcrumb we leave for ourselves to remember
+     * that we have chosen a column order for the group by
+     * columns, and that order is compatible with the order
+     * by order.
+     */
+    private boolean m_serialAggregationSortIsOrderBySort = false;
+    /**
      * Add an order by node for serial aggregation for Large
      * Temp Tables. We can't do hash aggregation, so we have
      * to do do serial aggregation.  The sort keys are the group
-     * by columns.
+     * by columns, but we can choose any order.  We know at
+     * this point we don't have an index to help us with
+     * ordering.  We don't have to handle the sort in this
+     * case, since we just use serial aggregation.  So we need
+     * to choose an order for the group by keys.  If there are
+     * no order expressions, then it doesn't matter.  But if there
+     * *are* order by expressions, and these can match the group
+     * by expressions, then we can avoid a second sort by
+     * sorting using the order by expressions first, followed
+     * by the left over group by expressions.
      *
-     * @param root
-     * @param stmt
-     * @return
+     * @param root The tree onto which we tack the new order by node.
+     * @return The new node.  We also set m_groupByOrderImpliesOrderByOrder
+     *         to true, so we will not create an order by node.
      */
-    private static AbstractPlanNode handleLTTSortForGroupBy(AbstractPlanNode root,
-                                                     ParsedSelectStmt stmt) {
-        OrderByPlanNode orderByNode = buildOrderByPlanNode(stmt.groupByColumns());
+    private AbstractPlanNode handleLTTSortForGroupBy(AbstractPlanNode root) {
+        List<ParsedColInfo> groupBySortColumns
+                = m_parsedSelect.getSortColumnsForSerialGroupBy();
+        if (groupBySortColumns == null) {
+            groupBySortColumns = m_parsedSelect.groupByColumns();
+            m_serialAggregationSortIsOrderBySort = false;
+        } else {
+            m_serialAggregationSortIsOrderBySort = true;
+        }
+        OrderByPlanNode orderByNode
+                = buildOrderByPlanNode(groupBySortColumns);
 
         orderByNode.addAndLinkChild(root);
         return orderByNode;
