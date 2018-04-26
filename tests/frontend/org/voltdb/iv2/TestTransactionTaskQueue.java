@@ -356,22 +356,26 @@ public class TestTransactionTaskQueue extends TestCase
             comp = createComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
             // Finish the transaction
             firstFrag[i].getTransactionState().setDone();
-            addTask(comp, m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
 
         // Run next mp transaction
         txnId = m_mpTxnId++;
         TransactionTask[] firstFragOfNextTxn = new TransactionTask[SITE_COUNT];
-        for (int i = 0; i < SITE_COUNT; i++) {
+        for (int i = 0; i < SITE_COUNT ; i++) {
             firstFragOfNextTxn[i] = createFrag(m_localTxnId[i]++, txnId, m_txnTaskQueues.get(i));
-            addTask(firstFragOfNextTxn[i], m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+            addTask(firstFragOfNextTxn[i], m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
 
         // failure occurs, MPI repair current transaction
 
-        // Every site gets the repair completion and restart completion messages
+        // Every site gets the repair completion to close previous transaction,
+        // and restart completion to restart the current one.
         for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRestartComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
+            comp = createRepairComplete(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
+            addMissingCompletionTask(comp, m_txnTaskQueues.get(i));
+
+            comp = createRestartComplete(firstFragOfNextTxn[i].getTransactionState(), firstFragOfNextTxn[i].getTxnId(), m_txnTaskQueues.get(i));
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
 
             TransactionTask restartFrag = createFrag(m_localTxnId[i]++, firstFragOfNextTxn[i].getTxnId(), m_txnTaskQueues.get(i));
