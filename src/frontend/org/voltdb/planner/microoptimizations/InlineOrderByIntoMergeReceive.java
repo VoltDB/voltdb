@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
@@ -229,8 +230,26 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         assert(receive.getChildCount() == 1);
         AbstractPlanNode partitionRoot = receive.getChild(0);
         if (!partitionRoot.isOutputOrdered(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections())) {
-            // Partition results are not ordered
-            return orderbyNode;
+            // Partition results are not ordered. If the coordinator fragment is trivial
+            // the ORDER BY plan node can be pushed down to make the Partition results ordered
+            if (hasTrivialCoordinatorFragment(orderbyNode.getChild(0))) {
+                // Build fragment's ORDER BY plan node
+                OrderByPlanNode fragmentOrderbyNode = new OrderByPlanNode();
+                fragmentOrderbyNode.addSort(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections());
+                for(Map.Entry<PlanNodeType, AbstractPlanNode> inlineEntry : orderbyNode.getInlinePlanNodes().entrySet()) {
+                    fragmentOrderbyNode.addInlinePlanNode(inlineEntry.getValue());
+                }
+
+                // Insert the fragment's ORDER BY plan node below the partition's root (Send node)
+                assert(partitionRoot.getChildCount() == 1);
+                AbstractPlanNode partitionRootInput = partitionRoot.getChild(0);
+                partitionRootInput.clearParents();
+                partitionRoot.clearChildren();
+                fragmentOrderbyNode.addAndLinkChild(partitionRootInput);
+                partitionRoot.addAndLinkChild(fragmentOrderbyNode);
+            } else {
+                return orderbyNode;
+            }
         }
 
         // At this point we confirmed that the optimization is applicable.
@@ -316,4 +335,15 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         return aggregateNode;
     }
 
+    private boolean hasTrivialCoordinatorFragment(AbstractPlanNode planNode) {
+        PlanNodeType planNodeType = planNode.getPlanNodeType();
+        if (PlanNodeType.RECEIVE == planNodeType || PlanNodeType.MERGERECEIVE == planNodeType) {
+            return true;
+        } else if (PlanNodeType.PROJECTION == planNodeType) {
+            assert(planNode.getChildCount() == 1);
+            return hasTrivialCoordinatorFragment(planNode.getChild(0));
+        }
+
+        return false;
+    }
 }
