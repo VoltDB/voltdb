@@ -70,6 +70,7 @@ import org.voltdb.messaging.RepairLogTruncationMessage;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
@@ -144,7 +145,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId);
     }
 
-    List<Long> m_replicaHSIds = new ArrayList<Long>();
+    private ImmutableList<Long> m_replicaHSIds = ImmutableList.of();
     long m_sendToHSIds[] = new long[0];
     private final TransactionTaskQueue m_pendingTasks;
     private final Map<Long, TransactionState> m_outstandingTxns =
@@ -256,7 +257,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             replicasAdded = Longs.toArray(rejoinHSIds);
         }
         // First - correct the official replica set.
-        m_replicaHSIds = replicas;
+        m_replicaHSIds = ImmutableList.copyOf(replicas);
         // Update the list of remote replicas that we'll need to send to
         List<Long> sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
         sendToHSIds.remove(m_mailbox.getHSId());
