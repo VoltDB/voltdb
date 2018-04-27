@@ -27,15 +27,9 @@
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/approx-count-distinct/voltcore.testapps.approx-count-distinct.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/approx-count-distinct/voltcore.testapps.approx-count-distinct.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/csvbenchmark/voltcore.testapps.csvbenchmark.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/csvbenchmark/voltcore.testapps.csvbenchmark.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/ctindex/voltcore.testapps.ctindex.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/ctindex/voltcore.testapps.ctindex.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/dedupe/voltcore.testapps.dedupe.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/dedupe/voltcore.testapps.dedupe.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/deletes/voltcore.testapps.deletes.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/deletes/voltcore.testapps.deletes.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/eng1969/voltcore.testapps.eng1969.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/eng1969/voltcore.testapps.eng1969.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/eng585/voltcore.testapps.eng585.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/eng585/voltcore.testapps.eng585.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/eng866/voltcore.testapps.eng866.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/eng866/voltcore.testapps.eng866.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/exportbenchmark/voltcore.testapps.exportbenchmark.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/exportbenchmark/voltcore.testapps.exportbenchmark.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/genqa/voltcore.testapps.genqa.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/genqa/voltcore.testapps.genqa.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/insertdelete/voltcore.testapps.insertdelete.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/insertdelete/voltcore.testapps.insertdelete.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/kafkaimporter/voltcore.testapps.kafkaimporter.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/kafkaimporter/voltcore.testapps.kafkaimporter.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/kvbenchmark/voltcore.testapps.kvbenchmark.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/kvbenchmark/voltcore.testapps.kvbenchmark.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/live-rejoin-consistency/voltcore.testapps.live-rejoin-consistency.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/live-rejoin-consistency/voltcore.testapps.live-rejoin-consistency.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/log4jsocketimporter/voltcore.testapps.log4jsocketimporter.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/log4jsocketimporter/voltcore.testapps.log4jsocketimporter.iml" />
@@ -54,11 +48,7 @@
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/txnid-selfcheck2/voltcore.testapps.txnid-selfcheck2.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/txnid-selfcheck2/voltcore.testapps.txnid-selfcheck2.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/uacbench/voltcore.testapps.uacbench.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/uacbench/voltcore.testapps.uacbench.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/udfbenchmark/voltcore.testapps.udfbenchmark.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/udfbenchmark/voltcore.testapps.udfbenchmark.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/voltkvqa/voltcore.testapps.voltkvqa.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/voltkvqa/voltcore.testapps.voltkvqa.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/voter-adhoc/voltcore.testapps.voter-adhoc.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/voter-adhoc/voltcore.testapps.voter-adhoc.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/voter-selfcheck/voltcore.testapps.voter-selfcheck.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/voter-selfcheck/voltcore.testapps.voter-selfcheck.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/ycsb/voltcore.testapps.ycsb.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/ycsb/voltcore.testapps.ycsb.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/ycsb-zipfian/voltcore.testapps.ycsb-zipfian.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/ycsb-zipfian/voltcore.testapps.ycsb-zipfian.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../../pro/voltpro.iml" filepath="$PROJECT_DIR$/../../../pro/voltpro.iml" />
     </modules>
   </component>
