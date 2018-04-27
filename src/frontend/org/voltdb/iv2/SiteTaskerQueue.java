@@ -99,4 +99,8 @@ public class SiteTaskerQueue
         m_queueDepthTracker = new QueueDepthTracker(siteId, m_tasks);
         return m_queueDepthTracker;
     }
+
+    public int size() {
+        return m_tasks.size();
+    }
 }

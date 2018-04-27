@@ -73,4 +73,8 @@ public class MPIEndOfLogTask extends TransactionTask
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_mailbox.getHSId()));
         return sb.toString();
     }
+
+    public boolean needCoordination() {
+        return false;
+    }
 }

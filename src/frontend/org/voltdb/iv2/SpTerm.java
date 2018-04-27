@@ -17,7 +17,9 @@
 
 package org.voltdb.iv2;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -31,6 +33,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.Sets;
 
 public class SpTerm implements Term
 {
@@ -43,6 +47,8 @@ public class SpTerm implements Term
 
     // Initialized in start() -- when the term begins.
     protected BabySitter m_babySitter;
+    private ImmutableList<Long> m_replicas = ImmutableList.of();
+    private boolean m_replicasUpdatedRequired = false;
 
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
@@ -54,11 +60,32 @@ public class SpTerm implements Term
         {
             // remove the leader; convert to hsids; deal with the replica change.
             List<Long> replicas = VoltZK.childrenToReplicaHSIds(children);
-            tmLog.debug(m_whoami
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami
                       + "replica change handler updating replica list to: "
-                      + CoreUtils.hsIdCollectionToString(replicas));
+                      + CoreUtils.hsIdCollectionToString(replicas) +
+                      "from " +
+                      CoreUtils.hsIdCollectionToString(m_replicas));
+            }
+            if (replicas.size() == m_replicas.size()) {
+                Set<Long> diff = Sets.difference(new HashSet<Long>(replicas),
+                                                 new HashSet<Long>(m_replicas));
+                if (diff.isEmpty()) {
+                    return;
+                }
+            }
 
-            m_mailbox.updateReplicas(replicas, null);
+            if (m_replicas.isEmpty() || replicas.size() <= m_replicas.size()) {
+                //The cases for startup or host failure
+                m_mailbox.updateReplicas(replicas, null);
+                m_replicasUpdatedRequired = false;
+            } else {
+                //The case for join or rejoin
+                m_replicasUpdatedRequired = true;
+                tmLog.info(m_whoami + " replicas to be updated from join or rejoin:"
+                          + CoreUtils.hsIdCollectionToString(m_replicas));
+            }
+            m_replicas = ImmutableList.copyOf(replicas);
         }
     };
 
@@ -100,6 +127,7 @@ public class SpTerm implements Term
         if (m_babySitter != null) {
             m_babySitter.shutdown();
         }
+        m_replicas = ImmutableList.of();
     }
 
     @Override
@@ -113,5 +141,17 @@ public class SpTerm implements Term
                 return survivors;
             }
         };
+    }
+
+    //replica update is delayed till this is called during joining or rejoing snapshot
+    public long[] updateReplicas() {
+        long[] replicasAdded = new long[0];
+        if (m_replicasUpdatedRequired) {
+            tmLog.info(m_whoami + " updated replica list to: "
+                    + CoreUtils.hsIdCollectionToString(m_replicas));
+            replicasAdded = m_mailbox.updateReplicas(m_replicas, null);
+            m_replicasUpdatedRequired = false;
+        }
+        return replicasAdded;
     }
 }
