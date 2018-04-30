@@ -164,7 +164,7 @@ public class TestDurabilityListener {
     {
         SiteTaskerQueue stq = mock(SiteTaskerQueue.class);
         SnapshotCompletionMonitor scm = mock(SnapshotCompletionMonitor.class);
-        SpScheduler sched = spy(new SpScheduler(1, stq, scm, 2));
+        SpScheduler sched = spy(new SpScheduler(1, stq, scm));
         sched.setLock(new Object());
 
         TransactionTaskQueue taskQueue = mock(TransactionTaskQueue.class);

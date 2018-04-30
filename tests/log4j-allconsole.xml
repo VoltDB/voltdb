@@ -24,9 +24,9 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="HOST">
-        <level value="INFO"/>
-    </logger -->
+    <logger name="HOST">
+        <level value="DEBUG"/>
+    </logger>
 
     <!-- logger name="NETWORK">
         <level value="INFO"/>
@@ -73,7 +73,7 @@
     </logger -->
 
     <logger name="TM">
-        <level value="INFO"/>
+        <level value="DEBUG"/>
     </logger>
 
     <root>
