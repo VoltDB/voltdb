@@ -1668,7 +1668,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_initiatorMailbox.setMaxLastSeenMultipartTxnId(txnId);
             }
         }
-        if (foundMultipartTxnId == -1) {
+        if (!skipMultiPart && foundMultipartTxnId == -1) {
             VoltDB.crashLocalVoltDB("Didn't find a multipart txnid on restore", false, null);
         }
     }
