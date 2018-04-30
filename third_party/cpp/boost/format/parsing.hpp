@@ -267,6 +267,8 @@ namespace detail {
         switch ( wrap_narrow(fac, *start, 0) ) {
         case 'X':
             fpar->fmtstate_.flags_ |= std::ios_base::uppercase;
+            // GCC-7 Needs this.  Sorry for the misspelling.
+            /* FALLTHRU */
         case 'p': // pointer => set hex.
         case 'x':
             fpar->fmtstate_.flags_ &= ~std::ios_base::basefield;
@@ -280,6 +282,8 @@ namespace detail {
 
         case 'E':
             fpar->fmtstate_.flags_ |=  std::ios_base::uppercase;
+            // GCC-7 Needs this.  Sorry for the misspelling.
+            /* FALLTHRU */
         case 'e':
             fpar->fmtstate_.flags_ &= ~std::ios_base::floatfield;
             fpar->fmtstate_.flags_ |=  std::ios_base::scientific;
@@ -291,6 +295,8 @@ namespace detail {
         case 'f':
             fpar->fmtstate_.flags_ &= ~std::ios_base::floatfield;
             fpar->fmtstate_.flags_ |=  std::ios_base::fixed;
+            // GCC-7 Needs this.  Sorry for the misspelling.
+            /* FALLTHRU */
         case 'u':
         case 'd':
         case 'i':

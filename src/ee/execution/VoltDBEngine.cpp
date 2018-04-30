@@ -163,7 +163,7 @@ typedef boost::multi_index::multi_index_container<
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
 
-int64_t VoltDBEngine::s_loadTableResult = 0;
+VoltEEExceptionType VoltDBEngine::s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
 
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
     : m_currentIndexInBatch(-1),
@@ -1551,7 +1551,7 @@ VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInputBE &serializeIn,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
                         int64_t uniqueId,
-                        bool returnUniqueViolations,
+                        bool throwUniqueViolations,
                         bool shouldDRStream,
                         int64_t undoToken) {
     //Not going to thread the unique id through.
@@ -1584,43 +1584,75 @@ VoltDBEngine::loadTable(int32_t tableId,
                    (int) tableId, ret->name().c_str());
         return false;
     }
-    try {
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                table->isCatalogTableReplicated(), isLowestSite(), s_loadTableResult);
-        if (possiblySynchronizedUseMpMemory.okToExecute()) {
-            try {
-                table->loadTuplesForLoadTable(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, ExecutorContext::currentUndoQuantum() == NULL);
-            } catch (ConstraintFailureException &cfe) {
-                if (!returnUniqueViolations) {
-                    // pre-serialize the exception here since we need to cleanup tuple memory within this sync block
-                    resetReusedResultOutputBuffer();
-                    cfe.serialize(getExceptionOutputSerializer());
-                    return false;
-                } else {
-                    throw;
-                }
+
+    // When loading a replicated table, behavior should be:
+    //   ConstraintFailureExceptions may be thrown on the lowest site thread.
+    //   If throwUniqueViolations is true:
+    //       Lowest site thread: throw the exception.
+    //       Other site threads: throw replicated table exceptions.
+    //   else (throwUniqueViolations is false)
+    //       Lowest site thread: serialize the offending rows, return 1.
+    //       Other site thread: return 1.
+    //
+    //   For all other kinds of exceptions, throw a FatalException.  This is legacy behavior.
+    //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
+
+    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
+            (table->isCatalogTableReplicated(), isLowestSite(), &s_loadTableException, VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE);
+    if (possiblySynchronizedUseMpMemory.okToExecute()) {
+        try {
+            table->loadTuplesForLoadTable(serializeIn,
+                                          NULL,
+                                          throwUniqueViolations ? &m_resultOutput : NULL,
+                                          shouldDRStream,
+                                          ExecutorContext::currentUndoQuantum() == NULL);
+        }
+        catch (const ConstraintFailureException &cfe) {
+            s_loadTableException = VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION;
+            if (throwUniqueViolations) {
+                throw;
             }
-            s_loadTableResult = 0;
+            else {
+                // pre-serialize the exception here since we need to cleanup tuple memory within this sync block
+                resetReusedResultOutputBuffer();
+                cfe.serialize(getExceptionOutputSerializer());
+                return false;
+            }
+        }
+        catch (const SerializableEEException& serializableExc) {
+            // Exceptions that are not constraint failures are treated as fatal.   This is legacy
+            // behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
+            // other kind of exception?
+            s_loadTableException = serializableExc.getType();
+            throwFatalException("%s", serializableExc.message().c_str());
+        }
+
+        // Indicate to other threads that load happened successfully.
+        s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
+    }
+    else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION) {
+        // An constraint failure exception was thrown on the lowest site thread and
+        // handle it on the other threads too.
+        if (throwUniqueViolations) {
+            std::ostringstream oss;
+            oss << "Replicated load table failed (constraint violation) on other thread for table \""
+                << table->name() << "\".";
+            VOLT_DEBUG("%s", oss.str().c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
         }
         else {
-            if (s_loadTableResult == -1) {
-                // An exception was thrown on the lowest site thread and we need to throw here as well so
-                // all threads are in the same state
-                char msg[1024];
-                snprintf(msg, 1024, "Replicated load table threw an unknown exception on other thread for table %s",
-                           table->name().c_str());
-                VOLT_DEBUG("%s", msg);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
-            }
+            // Offending rows will be serialized on lowest site thread.
+            return false;
         }
     }
-    catch (const SerializableEEException &e) {
-        assert(!SynchronizedThreadLock::isInSingleThreadMode());
-        if (returnUniqueViolations) {
-            throwFatalException("%s", e.message().c_str());
-        }
-        throw;
+    else if (s_loadTableException != VOLT_EE_EXCEPTION_TYPE_NONE) { // some other kind of exception occurred on lowest site thread
+        // This is fatal.
+        std::ostringstream oss;
+        oss << "An unknown exception occurred on another thread when loading table \"" << table->name() << "\".";
+        VOLT_DEBUG("%s", oss.str().c_str());
+        throwFatalException("%s", oss.str().c_str());
     }
+
     return true;
 }
 

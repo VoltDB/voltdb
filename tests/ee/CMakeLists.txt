@@ -127,6 +127,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   storage/ExportTupleStream_test
   storage/filter_test
   storage/LargeTempTableBlockTest
+  storage/LargeTempTableSortTest
   storage/LargeTempTableTest
   storage/persistent_table_log_test
   storage/PersistentTableMemStatsTest

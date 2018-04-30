@@ -66,7 +66,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.types.TimestampType;
 
 import com.google_voltpatches.common.base.Throwables;
-import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch:.ChannelSftp;
 import com.jcraft.jsch.ChannelSftp.LsEntry;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
