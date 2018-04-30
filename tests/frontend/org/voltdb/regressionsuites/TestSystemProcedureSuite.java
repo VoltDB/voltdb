@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.Random;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -417,9 +416,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMultipartitionTableProceduresUpsertWithNoPrimaryKey() throws Exception{
+    public void testLoadMultipartitionTableProceduresInsertPartitionTable() throws Exception{
         // using insert for @Load*Table
-        byte upsertMode = (byte) 1;
+        byte upsertMode = (byte) 0;
         Client client = getClient();
         // should not be able to upsert to new_order since it has no primary key
         try {
@@ -427,7 +426,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             fail("ORLY @LoadMultipartitionTable new_order succeeded w/o a primary key?");
         }
         catch (ProcCallException ex) {
-            assertTrue(ex.getMessage().contains("the table new_order does not have a primary key"));
+            assertTrue(ex.getMessage().contains("LoadMultipartitionTable no longer supports loading partitioned tables"));
+        }
+    }
+
+    public void testLoadMultipartitionTableProceduresUpsertWithNoPrimaryKey() throws Exception{
+        // using upsert for @Load*Table
+        byte upsertMode = (byte) 1;
+        Client client = getClient();
+        // should not be able to upsert to PAUSE_TEST_TBL since it has no primary key
+        try {
+            client.callProcedure("@LoadMultipartitionTable", "PAUSE_TEST_TBL",  upsertMode, null);
+            fail("ORLY @LoadMultipartitionTable PAUSE_TEST_TBL succeeded w/o a primary key?");
+        }
+        catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("the table PAUSE_TEST_TBL does not have a primary key"));
         }
     }
 
@@ -568,7 +581,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 Thread.sleep(1);
             }
             assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
-            assertEquals(memorySum, indexMemorySum);
+            // only have one copy of index of replicated table Per Host
+            assertEquals(memorySum / SITES, indexMemorySum);
 
             //
             // Test once using the current correct hash function,
@@ -771,8 +785,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    private final static Object[][] THE_SWAP_CONTENTS = {{"1", 1.0, 1, 1}};
-    private static Object[][] OTHER_SWAP_CONTENTS = {{"2", null, 2, 2}, {"3", 3.0, 3, 3}};
+    private static final Object[][] THE_SWAP_CONTENTS = {{"1", 1.0, 1, 1}};
+    private static final int THE_SWAP_COUNT = 1;
+    private static final Object[][] OTHER_SWAP_CONTENTS = {{"2", null, 2, 2}, {"3", 3.0, 3, 3}};
+    private static final int OTHER_SWAP_COUNT = 2;
 
     private void populateSwappyTables(Client client, String thisTable, String thatTable) throws Exception {
         for (Object[] row : THE_SWAP_CONTENTS) {
@@ -832,6 +848,24 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     contents = client.callProcedure("@AdHoc", "select * from " + otherTable + " order by id").getResults()[0];
                     assertContentOfTable(THE_SWAP_CONTENTS, contents);
 
+                    // Just to verify the statistics are correct for normal case
+                    // In some of the pairs we are involving partitioned tables where the
+                    // statistics we get from some partitions may be zero.
+                    if (ii == jj && ii == 0) {
+                        // Hacky, we need to sleep long enough so the internal server tick
+                        // updates the memory stats.
+                        Thread.sleep(1000);
+                        VoltTable stats = client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+                        while (stats.advanceRow()) {
+                            if (stats.getString("TABLE_NAME").equals(theTable)) {
+                                assertEquals(OTHER_SWAP_COUNT, stats.getLong("TUPLE_COUNT"));
+                            }
+                            else if (stats.getString("TABLE_NAME").equals(otherTable)) {
+                                assertEquals(THE_SWAP_COUNT, stats.getLong("TUPLE_COUNT"));
+                            }
+                        }
+                    }
+
                     // Swap again to restore the baseline populations.
                     results = client.callProcedure("@SwapTables",
                             otherTable, theTable).getResults();
@@ -846,6 +880,22 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
                     contents = client.callProcedure("@AdHoc", "select * from " + otherTable + " order by id").getResults()[0];
                     assertContentOfTable(OTHER_SWAP_CONTENTS, contents);
+
+                    // Just to verify the statistics are correct for normal case
+                    if (ii == jj && ii == 0) {
+                        // Hacky, we need to sleep long enough so the internal server tick
+                        // updates the memory stats.
+                        Thread.sleep(1000);
+                        VoltTable stats = client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+                        while (stats.advanceRow()) {
+                            if (stats.getString("TABLE_NAME").equals(theTable)) {
+                                assertEquals(THE_SWAP_COUNT, stats.getLong("TUPLE_COUNT"));
+                            }
+                            else if (stats.getString("TABLE_NAME").equals(otherTable)) {
+                                assertEquals(OTHER_SWAP_COUNT, stats.getLong("TUPLE_COUNT"));
+                            }
+                        }
+                    }
 
                     results = client.callProcedure("@AdHoc",
                             "TRUNCATE TABLE " + theTable).getResults();

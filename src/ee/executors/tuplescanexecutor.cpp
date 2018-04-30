@@ -44,13 +44,7 @@
  */
 
 #include "tuplescanexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "execution/ExecutorVector.h"
 #include "plannodes/tuplescannode.h"
-#include "storage/table.h"
-#include "storage/AbstractTempTable.hpp"
 
 using namespace voltdb;
 

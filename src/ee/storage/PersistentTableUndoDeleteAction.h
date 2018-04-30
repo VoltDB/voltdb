@@ -18,14 +18,14 @@
 #ifndef PERSISTENTTABLEUNDODELETEACTION_H_
 #define PERSISTENTTABLEUNDODELETEACTION_H_
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "common/types.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
 
-class PersistentTableUndoDeleteAction: public UndoAction {
+class PersistentTableUndoDeleteAction: public UndoReleaseAction {
 public:
     inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTableSurgeon *table)
         : m_tuple(deletedTuple), m_table(table)

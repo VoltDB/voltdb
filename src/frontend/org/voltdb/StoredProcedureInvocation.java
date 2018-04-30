@@ -424,14 +424,7 @@ public class StoredProcedureInvocation implements JSONString {
         setProcName(procNameBytes);
         clientHandle = buf.getLong();
         // do not deserialize parameters in ClientInterface context
-        serializedParams = buf.slice();
-        final ByteBuffer duplicate = serializedParams.duplicate();
-        params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
-            @Override
-            public ParameterSet call() throws Exception {
-                return ParameterSet.fromByteBuffer(duplicate);
-            }
-        });
+        initParameters(buf);
     }
 
     private void initVersion1FromBuffer(ByteBuffer buf) throws IOException {
@@ -495,6 +488,10 @@ public class StoredProcedureInvocation implements JSONString {
         }
 
         // do not deserialize parameters in ClientInterface context
+        initParameters(buf);
+    }
+
+    private void initParameters(ByteBuffer buf) {
         serializedParams = buf.slice();
         final ByteBuffer duplicate = serializedParams.duplicate();
         params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {

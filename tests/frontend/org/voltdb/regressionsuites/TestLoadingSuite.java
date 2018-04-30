@@ -42,9 +42,9 @@ public class TestLoadingSuite extends RegressionSuite {
     static byte upsertMode = (byte) 0;
 
     static VoltTable m_template = new VoltTable(new ColumnInfo[] {
-            new ColumnInfo("col1", VoltType.BIGINT),
-            new ColumnInfo("col2", VoltType.BIGINT),
-            new ColumnInfo("col3", VoltType.BIGINT),
+            new ColumnInfo("col1", VoltType.INTEGER),
+            new ColumnInfo("col2", VoltType.INTEGER),
+            new ColumnInfo("col3", VoltType.TINYINT),
             new ColumnInfo("col4", VoltType.STRING),
             new ColumnInfo("col5", VoltType.FLOAT)
     });
@@ -81,12 +81,12 @@ public class TestLoadingSuite extends RegressionSuite {
 
         // test failure to load replicated table from SP proc
         try {
-            r = client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(1),
+            client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(1),
                     "REPLICATED", upsertMode, table);
             fail(); // prev stmt should throw exception
         } catch (ProcCallException e) {
-            e.printStackTrace();
         }
+
         assertEquals(0, countReplicatedRows(client));
 
         // test rollback for constraint
@@ -94,20 +94,28 @@ public class TestLoadingSuite extends RegressionSuite {
         table.addRow(3, 2, 3, "3", 3.0);
         table.addRow(3, 2, 3, "3", 3.0);
         try {
-            r = client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(2),
+            client.callProcedure("@LoadSinglepartitionTable", VoltType.valueToBytes(2),
                     "PARTITIONED", upsertMode, table);
             fail(); // prev stmt should throw exception
         } catch (ProcCallException e) {
             e.printStackTrace();
         }
+
         // 2 rows in the db from the previous test (3 for hsql)
-        if (isHSQL()) // sadly, hsql is not super transactional as a backend
+        if (isHSQL()) { // sadly, hsql is not super transactional as a backend
             assertEquals(3, countPartitionedRows(client));
-        else
+        }
+        else {
             assertEquals(2, countPartitionedRows(client));
+        }
     }
 
     public void testMultiPartitionLoad() throws Exception {
+        // MockExecutionEngine does not implement loadTable
+        if (isHSQL()) {
+            System.out.println("Skip testMultiPartitionLoad for HSQL");
+            return;
+        }
 
         Client client = getClient();
         VoltTable table; ClientResponse r;
@@ -124,29 +132,31 @@ public class TestLoadingSuite extends RegressionSuite {
         assertEquals(4, r.getResults()[0].asScalarLong());
         assertEquals(4, countReplicatedRows(client));
 
-        if (!isHSQL()) {
-            // test successful load to partitioned table from MP txn
-            table = m_template.clone(100);
-            table.addRow(1, 1, 1, "1", 1.0);
-            table.addRow(2, 1, 2, "2", 2.0);
-            table.addRow(3, 2, 3, "3", 3.0);
-            table.addRow(4, 2, 4, "4", 4.0);
-            try {
-                r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", upsertMode, table);
-                fail();
-            } catch (ProcCallException e) {}
-
-            // test rollback to a replicated table (constraint)
-            table = m_template.clone(100);
-            table.addRow(5, 1, 5, "5", 5.0);
-            table.addRow(5, 1, 5, "5", 5.0);
-            try {
-                r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", upsertMode, table);
-                fail(); // prev stmt should throw exception
-            } catch (ProcCallException e) {}
-            // 4 rows in the db from the previous test
-            assertEquals(4, countReplicatedRows(client));
+        // test successful load to partitioned table from MP txn
+        table = m_template.clone(100);
+        table.addRow(1, 1, 1, "1", 1.0);
+        table.addRow(2, 1, 2, "2", 2.0);
+        table.addRow(3, 2, 3, "3", 3.0);
+        table.addRow(4, 2, 4, "4", 4.0);
+        try {
+            r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", upsertMode, table);
+            fail();
         }
+        catch (ProcCallException e) {
+        }
+
+        // test rollback to a replicated table (constraint)
+        table = m_template.clone(100);
+        table.addRow(5, 1, 5, "5", 5.0);
+        table.addRow(5, 1, 5, "5", 5.0);
+        try {
+            r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", upsertMode, table);
+            fail(); // prev stmt should throw exception
+        }
+        catch (ProcCallException e) {
+        }
+        // 4 rows in the db from the previous test
+        assertEquals(4, countReplicatedRows(client));
     }
 
     public TestLoadingSuite(String name) {

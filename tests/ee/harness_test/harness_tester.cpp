@@ -239,8 +239,8 @@ bool testAssertTrue() {
 TEST(ExpectDeath, FailsToDie) {
     // Skip expectDeath in non-debug builds because overwriting memory doesn't
     // always cause release builds to crash.
-#ifndef DEBUG
-    printf("SKIPPED: testing expectDeath due to non-debug build.\n");
+#if not(defined(DEBUG)) || defined(MEMCHECK)
+    printf("SKIPPED: testing expectDeath due to non-debug or build or memcheck build.\n");
     return;
 #endif
 
@@ -259,11 +259,17 @@ TEST(ExpectDeath, FailsToDie) {
     EXPECT_TRUE(endsWith(test.stupidunitError(0), "did not die"));
 }
 
+#if not(defined(MEMCHECK))
 // Test the EXPECT_DEATH macro. Note: This should *not* produce any output.
+// This leaks memory.  It's ok, but don't run it under valgrind.
+
 TEST(ExpectDeath, Dies) {
     class DeathTest : public TestTemplate {
     public:
         virtual void run() {
+            //
+            // This leaks memory.  It's ok.
+            //
             EXPECT_DEATH(assert(false));
         }
     };
@@ -273,6 +279,7 @@ TEST(ExpectDeath, Dies) {
     EXPECT_TRUE(test.testSuccess());
     EXPECT_EQ(0, test.stupidunitNumErrors());
 }
+#endif
 
 TEST(ChTempDir, Simple) {
     string tempdir_name;

@@ -116,7 +116,7 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
 
 
 def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth=5,
-                          optional_percent=50, final_statement=True):
+                          optional_percent=50, symbol_reuse={}, final_statement=True):
     """Randomly generates one SQL statement of the specified type, using the
        specified maximum depth (meaning that recursive definitions are limited
        to that depth) and optional percent (meaning that option clauses, in
@@ -131,7 +131,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
     if final_statement:
         symbol_order = []
         symbol_depth = {}
-    symbol_reuse = {}
+        symbol_reuse = {}
     symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
     while symbol and count < max_count:
         count += 1
@@ -141,6 +141,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
             reuse_name = symbol.group('reusename')
         except IndexError as ex:
             reuse_name = None
+        reuse_value = None
         definition  = grammar.get(symbol_name)
         if debug > 6:
             print 'DEBUG: sql           :', str(sql)
@@ -150,16 +151,12 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
             print 'DEBUG: reuse_name    :', str(reuse_name)
             print 'DEBUG: definition    :', str(definition)
 
-        # For debugging purposes, we may wish to track symbol use
-        if options.echo_grammar and symbol_name:
-            symbol_order.append((symbol_name, sql))
-
         # Handle the case where the same symbol could be used twice (or more)
         # in the same SQL statement, e.g., {table-name:t1} can be reused to
         # refer to the same table name more than once; the shorter {:t1} may
         # also be used, after the first occurrence
         if reuse_name:
-            if symbol_reuse.get(reuse_name):
+            if symbol_reuse.get(reuse_name) is not None:
                 # This reuse_name has been used before, so replace all
                 # occurrences of it with the same value used before
                 reuse_value = symbol_reuse[reuse_name]
@@ -167,12 +164,20 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                 # This reuse_name has not been used before, so choose a value
                 # that will be used to replace it, throughout this SQL statement
                 reuse_value = get_one_sql_statement(grammar, symbol_name, max_depth,
-                                                    optional_percent, False)
+                                                    optional_percent, symbol_reuse, False)
                 symbol_reuse[reuse_name] = reuse_value
 
             sql = sql.replace(bracketed_name, reuse_value)
             symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
+
+            # For debugging purposes, we may wish to track symbol use
+            if options.echo_grammar and symbol_name:
+                symbol_order.append((symbol_name, sql, reuse_name, reuse_value))
             continue
+
+        # For debugging purposes, we may wish to track symbol use
+        if options.echo_grammar and symbol_name:
+            symbol_order.append((symbol_name, sql, reuse_name, reuse_value))
 
         if definition is None:
             print "\n\nFATAL ERROR: Could not find definition of '" + str(symbol_name) + "' in grammar dictionary!!!"
@@ -833,8 +838,10 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
 
     if sql_contains_echo_substring and options.echo_grammar:
         print >> echo_output_file, '\nGrammar symbols used (in order), and how many times, and resulting SQL:'
-        for (symbol, partial_sql) in symbol_order:
+        for (symbol, partial_sql, reuse_name, reuse_value) in symbol_order:
             print >> echo_output_file, "{0:1d}: {1:24s}: {2:s}".format(symbol_depth.get(symbol, 0), symbol, partial_sql)
+            if reuse_name:
+                print >> echo_output_file, "   :{0:23s}: {1:s}".format(reuse_name, reuse_value)
         print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
 
 

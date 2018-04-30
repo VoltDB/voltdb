@@ -33,6 +33,14 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 public class ExtensibleSnapshotDigestData {
+    //JSON property names for export values stored in the snapshot json
+    public static final String EXPORT_SEQUENCE_NUMBER_ARR = "exportSequenceNumbers";
+    public static final String EXPORT_TABLE_NAME = "exportTableName";
+    public static final String SEQUENCE_NUM_PER_PARTITION = "sequenceNumberPerPartition";
+    public static final String PARTITION = "partition";
+    public static final String EXPORT_SEQUENCE_NUMBER = "exportSequenceNumber";
+    public static final String EXPORT_USO = "exportUso";
+
     /**
      * This field is the same values as m_exportSequenceNumbers once they have been extracted
      * in SnapshotSaveAPI.createSetup and then passed back in to SSS.initiateSnapshots. The only
@@ -71,20 +79,19 @@ public class ExtensibleSnapshotDigestData {
         m_terminus = jsData != null ? jsData.optLong(SnapshotUtil.JSON_TERMINUS, 0L) : 0L;
     }
 
-    private void writeExportSequenceNumbersToSnapshot(JSONStringer stringer) throws IOException {
+    private void writeExportSequencesToSnapshot(JSONStringer stringer) throws IOException {
         try {
-            stringer.key("exportSequenceNumbers").array();
+            stringer.key(EXPORT_SEQUENCE_NUMBER_ARR).array();
             for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : m_exportSequenceNumbers.entrySet()) {
                 stringer.object();
 
-                stringer.keySymbolValuePair("exportTableName", entry.getKey());
-
-                stringer.key("sequenceNumberPerPartition").array();
+                stringer.keySymbolValuePair(EXPORT_TABLE_NAME, entry.getKey());
+                stringer.key(SEQUENCE_NUM_PER_PARTITION).array();
                 for (Map.Entry<Integer, Pair<Long,Long>> sequenceNumber : entry.getValue().entrySet()) {
                     stringer.object();
-                    stringer.keySymbolValuePair("partition", sequenceNumber.getKey());
-                    //First value is the ack offset which matters for pauseless rejoin, but not persistence
-                    stringer.keySymbolValuePair("exportSequenceNumber", sequenceNumber.getValue().getSecond());
+                    stringer.keySymbolValuePair(PARTITION, sequenceNumber.getKey());
+                    stringer.keySymbolValuePair(EXPORT_USO, sequenceNumber.getValue().getFirst());
+                    stringer.keySymbolValuePair(EXPORT_SEQUENCE_NUMBER, sequenceNumber.getValue().getSecond());
                     stringer.endObject();
                 }
                 stringer.endArray();
@@ -104,11 +111,11 @@ public class ExtensibleSnapshotDigestData {
      */
     private void mergeExportSequenceNumbersToZK(JSONObject jsonObj, VoltLogger log) throws JSONException {
         JSONObject tableSequenceMap;
-        if (jsonObj.has("exportSequenceNumbers")) {
-            tableSequenceMap = jsonObj.getJSONObject("exportSequenceNumbers");
+        if (jsonObj.has(EXPORT_SEQUENCE_NUMBER_ARR)) {
+            tableSequenceMap = jsonObj.getJSONObject(EXPORT_SEQUENCE_NUMBER_ARR);
         } else {
             tableSequenceMap = new JSONObject();
-            jsonObj.put("exportSequenceNumbers", tableSequenceMap);
+            jsonObj.put(EXPORT_SEQUENCE_NUMBER_ARR, tableSequenceMap);
         }
 
         for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> tableEntry : m_exportSequenceNumbers.entrySet()) {
@@ -317,7 +324,7 @@ public class ExtensibleSnapshotDigestData {
     }
 
     public void writeToSnapshotDigest(JSONStringer stringer) throws IOException {
-        writeExportSequenceNumbersToSnapshot(stringer);
+        writeExportSequencesToSnapshot(stringer);
         writeDRStateToSnapshot(stringer);
     }
 

@@ -17,12 +17,12 @@
 #ifndef PERSISTENTTABLEUNDOSWAPTABLEACTION_H_
 #define PERSISTENTTABLEUNDOSWAPTABLEACTION_H_
 
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
-class PersistentTableUndoSwapTableAction: public UndoAction {
+class PersistentTableUndoSwapTableAction: public UndoReleaseAction {
 public:
     PersistentTableUndoSwapTableAction(
             PersistentTable* theTable,

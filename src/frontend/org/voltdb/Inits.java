@@ -39,19 +39,15 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -802,7 +798,15 @@ public class Inits {
                             String catalogVersion = buildInfo[0];
                             String serverVersion = m_rvdb.getVersionString();
                             if (!catalogVersion.equals(serverVersion)) {
-                                if (!m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
+                                // Only do version check when c/l is enabled.
+                                // Recover from a terminus snapshot generated from a different version,
+                                // the terminus snapshot marker will be deleted. If c/l is not enabled,
+                                // either on community edition or enterprise edition but with the feature
+                                // turned off, there is no truncation snapshot when cluster completes
+                                // initialization. So if cluster crashes before new snapshot is written,
+                                // it will have no viable snapshot to recover again. Bypass version check
+                                // when c/l is disabled resolves this issue.
+                                if (clenabled == true && !m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
                                     VoltDB.crashLocalVoltDB(String.format(
                                             "Unable to load version %s catalog \"%s\" "
                                                     + "from snapshot into a version %s server.",

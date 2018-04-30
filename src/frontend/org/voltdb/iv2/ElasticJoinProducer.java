@@ -117,14 +117,20 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         m_coordinatorHsId = message.m_sourceHSId;
         registerSnapshotMonitor(message.getSnapshotNonce());
 
-        long sinkHSId = m_dataSink.initialize(message.getSnapshotSourceCount(),
-                                              message.getSnapshotBufferPool());
+        // The lowest partition has a single source for all messages whereas all other partitions have a real
+        // data source and a dummy data source for replicated tables that are used to sync up replicated table changes.
+        boolean haveTwoSources = VoltDB.instance().getLowestPartitionId() != m_partitionId;
+
+        long sinkHSId = m_dataSink.initialize(haveTwoSources?2:1,
+                                              message.getSnapshotDataBufferPool(),
+                                              message.getSnapshotCompressedDataBufferPool());
 
         // respond to the coordinator with the sink HSID
         RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(), -1, sinkHSId);
         m_mailbox.send(m_coordinatorHsId, msg);
         m_taskQueue.offer(this);
-        JOINLOG.info("P" + m_partitionId + " received initiation");
+        JOINLOG.info("P" + m_partitionId + " received initiation" +
+                " sinkHSID:" + sinkHSId + " haveTwoSources:" + haveTwoSources);
     }
 
     /**

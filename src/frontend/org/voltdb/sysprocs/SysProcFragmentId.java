@@ -221,4 +221,8 @@ public class SysProcFragmentId
     // @SwapTables
     public static final long PF_swapTables = 320;
     public static final long PF_swapTablesAggregate = 321;
+
+    // @PingPartitions
+    public static final long PF_pingPartitions = 330;
+    public static final long PF_pingPartitionsAggregate = 331;
 }

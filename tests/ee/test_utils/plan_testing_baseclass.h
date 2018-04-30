@@ -51,7 +51,8 @@
 #include "catalog/cluster.h"
 #include "catalog/constraint.h"
 #include "catalog/table.h"
-
+#include "common/ExecuteWithMpMemory.h"
+#include "common/SynchronizedThreadLock.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/temptable.h"
 #include "test_utils/LoadTableFrom.hpp"
@@ -156,13 +157,13 @@ public:
                              m_exception_buffer.get(), m_smallBufferSize);
         m_engine->resetReusedResultOutputBuffer();
         m_engine->resetPerFragmentStatsOutputBuffer();
-
-        int partitionCount = htonl(1);
+        int partitionCount = 1;
+        m_engine->initialize(m_cluster_id, m_site_id, 0, partitionCount, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, true);
+        partitionCount = htonl(partitionCount);
         int tokenCount = htonl(100);
         int partitionId = htonl(0);
 
         int data[3] = {partitionCount, tokenCount, partitionId};
-        m_engine->initialize(m_cluster_id, m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator((char*)data, NULL, 0);
         ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
 
@@ -184,13 +185,15 @@ public:
         }
     }
     ~PlanTestingBaseClass() {
-            //
-            // When we delete the VoltDBEngine
-            // it will cleanup all the tables for us.
-            // The m_pool will delete all of its memory
-            // as well.  So we should be good here.
-            //
-        }
+        //
+        // When we delete the VoltDBEngine
+        // it will cleanup all the tables for us.
+        // The m_pool will delete all of its memory
+        // as well.
+        //
+        m_engine.reset();
+        voltdb::globalDestroyOncePerProcess();
+    }
 
     voltdb::PersistentTable *getPersistentTableAndId(const std::string &name,
                                                      int *id,
@@ -250,6 +253,9 @@ public:
             throw std::logic_error(oss.str());
         }
         assert(pTable != NULL);
+        int dummyExceptionTracker;
+        voltdb::ConditionalSynchronizedExecuteWithMpMemory setMpMemoryIfNeeded
+                (pTable->isCatalogTableReplicated(), true, &dummyExceptionTracker, -1);
         for (int row = 0; row < nRows; row += 1) {
             if (row > 0 && (row % 100 == 0)) {
                 std::cout << '.';
@@ -464,11 +470,11 @@ public:
         ASSERT_TRUE(result);
         const voltdb::TupleSchema* resultSchema = result->schema();
         voltdb::TableTuple tuple(resultSchema);
-        boost::scoped_ptr<voltdb::TableIterator> iter(result->makeIterator());
-        ASSERT_TRUE(iter->next(tuple));
+        voltdb::TableIterator iter = result->iterator();
+        ASSERT_TRUE(iter.next(tuple));
         int64_t actualModifiedTuples = voltdb::ValuePeeker::peekBigInt(tuple.getNValue(0));
         ASSERT_EQ(expectedModifiedTuples, actualModifiedTuples);
-        ASSERT_FALSE(iter->next(tuple));
+        ASSERT_FALSE(iter.next(tuple));
     }
 
     void initParamsBuffer() {

@@ -19,9 +19,11 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Queue;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.FixedDBBPool;
 
 /**
@@ -48,9 +50,9 @@ public class RejoinMessage extends VoltMessage {
     private long m_snapshotTxnId = -1; // snapshot txnId
     private long m_masterHSId = -1;
     private String m_snapshotNonce = null;
-    private FixedDBBPool m_bufferPool = null;
+    private Queue<BBContainer> m_dataBufferPool = null;
+    private Queue<BBContainer> m_compressedDataBufferPool = null;
     // number of sources sending to this site
-    private int m_snapshotSourceCount = 1;
     private long m_snapshotSinkHSId = -1;
     private boolean m_schemaHasNoTables = false;
 
@@ -75,13 +77,14 @@ public class RejoinMessage extends VoltMessage {
      * INITIATION, INITIATION_COMMUNITY pass the nonce used by the coordinator to the site.
      */
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
-                         int sourceCount, FixedDBBPool bufferPool,
+                         Queue<BBContainer> dataBufferPool,
+                         Queue<BBContainer> compressedDataBufferPool,
                          boolean schemaHasNoTables) {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
-        m_snapshotSourceCount = sourceCount;
-        m_bufferPool = bufferPool;
+        m_dataBufferPool = dataBufferPool;
+        m_compressedDataBufferPool = compressedDataBufferPool;
         m_schemaHasNoTables = schemaHasNoTables;
     }
 
@@ -112,14 +115,14 @@ public class RejoinMessage extends VoltMessage {
         return m_masterHSId;
     }
 
-    public FixedDBBPool getSnapshotBufferPool()
+    public Queue<BBContainer> getSnapshotDataBufferPool()
     {
-        return m_bufferPool;
+        return m_dataBufferPool;
     }
 
-    public int getSnapshotSourceCount()
+    public Queue<BBContainer> getSnapshotCompressedDataBufferPool()
     {
-        return m_snapshotSourceCount;
+        return m_compressedDataBufferPool;
     }
 
     public boolean schemaHasNoTables() {

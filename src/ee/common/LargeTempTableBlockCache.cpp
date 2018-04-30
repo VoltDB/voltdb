@@ -21,8 +21,7 @@
 
 #include "common/Topend.h"
 #include "common/executorcontext.hpp"
-#include "common/FixUnusedAssertHack.h"
-#include "common/SQLException.h"
+#include "FixUnusedAssertHack.h"
 
 namespace voltdb {
 

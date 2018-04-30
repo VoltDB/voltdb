@@ -46,7 +46,6 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -80,8 +79,6 @@ public class ExportManager
     private final AtomicReference<ExportGeneration> m_generation = new AtomicReference<>(null);
 
     private final HostMessenger m_messenger;
-
-    private final Object m_pushLock = new Object();
 
     /**
      * Set of partition ids for which this export manager instance is master of
@@ -121,8 +118,8 @@ public class ExportManager
     private volatile Map<String, Pair<Properties, Set<String>>> m_processorConfig = new HashMap<>();
 
     private int m_exportTablesCount = 0;
-
     private int m_connCount = 0;
+    private boolean m_startPolling = false;
 
     /**
      * Construct ExportManager using catalog.
@@ -173,7 +170,10 @@ public class ExportManager
         if (! m_masterOfPartitions.add(partitionId)) {
             return;
         }
-        exportLog.info("ExportManager accepting mastership for partition " + partitionId);
+
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("ExportManager accepting mastership for partition " + partitionId);
+        }
         /*
          * Only the first generation will have a processor which
          * makes it safe to accept mastership.
@@ -246,7 +246,9 @@ public class ExportManager
 
     }
 
-    public void startPolling(CatalogContext catalogContext) {
+    public synchronized void startPolling(CatalogContext catalogContext) {
+        m_startPolling = true;
+
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
         if(!hasEnabledConnectors(connectors)) {
             exportLog.info("System is not using any export functionality or connectors configured are disabled.");
@@ -332,7 +334,9 @@ public class ExportManager
                 return;
             }
 
-            exportLog.info("Creating connector " + m_loaderClass);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Creating connector " + m_loaderClass);
+            }
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
             m_processor.set(newProcessor);
 
@@ -341,14 +345,14 @@ public class ExportManager
             generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
             m_generation.set(generation);
             newProcessor.setExportGeneration(generation);
-            newProcessor.readyForData(true);
+            newProcessor.readyForData();
         }
         catch (final ClassNotFoundException e) {
             exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
         catch (final Exception e) {
-            Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -364,7 +368,7 @@ public class ExportManager
             return;
         }
         if (!requiresNewExportGeneration) {
-            exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
+            exportLog.info("No stream related changes in update catalog.");
             return;
         }
         /**
@@ -394,14 +398,21 @@ public class ExportManager
          * This occurs when export is turned on/off at runtime.
          */
         if (m_processor.get() == null) {
-            exportLog.info("First stream created processor will be initialized: " + m_loaderClass);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("First stream created processor will be initialized: " + m_loaderClass);
+            }
             try {
                 generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
-                exportLog.info("Creating connector " + m_loaderClass);
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Creating connector " + m_loaderClass);
+                }
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
                 m_processor.set(newProcessor);
                 newProcessor.setExportGeneration(generation);
-                newProcessor.readyForData(false);
+                if (m_startPolling && !m_processorConfig.isEmpty()) {
+                    newProcessor.startPolling();
+                }
+                newProcessor.readyForData();
 
                 /*
                  * When it isn't startup, it is necessary to kick things off with the mastership
@@ -419,10 +430,10 @@ public class ExportManager
             }
             catch (final ClassNotFoundException e) {
                 exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
-                Throwables.propagate(e);
+                throw new RuntimeException(e);
             }
             catch (final Exception e) {
-                Throwables.propagate(e);
+                throw new RuntimeException(e);
             }
         }
         else {
@@ -439,19 +450,28 @@ public class ExportManager
             Map<String, Pair<Properties, Set<String>>> config) {
 
             ExportDataProcessor oldProcessor = m_processor.get();
-            exportLog.info("Shutdown guestprocessor");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Shutdown guestprocessor");
+            }
             oldProcessor.shutdown();
-            exportLog.info("Processor shutdown completed, install new export processor");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Processor shutdown completed, install new export processor");
+            }
             generation.unacceptMastership();
-            exportLog.info("Existing export datasources unassigned.");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Existing export datasources unassigned.");
+            }
             //Load any missing tables.
             generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
             //We create processor even if we dont have any streams.
             try {
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);
                 newProcessor.setExportGeneration(generation);
+                if (m_startPolling && !config.isEmpty()) {
+                    newProcessor.startPolling();
+                }
                 m_processor.getAndSet(newProcessor);
-                newProcessor.readyForData(false);
+                newProcessor.readyForData();
             }
             catch (Exception crash) {
                 VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
@@ -550,7 +570,9 @@ public class ExportManager
     }
 
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
-        exportLog.info("Truncating export data after txnId " + snapshotTxnId);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Truncating export data after txnId " + snapshotTxnId);
+        }
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();
@@ -560,7 +582,9 @@ public class ExportManager
     }
 
     public static synchronized void sync(final boolean nofsync) {
-        exportLog.info("Syncing export data");
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Syncing export data");
+        }
         ExportGeneration generation = instance().m_generation.get();
         if (generation != null) {
             generation.sync(nofsync);

@@ -22,7 +22,9 @@ package org.voltcore.utils;
  * and all that other nice Java stuff. Based on STL's pair class in C++.
  *
  */
-public class Pair<T, U> {
+public class Pair<T, U> implements java.io.Serializable {
+    private static final long serialVersionUID = 2643511682081674630L;
+
     protected final T m_first;
     protected final U m_second;
     protected transient final int m_hash;

@@ -33,7 +33,7 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_nextFreeTuple(0),
         m_lastCompactionOffset(0),
         m_bucket(bucket),
-        m_bucketIndex(0)
+        m_bucketIndex(bucket.get() == NULL ? -1 : 0)
 {
 #ifdef USE_MMAP
     size_t tableAllocationSize = static_cast<size_t> (m_tupleLength * m_tuplesPerBlock);

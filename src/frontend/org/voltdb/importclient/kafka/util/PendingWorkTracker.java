@@ -55,4 +55,9 @@ final public class PendingWorkTracker {
     public long getCallbackCount() {
         return m_workConsumed.longValue();
     }
+
+    @Override
+    public String toString() {
+        return "produced/consumed:" + m_workProduced + "/" + m_workConsumed.longValue();
+    }
 }

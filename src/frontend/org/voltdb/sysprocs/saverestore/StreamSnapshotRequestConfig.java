@@ -48,15 +48,18 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         // the partition the ranges associate to
         public final Integer newPartition;
 
+        public final Long lowestSiteSinkHSId;
+
         /**
          * @param streamPairs     src - > (dest1, dest2,...)
          * @param newPartition    New partition for this stream, if not null, will create a
          *                        post-snapshot task to increment the partition count
          */
-        public Stream(Multimap<Long, Long> streamPairs, Integer newPartition)
+        public Stream(Multimap<Long, Long> streamPairs, Integer newPartition, Long lowestSiteSinkHSId)
         {
             this.streamPairs = ImmutableMultimap.copyOf(streamPairs);
             this.newPartition = newPartition;
+            this.lowestSiteSinkHSId = lowestSiteSinkHSId;
         }
     }
 
@@ -103,7 +106,9 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
                 if (!streamObj.isNull("newPartition")) {
                     newPartition = Integer.parseInt(streamObj.getString("newPartition"));
                 }
-                Stream config = new Stream(parseStreamPairs(streamObj), newPartition);
+                Long lowestSiteSinkHSId = Long.parseLong(streamObj.getString("lowestSiteSinkHSId"));
+
+                Stream config = new Stream(parseStreamPairs(streamObj), newPartition, lowestSiteSinkHSId);
 
                 builder.add(config);
             }
@@ -151,8 +156,9 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             stringer.object();
 
             stringer.keySymbolValuePair("newPartition", stream.newPartition == null ?
-                                               null : Integer.toString(stream.newPartition));
+                                                    null : Integer.toString(stream.newPartition));
 
+            stringer.keySymbolValuePair("lowestSiteSinkHSId", stream.lowestSiteSinkHSId);
             stringer.key("streamPairs").object();
             for (Map.Entry<Long, Collection<Long>> entry : stream.streamPairs.asMap().entrySet()) {
                 stringer.key(Long.toString(entry.getKey())).array();

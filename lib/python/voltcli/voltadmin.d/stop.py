@@ -61,7 +61,7 @@ def stop(runner):
                 (chost.get_admininterface(), chost.adminport, user_info, chost.hostname))
     runner.voltdb_connect(chost.get_admininterface(), chost.adminport,
                           runner.opts.username, runner.opts.password,
-                          runner.opts.ssl_config)
+                          runner.opts.ssl_config, runner.opts.kerberos)
 
     # Stop the requested host using exec @StopNode HOST_ID
     runner.info('Stopping host %d: %s:%s' % (thost.id, thost.hostname, thost.internalport))

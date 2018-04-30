@@ -44,14 +44,8 @@
  */
 
 #include "limitexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "execution/ExecutorVector.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
-#include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 
 using namespace voltdb;

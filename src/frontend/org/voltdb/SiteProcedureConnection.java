@@ -32,7 +32,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
+import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
 
 /**
  * VoltProcedures invoke SiteProcedureConnection methods to
@@ -186,7 +186,7 @@ public interface SiteProcedureConnection {
     public ProcedureRunner getNibbleDeleteProcRunner(String procedureName,
                                                      Table table,
                                                      Column column,
-                                                     ComparisonConstant op);
+                                                     ComparisonOperation op);
 
     /**
      * @return SystemProcedureExecutionContext
@@ -219,7 +219,7 @@ public interface SiteProcedureConnection {
     public void quiesce();
 
     public void exportAction(boolean syncAction,
-                             long ackOffset,
+                             long uso,
                              Long sequenceNumber,
                              Integer partitionId,
                              String tableSignature);
@@ -235,7 +235,7 @@ public interface SiteProcedureConnection {
     public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
-    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, int remotePartitionId, byte logData[]);
     public void setDRProtocolVersion(int drVersion);
     /*
      * Starting in DR version 7.0, we also generate a special event indicating the beginning of

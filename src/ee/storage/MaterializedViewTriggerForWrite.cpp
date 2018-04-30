@@ -109,8 +109,11 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
     BOOST_FOREACH (LabeledStatement labeledStatement, fallbackQueryStmts) {
         int key = std::stoi(labeledStatement.first);
         catalog::Statement *stmt = labeledStatement.second;
+//        Topend* topEnd = engine->getTopend();
+//        VOLT_DEBUG("Getting plan for statement %s from engine %p with topend %p", stmt->sqltext().c_str(), engine, topEnd);
         const string& b64plan = stmt->fragments().begin()->second->plannodetree();
         const string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
+//        VOLT_DEBUG("Getting plan %s from %p", jsonPlan.c_str(), engine);
 
         boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromJsonPlan(engine, jsonPlan, -1);
         // We don't need the send executor.

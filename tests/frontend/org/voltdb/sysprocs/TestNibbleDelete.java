@@ -25,41 +25,27 @@ package org.voltdb.sysprocs;
 
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
-import org.voltdb.CatalogContext;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Statement;
-import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.PlannerTool;
-import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.sysprocs.NibbleDeleteBase.ComparisonConstant;
 import org.voltdb.types.TimestampType;
 
 public class TestNibbleDelete {
@@ -96,7 +82,7 @@ public class TestNibbleDelete {
         builder.addStmtProcedure("partcount", "select count(*) from part;");
         builder.addStmtProcedure("repcount", "select count(*) from rep;");
         m_cluster = new LocalCluster("foo.jar", SPH, HOSTCOUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
-        m_cluster.setHasLocalServer(true);
+        m_cluster.setHasLocalServer(false);
         m_cluster.compile(builder);
         m_cluster.startUp();
 
@@ -116,11 +102,16 @@ public class TestNibbleDelete {
     }
 
     /**
-     * nullRatio, zeroRatio and sameValRatio can't be set at the same time. They are mutual exclusive.
+     * nullRatio, zeroRatio and dupValRatio can't be set to non-zero at the same time. They are mutual exclusive.
      */
     private VoltTable createTable(long numberOfItems, int indexBase,
-            double nullRatio, double zeroRatio, double sameValRatio)
+            double nullRatio, double zeroRatio, double dupValRatio)
     {
+        assert ((nullRatio != 0 && zeroRatio == 0 && dupValRatio == 0) ||
+                (nullRatio == 0 && zeroRatio != 0 && dupValRatio == 0) ||
+                (nullRatio == 0 && zeroRatio == 0 && dupValRatio != 0) ||
+                (nullRatio == 0 && zeroRatio == 0 && dupValRatio == 0));
+
         VoltTable table =
                 new VoltTable(new ColumnInfo("ID", VoltType.BIGINT),
                 new ColumnInfo("TS", VoltType.TIMESTAMP),
@@ -144,8 +135,8 @@ public class TestNibbleDelete {
                 } else {
                     ts = new TimestampType(i);
                 }
-            } else if (sameValRatio != 0) {
-                int numberOfSameValues = (int)(numberOfItems * sameValRatio);
+            } else if (dupValRatio != 0) {
+                int numberOfSameValues = (int)(numberOfItems * dupValRatio);
                 int val = (i / numberOfSameValues) * numberOfSameValues;
                 ts = new TimestampType(val);
             } else {
@@ -195,7 +186,7 @@ public class TestNibbleDelete {
         return results;
     }
 
-    private Pair<Long, Long> nibbleDeletePartitioned(ComparisonConstant op,
+    private Pair<Long, Long> nibbleDeletePartitioned(String opStr,
             int ts, long numberOfItems)
             throws NoConnectionsException, IOException
     {
@@ -223,7 +214,7 @@ public class TestNibbleDelete {
                         partitionKey,
                         "part",
                         "ts",
-                        op.ordinal(),
+                        opStr,
                         parameter,
                         500);
                 VoltTable result = response.getResults()[0];
@@ -231,9 +222,7 @@ public class TestNibbleDelete {
                 result.advanceRow();
                 long deletedRows = result.getLong("DELETED_ROWS");
                 deleted += deletedRows;
-//                // deleted rows is at least 1000 due to some duplicate time stamps, e.g. null values.
-//                assertTrue(deletedRows >= 1000);
-                long leftoverRows = result.getLong("LEFTOVER_ROWS");
+                long leftoverRows = result.getLong("LEFT_ROWS");
                 toBeDeleted += leftoverRows;
             } catch (ProcCallException e) {
                 fail("Failed to run NibbleDeleteSP: " + e.getMessage());
@@ -251,7 +240,7 @@ public class TestNibbleDelete {
         return new Pair<>(deleted, toBeDeleted);
     }
 
-    private Pair<Long, Long> nibbleDeleteReplicated(ComparisonConstant op, int ts, long numberOfItems)
+    private Pair<Long, Long> nibbleDeleteReplicated(String opStr, int ts, long numberOfItems)
             throws NoConnectionsException, IOException
     {
         TimestampType value = new TimestampType(ts);
@@ -266,14 +255,14 @@ public class TestNibbleDelete {
             ClientResponse response = m_client.callProcedure("@NibbleDeleteMP",
                     "rep",
                     "ts",
-                    op.ordinal(),
+                    opStr,
                     table,
                     500);
             VoltTable result = response.getResults()[0];
             assertEquals(1, result.getRowCount());
             result.advanceRow();
             deleted = result.getLong("DELETED_ROWS");
-            long leftoverRows = result.getLong("LEFTOVER_ROWS");
+            long leftoverRows = result.getLong("LEFT_ROWS");
             toBeDeleted += leftoverRows;
         } catch (ProcCallException e) {
             fail("Fail to run NibbleDeleteMP: " + e.getMessage());
@@ -290,14 +279,14 @@ public class TestNibbleDelete {
         return new Pair<>(deleted, toBeDeleted);
     }
 
-    private void runTester(long numberOfItems, ComparisonConstant op, int ts)
+    private void runTester(long numberOfItems, String opStr, int ts)
             throws NoConnectionsException, IOException
     {
         Pair<Long, Long> pair = new Pair<>(0l, Long.MAX_VALUE); // <deleted, toBeDeleted>
         int loop = 0;
         long existingRows = numberOfItems;
         while (pair.getSecond() > 0) {
-            pair = nibbleDeletePartitioned(op, ts, existingRows);
+            pair = nibbleDeletePartitioned(opStr, ts, existingRows);
             existingRows -= pair.getFirst();
             if (++loop > 100) {
                 fail("Make no progress on delete, something wrong happens in @NibbleDeleteSP or @NibbleDeleteMP");
@@ -308,7 +297,7 @@ public class TestNibbleDelete {
         loop = 0;
         existingRows = numberOfItems;
         while (pair.getSecond() > 0) {
-            pair = nibbleDeleteReplicated(op, ts, existingRows);
+            pair = nibbleDeleteReplicated(opStr, ts, existingRows);
             existingRows -= pair.getFirst();
             if (++loop > 100) {
                 fail("Make no progress on delete, something wrong happens in @NibbleDeleteSP or @NibbleDeleteMP");
@@ -328,7 +317,7 @@ public class TestNibbleDelete {
         VoltTable inputTable = createTable(numberOfItems, 0, 0, 0, 0);
         loadTable(m_client, "part", false, inputTable);
         loadTable(m_client, "rep", true, inputTable);
-        runTester(numberOfItems, ComparisonConstant.LESS_THAN_OR_EQUAL, 9000);
+        runTester(numberOfItems, "<=", 9000);
     }
 
     /**
@@ -343,7 +332,7 @@ public class TestNibbleDelete {
         VoltTable table = createTable(numberOfItems, 0, 0.5f, 0, 0);
         loadTable(m_client, "part", false, table);
         loadTable(m_client, "rep", true, table);
-        runTester(numberOfItems, ComparisonConstant.LESS_THAN_OR_EQUAL, 6000);
+        runTester(numberOfItems, "<=", 6000);
     }
 
     @Test
@@ -355,7 +344,7 @@ public class TestNibbleDelete {
         VoltTable table = createTable(numberOfItems, 0, 0, 0.5f, 0);
         loadTable(m_client, "part", false, table);
         loadTable(m_client, "rep", true, table);
-        runTester(numberOfItems, ComparisonConstant.LESS_THAN_OR_EQUAL, 6000);
+        runTester(numberOfItems, "<=", 6000);
     }
 
     @Test
@@ -367,64 +356,6 @@ public class TestNibbleDelete {
         VoltTable table = createTable(numberOfItems, 0, 0, 0, 0.3f);
         loadTable(m_client, "part", false, table);
         loadTable(m_client, "rep", true, table);
-        runTester(numberOfItems, ComparisonConstant.GREATER_THAN_OR_EQUAL, 0);
+        runTester(numberOfItems, ">=", 0);
     }
-
-    /**
-     * Two batches of execution should have similar latency
-     */
-    @Test
-    public void testNoSawToothPerformance()
-            throws NoConnectionsException, IOException, InterruptedException
-    {
-        System.out.println("testNoSawToothPerformance");
-
-        int numberOfItems = 20000;
-        VoltTable table = createTable(numberOfItems, 0, 0, 0, 0);
-        loadTable(m_client, "part", false, table);
-        loadTable(m_client, "rep", true, table);
-        // Warm up, let system compiles the plan
-        runTester(numberOfItems, ComparisonConstant.LESS_THAN_OR_EQUAL, 0);
-        // Start timing
-        long start = System.currentTimeMillis();
-        runTester(numberOfItems - 1, ComparisonConstant.LESS_THAN_OR_EQUAL, 10000);
-        long firstBatch = System.currentTimeMillis() - start;
-        Thread.sleep(1000);
-        start = System.currentTimeMillis();
-        runTester(numberOfItems - 10001, ComparisonConstant.LESS_THAN_OR_EQUAL, 20000);
-        long secondBatch = System.currentTimeMillis() - start;
-        assertTrue(secondBatch <= firstBatch);
-    }
-
-    /**
-     * Test the cost of select query with offset constraint on a indexed column
-     */
-    @Test
-    @Ignore
-    public void testSelectByOffsetOnIndexColumn() throws UnknownHostException, IOException
-    {
-        System.out.println("testSelectByOffsetOnIndexColumn");
-
-        int numberOfItems = 100000;
-        VoltTable part_table = createTable(numberOfItems, 0, 0, 0, 0);
-        loadTable(m_client, "part", false, part_table);
-
-        String query = "select * from part order by ts offset 1000 limit 1";
-        CatalogContext context = VoltDB.instance().getCatalogContext();
-        PlannerTool plannerTool = context.m_ptool;
-
-        Table catTable = mock(Table.class);
-        when(catTable.getTypeName()).thenReturn("part");
-        Column partitionCol = new Column();
-        partitionCol.setType(VoltType.TIMESTAMP.getValue());
-        partitionCol.setIndex(1);
-        partitionCol.setName("ts");
-        when(catTable.getPartitioncolumn()).thenReturn(partitionCol);
-        Procedure p = StatementCompiler.compileNibbleDeleteProcedure(catTable,
-                "proc1", partitionCol, ComparisonConstant.LESS_THAN_OR_EQUAL);
-        Statement countStmt = p.getStatements().get(VoltDB.ANON_STMT_NAME + "2");
-        String explain = countStmt.getExplainplan();
-        System.out.println("explain plan:" + explain);
-    }
-
 }

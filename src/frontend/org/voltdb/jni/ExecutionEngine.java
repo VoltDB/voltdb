@@ -787,7 +787,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Execute an Export action against the execution engine.
      */
     public abstract void exportAction( boolean syncAction,
-            long ackOffset, long seqNo, int partitionId, String tableSignature);
+            long uso, long seqNo, int partitionId, String tableSignature);
 
     /**
      * Get the seqNo and offset for an export table.
@@ -830,6 +830,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param spHandle                 The spHandle of the current transaction
      * @param lastCommittedSpHandle    The spHandle of the last committed transaction
      * @param uniqueId                 The uniqueId of the current transaction
+     * @param remoteClusterId          The cluster id of producer cluster
+     * @param remotePartitionId        The partition id of producer cluster
      * @param undoToken                For undo
      * @throws EEException
      */
@@ -839,6 +841,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                         long lastCommittedSpHandle,
                                         long uniqueId,
                                         int remoteClusterId,
+                                        int remotePartitionId,
                                         long undoToken) throws EEException;
 
     /**
@@ -895,6 +898,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int clusterIndex,
             long siteId,
             int partitionId,
+            int sitesPerHost,
             int hostId,
             byte hostname[],
             int drClusterId,
@@ -1119,6 +1123,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                long lastCommittedSpHandle,
                                                long uniqueId,
                                                int remoteClusterId,
+                                               int remotePartitionId,
                                                long undoToken);
 
     /**

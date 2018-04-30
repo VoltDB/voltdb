@@ -19,14 +19,9 @@
 
 #include "operatorexpression.h"
 
-#include "common/debuglog.h"
 #include "common/executorcontext.hpp"
-#include "common/NValue.hpp"
-#include "common/ValuePeeker.hpp"
 
-#include "common/tabletuple.h"
 #include "storage/table.h"
-#include "storage/tableiterator.h"
 
 
 namespace voltdb {

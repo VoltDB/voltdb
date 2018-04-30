@@ -60,6 +60,10 @@ public:
     virtual ActivationReturnCode handleActivation(TableStreamType streamType);
 
     /**
+     * Reactivation handler.
+     */
+    virtual ActivationReturnCode handleReactivation(TableStreamType streamType);
+    /**
      * Mandatory TableStreamContext override.
      */
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
@@ -112,7 +116,7 @@ private:
      * Iterator over the table via a CopyOnWriteIterator or an iterator over
      *  temp table used to stored backed up tuples
      */
-    boost::scoped_ptr<TupleIterator> m_iterator;
+    std::unique_ptr<TupleIterator> m_iterator;
 
     TableTuple m_tuple;
 
@@ -127,6 +131,7 @@ private:
     int64_t m_updates;
     int32_t m_skippedDirtyRows;
     int32_t m_skippedInactiveRows;
+    const bool m_replicated;
 
     void checkRemainingTuples(const std::string &label);
 

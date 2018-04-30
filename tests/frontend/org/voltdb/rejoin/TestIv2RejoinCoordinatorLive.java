@@ -187,9 +187,10 @@ public class TestIv2RejoinCoordinatorLive {
         createCoordinator(true);
         m_coordinator.startJoin(m_catalog);
         RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_1",
-                                              1, null, false);
+                                              null, null, false);
         List<Long> hsids = new ArrayList<Long>();
         hsids.add(1l);
+        hsids.add(2l);
         verifySent(hsids, msg);
         reset(m_coordinator);
         verify(m_volt, never()).onExecutionSiteRejoinCompletion(anyLong());
@@ -198,12 +199,21 @@ public class TestIv2RejoinCoordinatorLive {
         msg = new RejoinMessage(1l, 1001l, 1002l);
         m_coordinator.deliver(msg);
 
+        // fake an INITIATION_RESPONSE for site 2
+        msg = new RejoinMessage(2l, 2001l, 2002l);
+        m_coordinator.deliver(msg);
+
         // Verify that this triggers a snapshot request
         verifySnapshotRequest(true);
 
         // Generate a fake SNAPSHOT_FINISHED from site 1.
         msg = new RejoinMessage(1l, RejoinMessage.Type.SNAPSHOT_FINISHED);
         m_coordinator.deliver(msg);
+
+        // fake a snapshot finished response for site 2
+        msg = new RejoinMessage(2l, RejoinMessage.Type.SNAPSHOT_FINISHED);
+        m_coordinator.deliver(msg);
+
         reset(m_snapshotDaemon);
 
         // Verify that the second site is not started
@@ -215,24 +225,6 @@ public class TestIv2RejoinCoordinatorLive {
         // fake a replay finished response for site 1
         RejoinMessage msg1 = new RejoinMessage(1l, RejoinMessage.Type.REPLAY_FINISHED);
         m_coordinator.deliver(msg1);
-
-        // verify the second site is started
-        RejoinMessage expected = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_2",
-                                                   1, null, false);
-        hsids.clear();
-        hsids.add(2l);
-        verifySent(hsids, expected);
-
-        // fake an INITIATION_RESPONSE for site 2
-        msg = new RejoinMessage(2l, 2001l, 2002l);
-        m_coordinator.deliver(msg);
-
-        // Verify this triggers a second snapshot request
-        verifySnapshotRequest(true);
-
-        // fake a snapshot finished response for site 2
-        RejoinMessage msg2 = new RejoinMessage(2l, RejoinMessage.Type.SNAPSHOT_FINISHED);
-        m_coordinator.deliver(msg2);
 
         // fake a replay finished response for site 2
         RejoinMessage msg3 = new RejoinMessage(2l, RejoinMessage.Type.REPLAY_FINISHED);

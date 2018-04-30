@@ -66,6 +66,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.sysprocs.AdHocNTBase;
+import org.voltdb.sysprocs.AdHoc_RO_SP;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
@@ -533,6 +534,13 @@ public class ProcedureRunner {
                 // ClientInterface should pre-validate this param is valid
                 parameterAtIndex = invocation.getParameterAtIndex(0);
                 parameterType = VoltType.get((Byte) invocation.getParameterAtIndex(1));
+
+                if (parameterAtIndex == null && m_isReadOnly) {
+                    assert (m_procedure instanceof AdHoc_RO_SP);
+                    // Replicated table reads can run on any partition, skip check
+                    return true;
+                }
+
             } else {
                 parameterType = m_partitionColumnType;
                 parameterAtIndex = invocation.getParameterAtIndex(m_partitionColumn);
@@ -854,7 +862,7 @@ public class ProcedureRunner {
     }
 
     public byte[] voltLoadTable(String clusterName, String databaseName,
-                    String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
+                    String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream, boolean undo)
                     throws VoltAbortException {
         if (data == null || data.getRowCount() == 0) {
             return null;
@@ -862,9 +870,14 @@ public class ProcedureRunner {
         try {
             return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle, m_txnState.uniqueId,
                     clusterName, databaseName,
-                    tableName, data, returnUniqueViolations, shouldDRStream, false);
+                    tableName, data, returnUniqueViolations, shouldDRStream, undo);
         } catch (EEException e) {
-            throw new VoltAbortException("Failed to load table: " + tableName);
+            String msg = "Failed to load table \"" + tableName + "\"";
+            if (e.getMessage() != null) {
+                msg += ": " + e.getMessage();
+            }
+
+            throw new VoltAbortException(msg);
         }
     }
 

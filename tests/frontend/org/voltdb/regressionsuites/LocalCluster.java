@@ -1466,7 +1466,7 @@ public class LocalCluster extends VoltServerConfig {
         // I have no idea why this code ignores the user's input
         // based on other state in this class except to say that whoever wrote
         // it this way originally probably eats kittens and hates cake.
-        if (rejoinHostId == null || m_hasLocalServer) {
+        if (rejoinHostId == null || (m_hasLocalServer && hostId != 0)) {
             rejoinHostId = 0;
         }
         if (isNewCli) {
@@ -1479,6 +1479,7 @@ public class LocalCluster extends VoltServerConfig {
             templateCmdLine.leaderPort(portNoToRejoin);
             try {
                 startLocalServer(rejoinHostId, false, startAction);
+                m_localServer.waitForRejoin();
             } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }

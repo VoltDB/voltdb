@@ -51,6 +51,7 @@
 
 #include "harness.h"
 
+#include "common/SynchronizedThreadLock.h"
 #include "common/tabletuple.h"
 #include "common/valuevector.h"
 #include "expressions/abstractexpression.h"
@@ -384,7 +385,12 @@ public:
         ASSERT_TRUE(m_partitioned_customer_table);
         ASSERT_TRUE(voltdb::tableutil::addRandomTuples(m_partitioned_customer_table, NUM_OF_TUPLES));
         ASSERT_TRUE(m_replicated_customer_table);
+
+        // Either use the lock or execute on a single thread when adding tuples to a replicate table
+        voltdb::ScopedReplicatedResourceLock replicatedResourceLock;
+        voltdb::SynchronizedThreadLock::assumeMpMemoryContext();
         ASSERT_TRUE(voltdb::tableutil::addRandomTuples(m_replicated_customer_table, NUM_OF_TUPLES));
+        voltdb::SynchronizedThreadLock::assumeLocalSiteContext();
     }
 
 protected:
@@ -562,12 +568,12 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
 
     const voltdb::TupleSchema* res_schema = result->schema();
     voltdb::TableTuple tuple(res_schema);
-    boost::scoped_ptr<voltdb::TableIterator> iter(result->makeIterator());
-    if (!iter->hasNext()) {
+    voltdb::TableIterator iter = result->iterator();
+    if (!iter.hasNext()) {
         printf("No results!!\n");
     }
     int32_t count;
-    for (count = 0; iter->next(tuple); count += 1) {
+    for (count = 0; iter.next(tuple); count += 1) {
         /*
          * This is true because of collusion between the query
          * and the test.  The query selects two values, both

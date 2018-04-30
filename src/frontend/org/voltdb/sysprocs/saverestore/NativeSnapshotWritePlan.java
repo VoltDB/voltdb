@@ -125,7 +125,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                             null,
                             false);
 
-            SNAP_LOG.debug("ADDING TASK: " + task);
+            SNAP_LOG.debug("ADDING TASK for nativeSnapshot: " + task);
 
             if (table.getIsreplicated()) {
                 replicatedSnapshotTasks.add(task);

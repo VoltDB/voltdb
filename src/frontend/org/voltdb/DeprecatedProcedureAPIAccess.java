@@ -92,6 +92,19 @@ public abstract class DeprecatedProcedureAPIAccess {
                                 boolean shouldDRStream)
     throws VoltAbortException
     {
-        return procedure.m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream);
+        return voltLoadTable(procedure, clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream, false);
+    }
+
+    public static byte[] voltLoadTable(VoltProcedure procedure,
+                                       String clusterName,
+                                       String databaseName,
+                                       String tableName,
+                                       VoltTable data,
+                                       boolean returnUniqueViolations,
+                                       boolean shouldDRStream,
+                                       boolean undo)
+            throws VoltAbortException
+    {
+        return procedure.m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream, undo);
     }
 }

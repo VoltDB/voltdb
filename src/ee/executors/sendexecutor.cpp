@@ -45,21 +45,10 @@
 
 #include "sendexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "plannodes/sendnode.h"
 
-#include "execution/ExecutorVector.h"
-#include "execution/VoltDBEngine.h"
-
-#include "storage/table.h"
 #include "storage/tablefactory.h"
-#include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
 #include "storage/tableutil.h"
-#include "storage/temptable.h"
 
 namespace voltdb {
 
@@ -77,11 +66,11 @@ bool SendExecutor::p_execute(const NValueArray &params) {
 
     Table* inputTable = m_abstractNode->getInputTable();
     assert(inputTable);
-    VOLT_DEBUG("send input:\n%s\n", inputTable->debug().c_str());
+    VOLT_TRACE("send input:\n%s\n", inputTable->debug().c_str());
     //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
     m_engine->send(inputTable);
-    VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
+    VOLT_TRACE("SEND TABLE: %s", inputTable->debug().c_str());
 
     return true;
 }

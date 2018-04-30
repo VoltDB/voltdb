@@ -24,7 +24,7 @@
 #include <string.h>
 
 #include "common/Pool.hpp"
-#include "common/UndoAction.h"
+#include "common/UndoReleaseAction.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "boost/unordered_set.hpp"
 
@@ -34,11 +34,12 @@ class TableAndIndexTest;
 namespace voltdb {
 class UndoLog;
 
+
 class UndoQuantum {
     // UndoQuantum has a very limited public API that allows UndoAction registration
     // and copying buffers into pooled storage. Anything else is reserved for friends.
     friend class UndoLog; // For management access -- allocation, deallocation, etc.
-    friend class UndoAction; // For allocateAction.
+    friend class UndoReleaseAction; // For allocateAction.
     friend class ::StreamedTableTest;
 
 protected:
@@ -46,12 +47,13 @@ protected:
     void operator delete(void*, Pool&) { /* emergency deallocator does nothing */ }
     void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
 
-    inline UndoQuantum(int64_t undoToken, Pool *dataPool)
-        : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0), m_interests(NULL), m_dataPool(dataPool) {}
+    inline UndoQuantum(int64_t undoToken, Pool *dataPool, bool forLowestSite)
+        : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0), m_interests(NULL),
+          m_forLowestSite(forLowestSite), m_dataPool(dataPool) {}
     inline virtual ~UndoQuantum() {}
 
 public:
-    virtual inline void registerUndoAction(UndoAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+    virtual inline void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
         assert(undoAction);
         m_undoActions.push_back(undoAction);
 
@@ -68,6 +70,8 @@ public:
             }
             if (!isDup) {
                 if (m_numInterests == m_interestsCapacity) {
+                    // Don't need to explicitly free the old m_interests because all memory allocated by UndoQuantum
+                    // gets reset (by calling purge) to a clean state after the quantum completes
                     UndoQuantumReleaseInterest **newStorage =
                             reinterpret_cast<UndoQuantumReleaseInterest**>(m_dataPool->allocate(sizeof(void*) * m_interestsCapacity * 2));
                     ::memcpy(newStorage, m_interests, sizeof(void*) * m_interestsCapacity);
@@ -87,9 +91,9 @@ protected:
      * but their no-op delete operator leaves them to be purged in one go with the data pool.
      */
     inline Pool* undo() {
-        for (std::vector<UndoAction*>::reverse_iterator i = m_undoActions.rbegin();
+        for (std::vector<UndoReleaseAction*>::reverse_iterator i = m_undoActions.rbegin();
              i != m_undoActions.rend(); ++i) {
-            UndoAction* goner = *i;
+            UndoReleaseAction* goner = *i;
             goner->undo();
             delete goner;
         }
@@ -112,9 +116,9 @@ protected:
      * table before all the inserts and deletes are released.
      */
     inline Pool* release() {
-        for (std::vector<UndoAction*>::iterator i = m_undoActions.begin();
+        for (std::vector<UndoReleaseAction*>::iterator i = m_undoActions.begin();
              i != m_undoActions.end(); ++i) {
-            UndoAction* goner = *i;
+            UndoReleaseAction* goner = *i;
             goner->release();
             delete goner;
         }
@@ -150,16 +154,17 @@ public:
 
 private:
     const int64_t m_undoToken;
-    std::vector<UndoAction*> m_undoActions;
+    std::vector<UndoReleaseAction*> m_undoActions;
     uint32_t m_numInterests;
     uint32_t m_interestsCapacity;
     UndoQuantumReleaseInterest **m_interests;
+    const bool m_forLowestSite;
 protected:
     Pool *m_dataPool;
 };
 
 
-inline void* UndoAction::operator new(size_t sz, UndoQuantum& uq) { return uq.allocateAction(sz); }
+inline void* UndoReleaseAction::operator new(size_t sz, UndoQuantum& uq) { return uq.allocateAction(sz); }
 
 }
 

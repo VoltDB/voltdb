@@ -116,37 +116,6 @@ Then in order to have the ADHOC logger messages go to this file rather than the 
     </logger>
 
 
-## Configure gzip or zip rolling logs
-
-Here is what you need to do to get gzipped rolling log files:
-
-1. Download apache-log4j-extras-1.2.17 from here: https://logging.apache.org/log4j/extras/download.html
-
-2. Extract the files and copy the apache-log4j-extras-1.2.17.jar file to your voltdb-ent-<version>/lib directory.  You will need to do this on all the servers. (Normally additional jars are put in the lib/extension folder, but because Log4J is used by command line utilities such as SQLCMD that do not load the extensions folder, it is necessary to put the file in the lib directory to prevent those utilities from printing a ClassNotFound error message.
-
-3. Edit your log4j.xml files to replace the "file" appender with the following definition.  Using a ".gz" or ".zip" extension on the end of the FileNamePattern will cause the appender to gzip or zip the log file after it is rolled.  This configuration needs to be copied to each of the servers.
-
-    <!-- file appender captures all loggers messages. -->
-    <!-- <appender name="file" class="org.apache.log4j.DailyRollingFileAppender"> -->
-    <!--     <param name="file" value="log/volt.log"/> -->
-    <!--     <param name="DatePattern" value="'.'yyyy-MM-dd" /> -->
-    <!--     <layout class="org.apache.log4j.PatternLayout"> -->
-    <!--         <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/> -->
-    <!--     </layout> -->
-    <!-- </appender> -->
-    <!-- Gzip Rolling File Appender using Log4J Extras -->
-    <appender name="file" class="org.apache.log4j.rolling.RollingFileAppender">
-      <rollingPolicy name="file" class="org.apache.log4j.rolling.TimeBasedRollingPolicy">
-        <param name="FileNamePattern" value="log/volt.log.%d{yyyy-MM-dd}.gz" />
-        <param name="ActiveFileName" value="log/volt.log" />
-      </rollingPolicy>
-      <layout class="org.apache.log4j.PatternLayout">
-        <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
-      </layout>
-    </appender>
-
-
-
 Additional Notes
 -----------------------------------------
 

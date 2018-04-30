@@ -24,10 +24,10 @@
 #   4. Adding a (positive) integer before a | symbol makes the preceding option
 #      more likely; the "n|" still needs to be preceded and followed by a space.
 #      For example, in this definition:
-#          definition :== foo 2| bar
+#          definition ::= foo 2| bar
 #      the "foo" option is twice as likely as the "bar" option. You may use
 #      more than one such integer; for example, in this definition:
-#          definition :== foo 3| bar 2| null
+#          definition ::= foo 3| bar 2| null
 #      the "foo" option will be chosen half (3/6) the time, the "bar" option
 #      will be chosen a third (2/6) of the time, and the "null" option will
 #      be chosen only 1 time in 6. Note that the last option always has an
@@ -40,7 +40,7 @@
 #   6. You cannot include | inside brackets, so [foo | bar] will not work
 #      properly, though the reverse, e.g. [foo] | [bar] is fine; to achieve
 #      the same effect as [foo | bar] use [{foo-or-bar}], with:
-#          foo-or-bar :== foo | bar
+#          foo-or-bar ::= foo | bar
 #      See "all-or-distinct" for one example of this.
 #   7. It is possible (despite what I said in #3 above) to escape an open ("[")
 #      or close ("]") bracket symbol, by preceding it with a backslash, i.e.,
@@ -498,87 +498,333 @@ truncate-statement      ::= TRUNCATE TABLE {table-name}
 # WITH clause, with or without RECURSIVE:
 ################################################################################
 #
-# TODO: switch back to something reasonable (after non-recursive CTE's added to grammar):
-cte-statement           ::= {recursive-cte-statement} 9997| {basic-cte-statement}
-
-basic-cte-statement     ::= WITH {basic-cte-query}
-# TODO: change per Chris review: (use basic-query-*, defined below)
-basic-cte-query         ::= TODO
+cte-statement           ::= {basic-cte-statement} | {recursive-cte-statement}
 
 ########################################
+# Basic (non-recursive) CTEs
+#
+basic-cte-statement     ::= WITH {basic-cte-query}\
+                            {empty:depth}{empty:1depth}{empty:agdepth}
+
+# This is used above to replace certain things, mainly related to the DEPTH
+# column, that are needed by Recursive CTEs, but not by "basic" (non-recursive)
+# CTEs; so for those, they are replaced with an empty string
+empty                   ::=
+
+basic-cte-query         ::= {basic-cte-int} 4| {basic-cte-num} 2| {basic-cte-str} 4| \
+                            {basic-cte-time} | {basic-cte-varbin} | {basic-cte-point} | {basic-cte-polygon} | \
+                            {basic-cte-num-str} | {basic-cte-str-num} | {basic-cte-3-int} | {basic-cte-3-str} | \
+                            {basic-cte-9-int} | {basic-cte-9-str} | {basic-cte-9-mixed}
+
+basic-cte-int           ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-int} ) \
+                            {final-query-1num}
+basic-cte-num           ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-num} ) \
+                            {final-query-1num}
+basic-cte-str           ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-str} ) \
+                            {final-query-1non-num}
+basic-cte-time          ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-time} ) \
+                            {final-query-1non-num}
+basic-cte-varbin        ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-varbin} ) \
+                            {final-query-1non-num}
+basic-cte-point         ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-point} ) \
+                            {final-query-1non-num}
+basic-cte-polygon       ::= cte{optional-1-cte-col}  AS (\
+                            {basic-query-polygon} ) \
+                            {final-query-1non-num}
+basic-cte-num-str       ::= cte{optional-2-cte-cols} AS (\
+                            {basic-query-num-str} ) \
+                            {final-query-1num-1non}
+basic-cte-str-num       ::= cte{optional-2-cte-cols} AS (\
+                            {basic-query-str-num} ) \
+                            {final-query-1non-1num}
+basic-cte-3-int         ::= cte{optional-3-cte-cols} AS (\
+                            {basic-query-3-int} ) \
+                            {final-query-3num}
+basic-cte-3-str         ::= cte{optional-3-cte-cols} AS (\
+                            {basic-query-3-str} ) \
+                            {final-query-3non-num}
+basic-cte-9-int         ::= cte{optional-9-cte-cols} AS (\
+                            {basic-query-9-int} ) \
+                            {final-query-9num}
+basic-cte-9-str         ::= cte{optional-9-cte-cols} AS (\
+                            {basic-query-9-str} ) \
+                            {final-query-9non-num}
+basic-cte-9-mixed       ::= cte{optional-9-cte-cols} AS (\
+                            {basic-query-9-mixed} ) \
+                            {final-query-9-mixed}
+
+########################################
+# Grammar definitions used for both
+# kinds of CTE: "basic" (non-recursive,
+# above) and Recursive (below) 
+#
+
+# Note: VALUES version not currently supported by VoltDB, so make this rare
+# TODO: change per Chris review: (add GROUP BY; also ORDER BY ???)
+basic-query-int         ::= SELECT {int-expression}[[ {cte-col1-alias}]]        {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({int-rarely-null-value} {one-as-depth})
+basic-query-num         ::= SELECT {numeric-expression}[[ {cte-col1-alias}]]    {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({num-rarely-null-value} {one-as-depth})
+basic-query-str         ::= SELECT {cte-string-expression}[[ {cte-col1-alias}]] {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({str-rarely-null-value} {one-as-depth})
+basic-query-time        ::= SELECT {timestamp-expression}[[ {cte-col1-alias}]]  {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({time-rarely-null-value} {one-as-depth})
+basic-query-varbin      ::= SELECT {varbinary-expression}[[ {cte-col1-alias}]]  {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({varbin-rarely-null-value} {one-as-depth})
+basic-query-point       ::= SELECT {point-expression}[[ {cte-col1-alias}]]      {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({point-rarely-null-value} {one-as-depth})
+basic-query-polygon     ::= SELECT {polygon-expression}[[ {cte-col1-alias}]]    {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+                            VALUES ({poly-rarely-null-value} {one-as-depth})
+basic-query-num-str     ::= SELECT {numeric-expression},                  {cte-string-expression}                  {one-as-depth} FROM {table-references} [{where-clause}] 150| \
+                            SELECT {numeric-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias} {one-as-depth} FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({num-rarely-null-value}, {str-rarely-null-value} {one-as-depth})
+basic-query-str-num     ::= SELECT {cte-string-expression},                  {numeric-expression}                  {one-as-depth} FROM {table-references} [{where-clause}] 150| \
+                            SELECT {cte-string-expression} {cte-col1-alias}, {numeric-expression} {cte-col2-alias} {one-as-depth} FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({str-rarely-null-value}, {num-rarely-null-value} {one-as-depth})
+basic-query-3-int       ::= SELECT {int-expression},                  {int-expression},                  {int-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {int-expression} {cte-col1-alias}, {int-expression} {cte-col2-alias}, {int-expression} {cte-col3-alias} {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value} {one-as-depth})
+basic-query-3-str       ::= SELECT {cte-string-expression},                  {cte-string-expression},                  {cte-string-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {cte-string-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias}, {cte-string-expression} {cte-col3-alias} {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value} {one-as-depth})
+basic-query-9-int       ::= SELECT {int-expression}, {int-expression}, {int-expression}, \
+                                   {int-expression}, {int-expression}, {int-expression}, \
+                                   {int-expression}, {int-expression}, {int-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {int-expression} {cte-col1-alias}, {int-expression} {cte-col2-alias}, {int-expression} {cte-col3-alias}, \
+                                   {int-expression} {cte-col4-alias}, {int-expression} {cte-col5-alias}, {int-expression} {cte-col6-alias}, \
+                                   {int-expression} {cte-col7-alias}, {int-expression} {cte-col8-alias}, {int-expression} {cte-col9-alias} {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value}, \
+                                    {int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value}, \
+                                    {int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value} {one-as-depth})
+basic-query-9-str       ::= SELECT {cte-string-expression}, {cte-string-expression}, {cte-string-expression}, \
+                                   {cte-string-expression}, {cte-string-expression}, {cte-string-expression}, \
+                                   {cte-string-expression}, {cte-string-expression}, {cte-string-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {cte-string-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias}, {cte-string-expression} {cte-col3-alias}, \
+                                   {cte-string-expression} {cte-col4-alias}, {cte-string-expression} {cte-col5-alias}, {cte-string-expression} {cte-col6-alias}, \
+                                   {cte-string-expression} {cte-col7-alias}, {cte-string-expression} {cte-col8-alias}, {cte-string-expression} {cte-col9-alias}  \
+                                   {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value}, \
+                                    {str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value}, \
+                                    {str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value} {one-as-depth})
+basic-query-9-mixed     ::= SELECT {int-expression}, {cte-string-expression}, {numeric-expression}, \
+                                   {int-expression}, {cte-string-expression}, {varbinary-expression}, \
+                                   {int-expression}, {cte-string-expression}, {timestamp-expression} {one-as-depth} \
+                            FROM {table-references} [{where-clause}] 150| \
+                            SELECT {int-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias}, {numeric-expression}   {cte-col3-alias}, \
+                                   {int-expression} {cte-col4-alias}, {cte-string-expression} {cte-col5-alias}, {varbinary-expression} {cte-col6-alias}, \
+                                   {int-expression} {cte-col7-alias}, {cte-string-expression} {cte-col8-alias}, {timestamp-expression} {cte-col9-alias}  \
+                                   {one-as-depth} \
+                            FROM {table-references} [{where-clause}]  49| \
+                            VALUES ({int-rarely-null-value}, {str-rarely-null-value}, {num-rarely-null-value}, \
+                                    {int-rarely-null-value}, {str-rarely-null-value}, {varbin-rarely-null-value}, \
+                                    {int-rarely-null-value}, {str-rarely-null-value}, {time-rarely-null-value} {one-as-depth})
+
+cte-string-expression   ::= {simple-cte-string-expr} 49| {string-scalar-sub-q}
+simple-cte-string-expr  ::= {string-value} | [[[[{table-alias-or-name}.]]]]{cte-string-column-name} 8| \
+                            {string-function-expr}
+cte-string-column-name  ::= VCHAR 9| {any-string-column-name}
+
+cte-col1                ::= CTE_C1
+cte-col2                ::= CTE_C2
+cte-col3                ::= CTE_C3
+cte-col4                ::= CTE_C4
+cte-col5                ::= CTE_C5
+cte-col6                ::= CTE_C6
+cte-col7                ::= CTE_C7
+cte-col8                ::= CTE_C8
+cte-col9                ::= CTE_C9
+
+ctec1-9                 ::= {cte-col1:ctec1} | {cte-col2:ctec2} | {cte-col3:ctec3} | \
+                            {cte-col4:ctec4} | {cte-col5:ctec5} | {cte-col6:ctec6} | \
+                            {cte-col7:ctec7} | {cte-col8:ctec8} | {cte-col9:ctec9}
+
+cte-col-alias1          ::= CA1
+cte-col-alias2          ::= CA2
+cte-col-alias3          ::= CA3
+cte-col-alias4          ::= CA4
+cte-col-alias5          ::= CA5
+cte-col-alias6          ::= CA6
+cte-col-alias7          ::= CA7
+cte-col-alias8          ::= CA8
+cte-col-alias9          ::= CA9
+
+cte-col1-alias          ::= [AS ]{cte-col-alias1:ctec1}
+cte-col2-alias          ::= [AS ]{cte-col-alias2:ctec2}
+cte-col3-alias          ::= [AS ]{cte-col-alias3:ctec3}
+cte-col4-alias          ::= [AS ]{cte-col-alias4:ctec4}
+cte-col5-alias          ::= [AS ]{cte-col-alias5:ctec5}
+cte-col6-alias          ::= [AS ]{cte-col-alias6:ctec6}
+cte-col7-alias          ::= [AS ]{cte-col-alias7:ctec7}
+cte-col8-alias          ::= [AS ]{cte-col-alias8:ctec8}
+cte-col9-alias          ::= [AS ]{cte-col-alias9:ctec9}
+
+# Note: DEPTH "column" added to avoid infinite loops, per ENG-13586 (but only
+# for Recursive CTEs, not needed for "basic" non-recursive)
+optional-1-cte-col      ::=  ({cte-col1:ctec1}  {depth}) 8| [({cte-col1:ctec1} {depth})]
+optional-2-cte-cols     ::=  ({cte-col1:ctec1}, {cte-col2:ctec2}  {depth}) 8| \
+                            [({cte-col1:ctec1}, {cte-col2:ctec2}  {depth})]
+optional-3-cte-cols     ::=  ({cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col3:ctec3} {depth}) 8| \
+                            [({cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col3:ctec3} {depth})]
+optional-9-cte-cols     ::=  ({cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col3:ctec3}, \
+                              {cte-col4:ctec4}, {cte-col5:ctec5}, {cte-col6:ctec6}, \
+                              {cte-col7:ctec7}, {cte-col8:ctec8}, {cte-col9:ctec9} {depth}) 8| \
+                            [({cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                              {cte-col4:ctec4}, {cte-col5:ctec5}, {cte-col6:ctec6}, \
+                              {cte-col7:ctec7}, {cte-col8:ctec8}, {cte-col9:ctec9} {depth})]
+
+# Note: this level of indirection using ":depth", ":1depth", or ":agdepth"
+# allows recursive CTEs to set these definitions to appropriate values
+# related to DEPTH (which is used to prevent infinite loops), while "basic"
+# (non-recursive) CTEs can remove these terms, by replacing them with an
+# empty string
+depth                   ::= {depth2:depth}
+depth2                  ::= , DEPTH
+one-as-depth            ::= {one-as-depth2:1depth}
+one-as-depth2           ::= , 1[[[ AS] DEPTH]]
+aggregate-depth-funcs   ::= {aggregate-depth-funcs2:agdepth}
+aggregate-depth-funcs2  ::=  , MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD, SUM(DEPTH) SMD, AVG(DEPTH) AVD 2| \
+                            [, MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD, SUM(DEPTH) SMD, AVG(DEPTH) AVD] | \
+                            [, MIN(DEPTH) MND][, MAX(DEPTH) MXD][, COUNT(DEPTH) CTD][, SUM(DEPTH) SMD][, AVG(DEPTH) AVD]
+
+# TODO: lots more options could be used here
+final-query-1num        ::= SELECT {star} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1})    AG1 {aggregate-depth-funcs} FROM cte
+final-query-1non-num    ::= SELECT {star} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1 {aggregate-depth-funcs} FROM cte
+final-query-1num-1non   ::= SELECT {star} FROM cte | \
+                            SELECT    {aggregate-function}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                                {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[,    {aggregate-function}({:ctec1}) AG1]\
+                                {aggregate-depth-funcs} FROM cte
+final-query-1non-1num   ::= SELECT {star} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[,    {aggregate-function}({:ctec1}) AG2]\
+                                {aggregate-depth-funcs} FROM cte | \
+                            SELECT    {aggregate-function}({:ctec1}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
+                                {aggregate-depth-funcs} FROM cte
+final-query-3num        ::= SELECT {star} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1}) AG1[, {aggregate-function}({:ctec1}) AG2]\
+                                [, {aggregate-function}({:ctec1}) AG3] {aggregate-depth-funcs} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1}) AG2[, {aggregate-function}({:ctec1}) AG1]\
+                                [, {aggregate-function}({:ctec1}) AG3] {aggregate-depth-funcs} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1}) AG3[, {aggregate-function}({:ctec1}) AG2]\
+                                [, {aggregate-function}({:ctec1}) AG1] {aggregate-depth-funcs} FROM cte
+final-query-3non-num    ::= SELECT {star} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                                [, {non-num-arg-aggr-func}({:ctec1}) AG3]   {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG2[, {non-num-arg-aggr-func}({:ctec1}) AG1]\
+                                [, {non-num-arg-aggr-func}({:ctec1}) AG3]   {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec1}) AG3[, {non-num-arg-aggr-func}({:ctec1}) AG2]\
+                                [, {non-num-arg-aggr-func}({:ctec1}) AG1]   {aggregate-depth-funcs} FROM cte
+final-query-9num        ::= SELECT {star} FROM cte | \
+                            SELECT {aggregate-function}({ctec1-9}) AG1[, {aggregate-function}({ctec1-9}) AG2][, {aggregate-function}({ctec1-9}) AG3] \
+                                [, {aggregate-function}({ctec1-9}) AG4,  {aggregate-function}({ctec1-9}) AG5,   {aggregate-function}({ctec1-9}) AG6] \
+                                [, {aggregate-function}({ctec1-9}) AG7,  {aggregate-function}({ctec1-9}) AG8,   {aggregate-function}({ctec1-9}) AG9] \
+                            {aggregate-depth-funcs} FROM cte
+final-query-9non-num    ::= SELECT {star} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({ctec1-9}) AG1[, {non-num-arg-aggr-func}({ctec1-9}) AG2][, {non-num-arg-aggr-func}({ctec1-9}) AG3] \
+                                [, {non-num-arg-aggr-func}({ctec1-9}) AG4,  {non-num-arg-aggr-func}({ctec1-9}) AG5,   {non-num-arg-aggr-func}({ctec1-9}) AG6] \
+                                [, {non-num-arg-aggr-func}({ctec1-9}) AG7,  {non-num-arg-aggr-func}({ctec1-9}) AG8,   {non-num-arg-aggr-func}({ctec1-9}) AG9] \
+                            {aggregate-depth-funcs} FROM cte
+final-query-9-mixed     ::= SELECT {star} FROM cte | \
+                            SELECT {aggregate-function}({:ctec1}) AG1[, {non-num-arg-aggr-func}({:ctec2}) AG2][,  {aggregate-function}({:ctec3}) AG3] \
+                                [, {aggregate-function}({:ctec4}) AG4,  {non-num-arg-aggr-func}({:ctec5}) AG5, {non-num-arg-aggr-func}({:ctec6}) AG6] \
+                                [, {aggregate-function}({:ctec7}) AG7,  {non-num-arg-aggr-func}({:ctec8}) AG8, {non-num-arg-aggr-func}({:ctec9}) AG9] \
+                            {aggregate-depth-funcs} FROM cte | \
+                            SELECT {non-num-arg-aggr-func}({:ctec9}) AG9[, {non-num-arg-aggr-func}({:ctec8}) AG8][, {aggregate-function}({:ctec7}) AG7] \
+                                [, {non-num-arg-aggr-func}({:ctec6}) AG6,  {non-num-arg-aggr-func}({:ctec5}) AG5,   {aggregate-function}({:ctec4}) AG4] \
+                                [,    {aggregate-function}({:ctec3}) AG3,  {non-num-arg-aggr-func}({:ctec2}) AG2,   {aggregate-function}({:ctec1}) AG1] \
+                            {aggregate-depth-funcs} FROM cte
+
+########################################
+# Recursive CTEs
 #
 recursive-cte-statement ::= WITH RECURSIVE {recursive-cte-query}
+
 recursive-cte-query     ::= {rec-cte-int} 4| {rec-cte-num} 2| {rec-cte-str} 4| \
                             {rec-cte-time} | {rec-cte-varbin} | {rec-cte-point} | {rec-cte-polygon} | \
                             {rec-cte-num-str} | {rec-cte-str-num} | {rec-cte-3-int} | {rec-cte-3-str} | \
                             {rec-cte-9-int} | {rec-cte-9-str} | {rec-cte-9-mixed}
 
-rec-cte-int             ::= rcte{optional-1-rec-cte-col}  AS (\
+rec-cte-int             ::= cte{optional-1-cte-col}  AS (\
                             {basic-query-int} \
                             {union-all} \
                             {recursive-query-int} ) \
                             {final-query-1num}
-rec-cte-num             ::= rcte{optional-1-rec-cte-col}  AS (\
+rec-cte-num             ::= cte{optional-1-cte-col}  AS (\
                             {basic-query-num} \
                             {union-all} \
                             {recursive-query-num} ) \
                             {final-query-1num}
-rec-cte-str             ::= rcte{optional-1-rec-cte-col}  AS (\
+rec-cte-str             ::= cte{optional-1-cte-col}  AS (\
                             {basic-query-str} \
                             {union-all} \
                             {recursive-query-str} ) \
                             {final-query-1non-num}
-rec-cte-time            ::= rcte{optional-1-rec-cte-col}  AS (\
+rec-cte-time            ::= cte{optional-1-cte-col}  AS (\
                             {basic-query-time} \
                             {union-all} \
                             {recursive-query-time} ) \
                             {final-query-1non-num}
-rec-cte-varbin          ::= rcte{optional-1-rec-cte-col}  AS (\
+rec-cte-varbin          ::= cte{optional-1-cte-col}  AS (\
                             {basic-query-varbin} \
                             {union-all} \
                             {recursive-query-varbin} ) \
                             {final-query-1non-num}
-rec-cte-point           ::= rcte{optional-1-rec-cte-col}  AS (\
+rec-cte-point           ::= cte{optional-1-cte-col}  AS (\
                             {basic-query-point} \
                             {union-all} \
                             {recursive-query-point} ) \
                             {final-query-1non-num}
-rec-cte-polygon         ::= rcte{optional-1-rec-cte-col}  AS (\
+rec-cte-polygon         ::= cte{optional-1-cte-col}  AS (\
                             {basic-query-polygon} \
                             {union-all} \
                             {recursive-query-polygon} ) \
                             {final-query-1non-num}
-rec-cte-num-str         ::= rcte{optional-2-rec-cte-cols} AS (\
+rec-cte-num-str         ::= cte{optional-2-cte-cols} AS (\
                             {basic-query-num-str} \
                             {union-all} \
                             {recursive-query-num-str} ) \
                             {final-query-1num-1non}
-rec-cte-str-num         ::= rcte{optional-2-rec-cte-cols} AS (\
+rec-cte-str-num         ::= cte{optional-2-cte-cols} AS (\
                             {basic-query-str-num} \
                             {union-all} \
                             {recursive-query-str-num} ) \
                             {final-query-1non-1num}
-rec-cte-3-int           ::= rcte{optional-3-rec-cte-cols} AS (\
+rec-cte-3-int           ::= cte{optional-3-cte-cols} AS (\
                             {basic-query-3-int} \
                             {union-all} \
                             {recursive-query-3-int} ) \
                             {final-query-3num}
-rec-cte-3-str           ::= rcte{optional-3-rec-cte-cols} AS (\
+rec-cte-3-str           ::= cte{optional-3-cte-cols} AS (\
                             {basic-query-3-str} \
                             {union-all} \
                             {recursive-query-3-str} ) \
                             {final-query-3non-num}
-rec-cte-9-int           ::= rcte{optional-9-rec-cte-cols} AS (\
+rec-cte-9-int           ::= cte{optional-9-cte-cols} AS (\
                             {basic-query-9-int} \
                             {union-all} \
                             {recursive-query-9-int} ) \
                             {final-query-9num}
-rec-cte-9-str           ::= rcte{optional-9-rec-cte-cols} AS (\
+rec-cte-9-str           ::= cte{optional-9-cte-cols} AS (\
                             {basic-query-9-str} \
                             {union-all} \
                             {recursive-query-9-str} ) \
                             {final-query-9non-num}
-rec-cte-9-mixed         ::= rcte{optional-9-rec-cte-cols} AS (\
+rec-cte-9-mixed         ::= cte{optional-9-cte-cols} AS (\
                             {basic-query-9-mixed} \
                             {union-all} \
                             {recursive-query-9-mixed} ) \
@@ -588,421 +834,253 @@ rec-cte-9-mixed         ::= rcte{optional-9-rec-cte-cols} AS (\
 # so make that rare
 union-all               ::= UNION ALL 99| UNION [ALL]
 
-rec-cte-col1            ::= RCTE_C1
-rec-cte-col2            ::= RCTE_C2
-rec-cte-col3            ::= RCTE_C3
-rec-cte-col4            ::= RCTE_C4
-rec-cte-col5            ::= RCTE_C5
-rec-cte-col6            ::= RCTE_C6
-rec-cte-col7            ::= RCTE_C7
-rec-cte-col8            ::= RCTE_C8
-rec-cte-col9            ::= RCTE_C9
-
-rctec1-9                ::= {rec-cte-col1:rctec1} | {rec-cte-col2:rctec2} | {rec-cte-col3:rctec3} | \
-                            {rec-cte-col4:rctec4} | {rec-cte-col5:rctec5} | {rec-cte-col6:rctec6} | \
-                            {rec-cte-col7:rctec7} | {rec-cte-col8:rctec8} | {rec-cte-col9:rctec9}
-
-rec-cte-col-alias1      ::= CA1
-rec-cte-col-alias2      ::= CA2
-rec-cte-col-alias3      ::= CA3
-rec-cte-col-alias4      ::= CA4
-rec-cte-col-alias5      ::= CA5
-rec-cte-col-alias6      ::= CA6
-rec-cte-col-alias7      ::= CA7
-rec-cte-col-alias8      ::= CA8
-rec-cte-col-alias9      ::= CA9
-
-rec-cte-col1-alias      ::= [AS ]{rec-cte-col-alias1:rctec1}
-rec-cte-col2-alias      ::= [AS ]{rec-cte-col-alias2:rctec2}
-rec-cte-col3-alias      ::= [AS ]{rec-cte-col-alias3:rctec3}
-rec-cte-col4-alias      ::= [AS ]{rec-cte-col-alias4:rctec4}
-rec-cte-col5-alias      ::= [AS ]{rec-cte-col-alias5:rctec5}
-rec-cte-col6-alias      ::= [AS ]{rec-cte-col-alias1:rctec6}
-rec-cte-col7-alias      ::= [AS ]{rec-cte-col-alias2:rctec7}
-rec-cte-col8-alias      ::= [AS ]{rec-cte-col-alias3:rctec8}
-rec-cte-col9-alias      ::= [AS ]{rec-cte-col-alias4:rctec9}
-
-# Note: DEPTH "column" added to avoid infinite loops, per ENG-13586
-optional-1-rec-cte-col  ::=  ({rec-cte-col1:rctec1}, DEPTH) 8| [({rec-cte-col1:rctec1}, DEPTH)]
-optional-2-rec-cte-cols ::=  ({rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, DEPTH) 8| \
-                            [({rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, DEPTH)]
-optional-3-rec-cte-cols ::=  ({rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col3:rctec3}, DEPTH) 8| \
-                            [({rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col3:rctec3}, DEPTH)]
-optional-9-rec-cte-cols ::=  ({rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col3:rctec3}, \
-                              {rec-cte-col4:rctec4}, {rec-cte-col5:rctec5}, {rec-cte-col6:rctec6}, \
-                              {rec-cte-col7:rctec7}, {rec-cte-col8:rctec8}, {rec-cte-col9:rctec9}, DEPTH) 8| \
-                            [({rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                              {rec-cte-col4:rctec4}, {rec-cte-col5:rctec5}, {rec-cte-col6:rctec6}, \
-                              {rec-cte-col7:rctec7}, {rec-cte-col8:rctec8}, {rec-cte-col9:rctec9}, DEPTH)]
-
-# Note: VALUES version not currently supported by VoltDB, so make this rare
-# TODO: change per Chris review: (add GROUP BY; also ORDER BY ???)
-basic-query-int         ::= SELECT {int-expression}[[ {rec-cte-col1-alias}]],         1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}] 199| \
-                            VALUES ({int-rarely-null-value})
-basic-query-num         ::= SELECT {numeric-expression}[[ {rec-cte-col1-alias}]],     1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}] 199| \
-                            VALUES ({num-rarely-null-value})
-basic-query-str         ::= SELECT {rcte-string-expression}[[ {rec-cte-col1-alias}]], 1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}] 199| \
-                            VALUES ({str-rarely-null-value})
-basic-query-time        ::= SELECT {timestamp-expression}[[ {rec-cte-col1-alias}]],   1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}] 199| \
-                            VALUES ({time-rarely-null-value})
-basic-query-varbin      ::= SELECT {varbinary-expression}[[ {rec-cte-col1-alias}]],   1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}] 199| \
-                            VALUES ({varbin-rarely-null-value})
-basic-query-point       ::= SELECT {point-expression}[[ {rec-cte-col1-alias}]],       1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}] 199| \
-                            VALUES ({point-rarely-null-value})
-basic-query-polygon     ::= SELECT {polygon-expression}[[ {rec-cte-col1-alias}]],     1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}] 199| \
-                            VALUES ({poly-rarely-null-value})
-basic-query-num-str     ::= SELECT {numeric-expression},                      {rcte-string-expression},                      1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}] 150| \
-                            SELECT {numeric-expression} {rec-cte-col1-alias}, {rcte-string-expression} {rec-cte-col2-alias}, 1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}]  49| \
-                            VALUES ({num-rarely-null-value}, {str-rarely-null-value})
-basic-query-str-num     ::= SELECT {rcte-string-expression},                      {numeric-expression},                      1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}] 150| \
-                            SELECT {rcte-string-expression} {rec-cte-col1-alias}, {numeric-expression} {rec-cte-col2-alias}, 1[[[ AS] DEPTH]] FROM {table-references} [{where-clause}]  49| \
-                            VALUES ({str-rarely-null-value}, {num-rarely-null-value})
-basic-query-3-int       ::= SELECT {int-expression},                      {int-expression},                      {int-expression}, 1 \
-                            FROM {table-references} [{where-clause}] 150| \
-                            SELECT {int-expression} {rec-cte-col1-alias}, {int-expression} {rec-cte-col2-alias}, {int-expression} {rec-cte-col3-alias}, 1 \
-                            FROM {table-references} [{where-clause}]  49| \
-                            VALUES ({int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value})
-basic-query-3-str       ::= SELECT {rcte-string-expression},                      {rcte-string-expression},                      {rcte-string-expression}, 1 \
-                            FROM {table-references} [{where-clause}] 150| \
-                            SELECT {rcte-string-expression} {rec-cte-col1-alias}, {rcte-string-expression} {rec-cte-col2-alias}, {rcte-string-expression} {rec-cte-col3-alias}, 1 \
-                            FROM {table-references} [{where-clause}]  49| \
-                            VALUES ({str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value})
-basic-query-9-int       ::= SELECT {int-expression}, {int-expression}, {int-expression}, \
-                                   {int-expression}, {int-expression}, {int-expression}, \
-                                   {int-expression}, {int-expression}, {int-expression}, 1 \
-                            FROM {table-references} [{where-clause}] 150| \
-                            SELECT {int-expression} {rec-cte-col1-alias}, {int-expression} {rec-cte-col2-alias}, {int-expression} {rec-cte-col3-alias}, \
-                                   {int-expression} {rec-cte-col4-alias}, {int-expression} {rec-cte-col5-alias}, {int-expression} {rec-cte-col6-alias}, \
-                                   {int-expression} {rec-cte-col7-alias}, {int-expression} {rec-cte-col8-alias}, {int-expression} {rec-cte-col9-alias}, 1 \
-                            FROM {table-references} [{where-clause}]  49| \
-                            VALUES ({int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value}, \
-                                    {int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value}, \
-                                    {int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value})
-basic-query-9-str       ::= SELECT {rcte-string-expression}, {rcte-string-expression}, {rcte-string-expression}, \
-                                   {rcte-string-expression}, {rcte-string-expression}, {rcte-string-expression}, \
-                                   {rcte-string-expression}, {rcte-string-expression}, {rcte-string-expression}, 1 \
-                            FROM {table-references} [{where-clause}] 150| \
-                            SELECT {rcte-string-expression} {rec-cte-col1-alias}, {rcte-string-expression} {rec-cte-col2-alias}, {rcte-string-expression} {rec-cte-col3-alias}, \
-                                   {rcte-string-expression} {rec-cte-col4-alias}, {rcte-string-expression} {rec-cte-col5-alias}, {rcte-string-expression} {rec-cte-col6-alias}, \
-                                   {rcte-string-expression} {rec-cte-col7-alias}, {rcte-string-expression} {rec-cte-col8-alias}, {rcte-string-expression} {rec-cte-col9-alias}, 1 \
-                            FROM {table-references} [{where-clause}]  49| \
-                            VALUES ({str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value}, \
-                                    {str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value}, \
-                                    {str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value})
-basic-query-9-mixed     ::= SELECT {int-expression}, {rcte-string-expression}, {numeric-expression}, \
-                                   {int-expression}, {rcte-string-expression}, {varbinary-expression}, \
-                                   {int-expression}, {rcte-string-expression}, {timestamp-expression}, 1 \
-                            FROM {table-references} [{where-clause}] 150| \
-                            SELECT {int-expression} {rec-cte-col1-alias}, {rcte-string-expression} {rec-cte-col2-alias}, {numeric-expression}   {rec-cte-col3-alias}, \
-                                   {int-expression} {rec-cte-col4-alias}, {rcte-string-expression} {rec-cte-col5-alias}, {varbinary-expression} {rec-cte-col6-alias}, \
-                                   {int-expression} {rec-cte-col7-alias}, {rcte-string-expression} {rec-cte-col8-alias}, {timestamp-expression} {rec-cte-col9-alias}, 1 \
-                            FROM {table-references} [{where-clause}]  49| \
-                            VALUES ({int-rarely-null-value}, {str-rarely-null-value}, {num-rarely-null-value}, \
-                                    {int-rarely-null-value}, {str-rarely-null-value}, {varbin-rarely-null-value}, \
-                                    {int-rarely-null-value}, {str-rarely-null-value}, {time-rarely-null-value})
-
-rcte-string-expression  ::= {simple-rcte-string-expr} 49| {string-scalar-sub-q}
-simple-rcte-string-expr ::= {string-value} | [[[[{table-alias-or-name}.]]]]{rcte-string-column-name} 8| \
-                            {string-function-expr}
-rcte-string-column-name ::= VCHAR 9| {any-string-column-name}
+# Used to avoid infinite loops in the recursive queries below
+max-depth               ::= 5 | {digit-0-to-5} | {digit}
 
 # TODO: lots more options here (for the WHERE clause)
 # TODO: change per Chris review: (add GROUP BY; also ORDER BY ???)
-max-depth               ::= 5 | {digit-0-to-5} | {digit}
-recursive-query-int     ::= SELECT {recursive-clause-int1},    DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col1:rctec1} {comparison-operator} {int-rarely-null-value} \
+recursive-query-int     ::= SELECT {recursive-clause-int1},    DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {int-rarely-null-value} \
                               AND DEPTH < {max-depth}
-recursive-query-num     ::= SELECT {recursive-clause-num1},    DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col1:rctec1} {comparison-operator} {num-rarely-null-value} \
+recursive-query-num     ::= SELECT {recursive-clause-num1},    DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {num-rarely-null-value} \
                               AND DEPTH < {max-depth}
-recursive-query-str     ::= SELECT {recursive-clause-str1},    DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col1:rctec1} {comparison-operator} {str-rarely-null-value} \
+recursive-query-str     ::= SELECT {recursive-clause-str1},    DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {str-rarely-null-value} \
                               AND DEPTH < {max-depth}
-recursive-query-time    ::= SELECT {recursive-clause-time1},   DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col1:rctec1} {comparison-operator} {time-rarely-null-value} \
+recursive-query-time    ::= SELECT {recursive-clause-time1},   DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {time-rarely-null-value} \
                               AND DEPTH < {max-depth}
-recursive-query-varbin  ::= SELECT {recursive-clause-varbin1}, DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col1:rctec1} {comparison-operator} {varbin-rarely-null-value} \
+recursive-query-varbin  ::= SELECT {recursive-clause-varbin1}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {varbin-rarely-null-value} \
                               AND DEPTH < {max-depth}
-recursive-query-point   ::= SELECT {recursive-clause-point1},  DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col1:rctec1} {comparison-operator} {point-rarely-null-value} \
+recursive-query-point   ::= SELECT {recursive-clause-point1},  DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {point-rarely-null-value} \
                               AND DEPTH < {max-depth}
-recursive-query-polygon ::= SELECT {recursive-clause-poly1},   DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col1:rctec1} {comparison-operator} {poly-rarely-null-value} \
+recursive-query-polygon ::= SELECT {recursive-clause-poly1},   DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {poly-rarely-null-value} \
                               AND DEPTH < {max-depth}
-recursive-query-num-str ::= SELECT {recursive-clause-num1}, {rec-cte-col2:rctec2}, DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col1:rctec1} {comparison-operator} {num-rarely-null-value} \
+recursive-query-num-str ::= SELECT {recursive-clause-num1}, {cte-col2:ctec2}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {num-rarely-null-value} \
                               AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {recursive-clause-str2}, DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col2:rctec2} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-str2}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col2:ctec2} {comparison-operator} {str-rarely-null-value} \
                               AND DEPTH < {max-depth}
-recursive-query-str-num ::= SELECT {recursive-clause-str1}, {rec-cte-col2:rctec2}, DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col1:rctec1} {comparison-operator} {str-rarely-null-value} \
+recursive-query-str-num ::= SELECT {recursive-clause-str1}, {cte-col2:ctec2}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col1:ctec1} {comparison-operator} {str-rarely-null-value} \
                               AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {recursive-clause-num2}, DEPTH + 1 FROM rcte \
-                            WHERE {rec-cte-col2:rctec2} {comparison-operator} {num-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-num2}, DEPTH + 1 FROM cte \
+                            WHERE {cte-col2:ctec2} {comparison-operator} {num-rarely-null-value} \
                               AND DEPTH < {max-depth}
-recursive-query-3-int   ::= SELECT {recursive-clause-int1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec1} {comparison-operator} {int-rarely-null-value} \
+recursive-query-3-int   ::= SELECT {recursive-clause-int1}, {cte-col2:ctec2}, {cte-col2:ctec3}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {recursive-clause-int2}, {rec-cte-col2:rctec3}, DEPTH + 1 \
-                            FROM rcte WHERE {int-rarely-null-value} {comparison-operator} {rec-cte-col2:rctec2} \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-int2}, {cte-col2:ctec3}, DEPTH + 1 \
+                            FROM cte WHERE {int-rarely-null-value} {comparison-operator} {cte-col2:ctec2} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {recursive-clause-int3}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col2:rctec3} {comparison-operator} {int-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-int3}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col2:ctec3} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth}
-recursive-query-3-str   ::= SELECT {recursive-clause-str1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec1} {comparison-operator} {str-rarely-null-value} \
+recursive-query-3-str   ::= SELECT {recursive-clause-str1}, {cte-col2:ctec2}, {cte-col2:ctec3}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {recursive-clause-str2}, {rec-cte-col2:rctec3}, DEPTH + 1 \
-                            FROM rcte WHERE {str-rarely-null-value} {comparison-operator} {rec-cte-col2:rctec2} \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-str2}, {cte-col2:ctec3}, DEPTH + 1 \
+                            FROM cte WHERE {str-rarely-null-value} {comparison-operator} {cte-col2:ctec2} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {recursive-clause-str3}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col2:rctec3} {comparison-operator} {str-rarely-null-value} \
-                                        AND DEPTH < {max-depth}
-
-recursive-query-9-int   ::= SELECT {recursive-clause-int1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec1} {comparison-operator} {int-rarely-null-value} \
-                                        AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {recursive-clause-int2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec2} {comparison-operator} {int-rarely-null-value} \
-                                        AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {recursive-clause-int3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec3} {comparison-operator} {int-rarely-null-value} \
-                                        AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {recursive-clause-int4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec4} {comparison-operator} {int-rarely-null-value} \
-                                        AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {recursive-clause-int5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec5} {comparison-operator} {int-rarely-null-value} \
-                                        AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {recursive-clause-int6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec6} {comparison-operator} {int-rarely-null-value} \
-                                        AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {recursive-clause-int7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec7} {comparison-operator} {int-rarely-null-value} \
-                                        AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {recursive-clause-int8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec8} {comparison-operator} {int-rarely-null-value} \
-                                        AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {recursive-clause-int9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec9} {comparison-operator} {int-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-str3}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col2:ctec3} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth}
 
-recursive-query-9-str   ::= SELECT {recursive-clause-str1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec1} {comparison-operator} {str-rarely-null-value} \
+recursive-query-9-int   ::= SELECT {recursive-clause-int1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {recursive-clause-str2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec2} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-int2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec2} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {recursive-clause-str3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec3} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-int3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec3} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {recursive-clause-str4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec4} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {recursive-clause-int4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec4} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {recursive-clause-str5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec5} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {recursive-clause-int5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec5} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {recursive-clause-str6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec6} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {recursive-clause-int6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec6} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {recursive-clause-str7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec7} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {recursive-clause-int7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec7} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {recursive-clause-str8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec8} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {recursive-clause-int8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec8} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {recursive-clause-str9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec9} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {recursive-clause-int9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec9} {comparison-operator} {int-rarely-null-value} \
                                         AND DEPTH < {max-depth}
 
-recursive-query-9-mixed ::= SELECT {recursive-clause-int1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec1} {comparison-operator} {int-rarely-null-value} \
+recursive-query-9-str   ::= SELECT {recursive-clause-str1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {recursive-clause-str2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec2} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-str2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec2} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {recursive-clause-num3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec3} {comparison-operator} {num-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-str3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec3} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {recursive-clause-int4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec4} {comparison-operator} {int-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {recursive-clause-str4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec4} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {recursive-clause-str5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec5} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {recursive-clause-str5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec5} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {recursive-clause-varbin6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec6} {comparison-operator} {varbin-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {recursive-clause-str6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec6} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {recursive-clause-int7}, {rec-cte-col2:rctec8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec7} {comparison-operator} {int-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {recursive-clause-str7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec7} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {recursive-clause-str8}, {rec-cte-col2:rctec9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec8} {comparison-operator} {str-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {recursive-clause-str8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec8} {comparison-operator} {str-rarely-null-value} \
                                         AND DEPTH < {max-depth} | \
-                            SELECT {rec-cte-col1:rctec1}, {rec-cte-col2:rctec2}, {rec-cte-col2:rctec3}, \
-                                   {rec-cte-col1:rctec4}, {rec-cte-col2:rctec5}, {rec-cte-col2:rctec6}, \
-                                   {rec-cte-col1:rctec7}, {rec-cte-col2:rctec8}, {recursive-clause-time9}, DEPTH + 1 \
-                            FROM rcte WHERE {rec-cte-col1:rctec9} {comparison-operator} {time-rarely-null-value} \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {recursive-clause-str9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec9} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth}
+
+recursive-query-9-mixed ::= SELECT {recursive-clause-int1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec1} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {recursive-clause-str2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec2} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {recursive-clause-num3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec3} {comparison-operator} {num-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {recursive-clause-int4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec4} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {recursive-clause-str5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec5} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {recursive-clause-varbin6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec6} {comparison-operator} {varbin-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {recursive-clause-int7}, {cte-col2:ctec8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec7} {comparison-operator} {int-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {recursive-clause-str8}, {cte-col2:ctec9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec8} {comparison-operator} {str-rarely-null-value} \
+                                        AND DEPTH < {max-depth} | \
+                            SELECT {cte-col1:ctec1}, {cte-col2:ctec2}, {cte-col2:ctec3}, \
+                                   {cte-col1:ctec4}, {cte-col2:ctec5}, {cte-col2:ctec6}, \
+                                   {cte-col1:ctec7}, {cte-col2:ctec8}, {recursive-clause-time9}, DEPTH + 1 \
+                            FROM cte WHERE {cte-col1:ctec9} {comparison-operator} {time-rarely-null-value} \
                                         AND DEPTH < {max-depth}
 
 # TODO: could use functions here, etc.
-recursive-clause-int1   ::= {rec-cte-col1:rctec1} {math-operator} {int-rarely-null-value} | \
-                            {int-rarely-null-value} {math-operator} {rec-cte-col1:rctec3}
-recursive-clause-int2   ::= {rec-cte-col2:rctec2} {math-operator} {int-rarely-null-value} | \
-                            {int-rarely-null-value} {math-operator} {rec-cte-col2:rctec2}
-recursive-clause-int3   ::= {rec-cte-col3:rctec3} {math-operator} {int-rarely-null-value} | \
-                            {int-rarely-null-value} {math-operator} {rec-cte-col3:rctec3}
-recursive-clause-int4   ::= {rec-cte-col4:rctec4} {math-operator} {int-rarely-null-value} | \
-                            {int-rarely-null-value} {math-operator} {rec-cte-col4:rctec3}
-recursive-clause-int5   ::= {rec-cte-col5:rctec5} {math-operator} {int-rarely-null-value} | \
-                            {int-rarely-null-value} {math-operator} {rec-cte-col5:rctec3}
-recursive-clause-int6   ::= {rec-cte-col6:rctec6} {math-operator} {int-rarely-null-value} | \
-                            {int-rarely-null-value} {math-operator} {rec-cte-col6:rctec3}
-recursive-clause-int7   ::= {rec-cte-col7:rctec7} {math-operator} {int-rarely-null-value} | \
-                            {int-rarely-null-value} {math-operator} {rec-cte-col7:rctec3}
-recursive-clause-int8   ::= {rec-cte-col8:rctec8} {math-operator} {int-rarely-null-value} | \
-                            {int-rarely-null-value} {math-operator} {rec-cte-col8:rctec3}
-recursive-clause-int9   ::= {rec-cte-col9:rctec9} {math-operator} {int-rarely-null-value} | \
-                            {int-rarely-null-value} {math-operator} {rec-cte-col9:rctec3}
-recursive-clause-num1   ::= {rec-cte-col1:rctec1} {math-operator} {num-rarely-null-value} | \
-                            {num-rarely-null-value} {math-operator} {rec-cte-col1:rctec1}
-recursive-clause-num2   ::= {rec-cte-col2:rctec2} {math-operator} {num-rarely-null-value} | \
-                            {num-rarely-null-value} {math-operator} {rec-cte-col2:rctec2}
-recursive-clause-num3   ::= {rec-cte-col3:rctec3} {math-operator} {num-rarely-null-value} | \
-                            {num-rarely-null-value} {math-operator} {rec-cte-col3:rctec3}
-recursive-clause-str1   ::= {rec-cte-col1:rctec1} {string-operator} {str-rarely-null-value} | \
-                            {str-rarely-null-value} {string-operator} {rec-cte-col1:rctec1}
-recursive-clause-str2   ::= {rec-cte-col2:rctec2} {string-operator} {str-rarely-null-value} | \
-                            {str-rarely-null-value} {string-operator} {rec-cte-col2:rctec2}
-recursive-clause-str3   ::= {rec-cte-col3:rctec3} {string-operator} {str-rarely-null-value} | \
-                            {str-rarely-null-value} {string-operator} {rec-cte-col3:rctec3}
-recursive-clause-str4   ::= {rec-cte-col4:rctec4} {string-operator} {str-rarely-null-value} | \
-                            {str-rarely-null-value} {string-operator} {rec-cte-col4:rctec4}
-recursive-clause-str5   ::= {rec-cte-col5:rctec5} {string-operator} {str-rarely-null-value} | \
-                            {str-rarely-null-value} {string-operator} {rec-cte-col5:rctec5}
-recursive-clause-str6   ::= {rec-cte-col6:rctec6} {string-operator} {str-rarely-null-value} | \
-                            {str-rarely-null-value} {string-operator} {rec-cte-col6:rctec6}
-recursive-clause-str7   ::= {rec-cte-col7:rctec7} {string-operator} {str-rarely-null-value} | \
-                            {str-rarely-null-value} {string-operator} {rec-cte-col7:rctec7}
-recursive-clause-str8   ::= {rec-cte-col8:rctec8} {string-operator} {str-rarely-null-value} | \
-                            {str-rarely-null-value} {string-operator} {rec-cte-col8:rctec8}
-recursive-clause-str9   ::= {rec-cte-col9:rctec9} {string-operator} {str-rarely-null-value} | \
-                            {str-rarely-null-value} {string-operator} {rec-cte-col9:rctec9}
-recursive-clause-time1  ::= DATEADD(YEAR, {int-rarely-null-value}, {rec-cte-col1:rctec1})
-recursive-clause-time9  ::= DATEADD(YEAR, {int-rarely-null-value}, {rec-cte-col9:rctec9})
-recursive-clause-varbin1::= add2Varbinary({rec-cte-col1:rctec1}, {varbin-rarely-null-value}) | \
-                            add2Varbinary({varbin-rarely-null-value}, {rec-cte-col1:rctec1})
-recursive-clause-varbin6::= add2Varbinary({rec-cte-col6:rctec6}, {varbin-rarely-null-value}) | \
-                            add2Varbinary({varbin-rarely-null-value}, {rec-cte-col6:rctec6})
-recursive-clause-point1 ::= add2GeographyPoint({rec-cte-col1:rctec1}, {point-rarely-null-value}) | \
-                            add2GeographyPoint({point-rarely-null-value}, {rec-cte-col1:rctec1})
-recursive-clause-poly1  ::= addGeographyPointToGeography({rec-cte-col1:rctec1}, {point-rarely-null-value})
-
-# TODO: lots more options here
-aggregate-depth-funcs   ::=  , MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD, SUM(DEPTH) SMD, AVG(DEPTH) AVD 2| \
-                            [, MIN(DEPTH) MND, MAX(DEPTH) MXD, COUNT(DEPTH) CTD, SUM(DEPTH) SMD, AVG(DEPTH) AVD] | \
-                            [, MIN(DEPTH) MND][, MAX(DEPTH) MXD][, COUNT(DEPTH) CTD][, SUM(DEPTH) SMD][, AVG(DEPTH) AVD]
-final-query-1num        ::= SELECT {star} FROM rcte | \
-                            SELECT {aggregate-function}({:rctec1}) AG1 {aggregate-depth-funcs} FROM rcte
-final-query-1non-num    ::= SELECT {star} FROM rcte | \
-                            SELECT {non-num-arg-aggr-func}({:rctec1}) AG1 {aggregate-depth-funcs} FROM rcte
-final-query-1num-1non   ::= SELECT {star} FROM rcte | \
-                            SELECT    {aggregate-function}({:rctec1}) AG1[, {non-num-arg-aggr-func}({:rctec1}) AG2]\
-                                {aggregate-depth-funcs} FROM rcte | \
-                            SELECT {non-num-arg-aggr-func}({:rctec1}) AG2[,    {aggregate-function}({:rctec1}) AG1]\
-                                {aggregate-depth-funcs} FROM rcte
-final-query-1non-1num   ::= SELECT {star} FROM rcte | \
-                            SELECT {non-num-arg-aggr-func}({:rctec1}) AG1[,    {aggregate-function}({:rctec1}) AG2]\
-                                {aggregate-depth-funcs} FROM rcte | \
-                            SELECT    {aggregate-function}({:rctec1}) AG2[, {non-num-arg-aggr-func}({:rctec1}) AG1]\
-                                {aggregate-depth-funcs} FROM rcte
-final-query-3num        ::= SELECT {star} FROM rcte | \
-                            SELECT {aggregate-function}({:rctec1}) AG1[, {aggregate-function}({:rctec1}) AG2]\
-                                [, {aggregate-function}({:rctec1}) AG3] {aggregate-depth-funcs} FROM rcte | \
-                            SELECT {aggregate-function}({:rctec1}) AG2[, {aggregate-function}({:rctec1}) AG1]\
-                                [, {aggregate-function}({:rctec1}) AG3] {aggregate-depth-funcs} FROM rcte | \
-                            SELECT {aggregate-function}({:rctec1}) AG3[, {aggregate-function}({:rctec1}) AG2]\
-                                [, {aggregate-function}({:rctec1}) AG1] {aggregate-depth-funcs} FROM rcte
-final-query-3non-num    ::= SELECT {star} FROM rcte | \
-                            SELECT {non-num-arg-aggr-func}({:rctec1}) AG1[, {non-num-arg-aggr-func}({:rctec1}) AG2]\
-                                [, {non-num-arg-aggr-func}({:rctec1}) AG3]   {aggregate-depth-funcs} FROM rcte | \
-                            SELECT {non-num-arg-aggr-func}({:rctec1}) AG2[, {non-num-arg-aggr-func}({:rctec1}) AG1]\
-                                [, {non-num-arg-aggr-func}({:rctec1}) AG3]   {aggregate-depth-funcs} FROM rcte | \
-                            SELECT {non-num-arg-aggr-func}({:rctec1}) AG3[, {non-num-arg-aggr-func}({:rctec1}) AG2]\
-                                [, {non-num-arg-aggr-func}({:rctec1}) AG1]   {aggregate-depth-funcs} FROM rcte
-final-query-9num        ::= SELECT {star} FROM rcte | \
-                            SELECT {aggregate-function}({rctec1-9}) AG1[, {aggregate-function}({rctec1-9}) AG2][, {aggregate-function}({rctec1-9}) AG3] \
-                                [, {aggregate-function}({rctec1-9}) AG4,  {aggregate-function}({rctec1-9}) AG5,   {aggregate-function}({rctec1-9}) AG6] \
-                                [, {aggregate-function}({rctec1-9}) AG7,  {aggregate-function}({rctec1-9}) AG8,   {aggregate-function}({rctec1-9}) AG9] \
-                            {aggregate-depth-funcs} FROM rcte
-final-query-9non-num    ::= SELECT {star} FROM rcte | \
-                            SELECT {non-num-arg-aggr-func}({rctec1-9}) AG1[, {non-num-arg-aggr-func}({rctec1-9}) AG2][, {non-num-arg-aggr-func}({rctec1-9}) AG3] \
-                                [, {non-num-arg-aggr-func}({rctec1-9}) AG4,  {non-num-arg-aggr-func}({rctec1-9}) AG5,   {non-num-arg-aggr-func}({rctec1-9}) AG6] \
-                                [, {non-num-arg-aggr-func}({rctec1-9}) AG7,  {non-num-arg-aggr-func}({rctec1-9}) AG8,   {non-num-arg-aggr-func}({rctec1-9}) AG9] \
-                            {aggregate-depth-funcs} FROM rcte
-final-query-9-mixed     ::= SELECT {star} FROM rcte | \
-                            SELECT {aggregate-function}({:rctec1}) AG1[, {non-num-arg-aggr-func}({:rctec2}) AG2][,  {aggregate-function}({:rctec3}) AG3] \
-                                [, {aggregate-function}({:rctec4}) AG4,  {non-num-arg-aggr-func}({:rctec5}) AG5, {non-num-arg-aggr-func}({:rctec6}) AG6] \
-                                [, {aggregate-function}({:rctec7}) AG7,  {non-num-arg-aggr-func}({:rctec8}) AG8, {non-num-arg-aggr-func}({:rctec9}) AG9] \
-                            {aggregate-depth-funcs} FROM rcte | \
-                            SELECT {non-num-arg-aggr-func}({:rctec9}) AG9[, {non-num-arg-aggr-func}({:rctec8}) AG8][, {aggregate-function}({:rctec7}) AG7] \
-                                [, {non-num-arg-aggr-func}({:rctec6}) AG6,  {non-num-arg-aggr-func}({:rctec5}) AG5,   {aggregate-function}({:rctec4}) AG4] \
-                                [,    {aggregate-function}({:rctec3}) AG3,  {non-num-arg-aggr-func}({:rctec2}) AG2,   {aggregate-function}({:rctec1}) AG1] \
-                            {aggregate-depth-funcs} FROM rcte
+recursive-clause-int1   ::= {cte-col1:ctec1} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col1:ctec3}
+recursive-clause-int2   ::= {cte-col2:ctec2} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col2:ctec2}
+recursive-clause-int3   ::= {cte-col3:ctec3} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col3:ctec3}
+recursive-clause-int4   ::= {cte-col4:ctec4} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col4:ctec3}
+recursive-clause-int5   ::= {cte-col5:ctec5} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col5:ctec3}
+recursive-clause-int6   ::= {cte-col6:ctec6} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col6:ctec3}
+recursive-clause-int7   ::= {cte-col7:ctec7} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col7:ctec3}
+recursive-clause-int8   ::= {cte-col8:ctec8} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col8:ctec3}
+recursive-clause-int9   ::= {cte-col9:ctec9} {math-operator} {int-rarely-null-value} | \
+                            {int-rarely-null-value} {math-operator} {cte-col9:ctec3}
+recursive-clause-num1   ::= {cte-col1:ctec1} {math-operator} {num-rarely-null-value} | \
+                            {num-rarely-null-value} {math-operator} {cte-col1:ctec1}
+recursive-clause-num2   ::= {cte-col2:ctec2} {math-operator} {num-rarely-null-value} | \
+                            {num-rarely-null-value} {math-operator} {cte-col2:ctec2}
+recursive-clause-num3   ::= {cte-col3:ctec3} {math-operator} {num-rarely-null-value} | \
+                            {num-rarely-null-value} {math-operator} {cte-col3:ctec3}
+recursive-clause-str1   ::= {cte-col1:ctec1} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col1:ctec1}
+recursive-clause-str2   ::= {cte-col2:ctec2} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col2:ctec2}
+recursive-clause-str3   ::= {cte-col3:ctec3} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col3:ctec3}
+recursive-clause-str4   ::= {cte-col4:ctec4} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col4:ctec4}
+recursive-clause-str5   ::= {cte-col5:ctec5} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col5:ctec5}
+recursive-clause-str6   ::= {cte-col6:ctec6} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col6:ctec6}
+recursive-clause-str7   ::= {cte-col7:ctec7} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col7:ctec7}
+recursive-clause-str8   ::= {cte-col8:ctec8} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col8:ctec8}
+recursive-clause-str9   ::= {cte-col9:ctec9} {string-operator} {str-rarely-null-value} | \
+                            {str-rarely-null-value} {string-operator} {cte-col9:ctec9}
+recursive-clause-time1  ::= DATEADD(YEAR, {int-rarely-null-value}, {cte-col1:ctec1})
+recursive-clause-time9  ::= DATEADD(YEAR, {int-rarely-null-value}, {cte-col9:ctec9})
+recursive-clause-varbin1::= add2Varbinary({cte-col1:ctec1}, {varbin-rarely-null-value}) | \
+                            add2Varbinary({varbin-rarely-null-value}, {cte-col1:ctec1})
+recursive-clause-varbin6::= add2Varbinary({cte-col6:ctec6}, {varbin-rarely-null-value}) | \
+                            add2Varbinary({varbin-rarely-null-value}, {cte-col6:ctec6})
+recursive-clause-point1 ::= add2GeographyPoint({cte-col1:ctec1}, {point-rarely-null-value}) | \
+                            add2GeographyPoint({point-rarely-null-value}, {cte-col1:ctec1})
+recursive-clause-poly1  ::= addGeographyPointToGeography({cte-col1:ctec1}, {point-rarely-null-value})
 
 ################################################################################
 # Grammar rules for special non-standard SQL statements that can be used in

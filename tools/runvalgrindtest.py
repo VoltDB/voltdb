@@ -18,6 +18,7 @@ import sys
 import os
 import subprocess
 import xml.etree.ElementTree as ET
+import re
 
 class XMLFile(object):
     def __init__(self, xmlfile, expecterrors):
@@ -56,16 +57,28 @@ class XMLFile(object):
         idx = 0
         nstacks = len(stacks)
         for stack in stacks:
-            print('    Stack %d/%d' % (idx + 1, nstacks))
+            idx += 1
+            print('    Stack %d of %d' % (idx, nstacks))
             self.printStack(stack)
 
     def readErrors(self):
-        tree = ET.parse(self.xmlfile)
-        root = tree.getroot()
+        f = None
+        xml = ""
+        with open(self.xmlfile, "r") as f:
+            xml = f.read()
+        # Sometimes valgrind puts extra closing tags
+        # in the output.  This is a known bug in versions
+        # before 3.12.  Since we cannot install more modern
+        # tools we need to try to fix this up by removing all the
+        # end tags and adding one at the end.
+        xml = re.sub(r"(</valgrindoutput>)", "", xml) + "\n</valgrindoutput>\n"
+        root = ET.fromstring(xml)
         exe=root.findall('.//argv/exe')
         print('Exe: %s' % exe[0].text)
         self.errors = root.findall('.//error')
         self.numErrors = len(self.errors)
+        result = (self.numErrors > 0)
+        return result
 
     def printErrors(self):
         print(':---------------------------------------------------:')
@@ -81,37 +94,46 @@ class XMLFile(object):
         idx = 0
         for error in self.errors:
             idx += 1
-            print("Error %d/%d" % (idx + 1, self.numErrors))
+            print("Error %d of %d" % (idx, self.numErrors))
             self.printError(error)
 
 if __name__ == '__main__':
     xmlfile = None
-    arg = sys.argv[1]
     expectfail=False
-    expected_status = 0
     run_valgrind = True
-    if arg == '--expect-fail=true':
-        expectfail=True
-        sys.argv.pop(1)
-        expected_status = 1
-    elif arg == '--expect-fail=false':
-        expectfail=False
-        sys.argv.pop(1)
-        expected_status = 0
-    elif arg == '--just-read-file':
-        run_valgrind = False
+    debug = False
+    done = False
+    while not done:
+        arg = sys.argv[1]
+        if arg == '--expect-fail=true':
+            expectfail=True
+        elif arg == '--expect-fail=false':
+            expectfail=False
+        elif arg == '--just-read-file':
+            run_valgrind = False
+        elif arg == '--debug':
+            debug = True
+        else:
+            done = True
+        if not done:
+            sys.argv.pop(1)
     for arg in sys.argv:
         if arg.startswith('--xml-file='):
             xmlfile=arg[11:]
             break
+    if debug:
+        print("Valgrind command: %s" % (" ".join(sys.argv[1:])))
+        print("Expect fail: %s" % expectfail)
     if run_valgrind:
-        testReturnStatus = subprocess.call(sys.argv[1:], shell=False)
-    else:
-        testReturnStatus = 0
-    if xmlfile:
-        result = XMLFile(xmlfile, expectfail)
-        result.readErrors()
+        subprocess.call(sys.argv[1:], shell=False)
+    if not xmlfile:
+	sys.exit(1)
+    result = XMLFile(xmlfile, expectfail)
+    testfailed = result.readErrors()
+    gotexpected = (testfailed == expectfail)
+    print("testfailed: %s, expectfail: %s, gotexpected: %s" % (testfailed, expectfail, gotexpected))
+    if not gotexpected:
         result.printErrors()
-        if (testReturnStatus == expected_status):
-            os.remove(xmlfile)
-    sys.exit(testReturnStatus)
+    if gotexpected and run_valgrind:
+        os.remove(xmlfile)
+    sys.exit(1 if (testfailed) else 0)

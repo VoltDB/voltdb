@@ -455,6 +455,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                     continue;
                 }
                 sleepCounter = 1;
+                String topicIdentifer = m_topicAndPartition.topic() + "-" + m_topicAndPartition.partition();
                 for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
                     //You may be catchin up so dont sleep.
                     currentFetchCount++;
@@ -471,7 +472,7 @@ public abstract class BaseKafkaTopicPartitionImporter {
                         params = formatter.transform(payload);
 
                         ProcedureInvocationCallback cb = new ProcedureInvocationCallback(messageAndOffset.offset(),
-                                messageAndOffset.nextOffset(), callbackTracker, m_gapTracker, m_dead, m_pauseOffset);
+                                messageAndOffset.nextOffset(), callbackTracker, m_gapTracker, m_dead, m_pauseOffset, topicIdentifer);
 
                         if (m_lifecycle.hasTransaction()) {
                             if (invoke(params, cb)) {
@@ -557,7 +558,12 @@ public abstract class BaseKafkaTopicPartitionImporter {
 
     public boolean commitOffset(boolean usePausedOffset) {
         final short version = 1;
-        long safe = m_gapTracker.commit(-1L);
+        long safe = m_gapTracker.getSafe();
+
+        //nothing to commit;
+        if (safe < 0) {
+            return true;
+        }
         final long pausedOffset = usePausedOffset ? m_pauseOffset.get() : -1;
 
         if (m_lastCommittedOffset != pausedOffset && (safe > m_lastCommittedOffset || pausedOffset != -1)) {
@@ -575,7 +581,9 @@ public abstract class BaseKafkaTopicPartitionImporter {
                         m_logger.rateLimitedLog(Level.WARN, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
                         continue;
                     }
-                    safe = (pausedOffset != -1 ? pausedOffset : safe);
+                    if (pausedOffset != -1) {
+                        safe = Math.min(pausedOffset, safe);
+                    }
                     OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(
                             m_config.getGroupId(),
                             singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", now)),

@@ -46,7 +46,8 @@ public enum TxnId2Utils {;
                 statusString.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
                 statusString.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
                 statusString.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*") ||
-                statusString.matches("(?s).*Ad Hoc Planner task queue is full.*");
+                statusString.matches("(?s).*Ad Hoc Planner task queue is full.*") ||
+                statusString.matches("(?s).*Transaction Interrupted.*");
     }
 
     static boolean isServerUnavailableIssue(String statusString) {
