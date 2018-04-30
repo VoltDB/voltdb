@@ -215,7 +215,7 @@ public class EEPlanGenerator extends PlannerTestCase {
     private String m_VoltDBRootDirName = Paths.get(".").toAbsolutePath().normalize().toString();
     private String m_testGenDir = "ee_auto_generated_unit_tests";
 
-    protected String getPlanString(String sqlStmt, int fragmentNumber) throws JSONException {
+    protected String getPlanString(String sqlStmt, int fragmentNumber, boolean isLargeQuery) throws JSONException {
         boolean planForSinglePartition = (fragmentNumber == 0);
         List<AbstractPlanNode> nodes = compileToFragments(sqlStmt, planForSinglePartition);
         if (nodes.size() <= fragmentNumber) {
@@ -223,7 +223,7 @@ public class EEPlanGenerator extends PlannerTestCase {
                                                            fragmentNumber,
                                                            nodes.size()));
         }
-        String planString = PlanSelector.outputPlanDebugString(nodes.get(fragmentNumber));
+        String planString = PlanSelector.outputPlanDebugString(nodes.get(fragmentNumber), isLargeQuery);
         return planString;
     }
 
@@ -720,7 +720,10 @@ public class EEPlanGenerator extends PlannerTestCase {
                   .append(String.format("        %s,\n", tc.isExpectedToFail() ? "true" : "false"))
                   .append("        // Plan String\n")
                   .append(String.format("        %s,\n",
-                                        cleanString(getPlanString(tc.m_sqlString, tc.getPlanFragment()), "        ")))
+                                        cleanString(getPlanString(tc.m_sqlString,
+                                                                  tc.getPlanFragment(),
+                                                                  tc.isLargeQuery()),
+                                                    "        ")))
                   .append(String.format("        %s\n",  tc.getOutputTableName()))
                   .append("    },\n");
             }
@@ -764,6 +767,7 @@ public class EEPlanGenerator extends PlannerTestCase {
             m_expectedOutput = expectedOutput;
             m_expectFail     = expectFail;
             m_planFragment   = 0;
+            m_planLargeQuery = false;
         }
 
         public TestConfig(String testName,
@@ -842,6 +846,15 @@ public class EEPlanGenerator extends PlannerTestCase {
             return this;
         }
 
+        public boolean isLargeQuery() {
+            return m_planLargeQuery;
+        }
+
+        public TestConfig setIsLargeQuery(boolean q) {
+            m_planLargeQuery = q;
+            return this;
+        }
+
         public int getPlanFragment() {
             return m_planFragment;
         }
@@ -850,6 +863,7 @@ public class EEPlanGenerator extends PlannerTestCase {
         private TableConfig m_expectedOutput;
         private boolean     m_expectFail;
         private int         m_planFragment;
+        private boolean     m_planLargeQuery;
     }
 
     /**

@@ -46,54 +46,14 @@ import org.voltdb.types.PlanNodeType;
 public class TestPlansLargeQueries extends PlannerTestCase {
     public void testPlansSerialAggregates() {
         planForLargeQueries(true);
-        // Ranges of variation.
-        // -- Replicated or Partitioned Tables.
-        //     NRMP = N replicated, M partitions
-        //            N, M \in {0, 1}
-        // -- Single or Joined Tables.
-        //     Implicit in NRMP.
-        //     Joined iff N+M > 1.
-        // -- Indexable expressions.
-        //     IN -- No indexable expressions.
-        //     IO -- Indexable Order By, not Group By,
-        //     IG -- Indexable Group By, not Order By,
-        //     IOG -- Indexable Group By and Order By.
-        // -- Number of aggregates
-        //     NA - N aggregate functions, N \in {0, 1}
-        // -- Number of group bys: 0, 1, + = many.
-        //     NXG - N Group By Expressions: 0, 1, + = many.
-        //           X \in {P, R} for Partitioned or Replicated.
-        // -- Orderby Expressions
-        //     NO - N Order By Expressions: 0, 1, + = many.
-        // -- Select Distinct.
-        //     D for select distinct,
-        //     ND for select [not distinct].
-        // Total range of variation:
-        //   4   // Num replicated, num partitioned
-        //   * 4 // Indexable
-        //   * 2 // Number Agg Functions.
-        //   * 3 // Number Group Bys.
-        //   * 3 // Number Order Bys.
-        //   * 2 // Distinct or not.
-        //   == 576 cases.
+        /////////////////////////////////////////////////////////////////
         //
-        //  select sum(id) from R1;
-        //  1R0P-IN-1A-0RG-0O-0W-ND
-        //       1 Replicated table (unjoined), 0 Partitioned tables,
-        //       Not Indexable GB expressions.
-        //       Not Indexable OB expressions.
-        //       0 partitioned group by
-        //       0 partitioned order by
-        //       Not Distinct
-        //  select distinct sum(R1.id), sum(P1.id) from R1, P1 group by P1.id order by P1.id
-        //  1R1P-NIOB-NIGB-1PGB-1P0B-D
-        //       1 Replicated Table, 1 Partitioned Table, Joined.
-        //       1 Partitioned group by,
-        //       1 Partitioned order by,
-        //       1 Window Function,
-        //       Select distinct.
+        // Replicated tables and indexes.
+        //
+        /////////////////////////////////////////////////////////////////
         //
         // One table, no indexes, no group bys, no order bys.
+        //
         validatePlan("select max(aa) from r1;",
                      fragSpec(PlanNodeType.SEND,
                               new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
@@ -181,7 +141,87 @@ public class TestPlansLargeQueries extends PlannerTestCase {
                               new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
                                                       PlanNodeType.AGGREGATE,
                                                       PlanNodeType.PROJECTION)));
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        // Partitioned tables.
+        //
+        ////////////////////////////////////////////////////////////////////////////////
+        //
+        // Plain, simple partitioned query.
+        //
+        validatePlan("select sum(aa) from p1 group by aa",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.ORDERBY,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION)));
 
+        // Plain, simple partitioned query with order by.  We don't need an
+        // order by plan node because the index scan does the work for us.
+        validatePlan("select sum(id) as ss from p1 group by id order by id",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.MERGERECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION)));
+        // group by and order by on a partitioned table.  There
+        // is no index to scan, and we need two order by nodes,
+        // one for serial aggregation and one for ordering by the
+        // sums.
+        validatePlan("select sum(aa) as ss from p1 group by aa order by ss",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.ORDERBY,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.ORDERBY,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                      PlanNodeType.PROJECTION)));
+        // Group by and order by on a partitioned table.
+        // The group by and order by keys are the same, but
+        // are in different order.  The order by node for
+        // serial aggregation gives the order for the order
+        // by list.
+        validatePlan("select sum(aa) as ss from p1 group by aa, id order by id, aa",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.ORDERBY,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION)));
+        // Select distinct with a group by but no order by.  We expect
+        // the index scan to give an order for the serial aggregation,
+        // and the mergereceive node to preserve this order.
+        validatePlan("select distinct sum(id) as ss from p1 group by id",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.MERGERECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION)));
+        // Select distinct with a group by and order by the group key.  We expect
+        // the index scan to give an order for the serial aggregation,
+        // the mergereceive node to preserve this order and the order by
+        // to use the same order.  Note that some of the aggregate
+        // computation is pushed down to the distributed fragment, but
+        // there is a vestigial combiner in the coordinator fragment.
+        validatePlan("select distinct sum(id) as ss from p1 group by id",
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.AGGREGATE,
+                              PlanNodeType.MERGERECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION)));
     }
 
 

@@ -84,7 +84,7 @@ public class MicroOptimizationRunner {
             if (m_logger.isDebugEnabled()) {
                 String planString = null;
                 try {
-                    planString = PlanSelector.outputPlanDebugString(plan.rootPlanGraph);
+                    planString = PlanSelector.outputPlanDebugString(plan.rootPlanGraph, plan.getIsLargeQuery());
                 } catch (JSONException ex) {
                     planString = ex.getMessage();
                 }
@@ -98,7 +98,7 @@ public class MicroOptimizationRunner {
             if (m_logger.isDebugEnabled()) {
                 String planString = null;
                 try {
-                    planString = PlanSelector.outputPlanDebugString(plan.rootPlanGraph);
+                    planString = PlanSelector.outputPlanDebugString(plan.rootPlanGraph, plan.getIsLargeQuery());
                 } catch (JSONException ex) {
                     planString = ex.getMessage();
                 }

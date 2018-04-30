@@ -33,4 +33,10 @@ create table p1_aaidx (
 partition table p1_aaidx on column id;
 create index index_p1_aaidx on p1_aaidx(aa);
 
+create table paa_aaidx (
+    id  bigint not null,
+    aa  bigint not null
+);
+partition table paa_aaidx on column aa;
+create index index_paa_aaidx on p1_aaidx(aa);
 

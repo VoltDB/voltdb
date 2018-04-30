@@ -142,7 +142,7 @@ public class QueryPlanner implements AutoCloseable {
         m_isLargeQuery = isLargeQuery;
         m_planSelector = new PlanSelector(m_estimates, m_stmtName,
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
-                suppressDebugOutput);
+                suppressDebugOutput, m_isLargeQuery);
         m_isUpsert = false;
     }
 

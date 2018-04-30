@@ -60,6 +60,8 @@ public class PlanSelector implements Cloneable {
     int m_planId = 0;
     /** Determinism mode (for micro optimizations) */
     final DeterminismMode m_detMode;
+    /** Is this a large query? */
+    boolean m_isLargeQuery = false;
     /** Parameters to drive the output */
     boolean m_quietPlanner;
     boolean m_fullDebug = VoltCompiler.DEBUG_MODE;
@@ -79,9 +81,14 @@ public class PlanSelector implements Cloneable {
      * @param fullDebug Controls the debug output.
      */
     public PlanSelector(DatabaseEstimates estimates,
-            String stmtName, String procName, String sql,
-            AbstractCostModel costModel, ScalarValueHints[] paramHints,
-            DeterminismMode detMode, boolean quietPlanner)
+                        String stmtName,
+                        String procName,
+                        String sql,
+                        AbstractCostModel costModel,
+                        ScalarValueHints[] paramHints,
+                        DeterminismMode detMode,
+                        boolean quietPlanner,
+                        boolean isLargeQuery)
     {
         m_estimates = estimates;
         m_stmtName = stmtName;
@@ -91,6 +98,7 @@ public class PlanSelector implements Cloneable {
         m_paramHints = paramHints;
         m_detMode = detMode;
         m_quietPlanner = quietPlanner;
+        m_isLargeQuery = isLargeQuery;
     }
 
     /**
@@ -100,7 +108,7 @@ public class PlanSelector implements Cloneable {
     @Override
     public Object clone() {
         return new PlanSelector(m_estimates, m_stmtName, m_procName, m_sql,
-                m_costModel, m_paramHints, m_detMode, m_quietPlanner);
+                m_costModel, m_paramHints, m_detMode, m_quietPlanner, m_isLargeQuery);
     }
 
     /**
@@ -237,8 +245,8 @@ public class PlanSelector implements Cloneable {
                                       true);
     }
 
-    public static String outputPlanDebugString(AbstractPlanNode planGraph) throws JSONException {
-        PlanNodeList nodeList = new PlanNodeList(planGraph, false);
+    public static String outputPlanDebugString(AbstractPlanNode planGraph, boolean isLargeQuery) throws JSONException {
+        PlanNodeList nodeList = new PlanNodeList(planGraph, isLargeQuery);
 
         // get the json serialized version of the plan
         String json = null;
@@ -265,7 +273,7 @@ public class PlanSelector implements Cloneable {
 
         String json;
         try {
-            json = outputPlanDebugString(planGraph);
+            json = outputPlanDebugString(planGraph, plan.getIsLargeQuery());
         } catch (JSONException e2) {
             // Any plan that can't be serialized to JSON to
             // write to debugging output is also going to fail
