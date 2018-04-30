@@ -32,6 +32,8 @@ import traceback
 from datetime import datetime
 from distutils.util import strtobool
 from optparse import OptionParser
+from os.path import basename, isfile
+from shutil import copyfile
 from time import mktime
 from voltdbclient import VoltColumn, VoltTable, FastSerializer
 
@@ -58,7 +60,7 @@ ReproduceStatementTypes[Reproduce.DML].extend(ReproduceStatementTypes[Reproduce.
 ReproduceStatementTypes[Reproduce.CTE]  = ['WITH']
 ReproduceStatementTypes[Reproduce.CTE].extend(ReproduceStatementTypes[Reproduce.DML])
 ReproduceStatementTypes[Reproduce.ALL]  = ['']    # any statement, including SELECT
-### print "DEBUG: ReproduceStatementTypes:', str(ReproduceStatementTypes)
+### print "DEBUG: ReproduceStatementTypes:", str(ReproduceStatementTypes)
 
 def highlight(s, flag):
     if not isinstance(s, basestring):
@@ -97,8 +99,12 @@ def generate_table_str(res, key):
     tablestr = "<br />".join(result)
     return tablestr
 
-def generate_ddl(ddl_file):
-    return '<p>First, run: <a href="%s">%s</a></p>' % (ddl_file, 'the DDL file')
+def generate_ddl(output_dir, ddl_file):
+    local_ddl_file = output_dir + '/' + basename(ddl_file)
+    if not isfile(local_ddl_file):
+        ### print 'DEBUG: copying %s to %s' % (ddl_file, local_ddl_file)
+        copyfile(ddl_file, local_ddl_file)
+    return '<p>First, run: <a href="%s">%s</a></p>' % (local_ddl_file, 'the DDL file')
 
 def generate_reproducer(item, output_dir, reproducer, ddl_file):
     result = ''
@@ -119,7 +125,7 @@ td {width: 50%%}
 </body>
 </html>
 """ % (item["id"], item["id"],
-       generate_ddl(ddl_file),
+       generate_ddl(output_dir, ddl_file),
        Reproduce.reverse_mapping[reproducer],
        item["reproducer"] )
 
