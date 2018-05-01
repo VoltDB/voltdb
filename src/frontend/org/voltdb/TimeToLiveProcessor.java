@@ -62,7 +62,7 @@ public class TimeToLiveProcessor extends StatsSource{
     static final String JSON_ROWS_LEFT_KEY = "rowsLeft";
     static final String JSON_TTL_STATS_KEY = "ttlStats";
 
-    static final int DELAY = Integer.getInteger("TIME_TO_LIVE_DELAY", 5);
+    static final int DELAY = Integer.getInteger("TIME_TO_LIVE_DELAY", 0);
     static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 5);
     static final int CHUNK_SIZE = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
     static final int TIMEOUT = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);

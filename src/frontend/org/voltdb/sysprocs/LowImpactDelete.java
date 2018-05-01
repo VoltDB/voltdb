@@ -257,6 +257,9 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
             now = System.nanoTime();
         }
 
+        if (hostLog.isDebugEnabled()){
+            hostLog.debug("TTL results: deleted " + rowsDeleted + " left " + status.rowsLeft + " in " + rounds + " rounds");
+        }
         returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, ClientResponse.SUCCESS, "");
         return returnTable;
     }
