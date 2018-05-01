@@ -24,7 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.TransactionState;
 
 public class TransactionTaskQueue
@@ -225,13 +224,15 @@ public class TransactionTaskQueue
     private void coordinatedTaskQueueOffer(TransactionTask task) {
         synchronized (s_lock) {
             long matchingCompletionTime = -1;
+            long matchingFragmentTime = -1;
             if (task instanceof CompleteTransactionTask) {
                 matchingCompletionTime = ((CompleteTransactionTask)task).getTimestamp();
                 m_scoreboard.addCompletedTransactionTask((CompleteTransactionTask)task, false);
 
-            } else if (task instanceof FragmentTask ||
-                       task instanceof SysprocFragmentTask) {
-                m_scoreboard.addFragmentTask(task);
+            } else if (task instanceof FragmentTaskBase) {
+                FragmentTaskBase ft = (FragmentTaskBase)task;
+                matchingFragmentTime = ft.getTimestamp();
+                m_scoreboard.addFragmentTask(ft);
             }
 
             int fragmentScore = 0;
@@ -241,7 +242,7 @@ public class TransactionTaskQueue
                 if (sb.getFragmentTask() == null && sb.getCompletionTasks().isEmpty()) {
                     break;
                 }
-                if (sb.getFragmentTask() != null) {
+                if (sb.getFragmentTask() != null && matchingFragmentTime == sb.getFragmentTask().getTimestamp()) {
                     fragmentScore++;
                 }
                 if (!sb.getCompletionTasks().isEmpty()) {
@@ -402,7 +403,7 @@ public class TransactionTaskQueue
         if (!m_backlog.isEmpty()) {
             sb.append("\tHEAD: ").append(m_backlog.getFirst());
         }
-        sb.append("\tScoreboard:").append("\n");
+        sb.append("\n\tScoreboard:").append("\n");
         synchronized (s_lock) {
             sb.append("\t").append(m_scoreboard.toString());
         }
