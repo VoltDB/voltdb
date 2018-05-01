@@ -137,6 +137,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
+import org.voltdb.iv2.ElasticJoinProducer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
@@ -2092,6 +2093,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_snapshotCompletionMonitor, startAction);
             initiators.put(partition, initiator);
             m_partitionsToSitesAtStartupForExportInit.add(partition);
+        }
+        if (startAction == StartAction.JOIN) {
+            for (Integer partition : partitions) {
+                ((ElasticJoinProducer)(((BaseInitiator) initiators.get(partition)).m_joinProducer)).initMailBox();
+            }
         }
         return initiators;
     }
