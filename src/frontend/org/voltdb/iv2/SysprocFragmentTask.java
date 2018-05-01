@@ -312,7 +312,7 @@ public class SysprocFragmentTask extends FragmentTaskBase
     }
 
     public boolean needCoordination() {
-        return !m_txnState.isReadOnly() && !isBorrowedTask();
+        return !(m_txnState.isReadOnly() || isBorrowedTask() || m_isNPartition);
     }
 
     public boolean isBorrowedTask() {

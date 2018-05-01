@@ -104,7 +104,7 @@ public class TestSpSchedulerSpHandle extends TestCase
                                                           any(CommandLog.DurabilityListener.class),
                                                           any(TransactionTask.class));
 
-        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor, 2);
+        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
         dut.setMailbox(mbox);
         dut.setCommandLog(cl);
         dut.setLock(mbox);

@@ -1479,6 +1479,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
+    public int getNextSiteId() {
+        return m_nextSiteId.get();
+    }
+
     /**
      * Discard a mailbox
      */

@@ -164,6 +164,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_isSinglePartition;
     }
 
+    public boolean isN_Partition() {
+        return m_nPartitions != null;
+    }
+
     public boolean shouldReturnResultTables() {
         return m_shouldReturnResultTables;
     }

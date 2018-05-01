@@ -86,8 +86,11 @@ public class TestTransactionTaskQueue extends TestCase
                                     boolean forReplay)
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
+        Iv2InitiateTaskMessage itMsg = mock(Iv2InitiateTaskMessage.class);
+        when(itMsg.isN_Partition()).thenReturn(false);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         when(msg.isForReplay()).thenReturn(forReplay);
+        when(msg.getInitiateTask()).thenReturn(itMsg);
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         when(mbox.getHSId()).thenReturn(1337l);
         ParticipantTransactionState pft =
@@ -203,10 +206,11 @@ public class TestTransactionTaskQueue extends TestCase
 
     @Override
     public void setUp() {
+        TransactionTaskQueue.resetScoreboards(0, SITE_COUNT);
         for (int i = 0; i < SITE_COUNT; i++) {
             SiteTaskerQueue siteTaskQueue = getSiteTaskerQueue();
             m_siteTaskQueues.add(siteTaskQueue);
-            TransactionTaskQueue txnTaskQueue = new TransactionTaskQueue(siteTaskQueue, SITE_COUNT);
+            TransactionTaskQueue txnTaskQueue = new TransactionTaskQueue(siteTaskQueue);
             txnTaskQueue.initializeScoreboard(i);
             m_txnTaskQueues.add(txnTaskQueue);
             Deque<TransactionTask> expectedOrder = new ArrayDeque<>();
@@ -224,7 +228,6 @@ public class TestTransactionTaskQueue extends TestCase
             m_localTxnId[i] = 0;
         }
         m_mpTxnId = 0;
-        TransactionTaskQueue.resetScoreboards();
     }
 
     // This is the most common case
