@@ -17,12 +17,12 @@
 
 package org.voltdb.iv2;
 
-import org.voltdb.dtxn.TransactionState;
-
 public abstract class FragmentTaskBase extends TransactionTask {
+    final protected boolean m_isNPartition;
 
-    public FragmentTaskBase(TransactionState txnState, TransactionTaskQueue queue) {
+    public FragmentTaskBase(ParticipantTransactionState txnState, TransactionTaskQueue queue) {
         super(txnState, queue);
+        m_isNPartition = txnState.m_npTransaction;
     }
 
     // Used for FragmentTask and SysprocFragmentTask to match restarted messages

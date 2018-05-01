@@ -46,6 +46,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     @SuppressWarnings("serial")
     private static class TerminateThreadException extends RuntimeException {};
     private long m_taskThreadId = 0;
+    private final MpRestartSequenceGenerator m_restartSeqGenerator;
     private final Thread m_taskThread = new Thread(null,
                     new Runnable() {
                         @Override
@@ -94,7 +95,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 @Override
                 public RepairAlgo call() throws Exception {
                     RepairAlgo ra = new MpPromoteAlgo(survivors.get(), MpInitiatorMailbox.this,
-                            ((MpScheduler)MpInitiatorMailbox.this.m_scheduler).getLeaderNodeId(), whoami, balanceSPI);
+                            m_restartSeqGenerator, whoami, balanceSPI);
                     setRepairAlgoInternal(ra);
                     return ra;
                 }
@@ -106,8 +107,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 Throwables.propagate(e);
             }
         } else {
-            ra = new MpPromoteAlgo(survivors.get(), this, ((MpScheduler)this.m_scheduler).getLeaderNodeId(),
-                    whoami, balanceSPI);
+            ra = new MpPromoteAlgo(survivors.get(), this, m_restartSeqGenerator, whoami, balanceSPI);
             setRepairAlgoInternal(ra);
         }
         return ra;
@@ -202,6 +202,8 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             JoinProducerBase rejoinProducer)
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(
+                ((MpScheduler)m_scheduler).getLeaderNodeId(), false);
         m_taskThread.start();
         m_sendThread.start();
     }

@@ -17,7 +17,7 @@
 
 package org.voltdb.iv2;
 
-import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltdb.messaging.BorrowTaskMessage;
 
 /**
  * BorrowTransactionState represents the execution of a borrowed
@@ -29,9 +29,9 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
  */
 public class BorrowTransactionState extends ParticipantTransactionState
 {
-    BorrowTransactionState(long txnId, TransactionInfoBaseMessage notice)
+    BorrowTransactionState(long txnId, BorrowTaskMessage notice)
     {
-        super(txnId, notice, true);
+        super(txnId, notice, true, false);
     }
 
     @Override
