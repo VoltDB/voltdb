@@ -28,11 +28,11 @@ import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -230,9 +230,10 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         assert(receive.getChildCount() == 1);
         AbstractPlanNode partitionRoot = receive.getChild(0);
         if (!partitionRoot.isOutputOrdered(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections())) {
-            // Partition results are not ordered. If the coordinator fragment is trivial
-            // the ORDER BY plan node can be pushed down to make the Partition results ordered
-            if (hasTrivialCoordinatorFragment(orderbyNode.getChild(0))) {
+            // Partition results are not ordered. If the coordinator fragment is trivial and does not have
+            // LIMIT/OFFSET node the ORDER BY plan node can be pushed down to make the Partition results ordered
+            if (hasTrivialCoordinatorFragment(orderbyNode.getChild(0)) &&
+                    orderbyNode.getInlinePlanNode(PlanNodeType.LIMIT) == null) {
                 // Build fragment's ORDER BY plan node
                 OrderByPlanNode fragmentOrderbyNode = new OrderByPlanNode();
                 fragmentOrderbyNode.addSort(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections());
