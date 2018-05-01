@@ -361,7 +361,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
         {
             // P_D1_IDX index provides the right order for the coordinator. Merge Receive with LIMIT
-            validateMergeReceive("select P_D1 from P order by P_D1 limit 3", true, new int[] {0});
+            validateMergeReceive("select P_D1 from P order by P_D1 limit 3 offset 1", true, new int[] {0});
         }
         {
             // Partitions results are ordered by the pushed down ORDER BY.
@@ -370,11 +370,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
         {
             // NLIJ with index outer table scan (PK). ORDER BY column T.T_D1 is not the first index column
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by T.T_D1");
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            // Merge Receive is possible because of the trivial coordinator
+            validateMergeReceive("select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by T.T_D1",
+                    false, new int[] {1});
         }
         {
             // NLIJ with index outer table scan (PK). ORDER BY column T.T_D0 is the first index column
@@ -390,22 +388,18 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
     }
 
-    public void testOrderByMPNonOptimized() {
-        {
-            // P_D1_IDX index sort direction is INVALID. Partition output is not ordered. ORDER BY
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1, P_D1 + 1 from P where P_D1 > 3 order by P_D1, P_D2");
-            assertEquals(2, frags.size());
-            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
-        }
+    public void testOrderByMPTrivialCoordinatorOptimized() {
+        // Though the partitions's output is not properly ordered the MERGE_RECEIVE optimization
+        // is still possible because of a trivial coordinator fragment allowing for pushing the coordinator's
+        // ORDER BY down to partitions
         {
             // P_D2 column is not covered by P_D1_IDX index. ORDER BY
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P_D1 from P where P_D1 > 1 order by P_D1, P_D2");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // P_D32_IDX (P_D3,P_D2) Index scan. Sort order mismatch
@@ -413,7 +407,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
                     "select P_D1 from P order by P_D3 ASC, P_D2 DESC");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // P_D32_IDX (P_D3,P_D2) Index scan. Sort order mismatch
@@ -421,7 +416,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
                     "select P_D1 from P order by P_D3 DESC, P_D2");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // P_D32_IDX (P_D3,P_D2) Index scan. Column order in ORDER BY mismatch
@@ -429,7 +425,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
                     "select P_D1 from P order by P_D2, P_D3");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // P_D1 column is not covered by the P_D32_IDX
@@ -437,7 +434,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
                     "select P_D1 from P where P_D3 > 1 order by P_D3 DESC, P_D1");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // Partitions results are unordered. Sequential scan
@@ -448,7 +446,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // NLIJ with sequential outer table scan (T). ORDER BY
@@ -456,7 +455,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
                     "select P_D1 from P, T where P.P_D1 = T.T_D2 order by P.P_D1");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // NLIJ with index (PK) outer table scan (T).
@@ -465,7 +465,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
                     "select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by P.P_D1");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // NLIJ with index (PK(T_D0, T_D1)) outer table scan (T).
@@ -474,7 +475,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
                     "select P_D1 from P, T where P.P_D1 = T.T_D2 and T.T_D0 = 2 order by T.T_D1");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // Index P_D32_10_IDX ON P (P_D3 / 10, P_D2) does not cover ORDER BY expressions (P_D3 / 5, P_D2)
@@ -482,8 +484,12 @@ public class TestPlansOrderBy extends PlannerTestCase {
                     "select P_D1 from P where P.P_D3 / 10 > 0 order by P_D3 / 5, P_D2");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
+    }
+
+    public void testOrderByMPNonOptimized() {
         {
             // NLJ - a replicated table is on the "outer" side of an outer join with a partitioned table.
             // The optimization is rejected because of the coordinator NLJ node is a child of the ORDER BY node.
@@ -493,6 +499,16 @@ public class TestPlansOrderBy extends PlannerTestCase {
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
+        {
+            // The Merge Receive optimization is not possible because the ORDER BY node has inline
+            // OFFSET node that can't be pushed down
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select * from P order by P_D2 offset 3");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
+
     }
 
     public void testOrderByMPSubquery() {
@@ -795,13 +811,15 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          from partitioned
             //          group by non_indexed_partition
             //          order by non_indexed_partition;"
+            // Trivial coordinator - MERGE_RECEIVE
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select P1_D0, max(P1_D2) from P1 group by P1_D0 order by P1_D0");
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
-            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
+            assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
         }
         {
             // ORDER BY column P_D1 is not covered by the P_D32_IDX index
