@@ -61,7 +61,6 @@ public abstract class BaseInitiator implements Initiator
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
 
-    public final JoinProducerBase m_joinProducer;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
@@ -71,13 +70,15 @@ public abstract class BaseInitiator implements Initiator
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
+        JoinProducerBase joinProducer;
+
 
         if (startAction == StartAction.JOIN) {
-            m_joinProducer = new ElasticJoinProducer(m_partitionId, scheduler.m_tasks);
+            joinProducer = new ElasticJoinProducer(m_partitionId, scheduler.m_tasks);
         } else if (startAction.doesRejoin()) {
-            m_joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks);
+            joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks);
         } else {
-            m_joinProducer = null;
+            joinProducer = null;
         }
 
         if (m_partitionId == MpInitiator.MP_INIT_PID) {
@@ -86,20 +87,20 @@ public abstract class BaseInitiator implements Initiator
                     m_scheduler,
                     m_messenger,
                     m_repairLog,
-                    m_joinProducer);
+                    joinProducer);
         } else {
             m_initiatorMailbox = new InitiatorMailbox(
                     m_partitionId,
                     m_scheduler,
                     m_messenger,
                     m_repairLog,
-                    m_joinProducer);
+                    joinProducer);
         }
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
-        if (m_joinProducer != null) {
-            m_joinProducer.setMailbox(m_initiatorMailbox);
+        if (joinProducer != null) {
+            joinProducer.setMailbox(m_initiatorMailbox);
         }
         m_scheduler.setMailbox(m_initiatorMailbox);
         m_repairLog.setHSId(m_initiatorMailbox.getHSId());

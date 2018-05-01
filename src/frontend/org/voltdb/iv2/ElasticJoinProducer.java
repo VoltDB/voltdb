@@ -113,7 +113,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         connection.setPerPartitionTxnIds(partitionTxnIds, true);
     }
 
-    public void initMailBox() {
+    private void initMailBox() {
         m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
         m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb);
     }
@@ -121,6 +121,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
+        initMailBox();
 
         registerSnapshotMonitor(message.getSnapshotNonce());
 

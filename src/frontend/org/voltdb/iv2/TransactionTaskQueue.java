@@ -67,7 +67,7 @@ public class TransactionTaskQueue
                 hostLog.debug("release stashed fragment messages:" + TxnEgo.txnIdToString(txnId));
             }
             long lastTxnId = 0;
-            for (int ii = m_siteCount-1; ii < 0; ii--) {
+            for (int ii = m_siteCount-1; ii >= 0; ii--) {
                 TransactionTask task = m_stashedMpScoreboards[ii].getFragmentTask();
                 assert(lastTxnId == 0 || lastTxnId == task.getTxnId());
                 lastTxnId = task.getTxnId();
@@ -90,7 +90,7 @@ public class TransactionTaskQueue
                 }
             }
             long lastTxnId = 0;
-            for (int ii = m_siteCount-1; ii < 0; ii--) {
+            for (int ii = m_siteCount-1; ii >= 0; ii--) {
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().poll().getFirst();
                 assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
                 lastTxnId = completion.getMsgTxnId();

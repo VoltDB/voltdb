@@ -1397,7 +1397,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * supply a value
      */
     public long generateMailboxId(Long mailboxId) {
-        hostLog.debug("Creating mailbox " + m_nextSiteId.get() + ":", new Throwable());
         final long hsId = mailboxId == null ? getHSIdForLocalSite(m_nextSiteId.getAndIncrement()) : mailboxId;
         addMailbox(hsId, new Mailbox() {
             @Override
@@ -1464,7 +1463,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Create a site mailbox with a generated host id
      */
     public Mailbox createMailbox() {
-        hostLog.debug("Creating mailbox " + m_nextSiteId.get() + ":", new Throwable());
         final int siteId = m_nextSiteId.getAndIncrement();
         long hsId = getHSIdForLocalSite(siteId);
         SiteMailbox sm = new SiteMailbox( this, hsId);
@@ -1622,7 +1620,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
             hsId = proposedHSId;
         } else {
-            hostLog.debug("Creating mailbox " + m_nextSiteId.get() + ":", new Throwable());
             hsId = getHSIdForLocalSite(m_nextSiteId.getAndIncrement());
             mailbox.setHSId(hsId);
         }
