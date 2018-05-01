@@ -164,7 +164,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("\n  FLAGS: ").append(m_flags);
         sb.append("\n  TIMESTAMP: ");
         MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
-        sb.append("\n  TRUNCATION HANDLE:" + getTruncationHandle());
+        sb.append("\n  TRUNCATION HANDLE:" + TxnEgo.txnIdToString(getTruncationHandle()));
         sb.append("\n  HASH: " + String.valueOf(m_hash));
 
         if (isRollback())
