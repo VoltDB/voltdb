@@ -222,46 +222,6 @@ public class TransactionTaskQueue
         m_taskQueue.offer(task);
     }
 
-//    // All sites receives FragmentTask messages, time to fire the task.
-//    static private void releaseStashedFragments(long txnId)
-//    {
-//        if (hostLog.isDebugEnabled()) {
-//            hostLog.debug("release stashed fragment messages:" + TxnEgo.txnIdToString(txnId));
-//        }
-//        long lastTxnId = 0;
-//        for (Pair<SiteTaskerQueue, Scoreboard> p : s_stashedMpWrites) {
-//            TransactionTask task = p.getSecond().getFragmentTask();
-//            assert(lastTxnId == 0 || lastTxnId == task.getTxnId());
-//            lastTxnId = task.getTxnId();
-//            Iv2Trace.logSiteTaskerQueueOffer(task);
-//            p.getFirst().offer(task);
-//            p.getSecond().clearFragment();
-//        }
-//    }
-
-//    // All sites receives CompletedTransactionTask messages, time to fire the task.
-//    static private void releaseStashedComleteTxns(boolean missingTxn, long txnId)
-//    {
-//        if (hostLog.isDebugEnabled()) {
-//            if (missingTxn) {
-//                hostLog.debug("skipped incomplete rollback transaction message:" + TxnEgo.txnIdToString(txnId));
-//            }
-//            else {
-//                hostLog.debug("release stashed complete transaction message:" + TxnEgo.txnIdToString(txnId));
-//            }
-//        }
-//        long lastTxnId = 0;
-//        for (Pair<SiteTaskerQueue, Scoreboard> p : s_stashedMpWrites) {
-//            CompleteTransactionTask completion = p.getSecond().getCompletionTasks().poll().getFirst();
-//            assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
-//            lastTxnId = completion.getMsgTxnId();
-//            if (!missingTxn) {
-//                Iv2Trace.logSiteTaskerQueueOffer(completion);
-//                p.getFirst().offer(completion);
-//            }
-//        }
-//    }
-
     private void coordinatedTaskQueueOffer(TransactionTask task) {
         synchronized (s_lock) {
             long matchingCompletionTime = -1;
