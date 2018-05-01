@@ -121,6 +121,10 @@ public class DuplicateCounter
         return null;
     }
 
+    public VoltMessage getOpenMessage() {
+        return m_openMessage;
+    }
+
     String getStoredProcedureName() {
         StoredProcedureInvocation invocation = getInvocation();
         if (invocation != null) {

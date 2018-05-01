@@ -73,7 +73,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  */
 public class ReplaySequencer
 {
-    static final VoltLogger tmLog = new VoltLogger("TM");
+    static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // place holder that associates sentinel, first fragment and
     // work that follows in the transaction sequence.
@@ -367,14 +367,14 @@ public class ReplaySequencer
     public void dump(long hsId)
     {
         final String who = CoreUtils.hsIdToString(hsId);
-        tmLog.info(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s",
+        hostLog.warn(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s",
                                  who,
                                  m_lastPolledFragmentUniqueId, TxnEgo.txnIdToString(m_lastPolledFragmentUniqueId),
                                  m_lastSeenUniqueId, TxnEgo.txnIdToString(m_lastSeenUniqueId),
                                  m_mpiEOLReached ? "MPI EOL, " : "",
                                  m_mustDrain ? "MUST DRAIN" : ""));
         for (Entry<Long, ReplayEntry> e : m_replayEntries.entrySet()) {
-            tmLog.info(String.format("%s: REPLAY ENTRY %s: %s", who, e.getKey(), e.getValue()));
+            hostLog.warn(String.format("%s: REPLAY ENTRY %s: %s", who, e.getKey(), e.getValue()));
         }
     }
 }

@@ -186,7 +186,9 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
 }
 
 bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
+    VOLT_DEBUG("Entering countdown latch...");
     assert(s_globalTxnStartCountdownLatch > 0);
+    assert(ThreadLocalPool::getEnginePartitionId() != 16383);
     assert(!isInSingleThreadMode());
     if (lowestSite) {
         pthread_mutex_lock(&s_sharedEngineMutex);
@@ -206,8 +208,8 @@ bool SynchronizedThreadLock::countDownGlobalTxnStartCount(bool lowestSite) {
         }
         pthread_cond_wait(&s_sharedEngineCondition, &s_sharedEngineMutex);
         pthread_mutex_unlock(&s_sharedEngineMutex);
-        assert(!isInSingleThreadMode());
         VOLT_DEBUG("Other SP partition thread released on thread %d", ThreadLocalPool::getThreadPartitionId());
+        assert(!isInSingleThreadMode());
         return false;
     }
 }
@@ -314,7 +316,12 @@ bool SynchronizedThreadLock::isHoldingResourceLock() {
 #endif
 
 void SynchronizedThreadLock::assumeMpMemoryContext() {
-    assert(!usingMpMemory());
+#ifndef  NDEBUG
+    if (usingMpMemory()) {
+        VOLT_ERROR_STACK();
+        assert(!usingMpMemory());
+    }
+#endif
     // We should either be running on the lowest site thread (in the lowest site context) or
     // or be holding the replicated resource lock (Note: This could be a false positive if
     // a different thread happens to have the Replicated Resource Lock)

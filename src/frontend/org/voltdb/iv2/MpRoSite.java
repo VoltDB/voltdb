@@ -679,12 +679,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, int remotePartitionId, byte log[]) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }

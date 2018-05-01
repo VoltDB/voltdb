@@ -172,6 +172,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // multiple fragment transaction. m_currentBatchIndex > 0
     boolean m_isForOldLeader = false;
 
+    // Use to differentiate fragments and completions from different rounds of restart
+    // (same transaction can be restarted multiple times due to multiple leader promotions)
+    long m_restartTimestamp = INITIAL_TIMESTAMP;
+
     public void setPerFragmentStatsRecording(boolean value) {
         m_perFragmentStatsRecording = value;
     }
@@ -641,7 +645,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         int msgsize = super.getSerializedSize();
 
         // Fixed header
-        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2;
+        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 8;
 
         // procname to load str if any
         if (m_procNameToLoad != null) {
@@ -785,6 +789,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         }
         buf.put(m_perFragmentStatsRecording ? (byte) 1 : (byte) 0);
         buf.put(m_coordinatorTask ? (byte) 1 : (byte) 0);
+        // timestamp for restarted transaction
+        buf.putLong(m_restartTimestamp);
 
         // Plan Hash block
         for (FragmentData item : m_items) {
@@ -919,6 +925,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         }
         m_perFragmentStatsRecording = buf.get() != 0;
         m_coordinatorTask = buf.get() != 0;
+        // timestamp for restarted transaction
+        m_restartTimestamp = buf.getLong();
 
         m_items = new ArrayList<FragmentData>(fragCount);
 
@@ -1130,5 +1138,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public boolean isForOldLeader() {
         return m_isForOldLeader;
+    }
+
+    public void setTimestamp(long timestamp) {
+        m_restartTimestamp = timestamp;
+    }
+
+    public long getTimestamp() {
+        return m_restartTimestamp;
     }
 }

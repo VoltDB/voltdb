@@ -27,8 +27,8 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.BatchTimeoutOverrideType;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
@@ -161,7 +161,7 @@ public class SpProcedureTask extends ProcedureTask
     {
         LatencyWatchdog.pet();
 
-        if (HOST_TRACE_ENABLED) {
+        if (HOST_DEBUG_ENABLED) {
             hostLog.trace("START replaying txn: " + this);
         }
         if (!m_txnState.isReadOnly()) {
@@ -195,7 +195,7 @@ public class SpProcedureTask extends ProcedureTask
         if (EXEC_TRACE_ENABLED) {
             execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         }
-        if (HOST_TRACE_ENABLED) {
+        if (HOST_DEBUG_ENABLED) {
             hostLog.trace("COMPLETE replaying txn: " + this);
         }
 
@@ -242,5 +242,9 @@ public class SpProcedureTask extends ProcedureTask
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
+    }
+
+    public boolean needCoordination() {
+        return false;
     }
 }
