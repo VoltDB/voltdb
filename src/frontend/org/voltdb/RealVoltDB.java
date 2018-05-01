@@ -4865,5 +4865,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_iv2Initiators.values().stream().filter(p->p.getInitiatorHSId() == siteId)
             .forEach(s->((SpInitiator)s).updateReplicasForJoin(txnId));
     }
+
+    @Override
+    public int getKFactor() {
+        return (m_catalogContext == null) ? 0 :
+                   getCatalogContext().getDeployment().getCluster().getKfactor();
+    }
 }
 

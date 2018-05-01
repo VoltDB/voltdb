@@ -195,7 +195,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_repairLogTruncationHandle = getCurrentTxnId();
         // initialized as current txn id in order to release the initial reads into the system
         m_maxScheduledTxnSpHandle = getCurrentTxnId();
-        IS_KSAFE_CLUSTER = VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor() > 0;
+        IS_KSAFE_CLUSTER = VoltDB.instance().getKFactor() > 0;
     }
 
     public void initializeScoreboard(int siteId) {
