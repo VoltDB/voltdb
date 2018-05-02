@@ -90,7 +90,7 @@ public class TransactionTaskQueue
             }
             long lastTxnId = 0;
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
-                CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().poll().getFirst();
+                CompleteTransactionTask completion = m_stashedMpScoreboards[ii].releaseCompleteTransactionTaskAndRemoveStaleTxn(txnId);
                 assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
                 lastTxnId = completion.getMsgTxnId();
                 if (!missingTxn) {
@@ -245,16 +245,14 @@ public class TransactionTaskQueue
                 if (sb.getFragmentTask() != null && matchingFragmentTime == sb.getFragmentTask().getTimestamp()) {
                     fragmentScore++;
                 }
-                if (!sb.getCompletionTasks().isEmpty()) {
-                    if (matchingCompletionTime != sb.getCompletionTasks().peekFirst().getFirst().getTimestamp()) {
-                        continue;
-                    }
-                    missingTxn |= sb.getCompletionTasks().peekFirst().getSecond();
-                    // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
-                    // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
-                    // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
-                    completionScore++;
+                if (!sb.matchCompleteTransactionTask(matchingCompletionTime)) {
+                    continue;
                 }
+                missingTxn |= sb.getCompletionTasks().peekFirst().getSecond();
+                // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
+                // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
+                // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
+                completionScore++;
             }
 
             if (hostLog.isDebugEnabled()) {
@@ -281,10 +279,9 @@ public class TransactionTaskQueue
             int completionScore = 0;
             for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
                 if (!sb.getCompletionTasks().isEmpty()) {
-                    if (matchingCompletionTime != sb.getCompletionTasks().peekFirst().getFirst().getTimestamp()) {
+                    if (!sb.matchCompleteTransactionTask(matchingCompletionTime)) {
                         break;
-                    }
-                    // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
+                    }                    // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                     // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
                     completionScore++;
