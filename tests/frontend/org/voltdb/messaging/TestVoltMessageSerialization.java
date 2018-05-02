@@ -40,6 +40,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.TxnEgo;
 
 import com.google_voltpatches.common.collect.Sets;
 
@@ -486,5 +487,19 @@ public class TestVoltMessageSerialization extends TestCase {
         } catch(IOException e) {
             assertTrue(e.getMessage().contains("is negative"));
         }
+    }
+
+    public static FragmentTaskMessage createFragmentTaskMessage(long txnId, boolean readOnly, long destHSId, Iv2InitiateTaskMessage initTask) {
+        FragmentTaskMessage frag =
+            new FragmentTaskMessage(destHSId, // don't care
+                                    destHSId, // don't care
+                                    txnId,
+                                    System.currentTimeMillis(),
+                                    readOnly,
+                                    false,
+                                    false);
+        frag.m_initiateTask = initTask;
+        frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
+        return frag;
     }
 }
