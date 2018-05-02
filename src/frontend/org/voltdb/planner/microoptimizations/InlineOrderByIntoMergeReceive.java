@@ -336,15 +336,10 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         return aggregateNode;
     }
 
+    // For the time being coordinator fragment is considered to be trivial if it consists of
+    // only RECEIVE plan node
     private boolean hasTrivialCoordinatorFragment(AbstractPlanNode planNode) {
         PlanNodeType planNodeType = planNode.getPlanNodeType();
-        if (PlanNodeType.RECEIVE == planNodeType || PlanNodeType.MERGERECEIVE == planNodeType) {
-            return true;
-        } else if (PlanNodeType.PROJECTION == planNodeType) {
-            assert(planNode.getChildCount() == 1);
-            return hasTrivialCoordinatorFragment(planNode.getChild(0));
-        }
-
-        return false;
+        return PlanNodeType.RECEIVE == planNodeType;
     }
 }
