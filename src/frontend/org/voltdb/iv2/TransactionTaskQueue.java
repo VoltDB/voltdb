@@ -280,7 +280,7 @@ public class TransactionTaskQueue
             for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
                 if (!sb.getCompletionTasks().isEmpty()) {
                     if (!sb.matchCompleteTransactionTask(matchingCompletionTime)) {
-                        continue;
+                        break;
                     }                    // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                     // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                     // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
