@@ -38,7 +38,7 @@ public class MpRestartSequenceGenerator {
     public MpRestartSequenceGenerator(int nodeId, boolean forRestart) {
         assert (nodeId <= NODEID_MAX_VALUE);
         m_highOrderFields = ((long)nodeId << (COUNTER_BITS + RESTART_BITS))
-                          | (forRestart ? (1 << COUNTER_BITS) : 0);
+                          | (forRestart ? (1L << COUNTER_BITS) : 0);
     }
 
     public long getNextSeqNum() {
@@ -54,7 +54,7 @@ public class MpRestartSequenceGenerator {
         return seq;
     }
 
-    private static long getSequence(long restartSeqId) {
+    public static long getSequence(long restartSeqId) {
         return restartSeqId & COUNTER_MAX_VALUE;
     }
 
@@ -62,7 +62,7 @@ public class MpRestartSequenceGenerator {
         return ((restartSeqId >> COUNTER_BITS) & RESTART_MAX_VALUE) == 1;
     }
 
-    private static int getNodeId(long restartSeqId) {
+    public static int getNodeId(long restartSeqId) {
         return (int) (restartSeqId >> (COUNTER_BITS + RESTART_BITS));
     }
 
@@ -72,7 +72,7 @@ public class MpRestartSequenceGenerator {
             return "(INITIAL)";
         }
         return "(" + MpRestartSequenceGenerator.getNodeId(restartSeqId) + ":" +
-                MpRestartSequenceGenerator.getSequence(restartSeqId) + ")";
+                MpRestartSequenceGenerator.getSequence(restartSeqId) + (isForRestart(restartSeqId) ? "R)" : ")");
     }
 
     public static void restartSeqIdToString(long restartSeqId, StringBuilder sb)
