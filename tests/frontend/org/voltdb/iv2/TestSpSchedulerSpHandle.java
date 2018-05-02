@@ -45,9 +45,11 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.CommandLog;
+import org.voltdb.MockVoltDB;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -80,6 +82,9 @@ public class TestSpSchedulerSpHandle extends TestCase
     public void setUp()
     {
         msgGen = new RandomMsgGenerator();
+        MockVoltDB mockVoltDB = new MockVoltDB();
+        mockVoltDB.setKFactor(2);
+        VoltDB.replaceVoltDBInstanceForTest(mockVoltDB);
     }
 
     public void createObjs() throws JSONException
@@ -99,7 +104,7 @@ public class TestSpSchedulerSpHandle extends TestCase
                                                           any(CommandLog.DurabilityListener.class),
                                                           any(TransactionTask.class));
 
-        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor, 2);
+        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
         dut.setMailbox(mbox);
         dut.setCommandLog(cl);
         dut.setLock(mbox);

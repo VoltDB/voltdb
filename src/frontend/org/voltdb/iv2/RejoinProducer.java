@@ -138,7 +138,9 @@ public class RejoinProducer extends JoinProducerBase {
         super(partitionId, "Rejoin producer:" + partitionId + " ", taskQueue);
         m_currentlyRejoining = new AtomicBoolean(true);
         m_completionAction = new ReplayCompletionAction();
-        REJOINLOG.debug(m_whoami + "created.");
+        if (REJOINLOG.isDebugEnabled()) {
+            REJOINLOG.debug(m_whoami + "created.");
+        }
     }
 
     @Override

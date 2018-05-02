@@ -184,10 +184,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private final boolean IS_KSAFE_CLUSTER;
 
-    SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor, int localSitesCount)
+    SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new TransactionTaskQueue(m_tasks, localSitesCount);
+        m_pendingTasks = new TransactionTaskQueue(m_tasks);
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
@@ -195,7 +195,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_repairLogTruncationHandle = getCurrentTxnId();
         // initialized as current txn id in order to release the initial reads into the system
         m_maxScheduledTxnSpHandle = getCurrentTxnId();
-        IS_KSAFE_CLUSTER = VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor() > 0;
+        IS_KSAFE_CLUSTER = VoltDB.instance().getKFactor() > 0;
     }
 
     public void initializeScoreboard(int siteId) {
@@ -1036,7 +1036,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
-            txn = new ParticipantTransactionState(msg.getSpHandle(), msg, msg.isReadOnly());
+            txn = new ParticipantTransactionState(msg.getSpHandle(), msg, msg.isReadOnly(),
+                    msg.isReadOnly() ? false : msg.getInitiateTask().isN_Partition());
             m_outstandingTxns.put(msg.getTxnId(), txn);
             // Only want to send things to the command log if it satisfies this predicate
             // AND we've never seen anything for this transaction before.  We can't

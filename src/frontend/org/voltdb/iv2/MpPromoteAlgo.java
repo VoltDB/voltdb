@@ -111,27 +111,27 @@ public class MpPromoteAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox, int zkNodeId,
+    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox, MpRestartSequenceGenerator seqGen,
             String whoami)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = false;
         m_whoami = whoami;
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(zkNodeId, false);
+        m_restartSeqGenerator = seqGen;
     }
 
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox, int zkNodeId,
+    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox, MpRestartSequenceGenerator seqGen,
             String whoami, boolean migratePartitionLeader)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
-        m_restartSeqGenerator = new MpRestartSequenceGenerator(zkNodeId, false);
+        m_restartSeqGenerator = seqGen;
     }
 
     @Override
@@ -329,6 +329,10 @@ public class MpPromoteAlgo implements RepairAlgo
             message.setForReplica(false);
             message.setRequireAck(false);
             message.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(m_whoami + "sending completion for txn " + TxnEgo.txnIdToString(message.getTxnId()) +
+                        ", ts " + MpRestartSequenceGenerator.restartSeqIdToString(message.getTimestamp()));
+            }
             return message;
         } else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();

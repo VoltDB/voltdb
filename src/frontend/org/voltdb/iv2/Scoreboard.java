@@ -35,7 +35,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
  */
 public class Scoreboard {
     private Deque<Pair<CompleteTransactionTask, Boolean>> m_compTasks = new ArrayDeque<>(2);
-    private TransactionTask m_fragTask;
+    private FragmentTaskBase m_fragTask;
 
     public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
         if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP &&
@@ -79,14 +79,15 @@ public class Scoreboard {
         if (!m_compTasks.isEmpty()){
             builder.append("CompleteTransactionTasks: " + m_compTasks.peekFirst() +
                     (m_compTasks.size() == 2 ? "\n" + m_compTasks.peekLast() : ""));
+            builder.append("\n");
         }
         if (m_fragTask != null) {
-            builder.append("\nFragmentTask: " + m_fragTask);
+            builder.append("FragmentTask: " + m_fragTask);
         }
         return builder.toString();
     }
 
-    public void addFragmentTask(TransactionTask task) {
+    public void addFragmentTask(FragmentTaskBase task) {
         m_fragTask = task;
     }
 
@@ -94,7 +95,7 @@ public class Scoreboard {
         return m_compTasks;
     }
 
-    public TransactionTask getFragmentTask() {
+    public FragmentTaskBase getFragmentTask() {
         return m_fragTask;
     }
 

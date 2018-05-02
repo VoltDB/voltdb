@@ -78,16 +78,21 @@ public class TestTransactionTaskQueue extends TestCase
 
     private FragmentTask createFrag(long localTxnId, long mpTxnId,
             TransactionTaskQueue queue) {
-        return createFrag(localTxnId, mpTxnId, queue, false);
+        return createFrag(localTxnId, mpTxnId, queue, CompleteTransactionMessage.INITIAL_TIMESTAMP, false);
     }
     // Create the first fragment of a MP txn
     private FragmentTask createFrag(long localTxnId, long mpTxnId,
                                     TransactionTaskQueue queue,
+                                    long restartTimestamp,
                                     boolean forReplay)
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
+        Iv2InitiateTaskMessage itMsg = mock(Iv2InitiateTaskMessage.class);
+        when(itMsg.isN_Partition()).thenReturn(false);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         when(msg.isForReplay()).thenReturn(forReplay);
+        when(msg.getInitiateTask()).thenReturn(itMsg);
+        when(msg.getTimestamp()).thenReturn(restartTimestamp);
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         when(mbox.getHSId()).thenReturn(1337l);
         ParticipantTransactionState pft =
@@ -99,10 +104,11 @@ public class TestTransactionTaskQueue extends TestCase
 
     // Create follow-on fragments of an MP txn
     private FragmentTask createFrag(TransactionState txn, long mpTxnId,
-                                    TransactionTaskQueue queue)
+                                    TransactionTaskQueue queue, long restartTimestamp)
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
+        when(msg.getTimestamp()).thenReturn(restartTimestamp);
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         when(mbox.getHSId()).thenReturn(1337l);
         FragmentTask task =
@@ -203,10 +209,11 @@ public class TestTransactionTaskQueue extends TestCase
 
     @Override
     public void setUp() {
+        TransactionTaskQueue.resetScoreboards(0, SITE_COUNT);
         for (int i = 0; i < SITE_COUNT; i++) {
             SiteTaskerQueue siteTaskQueue = getSiteTaskerQueue();
             m_siteTaskQueues.add(siteTaskQueue);
-            TransactionTaskQueue txnTaskQueue = new TransactionTaskQueue(siteTaskQueue, SITE_COUNT);
+            TransactionTaskQueue txnTaskQueue = new TransactionTaskQueue(siteTaskQueue);
             txnTaskQueue.initializeScoreboard(i);
             m_txnTaskQueues.add(txnTaskQueue);
             Deque<TransactionTask> expectedOrder = new ArrayDeque<>();
@@ -224,7 +231,6 @@ public class TestTransactionTaskQueue extends TestCase
             m_localTxnId[i] = 0;
         }
         m_mpTxnId = 0;
-        TransactionTaskQueue.resetScoreboards();
     }
 
     // This is the most common case
@@ -240,7 +246,7 @@ public class TestTransactionTaskQueue extends TestCase
 
         // Every site receives second fragment
         for (int i = 0; i < SITE_COUNT; i++) {
-            TransactionTask next = createFrag(firstFrag.getTransactionState(), txnId, m_txnTaskQueues.get(i));
+            TransactionTask next = createFrag(firstFrag.getTransactionState(), txnId, m_txnTaskQueues.get(i), CompleteTransactionMessage.INITIAL_TIMESTAMP);
             addTask(next, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
 
@@ -306,6 +312,21 @@ public class TestTransactionTaskQueue extends TestCase
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
 
+        verify();
+    }
+
+    @Test
+    public void testStaledFragment() throws InterruptedException {
+        MpRestartSequenceGenerator generator = new MpRestartSequenceGenerator(0, false);
+        long nextSeq = generator.getNextSeqNum();
+        long txnId = m_mpTxnId++;
+        for (int i = 0; i < SITE_COUNT; i++) {
+            TransactionTask firstFrag = createFrag(m_localTxnId[i]++, txnId, m_txnTaskQueues.get(i));
+            addTask(firstFrag, m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+
+            TransactionTask staleFrag = createFrag(m_localTxnId[i]++, txnId, m_txnTaskQueues.get(i), nextSeq, false);
+            addTask(staleFrag, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
         verify();
     }
 
