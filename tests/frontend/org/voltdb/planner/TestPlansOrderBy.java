@@ -395,7 +395,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         {
             // P_D2 column is not covered by P_D1_IDX index. ORDER BY
             List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1 from P where P_D1 > 1 order by P_D1, P_D2");
+                    "select P_D1 from P where P_D1 > 1 order by abs(P_D3), P_D2");
             assertEquals(2, frags.size());
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             assertEquals(PlanNodeType.MERGERECEIVE, pn.getPlanNodeType());
