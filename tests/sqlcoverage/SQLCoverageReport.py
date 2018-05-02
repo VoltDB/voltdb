@@ -99,12 +99,23 @@ def generate_table_str(res, key):
     tablestr = "<br />".join(result)
     return tablestr
 
-def generate_ddl(output_dir, ddl_file):
-    local_ddl_file = output_dir + '/' + basename(ddl_file)
-    if not isfile(local_ddl_file):
-        ### print 'DEBUG: copying %s to %s' % (ddl_file, local_ddl_file)
-        copyfile(ddl_file, local_ddl_file)
-    return '<p>First, run: <a href="%s">%s</a></p>' % (local_ddl_file, 'the DDL file')
+def generate_ddl(output_dir, ddl_path):
+    filename = basename(ddl_path) + '.html'
+    local_ddl_path = output_dir + '/' + filename
+    if not isfile(local_ddl_path):
+        ### print 'DEBUG: copying %s to %s' % (ddl_path, local_ddl_path)
+        read_ddl_file = open(ddl_path, 'rb')
+        copy_ddl_file = open(local_ddl_path, 'w')
+        copy_ddl_file.write('<html>\n<head>\n<title>DDL File</title>\n</head>\n<body>\n<pre>\n')
+        while True:
+            line = read_ddl_file.readline()
+            if not line:
+                break
+            copy_ddl_file.write(line)
+        read_ddl_file.close()
+        copy_ddl_file.write('</pre>\n</body>\n</html>')
+        copy_ddl_file.close()
+    return '<p>First, run: <a href="%s">%s</a></p>' % (filename, 'the DDL file')
 
 def generate_reproducer(item, output_dir, reproducer, ddl_file):
     result = ''
