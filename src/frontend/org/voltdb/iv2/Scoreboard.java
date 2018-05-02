@@ -128,12 +128,12 @@ public class Scoreboard {
         Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.pollFirst();
         //match in the header
         if (header.getFirst().getMsgTxnId() == txnId) {
-            if (header.getFirst().getTimestamp() < tail.getFirst().getTimestamp()) {
+            if (txnId < tail.getFirst().getMsgTxnId()) {
                 m_compTasks.addLast(tail);
             }
             return header.getFirst();
         } else { //match in the tail
-            if (header.getFirst().getTimestamp() > tail.getFirst().getTimestamp()) {
+            if (header.getFirst().getMsgTxnId() > txnId) {
                 m_compTasks.addLast(header);
             }
             return tail.getFirst();
