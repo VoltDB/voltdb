@@ -62,6 +62,7 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.TestVoltMessageSerialization;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -143,20 +144,6 @@ public class TestSpSchedulerDedupe
         return task;
     }
 
-    private FragmentTaskMessage createFrag(long txnId, boolean readOnly, long destHSId)
-    {
-        FragmentTaskMessage frag =
-            new FragmentTaskMessage(destHSId, // don't care
-                                    destHSId, // don't care
-                                    txnId,
-                                    System.currentTimeMillis(),
-                                    readOnly,
-                                    false,
-                                    false);
-        frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
-        return frag;
-    }
-
     @Test
     public void testReplicaInitiateTaskResponse() throws Exception
     {
@@ -199,8 +186,9 @@ public class TestSpSchedulerDedupe
         long primary_hsid = 1111l;
 
         createObjs();
+        Iv2InitiateTaskMessage initTask = createMsg(txnid, false, true, primary_hsid);
         // read only message will not be received on replicas.
-        FragmentTaskMessage sptask = createFrag(txnid, false, primary_hsid);
+        FragmentTaskMessage sptask = TestVoltMessageSerialization.createFragmentTaskMessage(txnid, false, primary_hsid, initTask);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
@@ -238,7 +226,7 @@ public class TestSpSchedulerDedupe
         createObjs();
         dut.setLeaderState(true);
         dut.updateReplicas(new ArrayList<Long>(), null);
-        FragmentTaskMessage sptask = createFrag(txnid, true, primary_hsid);
+        FragmentTaskMessage sptask = TestVoltMessageSerialization.createFragmentTaskMessage(txnid, true, primary_hsid, null);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
@@ -292,7 +280,8 @@ public class TestSpSchedulerDedupe
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
         dut.updateReplicas(replicas, null);
-        FragmentTaskMessage sptask = createFrag(txnid, false, primary_hsid);
+        Iv2InitiateTaskMessage initTask = createMsg(txnid, false, true, primary_hsid);
+        FragmentTaskMessage sptask = TestVoltMessageSerialization.createFragmentTaskMessage(txnid, false, primary_hsid, initTask);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
