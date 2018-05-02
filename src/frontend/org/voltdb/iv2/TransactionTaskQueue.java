@@ -90,7 +90,7 @@ public class TransactionTaskQueue
             }
             long lastTxnId = 0;
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
-                CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().poll().getFirst();
+                CompleteTransactionTask completion = m_stashedMpScoreboards[ii].releaseCompleteTransactionTaskAndRemoveStaleTxn(txnId);
                 assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
                 lastTxnId = completion.getMsgTxnId();
                 if (!missingTxn) {
