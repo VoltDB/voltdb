@@ -2287,7 +2287,7 @@ public class PlanAssembler {
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
 
         HashAggregatePlanNode reAggNodeForReplace = null;
-        if (m_parsedSelect.m_tableList.size() > 1 && !edgeCaseOuterJoin) {
+        if (m_parsedSelect.getScanCount() > 1 && !edgeCaseOuterJoin) {
             reAggNodeForReplace = reAggNode;
         }
         boolean find = mvFixInfo.processScanNodeWithReAggNode(sendNode, reAggNodeForReplace);
@@ -2295,7 +2295,7 @@ public class PlanAssembler {
 
         // If it is a normal joined query, replace the node under the
         // receive node with materialized view scan node.
-        if (m_parsedSelect.m_tableList.size() > 1 && !edgeCaseOuterJoin) {
+        if (m_parsedSelect.getScanCount() > 1 && !edgeCaseOuterJoin) {
             AbstractPlanNode joinNode = sendNodeChild;
             // No agg, limit pushed down at this point.
             assert(joinNode instanceof AbstractJoinPlanNode);
