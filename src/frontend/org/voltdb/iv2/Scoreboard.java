@@ -140,4 +140,13 @@ public class Scoreboard {
             return tail.getFirst();
         }
     }
+
+    public boolean isTransactionMissing(long txnId) {
+        if (m_compTasks.peekFirst().getSecond() && txnId == m_compTasks.peekFirst().getFirst().getMsgTxnId()) {
+            return true;
+        }
+
+        return (m_compTasks.size() == 2 && m_compTasks.peekLast().getSecond() &&
+                txnId == m_compTasks.peekLast().getFirst().getMsgTxnId());
+    }
 }

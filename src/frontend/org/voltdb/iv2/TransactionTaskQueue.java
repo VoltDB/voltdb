@@ -97,6 +97,9 @@ public class TransactionTaskQueue
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].releaseCompleteTransactionTaskAndRemoveStaleTxn(txnId);
                 if (missingTask && m_mailBoxes[ii] != null) {
+
+                    //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
+                    //up the site outstanding transaction queue and duplicate counter
                     final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(completion.getCompleteMessage());
                     resp.m_sourceHSId = m_mailBoxes[ii].getHSId();
                     m_mailBoxes[ii].deliver(resp);
@@ -127,17 +130,9 @@ public class TransactionTaskQueue
 
         boolean hasMissingTxn(long txnId) {
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
-                if (m_stashedMpScoreboards[ii].getCompletionTasks().peekFirst().getSecond()) {
-                   if (txnId == m_stashedMpScoreboards[ii].getCompletionTasks().peekFirst().getFirst().getMsgTxnId()) {
-                       return true;
-                   }
+                if (m_stashedMpScoreboards[ii].isTransactionMissing(ii)) {
+                    return true;
                 }
-                if (m_stashedMpScoreboards[ii].getCompletionTasks().size() == 1) continue;
-                if (m_stashedMpScoreboards[ii].getCompletionTasks().peekLast().getSecond()) {
-                    if (txnId == m_stashedMpScoreboards[ii].getCompletionTasks().peekLast().getFirst().getMsgTxnId()) {
-                        return true;
-                    }
-                 }
             }
             return false;
         }
