@@ -37,6 +37,7 @@ import org.voltdb.calciteadapter.rules.logical.VoltDBLCalcRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLSortRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLTableScanRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPAggregateRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPAggregateToSerialRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPCalcRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPCalcScanToIndexRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPLimitRule;
@@ -77,6 +78,8 @@ public class VoltDBRules {
             , VoltDBPCalcScanToIndexRule.INSTANCE
             , VoltDBPSortCalcTransposeRule.INSTANCE
             , VoltDBPSortIndexScanRemoveRule.INSTANCE
+            , VoltDBPAggregateToSerialRule.INSTANCE
+
 //            , VoltDBCalcMergeRule.INSTANCE
 
             // VoltDB Physical Conversion Rules

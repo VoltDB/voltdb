@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rel.logical;
+package org.voltdb.calciteadapter.rel.physical;
 
 import java.util.List;
 
@@ -23,16 +23,17 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Aggregate;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
 
-public class VoltDBLSerialAggregate extends Aggregate  implements VoltDBLRel {
+public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
 
-    private RelCollation m_groupByCollation;
+    private final RelCollation m_groupByCollation;
 
     /** Constructor */
-    private VoltDBLSerialAggregate(
+    private VoltDBPSerialAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -40,16 +41,31 @@ public class VoltDBLSerialAggregate extends Aggregate  implements VoltDBLRel {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RelCollation groupByCollation) {
-      super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
+            RelCollation groupByCollation,
+            RexNode postPredicate) {
+      super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate);
       m_groupByCollation = groupByCollation;
     }
 
     @Override
-    public VoltDBLSerialAggregate copy(RelTraitSet traitSet, RelNode input,
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.item("collation", m_groupByCollation);
+        return pw;
+    }
+
+    @Override
+    protected String computeDigest() {
+        String digest = super.computeDigest();
+        digest += m_groupByCollation.toString();
+        return digest;
+    }
+
+    @Override
+    public VoltDBPSerialAggregate copy(RelTraitSet traitSet, RelNode input,
             boolean indicator, ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        return VoltDBLSerialAggregate.create(
+        return VoltDBPSerialAggregate.create(
                 getCluster(),
                 traitSet,
                 input,
@@ -57,10 +73,11 @@ public class VoltDBLSerialAggregate extends Aggregate  implements VoltDBLRel {
                 groupSet,
                 groupSets,
                 aggCalls,
-                m_groupByCollation);
+                m_groupByCollation,
+                m_postPredicate);
     }
 
-    public static VoltDBLSerialAggregate create(
+    public static VoltDBPSerialAggregate create(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -68,8 +85,9 @@ public class VoltDBLSerialAggregate extends Aggregate  implements VoltDBLRel {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RelCollation groupByCollation) {
-        return new VoltDBLSerialAggregate(
+            RelCollation groupByCollation,
+            RexNode postPredicate) {
+        return new VoltDBPSerialAggregate(
                 cluster,
                 traitSet,
                 child,
@@ -77,6 +95,8 @@ public class VoltDBLSerialAggregate extends Aggregate  implements VoltDBLRel {
                 groupSet,
                 groupSets,
                 aggCalls,
-                groupByCollation);
+                groupByCollation,
+                postPredicate);
     }
+
 }

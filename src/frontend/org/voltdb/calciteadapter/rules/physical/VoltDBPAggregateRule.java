@@ -23,7 +23,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLAggregate;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPAggregate;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPHashAggregate;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 
 
@@ -41,7 +41,7 @@ public class VoltDBPAggregateRule extends RelOptRule {
         RelTraitSet convertedTraits = aggregate.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
         RelNode input = aggregate.getInput();
         RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
-        call.transformTo(VoltDBPAggregate.create(
+        call.transformTo(VoltDBPHashAggregate.create(
                 aggregate.getCluster(),
                 convertedTraits,
                 convertedInput,
