@@ -216,7 +216,7 @@ public class TestTransactionTaskQueue extends TestCase
             SiteTaskerQueue siteTaskQueue = getSiteTaskerQueue();
             m_siteTaskQueues.add(siteTaskQueue);
             TransactionTaskQueue txnTaskQueue = new TransactionTaskQueue(siteTaskQueue);
-            txnTaskQueue.initializeScoreboard(i);
+            txnTaskQueue.initializeScoreboard(i, null);
             m_txnTaskQueues.add(txnTaskQueue);
             Deque<TransactionTask> expectedOrder = new ArrayDeque<>();
             m_expectedOrders.add(expectedOrder);

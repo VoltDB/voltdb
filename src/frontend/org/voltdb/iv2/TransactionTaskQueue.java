@@ -24,7 +24,10 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
+import org.voltcore.utils.Pair;
 
 public class TransactionTaskQueue
 {
@@ -40,7 +43,7 @@ public class TransactionTaskQueue
         private Scoreboard[] m_stashedMpScoreboards;
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
-
+        private Mailbox[] m_mailBoxes;
         void resetScoreboards(int firstSiteId, int siteCount) {
             m_stashedMpQueues = null;
             m_stashedMpScoreboards = null;
@@ -48,16 +51,18 @@ public class TransactionTaskQueue
             m_siteCount = siteCount;
         }
 
-        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard) {
+        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox) {
             hostLog.debug("Initializing scoreboard for site " + siteId + " out of " + m_siteCount + " (lowest expected is " + m_lowestSiteId + ")");
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
             if (m_stashedMpQueues == null) {
                 m_stashedMpQueues = new SiteTaskerQueue[m_siteCount];
                 m_stashedMpScoreboards = new Scoreboard[m_siteCount];
+                m_mailBoxes = new Mailbox[m_siteCount];
             }
             m_stashedMpQueues[siteId-m_lowestSiteId] = queue;
             m_stashedMpScoreboards[siteId-m_lowestSiteId] = scoreboard;
+            m_mailBoxes[siteId-m_lowestSiteId] = mailBox;
         }
 
         // All sites receives FragmentTask messages, time to fire the task.
@@ -78,7 +83,7 @@ public class TransactionTaskQueue
         }
 
         // All sites receives CompletedTransactionTask messages, time to fire the task.
-        void releaseStashedComleteTxns(boolean missingTxn, long txnId)
+        void releaseStashedCompleteTxns(boolean missingTxn, long txnId)
         {
             if (hostLog.isDebugEnabled()) {
                 if (missingTxn) {
@@ -89,13 +94,25 @@ public class TransactionTaskQueue
                 }
             }
             long lastTxnId = 0;
+            CompleteTransactionTask completeTasks[] = new CompleteTransactionTask[m_siteCount];
+            boolean handleMissing = false;
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
-                CompleteTransactionTask completion = m_stashedMpScoreboards[ii].releaseCompleteTransactionTaskAndRemoveStaleTxn(txnId);
-                assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
-                lastTxnId = completion.getMsgTxnId();
-                if (!missingTxn) {
-                    Iv2Trace.logSiteTaskerQueueOffer(completion);
-                    m_stashedMpQueues[ii].offer(completion);
+                Pair<CompleteTransactionTask, Boolean> completion = m_stashedMpScoreboards[ii].releaseCompleteTransactionTaskAndRemoveStaleTxn(txnId);
+                assert(lastTxnId == 0 || lastTxnId == completion.getFirst().getMsgTxnId());
+                lastTxnId = completion.getFirst().getMsgTxnId();
+                completeTasks[ii] = completion.getFirst();
+                if (!handleMissing && completion.getSecond()) {
+                    handleMissing = true;
+                }
+            }
+            for (int ii = m_siteCount-1; ii >= 0; ii--) {
+                Iv2Trace.logSiteTaskerQueueOffer(completeTasks[ii]);
+                if (handleMissing &&  m_mailBoxes[ii] != null) {
+                    final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(completeTasks[ii].getCompleteMessage());
+                    resp.m_sourceHSId = m_mailBoxes[ii].getHSId();
+                    m_mailBoxes[ii].deliver(resp);
+                } else {
+                    m_stashedMpQueues[ii].offer(completeTasks[ii]);
                 }
             }
         }
@@ -144,10 +161,10 @@ public class TransactionTaskQueue
         }
     }
 
-    void initializeScoreboard(int siteId) {
+    void initializeScoreboard(int siteId, Mailbox mailBox) {
         synchronized (s_lock) {
             if (m_taskQueue.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard);
+                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox);
             }
         }
     }
@@ -263,7 +280,7 @@ public class TransactionTaskQueue
                 hostLog.debug(sb.toString());
             }
             if (completionScore == s_stashedMpWrites.getSiteCount()) {
-                s_stashedMpWrites.releaseStashedComleteTxns(missingTxn, task.getTxnId());
+                s_stashedMpWrites.releaseStashedCompleteTxns(missingTxn, task.getTxnId());
             }
             else
             if (fragmentScore == s_stashedMpWrites.getSiteCount() && completionScore == 0) {
@@ -295,7 +312,7 @@ public class TransactionTaskQueue
                 hostLog.debug(sb.toString());
             }
             if (completionScore == s_stashedMpWrites.getSiteCount()) {
-                s_stashedMpWrites.releaseStashedComleteTxns(true, missingTxnCompletion.getMsgTxnId());
+                s_stashedMpWrites.releaseStashedCompleteTxns(true, missingTxnCompletion.getMsgTxnId());
             }
         }
     }
@@ -425,4 +442,6 @@ public class TransactionTaskQueue
         }
         return pendingTasks;
     }
+
+
 }
