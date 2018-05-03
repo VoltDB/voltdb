@@ -1153,6 +1153,7 @@ public class SQLCommand
         + "              [--port=port_number]\n"
         + "              [--user=user]\n"
         + "              [--password=password]\n"
+        + "              [--userfile=userfile]\n"
         + "              [--kerberos=jaas_login_configuration_entry_key]\n"
         + "              [--ssl or --ssl=ssl-configuration-file]\n"
         + "              [--query=query]\n"
@@ -1175,6 +1176,10 @@ public class SQLCommand
         + "\n"
         + "[--password=password]\n"
         + "  Password of the user for database login.\n"
+        + "  Default: (not defined - connection made without credentials).\n"
+        + "\n"
+        + "[--userfile=userfile]\n"
+        + "  Userfile that contains username and password information.\n"
         + "  Default: (not defined - connection made without credentials).\n"
         + "\n"
         + "[--kerberos=jaas_login_configuration_entry_key]\n"
@@ -1393,7 +1398,10 @@ public class SQLCommand
         int port = 21212;
         String user = "";
         String password = "";
+        String userfile = "";
         String kerberos = "";
+        FileReader fr = null;
+        BufferedReader br = null;
         List<String> queries = null;
         String ddlFileText = "";
         String sslConfigFile = null;
@@ -1418,6 +1426,10 @@ public class SQLCommand
             else if (arg.startsWith("--password=")) {
                 password = extractArgInput(arg);
                 if (password == null) return -1;
+            }
+            else if (arg.startsWith("--userfile")) {
+                userfile = extractArgInput(arg);
+                if (userfile == null) return -1;
             }
             else if (arg.startsWith("--kerberos=")) {
                 kerberos = extractArgInput(arg);
@@ -1531,6 +1543,37 @@ public class SQLCommand
         // Phone home to see if there is a newer version of VoltDB
         if (m_versionCheck) {
             openURLAsync();
+        }
+
+        // read username and password from txt file
+        if (userfile.length() > 0) {
+            try {
+                fr = new FileReader(userfile);
+                br = new BufferedReader(fr);
+                String content = "";
+                String sCurrentLine;
+                while ((sCurrentLine = br.readLine()) != null) {
+                    content += sCurrentLine + " ";
+                }
+                String[] tokens = content.split("\\W+");
+                if (tokens.length != 4) {
+                    System.out.println("Incorrect info.");
+                } else {
+                    user = tokens[1];
+                    password = tokens[3];
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    if (br != null)
+                        br.close();
+                    if (fr != null)
+                        fr.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
         }
 
         try
