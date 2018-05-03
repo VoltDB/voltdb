@@ -1068,6 +1068,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                  m_pendingTasks, msg, null);
         }
         if (logThis) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("doLocalFragmentOffer prepare commandlog for fragmentTask:" + msg +
+                        " Involved Partitions" + msg.getInvolvedPartitions());
+            }
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
                              m_durabilityListener, task);

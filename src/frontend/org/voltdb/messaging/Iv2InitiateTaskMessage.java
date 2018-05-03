@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -305,8 +306,11 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             sb.append("  WRITE, ");
         if (m_isSinglePartition)
             sb.append("SINGLE PARTITION, ");
-        else
+        else if (isN_Partition()) {
+            sb.append("N PARTITION " + Arrays.toString(m_nPartitions) + ", ");
+        } else {
             sb.append("MULTI PARTITION, ");
+        }
         if (isForReplay())
             sb.append("FOR REPLAY, ");
         else

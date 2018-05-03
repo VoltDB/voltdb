@@ -1098,6 +1098,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 false);  // is for replay.
     }
 
+    public boolean createTransaction(
+            final long connectionId,
+            final StoredProcedureInvocation invocation,
+            final boolean isReadOnly,
+            final boolean isSinglePartition,
+            final boolean isEveryPartition,
+            final int[] partitions,
+            final int messageSize,
+            final long nowNanos)
+    {
+        return m_dispatcher.createTransaction(
+                connectionId,
+                Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                0, //unused timestammp
+                invocation,
+                isReadOnly,
+                isSinglePartition,
+                isEveryPartition,
+                partitions,
+                messageSize,
+                nowNanos,
+                false);  // is for replay.
+    }
+
     // Wrap API to SimpleDtxnInitiator - mostly for the future
     public boolean createTransaction(
             final long connectionId,

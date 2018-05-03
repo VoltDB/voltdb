@@ -297,39 +297,25 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
-                    null,
+                    message.getNParitionIds(),
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
                     message.isForReplay());
+
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
-        if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
-            Set<Integer> involvedPartitions = getBalancePartitions(message);
-            if (involvedPartitions != null) {
-                HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
-                involvedPartitionMasters.keySet().retainAll(involvedPartitions);
 
-                task = instantiateNpProcedureTask(m_mailbox, procedureName,
-                        m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId);
-            }
-
-            // if cannot figure out the involved partitions, run it as an MP txn
-        }
-
-        int[] nPartitionIds = message.getNParitionIds();
-        if (nPartitionIds != null) {
-            HashMap<Integer, Long> involvedPartitionMasters = new HashMap<>();
-            for (int partitionId : nPartitionIds) {
+        if (isNpTxn(message)) {
+            Map<Integer, Long> involvedPartitionMasters = new HashMap<>();
+            for (int partitionId : message.getNParitionIds()) {
                 involvedPartitionMasters.put(partitionId, m_partitionMasters.get(partitionId));
             }
-
             task = instantiateNpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, involvedPartitionMasters,
                     m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId);
+            // if cannot figure out the involved partitions, run it as an MP txn
         }
-
 
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
@@ -343,14 +329,25 @@ public class MpScheduler extends Scheduler
     }
 
     /**
-     * Hacky way to only run @BalancePartitions as n-partition transactions for now.
+     * run n-partition transactions.
      * @return true if it's an n-partition transaction
      */
     private boolean isNpTxn(Iv2InitiateTaskMessage msg)
     {
-        return msg.getStoredProcedureName().startsWith("@") &&
-                msg.getStoredProcedureName().equalsIgnoreCase("@BalancePartitions") &&
-                (byte) msg.getParameters()[1] != 1; // clearIndex is MP, normal rebalance is NP
+        if (NpProcedureTaskConstructor == null) return false;
+        if (msg.isN_Partition()) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("Handling NP Transaction: " + msg);
+            }
+            // Right now the known np prcoedures are following
+            /*
+            assert (msg.getStoredProcedureName().equalsIgnoreCase("@BalancePartitions") ||
+                    msg.getStoredProcedureName().equalsIgnoreCase("TestTwoPartitionProcs$TwoPartitionProcA") ||
+                    msg.getStoredProcedureName().equalsIgnoreCase("Test2PTransactionExport$TestProc"));
+                    */
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -397,7 +394,7 @@ public class MpScheduler extends Scheduler
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
-                    null,
+                    message.getNParitionIds(),
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -405,17 +402,14 @@ public class MpScheduler extends Scheduler
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
-        if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
-            Set<Integer> involvedPartitions = getBalancePartitions(message);
-            if (involvedPartitions != null) {
-                HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
-                involvedPartitionMasters.keySet().retainAll(involvedPartitions);
-
-                task = instantiateNpProcedureTask(m_mailbox, procedureName,
-                        m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), true);
+        if (isNpTxn(message)) {
+            Map<Integer, Long> involvedPartitionMasters = new HashMap<>();
+            for (int partitionId : message.getNParitionIds()) {
+                involvedPartitionMasters.put(partitionId, m_partitionMasters.get(partitionId));
             }
-
+            task = instantiateNpProcedureTask(m_mailbox, procedureName,
+                    m_pendingTasks, mp, involvedPartitionMasters,
+                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId);
             // if cannot figure out the involved partitions, run it as an MP txn
         }
 
@@ -588,6 +582,7 @@ public class MpScheduler extends Scheduler
     {
         if (NpProcedureTaskConstructor != null) {
             try {
+                // TODO: initiate NP procedureTask without using reflection
                 return (MpProcedureTask) NpProcedureTaskConstructor.newInstance(params);
             } catch (Exception e) {
                 tmLog.error("Unable to instantiate NpProcedureTask", e);
