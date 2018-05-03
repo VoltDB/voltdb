@@ -43,9 +43,7 @@ import org.voltdb.calciteadapter.planner.CalcitePlanningException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.plannodes.PartialAggregatePlanNode;
 import org.voltdb.types.ExpressionType;
 
 public abstract class AbstractVoltDBPAggregate extends Aggregate implements VoltDBPRel {
@@ -171,31 +169,16 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
 //        return newAggregate;
 //    }
 
-    @Override
-    public AbstractPlanNode toPlanNode() {
-        // Identify Aggregation type
-        AggregatePlanNode hapn;
-        int groupByCount = getGroupSet().cardinality();
-
-        List<Integer> coveredGroupByColumns = calculateGroupbyColumnsCovered(groupByCount);
-        if (groupByCount != 0 && groupByCount == coveredGroupByColumns.size()) {
-            hapn = new AggregatePlanNode();
-        } else if (groupByCount != 0 && !coveredGroupByColumns.isEmpty()) {
-            hapn = new PartialAggregatePlanNode();
-            ((PartialAggregatePlanNode)hapn).setPartialAggregateColumns(coveredGroupByColumns);
-        } else {
-            hapn = new HashAggregatePlanNode();
-        }
-
+    protected AbstractPlanNode toPlanNode(AggregatePlanNode apn) {
         // Convert child
         VoltDBPRel inputNode = getInputNode(this, 0);
         assert(inputNode != null);
         AbstractPlanNode child = inputNode.toPlanNode();
-        hapn.addAndLinkChild(child);
+        apn.addAndLinkChild(child);
 
         // Generate output schema
         NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getRowType());
-        hapn.setOutputSchema(schema);
+        apn.setOutputSchema(schema);
 
         // The Aggregate's record layout seems to be
         // - GROUP BY expressions
@@ -226,16 +209,16 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             }
 
             assert(aggrFieldIdx < aggrRowType.getFieldCount());
-            hapn.addAggregate(aggrType, aggrCall.isDistinct(),  aggrFieldIdx, aggrExpr);
+            apn.addAggregate(aggrType, aggrCall.isDistinct(),  aggrFieldIdx, aggrExpr);
             // Increment aggregate field index
             aggrFieldIdx++;
         }
         // Group by
-        setGroupByExpressions(hapn);
+        setGroupByExpressions(apn);
         // Having
-        setPostPredicate(hapn);
+        setPostPredicate(apn);
 
-        return hapn;
+        return apn;
     }
 
     private void setGroupByExpressions(AggregatePlanNode hapn) {

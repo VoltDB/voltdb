@@ -17,14 +17,23 @@
 
 package org.voltdb.calciteadapter.rules.physical;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLAggregate;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPHashAggregate;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPSerialAggregate;
 
 
 public class VoltDBPAggregateRule extends RelOptRule {
@@ -41,14 +50,50 @@ public class VoltDBPAggregateRule extends RelOptRule {
         RelTraitSet convertedTraits = aggregate.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
         RelNode input = aggregate.getInput();
         RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
+
+        // Transform to a physical Hash Aggregate
         call.transformTo(VoltDBPHashAggregate.create(
+                            aggregate.getCluster(),
+                            convertedTraits,
+                            convertedInput,
+                            aggregate.indicator,
+                            aggregate.getGroupSet(),
+                            aggregate.getGroupSets(),
+                            aggregate.getAggCallList(),
+                            null));
+
+        // Transform to a physical Serial Aggregate with an enforcer - A Sort rel which collation
+        // matches the aggreagte's GROUP BY columns (for now)
+        RelCollation groupByCollation = buildGroupByCollation(aggregate);
+        RelTraitSet serialAggrTraits = input.getTraitSet()
+                .replace(VoltDBPRel.VOLTDB_PHYSICAL)
+                .plus(groupByCollation);
+        RelNode convertedSerialAggrInput = convert(input, serialAggrTraits);
+        call.transformTo(VoltDBPSerialAggregate.create(
                 aggregate.getCluster(),
-                convertedTraits,
-                convertedInput,
+                convertedTraits.plus(groupByCollation),
+                convertedSerialAggrInput,
                 aggregate.indicator,
                 aggregate.getGroupSet(),
                 aggregate.getGroupSets(),
                 aggregate.getAggCallList(),
                 null));
+
     }
+
+    RelCollation buildGroupByCollation(VoltDBLAggregate aggr) {
+        // Build a collation that represents each GROUP BY expression.
+        // This collation implies that this serial aggregate requires its input
+        // to be sorted in an order that is one of permutations of the fields from this collation
+        ImmutableBitSet groupBy = aggr.getGroupSet();
+        List<RelDataTypeField> rowTypeList = aggr.getRowType().getFieldList();
+        List<RelFieldCollation> collationFields = new ArrayList<>();
+        for (int index = groupBy.nextSetBit(0); index != -1; index = groupBy.nextSetBit(index + 1)) {
+            assert(index < rowTypeList.size());
+            collationFields.add(new RelFieldCollation(index));
+        }
+
+        return RelCollations.of(collationFields.toArray(new RelFieldCollation[collationFields.size()]));
+    }
+
 }

@@ -21,16 +21,15 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
 
 public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
-
-    private final RelCollation m_groupByCollation;
 
     /** Constructor */
     private VoltDBPSerialAggregate(
@@ -41,24 +40,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RelCollation groupByCollation,
             RexNode postPredicate) {
       super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate);
-      m_groupByCollation = groupByCollation;
-    }
-
-    @Override
-    public RelWriter explainTerms(RelWriter pw) {
-        super.explainTerms(pw);
-        pw.item("collation", m_groupByCollation);
-        return pw;
-    }
-
-    @Override
-    protected String computeDigest() {
-        String digest = super.computeDigest();
-        digest += m_groupByCollation.toString();
-        return digest;
     }
 
     @Override
@@ -73,7 +56,6 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                m_groupByCollation,
                 m_postPredicate);
     }
 
@@ -85,7 +67,6 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RelCollation groupByCollation,
             RexNode postPredicate) {
         return new VoltDBPSerialAggregate(
                 cluster,
@@ -95,8 +76,13 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                groupByCollation,
                 postPredicate);
+    }
+
+    @Override
+    public AbstractPlanNode toPlanNode() {
+        AggregatePlanNode apn = new AggregatePlanNode();
+        return super.toPlanNode(apn);
     }
 
 }
