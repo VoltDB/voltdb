@@ -93,26 +93,19 @@ public class TransactionTaskQueue
                     hostLog.debug("release stashed complete transaction message:" + TxnEgo.txnIdToString(txnId));
                 }
             }
-            long lastTxnId = 0;
-            CompleteTransactionTask completeTasks[] = new CompleteTransactionTask[m_siteCount];
-            boolean handleMissing = false;
+            boolean missingTask = missingTxn ? true : hasMissingTxn(txnId);
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
-                Pair<CompleteTransactionTask, Boolean> completion = m_stashedMpScoreboards[ii].releaseCompleteTransactionTaskAndRemoveStaleTxn(txnId);
-                assert(lastTxnId == 0 || lastTxnId == completion.getFirst().getMsgTxnId());
-                lastTxnId = completion.getFirst().getMsgTxnId();
-                completeTasks[ii] = completion.getFirst();
-                if (!handleMissing && completion.getSecond()) {
-                    handleMissing = true;
-                }
-            }
-            for (int ii = m_siteCount-1; ii >= 0; ii--) {
-                Iv2Trace.logSiteTaskerQueueOffer(completeTasks[ii]);
-                if (handleMissing &&  m_mailBoxes[ii] != null) {
-                    final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(completeTasks[ii].getCompleteMessage());
+                CompleteTransactionTask completion = m_stashedMpScoreboards[ii].releaseCompleteTransactionTaskAndRemoveStaleTxn(txnId);
+                if (missingTask && m_mailBoxes[ii] != null) {
+                    final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(completion.getCompleteMessage());
                     resp.m_sourceHSId = m_mailBoxes[ii].getHSId();
                     m_mailBoxes[ii].deliver(resp);
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("handling missing complete response in scoreboard:" + completion);
+                    }
                 } else {
-                    m_stashedMpQueues[ii].offer(completeTasks[ii]);
+                    Iv2Trace.logSiteTaskerQueueOffer(completion);
+                    m_stashedMpQueues[ii].offer(completion);
                 }
             }
         }
@@ -132,6 +125,22 @@ public class TransactionTaskQueue
             }
         }
 
+        boolean hasMissingTxn(long txnId) {
+            for (int ii = m_siteCount-1; ii >= 0; ii--) {
+                if (m_stashedMpScoreboards[ii].getCompletionTasks().peekFirst().getSecond()) {
+                   if (txnId == m_stashedMpScoreboards[ii].getCompletionTasks().peekFirst().getFirst().getMsgTxnId()) {
+                       return true;
+                   }
+                }
+                if (m_stashedMpScoreboards[ii].getCompletionTasks().size() == 1) continue;
+                if (m_stashedMpScoreboards[ii].getCompletionTasks().peekLast().getSecond()) {
+                    if (txnId == m_stashedMpScoreboards[ii].getCompletionTasks().peekLast().getFirst().getMsgTxnId()) {
+                        return true;
+                    }
+                 }
+            }
+            return false;
+        }
     }
 
     /*

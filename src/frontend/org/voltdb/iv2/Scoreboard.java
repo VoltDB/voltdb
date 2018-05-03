@@ -120,10 +120,10 @@ public class Scoreboard {
 
     //Find the CompleteTransactionTask to be released. The task could be in header or tail
     //If the released one has the latest time stamp, then remove txn before the released one.
-    public Pair<CompleteTransactionTask, Boolean> releaseCompleteTransactionTaskAndRemoveStaleTxn(long txnId) {
+    public CompleteTransactionTask releaseCompleteTransactionTaskAndRemoveStaleTxn(long txnId) {
         Pair<CompleteTransactionTask, Boolean> header = m_compTasks.pollFirst();
         if (m_compTasks.isEmpty()) {
-            return header;
+            return header.getFirst();
         }
 
         Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.pollFirst();
@@ -132,12 +132,12 @@ public class Scoreboard {
             if (txnId < tail.getFirst().getMsgTxnId()) {
                 m_compTasks.addLast(tail);
             }
-            return header;
+            return header.getFirst();
         } else { //match in the tail
             if (header.getFirst().getMsgTxnId() > txnId) {
                 m_compTasks.addLast(header);
             }
-            return tail;
+            return tail.getFirst();
         }
     }
 }
