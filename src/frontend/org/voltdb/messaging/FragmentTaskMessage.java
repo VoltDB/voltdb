@@ -527,6 +527,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     }
 
     // Can be null for non-first fragment task message or read-only transaction
+    // or in replay
     public Iv2InitiateTaskMessage getInitiateTask() {
         return m_initiateTask;
     }
