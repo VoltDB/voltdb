@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MockMailbox;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltcore.utils.Pair;
@@ -96,7 +97,8 @@ public class TransactionTaskQueue
             boolean missingTask = missingTxn ? true : hasMissingTxn(txnId);
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].releaseCompleteTransactionTaskAndRemoveStaleTxn(txnId);
-                if (missingTask && m_mailBoxes[ii] != null) {
+                //skip for test case
+                if (missingTask) {
 
                     //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
                     //up the site outstanding transaction queue and duplicate counter
