@@ -1153,7 +1153,7 @@ public class SQLCommand
         + "              [--port=port_number]\n"
         + "              [--user=user]\n"
         + "              [--password=password]\n"
-        + "              [--userfile=userfile]\n"
+        + "              [--credentials=file_spec]\n"
         + "              [--kerberos=jaas_login_configuration_entry_key]\n"
         + "              [--ssl or --ssl=ssl-configuration-file]\n"
         + "              [--query=query]\n"
@@ -1178,8 +1178,8 @@ public class SQLCommand
         + "  Password of the user for database login.\n"
         + "  Default: (not defined - connection made without credentials).\n"
         + "\n"
-        + "[--userfile=userfile]\n"
-        + "  Userfile that contains username and password information.\n"
+        + "[--credentials=credentials]\n"
+        + "  File that contains username and password information.\n"
         + "  Default: (not defined - connection made without credentials).\n"
         + "\n"
         + "[--kerberos=jaas_login_configuration_entry_key]\n"
@@ -1398,7 +1398,7 @@ public class SQLCommand
         int port = 21212;
         String user = "";
         String password = "";
-        String userfile = "";
+        String credentials = "";
         String kerberos = "";
         FileReader fr = null;
         BufferedReader br = null;
@@ -1427,9 +1427,9 @@ public class SQLCommand
                 password = extractArgInput(arg);
                 if (password == null) return -1;
             }
-            else if (arg.startsWith("--userfile")) {
-                userfile = extractArgInput(arg);
-                if (userfile == null) return -1;
+            else if (arg.startsWith("--credentials")) {
+                credentials = extractArgInput(arg);
+                if (credentials == null) return -1;
             }
             else if (arg.startsWith("--kerberos=")) {
                 kerberos = extractArgInput(arg);
@@ -1546,9 +1546,9 @@ public class SQLCommand
         }
 
         // read username and password from txt file
-        if (userfile.length() > 0) {
+        if (credentials.length() > 0) {
             try {
-                fr = new FileReader(userfile);
+                fr = new FileReader(credentials);
                 br = new BufferedReader(fr);
                 String content = "";
                 String sCurrentLine;
