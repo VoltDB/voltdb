@@ -57,10 +57,13 @@ public class MpProcedureTask extends ProcedureTask
     final private AtomicReference<Map<Integer, Long>> m_restartMastersMap = new AtomicReference<Map<Integer, Long>>();
     boolean m_isRestart = false;
     final Iv2InitiateTaskMessage m_msg;
+    // Generator uses node id under ZK.leaders_globalservice directory, not host id.
+    // Only used for MP scoreboard at TransactionTaskQueue to track restarted MP transactions.
+    final private MpRestartSequenceGenerator m_restartSeqGenerator;
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters,
-                  long buddyHSId, boolean isRestart)
+                  long buddyHSId, boolean isRestart, int leaderNodeId)
     {
         super(mailbox, procName,
               new MpTransactionState(mailbox, msg, pInitiators, partitionMasters,
@@ -71,6 +74,7 @@ public class MpProcedureTask extends ProcedureTask
         m_initiatorHSIds.addAll(pInitiators);
         m_restartMasters.set(new ArrayList<Long>());
         m_restartMastersMap.set(new HashMap<Integer, Long>());
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(leaderNodeId, true);
     }
 
     /**
@@ -158,13 +162,20 @@ public class MpProcedureTask extends ProcedureTask
                     false,  // really don't want to have ack the ack.
                     !m_txnState.isReadOnly(),
                     m_msg.isForReplay());
-
+            // TransactionTaskQueue uses it to find matching CompleteTransactionMessage
+            long ts = m_restartSeqGenerator.getNextSeqNum();
+            restart.setTimestamp(ts);
+            // Update the timestamp to txnState so following restarted fragments could use it
+            m_txnState.setTimestamp(ts);
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             //restart.setForReplica(false);
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
             }
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
+        }
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("[MpProcedureTask] STARTING: " + this);
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
         // We currently don't want to restart read-only MP transactions because:
@@ -241,6 +252,7 @@ public class MpProcedureTask extends ProcedureTask
                                                  "dest", CoreUtils.hsIdCollectionToString(m_initiatorHSIds)));
         }
 
+        // Only send completions for MP transactions that have processed at least one fragment
         CompleteTransactionMessage complete = new CompleteTransactionMessage(
                 m_initiator.getHSId(), // who is the "initiator" now??
                 m_initiator.getHSId(),
@@ -290,5 +302,9 @@ public class MpProcedureTask extends ProcedureTask
             sb.append("\n" + m_msg);
         }
         return sb.toString();
+    }
+
+    public boolean needCoordination() {
+        return false;
     }
 }

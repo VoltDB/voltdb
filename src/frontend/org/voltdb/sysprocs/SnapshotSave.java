@@ -34,6 +34,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
@@ -145,6 +146,14 @@ public class SnapshotSave extends VoltSystemProcedure
             // with hostID and success so that the MPI has the correct participant count.
             if (result.getRowCount() == 0) {
                 result.addRow(context.getHostId(), hostname, "", "SUCCESS", "");
+            }
+            if (format == SnapshotFormat.STREAM) {
+                result.resetRowPosition();
+                result.advanceRow();
+                String success = result.getString("RESULT");
+                if (success.equals("SUCCESS")) {
+                    ((RealVoltDB)VoltDB.instance()).updateReplicaForJoin(context.getSiteId(), txnId);
+                }
             }
             return new DependencyPair.TableDependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }

@@ -17,28 +17,14 @@
 
 package org.voltdb.iv2;
 
-import org.voltdb.messaging.BorrowTaskMessage;
+public abstract class FragmentTaskBase extends TransactionTask {
+    final protected boolean m_isNPartition;
 
-/**
- * BorrowTransactionState represents the execution of a borrowed
- * read fragment that must be executed before the leader SP has
- * created the multi-partition transaction. This fragment must not
- * block the head of the pendingQueue -- only work arriving from
- * the SP leader can block the queue or the SP leader's ordering
- * is violated at the borrowed site.
- */
-public class BorrowTransactionState extends ParticipantTransactionState
-{
-    BorrowTransactionState(long txnId, BorrowTaskMessage notice)
-    {
-        super(txnId, notice, true, false);
+    public FragmentTaskBase(ParticipantTransactionState txnState, TransactionTaskQueue queue) {
+        super(txnState, queue);
+        m_isNPartition = txnState.m_npTransaction;
     }
 
-    @Override
-    public boolean isSinglePartition()
-    {
-        return true;
-    }
-
-
+    // Used for FragmentTask and SysprocFragmentTask to match restarted messages
+    abstract public long getTimestamp();
 }

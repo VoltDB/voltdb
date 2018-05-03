@@ -18,8 +18,10 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.dtxn.TransactionState;
@@ -27,8 +29,93 @@ import org.voltdb.dtxn.TransactionState;
 public class TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
+    protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     final protected SiteTaskerQueue m_taskQueue;
+
+    final private Scoreboard m_scoreboard;
+
+    private static class RelativeSiteOffset {
+        private SiteTaskerQueue[] m_stashedMpQueues;
+        private Scoreboard[] m_stashedMpScoreboards;
+        private int m_lowestSiteId = Integer.MIN_VALUE;
+        private int m_siteCount = 0;
+
+        void resetScoreboards(int firstSiteId, int siteCount) {
+            m_stashedMpQueues = null;
+            m_stashedMpScoreboards = null;
+            m_lowestSiteId = firstSiteId;
+            m_siteCount = siteCount;
+        }
+
+        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard) {
+            hostLog.debug("Initializing scoreboard for site " + siteId + " out of " + m_siteCount + " (lowest expected is " + m_lowestSiteId + ")");
+            assert(m_lowestSiteId != Integer.MIN_VALUE);
+            assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
+            if (m_stashedMpQueues == null) {
+                m_stashedMpQueues = new SiteTaskerQueue[m_siteCount];
+                m_stashedMpScoreboards = new Scoreboard[m_siteCount];
+            }
+            m_stashedMpQueues[siteId-m_lowestSiteId] = queue;
+            m_stashedMpScoreboards[siteId-m_lowestSiteId] = scoreboard;
+        }
+
+        // All sites receives FragmentTask messages, time to fire the task.
+        void releaseStashedFragments(long txnId) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("release stashed fragment messages:" + TxnEgo.txnIdToString(txnId));
+            }
+            long lastTxnId = 0;
+            for (int ii = m_siteCount-1; ii >= 0; ii--) {
+                TransactionTask task = m_stashedMpScoreboards[ii].getFragmentTask();
+                assert(lastTxnId == 0 || lastTxnId == task.getTxnId());
+                lastTxnId = task.getTxnId();
+                Iv2Trace.logSiteTaskerQueueOffer(task);
+                m_stashedMpQueues[ii].offer(task);
+                m_stashedMpScoreboards[ii].clearFragment();
+            }
+
+        }
+
+        // All sites receives CompletedTransactionTask messages, time to fire the task.
+        void releaseStashedComleteTxns(boolean missingTxn, long txnId)
+        {
+            if (hostLog.isDebugEnabled()) {
+                if (missingTxn) {
+                    hostLog.debug("skipped incomplete rollback transaction message:" + TxnEgo.txnIdToString(txnId));
+                }
+                else {
+                    hostLog.debug("release stashed complete transaction message:" + TxnEgo.txnIdToString(txnId));
+                }
+            }
+            long lastTxnId = 0;
+            for (int ii = m_siteCount-1; ii >= 0; ii--) {
+                CompleteTransactionTask completion = m_stashedMpScoreboards[ii].releaseCompleteTransactionTaskAndRemoveStaleTxn(txnId);
+                assert(lastTxnId == 0 || lastTxnId == completion.getMsgTxnId());
+                lastTxnId = completion.getMsgTxnId();
+                if (!missingTxn) {
+                    Iv2Trace.logSiteTaskerQueueOffer(completion);
+                    m_stashedMpQueues[ii].offer(completion);
+                }
+            }
+        }
+
+        Scoreboard[] getScoreboards() {
+            return m_stashedMpScoreboards;
+        }
+
+        int getSiteCount() {
+            return m_siteCount;
+        }
+
+        // should only be used for debugging purpose
+        private void dumpStashedMpWrites(StringBuilder builder) {
+            for (int ii = 0; ii < m_siteCount; ii++) {
+                builder.append("\nQueue " + m_stashedMpQueues[ii].getPartitionId() + ":" + m_stashedMpScoreboards[ii]);
+            }
+        }
+
+    }
 
     /*
      * Multi-part transactions create a backlog of tasks behind them. A queue is
@@ -37,9 +124,32 @@ public class TransactionTaskQueue
      */
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
+    final private static RelativeSiteOffset s_stashedMpWrites = new RelativeSiteOffset();
+    private static Object s_lock = new Object();
+
     TransactionTaskQueue(SiteTaskerQueue queue)
     {
         m_taskQueue = queue;
+        if (queue.getPartitionId() == MpInitiator.MP_INIT_PID) {
+            m_scoreboard = null;
+        }
+        else {
+            m_scoreboard = new Scoreboard();
+        }
+    }
+
+    public static void resetScoreboards(int firstSiteId, int siteCount) {
+        synchronized (s_lock) {
+            s_stashedMpWrites.resetScoreboards(firstSiteId, siteCount);
+        }
+    }
+
+    void initializeScoreboard(int siteId) {
+        synchronized (s_lock) {
+            if (m_taskQueue.getPartitionId() != MpInitiator.MP_INIT_PID) {
+                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard);
+            }
+        }
     }
 
     /**
@@ -66,6 +176,14 @@ public class TransactionTaskQueue
                 m_backlog.addLast(task);
                 retval = true;
             }
+            /*
+             * This branch coordinates FragmentTask or CompletedTransactionTask,
+             * holds the tasks until all the sites on the node receive the task.
+             * Task with newer spHandle will
+             */
+            else if (task.needCoordination()) {
+                coordinatedTaskQueueOffer(task);
+            }
             else {
                 taskQueueOffer(task);
             }
@@ -81,7 +199,16 @@ public class TransactionTaskQueue
                 m_backlog.addLast(task);
                 retval = true;
             }
-            taskQueueOffer(task);
+            /*
+             * This branch coordinates FragmentTask or CompletedTransactionTask,
+             * holds the tasks until all the sites on the node receive the task.
+             * Task with newer spHandle will
+             */
+            if (task.needCoordination()) {
+                coordinatedTaskQueueOffer(task);
+            } else {
+                taskQueueOffer(task);
+            }
         }
         return retval;
     }
@@ -94,6 +221,85 @@ public class TransactionTaskQueue
         m_taskQueue.offer(task);
     }
 
+    private void coordinatedTaskQueueOffer(TransactionTask task) {
+        synchronized (s_lock) {
+            long matchingCompletionTime = -1;
+            long matchingFragmentTime = -1;
+            if (task instanceof CompleteTransactionTask) {
+                matchingCompletionTime = ((CompleteTransactionTask)task).getTimestamp();
+                m_scoreboard.addCompletedTransactionTask((CompleteTransactionTask)task, false);
+
+            } else if (task instanceof FragmentTaskBase) {
+                FragmentTaskBase ft = (FragmentTaskBase)task;
+                matchingFragmentTime = ft.getTimestamp();
+                m_scoreboard.addFragmentTask(ft);
+            }
+
+            int fragmentScore = 0;
+            int completionScore = 0;
+            boolean missingTxn = false;
+            for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
+                if (sb.getFragmentTask() == null && sb.getCompletionTasks().isEmpty()) {
+                    break;
+                }
+                if (sb.getFragmentTask() != null && matchingFragmentTime == sb.getFragmentTask().getTimestamp()) {
+                    fragmentScore++;
+                }
+                if (!sb.matchCompleteTransactionTask(matchingCompletionTime)) {
+                    continue;
+                }
+                missingTxn |= sb.getCompletionTasks().peekFirst().getSecond();
+                // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
+                // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
+                // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
+                completionScore++;
+            }
+
+            if (hostLog.isDebugEnabled()) {
+                StringBuilder sb = new StringBuilder("MP Write Scoreboard Received " + task +
+                        "\nFrags: " + fragmentScore + "/" + s_stashedMpWrites.getSiteCount() +
+                        " Comps: " + completionScore + "/" + s_stashedMpWrites.getSiteCount() + ".\n");
+                s_stashedMpWrites.dumpStashedMpWrites(sb);
+                hostLog.debug(sb.toString());
+            }
+            if (completionScore == s_stashedMpWrites.getSiteCount()) {
+                s_stashedMpWrites.releaseStashedComleteTxns(missingTxn, task.getTxnId());
+            }
+            else
+            if (fragmentScore == s_stashedMpWrites.getSiteCount() && completionScore == 0) {
+                s_stashedMpWrites.releaseStashedFragments(task.getTxnId());
+            }
+        }
+    }
+
+    public void handleCompletionForMissingTxn(CompleteTransactionTask missingTxnCompletion) {
+        synchronized (s_lock) {
+            long matchingCompletionTime = missingTxnCompletion.getTimestamp();
+            m_scoreboard.addCompletedTransactionTask(missingTxnCompletion, true);
+            int completionScore = 0;
+            for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
+                if (!sb.getCompletionTasks().isEmpty()) {
+                    if (!sb.matchCompleteTransactionTask(matchingCompletionTime)) {
+                        break;
+                    }                    // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
+                    // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
+                    // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
+                    completionScore++;
+                }
+            }
+
+            if (hostLog.isDebugEnabled()) {
+                StringBuilder sb = new StringBuilder("MP Write Scoreboard Received unmatched " + missingTxnCompletion +
+                        "\nComps: " + completionScore + "/" + s_stashedMpWrites.getSiteCount());
+                s_stashedMpWrites.dumpStashedMpWrites(sb);
+                hostLog.debug(sb.toString());
+            }
+            if (completionScore == s_stashedMpWrites.getSiteCount()) {
+                s_stashedMpWrites.releaseStashedComleteTxns(true, missingTxnCompletion.getMsgTxnId());
+            }
+        }
+    }
+
     /**
      * Try to offer as many runnable Tasks to the SiteTaskerQueue as possible.
      * @param txnId The transaction ID of the TransactionTask which is completing and causing the flush
@@ -101,6 +307,11 @@ public class TransactionTaskQueue
      */
     synchronized int flush(long txnId)
     {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Flush backlog with txnId:" + TxnEgo.txnIdToString(txnId) +
+                    ", backlog head txnId is:" + (m_backlog.isEmpty()? "empty" : TxnEgo.txnIdToString(m_backlog.getFirst().getTxnId()))
+                    );
+        }
         int offered = 0;
         // If the first entry of the backlog is a completed transaction, clear it so it no longer
         // blocks the backlog then iterate the backlog for more work.
@@ -124,7 +335,11 @@ public class TransactionTaskQueue
         while (iter.hasNext()) {
             TransactionTask task = iter.next();
             long lastQueuedTxnId = task.getTxnId();
-            taskQueueOffer(task);
+            if (task.needCoordination()) {
+                coordinatedTaskQueueOffer(task);
+            } else {
+                taskQueueOffer(task);
+            }
             ++offered;
             if (task.getTransactionState().isSinglePartition()) {
                 // single part can be immediately removed and offered
@@ -138,7 +353,11 @@ public class TransactionTaskQueue
                     task = iter.next();
                     if (task.getTxnId() == lastQueuedTxnId) {
                         iter.remove();
-                        taskQueueOffer(task);
+                        if (task.needCoordination()) {
+                            coordinatedTaskQueueOffer(task);
+                        } else {
+                            taskQueueOffer(task);
+                        }
                         ++offered;
                     }
                 }
@@ -155,7 +374,12 @@ public class TransactionTaskQueue
      */
     synchronized void restart()
     {
-        taskQueueOffer(m_backlog.getFirst());
+        TransactionTask task = m_backlog.getFirst();
+        if (task.needCoordination()) {
+            coordinatedTaskQueueOffer(task);
+        } else {
+            taskQueueOffer(task);
+        }
     }
 
     /**
@@ -176,6 +400,29 @@ public class TransactionTaskQueue
         if (!m_backlog.isEmpty()) {
             sb.append("\tHEAD: ").append(m_backlog.getFirst());
         }
+        sb.append("\n\tScoreboard:").append("\n");
+        synchronized (s_lock) {
+            sb.append("\t").append(m_scoreboard.toString());
+        }
         return sb.toString();
+    }
+
+    // Called from streaming snapshot execution
+    public synchronized List<TransactionTask> getBacklogTasks() {
+        List<TransactionTask> pendingTasks = new ArrayList<>();
+        Iterator<TransactionTask> iter = m_backlog.iterator();
+        // skip the first fragments which is streaming snapshot
+        TransactionTask mpTask = iter.next();
+        assert (!mpTask.getTransactionState().isSinglePartition());
+        while (iter.hasNext()) {
+            TransactionTask task = iter.next();
+            // Skip all fragments of current transaction
+            if (task.getTxnId() == mpTask.getTxnId()) {
+                continue;
+            }
+            assert (task.getTransactionState().isSinglePartition());
+            pendingTasks.add(task);
+        }
+        return pendingTasks;
     }
 }

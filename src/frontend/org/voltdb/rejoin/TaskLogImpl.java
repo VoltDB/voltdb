@@ -52,7 +52,6 @@ public class TaskLogImpl implements TaskLog {
     // The number of tasks in the current buffer
     private int m_taskCount = 0;
     private int m_tasksPendingInCurrentTail = 0;
-    private long m_snapshotSpHandle = Long.MAX_VALUE;
     private int m_bufferHeadroom = RejoinTaskBuffer.DEFAULT_BUFFER_SIZE;
 
     private final ExecutorService m_es;
@@ -130,7 +129,6 @@ public class TaskLogImpl implements TaskLog {
 
     @Override
     public void logTask(TransactionInfoBaseMessage message) throws IOException {
-        if (message.getSpHandle() <= m_snapshotSpHandle) return;
         if (m_closed) throw new IOException("Closed");
 
         assert(message != null);
@@ -218,14 +216,7 @@ public class TaskLogImpl implements TaskLog {
             nextTask = getNextMessage();
         }
 
-        // SPs or fragments that's before the actual snapshot fragment may end up in the task log,
-        // because there can be multiple snapshot fragments enabling the task log due to snapshot
-        // collision. Need to filter tasks here based on their spHandles.
-        if (nextTask != null && nextTask.getSpHandle() > m_snapshotSpHandle) {
-            return nextTask;
-        } else {
-            return null;
-        }
+        return nextTask;
     }
 
     @Override
@@ -263,10 +254,4 @@ public class TaskLogImpl implements TaskLog {
             buf.discard();
         }
     }
-
-    @Override
-    public void enableRecording(long snapshotSpHandle) {
-        m_snapshotSpHandle = snapshotSpHandle;
-    }
-
 }

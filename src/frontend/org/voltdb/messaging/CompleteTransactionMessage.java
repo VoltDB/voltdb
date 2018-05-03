@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.iv2.MpRestartSequenceGenerator;
 import org.voltdb.iv2.TxnEgo;
 
 public class CompleteTransactionMessage extends TransactionInfoBaseMessage
@@ -29,6 +30,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_isRollback;
     boolean m_requiresAck;
     boolean m_rollbackForFault;
+    long m_timestamp = INITIAL_TIMESTAMP;
 
     int m_hash;
     int m_flags = 0;
@@ -110,11 +112,20 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(REQUIRESACK, requireAck);
     }
 
+    // This is used when MP txn is restarted.
+    public void setTimestamp(long timestamp) {
+        m_timestamp = timestamp;
+    }
+
+    public long getTimestamp() {
+        return m_timestamp;
+    }
+
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4 + 4;
+        msgsize += 4 + 4 + 8;
         return msgsize;
     }
 
@@ -125,6 +136,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.flattenToBuffer(buf);
         buf.putInt(m_hash);
         buf.putInt(m_flags);
+        buf.putLong(m_timestamp);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -135,6 +147,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.initFromBuffer(buf);
         m_hash = buf.getInt();
         m_flags = buf.getInt();
+        m_timestamp = buf.getLong();
         assert(buf.capacity() == buf.position());
     }
 
@@ -149,7 +162,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("\n SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
-        sb.append("\n  TRUNCATION HANDLE:" + getTruncationHandle());
+        sb.append("\n  TIMESTAMP: ");
+        MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
+        sb.append("\n  TRUNCATION HANDLE:" + TxnEgo.txnIdToString(getTruncationHandle()));
         sb.append("\n  HASH: " + String.valueOf(m_hash));
 
         if (isRollback())

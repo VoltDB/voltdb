@@ -17,28 +17,23 @@
 
 package org.voltdb.iv2;
 
-import org.voltdb.messaging.BorrowTaskMessage;
+import java.util.List;
+import java.util.Map;
 
-/**
- * BorrowTransactionState represents the execution of a borrowed
- * read fragment that must be executed before the leader SP has
- * created the multi-partition transaction. This fragment must not
- * block the head of the pendingQueue -- only work arriving from
- * the SP leader can block the queue or the SP leader's ordering
- * is violated at the borrowed site.
- */
-public class BorrowTransactionState extends ParticipantTransactionState
-{
-    BorrowTransactionState(long txnId, BorrowTaskMessage notice)
-    {
-        super(txnId, notice, true, false);
+import org.voltcore.messaging.Mailbox;
+import org.voltdb.VoltTable;
+import org.voltdb.messaging.FragmentTaskMessage;
+
+public class BorrowedTask extends FragmentTask {
+
+    BorrowedTask(Mailbox mailbox, ParticipantTransactionState txnState,
+            TransactionTaskQueue queue, FragmentTaskMessage message,
+            Map<Integer, List<VoltTable>> inputDeps) {
+        super(mailbox, txnState, queue, message, inputDeps);
     }
 
     @Override
-    public boolean isSinglePartition()
-    {
+    public boolean isBorrowedTask() {
         return true;
     }
-
-
 }

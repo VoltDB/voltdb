@@ -32,10 +32,35 @@ import traceback
 from datetime import datetime
 from distutils.util import strtobool
 from optparse import OptionParser
+from os.path import basename, isfile
+from shutil import copyfile
 from time import mktime
 from voltdbclient import VoltColumn, VoltTable, FastSerializer
 
 __quiet = True
+
+# One way of representing Enums in earlier versions of Python,
+# per Stack Overflow
+def enum(*sequential, **named):
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    reverse = dict((value, key) for key, value in enums.iteritems())
+    enums['reverse_mapping'] = reverse
+    return type('Enum', (), enums)
+
+# Options for which SQL statement types to include when generating Steps to
+# Reproduce a failure (or crash, NPE, etc.)
+Reproduce = enum('NONE', 'DDL', 'DML', 'CTE', 'ALL')
+
+# Define which SQL statement types are included in each of the above options
+ReproduceStatementTypes = {}
+ReproduceStatementTypes[Reproduce.NONE] = []
+ReproduceStatementTypes[Reproduce.DDL]  = ['CREATE', 'DROP', 'ALTER', 'PARTITION', 'DR ']
+ReproduceStatementTypes[Reproduce.DML]  = ['INSERT', 'UPSERT', 'UPDATE', 'DELETE', 'TRUNCATE']
+ReproduceStatementTypes[Reproduce.DML].extend(ReproduceStatementTypes[Reproduce.DDL])
+ReproduceStatementTypes[Reproduce.CTE]  = ['WITH']
+ReproduceStatementTypes[Reproduce.CTE].extend(ReproduceStatementTypes[Reproduce.DML])
+ReproduceStatementTypes[Reproduce.ALL]  = ['']    # any statement, including SELECT
+### print "DEBUG: ReproduceStatementTypes:", str(ReproduceStatementTypes)
 
 def highlight(s, flag):
     if not isinstance(s, basestring):
@@ -74,6 +99,54 @@ def generate_table_str(res, key):
     tablestr = "<br />".join(result)
     return tablestr
 
+def generate_ddl(output_dir, ddl_path):
+    filename = basename(ddl_path) + '.html'
+    local_ddl_path = output_dir + '/' + filename
+    if not isfile(local_ddl_path):
+        ### print 'DEBUG: copying %s to %s' % (ddl_path, local_ddl_path)
+        read_ddl_file = open(ddl_path, 'rb')
+        copy_ddl_file = open(local_ddl_path, 'w')
+        copy_ddl_file.write('<html>\n<head>\n<title>DDL File</title>\n</head>\n<body>\n<pre>\n')
+        while True:
+            line = read_ddl_file.readline()
+            if not line:
+                break
+            copy_ddl_file.write(line)
+        read_ddl_file.close()
+        copy_ddl_file.write('</pre>\n</body>\n</html>')
+        copy_ddl_file.close()
+    return '<p>First, run: <a href="%s">%s</a></p>' % (filename, 'the DDL file')
+
+def generate_reproducer(item, output_dir, reproducer, ddl_file):
+    result = ''
+    if item.get("reproducer"):
+        reproducer_html = """
+<html>
+<head>
+<title>Reproduce Query #%s</title>
+<style>
+td {width: 50%%}
+</style>
+</head>
+<body>
+<h2>Steps to Reproduce Query #%s</h2>
+<p>%s</p>
+<p>Then, run the following (includes %s statements):</p>
+<p>%s</p>
+</body>
+</html>
+""" % (item["id"], item["id"],
+       generate_ddl(output_dir, ddl_file),
+       Reproduce.reverse_mapping[reproducer],
+       item["reproducer"] )
+
+        filename = "reproduce%s.html" % (item["id"])
+        fd = open(os.path.join(output_dir, filename), "w")
+        fd.write(reproducer_html.encode("utf-8"))
+        fd.close()
+        result = '<p><a href="%s">%s</a></p>' % (filename, 'For Steps to Reproduce, Click Here')
+    return result
+
 def generate_modified_query(cmpdb, sql, modified_sql):
     result = ''
     mod_sql = modified_sql.get(sql.rstrip(';'), None)
@@ -81,7 +154,7 @@ def generate_modified_query(cmpdb, sql, modified_sql):
         result = '<p>Modified SQL query, as sent to ' + str(cmpdb) + ':</p><h2>' + str(mod_sql) + '</h2>'
     return result
 
-def generate_detail(name, item, output_dir, cmpdb, modified_sql):
+def generate_detail(name, item, output_dir, cmpdb, modified_sql, reproducer, ddl_file):
     if output_dir == None:
         return
 
@@ -96,6 +169,7 @@ td {width: 50%%}
 
 <body>
 <h2>%s</h2>
+%s
 %s
 <table cellpadding=3 cellspacing=1 border=1>
 <tr>
@@ -121,6 +195,7 @@ td {width: 50%%}
 """ % (cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'),
        cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'),
        generate_modified_query(cmpdb, cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'), modified_sql),
+       generate_reproducer(item, output_dir, reproducer, ddl_file),
        cmpdb,
        highlight(item["jni"]["Status"], "Status" == item.get("highlight")),
        highlight(item["cmp"]["Status"], "Status" == item.get("highlight")),
@@ -140,7 +215,7 @@ def safe_print(s):
     if not __quiet:
         print s
 
-def print_section(name, mismatches, output_dir, cmpdb, modified_sql):
+def print_section(name, mismatches, output_dir, cmpdb, modified_sql, reproducer, ddl_file):
     result = """
 <h2>%s: %d</h2>
 <table cellpadding=3 cellspacing=1 border=1>
@@ -155,7 +230,7 @@ def print_section(name, mismatches, output_dir, cmpdb, modified_sql):
     temp = []
     for i in mismatches:
         safe_print(i["SQL"])
-        detail_page = generate_detail(name, i, output_dir, cmpdb, modified_sql)
+        detail_page = generate_detail(name, i, output_dir, cmpdb, modified_sql, reproducer, ddl_file)
         jniStatus = i["jni"]["Status"]
         if jniStatus < 0:
             jniStatus = "Error: " + `jniStatus`
@@ -313,10 +388,20 @@ Generates HTML reports based on the given report files. The generated reports
 contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
+def get_reproducer(reproduce_results, sql):
+    result = ";<br>\n".join(reproduce_results)
+    if reproduce_results:
+        result += ";<br>\n"
+    if not reproduce_results or sql != reproduce_results[len(reproduce_results)-1]:
+        result += sql + ";\n"
+    return result
+
 def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
                           output_dir, report_invalid, report_all, extra_stats='',
                           cmpdb='HSqlDB', modified_sql_path=None,
-                          max_mismatches=0, within_minutes=0, cntonly=False):
+                          max_mismatches=0, within_minutes=0,
+                          reproducer=Reproduce.NONE, ddl_file=None,
+                          cntonly=False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -336,51 +421,64 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     cmpdb_npes  = []
     invalid     = []
     all_results = []
+    reproduce_results = []
 
-    try:
-        while True:
-            try:
-                statement = cPickle.load(statements_file)
-                # print "DEBUG loaded statement ", statement
-            except EOFError:
-                break
+    while True:
+        try:
+            statement = cPickle.load(statements_file)
+            # print "DEBUG loaded statement ", statement
+        except EOFError:
+            break
 
-            notFound = False
-            try:
-                jni = cPickle.load(jni_file)
-            except EOFError as e:
-                notFound = True
-                jni = {'Status': -99, 'Exception': 'None', 'Result': None,
-                       'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a VoltDB crash!</p>'}
-            try:
-                cdb = cPickle.load(cmpdb_file)
-            except EOFError as e:
-                notFound = True
-                cdb = {'Status': -98, 'Exception': 'None', 'Result': None,
-                       'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a ' + cmpdb + ' backend crash!</p>'}
+        notFound = False
+        try:
+            jni = cPickle.load(jni_file)
+        except EOFError as e:
+            notFound = True
+            jni = {'Status': -99, 'Exception': 'None', 'Result': None,
+                   'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a VoltDB crash!</p>'}
+        try:
+            cdb = cPickle.load(cmpdb_file)
+        except EOFError as e:
+            notFound = True
+            cdb = {'Status': -98, 'Exception': 'None', 'Result': None,
+                   'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a ' + cmpdb + ' backend crash!</p>'}
 
-            count += 1
-            if int(jni["Status"]) != 1:
-                failures += 1
-                if report_invalid:
-                    invalid.append(statement)
+        count += 1
+        if int(jni["Status"]) != 1:
+            failures += 1
+            if report_invalid:
+                invalid.append(statement)
 
-            statement["jni"] = jni
-            statement["cmp"] = cdb
+        statement["jni"] = jni
+        statement["cmp"] = cdb
 
-            if notFound:
-                crashed.append(statement)
-            elif is_different(statement, cntonly, within_minutes):
-                mismatches.append(statement)
-            if ('NullPointerException' in str(jni)):
-                voltdb_npes.append(statement)
-            if ('NullPointerException' in str(cdb)):
-                cmpdb_npes.append(statement)
-            if report_all:
-                all_results.append(statement)
+        if reproducer and (
+            any(str(statement["SQL"].lstrip()[:12]).upper().startswith(statementType)
+                for statementType in ReproduceStatementTypes[reproducer]) ):
+            reproduce_results.append(statement["SQL"])
 
-    except EOFError as e:
-        raise IOError("Not enough results for generated statements: %s" % str(e))
+        if notFound:
+            if reproducer:
+                statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
+                # No point in adding additional steps to reproduce, after a crash
+                reproducer = Reproduce.NONE
+            crashed.append(statement)
+        elif is_different(statement, cntonly, within_minutes):
+            if reproducer:
+                statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
+            mismatches.append(statement)
+
+        if ('NullPointerException' in str(jni)):
+            if reproducer:
+                statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
+            voltdb_npes.append(statement)
+        if ('NullPointerException' in str(cdb)):
+            if reproducer:
+                statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
+            cmpdb_npes.append(statement)
+        if report_all:
+            all_results.append(statement)
 
     statements_file.close()
     cmpdb_file.close()
@@ -434,25 +532,31 @@ h2 {text-transform: uppercase}
         return int(x["id"])
     if(len(mismatches) > 0):
         sorted(mismatches, cmp=cmp, key=key)
-        report += print_section("Mismatched Statements", mismatches, output_dir, cmpdb, modified_sql)
+        report += print_section("Mismatched Statements",
+                                mismatches,  output_dir, cmpdb, modified_sql, reproducer, ddl_file)
 
     if(len(crashed) > 0):
         sorted(crashed, cmp=cmp, key=key)
-        report += print_section("Statements Missing Results, due to a Crash<br>(the first one probably caused the crash)", crashed, output_dir, cmpdb, modified_sql)
+        report += print_section("Statements Missing Results, due to a Crash<br>(the first one probably caused the crash)",
+                                crashed,     output_dir, cmpdb, modified_sql, reproducer, ddl_file)
 
     if(len(voltdb_npes) > 0):
         sorted(voltdb_npes, cmp=cmp, key=key)
-        report += print_section("Statements That Cause a NullPointerException (NPE) in VoltDB", voltdb_npes, output_dir, cmpdb, modified_sql)
+        report += print_section("Statements That Cause a NullPointerException (NPE) in VoltDB",
+                                voltdb_npes, output_dir, cmpdb, modified_sql, reproducer, ddl_file)
 
     if(len(cmpdb_npes) > 0):
         sorted(cmpdb_npes, cmp=cmp, key=key)
-        report += print_section("Statements That Cause a NullPointerException (NPE) in " + cmpdb, cmpdb_npes, output_dir, cmpdb, modified_sql)
+        report += print_section("Statements That Cause a NullPointerException (NPE) in " + cmpdb,
+                                cmpdb_npes,  output_dir, cmpdb, modified_sql, reproducer, ddl_file)
 
     if report_invalid and (len(invalid) > 0):
-        report += print_section("Invalid Statements", invalid, output_dir, cmpdb, modified_sql)
+        report += print_section("Invalid Statements",
+                                invalid,     output_dir, cmpdb, modified_sql, reproducer, ddl_file)
 
     if report_all:
-        report += print_section("Total Statements", all_results, output_dir, cmpdb, modified_sql)
+        report += print_section("Total Statements",
+                                all_results, output_dir, cmpdb, modified_sql, reproducer, ddl_file)
 
     report += """
 </body>

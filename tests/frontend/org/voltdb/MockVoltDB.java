@@ -96,6 +96,7 @@ public class MockVoltDB implements VoltDBInterface
             new HashMap<>();
     private boolean m_replicationActive = false;
     private CommandLog m_cl = null;
+    private int m_kfactor;
 
     public MockVoltDB() {
         this(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT, -1, VoltDB.DEFAULT_DR_PORT);
@@ -869,5 +870,14 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public int getLowestPartitionId() {
         return 0;
+    }
+
+    @Override
+    public int getKFactor() {
+        return m_kfactor;
+    }
+
+    public void setKFactor(int kfactor) {
+        m_kfactor = kfactor;
     }
 }

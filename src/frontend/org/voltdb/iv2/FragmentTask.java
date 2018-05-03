@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
@@ -49,11 +48,8 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
 
-public class FragmentTask extends TransactionTask
+public class FragmentTask extends FragmentTaskBase
 {
-    /** java.util.logging logger. */
-    private static final VoltLogger LOG = new VoltLogger("HOST");
-
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     final Map<Integer, List<VoltTable>> m_inputDeps;
@@ -214,6 +210,9 @@ public class FragmentTask extends TransactionTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("START replaying txn: " + this);
+        }
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
@@ -226,6 +225,9 @@ public class FragmentTask extends TransactionTask
         // ignore response.
         processFragmentTask(siteConnection);
         completeFragment();
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE replaying txn: " + this);
+        }
     }
 
     private void completeFragment()
@@ -355,7 +357,7 @@ public class FragmentTask extends TransactionTask
                     // get a copy of the buffer
                     fragResult.readFully(fullBacking);
                 } catch (final IOException ex) {
-                    LOG.error("Failed to deserialze result table" + ex);
+                    hostLog.error("Failed to deserialze result table" + ex);
                     throw new EEException(ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
                 }
 
@@ -444,6 +446,21 @@ public class FragmentTask extends TransactionTask
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        sb.append("  TIMESTAMP: ");
+        MpRestartSequenceGenerator.restartSeqIdToString(getTimestamp(), sb);
         return sb.toString();
+    }
+
+    public boolean needCoordination() {
+        return !(m_txnState.isReadOnly() || isBorrowedTask() || m_isNPartition);
+    }
+
+    public boolean isBorrowedTask() {
+        return false;
+    }
+
+    @Override
+    public long getTimestamp() {
+        return m_fragmentMsg.getTimestamp();
     }
 }

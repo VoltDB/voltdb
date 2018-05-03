@@ -46,10 +46,10 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.Maps;
-import org.voltdb.utils.VoltTrace;
 
 public class MpTransactionState extends TransactionState
 {
@@ -177,6 +177,9 @@ public class MpTransactionState extends TransactionState
                 task.setStateForDurability((Iv2InitiateTaskMessage) getNotice(), m_masterHSIds.keySet());
             }
 
+            if (m_isRestart) {
+                task.setTimestamp(m_restartTimestamp);
+            }
             m_remoteWork = task;
             m_remoteWork.setTruncationHandle(m_initiationMsg.getTruncationHandle());
             // Distribute fragments to remote destinations.
@@ -238,6 +241,7 @@ public class MpTransactionState extends TransactionState
                     m_localWork.isReadOnly(),
                     false,
                     false);
+            m_remoteWork.setTimestamp(m_restartTimestamp);
             m_remoteWork.setEmptyForRestart(getNextDependencyId());
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
                 m_haveDistributedInitTask = true;
