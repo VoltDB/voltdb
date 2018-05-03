@@ -130,7 +130,7 @@ public class TransactionTaskQueue
 
         boolean hasMissingTxn(long txnId) {
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
-                if (m_stashedMpScoreboards[ii].isTransactionMissing(ii)) {
+                if (m_stashedMpScoreboards[ii].isTransactionMissing(txnId)) {
                     return true;
                 }
             }
