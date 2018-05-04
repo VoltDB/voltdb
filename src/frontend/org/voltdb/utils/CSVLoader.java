@@ -288,7 +288,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         @Option(desc = "password to use when connecting to servers")
         String password = "";
-        
+
         @Option(desc = "credentials that contains username and password information")
         String credentials = "";
 
@@ -460,7 +460,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         // read username and password from txt file
         if (config.credentials.length() > 0) {
-        	try {
+            try {
                 fr = new FileReader(config.credentials);
                 br = new BufferedReader(fr);
                 String content = "";
@@ -488,7 +488,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 }
             }
         }
-        
+
         // If we need to prompt the user for a password, do so.
         config.password = CLIConfig.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
 
