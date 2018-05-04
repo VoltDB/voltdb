@@ -230,13 +230,20 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         assert(receive.getChildCount() == 1);
         AbstractPlanNode partitionRoot = receive.getChild(0);
         if (!partitionRoot.isOutputOrdered(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections())) {
-            // Partition results are not ordered. If the coordinator fragment is trivial and does not have
-            // LIMIT/OFFSET node the ORDER BY plan node can be pushed down to make the Partition results ordered
-            if (hasTrivialCoordinatorFragment(orderbyNode.getChild(0)) &&
-                    orderbyNode.getInlinePlanNode(PlanNodeType.LIMIT) == null) {
+            // Partition results are not ordered. The MERGE RECEIVE optimization is still possible if
+            //  - the coordinator's plan below the ORDER BY node is trivial. At the moment only RECEIVE node is allowed.
+            //    A future enhancement may allow PROJECTION/RECEIVE
+            //  - Coordinator's ORDER BY node does not have inline LIMIT/OFFSET node. If a plan has an ORDER BY and
+            // LIMIT/OFFSET nodes, PlanAssembeler tries to push both of them to a partition fragment
+            // as LIMIT pushed down optimization during the regular planning phase (PlanAssembler.handleSelectLimitOperator).
+            // If it succeeds, the partition's output would be ordered and we wouldn't get there.
+            // If we get there and ODER BY node does have inline LIMIT it means that the PlanAssembler
+            // fails to apply the original optimization and we also can not do it here.
+            // For example, an OFFSET without a LIMIT can not be pushed down.
+            if (isOptimizationPossible(orderbyNode)) {
                 // Build fragment's ORDER BY plan node
                 OrderByPlanNode fragmentOrderbyNode = new OrderByPlanNode();
-                fragmentOrderbyNode.addSort(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections());
+                fragmentOrderbyNode.addSortExpressions(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections());
                 for(Map.Entry<PlanNodeType, AbstractPlanNode> inlineEntry : orderbyNode.getInlinePlanNodes().entrySet()) {
                     fragmentOrderbyNode.addInlinePlanNode(inlineEntry.getValue());
                 }
@@ -336,10 +343,14 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         return aggregateNode;
     }
 
-    // For the time being coordinator fragment is considered to be trivial if it consists of
-    // only RECEIVE plan node
-    private boolean hasTrivialCoordinatorFragment(AbstractPlanNode planNode) {
-        PlanNodeType planNodeType = planNode.getPlanNodeType();
+    private boolean isOptimizationPossible(OrderByPlanNode orderPlanNode) {
+        assert(orderPlanNode.getChildCount() == 1);
+        // No inline LIMIT/OFFSET
+        if (orderPlanNode.getInlinePlanNode(PlanNodeType.LIMIT) != null) {
+            return false;
+        }
+        // For the time being, the optimization is possible only if ORDER node's child is a RECEIVE node
+        PlanNodeType planNodeType = orderPlanNode.getChild(0).getPlanNodeType();
         return PlanNodeType.RECEIVE == planNodeType;
     }
 }
