@@ -38,6 +38,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.BoxedByteArrays;
@@ -3086,6 +3087,47 @@ public class TestFixedSQLSuite extends RegressionSuite {
                                        "       j varchar(32),\n" +
                                        "       primary key (i)\n" +
                                        ");");
+    }
+
+    public void testEng13852() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+
+        assertSuccessfulDML(client,
+                "insert into ENG_13852_P5 values ( \n" +
+                "        0, \n" +
+                "        1, 10, 100, 1000,\n" +
+                "        1.0, 2.0,\n" +
+                "        'foo', 'bar', 'baz', 'boo', 'bugs',\n" +
+                "        now,\n" +
+                "        x'ab',\n" +
+                "        pointfromtext('point(0 0)'), -- point\n" +
+                "        null, -- polygon\n" +
+                "        null, null, null, x'ab')");
+        assertSuccessfulDML(client, "insert into ENG_13852_R11 values (\n" +
+                "        0,\n" +
+                "        1, 10, 100, 1000,\n" +
+                "        1.0, 2.0,\n" +
+                "        'foo', 'bar', 'baz', 'boo', 'bugs',\n" +
+                "        now,\n" +
+                "        x'ab',\n" +
+                "        pointfromtext('point(0 0)'), -- point\n" +
+                "        null, -- polygon\n" +
+                "        null, null, null, x'ab')");
+
+        // In this bug, we didn't properly apply the "MV fix", that is,
+        // the aggregation node that must be in the plan when a view aggregates
+        // table, but the partition key is not a GROUP BY key.
+        // This bug happens when there is a derived table and a view that needs the fix.
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "SELECT ALL R11.POINT AS CA2\n" +
+                "FROM (SELECT DISTINCT * FROM ENG_13852_R11 LIMIT 12) AS R11,\n" +
+                "     ENG_13852_VP5 AS TA1;").getResults()[0];
+        GeographyPointValue gpv = GeographyPointValue.fromWKT("point (0 0)");
+        assertContentOfTable(new Object[][] {{gpv}}, vt);
     }
 
     //
