@@ -70,17 +70,17 @@ public class TestScoreboard {
         CompleteTransactionTask comp2 = createComp(1000L, expectedTimestamp);
         scoreboard.addCompletedTransactionTask(comp2, false);
 
-        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getFirst().getMsgTxnId());
-        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
+        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getMsgTxnId());
+        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getTimestamp());
 
         // Message from different transaction can't step on each other
         CompleteTransactionTask comp3 = createComp(2000L, CompleteTransactionMessage.INITIAL_TIMESTAMP);
         scoreboard.addCompletedTransactionTask(comp3, false);
 
-        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getFirst().getMsgTxnId());
-        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
-        assertEquals(2000L, scoreboard.getCompletionTasks().peekLast().getFirst().getMsgTxnId());
-        assertEquals(CompleteTransactionMessage.INITIAL_TIMESTAMP, scoreboard.getCompletionTasks().peekLast().getFirst().getTimestamp());
+        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getMsgTxnId());
+        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getTimestamp());
+        assertEquals(2000L, scoreboard.getCompletionTasks().peekLast().getMsgTxnId());
+        assertEquals(CompleteTransactionMessage.INITIAL_TIMESTAMP, scoreboard.getCompletionTasks().peekLast().getTimestamp());
     }
 
     @Test
@@ -97,10 +97,10 @@ public class TestScoreboard {
         CompleteTransactionTask comp2 = createComp(2000L, restartTimestamp);
         scoreboard.addCompletedTransactionTask(comp2, false);
 
-        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getFirst().getMsgTxnId());
-        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
-        assertEquals(2000L, scoreboard.getCompletionTasks().peekLast().getFirst().getMsgTxnId());
-        assertEquals(restartTimestamp, scoreboard.getCompletionTasks().peekLast().getFirst().getTimestamp());
+        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getMsgTxnId());
+        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getTimestamp());
+        assertEquals(2000L, scoreboard.getCompletionTasks().peekLast().getMsgTxnId());
+        assertEquals(restartTimestamp, scoreboard.getCompletionTasks().peekLast().getTimestamp());
     }
 
     @Test
@@ -117,8 +117,8 @@ public class TestScoreboard {
         CompleteTransactionTask comp2 = createComp(1000L, CompleteTransactionMessage.INITIAL_TIMESTAMP);
         scoreboard.addCompletedTransactionTask(comp2, false);
 
-        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getFirst().getMsgTxnId());
-        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
+        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getMsgTxnId());
+        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getTimestamp());
         assertEquals(1, scoreboard.getCompletionTasks().size());
 
         long restartTimestamp = restartGen.getNextSeqNum();
@@ -128,10 +128,10 @@ public class TestScoreboard {
         // stale initial completion doesn't overwrite restart completion
         scoreboard.addCompletedTransactionTask(comp2, false);
 
-        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getFirst().getMsgTxnId());
-        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
-        assertEquals(2000L, scoreboard.getCompletionTasks().peekLast().getFirst().getMsgTxnId());
-        assertEquals(restartTimestamp, scoreboard.getCompletionTasks().peekLast().getFirst().getTimestamp());
+        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getMsgTxnId());
+        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getTimestamp());
+        assertEquals(2000L, scoreboard.getCompletionTasks().peekLast().getMsgTxnId());
+        assertEquals(restartTimestamp, scoreboard.getCompletionTasks().peekLast().getTimestamp());
     }
 
     @Test
@@ -148,10 +148,10 @@ public class TestScoreboard {
         CompleteTransactionTask comp2 = createComp(1000L, expectedTimestamp);
         scoreboard.addCompletedTransactionTask(comp2, false);
 
-        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getFirst().getMsgTxnId());
-        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
-        assertEquals(2000L, scoreboard.getCompletionTasks().peekLast().getFirst().getMsgTxnId());
-        assertEquals(restartTimestamp, scoreboard.getCompletionTasks().peekLast().getFirst().getTimestamp());
+        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getMsgTxnId());
+        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getTimestamp());
+        assertEquals(2000L, scoreboard.getCompletionTasks().peekLast().getMsgTxnId());
+        assertEquals(restartTimestamp, scoreboard.getCompletionTasks().peekLast().getTimestamp());
     }
 
     @Test
@@ -166,8 +166,8 @@ public class TestScoreboard {
         CompleteTransactionTask comp2 = createComp(1000L, expectedTimestamp);
         scoreboard.addCompletedTransactionTask(comp2, true);
 
-        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getFirst().getMsgTxnId());
-        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
+        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getMsgTxnId());
+        assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getTimestamp());
         assertEquals(1, scoreboard.getCompletionTasks().size());
     }
 }
