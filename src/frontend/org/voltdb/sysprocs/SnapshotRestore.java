@@ -2819,7 +2819,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             pf.outputDepId,
                             pf.parameters,
                             false,
-                            m_runner.getTxnState().isForReplay());
+                            m_runner.getTxnState().isForReplay(),
+                            (short)0);
             m.send(pf.siteId, ftm);
         }
 

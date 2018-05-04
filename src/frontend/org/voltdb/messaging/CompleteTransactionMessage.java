@@ -30,6 +30,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_isRollback;
     boolean m_requiresAck;
     boolean m_rollbackForFault;
+    short m_nPartCount;
     long m_timestamp = INITIAL_TIMESTAMP;
 
     int m_hash;
@@ -73,10 +74,12 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId,
                                       long txnId, boolean isReadOnly, int hash,
                                       boolean isRollback, boolean requiresAck,
-                                      boolean isRestart, boolean isForReplay)
+                                      boolean isRestart, boolean isForReplay,
+                                      short nPartCount)
     {
         super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, isForReplay);
         m_hash = hash;
+        m_nPartCount = nPartCount;
         setBit(ISROLLBACK, isRollback);
         setBit(REQUIRESACK, requiresAck);
         setBit(ISRESTART, isRestart);
@@ -112,6 +115,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(REQUIRESACK, requireAck);
     }
 
+    public boolean needsCoordination() {
+        return m_nPartCount == 0 && !isReadOnly();
+    }
+
     // This is used when MP txn is restarted.
     public void setTimestamp(long timestamp) {
         m_timestamp = timestamp;
@@ -125,7 +132,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4 + 4 + 8;
+        msgsize += 4 + 4 + 2 + 8;
         return msgsize;
     }
 
@@ -136,6 +143,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.flattenToBuffer(buf);
         buf.putInt(m_hash);
         buf.putInt(m_flags);
+        buf.putShort(m_nPartCount);
         buf.putLong(m_timestamp);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -147,6 +155,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.initFromBuffer(buf);
         m_hash = buf.getInt();
         m_flags = buf.getInt();
+        m_nPartCount = buf.getShort();
         m_timestamp = buf.getLong();
         assert(buf.capacity() == buf.position());
     }
@@ -162,6 +171,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("\n SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
+
+        if (m_nPartCount != 0)
+            sb.append("\n  ").append(m_nPartCount).append(" part TXN");
+
         sb.append("\n  TIMESTAMP: ");
         MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
         sb.append("\n  TRUNCATION HANDLE:" + TxnEgo.txnIdToString(getTruncationHandle()));

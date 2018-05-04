@@ -210,7 +210,7 @@ public class CompleteTransactionTask extends TransactionTask
     }
 
     public boolean needCoordination() {
-        return !m_txnState.isReadOnly();
+        return m_completeMsg.needsCoordination();
     }
 
     public CompleteTransactionMessage getCompleteMessage() {

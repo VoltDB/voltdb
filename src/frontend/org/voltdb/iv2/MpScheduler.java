@@ -469,7 +469,8 @@ public class MpScheduler extends Scheduler
                 m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
                 m_repairLogAwaitingCommit = message.getTxnId();
             }
-            m_outstandingTxns.remove(message.getTxnId());
+            MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
+            assert(txn != null);
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
             // We actually completed this MP transaction.  Create a fake CompleteTransactionMessage
@@ -477,7 +478,7 @@ public class MpScheduler extends Scheduler
             // even if all the masters somehow die before forwarding Complete on to their replicas.
             CompleteTransactionMessage ctm = new CompleteTransactionMessage(m_mailbox.getHSId(),
                     message.m_sourceHSId, message.getTxnId(), message.isReadOnly(), 0,
-                    !message.shouldCommit(), false, false, false);
+                    !message.shouldCommit(), false, false, false, txn.getNPartCount());
             ctm.setTruncationHandle(m_repairLogTruncationHandle);
             // dump it in the repair log
             // hacky castage

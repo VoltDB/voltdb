@@ -161,7 +161,8 @@ public class MpProcedureTask extends ProcedureTask
                     true,
                     false,  // really don't want to have ack the ack.
                     !m_txnState.isReadOnly(),
-                    m_msg.isForReplay());
+                    m_msg.isForReplay(),
+                    txn.getNPartCount());
             // TransactionTaskQueue uses it to find matching CompleteTransactionMessage
             long ts = m_restartSeqGenerator.getNextSeqNum();
             restart.setTimestamp(ts);
@@ -251,6 +252,7 @@ public class MpProcedureTask extends ProcedureTask
                                                  "commit", Boolean.toString(!m_txnState.needsRollback()),
                                                  "dest", CoreUtils.hsIdCollectionToString(m_initiatorHSIds)));
         }
+        MpTransactionState txn = (MpTransactionState)m_txnState;
 
         // Only send completions for MP transactions that have processed at least one fragment
         CompleteTransactionMessage complete = new CompleteTransactionMessage(
@@ -262,14 +264,15 @@ public class MpProcedureTask extends ProcedureTask
                 m_txnState.needsRollback(),
                 false,  // really don't want to have ack the ack.
                 false,
-                m_msg.isForReplay());
+                m_msg.isForReplay(),
+                txn.getNPartCount());
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
 
         //If there are misrouted fragments, send message to current masters.
         final List<Long> initiatorHSIds = new ArrayList<Long>();
-        if (((MpTransactionState)m_txnState).isFragmentRestarted()) {
-            initiatorHSIds.addAll(((MpTransactionState)m_txnState).getMasterHSIDs());
+        if (txn.isFragmentRestarted()) {
+            initiatorHSIds.addAll(txn.getMasterHSIDs());
         } else {
             initiatorHSIds.addAll(m_initiatorHSIds);
         }

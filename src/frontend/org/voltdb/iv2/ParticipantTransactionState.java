@@ -29,7 +29,7 @@ public class ParticipantTransactionState extends TransactionState
     ParticipantTransactionState(long txnId, FragmentTaskMessage notice)
     {
         super(null, notice);
-        m_npTransaction = notice.getInitiateTask().isN_Partition();
+        m_npTransaction = notice.getNPartCount() != 0;
     }
 
     /**

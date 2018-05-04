@@ -240,7 +240,8 @@ public class MpTransactionState extends TransactionState
                     m_localWork.getUniqueId(),
                     m_localWork.isReadOnly(),
                     false,
-                    false);
+                    false,
+                    m_initiationMsg.getNPartCount());
             m_remoteWork.setTimestamp(m_restartTimestamp);
             m_remoteWork.setEmptyForRestart(getNextDependencyId());
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
@@ -523,7 +524,8 @@ public class MpTransactionState extends TransactionState
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("Aborting transaction: " + TxnEgo.txnIdToString(txnId));
         }
-        FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+        FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false,
+                m_initiationMsg.getNPartCount());
         FragmentResponseMessage poison = new FragmentResponseMessage(dummy, 0L);
         TransactionTerminationException termination = new TransactionTerminationException(
                 "Transaction interrupted.", txnId);
@@ -540,5 +542,9 @@ public class MpTransactionState extends TransactionState
         Preconditions.checkArgument(m_masterHSIds.values().containsAll(m_useHSIds) &&
                                     m_useHSIds.containsAll(m_masterHSIds.values()));
         return m_masterHSIds.get(partition);
+    }
+
+    public short getNPartCount() {
+        return m_initiationMsg.getNPartCount();
     }
 }

@@ -88,11 +88,9 @@ public class TestTransactionTaskQueue extends TestCase
                                     boolean forReplay)
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
-        Iv2InitiateTaskMessage itMsg = mock(Iv2InitiateTaskMessage.class);
-        when(itMsg.isN_Partition()).thenReturn(false);
+        when(msg.getNPartCount()).thenReturn((short)0);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         when(msg.isForReplay()).thenReturn(forReplay);
-        when(msg.getInitiateTask()).thenReturn(itMsg);
         when(msg.getTimestamp()).thenReturn(restartTimestamp);
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         when(mbox.getHSId()).thenReturn(1337l);
