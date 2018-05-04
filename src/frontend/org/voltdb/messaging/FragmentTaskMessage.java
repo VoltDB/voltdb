@@ -509,7 +509,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                       Collection<Integer> involvedPartitions) {
         m_initiateTask = initiateTask;
         m_involvedPartitions = ImmutableSet.copyOf(involvedPartitions);
-        assert(m_involvedPartitions.size() == m_nPartCount);
+        assert(m_nPartCount == 0 || m_involvedPartitions.size() == m_nPartCount);
         // this function may be called for the same instance twice, with slightly different
         // but same size initiateTask. The second call is intended to update the spHandle in
         // the initiateTask to a new value and update the corresponding buffer, therefore it
