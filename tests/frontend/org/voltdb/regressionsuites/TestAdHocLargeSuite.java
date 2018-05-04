@@ -117,12 +117,82 @@ public class TestAdHocLargeSuite extends RegressionSuite {
         verifyProcFails(client, "More than 25 MB of temp table memory used while executing SQL",
                 "@AdHoc", query);
 
+        // Variant of test query with an ORDER BY clause, which exercises large temp table sorting.
+        String orderByLimitQuery =
+                "select theval1 || '--' || theval2 as vals "
+              + "from (select t1.i,  t1.inl_vc00,  t1.inl_vc01 as t1_inl_vc01,  t1.longval as theval1, "
+              +  "            t2.i,  t2.inl_vc00,  t2.inl_vc01,                 t2.longval as theval2 "
+              + "      from t as t1, t  as t2) as dtbl "
+              + "order by vals "
+              + "limit 5";
+        cr = client.callProcedure("@AdHocLarge", orderByLimitQuery);
+        assertContentOfTable(new Object[][] {
+            {"long 0--long 0"},
+            {"long 0--long 1"},
+            {"long 0--long 10"},
+            {"long 0--long 100"},
+            {"long 0--long 101"}
+        }, cr.getResults()[0]);
+
+        // Same as above but use OFFSET
+        String orderByLimitOffsetQuery =
+                "select theval1 || '--' || theval2 as vals "
+              + "from (select t1.i,  t1.inl_vc00,  t1.inl_vc01 as t1_inl_vc01,  t1.longval as theval1, "
+              +  "            t2.i,  t2.inl_vc00,  t2.inl_vc01,                 t2.longval as theval2 "
+              + "      from t as t1, t  as t2) as dtbl "
+              + "order by vals "
+              + "limit 5 "
+              + "offset 5 ";
+        cr = client.callProcedure("@AdHocLarge", orderByLimitOffsetQuery);
+        assertContentOfTable(new Object[][] {
+            {"long 0--long 102"},
+            {"long 0--long 103"},
+            {"long 0--long 104"},
+            {"long 0--long 105"},
+            {"long 0--long 106"},
+        }, cr.getResults()[0]);
+
+        // Select the last 5 rows, using OFFSET, with no limit
+        String orderByOffsetQuery =
+                "select theval1 || '--' || theval2 as vals "
+                        + "from (select t1.i,  t1.inl_vc00,  t1.inl_vc01 as t1_inl_vc01,  t1.longval as theval1, "
+                        +  "            t2.i,  t2.inl_vc00,  t2.inl_vc01,                 t2.longval as theval2 "
+                        + "      from t as t1, t  as t2) as dtbl "
+                        + "order by vals "
+                        + "offset 249995 ";
+        cr = client.callProcedure("@AdHocLarge", orderByOffsetQuery);
+        assertContentOfTable(new Object[][] {
+            {"long 99--long 95"},
+            {"long 99--long 96"},
+            {"long 99--long 97"},
+            {"long 99--long 98"},
+            {"long 99--long 99"},
+        }, cr.getResults()[0]);
+
         // Delete some rows
         validateTableOfScalarLongs(client, "delete from t where i >= 5", new long[] {NUM_ROWS - 5});
 
         // Query can now execute as normal.
         cr = client.callProcedure("@AdHoc", query);
         assertContentOfTable(new Object[][] {{25, "long 4", "long 0", "short 4"}}, cr.getResults()[0]);
+
+        // Test large temp table sorting using ORDER BY by itself
+        String orderByQuery =
+                "select theval1 || '--' || theval2 as vals "
+              + "from (select t1.i,  t1.inl_vc00,  t1.inl_vc01 as t1_inl_vc01,  t1.longval as theval1, "
+              +  "            t2.i,  t2.inl_vc00,  t2.inl_vc01,                 t2.longval as theval2 "
+              + "      from t as t1, t as t2 "
+              + "      where mod(t1.i, 3) = 0 "
+              + "          and mod(t2.i, 3) = 0) as dtbl "
+              + "order by vals desc ";
+        cr = client.callProcedure("@AdHocLarge", orderByQuery);
+        System.out.println(cr.getResults()[0]);
+        assertContentOfTable(new Object[][] {
+            {"long 3--long 3"},
+            {"long 3--long 0"},
+            {"long 0--long 3"},
+            {"long 0--long 0"}
+        }, cr.getResults()[0]);
     }
 
     static public junit.framework.Test suite() throws Exception {

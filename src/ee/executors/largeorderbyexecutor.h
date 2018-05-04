@@ -43,16 +43,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREEXECUTORFACTORY_H
-#define HSTOREEXECUTORFACTORY_H
+#ifndef EE_EXECUTORS_LARGEORDERBYEXECUTOR_H
+#define EE_EXECUTORS_LARGEORDERBYEXECUTOR_H
+
+#include "common/common.h"
+#include "executors/abstractexecutor.h"
 
 namespace voltdb {
 
-class AbstractExecutor;
-class AbstractPlanNode;
-class VoltDBEngine;
+class LimitPlanNode;
 
-AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node, bool isLargeQueryx);
+class LargeOrderByExecutor : public AbstractExecutor {
+public:
+    LargeOrderByExecutor(VoltDBEngine *engine,
+                         AbstractPlanNode* planNode)
+        : AbstractExecutor(engine, planNode)
+        , m_limitPlanNode(NULL)
+    {
+    }
+
+    ~LargeOrderByExecutor();
+
+protected:
+    bool p_init(AbstractPlanNode* abstract_node,
+                const ExecutorVector& executorVector);
+
+    bool p_execute(const NValueArray &params);
+
+private:
+
+    LimitPlanNode *m_limitPlanNode;
+};
+
 }
 
-#endif
+#endif // EE_EXECUTORS_LARGEORDERBYEXECUTOR_H
