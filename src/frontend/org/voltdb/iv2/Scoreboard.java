@@ -81,7 +81,7 @@ public class Scoreboard {
             Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();
             Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.peekLast();
             // scorebaord can take completions from two transactions at most
-            assert (task.getMsgTxnId() != head.getFirst().getMsgTxnId() && task.getMsgTxnId() != tail.getFirst().getMsgTxnId());
+            assert (task.getMsgTxnId() == head.getFirst().getMsgTxnId() || task.getMsgTxnId() == tail.getFirst().getMsgTxnId());
 
             // Keep newer completion, discard the older one
             if ( task.getTimestamp() > head.getFirst().getTimestamp() && isComparable(head.getFirst(), task)) {

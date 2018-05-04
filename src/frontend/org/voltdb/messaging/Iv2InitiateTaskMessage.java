@@ -164,8 +164,8 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_isSinglePartition;
     }
 
-    public boolean isN_Partition() {
-        return m_nPartitions != null;
+    public short getNPartCount() {
+        return (short)(m_nPartitions != null ? m_nPartitions.length : 0);
     }
 
     public boolean shouldReturnResultTables() {
@@ -305,6 +305,9 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             sb.append("  WRITE, ");
         if (m_isSinglePartition)
             sb.append("SINGLE PARTITION, ");
+        else
+        if (getNPartCount() != 0)
+            sb.append("N PARTITION (").append(m_nPartitions).append("), ");
         else
             sb.append("MULTI PARTITION, ");
         if (isForReplay())
