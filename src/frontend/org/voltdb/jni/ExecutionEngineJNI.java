@@ -843,24 +843,25 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     /**
      * Store a large temp table block to disk.
      *
-     * @param id           The id of the block to store to disk
-     * @param origAddress  The original address of the block
+     * @param siteId       The site id of the block to store to disk
+     * @param blockCounter The serial number of the block to store to disk
      * @param block        A directly-allocated ByteBuffer of the block
      * @return true if operation succeeded, false otherwise
      */
-    public boolean storeLargeTempTableBlock(long siteId, long blockCounter, long origAddress, ByteBuffer block) {
+    public boolean storeLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
         assert (lbm != null);
+        boolean success = true;
 
         try {
-            lbm.storeBlock(new BlockId(siteId, blockCounter), origAddress, block);
+            lbm.storeBlock(new BlockId(siteId, blockCounter), block);
         }
         catch (IOException ioe) {
             LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
-            return false;
+            success = false;
         }
 
-        return true;
+        return success;
     }
 
     /**
@@ -871,40 +872,43 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param block  The buffer to write the block to
      * @return The original address of the block (so that its internal pointers may get updated)
      */
-    public long loadLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
+    public boolean loadLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
         assert (lbm != null);
-        long origAddress = 0;
+        boolean success = true;
 
         try {
-            origAddress = lbm.loadBlock(new BlockId(siteId, blockCounter), block);
+            lbm.loadBlock(new BlockId(siteId, blockCounter), block);
         }
         catch (IOException ioe) {
             LOG.error("Could not write large temp table block to disk: " + ioe.getMessage());
+            success = false;
         }
 
-        return origAddress;
+        return success;
     }
 
     /**
      * Delete the block with the given id from disk.
      *
-     * @param blockId   The id of the block to release
+     * @param siteId        The site id of the block to release
+     * @param blockCounter  The serial number of the block to release
      * @return True if the operation succeeded, and false otherwise
      */
-    public boolean releaseLargeTempTableBlock(long siteId, long blockId) {
+    public boolean releaseLargeTempTableBlock(long siteId, long blockCounter) {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
         assert (lbm != null);
+        boolean success = true;
 
         try {
-            lbm.releaseBlock(new BlockId(siteId, blockId));
+            lbm.releaseBlock(new BlockId(siteId, blockCounter));
         }
         catch (IOException ioe) {
             LOG.error("Could not release large temp table block on disk: " + ioe.getMessage());
-            return false;
+            success = false;
         }
 
-        return true;
+        return success;
     }
 
     @Override
