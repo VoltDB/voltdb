@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -28,8 +29,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
-
-import com.google.common.collect.Sets;
 
 public class TransactionTaskQueue
 {
@@ -47,7 +46,7 @@ public class TransactionTaskQueue
         private int m_siteCount = 0;
         private Mailbox[] m_mailBoxes;
         //two missing transactions at most.
-        private Set<Long> m_missingTxns = Sets.newHashSet();
+        private Set<Long> m_missingTxns = new HashSet<>();
         void resetScoreboards(int firstSiteId, int siteCount) {
             m_stashedMpQueues = null;
             m_stashedMpScoreboards = null;
