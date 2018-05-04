@@ -47,6 +47,10 @@ public class TestTransactionTaskQueue extends TestCase
     private List<TransactionTaskQueue> m_txnTaskQueues = new ArrayList<>();
     private List<SiteTaskerQueue> m_siteTaskQueues = new ArrayList<>();
     List<Deque<TransactionTask>> m_expectedOrders = new ArrayList<>();
+    private MpRestartSequenceGenerator m_repairGenerator;
+    private MpRestartSequenceGenerator m_restartGenerator;
+
+
     TxnEgo[] m_localTxnEgo = new TxnEgo[SITE_COUNT]; // for sp txn, txnId is spHandle
     TxnEgo m_mpTxnEgo;
 
@@ -88,11 +92,9 @@ public class TestTransactionTaskQueue extends TestCase
                                     boolean forReplay)
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
-        Iv2InitiateTaskMessage itMsg = mock(Iv2InitiateTaskMessage.class);
-        when(itMsg.isN_Partition()).thenReturn(false);
+        when(msg.isNPartTxn()).thenReturn(false);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         when(msg.isForReplay()).thenReturn(forReplay);
-        when(msg.getInitiateTask()).thenReturn(itMsg);
         when(msg.getTimestamp()).thenReturn(restartTimestamp);
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         when(mbox.getHSId()).thenReturn(1337l);
@@ -124,19 +126,20 @@ public class TestTransactionTaskQueue extends TestCase
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         when(msg.getTimestamp()).thenReturn(CompleteTransactionMessage.INITIAL_TIMESTAMP);
+        when(msg.needsCoordination()).thenReturn(true);
         CompleteTransactionTask task =
                 new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
         return task;
     }
     private CompleteTransactionTask createRepairCompletion(TransactionState txn,
                                                        long mpTxnId,
-                                                       TransactionTaskQueue queue)
+                                                       TransactionTaskQueue queue,
+                                                       long seq)
     {
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
-        MpRestartSequenceGenerator generator = new MpRestartSequenceGenerator(0, false);
-        long seq = generator.getNextSeqNum();
         when(msg.getTimestamp()).thenReturn(seq);
+        when(msg.needsCoordination()).thenReturn(true);
         CompleteTransactionTask task =
             new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
         return task;
@@ -144,13 +147,13 @@ public class TestTransactionTaskQueue extends TestCase
 
     private CompleteTransactionTask createRestartComplete(TransactionState txn,
                                                          long mpTxnId,
-                                                         TransactionTaskQueue queue)
+                                                         TransactionTaskQueue queue,
+                                                         long seq)
     {
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
-        MpRestartSequenceGenerator generator = new MpRestartSequenceGenerator(0, true);
-        long seq = generator.getNextSeqNum();
         when(msg.getTimestamp()).thenReturn(seq);
+        when(msg.needsCoordination()).thenReturn(true);
         CompleteTransactionTask task =
                 new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
         return task;
@@ -172,15 +175,17 @@ public class TestTransactionTaskQueue extends TestCase
     }
 
     private void repairThenRestart(TransactionTask[] repairTask, TransactionTask restartTask, boolean missingCompletion) {
+        long restartSeq = m_restartGenerator.getNextSeqNum();
+        long repairSeq = m_repairGenerator.getNextSeqNum();
         for (int i = 0; i < SITE_COUNT; i++) {
-            TransactionTask comp = createRepairCompletion(repairTask[i].getTransactionState(), repairTask[i].getTxnId(), m_txnTaskQueues.get(i));
+            TransactionTask comp = createRepairCompletion(repairTask[i].getTransactionState(), repairTask[i].getTxnId(), m_txnTaskQueues.get(i), repairSeq);
             if (missingCompletion) {
                 addMissingCompletionTask(comp, m_txnTaskQueues.get(i));
             } else {
                 addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
             }
 
-            comp = createRestartComplete(restartTask.getTransactionState(), restartTask.getTxnId(), m_txnTaskQueues.get(i));
+            comp = createRestartComplete(restartTask.getTransactionState(), restartTask.getTxnId(), m_txnTaskQueues.get(i), restartSeq);
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
 
             TransactionTask restartFrag = createFrag(m_localTxnEgo[i].getTxnId(), restartTask.getTxnId(), m_txnTaskQueues.get(i));
@@ -213,6 +218,8 @@ public class TestTransactionTaskQueue extends TestCase
     public void setUp() {
         TransactionTaskQueue.resetScoreboards(0, SITE_COUNT);
         m_mpTxnEgo = TxnEgo.makeZero(MpInitiator.MP_INIT_PID);
+        m_repairGenerator = new MpRestartSequenceGenerator(0, false);
+        m_restartGenerator = new MpRestartSequenceGenerator(0, true);
         for (int i = 0; i < SITE_COUNT; i++) {
             SiteTaskerQueue siteTaskQueue = getSiteTaskerQueue();
             m_siteTaskQueues.add(siteTaskQueue);
@@ -357,8 +364,9 @@ public class TestTransactionTaskQueue extends TestCase
         // failure occurs, MPI repair current transaction
 
         // Every site gets the repair completion message
+        long seq = m_repairGenerator.getNextSeqNum();
         for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRepairCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
+            comp = createRepairCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i), seq);
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
         flushBacklog(firstFrag);
