@@ -38,16 +38,16 @@ public class Scoreboard {
     private FragmentTaskBase m_fragTask;
 
     public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
-        // special case, scoreboard is empty
-        if (m_compTasks.peekFirst() == null) {
-            m_compTasks.addFirst(Pair.of(task, missingTxn));
-            return;
-        }
-
         // This is an extremely rare case were a MPI restart completion arrives before the dead MPI's completion
         // Ignore this message because the restart completion is more recent and should step on the initial completion
         if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP &&
                 ( hasRestartCompletion(task) || missingTxn)) {
+            return;
+        }
+
+        // special case, scoreboard is empty
+        if (m_compTasks.peekFirst() == null) {
+            m_compTasks.addFirst(Pair.of(task, missingTxn));
             return;
         }
 
