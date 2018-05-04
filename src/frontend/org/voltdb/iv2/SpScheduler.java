@@ -416,8 +416,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void deliver(VoltMessage message)
     {
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("DELIVER: " + message.toString());
+        if (tmLog.isTraceEnabled()) {
+            tmLog.trace("DELIVER: " + message.toString());
         }
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
