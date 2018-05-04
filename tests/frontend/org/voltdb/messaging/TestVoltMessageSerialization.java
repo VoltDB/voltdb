@@ -181,7 +181,7 @@ public class TestVoltMessageSerialization extends TestCase {
     }
 
     public void testFragmentTask() throws IOException {
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false, (short)0);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false, false);
         ft.addFragment(new byte[20], 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
         ft.setBatch(75);
@@ -217,7 +217,7 @@ public class TestVoltMessageSerialization extends TestCase {
         param_set2.flattenToBuffer(param2_buf);
         param2_buf.flip();
 
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false, (short)0);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false, false);
         ft.addFragment(new byte[20], 12, param1_buf);
         ft.addFragment(new byte[20], 24, param2_buf);
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
@@ -256,7 +256,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testFragmentTaskWithInitiateTask() throws IOException {
         // The fragment task.
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false, (short)0);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false, false);
         ft.addFragment(new byte[20], 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
@@ -310,7 +310,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
 
     public void testFragmentResponse() throws IOException {
-        FragmentTaskMessage ft = new FragmentTaskMessage(15, 12, 37, 99, false, false, false, (short)0);
+        FragmentTaskMessage ft = new FragmentTaskMessage(15, 12, 37, 99, false, false, false, false);
 
         VoltTable table = new VoltTable(
                 new VoltTable.ColumnInfo("bearhugg", VoltType.STRING)
@@ -372,7 +372,7 @@ public class TestVoltMessageSerialization extends TestCase {
     {
         CompleteTransactionMessage ctm =
             new CompleteTransactionMessage(12345, 54321, 67890, false, 77, false,
-                                           true, false, true, (short)0);
+                                           true, false, true, false);
 
         CompleteTransactionMessage ctm2 = (CompleteTransactionMessage) checkVoltMessage(ctm);
         assertEquals(ctm.m_isRollback, ctm2.m_isRollback);
@@ -385,7 +385,7 @@ public class TestVoltMessageSerialization extends TestCase {
     {
         CompleteTransactionMessage ctm =
             new CompleteTransactionMessage(12345, 54321, 67890, false, 0, false,
-                                           true, false, true, (short)0);
+                                           true, false, true, false);
 
         CompleteTransactionResponseMessage ctrm =
             new CompleteTransactionResponseMessage(ctm);
@@ -498,7 +498,7 @@ public class TestVoltMessageSerialization extends TestCase {
                                     readOnly,
                                     false,
                                     false,
-                                    (short)0);
+                                    false);
         frag.m_initiateTask = initTask;
         frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
         return frag;

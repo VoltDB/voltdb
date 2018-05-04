@@ -334,7 +334,7 @@ public class MpScheduler extends Scheduler
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId);
+                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId, false);
         }
 
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
@@ -422,7 +422,7 @@ public class MpScheduler extends Scheduler
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), true, m_leaderNodeId);
+                    m_buddyHSIds.get(m_nextBuddy), true, m_leaderNodeId, false);
         }
 
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
@@ -478,7 +478,7 @@ public class MpScheduler extends Scheduler
             // even if all the masters somehow die before forwarding Complete on to their replicas.
             CompleteTransactionMessage ctm = new CompleteTransactionMessage(m_mailbox.getHSId(),
                     message.m_sourceHSId, message.getTxnId(), message.isReadOnly(), 0,
-                    !message.shouldCommit(), false, false, false, txn.getNPartCount());
+                    !message.shouldCommit(), false, false, false, txn.isNPartTxn());
             ctm.setTruncationHandle(m_repairLogTruncationHandle);
             // dump it in the repair log
             // hacky castage

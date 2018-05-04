@@ -224,7 +224,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     pf.parameters,
                     false,
                     txnState.isForReplay(),
-                    txnState.getNPartCount());
+                    txnState.isNPartTxn());
 
             //During @MigratePartitionLeader, a fragment may be mis-routed. fragmentIndex is used to check which fragment is mis-routed and
             //to determine how the follow-up fragments are processed.

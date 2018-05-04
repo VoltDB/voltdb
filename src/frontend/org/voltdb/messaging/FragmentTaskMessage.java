@@ -144,8 +144,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // desired output dep ID, but no real work to do.
     boolean m_emptyForRestart = false;
 
-    // Used this to track the number of partitions involved in an N-Part transaction
-    short m_nPartCount;
+    // Used to flag an N-Part transaction
+    boolean m_nPartTxn;
 
     // If this flag = true, it means the current execution is being sampled.
     boolean m_perFragmentStatsRecording = false;
@@ -219,11 +219,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                boolean isReadOnly,
                                boolean isFinal,
                                boolean isForReplay,
-                               short nPartCount) {
+                               boolean nPartTxn) {
         super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
         m_isFinal = isFinal;
         m_subject = Subject.DEFAULT.getId();
-        m_nPartCount = nPartCount;
+        m_nPartTxn = nPartTxn;
         assert(selfCheck());
     }
 
@@ -243,7 +243,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_taskType = ftask.m_taskType;
         m_isFinal = ftask.m_isFinal;
         m_subject = ftask.m_subject;
-        m_nPartCount = ftask.m_nPartCount;
+        m_nPartTxn = ftask.m_nPartTxn;
         m_inputDepCount = ftask.m_inputDepCount;
         m_items = ftask.m_items;
         m_initiateTask = ftask.m_initiateTask;
@@ -340,7 +340,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                                             ParameterSet params,
                                                             boolean isFinal,
                                                             boolean isForReplay,
-                                                            short nPartCount) {
+                                                            boolean isNPartTxn) {
         ByteBuffer parambytes = null;
         if (params != null) {
             parambytes = ByteBuffer.allocate(params.getSerializedSize());
@@ -355,7 +355,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
                                                           txnId, uniqueId, isReadOnly, isFinal,
-                                                          isForReplay, nPartCount);
+                                                          isForReplay, isNPartTxn);
         ret.addFragment(planHash, outputDepId, parambytes);
         return ret;
     }
@@ -509,12 +509,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                       Collection<Integer> involvedPartitions) {
         m_initiateTask = initiateTask;
         m_involvedPartitions = ImmutableSet.copyOf(involvedPartitions);
-        if (m_nPartCount != 0 && m_involvedPartitions.size() != m_nPartCount) {
-            hostLog.error("FragmentTaskMessage has inconsistent fields: nPartCount=" + m_nPartCount +
-                    ", involvedPartitions=" + m_involvedPartitions);
-            assert(false);
-        }
-        assert(m_nPartCount == 0 || m_involvedPartitions.size() == m_nPartCount);
+        assert(!m_nPartTxn || m_involvedPartitions.size() > 0);
         // this function may be called for the same instance twice, with slightly different
         // but same size initiateTask. The second call is intended to update the spHandle in
         // the initiateTask to a new value and update the corresponding buffer, therefore it
@@ -548,8 +543,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public Set<Integer> getInvolvedPartitions() { return m_involvedPartitions; }
 
-    public short getNPartCount() {
-        return m_nPartCount;
+    public boolean isNPartTxn() {
+        return m_nPartTxn;
     }
 
     public byte[] getPlanHash(int index) {
@@ -624,7 +619,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      *     should undo flag: byte: 1
      *     output dependencies flag (outdep): byte: 1
      *     input dependencies flag (indep): byte: 1
-     *     NPart Partition Count: short : 2
+     *     NPart Partition Count: byte : 1
      *     FragmentRestart Sequence: long : 8
      *
      * Procedure name to load string (if any).
@@ -667,7 +662,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         int msgsize = super.getSerializedSize();
 
         // Fixed header
-        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 2 + 8;
+        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 8;
 
         // procname to load str if any
         if (m_procNameToLoad != null) {
@@ -812,7 +807,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(m_perFragmentStatsRecording ? (byte) 1 : (byte) 0);
         buf.put(m_coordinatorTask ? (byte) 1 : (byte) 0);
         // N Partition Transaction PartitionCount
-        buf.putShort(m_nPartCount);
+        buf.put(m_nPartTxn ? (byte) 1 : (byte) 0);
         // timestamp for restarted transaction
         buf.putLong(m_restartTimestamp);
 
@@ -950,7 +945,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_perFragmentStatsRecording = buf.get() != 0;
         m_coordinatorTask = buf.get() != 0;
         // N Partition Transaction PartitionCount
-        m_nPartCount = buf.getShort();
+        m_nPartTxn = buf.get() != 0;
         // timestamp for restarted transaction
         m_restartTimestamp = buf.getLong();
 
@@ -1104,10 +1099,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (m_isReadOnly)
             sb.append("  READ, COORD ");
         else
-        if (getNPartCount() == 0)
-            sb.append("  WRITE, COORD ");
+        if (m_nPartTxn)
+            sb.append("  ").append(" N part WRITE, COORD ");
         else
-            sb.append("  ").append(getNPartCount()).append(" part WRITE, COORD ");
+            sb.append("  WRITE, COORD ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
 
         if (!m_emptyForRestart) {

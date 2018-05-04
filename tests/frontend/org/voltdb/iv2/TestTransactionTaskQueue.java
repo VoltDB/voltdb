@@ -92,7 +92,7 @@ public class TestTransactionTaskQueue extends TestCase
                                     boolean forReplay)
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
-        when(msg.getNPartCount()).thenReturn((short)0);
+        when(msg.isNPartTxn()).thenReturn(false);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         when(msg.isForReplay()).thenReturn(forReplay);
         when(msg.getTimestamp()).thenReturn(restartTimestamp);
