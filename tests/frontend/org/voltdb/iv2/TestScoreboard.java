@@ -41,9 +41,12 @@ public class TestScoreboard {
     }
 
     private CompleteTransactionTask createComp(long txnId, long timestamp) {
+        CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
+        when(msg.isRollback()).thenReturn(!MpRestartSequenceGenerator.isForRestart(timestamp));
         CompleteTransactionTask task = mock(CompleteTransactionTask.class);
         when(task.getMsgTxnId()).thenReturn(txnId);
         when(task.getTimestamp()).thenReturn(timestamp);
+        when(task.getCompleteMessage()).thenReturn(msg);
         return task;
     }
 
