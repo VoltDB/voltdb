@@ -79,6 +79,7 @@ public class MpTransactionState extends TransactionState
     boolean m_isRestart = false;
     boolean m_fragmentRestarted = false;
     final boolean m_nPartTxn;
+    boolean m_haveSentfragment = false;
 
     //Master change from MigratePartitionLeader. The remote dependencies are built before MigratePartitionLeader. After
     //fragment restart, the FragmentResponseMessage will come from the new partition master. The map is used to remove
@@ -125,6 +126,7 @@ public class MpTransactionState extends TransactionState
         // since some masters may not have seen it.
         m_haveDistributedInitTask = false;
         m_isRestart = true;
+        m_haveSentfragment = false;
     }
 
     @Override
@@ -184,6 +186,7 @@ public class MpTransactionState extends TransactionState
             }
             m_remoteWork = task;
             m_remoteWork.setTruncationHandle(m_initiationMsg.getTruncationHandle());
+            m_haveSentfragment = true;
             // Distribute fragments to remote destinations.
             long[] non_local_hsids = new long[m_useHSIds.size()];
             for (int i = 0; i < m_useHSIds.size(); i++) {
@@ -251,6 +254,7 @@ public class MpTransactionState extends TransactionState
                 m_remoteWork.setStateForDurability((Iv2InitiateTaskMessage) getNotice(),
                         m_masterHSIds.keySet());
             }
+            m_haveSentfragment = true;
             // Distribute fragments to remote destinations.
             if (!m_useHSIds.isEmpty()) {
                 m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), m_remoteWork);
@@ -548,5 +552,11 @@ public class MpTransactionState extends TransactionState
 
     public boolean isNPartTxn() {
         return m_nPartTxn;
+    }
+
+    // Have MPI sent out at least one round of fragment to leaders?
+    // When MP txn is restarted, the flag is reset to false.
+    public boolean haveSentFragment() {
+        return m_haveSentfragment;
     }
 }
