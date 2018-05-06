@@ -252,31 +252,31 @@ public class MpProcedureTask extends ProcedureTask
                                                  "commit", Boolean.toString(!m_txnState.needsRollback()),
                                                  "dest", CoreUtils.hsIdCollectionToString(m_initiatorHSIds)));
         }
-        MpTransactionState txn = (MpTransactionState)m_txnState;
-
+        MpTransactionState txnState = (MpTransactionState)m_txnState;
         // Only send completions for MP transactions that have processed at least one fragment
-        CompleteTransactionMessage complete = new CompleteTransactionMessage(
-                m_initiator.getHSId(), // who is the "initiator" now??
-                m_initiator.getHSId(),
-                m_txnState.txnId,
-                m_txnState.isReadOnly(),
-                m_txnState.getHash(),
-                m_txnState.needsRollback(),
-                false,  // really don't want to have ack the ack.
-                false,
-                m_msg.isForReplay(),
-                txn.isNPartTxn());
+        if (txnState.isReadOnly() || txnState.haveSentFragment()) {
+            CompleteTransactionMessage complete = new CompleteTransactionMessage(
+                    m_initiator.getHSId(), // who is the "initiator" now??
+                    m_initiator.getHSId(),
+                    m_txnState.txnId,
+                    m_txnState.isReadOnly(),
+                    m_txnState.getHash(),
+                    m_txnState.needsRollback(),
+                    false,  // really don't want to have ack the ack.
+                    false,
+                    m_msg.isForReplay(),
+                    txnState.isNPartTxn());
+            complete.setTruncationHandle(m_msg.getTruncationHandle());
 
-        complete.setTruncationHandle(m_msg.getTruncationHandle());
-
-        //If there are misrouted fragments, send message to current masters.
-        final List<Long> initiatorHSIds = new ArrayList<Long>();
-        if (txn.isFragmentRestarted()) {
-            initiatorHSIds.addAll(txn.getMasterHSIDs());
-        } else {
-            initiatorHSIds.addAll(m_initiatorHSIds);
+            //If there are misrouted fragments, send message to current masters.
+            final List<Long> initiatorHSIds = new ArrayList<Long>();
+            if (txnState.isFragmentRestarted()) {
+                initiatorHSIds.addAll(txnState.getMasterHSIDs());
+            } else {
+                initiatorHSIds.addAll(m_initiatorHSIds);
+            }
+            m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
         }
-        m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());
     }
