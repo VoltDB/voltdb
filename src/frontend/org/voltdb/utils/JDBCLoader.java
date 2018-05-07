@@ -208,7 +208,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
         @Option(desc = "password to use when connecting to servers")
         String password = "";
-        
+
         @Option(desc = "credentials that contains username and password information")
         String credentials = "";
 
@@ -366,7 +366,6 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                 }
             }
         }
-        
         // If we need to prompt the user for a VoltDB password, do so.
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter VoltDB password: ");
 
