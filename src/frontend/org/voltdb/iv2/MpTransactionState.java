@@ -78,6 +78,8 @@ public class MpTransactionState extends TransactionState
     boolean m_haveDistributedInitTask = false;
     boolean m_isRestart = false;
     boolean m_fragmentRestarted = false;
+    final boolean m_nPartTxn;
+    boolean m_haveSentfragment = false;
 
     //Master change from MigratePartitionLeader. The remote dependencies are built before MigratePartitionLeader. After
     //fragment restart, the FragmentResponseMessage will come from the new partition master. The map is used to remove
@@ -90,7 +92,7 @@ public class MpTransactionState extends TransactionState
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
                        List<Long> useHSIds, Map<Integer, Long> partitionMasters,
-                       long buddyHSId, boolean isRestart)
+                       long buddyHSId, boolean isRestart, boolean nPartTxn)
     {
         super(mailbox, notice);
         m_initiationMsg = (Iv2InitiateTaskMessage)notice;
@@ -98,6 +100,7 @@ public class MpTransactionState extends TransactionState
         m_masterHSIds.putAll(partitionMasters);
         m_buddyHSId = buddyHSId;
         m_isRestart = isRestart;
+        m_nPartTxn = nPartTxn;
     }
 
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
@@ -123,6 +126,7 @@ public class MpTransactionState extends TransactionState
         // since some masters may not have seen it.
         m_haveDistributedInitTask = false;
         m_isRestart = true;
+        m_haveSentfragment = false;
     }
 
     @Override
@@ -182,6 +186,7 @@ public class MpTransactionState extends TransactionState
             }
             m_remoteWork = task;
             m_remoteWork.setTruncationHandle(m_initiationMsg.getTruncationHandle());
+            m_haveSentfragment = true;
             // Distribute fragments to remote destinations.
             long[] non_local_hsids = new long[m_useHSIds.size()];
             for (int i = 0; i < m_useHSIds.size(); i++) {
@@ -240,7 +245,8 @@ public class MpTransactionState extends TransactionState
                     m_localWork.getUniqueId(),
                     m_localWork.isReadOnly(),
                     false,
-                    false);
+                    false,
+                    m_nPartTxn);
             m_remoteWork.setTimestamp(m_restartTimestamp);
             m_remoteWork.setEmptyForRestart(getNextDependencyId());
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
@@ -248,6 +254,7 @@ public class MpTransactionState extends TransactionState
                 m_remoteWork.setStateForDurability((Iv2InitiateTaskMessage) getNotice(),
                         m_masterHSIds.keySet());
             }
+            m_haveSentfragment = true;
             // Distribute fragments to remote destinations.
             if (!m_useHSIds.isEmpty()) {
                 m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), m_remoteWork);
@@ -523,7 +530,8 @@ public class MpTransactionState extends TransactionState
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("Aborting transaction: " + TxnEgo.txnIdToString(txnId));
         }
-        FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+        FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false,
+                m_nPartTxn);
         FragmentResponseMessage poison = new FragmentResponseMessage(dummy, 0L);
         TransactionTerminationException termination = new TransactionTerminationException(
                 "Transaction interrupted.", txnId);
@@ -540,5 +548,15 @@ public class MpTransactionState extends TransactionState
         Preconditions.checkArgument(m_masterHSIds.values().containsAll(m_useHSIds) &&
                                     m_useHSIds.containsAll(m_masterHSIds.values()));
         return m_masterHSIds.get(partition);
+    }
+
+    public boolean isNPartTxn() {
+        return m_nPartTxn;
+    }
+
+    // Have MPI sent out at least one round of fragment to leaders?
+    // When MP txn is restarted, the flag is reset to false.
+    public boolean haveSentFragment() {
+        return m_haveSentfragment;
     }
 }

@@ -27,7 +27,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 
 /**
- *  Load the levelDB backing stor with raw data.
+ *  Load the levelDB backing store with raw data.
  *  This creates a 100% cold cache.
  */
 public class CreateKey extends VoltProcedure {

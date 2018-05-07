@@ -52,7 +52,7 @@ class AbstractExecutor;
 class AbstractPlanNode;
 class VoltDBEngine;
 
-AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node, bool isLargeQueryx);
 }
 
 #endif

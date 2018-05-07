@@ -144,7 +144,7 @@ void ExecutorVector::initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node) 
 
     // Executor is created here. An executor is *devoted* to this
     // plannode so that it can cache anything for the plannode
-    AbstractExecutor* executor = getNewExecutor(engine, node);
+    AbstractExecutor* executor = getNewExecutor(engine, node, isLargeQuery());
     if (executor == NULL) {
         char message[256];
         snprintf(message, sizeof(message), "Unexpected error. "

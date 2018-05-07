@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -70,7 +71,6 @@ import org.voltdb.messaging.RepairLogTruncationMessage;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
-import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
@@ -145,7 +145,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId);
     }
 
-    private ImmutableList<Long> m_replicaHSIds = ImmutableList.of();
+    private List<Long> m_replicaHSIds = new ArrayList<>();
     long m_sendToHSIds[] = new long[0];
     private final TransactionTaskQueue m_pendingTasks;
     private final Map<Long, TransactionState> m_outstandingTxns =
@@ -198,8 +198,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         IS_KSAFE_CLUSTER = VoltDB.instance().getKFactor() > 0;
     }
 
-    public void initializeScoreboard(int siteId) {
-        m_pendingTasks.initializeScoreboard(siteId);
+    public void initializeScoreboard(int siteId, Mailbox mailBox) {
+        m_pendingTasks.initializeScoreboard(siteId, mailBox);
     }
 
     @Override
@@ -257,7 +257,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             replicasAdded = Longs.toArray(rejoinHSIds);
         }
         // First - correct the official replica set.
-        m_replicaHSIds = ImmutableList.copyOf(replicas);
+        m_replicaHSIds = replicas;
         // Update the list of remote replicas that we'll need to send to
         List<Long> sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
         sendToHSIds.remove(m_mailbox.getHSId());
@@ -415,8 +415,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void deliver(VoltMessage message)
     {
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("DELIVER: " + message.toString());
+        if (tmLog.isTraceEnabled()) {
+            tmLog.trace("DELIVER: " + message.toString());
         }
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
@@ -1036,8 +1036,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
+            //FIXME: replay transaction doesn't have initiate task,
             txn = new ParticipantTransactionState(msg.getSpHandle(), msg, msg.isReadOnly(),
-                    msg.isReadOnly() ? false : msg.getInitiateTask().isN_Partition());
+                    msg.isNPartTxn());
             m_outstandingTxns.put(msg.getTxnId(), txn);
             // Only want to send things to the command log if it satisfies this predicate
             // AND we've never seen anything for this transaction before.  We can't

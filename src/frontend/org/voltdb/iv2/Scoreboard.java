@@ -38,53 +38,70 @@ public class Scoreboard {
     private FragmentTaskBase m_fragTask;
 
     public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
+        // This happens when a non-restartable sysproc was aborted, since MPI doesn't send repair message for this transaction
+        // we must allow the rollback completion to go through scoreboard.
+        boolean isTxnRollback = (task.getCompleteMessage().isRollback() && task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP);
+        // Dont' treat rollback transaction as missing
+        if (isTxnRollback) {
+            missingTxn = false;
+        }
+
+        // This is an extremely rare case were a MPI restart completion arrives before the dead MPI's completion
+        // Ignore this message because the restart completion is more recent and should step on the initial completion
         if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP &&
-                (m_compTasks.peekFirst() != null || missingTxn)) {
-            // This is an extremely rare case were a MPI repair arrives before the dead MPI's completion
-            // Ignore this message because the repair completion is more recent and should step on the initial completion
-            if (!missingTxn) {
-                assert(MpRestartSequenceGenerator.isForRestart(m_compTasks.peekFirst().getFirst().getTimestamp()));
-            }
+                ( hasRestartCompletion(task) || missingTxn)) {
+            return;
         }
-        else
-        if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP ||
-                (m_compTasks.peekFirst() != null &&
-                !MpRestartSequenceGenerator.isForRestart(task.getTimestamp()) &&
-                m_compTasks.peekFirst().getFirst().getMsgTxnId() == task.getMsgTxnId())) {
-            // This is a submission of a completion. In case this is a resubmission of a completion that not
-            // all sites received clear the whole queue. The Completion may or may not be for a transaction
-            // that has already been completed (if it was completed missingTxn will be true)
-            m_compTasks.clear();
-            m_compTasks.addLast(Pair.of(task, missingTxn));
+
+        // special case, scoreboard is empty
+        if (m_compTasks.peekFirst() == null) {
+            m_compTasks.addFirst(Pair.of(task, missingTxn));
+            return;
         }
-        else {
-            // This is an abort completion that will be followed with a resubmitted fragment,
-            // so step on any fragment that is pending
-            Pair<CompleteTransactionTask, Boolean> lastTaskPair = m_compTasks.peekLast();
-            if (lastTaskPair != null && lastTaskPair.getFirst().getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP &&
-                    lastTaskPair.getFirst().getMsgTxnId() == task.getMsgTxnId()) {
-                assert(lastTaskPair.getFirst().getMsgTxnId() == task.getMsgTxnId());
-                m_compTasks.removeLast();
-            }
-            else {
-                assert(m_compTasks.size() <= 1);
-            }
-            m_compTasks.addLast(Pair.of(task, missingTxn));
+
+        // Restart completion steps on any pending prior fragment of the same transaction
+        if (task.getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP &&
+                MpRestartSequenceGenerator.isForRestart(task.getTimestamp()) &&
+                m_fragTask != null && m_fragTask.getTxnId() == task.getMsgTxnId()) {
             m_fragTask = null;
         }
-    }
+        // scoreboard has one completion
+        if (m_compTasks.size() == 1) {
+            Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();
+            if (head.getFirst().getMsgTxnId() < task.getMsgTxnId()) {
+                // Completion with higher txnId adds to tail
+                m_compTasks.addLast(Pair.of(task, missingTxn));
+            } else if (head.getFirst().getMsgTxnId() > task.getMsgTxnId()) {
+                // Completion with lower txnId goes to head
+                m_compTasks.removeFirst();
+                m_compTasks.addFirst(Pair.of(task, missingTxn));
+                m_compTasks.addLast(head);
+            } else {
+                // Only keep the completion with latest timestamp if txnId is same
+                if (head.getFirst().getTimestamp() < task.getTimestamp() && isComparable(head.getFirst(), task)) {
+                    m_compTasks.removeFirst();
+                    m_compTasks.addFirst(Pair.of(task, missingTxn));
+                }
+                // Ignore stale completion
+            }
+        } else {
+            // scoreboard has two completions
+            Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();
+            Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.peekLast();
+            // scorebaord can take completions from two transactions at most
+            assert (task.getMsgTxnId() == head.getFirst().getMsgTxnId() || task.getMsgTxnId() == tail.getFirst().getMsgTxnId());
 
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        if (!m_compTasks.isEmpty()){
-            builder.append("CompleteTransactionTasks: " + m_compTasks.peekFirst() +
-                    (m_compTasks.size() == 2 ? "\n" + m_compTasks.peekLast() : ""));
-            builder.append("\n");
+            // Keep newer completion, discard the older one
+            if ( task.getTimestamp() > head.getFirst().getTimestamp() && isComparable(head.getFirst(), task)) {
+                m_compTasks.removeFirst();
+                m_compTasks.addFirst(Pair.of(task, missingTxn));
+            } else if ( task.getTimestamp() > tail.getFirst().getTimestamp() && isComparable(tail.getFirst(), task)) {
+                m_compTasks.removeLast();
+                m_compTasks.addLast(Pair.of(task, missingTxn));
+            }
+            // Ignore stale completion
         }
-        if (m_fragTask != null) {
-            builder.append("FragmentTask: " + m_fragTask);
-        }
-        return builder.toString();
+
     }
 
     public void addFragmentTask(FragmentTaskBase task) {
@@ -103,19 +120,39 @@ public class Scoreboard {
         m_fragTask = null;
     }
 
-    //There could be two transactions in the queue.
-    public boolean matchCompleteTransactionTask(long matchingCompletionTime) {
-        if (m_compTasks.isEmpty()) {
-            return false;
-        }
-        if (matchingCompletionTime == m_compTasks.peekFirst().getFirst().getTimestamp()) {
+    // Overwrite criteria:
+    //   1) from same transaction,
+    //   2) repair completion can overwrite initial completion or older repair completion
+    //   3) restart completion can overwrite initial completion or older restart completion
+    //   4) restart completion and repair completion can't overwrite each other
+    private static boolean isComparable(CompleteTransactionTask c1, CompleteTransactionTask c2) {
+        return c1.getMsgTxnId() == c2.getMsgTxnId() &&
+                MpRestartSequenceGenerator.isForRestart(c1.getTimestamp()) ==
+                MpRestartSequenceGenerator.isForRestart(c2.getTimestamp());
+    }
+
+    private boolean hasRestartCompletion(CompleteTransactionTask task) {
+        if (m_compTasks.peekFirst() != null &&
+                MpRestartSequenceGenerator.isForRestart(m_compTasks.peekFirst().getFirst().getTimestamp()) &&
+                task.getMsgTxnId() < m_compTasks.peekFirst().getFirst().getMsgTxnId()) {
+            return true;
+        } else if (m_compTasks.size() == 2 &&
+                MpRestartSequenceGenerator.isForRestart(m_compTasks.peekLast().getFirst().getTimestamp()) &&
+                task.getMsgTxnId() < m_compTasks.peekLast().getFirst().getMsgTxnId()) {
             return true;
         }
-
-        if (m_compTasks.size() == 2) {
-            return (matchingCompletionTime == m_compTasks.peekLast().getFirst().getTimestamp());
-        }
         return false;
+    }
+
+    public boolean matchFragmentTask(long txnId, long timestamp) {
+        return m_fragTask != null && m_fragTask.getTxnId() == txnId && m_fragTask.getTimestamp() == timestamp;
+    }
+
+    // Only match CompleteTransactionTask at head of the queue
+    public boolean matchCompleteTransactionTask(long txnId, long timestamp) {
+        return !m_compTasks.isEmpty() &&
+                m_compTasks.peekFirst().getFirst().getMsgTxnId() == txnId &&
+                m_compTasks.peekFirst().getFirst().getTimestamp() == timestamp;
     }
 
     //Find the CompleteTransactionTask to be released. The task could be in header or tail
@@ -139,5 +176,27 @@ public class Scoreboard {
             }
             return tail.getFirst();
         }
+    }
+
+    public boolean isTransactionMissing(long txnId) {
+        if (m_compTasks.peekFirst().getSecond() && txnId == m_compTasks.peekFirst().getFirst().getMsgTxnId()) {
+            return true;
+        }
+
+        return (m_compTasks.size() == 2 && m_compTasks.peekLast().getSecond() &&
+                txnId == m_compTasks.peekLast().getFirst().getMsgTxnId());
+    }
+
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        if (!m_compTasks.isEmpty()){
+            builder.append("CompleteTransactionTasks: " + m_compTasks.peekFirst() +
+                    (m_compTasks.size() == 2 ? "\n" + m_compTasks.peekLast() : ""));
+            builder.append("\n");
+        }
+        if (m_fragTask != null) {
+            builder.append("FragmentTask: " + m_fragTask);
+        }
+        return builder.toString();
     }
 }
