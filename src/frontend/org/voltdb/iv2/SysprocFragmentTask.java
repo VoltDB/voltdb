@@ -308,6 +308,8 @@ public class SysprocFragmentTask extends FragmentTaskBase
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         sb.append("  TIMESTAMP: ");
         MpRestartSequenceGenerator.restartSeqIdToString(getTimestamp(), sb);
+        sb.append("  FRAGMENT ID: ").append(VoltSystemProcedure.hashToFragId(m_fragmentMsg.getPlanHash(0)));
+
         return sb.toString();
     }
 
