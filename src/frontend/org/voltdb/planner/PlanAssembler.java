@@ -132,6 +132,11 @@ public class PlanAssembler {
     /** plan selector */
     private final PlanSelector m_planSelector;
 
+    /**
+     * True iff this is a large query.  This duplicates the ones
+     * in the abstract parsed statements above.  But it's more
+     * convenient to have our own.
+     */
     private boolean m_isLargeQuery = false;
 
     /** Describes the specified and inferred partition context. */
@@ -2362,18 +2367,22 @@ public class PlanAssembler {
 
         /**
          * A hash aggregation is needed if all of these are true.
-         * 1. There are group by columns.
-         * 2. There is no useful index, or there is a useful index,
-         *    but this is a multi partition query.
-         * 3. There is no determinable sort order, set by the order by
-         *    expressions, or else the order by expressions determine
-         *    a sort order, and some order imposed by the group by
-         *    expressions is compatible with the order imposed by
-         *    the order by expressions.  The order of group by
-         *    expressions in the group by list is immaterial for
-         *    grouping, so any expression order which matches the order by
-         *    expressions will do.
-         *
+         * <ol>
+         *   <li>There are group by columns.</li>
+         *   <li>There is no useful index, or there is a useful index,
+         *    but this is a multi partition query.</li>
+         *   <li>This is not a large temp table query.</li>
+         *   <li>The order by expressions, which require an order by
+         *    node, cannot supply a useful order for group bys.  For
+         *    example, if the group by expressions are "a, b" and the
+         *    order by expressions are "b, a", then we can sort by
+         *    "b, a" and get the same groups as "a, b".  Whatever
+         *    mechanism, index or order by node, satisfies the order
+         *    by expressions also satisfies the group by expressions.
+         *    But if the mechanism for satisfying the order by expressions
+         *    is not compatible with group bys, then we either need
+         *    an order by or hash aggregation.</li>
+         * </ol>
          * Note that we could just insert an order by node in this case,
          * but sorting is slower than hashing.  We expect sorting to be
          * O(n lg(n)), and hashing to be about O(n).  Hashing requires
@@ -2390,7 +2399,7 @@ public class PlanAssembler {
             // of an index scan.
             // Currently, an index scan only claims to have a sort direction when its output
             // matches the order demanded by the ORDER BY clause.
-            if (! parsedSelect.isGrouped()) {
+            if (! parsedSelect.isGrouped() || parsedSelect.isLargeQuery()) {
                 return false;
             }
 
@@ -2647,11 +2656,27 @@ public class PlanAssembler {
      */
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         /*
+         * The query "select A from R group by A" has no aggregate
+         * functions.  So, we want to look at more than just "hasAggregate".
+         *
          * If this is a large query, and there are aggregates
          * then we may need to add an order by to get serial
          * aggregation working.
          */
         if (m_parsedSelect.hasAggregateOrGroupby()) {
+            // Consider this query: select count(a) from P group by a
+            //                      where P is partitioned on a column not a.
+            // If we aggregate by a and count rows on the partitions,
+            // we just have to sum up the counts on the coordinator
+            // fragment.  The counting computations are done in parallel
+            // on the partitions.  The aggNode is the computation that
+            // goes to the partitions and the topAggNode is the
+            // coordinator fragment computation.  There will be a
+            // recieve/send pair placed between them.  We may not
+            // need the topAggNode if all the calculation can be completed
+            // on the partitions, or of none of the calculation can
+            // be done on the partitions.
+            //
             AggregatePlanNode aggNode = null;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
@@ -2670,7 +2695,7 @@ public class PlanAssembler {
                 root = gbInfo.m_indexAccess;
             }
             // See the definition of needHashAggregator for the
-            // conditions for hash aggregation.
+            // conditions which hash aggregation requires.
             boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
 
             // Construct the aggregate nodes.
@@ -2682,14 +2707,6 @@ public class PlanAssembler {
                     // TODO: may optimize this edge case in future
                     assert( ! m_isLargeQuery );
                     aggNode = new HashAggregatePlanNode();
-                }
-                else if ( m_isLargeQuery ) {
-                    aggNode = new AggregatePlanNode();
-                    topAggNode = new AggregatePlanNode();
-                    // If this is a large temp table query, we need
-                    // to convert this to serial aggregation by
-                    // adding an order by node.
-                    root = handleLTTSortForGroupBy(root);
                 }
                 else {
                     if (gbInfo.isChangedToSerialAggregate()) {
@@ -2707,8 +2724,17 @@ public class PlanAssembler {
                 }
             }
             else {
+                // If a hash aggregation is not needed, either
+                // because there is a natural index to provide
+                // order for serial aggregation, or because it is a
+                // large temp table query and we have group by expressions.
+                // If this is a large temp table query and there are
+                // aggregates but there are no group by expressions
+                // we don't need any sorting at all.
                 aggNode = new AggregatePlanNode();
 
+                // If m_isLargeQuery is true, then the MV fix cannot be needed.
+                assert ( ! m_isLargeQuery || ! m_parsedSelect.m_mvFixInfo.needed() );
                 if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
                     topAggNode = new AggregatePlanNode();
                 }

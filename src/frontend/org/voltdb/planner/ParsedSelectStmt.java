@@ -2636,7 +2636,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                                                                               queryNode,
                                                                               m_paramValues,
                                                                               m_db,
-                                                                              m_isLargeQuery);
+                                                                              isLargeQuery());
         // Propagate parameters from the parent to the child
         commonTableStmt.m_paramsById.putAll(m_paramsById);
         commonTableStmt.setParamsByIndex(getParamsByIndex());
@@ -2720,7 +2720,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      *         the order by columns are an initial sequence.  If
      *         this is not possible, because there is an order by column
      *         which does not appear in the group by list, then
-     *         we return null.
+     *         we return null.  Note that the order by column
+     *         values must be functionally dependent on the group
+     *         by expressions, but they don't have to be exactly
+     *         the same.  For example, in "group by a order by a * a"
+     *         the order by expression is not a group by expression,
+     *         but is functionally dependent on the group by expression.
      */
     List<ParsedColInfo> getSortColumnsForSerialGroupBy() {
         List<ParsedColInfo> answer = new ArrayList<>();

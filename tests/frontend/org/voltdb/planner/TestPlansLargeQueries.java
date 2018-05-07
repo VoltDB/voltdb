@@ -51,14 +51,6 @@ public class TestPlansLargeQueries extends PlannerTestCase {
         // Replicated tables and indexes.
         //
         /////////////////////////////////////////////////////////////////
-        //
-        // One table, no indexes, no group bys, no order bys.
-        //
-        validatePlan("select max(aa) from r1;",
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
-                                                      PlanNodeType.AGGREGATE,
-                                                      PlanNodeType.PROJECTION)));
         // One table, no indexes, one group by expression, no order by.
         validatePlan("select max(aa) from r1 group by aa",
                      fragSpec(PlanNodeType.SEND,

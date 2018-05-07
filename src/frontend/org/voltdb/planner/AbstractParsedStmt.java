@@ -121,7 +121,7 @@ public abstract class AbstractParsedStmt {
     private boolean m_isChildOfUnion = false;
 
     // This is true iff this is a query with large temp tables.
-    protected boolean m_isLargeQuery;
+    private boolean m_isLargeQuery;
 
     // We often need a null name list for UDFs.  This
     // lets us have one without making a lot of copies.
@@ -2425,5 +2425,9 @@ public abstract class AbstractParsedStmt {
 
     public void setStmtId(int id) {
         m_stmtId = id;
+    }
+
+    public boolean isLargeQuery() {
+        return m_isLargeQuery;
     }
 }

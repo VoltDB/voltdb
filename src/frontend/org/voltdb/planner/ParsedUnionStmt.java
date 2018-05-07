@@ -125,7 +125,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         AbstractParsedStmt childStmt = null;
         for (VoltXMLElement childSQL : stmtNode.children) {
             if (childSQL.name.equals(SELECT_NODE_NAME)) {
-                childStmt = new ParsedSelectStmt(null, m_paramValues, m_db, m_isLargeQuery);
+                childStmt = new ParsedSelectStmt(null, m_paramValues, m_db, isLargeQuery());
                 // Assign every child a unique ID
                 childStmt.setStmtId(AbstractParsedStmt.NEXT_STMT_ID++);
                 childStmt.m_parentStmt = m_parentStmt;
@@ -133,7 +133,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
             }
             else if (childSQL.name.equals(UNION_NODE_NAME)) {
-                childStmt = new ParsedUnionStmt(null, m_paramValues, m_db, m_isLargeQuery);
+                childStmt = new ParsedUnionStmt(null, m_paramValues, m_db, isLargeQuery());
                 // Set the parent before recursing to children.
                 childStmt.m_parentStmt = m_parentStmt;
             }
