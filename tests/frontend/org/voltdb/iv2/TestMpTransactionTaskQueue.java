@@ -37,9 +37,9 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
+
+import junit.framework.TestCase;
 
 public class TestMpTransactionTaskQueue extends TestCase
 {

@@ -1643,28 +1643,32 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds, boolean skipMultiPart) {
-        boolean foundMultipartTxnId = skipMultiPart;
-        boolean foundSinglepartTxnId = false;
+        long foundMultipartTxnId = -1;
+        long foundSinglepartTxnId = -1;
         for (long txnId : perPartitionTxnIds) {
             if (TxnEgo.getPartitionId(txnId) == m_partitionId) {
-                if (foundSinglepartTxnId) {
+                if (foundSinglepartTxnId != -1) {
                     VoltDB.crashLocalVoltDB(
-                            "Found multiple transactions ids during restore for a partition", false, null);
+                            "Found multiple transactions ids (" + TxnEgo.txnIdToString(txnId) + " and " +
+                            TxnEgo.txnIdToString(foundSinglepartTxnId) + ")during restore for a partition",
+                            false, null);
                 }
-                foundSinglepartTxnId = true;
+                foundSinglepartTxnId = txnId;
                 m_initiatorMailbox.setMaxLastSeenTxnId(txnId);
                 setSpHandleForSnapshotDigest(txnId);
             }
             if (!skipMultiPart && TxnEgo.getPartitionId(txnId) == MpInitiator.MP_INIT_PID) {
-                if (foundMultipartTxnId) {
+                if (foundMultipartTxnId != -1) {
                     VoltDB.crashLocalVoltDB(
-                            "Found multiple transactions ids during restore for a multipart txnid", false, null);
+                            "Found multiple transactions ids (" + TxnEgo.txnIdToString(txnId) + " and " +
+                            TxnEgo.txnIdToString(foundMultipartTxnId) + ") during restore for a multipart txnid",
+                            false, null);
                 }
-                foundMultipartTxnId = true;
+                foundMultipartTxnId = txnId;
                 m_initiatorMailbox.setMaxLastSeenMultipartTxnId(txnId);
             }
         }
-        if (!foundMultipartTxnId) {
+        if (!skipMultiPart && foundMultipartTxnId == -1) {
             VoltDB.crashLocalVoltDB("Didn't find a multipart txnid on restore", false, null);
         }
     }
@@ -1716,11 +1720,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setProcedureName(String procedureName) {
         m_ee.setProcedureName(procedureName);
-    }
-
-    @Override
-    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
-        m_initiatorMailbox.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
     }
 
     @Override

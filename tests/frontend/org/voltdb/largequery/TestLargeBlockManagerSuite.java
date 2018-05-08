@@ -75,7 +75,11 @@ public class TestLargeBlockManagerSuite {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
         assertNotNull(lbm);
 
-        ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
+        int blockSize = 12 + 32; // block header and space for four longs
+        long address = 0xDEADBEEF;
+        ByteBuffer block = ByteBuffer.allocate(blockSize);
+        block.putLong(address);
+        block.putInt(4);
         for (long i = 1000; i < 5000; i += 1000) {
             block.putLong(i);
         }
@@ -83,20 +87,25 @@ public class TestLargeBlockManagerSuite {
         // Store a block...
         long siteId = 555;
         long blockId = 333;
-        long address = 0xDEADBEEF;
-        lbm.storeBlock(new BlockId(siteId, blockId), address, block);
+
+        lbm.storeBlock(new BlockId(siteId, blockId), block);
 
         Path blockPath = lbm.makeBlockPath(new BlockId(siteId, blockId));
         assertThat(blockPath.toString(), endsWith("large_query_swap/555___333.block"));
         assertTrue(Files.exists(blockPath));
 
         // Load the block back into memory
-        ByteBuffer loadedBlock = ByteBuffer.allocateDirect(32);
-        long origAddress = lbm.loadBlock(new BlockId(siteId, blockId), loadedBlock);
+        ByteBuffer loadedBlock = ByteBuffer.allocateDirect(blockSize);
+        lbm.loadBlock(new BlockId(siteId, blockId), loadedBlock);
+        loadedBlock.position(0);
+
+        // Verify the metadata
+        long origAddress = loadedBlock.getLong();
+        int tupleCount = loadedBlock.getInt();
         assertEquals(address, origAddress);
+        assertEquals(4, tupleCount);
 
         // Ensure the block contains the expected data
-        loadedBlock.position(0);
         for (long i = 1000;  i < 5000; i += 1000) {
             assertEquals(i, loadedBlock.getLong());
         }
@@ -112,13 +121,16 @@ public class TestLargeBlockManagerSuite {
         long[] ids = {11, 22, 33, 101, 202, 303, 505, 606, 707};
         long address = 0xDEADBEEF;
 
+        int blockSize = 12 + 32; // block header and space for four longs
         for (long id : ids) {
-            ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
+            ByteBuffer block = ByteBuffer.allocate(blockSize);
+            block.putLong(address);
+            block.putInt(4);
             for (long i = 1000; i < 5000; i += 1000) {
                 block.putLong(i);
             }
 
-            lbm.storeBlock(new BlockId(id + 100, id), address, block);
+            lbm.storeBlock(new BlockId(id + 100, id), block);
         }
 
         for (long id : ids) {
@@ -150,7 +162,12 @@ public class TestLargeBlockManagerSuite {
     public void testErrors() throws IOException {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
 
-        ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
+        int blockSize = 12 + 32; // block header and space for four longs
+        long address = 0xDEADBEEF;
+
+        ByteBuffer block = ByteBuffer.allocate(blockSize);
+        block.putLong(address);
+        block.putInt(4);
         for (long i = 1000; i < 5000; i += 1000) {
             block.putLong(i);
         }
@@ -158,8 +175,7 @@ public class TestLargeBlockManagerSuite {
         // Store a block...
         long siteId = 555;
         long blockId = 555;
-        long address = 0xDEADBEEF;
-        lbm.storeBlock(new BlockId(siteId, blockId), address, block);
+        lbm.storeBlock(new BlockId(siteId, blockId), block);
 
         Path blockPath = lbm.makeBlockPath(new BlockId(siteId, blockId));
         assertThat(blockPath.toString(), endsWith("large_query_swap/555___555.block"));
@@ -167,7 +183,7 @@ public class TestLargeBlockManagerSuite {
 
         try {
             // Redundantly store a block (should fail)
-            lbm.storeBlock(new BlockId(siteId, blockId), address, block);
+            lbm.storeBlock(new BlockId(siteId, blockId), block);
             fail("Expected redundant store to throw an exception");
         }
         catch (IllegalArgumentException iac) {

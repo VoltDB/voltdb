@@ -72,6 +72,16 @@ public:
     */
     static const size_t BLOCK_SIZE_IN_BYTES = 8 * 1024 * 1024; // 8 MB
 
+    /** Each block has a header of 12 bytes:
+        - 8 bytes for the address of the block in memory.  This is needed
+          when loading a block from disk back into memory, to update pointers
+          to non-inlined string data
+        - 4 bytes for the number of tuples in the block.
+        This information is redundant (this class contains a separate tuple count),
+        but needed for when we serialize data to disk.
+    */
+    static const size_t HEADER_SIZE = 8 + 4;
+
     /** constructor for a new block. */
     LargeTempTableBlock(LargeTempTableBlockId id, const TupleSchema* schema);
 
@@ -83,12 +93,6 @@ public:
     /** insert a tuple into this block.  Returns true if insertion was
         successful.  */
     bool insertTuple(const TableTuple& source);
-
-    /** insert a tuple into this block, assuming that any non-inlined
-        data is already present in this block at an offset of
-        (<non-inlined object address> - origAddress). Returns true if
-        insertion was successful.  */
-    bool insertTupleRelocateNonInlinedFields(const TableTuple& source, const char* origAddress);
 
     /** Because we can allocate non-inlined objects into LTT blocks,
         this class needs to function like a pool, and this allocate
@@ -102,8 +106,13 @@ public:
     }
 
     /** Return a pointer to the storage for this block. */
-    char* address() {
-        return m_storage.get();
+    char* tupleStorage() const {
+        return (m_storage.get() + HEADER_SIZE);
+    }
+
+    /** Return a pointer to the storage for this block. (not const) */
+    char* tupleStorage() {
+        return (m_storage.get() + HEADER_SIZE);
     }
 
     /** Returns the amount of memory used by this block.  For blocks
@@ -111,7 +120,7 @@ public:
         BLOCK_SIZE_IN_BYTES, and zero otherwise.
         Note that this value may not be equal to
         getAllocatedTupleMemory() + getAllocatedPoolMemory() because
-        of unused space at the middle of the block. */
+        of the block header and unused space at the middle of the block. */
     int64_t getAllocatedMemory() const;
 
     /** Return the number of bytes used to store tuples in this
@@ -128,11 +137,7 @@ public:
 
     /** Set the storage associated with this block (as when loading
         from disk) */
-    void setData(char* origAddress, std::unique_ptr<char[]> storage);
-
-    /** Copy the non-inlined data segment from the given block into
-        this one. */
-    void copyNonInlinedData(const LargeTempTableBlock& srcBlock);
+    void setData(std::unique_ptr<char[]> storage);
 
     /** Returns true if this block is pinned in the cache and may not
         be stored to disk (i.e., we are currently inserting tuples
@@ -178,13 +183,8 @@ public:
         return m_schema;
     }
 
-    /* /\** Return the schema of the tuples in this block (non-const version) *\/ */
-    /* TupleSchema* schema() { */
-    /*     return m_schema; */
-    /* } */
-
     /** Swap the contents of the two blocks.  It's up to the caller to
-        invalidate any copies of this block in disk. */
+        invalidate any copies of this block on disk. */
     void swap(LargeTempTableBlock* otherBlock) {
         assert(m_schema->isCompatibleForMemcpy(otherBlock->m_schema));
         // id should stay the same
@@ -197,7 +197,7 @@ public:
 
     /** Clear all the data out of this block. */
     void clearForTest() {
-        m_tupleInsertionPoint = m_storage.get();
+        m_tupleInsertionPoint = tupleStorage();
         m_nonInlinedInsertionPoint = m_storage.get() + BLOCK_SIZE_IN_BYTES;
         m_activeTupleCount = 0;
     }
@@ -237,9 +237,23 @@ public:
 
  private:
 
-    /** Update all fields referencing non-inlined data, assuming they
-        were relative to the given address. */
-    void relocateNonInlinedFields(char* origAddress);
+    /** Return a pointer to the first 8-byte word in the buffer.
+     * This is the original address of the buffer when it gets
+     * saved and reloaded from disk.  When this word is not equal to
+     * the buffers current address, string pointers in the tuples
+     * must be updated to reflect the buffer's new location
+     * */
+    char** getStorageAddressPointer() {
+        return reinterpret_cast<char**>(&(m_storage[0]));
+    }
+
+    /**
+     * Return the address of 4-byte integer in the block header that
+     * contains the tuple count for the block.
+     */
+    int32_t* getStorageTupleCount() const {
+        return reinterpret_cast<int32_t*>(&(m_storage[sizeof(char*)]));
+    }
 
     /** the ID of this block */
     LargeTempTableBlockId m_id;
@@ -268,7 +282,10 @@ public:
         Blocks that are resident and also stored can be evicted without doing any I/O. */
     bool m_isStored;
 
-    /** Number of tuples currently in this block */
+    /**
+     * Number of tuples currently in this block.  This is also stored in the tuple
+     * block storage itself.  These two values need to be kept in sync.
+     */
     int64_t m_activeTupleCount;
 };
 

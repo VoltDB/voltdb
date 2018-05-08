@@ -61,6 +61,7 @@ public abstract class BaseInitiator implements Initiator
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
 
+
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
             StartAction startAction)
@@ -70,6 +71,7 @@ public abstract class BaseInitiator implements Initiator
         m_partitionId = partition;
         m_scheduler = scheduler;
         JoinProducerBase joinProducer;
+
 
         if (startAction == StartAction.JOIN) {
             joinProducer = new ElasticJoinProducer(m_partitionId, scheduler.m_tasks);
