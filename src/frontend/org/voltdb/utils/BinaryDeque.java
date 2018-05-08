@@ -152,6 +152,11 @@ public interface BinaryDeque {
         public TruncatorResponse(Status status) {
             this.status = status;
         }
+
+        public int getTruncatedBuffSize() throws IOException {
+            throw new UnsupportedOperationException("Must implement this for partial object truncation");
+        }
+
         public int writeTruncatedObject(ByteBuffer output) throws IOException {
             throw new UnsupportedOperationException("Must implement this for partial object truncation");
         }
