@@ -16,8 +16,10 @@
  */
 package org.voltdb.importclient.kafka10;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -222,6 +224,34 @@ public class KafkaLoader implements ImporterLifecycle {
     }
 
     private void processKafkaMessages() throws Exception {
+        FileReader fr = null;
+        BufferedReader br = null;
+
+        if (m_cliOptions.credentials.length() > 0) {
+            try {
+                fr = new FileReader(m_cliOptions.credentials);
+                br = new BufferedReader(fr);
+                String content = "";
+                String sCurrentLine;
+                while ((sCurrentLine = br.readLine()) != null) {
+                    content += sCurrentLine + " ";
+                }
+                String[] tokens = content.split("\\W+");
+                m_cliOptions.user = tokens[1];
+                m_cliOptions.password = tokens[3];
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    if (br != null)
+                        br.close();
+                    if (fr != null)
+                        fr.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }
 
         // If we need to prompt the user for a VoltDB password, do so.
         m_cliOptions.password = CLIConfig.readPasswordIfNeeded(m_cliOptions.user, m_cliOptions.password, "Enter password: ");
