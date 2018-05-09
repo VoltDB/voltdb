@@ -1556,12 +1556,8 @@ public class SQLCommand
                     content += sCurrentLine + " ";
                 }
                 String[] tokens = content.split("\\W+");
-                if (tokens.length != 4) {
-                    System.out.println("Incorrect info.");
-                } else {
-                    user = tokens[1];
-                    password = tokens[3];
-                }
+                user = tokens[1];
+                password = tokens[3];
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {

@@ -469,12 +469,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                     content += sCurrentLine + " ";
                 }
                 String[] tokens = content.split("\\W+");
-                if (tokens.length != 4) {
-                    System.out.println("Incorrect info.");
-                } else {
-                    config.user = tokens[1];
-                    config.password = tokens[3];
-                }
+                config.user = tokens[1];
+                config.password = tokens[3];
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
