@@ -104,7 +104,7 @@ public class KafkaLoader {
     }
 
     public void processKafkaMessages() throws Exception {
-    	FileReader fr = null;
+        FileReader fr = null;
         BufferedReader br = null;
 
         if (m_config.credentials.length() > 0) {
@@ -132,7 +132,7 @@ public class KafkaLoader {
                 }
             }
         }
-    	
+
         // Split server list
         final String[] serverlist = m_config.servers.split(",");
 
