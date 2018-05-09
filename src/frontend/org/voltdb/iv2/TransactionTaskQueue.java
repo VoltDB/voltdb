@@ -52,7 +52,6 @@ public class TransactionTaskQueue
         }
 
         void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox) {
-            hostLog.debug("Initializing scoreboard for site " + siteId + " out of " + m_siteCount + " (lowest expected is " + m_lowestSiteId + ")");
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
             if (m_stashedMpQueues == null) {
