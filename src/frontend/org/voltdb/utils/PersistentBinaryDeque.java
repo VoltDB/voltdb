@@ -816,6 +816,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         @Override
+        public int getTruncatedBuffSize() {
+            return m_retval.remaining();
+        }
+
+        @Override
         public int writeTruncatedObject(ByteBuffer output) {
             int objectSize = m_retval.remaining();
             output.putInt(objectSize);
@@ -837,6 +842,11 @@ public class PersistentBinaryDeque implements BinaryDeque {
             super(Status.PARTIAL_TRUNCATE);
             m_ds = ds;
             m_truncationCallback = truncationCallback;
+        }
+
+        @Override
+        public int getTruncatedBuffSize() throws IOException {
+            return m_ds.getSerializedSize();
         }
 
         @Override
