@@ -1285,7 +1285,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg);
             queueOrOfferMPTask(task);
         } else {
-            if (!msg.isReadOnly()) {
+            if (msg.needsCoordination()) {
                 final CompleteTransactionTask missingTxnCompletion =
                         new CompleteTransactionTask(m_mailbox, null, m_pendingTasks, msg);
                 m_pendingTasks.handleCompletionForMissingTxn(missingTxnCompletion);
