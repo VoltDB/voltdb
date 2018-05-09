@@ -16,8 +16,10 @@
  */
 package org.voltdb.importclient.kafka;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
@@ -102,6 +104,35 @@ public class KafkaLoader {
     }
 
     public void processKafkaMessages() throws Exception {
+    	FileReader fr = null;
+        BufferedReader br = null;
+
+        if (m_config.credentials.length() > 0) {
+            try {
+                fr = new FileReader(m_config.credentials);
+                br = new BufferedReader(fr);
+                String content = "";
+                String sCurrentLine;
+                while ((sCurrentLine = br.readLine()) != null) {
+                    content += sCurrentLine + " ";
+                }
+                String[] tokens = content.split("\\W+");
+                m_config.user = tokens[1];
+                m_config.password = tokens[3];
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    if (br != null)
+                        br.close();
+                    if (fr != null)
+                        fr.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }
+    	
         // Split server list
         final String[] serverlist = m_config.servers.split(",");
 
@@ -180,6 +211,9 @@ public class KafkaLoader {
 
         @Option(desc = "password to use when connecting to servers")
         String password = "";
+
+        @Option(desc = "credentials that contains username and password information")
+        String credentials = "";
 
         @Option(shortOpt = "z", desc = "kafka zookeeper to connect to. (format: zkserver:port)")
         String zookeeper = ""; //No default here as default will clash with local voltdb cluster
