@@ -165,7 +165,7 @@ public abstract class PBDSegment {
     // TODO: javadoc
     abstract int size();
 
-    abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int hdrLength) throws IOException;
+    abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry) throws IOException;
 
     /**
      * Parse the segment and truncate the file if necessary.
@@ -226,7 +226,7 @@ public abstract class PBDSegment {
                         final long partialEntryBeginOffset = reader.readOffset();
                         m_fc.position(partialEntryBeginOffset);
 
-                        final int written = writeTruncatedEntry(retval, OBJECT_HEADER_BYTES);
+                        final int written = writeTruncatedEntry(retval);
                         sizeInBytes += written;
 
                         initNumEntries(reader.readIndex(), sizeInBytes);
