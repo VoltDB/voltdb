@@ -83,6 +83,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
@@ -113,6 +114,8 @@ public class SnapshotUtil {
      * milestone used to mark a shutdown save snapshot
      */
     public static final String JSON_TERMINUS = "terminus";
+
+    private static VoltLogger host = new VoltLogger("HOST");
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
@@ -194,6 +197,13 @@ public class SnapshotUtil {
                     stringer.value(tables.get(ii).getTypeName());
                 }
                 stringer.endArray();
+                if (host.isDebugEnabled()) {
+                    StringBuffer sb = new StringBuffer();
+                    sb.append("Digest for snapshot ").append(timestamp).append(" with txnId ").append(TxnEgo.txnIdToString(txnId));
+                    sb.append(" contains partition txnIds");
+                    partitionTransactionIds.entrySet().stream().forEachOrdered(e -> sb.append(" ").append(TxnEgo.txnIdToString(e.getValue())));
+                    host.debug(sb.toString());
+                }
 
                 stringer.key("partitionTransactionIds").object();
                 for (Map.Entry<Integer, Long> entry : partitionTransactionIds.entrySet()) {
