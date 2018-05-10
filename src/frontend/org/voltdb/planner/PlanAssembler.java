@@ -1947,7 +1947,7 @@ public class PlanAssembler {
         OrderByPlanNode n = new OrderByPlanNode();
 
         for (ParsedColInfo col : cols) {
-            n.addSort(col.expression,
+            n.addSortExpression(col.expression,
                     col.ascending ? SortDirectionType.ASC
                                   : SortDirectionType.DESC);
         }
@@ -2528,13 +2528,13 @@ public class PlanAssembler {
                     pdir = orderByDirections.get(sidx);
                     dontsort[sidx] = true;
                 }
-                onode.addSort(partitionByExpression, pdir);
+                onode.addSortExpression(partitionByExpression, pdir);
             }
             for (int idx = 0; idx < winExpr.getOrderbySize(); ++idx) {
                 if (!dontsort[idx]) {
                     AbstractExpression orderByExpr = orderByExpressions.get(idx);
                     SortDirectionType  orderByDir  = orderByDirections.get(idx);
-                    onode.addSort(orderByExpr, orderByDir);
+                    onode.addSortExpression(orderByExpr, orderByDir);
                 }
             }
             onode.addAndLinkChild(root);
@@ -2555,7 +2555,7 @@ public class PlanAssembler {
                 List<AbstractExpression> orderExprs = scanNode.getFinalExpressionOrderFromIndexScan();
                 assert(orderExprs != null);
                 for (AbstractExpression ae : orderExprs) {
-                    onode.addSort(ae, dir);
+                    onode.addSortExpression(ae, dir);
                 }
                 // Link in the OrderByNode.
                 onode.addAndLinkChild(root);

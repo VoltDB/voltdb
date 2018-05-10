@@ -22,16 +22,17 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -229,8 +230,34 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         assert(receive.getChildCount() == 1);
         AbstractPlanNode partitionRoot = receive.getChild(0);
         if (!partitionRoot.isOutputOrdered(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections())) {
-            // Partition results are not ordered
-            return orderbyNode;
+            // Partition results are not ordered. The MERGE RECEIVE optimization is still possible if
+            //  - the coordinator's plan below the ORDER BY node is trivial. At the moment only RECEIVE node is allowed.
+            //    A future enhancement may allow PROJECTION/RECEIVE
+            //  - Coordinator's ORDER BY node does not have inline LIMIT/OFFSET node. If a plan has an ORDER BY and
+            // LIMIT/OFFSET nodes, PlanAssembeler tries to push both of them to a partition fragment
+            // as LIMIT pushed down optimization during the regular planning phase (PlanAssembler.handleSelectLimitOperator).
+            // If it succeeds, the partition's output would be ordered and we wouldn't get there.
+            // If we get there and ODER BY node does have inline LIMIT it means that the PlanAssembler
+            // fails to apply the original optimization and we also can not do it here.
+            // For example, an OFFSET without a LIMIT can not be pushed down.
+            if (isOptimizationPossible(orderbyNode)) {
+                // Build fragment's ORDER BY plan node
+                OrderByPlanNode fragmentOrderbyNode = new OrderByPlanNode();
+                fragmentOrderbyNode.addSortExpressions(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections());
+                for(Map.Entry<PlanNodeType, AbstractPlanNode> inlineEntry : orderbyNode.getInlinePlanNodes().entrySet()) {
+                    fragmentOrderbyNode.addInlinePlanNode(inlineEntry.getValue());
+                }
+
+                // Insert the fragment's ORDER BY plan node below the partition's root (Send node)
+                assert(partitionRoot.getChildCount() == 1);
+                AbstractPlanNode partitionRootInput = partitionRoot.getChild(0);
+                partitionRootInput.clearParents();
+                partitionRoot.clearChildren();
+                fragmentOrderbyNode.addAndLinkChild(partitionRootInput);
+                partitionRoot.addAndLinkChild(fragmentOrderbyNode);
+            } else {
+                return orderbyNode;
+            }
         }
 
         // At this point we confirmed that the optimization is applicable.
@@ -316,4 +343,14 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         return aggregateNode;
     }
 
+    private boolean isOptimizationPossible(OrderByPlanNode orderPlanNode) {
+        assert(orderPlanNode.getChildCount() == 1);
+        // No inline LIMIT/OFFSET
+        if (orderPlanNode.getInlinePlanNode(PlanNodeType.LIMIT) != null) {
+            return false;
+        }
+        // For the time being, the optimization is possible only if ORDER node's child is a RECEIVE node
+        PlanNodeType planNodeType = orderPlanNode.getChild(0).getPlanNodeType();
+        return PlanNodeType.RECEIVE == planNodeType;
+    }
 }
