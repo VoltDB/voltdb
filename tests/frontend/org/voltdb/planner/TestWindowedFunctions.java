@@ -777,14 +777,14 @@ public class TestWindowedFunctions extends PlannerTestCase {
                                   PlanNodeType.SEQSCAN));
         }
         //  12: SLOB, No WF, MP Query, noindex
-        //      Expect OrderBy(SLOB) -> RECV -> SEND -> SeqScan
+        //      Expect MergeReceive with OrderBy(SLOB) -> RECV -> SEND -> ORDER BY -> SeqScan
         //   select * from vanilla_pa order by b;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pa order by b;",
                          fragSpec(PlanNodeType.SEND,
-                                  PlanNodeType.ORDERBY, // (SLOB),
-                                  PlanNodeType.RECEIVE),
+                                  PlanNodeType.MERGERECEIVE),
                          fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY, // (SLOB),
                                   PlanNodeType.SEQSCAN));
         }
         //  13: SLOB, No WF, SP Query, index (Can order the SLOB)
@@ -851,22 +851,22 @@ public class TestWindowedFunctions extends PlannerTestCase {
                                   PlanNodeType.INDEXSCAN));
         }
         //  16: SLOB, No WF, MP Query, index (Cannot order the SLOB)
-        //      Expect OrderBy(SLOB) -> RECV -> SEND -> IndxScan
+        //      Expect MERGERECEIVE with (OrderBy(SLOB)) -> RECV -> SEND -> ORDER BY IndxScan
         //   select * from vanilla_pb_idx where a = 1 order by b;
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pb_idx where a = 1 order by b;",
                          fragSpec(PlanNodeType.SEND,
-                                  PlanNodeType.ORDERBY, // (SLOB),
-                                  PlanNodeType.RECEIVE),
+                                  PlanNodeType.MERGERECEIVE),
                          fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY, // (SLOB),
                                   PlanNodeType.INDEXSCAN));
         }
         if (IS_ENABLED) {
             validatePlan("select * from vanilla_pb_idx where a < 1 order by b;",
                          fragSpec(PlanNodeType.SEND,
-                                  PlanNodeType.ORDERBY, // (SLOB),
-                                  PlanNodeType.RECEIVE),
+                                  PlanNodeType.MERGERECEIVE),
                          fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY, // (SLOB),
                                   PlanNodeType.INDEXSCAN));
         }
         //  17: SLOB, One WF, SP Query, index (Cannot order SLOB or WF)
