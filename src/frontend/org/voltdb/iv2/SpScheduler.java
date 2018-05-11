@@ -1796,7 +1796,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
             }
         }
-        if (maxSeenMpTxnId != -1 && m_pendingTasks.peekFirstBacklogTask().getTransactionState().isReadOnly()) {
+        if (maxSeenMpTxnId != -1 && m_pendingTasks.peekFirstBacklogTask() != null &&
+                m_pendingTasks.peekFirstBacklogTask().getTransactionState().isReadOnly()) {
             m_pendingTasks.flush(maxSeenMpTxnId);
         }
     }
