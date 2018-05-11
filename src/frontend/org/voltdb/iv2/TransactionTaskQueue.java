@@ -475,11 +475,5 @@ public class TransactionTaskQueue
         return pendingTasks;
     }
 
-    public TransactionTask peekFirstBacklogTask() {
-        if (m_backlog.isEmpty()) {
-            return null;
-        }
-        return m_backlog.getFirst();
-    }
 
 }

@@ -215,6 +215,4 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void enableWritingIv2FaultLog();
 
     abstract public boolean sequenceForReplay(VoltMessage m);
-
-    public void handleMPIFailoverMessage() {}
 }

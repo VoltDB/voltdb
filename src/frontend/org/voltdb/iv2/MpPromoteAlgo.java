@@ -46,8 +46,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
-    // The last bit is isMPIFailover flag, 1 means true, 0 means false.
-    private final long m_requestId;
+    private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private long m_maxSeenCompleteTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
@@ -121,22 +120,19 @@ public class MpPromoteAlgo implements RepairAlgo
         m_isMigratePartitionLeader = false;
         m_whoami = whoami;
         m_restartSeqGenerator = seqGen;
-        m_requestId = System.nanoTime() << 1;
     }
 
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox, MpRestartSequenceGenerator seqGen,
-            String whoami, boolean migratePartitionLeader, boolean isMPIFailover)
+            String whoami, boolean migratePartitionLeader)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
         m_restartSeqGenerator = seqGen;
-        // use the last bit to mark whether the repair request message is from newly promoted MPI (MPI failover)
-        m_requestId = (isMPIFailover? 1L : 0L) | System.nanoTime() << 1;
     }
 
     @Override
