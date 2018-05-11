@@ -210,7 +210,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
                 RepairAlgo repair =
-                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, migratePartitionLeader);
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, migratePartitionLeader, false);
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
