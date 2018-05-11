@@ -679,7 +679,7 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
     """
     Read username/password from txt file
     """
-    if command.opts.credentials is not None:
+    if hasattr(command.opts, 'credentials') and command.opts.credentials is not None:
         credentials = command.opts.credentials
         credentialsFile = open(credentials, "r")
         content = ""

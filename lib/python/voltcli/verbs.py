@@ -369,6 +369,7 @@ class JavaBundle(object):
 
 
     def start(self, verb, runner):
+        verb.add_options(cli.StringOption(None, '--credentials', "credentials", "contains username and password information"))
         pass
 
     def go(self, verb, runner):
