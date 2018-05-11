@@ -120,7 +120,8 @@ public class KafkaLoader {
                 m_config.user = tokens[1];
                 m_config.password = tokens[3];
             } catch (IOException e) {
-                e.printStackTrace();
+                m_log.error("Credentials file not found or permission denied");
+                System.exit(-1);
             } finally {
                 try {
                     if (br != null)

@@ -681,14 +681,18 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
     """
     if hasattr(command.opts, 'credentials') and command.opts.credentials is not None:
         credentials = command.opts.credentials
-        credentialsFile = open(credentials, "r")
-        content = ""
-        for line in credentialsFile:
-            content += line
-        user,usr,password,pswd = content.split( )
-        command.opts.username = usr
-        command.opts.password = pswd
-        credentialsFile.close()
+        try:
+            credentialsFile = open(credentials, "r")
+        except IOError:
+            print "Credentials file not found or permission denied."
+        else: 
+            content = ""
+            for line in credentialsFile:
+                content += line
+            user,usr,password,pswd = content.split( )
+            command.opts.username = usr
+            command.opts.password = pswd
+            credentialsFile.close()
 
     # Initialize utility function options according to parsed options.
     utility.set_verbose(command.opts.verbose)

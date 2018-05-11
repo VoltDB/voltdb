@@ -336,7 +336,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         // Split server list
         final String[] serverlist = m_config.servers.split(",");
 
-     // read username and password from txt file
+        // read username and password from txt file
         if (cfg.credentials.length() > 0) {
             try {
                 fr = new FileReader(cfg.credentials);
@@ -350,7 +350,8 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                 m_config.user = tokens[1];
                 m_config.password = tokens[3];
             } catch (IOException e) {
-                e.printStackTrace();
+                m_log.error("Credential file not found or permission denied.");
+                System.exit(-1);
             } finally {
                 try {
                     if (br != null)

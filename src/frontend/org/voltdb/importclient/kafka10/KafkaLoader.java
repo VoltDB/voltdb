@@ -240,7 +240,8 @@ public class KafkaLoader implements ImporterLifecycle {
                 m_cliOptions.user = tokens[1];
                 m_cliOptions.password = tokens[3];
             } catch (IOException e) {
-                e.printStackTrace();
+                LOGGER.error("Credentials file not found or permission denied");
+                System.exit(-1);
             } finally {
                 try {
                     if (br != null)

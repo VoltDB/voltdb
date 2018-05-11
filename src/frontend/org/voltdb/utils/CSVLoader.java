@@ -472,7 +472,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 config.user = tokens[1];
                 config.password = tokens[3];
             } catch (IOException e) {
-                e.printStackTrace();
+                m_log.error("Credential file not found or permission denied.");
+                System.exit(-1);
             } finally {
                 try {
                     if (br != null)
