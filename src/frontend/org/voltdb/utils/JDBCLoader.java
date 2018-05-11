@@ -347,8 +347,8 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                     content += sCurrentLine + " ";
                 }
                 String[] tokens = content.split("\\W+");
-                cfg.user = tokens[1];
-                cfg.password = tokens[3];
+                m_config.user = tokens[1];
+                m_config.password = tokens[3];
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
