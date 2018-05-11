@@ -1769,8 +1769,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    // When MPI fails over, since repair log doesn't include any MP RO transaction, the new MPI needs to clean up
-    // possible in-progress RO transaction. Note that if RO transaction is a multi-fragment read, some sites may have
+    // When MPI fails over, since repair log doesn't include any MP RO transaction, new MPI needs to clean up the
+    // possibly in-progress RO transaction. Note that if RO transaction is a multi-fragment read, some sites may have
     // not received the fragment while some others have received it when the MPI failover occurs. If new MPI starts
     // the next transaction without cleaning up prior RO transaction, on the sites that have received fragment, the
     // backlogs of transaction task queue are still blocked on the fragment, it causes MP deadlock for the next transaction.
