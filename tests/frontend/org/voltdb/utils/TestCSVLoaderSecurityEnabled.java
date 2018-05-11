@@ -83,11 +83,11 @@ public class TestCSVLoaderSecurityEnabled {
     public static final RoleInfo[] GROUPS = new RoleInfo[] {
         new RoleInfo("Operator", true, true, true, true, true, true)
     };
-    
+
     public static final UserInfo[] USERS = new UserInfo[] {
         new UserInfo("operator", "mech", new String[] {"Operator"})
     };
-    
+
     public static void prepare() {
         if (!reportDir.endsWith("/"))
             reportDir += "/";
@@ -140,7 +140,7 @@ public class TestCSVLoaderSecurityEnabled {
 
         localServer.start();
         localServer.waitForInitialization();
-        
+
         ClientConfig cfg = new ClientConfig("operator", "mech");
         client = ClientFactory.createClient(cfg);
         client.createConnection("localhost");
@@ -162,7 +162,7 @@ public class TestCSVLoaderSecurityEnabled {
     @Before
     public void setup() throws IOException, ProcCallException
     {
-    	//TODO
+        //TODO
     }
 
     @After
@@ -172,7 +172,7 @@ public class TestCSVLoaderSecurityEnabled {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 
-    // A bad decimal
+    // test with username / password
     @Test
     public void testBadDecimal() throws Exception {
         String []myOptions = {
@@ -202,7 +202,7 @@ public class TestCSVLoaderSecurityEnabled {
     // test csvloader connection with credentials file
     @Test
     public void testUsingCredentialFile() throws Exception {
-    	try{
+        try{
             BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_credentials ) );
             String[] credentials = {"username: operator", "password: mech"};
             for (String token : credentials) {
@@ -214,7 +214,7 @@ public class TestCSVLoaderSecurityEnabled {
         catch( Exception e) {
             System.err.print( e.getMessage() );
         }
-    	
+
         String []myOptions = {
                 "-f" + path_csv,
                 "--reportdir=" + reportDir,
@@ -230,7 +230,7 @@ public class TestCSVLoaderSecurityEnabled {
         };
         String currentTime = new TimestampType().toString();
         String []myData = {
-                "1 ,1,1,11111111,first,2000.00,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\"",
+                "1 ,1,1,11111111,first,2000.00,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\""
         };
         int invalidLineCnt = 1;
         int validLineCnt = 0;
