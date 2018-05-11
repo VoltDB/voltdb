@@ -41,6 +41,7 @@ public class TransactionTaskQueue
     private static class RelativeSiteOffset {
         private SiteTaskerQueue[] m_stashedMpQueues;
         private Scoreboard[] m_stashedMpScoreboards;
+        private TransactionTaskQueue[] m_txnTaskQueues;
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
         private Mailbox[] m_mailBoxes;
@@ -49,19 +50,22 @@ public class TransactionTaskQueue
             m_stashedMpScoreboards = null;
             m_lowestSiteId = firstSiteId;
             m_siteCount = siteCount;
+            m_txnTaskQueues = null;
         }
 
-        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox) {
+        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox, TransactionTaskQueue taskQueue) {
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
             if (m_stashedMpQueues == null) {
                 m_stashedMpQueues = new SiteTaskerQueue[m_siteCount];
                 m_stashedMpScoreboards = new Scoreboard[m_siteCount];
                 m_mailBoxes = new Mailbox[m_siteCount];
+                m_txnTaskQueues = new TransactionTaskQueue[m_siteCount];
             }
             m_stashedMpQueues[siteId-m_lowestSiteId] = queue;
             m_stashedMpScoreboards[siteId-m_lowestSiteId] = scoreboard;
             m_mailBoxes[siteId-m_lowestSiteId] = mailBox;
+            m_txnTaskQueues[siteId-m_lowestSiteId] = taskQueue;
         }
 
         // All sites receives FragmentTask messages, time to fire the task.
@@ -100,14 +104,14 @@ public class TransactionTaskQueue
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst().getFirst();
                 // skip for test case
                 if (missingTask) {
-                  //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
+                    if (!completion.isRestartable()) {
+                        m_txnTaskQueues[ii].flush(txnId);
+                    }
+                    //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
                     //up the site outstanding transaction queue and duplicate counter
                     final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(completion.getCompleteMessage());
                     resp.m_sourceHSId = m_mailBoxes[ii].getHSId();
                     m_mailBoxes[ii].deliver(resp);
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("handling missing complete response in scoreboard:" + completion);
-                    }
                 } else {
                     Iv2Trace.logSiteTaskerQueueOffer(completion);
                     m_stashedMpQueues[ii].offer(completion);
@@ -176,7 +180,7 @@ public class TransactionTaskQueue
     void initializeScoreboard(int siteId, Mailbox mailBox) {
         synchronized (s_lock) {
             if (m_taskQueue.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox);
+                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox, this);
             }
         }
     }

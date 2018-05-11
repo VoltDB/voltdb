@@ -139,7 +139,7 @@ public class MpProcedureTask extends ProcedureTask
                         "Failure while running system procedure " + txn.m_initiationMsg.getStoredProcedureName() +
                         ", and system procedures can not be restarted."));
             txn.setNeedsRollback(true);
-            completeInitiateTask(siteConnection);
+            completeInitiateTask(siteConnection, false);
             errorResp.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(errorResp);
 
@@ -243,8 +243,11 @@ public class MpProcedureTask extends ProcedureTask
     }
 
     @Override
-    void completeInitiateTask(SiteProcedureConnection siteConnection)
-    {
+    void completeInitiateTask(SiteProcedureConnection siteConnection) {
+        completeInitiateTask(siteConnection, true);
+    }
+
+    void completeInitiateTask(SiteProcedureConnection siteConnection, boolean restartable){
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
         if (traceLog != null) {
             traceLog.add(() -> VoltTrace.instant("sendcomplete",
@@ -267,7 +270,7 @@ public class MpProcedureTask extends ProcedureTask
                     m_msg.isForReplay(),
                     txnState.isNPartTxn());
             complete.setTruncationHandle(m_msg.getTruncationHandle());
-
+            complete.setRestartable(restartable);
             //If there are misrouted fragments, send message to current masters.
             final List<Long> initiatorHSIds = new ArrayList<Long>();
             if (txnState.isFragmentRestarted()) {

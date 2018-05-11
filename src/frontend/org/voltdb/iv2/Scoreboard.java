@@ -155,29 +155,6 @@ public class Scoreboard {
                 m_compTasks.peekFirst().getFirst().getTimestamp() == timestamp;
     }
 
-    //Find the CompleteTransactionTask to be released. The task could be in header or tail
-    //If the released one has the latest time stamp, then remove txn before the released one.
-    public CompleteTransactionTask releaseCompleteTransactionTaskAndRemoveStaleTxn(long txnId) {
-        Pair<CompleteTransactionTask, Boolean> header = m_compTasks.pollFirst();
-        if (m_compTasks.isEmpty()) {
-            return header.getFirst();
-        }
-
-        Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.pollFirst();
-        //match in the header
-        if (header.getFirst().getMsgTxnId() == txnId) {
-            if (txnId < tail.getFirst().getMsgTxnId()) {
-                m_compTasks.addLast(tail);
-            }
-            return header.getFirst();
-        } else { //match in the tail
-            if (header.getFirst().getMsgTxnId() > txnId) {
-                m_compTasks.addLast(header);
-            }
-            return tail.getFirst();
-        }
-    }
-
     public boolean isTransactionMissing(long txnId) {
         if (m_compTasks.peekFirst().getSecond() && txnId == m_compTasks.peekFirst().getFirst().getMsgTxnId()) {
             return true;

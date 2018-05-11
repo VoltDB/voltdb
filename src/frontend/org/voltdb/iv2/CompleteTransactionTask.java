@@ -148,6 +148,10 @@ public class CompleteTransactionTask extends TransactionTask
         return m_completeMsg.getTxnId();
     }
 
+    public boolean isRestartable() {
+        return m_completeMsg.isRestartable();
+    }
+
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
