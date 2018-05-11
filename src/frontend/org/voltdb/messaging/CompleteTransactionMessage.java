@@ -31,7 +31,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_requiresAck;
     boolean m_rollbackForFault;
     long m_timestamp = INITIAL_TIMESTAMP;
-
+    boolean m_restartable = true;
     int m_hash;
     int m_flags = 0;
     static final int ISROLLBACK = 0;
@@ -137,7 +137,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4 + 4 + 8;
+        msgsize += 4 + 4 + 8 + 1;
         return msgsize;
     }
 
@@ -149,6 +149,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         buf.putInt(m_hash);
         buf.putInt(m_flags);
         buf.putLong(m_timestamp);
+        buf.put(m_restartable ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -160,7 +161,16 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         m_hash = buf.getInt();
         m_flags = buf.getInt();
         m_timestamp = buf.getLong();
+        m_restartable = (buf.get() == 1);
         assert(buf.capacity() == buf.position());
+    }
+
+    public void setRestartable(boolean restartable) {
+        m_restartable = restartable;
+    }
+
+    public boolean isRestartable() {
+        return m_restartable;
     }
 
     @Override
