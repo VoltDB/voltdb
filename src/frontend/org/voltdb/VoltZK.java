@@ -500,11 +500,12 @@ public class VoltZK {
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
                 if (log != null) {
-                    log.error("Failed to remove action blocker: " + e.getMessage(), e);
+                    log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
                 }
                 return false;
             }
         } catch (InterruptedException e) {
+            log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
             return false;
         }
         return true;

@@ -29,6 +29,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
+import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -49,6 +50,7 @@ public class SpTerm implements Term
     protected BabySitter m_babySitter;
     private ImmutableList<Long> m_replicas = ImmutableList.of();
     private boolean m_replicasUpdatedRequired = false;
+    private final boolean m_isJoining;
 
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
@@ -64,7 +66,7 @@ public class SpTerm implements Term
                 tmLog.debug(m_whoami
                       + "replica change handler updating replica list to: "
                       + CoreUtils.hsIdCollectionToString(replicas) +
-                      "from " +
+                      " from " +
                       CoreUtils.hsIdCollectionToString(m_replicas));
             }
             if (replicas.size() == m_replicas.size()) {
@@ -75,12 +77,12 @@ public class SpTerm implements Term
                 }
             }
 
-            if (m_replicas.isEmpty() || replicas.size() <= m_replicas.size()) {
+            if (m_replicas.isEmpty() || replicas.size() <= m_replicas.size() || m_isJoining) {
                 //The cases for startup or host failure
                 m_mailbox.updateReplicas(replicas, null);
                 m_replicasUpdatedRequired = false;
             } else {
-                //The case for join or rejoin
+                //The case for rejoin
                 m_replicasUpdatedRequired = true;
                 tmLog.info(m_whoami + " replicas to be updated from join or rejoin:"
                           + CoreUtils.hsIdCollectionToString(m_replicas));
@@ -99,6 +101,7 @@ public class SpTerm implements Term
         m_partitionId = partitionId;
         m_mailbox = mailbox;
         m_whoami = whoami;
+        m_isJoining = StartAction.JOIN.equals(VoltDB.instance().getConfig().m_startAction);
     }
 
     /**

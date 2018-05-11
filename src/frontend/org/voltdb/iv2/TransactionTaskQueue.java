@@ -37,6 +37,7 @@ public class TransactionTaskQueue
     final protected SiteTaskerQueue m_taskQueue;
 
     final private Scoreboard m_scoreboard;
+    private boolean m_scoreboardEnabled;
 
     private static class RelativeSiteOffset {
         private SiteTaskerQueue[] m_stashedMpQueues;
@@ -87,7 +88,7 @@ public class TransactionTaskQueue
 
         // All sites receives CompletedTransactionTask messages, time to fire the task.
         // If there are enough completeTransactionTask messages to fire another round of release, return false, otherwise true.
-        boolean releaseStashedComleteTxns(boolean missingTxn, long txnId)
+        boolean releaseStashedCompleteTxns(boolean missingTxn, long txnId)
         {
             boolean missingTask = missingTxn ? true : hasMissingTxn(txnId);
             if (hostLog.isDebugEnabled()) {
@@ -160,7 +161,8 @@ public class TransactionTaskQueue
     final private static RelativeSiteOffset s_stashedMpWrites = new RelativeSiteOffset();
     private static Object s_lock = new Object();
 
-    TransactionTaskQueue(SiteTaskerQueue queue)
+
+    TransactionTaskQueue(SiteTaskerQueue queue, boolean scoreboardEnabled)
     {
         m_taskQueue = queue;
         if (queue.getPartitionId() == MpInitiator.MP_INIT_PID) {
@@ -169,6 +171,18 @@ public class TransactionTaskQueue
         else {
             m_scoreboard = new Scoreboard();
         }
+        m_scoreboardEnabled = scoreboardEnabled;
+    }
+
+    public void setScoreboard(boolean enabled) {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("Scoreboard being enabled " + enabled);
+        }
+        m_scoreboardEnabled = enabled;
+    }
+
+    public boolean scoreboardEnabled() {
+        return m_scoreboardEnabled;
     }
 
     public static void resetScoreboards(int firstSiteId, int siteCount) {
@@ -214,7 +228,7 @@ public class TransactionTaskQueue
              * holds the tasks until all the sites on the node receive the task.
              * Task with newer spHandle will
              */
-            else if (task.needCoordination()) {
+            else if (task.needCoordination() && m_scoreboardEnabled) {
                 coordinatedTaskQueueOffer(task);
             }
             else {
@@ -237,7 +251,7 @@ public class TransactionTaskQueue
              * holds the tasks until all the sites on the node receive the task.
              * Task with newer spHandle will
              */
-            if (task.needCoordination()) {
+            if (task.needCoordination() && m_scoreboardEnabled) {
                 coordinatedTaskQueueOffer(task);
             } else {
                 taskQueueOffer(task);
@@ -302,7 +316,7 @@ public class TransactionTaskQueue
                     hostLog.debug(sb.toString());
                 }
                 if (completionScore == s_stashedMpWrites.getSiteCount()) {
-                    done = s_stashedMpWrites.releaseStashedComleteTxns(missingTxn, task.getTxnId());
+                    done = s_stashedMpWrites.releaseStashedCompleteTxns(missingTxn, task.getTxnId());
                 }
                 else if (fragmentScore == s_stashedMpWrites.getSiteCount() && completionScore == 0) {
                     s_stashedMpWrites.releaseStashedFragments(task.getTxnId());
@@ -341,7 +355,7 @@ public class TransactionTaskQueue
                     hostLog.debug(sb.toString());
                 }
                 if (completionScore == s_stashedMpWrites.getSiteCount()) {
-                    done = s_stashedMpWrites.releaseStashedComleteTxns(true, missingTxnCompletion.getMsgTxnId());
+                    done = s_stashedMpWrites.releaseStashedCompleteTxns(true, missingTxnCompletion.getMsgTxnId());
                 } else {
                     done = true;
                 }
@@ -384,7 +398,7 @@ public class TransactionTaskQueue
         while (iter.hasNext()) {
             TransactionTask task = iter.next();
             long lastQueuedTxnId = task.getTxnId();
-            if (task.needCoordination()) {
+            if (task.needCoordination() && m_scoreboardEnabled) {
                 coordinatedTaskQueueOffer(task);
             } else {
                 taskQueueOffer(task);
@@ -402,7 +416,7 @@ public class TransactionTaskQueue
                     task = iter.next();
                     if (task.getTxnId() == lastQueuedTxnId) {
                         iter.remove();
-                        if (task.needCoordination()) {
+                        if (task.needCoordination() && m_scoreboardEnabled) {
                             coordinatedTaskQueueOffer(task);
                         } else {
                             taskQueueOffer(task);
@@ -424,7 +438,7 @@ public class TransactionTaskQueue
     synchronized void restart()
     {
         TransactionTask task = m_backlog.getFirst();
-        if (task.needCoordination()) {
+        if (task.needCoordination() && m_scoreboardEnabled) {
             coordinatedTaskQueueOffer(task);
         } else {
             taskQueueOffer(task);
