@@ -40,7 +40,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
-    private final long m_requestId = System.nanoTime();
+    private final long m_requestId;
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
     private final boolean m_isMigratePartitionLeader;
@@ -118,6 +118,8 @@ public class SpPromoteAlgo implements RepairAlgo
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_isMigratePartitionLeader = isMigratePartitionLeader;
+        // last bit of request id is reserved for MpPromoteAlgo
+        m_requestId = System.nanoTime() << 1L;
     }
 
     @Override
