@@ -270,6 +270,8 @@ public class MpProcedureTask extends ProcedureTask
                     m_msg.isForReplay(),
                     txnState.isNPartTxn());
             complete.setTruncationHandle(m_msg.getTruncationHandle());
+
+            //A flag for Scoreboard to determine if it is necessary to flush transaction queue.
             complete.setRestartable(restartable);
             //If there are misrouted fragments, send message to current masters.
             final List<Long> initiatorHSIds = new ArrayList<Long>();

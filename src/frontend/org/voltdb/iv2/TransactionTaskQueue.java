@@ -89,21 +89,21 @@ public class TransactionTaskQueue
         // If there are enough completeTransactionTask messages to fire another round of release, return false, otherwise true.
         boolean releaseStashedComleteTxns(boolean missingTxn, long txnId)
         {
+            boolean missingTask = missingTxn ? true : hasMissingTxn(txnId);
             if (hostLog.isDebugEnabled()) {
-                if (missingTxn) {
+                if (missingTask) {
                     hostLog.debug("skipped incomplete rollback transaction message:" + TxnEgo.txnIdToString(txnId));
-                }
-                else {
+                } else {
                     hostLog.debug("release stashed complete transaction message:" + TxnEgo.txnIdToString(txnId));
                 }
             }
-            boolean missingTask = missingTxn ? true : hasMissingTxn(txnId);
             int tasksAtTail = 0;
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
                 // only release completions at head of queue
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst().getFirst();
-                // skip for test case
                 if (missingTask) {
+
+                    //flush the backlog to avoid no task is pushed to site queue
                     if (!completion.isRestartable()) {
                         m_txnTaskQueues[ii].flush(txnId);
                     }
