@@ -1551,7 +1551,7 @@ VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInputBE &serializeIn,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
                         int64_t uniqueId,
-                        bool throwUniqueViolations,
+                        bool returnConflictRows,
                         bool shouldDRStream,
                         int64_t undoToken) {
     //Not going to thread the unique id through.
@@ -1603,13 +1603,15 @@ VoltDBEngine::loadTable(int32_t tableId,
         try {
             table->loadTuplesForLoadTable(serializeIn,
                                           NULL,
-                                          throwUniqueViolations ? &m_resultOutput : NULL,
+                                          returnConflictRows ? &m_resultOutput : NULL,
                                           shouldDRStream,
                                           ExecutorContext::currentUndoQuantum() == NULL);
         }
         catch (const ConstraintFailureException &cfe) {
             s_loadTableException = VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION;
-            if (throwUniqueViolations) {
+            if (returnConflictRows) {
+                // This should not happen because all errors are swallowed and constraint violations are returned
+                // as failed rows in the result
                 throw;
             }
             else {
@@ -1627,13 +1629,24 @@ VoltDBEngine::loadTable(int32_t tableId,
             throwFatalException("%s", serializableExc.message().c_str());
         }
 
+        if (table->isCatalogTableReplicated() && returnConflictRows) {
+            // There may or may not have been conflicts but the call always succeeds. We need to copy the
+            // lowest site result into the results of other sites so there are no hash mismatches.
+            ExecuteWithAllSitesMemory execAllSites;
+            for (auto engineIt = execAllSites.begin(); engineIt != execAllSites.end(); ++engineIt) {
+                EngineLocals &curr = engineIt->second;
+                VoltDBEngine *currEngine = curr.context->getContextEngine();
+                currEngine->m_resultOutput.writeBytes(m_resultOutput.data(), m_resultOutput.size());
+            }
+        }
+
         // Indicate to other threads that load happened successfully.
         s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
     }
     else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION) {
         // An constraint failure exception was thrown on the lowest site thread and
         // handle it on the other threads too.
-        if (throwUniqueViolations) {
+        if (!returnConflictRows) {
             std::ostringstream oss;
             oss << "Replicated load table failed (constraint violation) on other thread for table \""
                 << table->name() << "\".";
