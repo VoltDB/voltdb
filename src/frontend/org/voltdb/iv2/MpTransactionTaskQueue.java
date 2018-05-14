@@ -144,6 +144,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                             "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
                     restart.setMisrouted(false);
                     poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
+                    poison.setRestartTimestamp(txn.getTimetamp());
                     txn.offerReceivedFragmentResponse(poison);
                     if (tmLog.isDebugEnabled()) {
                         tmLog.debug("MpTTQ: restarting:" + next);

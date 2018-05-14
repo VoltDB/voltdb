@@ -21,12 +21,14 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.iv2.MpRestartSequenceGenerator;
 import org.voltdb.iv2.TxnEgo;
 
 /**
@@ -70,6 +72,9 @@ public class FragmentResponseMessage extends VoltMessage {
     // before MigratePartitionLeader if the first batch or fragment has been processed in a batched or
     // multiple fragment transaction. m_currentBatchIndex > 0
     boolean m_isForOldLeader = false;
+
+    // Used by MPI to differentiate responses due to the transaction restart
+    long m_restartTimestamp = TransactionInfoBaseMessage.INITIAL_TIMESTAMP;
 
     /** Empty constructor for de-serialization */
     FragmentResponseMessage() {
@@ -195,7 +200,8 @@ public class FragmentResponseMessage extends VoltMessage {
             + 1 // node recovering flag
             + 2 // dependency count
             + 4// partition id
-            + 1; //m_forLeader
+            + 1 //m_forLeader
+            + 8;// restart timestamp
         // one int per dependency ID and table length (0 = null)
         msgsize += 8 * m_dependencyCount;
 
@@ -232,6 +238,7 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.putShort(m_dependencyCount);
         buf.putInt(m_partitionId);
         buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
+        buf.putLong(m_restartTimestamp);
         for (DependencyPair depPair : m_dependencies) {
             buf.putInt(depPair.depId);
 
@@ -266,6 +273,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_dependencyCount = buf.getShort();
         m_partitionId = buf.getInt();
         m_isForOldLeader = buf.get() == 1;
+        m_restartTimestamp = buf.getLong();
         for (int i = 0; i < m_dependencyCount; i++) {
             int depId = buf.getInt();
             int depLen = buf.getInt(buf.position());
@@ -301,6 +309,8 @@ public class FragmentResponseMessage extends VoltMessage {
         sb.append(TxnEgo.txnIdToString(m_txnId));
         sb.append(", SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(m_spHandle));
+        sb.append(", TIMESTAMP: ");
+        sb.append(MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp));
 
         if (m_status == SUCCESS)
             sb.append("\n  SUCCESS");
@@ -340,6 +350,14 @@ public class FragmentResponseMessage extends VoltMessage {
 
     public boolean isForOldLeader() {
         return m_isForOldLeader;
+    }
+
+    public void setRestartTimestamp(long timestamp) {
+        m_restartTimestamp = timestamp;
+    }
+
+    public long getRestartTimestamp() {
+        return m_restartTimestamp;
     }
 
     @Override

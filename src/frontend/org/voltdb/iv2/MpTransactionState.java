@@ -277,6 +277,14 @@ public class MpTransactionState extends TransactionState
                                                           MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), msg.m_sourceHSId, txnId, batchIdx),
                                                           "status", Byte.toString(msg.getStatusCode())));
                 }
+                // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
+                if (m_restartTimestamp != msg.getRestartTimestamp()) {
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug("Receives unmatched fragment response, expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
+                                " actually receives: " + msg);
+                    }
+                    continue;
+                }
                 boolean expectedMsg = handleReceivedFragResponse(msg);
                 if (expectedMsg) {
                     // Will roll-back and throw if this message has an exception
