@@ -598,8 +598,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new VoltTable.ColumnInfo("I_PRICE", VoltType.FLOAT),
                 new VoltTable.ColumnInfo("I_DATA", VoltType.STRING)
                 );
-        TPCCProjectBuilder builder = new TPCCProjectBuilder();
-        m_catalog = builder.createTPCCSchemaCatalog();
+        m_catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
         Cluster cluster = m_catalog.getClusters().get("cluster");
         WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().
                 get("database").getTables().get("WAREHOUSE").getRelativeIndex();
