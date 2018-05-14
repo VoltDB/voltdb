@@ -360,23 +360,27 @@ public class MpPromoteAlgo implements RepairAlgo
                 assert(ftm.getInitiateTask() != null);
                 m_interruptedTxns.add(ftm.getInitiateTask());
             }
-            //send out a message for non-restartable system procedures to clean up and flush transaction queue.
             CompleteTransactionMessage rollback = null;
-            String procName = ftm.getProcedureName();
-            if (procName != null) {
-                final SystemProcedureCatalog.Config proc = SystemProcedureCatalog.listing.get(procName);
-                if (proc != null && !proc.isRestartable()) {
-                    rollback = new CompleteTransactionMessage(
-                            ftm.getInitiatorHSId(),
-                            ftm.getCoordinatorHSId(),
-                            ftm.getTxnId(),
-                            ftm.isReadOnly(),
-                            0,
-                            true,       // Force rollback as our repair operation.
-                            false,      // no acks in iv2.
-                            restart,    // Indicate rollback for repair as appropriate
-                            ftm.isForReplay(),
-                            ftm.isNPartTxn());
+            if (ftm.isSysProcTask()) {
+                //A response for non-restartable proc will be sent to client immediately if it is restarted. Thus
+                //the transaction is marked as done and the state is removed. But sites may still have fragments in the backlog or site queue
+                //which may block Scoreboard to release downstream transactions. The message would help clean the transaction state.
+                String procName = ftm.getProcedureName();
+                if (procName != null) {
+                    final SystemProcedureCatalog.Config proc = SystemProcedureCatalog.listing.get(procName);
+                    if (proc != null && !proc.isRestartable()) {
+                        rollback = new CompleteTransactionMessage(
+                                ftm.getInitiatorHSId(),
+                                ftm.getCoordinatorHSId(),
+                                ftm.getTxnId(),
+                                ftm.isReadOnly(),
+                                0,
+                                true,       // Force rollback as our repair operation.
+                                false,      // no acks in iv2.
+                                restart,    // Indicate rollback for repair as appropriate
+                                ftm.isForReplay(),
+                                ftm.isNPartTxn());
+                    }
                 }
             }
             return rollback;

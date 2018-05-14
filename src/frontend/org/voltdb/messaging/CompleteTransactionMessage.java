@@ -208,7 +208,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         }
 
         if(!isRestartable()) {
-            sb.append("\n  THIS IS NOT RESTARTaable");
+            sb.append("\n  THIS IS NOT RESTARTABLE");
         }
         return sb.toString();
     }
