@@ -31,6 +31,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ElasticHashinator;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -359,7 +360,30 @@ public class MpPromoteAlgo implements RepairAlgo
                 assert(ftm.getInitiateTask() != null);
                 m_interruptedTxns.add(ftm.getInitiateTask());
             }
-            return null;
+            CompleteTransactionMessage rollback = null;
+            if (ftm.isSysProcTask()) {
+                //A response for non-restartable proc will be sent to client immediately if it is restarted. Thus
+                //the transaction is marked as done and the state is removed. But sites may still have fragments in the backlog or site queue
+                //which may block Scoreboard to release downstream transactions. The message would help clean the transaction state.
+                String procName = ftm.getProcedureName();
+                if (procName != null) {
+                    final SystemProcedureCatalog.Config proc = SystemProcedureCatalog.listing.get(procName);
+                    if (proc != null && !proc.isRestartable()) {
+                        rollback = new CompleteTransactionMessage(
+                                ftm.getInitiatorHSId(),
+                                ftm.getCoordinatorHSId(),
+                                ftm.getTxnId(),
+                                ftm.isReadOnly(),
+                                0,
+                                true,       // Force rollback as our repair operation.
+                                false,      // no acks in iv2.
+                                restart,    // Indicate rollback for repair as appropriate
+                                ftm.isForReplay(),
+                                ftm.isNPartTxn());
+                    }
+                }
+            }
+            return rollback;
         }
     }
 }
