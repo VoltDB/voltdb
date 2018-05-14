@@ -685,7 +685,7 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
             credentialsFile = open(credentials, "r")
         except IOError:
             print "Credentials file not found or permission denied."
-        else: 
+        else:
             content = ""
             for line in credentialsFile:
                 content += line
