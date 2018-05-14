@@ -207,6 +207,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
             sb.append("\n  SEND TO LEADER");
         }
 
+        if(!isRestartable()) {
+            sb.append("\n  THIS IS NOT RESTARTaable");
+        }
         return sb.toString();
     }
 }

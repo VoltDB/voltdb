@@ -105,6 +105,9 @@ public class TransactionTaskQueue
 
                     //flush the backlog to avoid no task is pushed to site queue
                     if (!completion.isRestartable()) {
+                        if (hostLog.isDebugEnabled()) {
+                            hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(txnId));
+                        }
                         m_txnTaskQueues[ii].flush(txnId);
                     }
                     //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
