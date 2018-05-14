@@ -2399,7 +2399,7 @@ public class PlanAssembler {
             // of an index scan.
             // Currently, an index scan only claims to have a sort direction when its output
             // matches the order demanded by the ORDER BY clause.
-            if (! parsedSelect.isGrouped() || parsedSelect.isLargeQuery()) {
+            if (! parsedSelect.isGrouped()) {
                 return false;
             }
 
@@ -2456,21 +2456,58 @@ public class PlanAssembler {
     }
 
     /**
-     * For a seqscan feeding a GROUP BY, consider substituting an IndexScan
-     * that pre-sorts by the GROUP BY keys.
-     * If a candidate is already an indexscan,
-     * simply calculate GROUP BY column coverage
+     * It's sometimes useful or necessary to take advantage of a well
+     * defined sort order to implement grouping. For example, if we are
+     * already scanning an index which can calculate a suitable sort order
+     * for a group by then we don't need an order by node.  Also, we cannot
+     * do hash aggregation for a large temp table query, since the hash tables
+     * all need to be in memory at the same time.  If an existing scan does
+     * not provide a useful order for GROUP BY expressions, we need to add
+     * and ORDER BY node.
+     *
+     * There are three cases.
+     * <ol>
+     *     <li>
+     *         For a sequential scan node feeding a GROUP BY, consider substituting an IndexScan
+     *         that provides an order for the GROUP BY keys.
+     *     </li>
+     *     <li>
+     *         For an index scan node feeding a GROUP BY, if the index expressions
+     *         are compatible with the GROUP BY expressions we just use the index
+     *         scan.  By "compatible" we mean there is some permutation of the
+     *         GROUP BY expressions which form a possibly improper initial subsequence
+     *         of the index expressions.
+     *     </li>
+     *     <li>
+     *         For a large temp table query, which is not one of the previous two
+     *         cases we need to add an order by node.
+     *         <ol>
+     *             <li>
+     *                 We prefer to put this node
+     *                 in the the distributed fragment, since it can then be done in
+     *                 parallel.  This can only happen if one of the GROUP BY expressions
+     *                 is a partition column.  In this case we will modify the candidate.
+     *             </li>
+     *             <li>
+     *                 If we cannot distribute the order by node then we need to add an
+     *                 order by node at the top of the existing plan.  This will make
+     *                 it impossible to push aggregate calculations down, but it was
+     *                 already impossible, so this is not a regression.
+     *             </li>
+     *     </li>
+     * </ol>
      *
      * @param candidate
      * @param gbInfo
-     * @return true when planner can switch to index scan
-     *         from a sequential scan, and when the index scan
-     *         has no parent plan node or the candidate is already
-     *         an indexscan and covers all or some GROUP BY columns
+     * @return true when planner has discovered or created a mechanism to
+     *         order the candidate plan for serial aggregation.
      */
-    private boolean switchToIndexScanForGroupBy(AbstractPlanNode candidate,
-            IndexGroupByInfo gbInfo) {
-        if (! m_parsedSelect.isGrouped()) {
+    private boolean switchToOrderedScanForGroupBy(AbstractPlanNode candidate,
+                                                  IndexGroupByInfo gbInfo) {
+        // This is only a useful analysis and transformation when
+        // we have group by keys, or if we have aggregate functions
+        //
+        if (! m_parsedSelect.hasAggregateOrGroupby()) {
             return false;
         }
 
@@ -2648,7 +2685,7 @@ public class PlanAssembler {
      * or
      *    select col from t group by col;
      * or
-     *    select sum(col) from t group by col;
+     *    select sum(col) from t group by othercol, col;
      * This function computes plans for all three forms.
      *
      * @param root The plan so far.
@@ -2688,10 +2725,10 @@ public class PlanAssembler {
                         m_parsedSelect.hasPartitionColumnInGroupby()) {
                     AbstractPlanNode candidate = root.getChild(0).getChild(0);
                     gbInfo.m_multiPartition = true;
-                    switchToIndexScanForGroupBy(candidate, gbInfo);
+                    switchToOrderedScanForGroupBy(candidate, gbInfo);
                 }
             }
-            else if (switchToIndexScanForGroupBy(root, gbInfo)) {
+            else if (switchToOrderedScanForGroupBy(root, gbInfo)) {
                 root = gbInfo.m_indexAccess;
             }
             // See the definition of needHashAggregator for the
