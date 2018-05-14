@@ -329,6 +329,7 @@ public class TransactionTaskQueue
     }
 
     public void handleCompletionForMissingTxn(CompleteTransactionTask missingTxnCompletion) {
+        if (!m_scoreboardEnabled) return;
         synchronized (s_lock) {
             long taskTxnId = missingTxnCompletion.getMsgTxnId();
             long taskTimestamp = missingTxnCompletion.getTimestamp();
