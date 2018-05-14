@@ -42,7 +42,7 @@ public class Scoreboard {
         // we must allow the rollback completion to go through scoreboard.
         boolean isTxnRollback = (task.getCompleteMessage().isRollback() && task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP);
         // Dont' treat rollback transaction as missing
-        if (isTxnRollback) {
+        if (isTxnRollback  && !task.isRestartable()) {
             missingTxn = false;
         }
 
