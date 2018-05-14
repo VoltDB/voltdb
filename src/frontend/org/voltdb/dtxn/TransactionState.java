@@ -53,7 +53,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     public final long m_spHandle;
     private ArrayList<UndoAction> m_undoLog;
     // This timestamp is only used for restarted transactions
-    protected long m_restartTimestamp;
+    protected long m_restartTimestamp = TransactionInfoBaseMessage.INITIAL_TIMESTAMP;
 
     /**
      * Set up the final member variables from the parameters. This will

@@ -171,7 +171,8 @@ public class MpProcedureTask extends ProcedureTask
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             //restart.setForReplica(false);
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
+                hostLog.debug("MP restart cleanup CompleteTransactionMessage "+ MpRestartSequenceGenerator.restartSeqIdToString(ts) +
+                        " to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
             }
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
