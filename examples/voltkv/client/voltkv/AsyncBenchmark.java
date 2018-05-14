@@ -466,10 +466,12 @@ public class AsyncBenchmark {
             for(int i=0; i < config.poolsize; i++) {
                 String keyStr = String.format(processor.KeyFormat, i);
                 byte[] valArr = processor.generateForStore().getStoreValue();
-                client.callProcedure(new NullCallback(),
-                                     "STORER.upsert",
-                                     keyStr,
-                                     valArr);
+                if (config.partrepratio != 1.00) {
+                    client.callProcedure(new NullCallback(),
+                                         "STORER.upsert",
+                                         keyStr,
+                                         valArr);
+                }
                 client.callProcedure(new NullCallback(),
                                      "STORE.upsert",
                                      keyStr,
