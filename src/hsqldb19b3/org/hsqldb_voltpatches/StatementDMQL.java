@@ -922,7 +922,7 @@ public abstract class StatementDMQL extends Statement {
                 // Order By
                 if (queryExpr.sortAndSlice.getOrderLength() > 0) {
                     List<Expression> displayCols = getDisplayColumnsForSetOp(queryExpr);
-                    SimpleColumnContext context = new SimpleColumnContext(session, displayCols);
+                    SimpleColumnContext context = new SimpleColumnContext(session, displayCols, displayCols.size());
                     VoltXMLElement orderCols = new VoltXMLElement("ordercolumns");
                     unionExpr.children.add(orderCols);
                     for (int i=0; i < queryExpr.sortAndSlice.exprList.size(); ++i) {
@@ -1187,6 +1187,7 @@ public abstract class StatementDMQL extends Statement {
 
             }
             else if (expr.opType != OpTypes.SIMPLE_COLUMN || (expr.isAggregate && expr.alias != null)) {
+
                 // Add aggregate aliases to the display columns to maintain
                 // the output schema column ordering.
                 select.displayCols.add(expr);
@@ -1214,7 +1215,7 @@ public abstract class StatementDMQL extends Statement {
          *
          * Serialize the display columns in the exprColumn order.
          */
-        SimpleColumnContext context = new SimpleColumnContext(session, select.displayCols);
+        SimpleColumnContext context = new SimpleColumnContext(session, select.displayCols, select.indexLimitVisible);
 
         // having
         Expression havingCondition = select.getHavingCondition();
@@ -1292,7 +1293,7 @@ public abstract class StatementDMQL extends Statement {
      * COALESCE(leftTable.C, rightTable.C) expression.
      *
      * @param elements list of expression columns to resolve
-     * @param rv list of range variables
+     * @param rvs list of range variables
      */
     static protected void resolveUsingExpressions(List<VoltXMLElement> elements, RangeVariable[] rvs)
             throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException {

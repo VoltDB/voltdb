@@ -3130,6 +3130,54 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{gpv}}, vt);
     }
 
+    public void testEng13801() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+
+        // In this bug, the COUNT(*) in the ORDER BY clause was in the query's
+        // result, even though it's not in the SELECT list.
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "SELECT MIN(VCHAR_INLINE) FROM ENG_13852_R11 AS T1 ORDER BY COUNT(*), T1.BIG;").getResults()[0];
+        assertEquals(1, vt.getColumnCount());
+
+        assertSuccessfulDML(client,
+                "insert into ENG_13852_P5 values ( \n" +
+                        "        0, \n" +
+                        "        1, 10, 100, 1000,\n" +
+                        "        1.0, 2.0,\n" +
+                        "        'foo', 'bar', 'baz', 'boo', 'bugs',\n" +
+                        "        now,\n" +
+                        "        x'ab',\n" +
+                        "        pointfromtext('point(1 0)'), -- point\n" +
+                        "        null, -- polygon\n" +
+                        "        null, null, null, x'ab')");
+        assertSuccessfulDML(client, "insert into ENG_13852_R11 values (\n" +
+                "        0,\n" +
+                "        1, 10, 100, 1000,\n" +
+                "        1.0, 2.0,\n" +
+                "        'foo', 'bar', 'baz', 'boo', 'bugs',\n" +
+                "        now,\n" +
+                "        x'ab',\n" +
+                "        pointfromtext('point(0 0)'), -- point\n" +
+                "        null, -- polygon\n" +
+                "        null, null, null, x'ab')");
+
+        // Original query found by grammar generator:
+        vt = client.callProcedure("@AdHoc",
+                "SELECT 'foo' AS CA2, OUTER_TBL.TINY " +
+                        "FROM ENG_13852_P5 AS OUTER_TBL " +
+                        "WHERE VCHAR_INLINE != (" +
+                        "  SELECT MAX(VCHAR) " +
+                        "  FROM ENG_13852_R11 AS INNER_TBL " +
+                        "  WHERE POINT != OUTER_TBL.POINT " +
+                        "  ORDER BY COUNT(*)) " +
+                        "ORDER BY NUM;").getResults()[0];
+        assertContentOfTable(new Object[][] {{"foo", 1}}, vt);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
