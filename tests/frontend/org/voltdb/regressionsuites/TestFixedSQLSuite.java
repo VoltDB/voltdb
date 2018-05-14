@@ -3130,9 +3130,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{gpv}}, vt);
     }
 
+    public void testEng13801() throws Exception {
+        Client client = getClient();
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "SELECT MIN(VCHAR_INLINE) FROM ENG_13852_R11 ORDER BY 'z' || VCHAR, COUNT(*);").getResults()[0];
+        assertEquals(1, vt.getColumnCount());
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
-    //
+    //z
     public TestFixedSQLSuite(String name) {
         super(name);
     }
