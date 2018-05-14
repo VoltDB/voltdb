@@ -175,7 +175,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     /**
      * Get a pointer to a compiled catalog for TPCC with all the procedures.
      */
-    public Catalog createTPCCSchemaCatalog() throws IOException {
+    public Catalog createTPCCSchemaCatalog(int sitesPerHost) throws IOException {
         // compile a catalog
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcc-jni.jar";
@@ -184,7 +184,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         addDefaultPartitioning();
         addDefaultProcedures();
 
-        Catalog catalog = compile(catalogJar, 1, 1, 0, null);
+        Catalog catalog = compile(catalogJar, sitesPerHost, 1, 0, null);
         assert(catalog != null);
         return catalog;
     }
@@ -194,6 +194,10 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
      * This can be run without worrying about setting up anything else in this class.
      */
     static public Catalog getTPCCSchemaCatalog() throws IOException {
-        return (new TPCCProjectBuilder().createTPCCSchemaCatalog());
+        return (new TPCCProjectBuilder().createTPCCSchemaCatalog(1));
+    }
+
+    static public Catalog getTPCCSchemaCatalogMultiSite(int sitesPerHost) throws IOException {
+        return (new TPCCProjectBuilder().createTPCCSchemaCatalog(sitesPerHost));
     }
 }
