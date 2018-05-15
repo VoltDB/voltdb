@@ -38,8 +38,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.Mailbox;
@@ -58,6 +56,8 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.VoltTableUtil;
+
+import junit.framework.TestCase;
 
 public class TestMpTransactionState extends TestCase
 {

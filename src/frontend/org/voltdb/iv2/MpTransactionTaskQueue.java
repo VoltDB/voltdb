@@ -135,6 +135,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                     // inject poison pill
                     FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L,
                             false, false, false, txn.isNPartTxn());
+                    dummy.setTimestamp(txn.getTimetamp());
                     FragmentResponseMessage poison =
                             new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
                     // Provide a TransactionRestartException which will be converted
@@ -144,7 +145,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                             "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
                     restart.setMisrouted(false);
                     poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
-                    poison.setRestartTimestamp(txn.getTimetamp());
                     txn.offerReceivedFragmentResponse(poison);
                     if (tmLog.isDebugEnabled()) {
                         tmLog.debug("MpTTQ: restarting:" + next);

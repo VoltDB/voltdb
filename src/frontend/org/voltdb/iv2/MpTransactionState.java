@@ -540,6 +540,7 @@ public class MpTransactionState extends TransactionState
         }
         FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false,
                 m_nPartTxn);
+        dummy.setTimestamp(m_restartTimestamp);
         FragmentResponseMessage poison = new FragmentResponseMessage(dummy, 0L);
         TransactionTerminationException termination = new TransactionTerminationException(
                 "Transaction interrupted.", txnId);

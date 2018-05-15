@@ -255,6 +255,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_batchTimeout = ftask.m_batchTimeout;
         m_perFragmentStatsRecording = ftask.m_perFragmentStatsRecording;
         m_coordinatorTask = ftask.m_coordinatorTask;
+        m_restartTimestamp = ftask.m_restartTimestamp;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }

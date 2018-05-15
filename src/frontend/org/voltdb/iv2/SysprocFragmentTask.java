@@ -109,7 +109,6 @@ public class SysprocFragmentTask extends FragmentTaskBase
                     m_rawDummyResponse, 0, m_rawDummyResponse.length));
         }
         response.setRespBufferable(m_respBufferable);
-        response.setRestartTimestamp(m_fragmentMsg.getTimestamp());
         m_initiator.deliver(response);
     }
 
@@ -149,7 +148,6 @@ public class SysprocFragmentTask extends FragmentTaskBase
         response.m_sourceHSId = m_initiator.getHSId();
         response.setRespBufferable(m_respBufferable);
         response.setForOldLeader(m_fragmentMsg.isForOldLeader());
-        response.setRestartTimestamp(m_fragmentMsg.getTimestamp());
         m_initiator.deliver(response);
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("COMPLETE: " + this);

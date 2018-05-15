@@ -26,8 +26,6 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import junit.framework.TestCase;
-
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -43,6 +41,8 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.TxnEgo;
 
 import com.google_voltpatches.common.collect.Sets;
+
+import junit.framework.TestCase;
 
 public class TestVoltMessageSerialization extends TestCase {
 

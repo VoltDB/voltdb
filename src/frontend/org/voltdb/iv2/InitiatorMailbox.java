@@ -463,7 +463,6 @@ public class InitiatorMailbox implements Mailbox
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("misRoutedFragMsg on site:" + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
             }
-            response.setRestartTimestamp(message.getTimestamp());
             deliver(response);
             return true;
         }
