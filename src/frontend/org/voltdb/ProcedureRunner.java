@@ -1435,14 +1435,14 @@ public class ProcedureRunner {
 
             // the data and message for locally processed fragments
             m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId, siteId, m_txnState.txnId,
-                    m_txnState.uniqueId, m_txnState.isReadOnly(), false, txnState.isForReplay(), txnState.isNPartTxn());
+                    m_txnState.uniqueId, m_txnState.isReadOnly(), false, txnState.isForReplay(), txnState.isNPartTxn(), txnState.getTimetamp());
             m_localTask.setProcedureName(procedureName);
             m_localTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
             m_localTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
 
             // the data and message for all sites in the transaction
             m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId, siteId, m_txnState.txnId,
-                    m_txnState.uniqueId, m_txnState.isReadOnly(), finalTask, txnState.isForReplay(), txnState.isNPartTxn());
+                    m_txnState.uniqueId, m_txnState.isReadOnly(), finalTask, txnState.isForReplay(), txnState.isNPartTxn(), txnState.getTimetamp());
             m_distributedTask.setProcedureName(procedureName);
             // this works fine if procToLoad is NULL
             m_distributedTask.setProcNameToLoad(procToLoad);

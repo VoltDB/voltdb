@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 import org.voltcore.messaging.Subject;
-import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
@@ -74,7 +73,7 @@ public class FragmentResponseMessage extends VoltMessage {
     boolean m_isForOldLeader = false;
 
     // Used by MPI to differentiate responses due to the transaction restart
-    long m_restartTimestamp = TransactionInfoBaseMessage.INITIAL_TIMESTAMP;
+    long m_restartTimestamp = -1L;
 
     /** Empty constructor for de-serialization */
     FragmentResponseMessage() {
@@ -87,6 +86,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_spHandle = task.getSpHandle();
         m_destinationHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
+        m_restartTimestamp = task.getTimestamp();
     }
 
     // IV2 hacky constructor
@@ -106,6 +106,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_respBufferable = resp.m_respBufferable;
         m_exception = resp.m_exception;
         m_subject = Subject.DEFAULT.getId();
+        m_restartTimestamp = resp.m_restartTimestamp;
     }
 
     /**
@@ -350,10 +351,6 @@ public class FragmentResponseMessage extends VoltMessage {
 
     public boolean isForOldLeader() {
         return m_isForOldLeader;
-    }
-
-    public void setRestartTimestamp(long timestamp) {
-        m_restartTimestamp = timestamp;
     }
 
     public long getRestartTimestamp() {
