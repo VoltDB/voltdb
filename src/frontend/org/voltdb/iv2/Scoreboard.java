@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.messaging.CompleteTransactionMessage;
 
@@ -36,6 +37,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 public class Scoreboard {
     private Deque<Pair<CompleteTransactionTask, Boolean>> m_compTasks = new ArrayDeque<>(2);
     private FragmentTaskBase m_fragTask;
+    protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
         // This happens when a non-restartable sysproc was aborted, since MPI doesn't send repair message for this transaction
@@ -88,7 +90,7 @@ public class Scoreboard {
             // scoreboard has two completions
             Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();
             Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.peekLast();
-            // scorebaord can take completions from two transactions at most
+            // scoreboard can take completions from two transactions at most
             assert (task.getMsgTxnId() == head.getFirst().getMsgTxnId() || task.getMsgTxnId() == tail.getFirst().getMsgTxnId());
 
             // Keep newer completion, discard the older one
