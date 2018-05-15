@@ -225,4 +225,13 @@ public class SysProcFragmentId
     // @PingPartitions
     public static final long PF_pingPartitions = 330;
     public static final long PF_pingPartitionsAggregate = 331;
+    public static final long PF_enableScoreboard = 332;
+    public static final long PF_enableScoreboardAggregate = 333;
+
+
+    public static boolean isEnableScoreboardFragment(byte[] planHash) {
+        long fragId = VoltSystemProcedure.hashToFragId(planHash);
+
+        return (fragId == PF_enableScoreboard);
+    }
 }

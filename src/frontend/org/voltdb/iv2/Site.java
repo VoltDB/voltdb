@@ -844,7 +844,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         }
                     } else {
                         //If there are no tasks, do task log work
-                        didWork |= replayFromTaskLog(mrm);
+                        didWork = replayFromTaskLog(mrm);
                     }
                     if (!didWork) Thread.yield();
                 } else {

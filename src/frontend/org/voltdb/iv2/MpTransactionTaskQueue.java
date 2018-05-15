@@ -51,7 +51,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
-        super(queue);
+        super(queue, false);
     }
 
     void setMpRoSitePool(MpRoSitePool sitePool)

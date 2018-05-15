@@ -223,7 +223,7 @@ public class TestTransactionTaskQueue extends TestCase
         for (int i = 0; i < SITE_COUNT; i++) {
             SiteTaskerQueue siteTaskQueue = getSiteTaskerQueue();
             m_siteTaskQueues.add(siteTaskQueue);
-            TransactionTaskQueue txnTaskQueue = new TransactionTaskQueue(siteTaskQueue);
+            TransactionTaskQueue txnTaskQueue = new TransactionTaskQueue(siteTaskQueue, true);
             txnTaskQueue.initializeScoreboard(i, new MockMailbox());
             m_txnTaskQueues.add(txnTaskQueue);
             Deque<TransactionTask> expectedOrder = new ArrayDeque<>();
