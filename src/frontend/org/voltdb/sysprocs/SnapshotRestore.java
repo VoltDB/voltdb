@@ -2820,7 +2820,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             pf.parameters,
                             false,
                             m_runner.getTxnState().isForReplay(),
-                            false);
+                            false,
+                            m_runner.getTxnState().getTimetamp());
             m.send(pf.siteId, ftm);
         }
 

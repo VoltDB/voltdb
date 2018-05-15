@@ -246,8 +246,8 @@ public class MpTransactionState extends TransactionState
                     m_localWork.isReadOnly(),
                     false,
                     false,
-                    m_nPartTxn);
-            m_remoteWork.setTimestamp(m_restartTimestamp);
+                    m_nPartTxn,
+                    m_restartTimestamp);
             m_remoteWork.setEmptyForRestart(getNextDependencyId());
             if (!m_haveDistributedInitTask && !isForReplay() && !isReadOnly()) {
                 m_haveDistributedInitTask = true;
@@ -539,8 +539,7 @@ public class MpTransactionState extends TransactionState
             tmLog.debug("Aborting transaction: " + TxnEgo.txnIdToString(txnId));
         }
         FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false,
-                m_nPartTxn);
-        dummy.setTimestamp(m_restartTimestamp);
+                m_nPartTxn, m_restartTimestamp);
         FragmentResponseMessage poison = new FragmentResponseMessage(dummy, 0L);
         TransactionTerminationException termination = new TransactionTerminationException(
                 "Transaction interrupted.", txnId);

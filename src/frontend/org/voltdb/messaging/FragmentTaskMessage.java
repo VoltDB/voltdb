@@ -177,7 +177,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     // Use to differentiate fragments and completions from different rounds of restart
     // (same transaction can be restarted multiple times due to multiple leader promotions)
-    long m_restartTimestamp = INITIAL_TIMESTAMP;
+    long m_restartTimestamp = -1;
 
     public void setPerFragmentStatsRecording(boolean value) {
         m_perFragmentStatsRecording = value;
@@ -219,11 +219,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                boolean isReadOnly,
                                boolean isFinal,
                                boolean isForReplay,
-                               boolean nPartTxn) {
+                               boolean nPartTxn,
+                               long timestamp) {
         super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
         m_isFinal = isFinal;
         m_subject = Subject.DEFAULT.getId();
         m_nPartTxn = nPartTxn;
+        m_restartTimestamp = timestamp;
         assert(selfCheck());
     }
 
@@ -341,7 +343,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                                             ParameterSet params,
                                                             boolean isFinal,
                                                             boolean isForReplay,
-                                                            boolean isNPartTxn) {
+                                                            boolean isNPartTxn,
+                                                            long timestamp) {
         ByteBuffer parambytes = null;
         if (params != null) {
             parambytes = ByteBuffer.allocate(params.getSerializedSize());
@@ -356,7 +359,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
                                                           txnId, uniqueId, isReadOnly, isFinal,
-                                                          isForReplay, isNPartTxn);
+                                                          isForReplay, isNPartTxn, timestamp);
         ret.addFragment(planHash, outputDepId, parambytes);
         return ret;
     }
