@@ -153,7 +153,6 @@ public class FragmentTask extends FragmentTaskBase
             //The fragment is not misrouted and the site may have been marked as non-leader via @MigratePartitionLeader
             //but it should be processed by the same site, act like a leader.
             response.setForOldLeader(m_fragmentMsg.isForOldLeader());
-            response.setRestartTimestamp(m_fragmentMsg.getTimestamp());
             deliverResponse(response);
         } finally {
             if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
@@ -201,7 +200,6 @@ public class FragmentTask extends FragmentTaskBase
                     m_rawDummyResponse, 0, m_rawDummyResponse.length));
         }
 
-        response.setRestartTimestamp(m_fragmentMsg.getTimestamp());
         deliverResponse(response);
         completeFragment();
     }

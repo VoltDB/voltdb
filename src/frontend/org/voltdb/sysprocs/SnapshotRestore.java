@@ -716,7 +716,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                     ftm.getParameterSetForFragment(0));
                     FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
                     frm.addDependency(dp);
-                    frm.setRestartTimestamp(m_runner.getTxnState().getTimetamp());
                     m.send(ftm.getCoordinatorHSId(), frm);
                 } else if (vm instanceof BinaryPayloadMessage) {
                     if (context.isLowestSiteId() && m_duplicateRowHandler != null) {
@@ -2821,7 +2820,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             pf.parameters,
                             false,
                             m_runner.getTxnState().isForReplay(),
-                            false);
+                            false,
+                            m_runner.getTxnState().getTimetamp());
             m.send(pf.siteId, ftm);
         }
 
@@ -2852,7 +2852,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                 ftm.getParameterSetForFragment(0));
                 FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
                 frm.addDependency(dp);
-                frm.setRestartTimestamp(m_runner.getTxnState().getTimetamp());
                 m.send(ftm.getCoordinatorHSId(), frm);
 
                 if (!m_unexpectedDependencies.isEmpty()) {
