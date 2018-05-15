@@ -325,9 +325,11 @@ public class RejoinProducer extends JoinProducerBase {
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;
                 Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers = null;
+                Map<Integer, Long> partitionTxnIds = null;
                 long clusterCreateTime = -1;
                 try {
                     event = m_snapshotCompletionMonitor.get();
+                    partitionTxnIds = event.partitionTxnIds;
                     if (!m_schemaHasNoTables) {
                         REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
                         exportSequenceNumbers = event.exportSequenceNumbers;
@@ -360,6 +362,7 @@ public class RejoinProducer extends JoinProducerBase {
                 }
                 setJoinComplete(
                         siteConnection,
+                        partitionTxnIds,
                         exportSequenceNumbers,
                         drSequenceNumbers,
                         allConsumerSiteTrackers,

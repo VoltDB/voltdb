@@ -1410,6 +1410,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
+            Map<Integer, Long> partitionTxnIds,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
@@ -1420,6 +1421,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // live rejoin, will transfer to kStateRunning as usual
         // as the rejoin task log will be empty.
         assert(m_rejoinState == kStateRejoining);
+        Long snapshotSpHandle = partitionTxnIds.get(m_partitionId);
+        assert(snapshotSpHandle != null);
+        setSpHandleForSnapshotDigest(snapshotSpHandle);
 
         if (replayComplete == null) {
             throw new RuntimeException("Null Replay Complete Action.");

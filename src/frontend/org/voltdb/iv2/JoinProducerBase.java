@@ -172,13 +172,14 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     // Completed all criteria: Kill the watchdog and inform the site.
     protected void setJoinComplete(SiteProcedureConnection siteConnection,
+                                   Map<Integer, Long> partitionTxnIds,
                                    Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                    Map<Integer, Long> drSequenceNumbers,
                                    Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
                                    boolean requireExistingSequenceNumbers,
                                    long clusterCreateTime)
     {
-        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, drSequenceNumbers,
+        siteConnection.setRejoinComplete(m_completionAction, partitionTxnIds, exportSequenceNumbers, drSequenceNumbers,
                 allConsumerSiteTrackers, requireExistingSequenceNumbers, clusterCreateTime);
     }
 
