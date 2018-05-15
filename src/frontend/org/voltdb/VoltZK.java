@@ -505,7 +505,6 @@ public class VoltZK {
                 return false;
             }
         } catch (InterruptedException e) {
-            log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
             return false;
         }
         return true;

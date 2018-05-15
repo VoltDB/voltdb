@@ -171,9 +171,9 @@ public class SysprocFragmentTask extends FragmentTaskBase
         if (SysProcFragmentId.isEnableScoreboardFragment(m_fragmentMsg.getPlanHash(0)) &&
                 ! m_queue.scoreboardEnabled()) {
             // enable scoreboard
-            // TODO: For handling the rare corner case of MP Failover during handling the last @PingPartitions,
+            // TODO: For handling the rare corner case of MPI Failover during handling the last @PingPartitions,
             // We would better to enable the scoreboard atomic for. This requires a barrier for ensuring all sites has seen this last fragments.
-            m_queue.setScoreboard(true);
+            m_queue.enableScoreboard();
             // queue to the scoreboard
             m_queue.offer(this);
             return;

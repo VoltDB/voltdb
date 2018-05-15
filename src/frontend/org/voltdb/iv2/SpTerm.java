@@ -50,7 +50,8 @@ public class SpTerm implements Term
     protected BabySitter m_babySitter;
     private ImmutableList<Long> m_replicas = ImmutableList.of();
     private boolean m_replicasUpdatedRequired = false;
-    private final boolean m_isJoining;
+    private boolean m_initJoin = StartAction.JOIN.equals(VoltDB.instance().getConfig().m_startAction);
+    private final int m_kFactor = VoltDB.instance().getKFactor();
 
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
@@ -77,14 +78,23 @@ public class SpTerm implements Term
                 }
             }
 
-            if (m_replicas.isEmpty() || replicas.size() <= m_replicas.size() || m_isJoining) {
-                //The cases for startup or host failure
+            // for joining nodes that hasn't been fully initialized
+            // still update replicas for allowing all replicas receive fragment tasks
+            if (m_initJoin) {
+                if (replicas.size() == m_kFactor) {
+                    m_initJoin = false;
+                }
+                m_mailbox.updateReplicas(replicas, null);
+                m_replicasUpdatedRequired = false;
+            }
+            if (m_replicas.isEmpty() || replicas.size() <= m_replicas.size()) {
+                //The cases for startup or host failure/
                 m_mailbox.updateReplicas(replicas, null);
                 m_replicasUpdatedRequired = false;
             } else {
                 //The case for rejoin
                 m_replicasUpdatedRequired = true;
-                tmLog.info(m_whoami + " replicas to be updated from join or rejoin:"
+                tmLog.info(m_whoami + " replicas to be updated from join:"
                           + CoreUtils.hsIdCollectionToString(m_replicas));
             }
             m_replicas = ImmutableList.copyOf(replicas);
@@ -101,7 +111,6 @@ public class SpTerm implements Term
         m_partitionId = partitionId;
         m_mailbox = mailbox;
         m_whoami = whoami;
-        m_isJoining = StartAction.JOIN.equals(VoltDB.instance().getConfig().m_startAction);
     }
 
     /**

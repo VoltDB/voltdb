@@ -174,11 +174,14 @@ public class TransactionTaskQueue
         m_scoreboardEnabled = scoreboardEnabled;
     }
 
-    public void setScoreboard(boolean enabled) {
+
+    // We start joining nodes with scoreboard disabled
+    // After all sites has been fully initilized and ready for snapshot, we should enable the scoreboard.
+    void enableScoreboard() {
         if (hostLog.isDebugEnabled()) {
-            hostLog.debug("Scoreboard being enabled " + enabled);
+            hostLog.debug("Scoreboard has been enabled.");
         }
-        m_scoreboardEnabled = enabled;
+        m_scoreboardEnabled = true;
     }
 
     public boolean scoreboardEnabled() {

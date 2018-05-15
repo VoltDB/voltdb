@@ -91,13 +91,7 @@ public class Scoreboard {
             Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();
             Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.peekLast();
             // scoreboard can take completions from two transactions at most
-            if (!(task.getMsgTxnId() == head.getFirst().getMsgTxnId() || task.getMsgTxnId() == tail.getFirst().getMsgTxnId())) {
-                tmLog.error("Received an unexpected completion task: " + task +
-                            "\n head: " + head.getFirst() +
-                            "\n tail: " + tail.getFirst());
-                assert (false);
-            }
-
+            assert (task.getMsgTxnId() == head.getFirst().getMsgTxnId() || task.getMsgTxnId() == tail.getFirst().getMsgTxnId());
 
             // Keep newer completion, discard the older one
             if ( task.getTimestamp() > head.getFirst().getTimestamp() && isComparable(head.getFirst(), task)) {
