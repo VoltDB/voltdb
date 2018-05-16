@@ -361,7 +361,9 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
             m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
         p_execute_tuple_internal(tuple);
-        s_modifiedTuples = m_modifiedTuples;
+        if (m_replicatedTableOperation) {
+            s_modifiedTuples = m_modifiedTuples;
+        }
     }
     else {
         if (s_modifiedTuples == -1) {
@@ -416,7 +418,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 while (iterator.next(inputTuple)) {
                     p_execute_tuple_internal(inputTuple);
                 }
-                s_modifiedTuples = m_modifiedTuples;
+                if (m_replicatedTableOperation) {
+                    s_modifiedTuples = m_modifiedTuples;
+                }
             }
             else {
                 if (s_modifiedTuples == -1) {
