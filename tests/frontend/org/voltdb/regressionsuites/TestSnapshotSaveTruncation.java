@@ -59,7 +59,7 @@ public class TestSnapshotSaveTruncation extends SaveRestoreBase {
         public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
             this.txnId = event.multipartTxnId;
             this.truncationSnapshot = event.truncationSnapshot;
-            this.partitionTxnIds = event.partitionTxnIds;
+            this.partitionTxnIds = event.localPartitionTxnIds;
             snapshotCompleted.release();
             return null;
         }

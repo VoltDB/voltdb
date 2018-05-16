@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
@@ -32,7 +33,8 @@ public interface SnapshotCompletionInterest {
         // multipartTxnId is the txnId of the snapshot itself.
         // as well as the last snapshotted MP transaction.
         public final long multipartTxnId;
-        public final Map<Integer, Long> partitionTxnIds;
+        public final Map<Integer, Long> localPartitionTxnIds;
+        public final List<Long> allPartitionTxnIds;
         public final boolean truncationSnapshot;
         public final boolean didSucceed;
         public final String requestId;
@@ -47,7 +49,8 @@ public interface SnapshotCompletionInterest {
                 SnapshotPathType stype,
                 String nonce,
                 final long multipartTxnId,
-                final Map<Integer, Long> partitionTxnIds,
+                final Map<Integer, Long> localPartitionTxnIds,
+                final List<Long> allPartitionTxnIds,
                 final boolean truncationSnapshot,
                 final boolean didSucceed,
                 final String requestId,
@@ -59,7 +62,8 @@ public interface SnapshotCompletionInterest {
             this.path = path;
             this.nonce = nonce;
             this.multipartTxnId = multipartTxnId;
-            this.partitionTxnIds = partitionTxnIds;
+            this.localPartitionTxnIds = localPartitionTxnIds;
+            this.allPartitionTxnIds = allPartitionTxnIds;
             this.truncationSnapshot = truncationSnapshot;
             this.didSucceed = didSucceed;
             this.requestId = requestId;
@@ -77,13 +81,14 @@ public interface SnapshotCompletionInterest {
                 SnapshotPathType stype,
                 String nonce,
                 long multipartTxnId,
-                Map<Integer, Long> partitionTxnIds,
+                Map<Integer, Long> localPartitionTxnIds,
+                List<Long> allPartitionTxnIds,
                 boolean truncationSnapshot,
                 int drVersion,
                 long clusterCreateTime) {
             return new SnapshotCompletionEvent(
-                    path, stype, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
-                    true, "", null, null, new HashMap<>(), drVersion, clusterCreateTime);
+                    path, stype, nonce, multipartTxnId, localPartitionTxnIds, allPartitionTxnIds,
+                    truncationSnapshot, true, "", null, null, new HashMap<>(), drVersion, clusterCreateTime);
         }
     }
 

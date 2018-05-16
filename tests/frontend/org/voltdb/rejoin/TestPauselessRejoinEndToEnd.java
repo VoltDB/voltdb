@@ -99,7 +99,7 @@ public class TestPauselessRejoinEndToEnd extends RejoinTestBase {
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
+        cluster.setHasLocalServer(true);
 
         cluster.startUp();
 

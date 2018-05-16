@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -325,11 +326,11 @@ public class RejoinProducer extends JoinProducerBase {
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;
                 Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers = null;
-                Map<Integer, Long> partitionTxnIds = null;
+                List<Long> allPartitionTxnIds = null;
                 long clusterCreateTime = -1;
                 try {
                     event = m_snapshotCompletionMonitor.get();
-                    partitionTxnIds = event.partitionTxnIds;
+                    allPartitionTxnIds = event.allPartitionTxnIds;
                     if (!m_schemaHasNoTables) {
                         REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
                         exportSequenceNumbers = event.exportSequenceNumbers;
@@ -362,7 +363,7 @@ public class RejoinProducer extends JoinProducerBase {
                 }
                 setJoinComplete(
                         siteConnection,
-                        partitionTxnIds,
+                        allPartitionTxnIds,
                         exportSequenceNumbers,
                         drSequenceNumbers,
                         allConsumerSiteTrackers,

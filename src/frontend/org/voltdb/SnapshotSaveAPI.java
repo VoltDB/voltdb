@@ -18,9 +18,11 @@
 package org.voltdb;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
@@ -150,6 +152,7 @@ public class SnapshotSaveAPI
                 @Override
                 public void run() {
                     Map<Integer, Long> partitionTransactionIds = m_partitionLastSeenTransactionIds;
+                    List<Long> snapshotPartitionTxnIds = new ArrayList<Long>(partitionTransactionIds.values());
 
                     SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
                     m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
@@ -175,6 +178,7 @@ public class SnapshotSaveAPI
                     }
 
                     m_allLocalSiteSnapshotDigestData = new ExtensibleSnapshotDigestData(
+                            snapshotPartitionTxnIds,
                             SnapshotSiteProcessor.getExportSequenceNumbers(),
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
                             remoteDataCenterLastIds, finalJsData);
