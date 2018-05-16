@@ -918,8 +918,7 @@ public class VoltDB {
             }
 
             if (m_clusterName != null && !m_clusterName.equals(stagedName)) {
-                //hostLog.fatal("Cluster name " + m_clusterName + " does not match the name given at initialization " + stagedName);
-                hostLog.fatal("Database initialization may not have been run to completion");
+                hostLog.fatal("The database root directory has changed. Either initialization did not complete properly or the directory has been corrupted. You must reinitialize the database directory before using it.");
             	referToDocAndExit();
             } else {
                 m_clusterName = stagedName;
