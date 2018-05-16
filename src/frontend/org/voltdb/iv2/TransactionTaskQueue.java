@@ -22,10 +22,15 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 
@@ -163,7 +168,7 @@ public class TransactionTaskQueue
 
     final private static RelativeSiteOffset s_stashedMpWrites = new RelativeSiteOffset();
     private static Object s_lock = new Object();
-
+    private final static CyclicBarrier s_barrier = new CyclicBarrier(VoltDB.instance().getCatalogContext().getNodeSettings().getLocalSitesCount());
 
     TransactionTaskQueue(SiteTaskerQueue queue, boolean scoreboardEnabled)
     {
@@ -180,11 +185,20 @@ public class TransactionTaskQueue
 
     // We start joining nodes with scoreboard disabled
     // After all sites has been fully initilized and ready for snapshot, we should enable the scoreboard.
-    void enableScoreboard() {
+    boolean enableScoreboard() {
+        try {
+            s_barrier.await(3L, TimeUnit.MINUTES);
+        } catch (InterruptedException | BrokenBarrierException |TimeoutException e) {
+            hostLog.error("Cannot re-enable the scoreboard.");
+            s_barrier.reset();
+            return false;
+        }
+
+        m_scoreboardEnabled = true;
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("Scoreboard has been enabled.");
         }
-        m_scoreboardEnabled = true;
+        return true;
     }
 
     public boolean scoreboardEnabled() {
