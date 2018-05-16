@@ -139,7 +139,7 @@ public class MpProcedureTask extends ProcedureTask
                         "Failure while running system procedure " + txn.m_initiationMsg.getStoredProcedureName() +
                         ", and system procedures can not be restarted."));
             txn.setNeedsRollback(true);
-            completeInitiateTask(siteConnection);
+            completeInitiateTask(siteConnection, false);
             errorResp.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(errorResp);
 
@@ -171,7 +171,8 @@ public class MpProcedureTask extends ProcedureTask
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             //restart.setForReplica(false);
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
+                hostLog.debug("MP restart cleanup CompleteTransactionMessage "+ MpRestartSequenceGenerator.restartSeqIdToString(ts) +
+                        " to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
             }
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
@@ -243,8 +244,11 @@ public class MpProcedureTask extends ProcedureTask
     }
 
     @Override
-    void completeInitiateTask(SiteProcedureConnection siteConnection)
-    {
+    void completeInitiateTask(SiteProcedureConnection siteConnection) {
+        completeInitiateTask(siteConnection, true);
+    }
+
+    void completeInitiateTask(SiteProcedureConnection siteConnection, boolean restartable){
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
         if (traceLog != null) {
             traceLog.add(() -> VoltTrace.instant("sendcomplete",
@@ -268,6 +272,8 @@ public class MpProcedureTask extends ProcedureTask
                     txnState.isNPartTxn());
             complete.setTruncationHandle(m_msg.getTruncationHandle());
 
+            //A flag for Scoreboard to determine if it is necessary to flush transaction queue.
+            complete.setRestartable(restartable);
             //If there are misrouted fragments, send message to current masters.
             final List<Long> initiatorHSIds = new ArrayList<Long>();
             if (txnState.isFragmentRestarted()) {

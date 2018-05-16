@@ -112,7 +112,7 @@ public class TestSpSchedulerDedupe
                                                           any(CommandLog.DurabilityListener.class),
                                                           any(TransactionTask.class));
 
-        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor);
+        dut = new SpScheduler(0, getSiteTaskerQueue(), snapMonitor, true);
         dut.setMailbox(mbox);
         dut.setCommandLog(cl);
         dut.setLock(mbox);

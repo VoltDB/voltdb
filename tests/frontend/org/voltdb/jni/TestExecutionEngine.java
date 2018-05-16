@@ -25,9 +25,12 @@ package org.voltdb.jni;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
@@ -35,6 +38,7 @@ import junit.framework.TestCase;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -45,7 +49,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.ReplicatedTableException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
@@ -153,6 +159,114 @@ public class TestExecutionEngine extends TestCase {
         assertEquals(200, sourceEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(1000, sourceEngine.serializeTable(STOCK_TABLEID).getRowCount());
         terminateSourceEngine();
+    }
+
+    private Pair<byte[], byte[]> verifyMultiSiteLoadTable(boolean returnUniqueViolations) throws Exception {
+        int ITEM_TABLEID = itemTableId(m_twoSiteCatalog);
+
+        VoltTable itemdata = new VoltTable(
+                new VoltTable.ColumnInfo("I_ID", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("I_IM_ID", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("I_NAME", VoltType.STRING),
+                new VoltTable.ColumnInfo("I_PRICE", VoltType.FLOAT),
+                new VoltTable.ColumnInfo("I_DATA", VoltType.STRING)
+        );
+        for (int i = 0; i < 200; ++i) {
+            itemdata.addRow(i, i, "name" + i, 1.0, "desc");
+        }
+        // make a conflict row
+        itemdata.addRow(5, 5, "failedRow", 1.0, "failedRow");
+
+
+        // Each EE needs its own thread for correct initialization.
+        final AtomicReference<ExecutionEngine> source2Engine = new AtomicReference<ExecutionEngine>();
+        final byte configBytes[] = ElasticHashinator.getConfigureBytes(1);
+        final ExecutorService es = Executors.newSingleThreadExecutor();
+        es.submit(new Runnable() {
+            @Override
+            public void run() {
+                source2Engine.set(
+                        new ExecutionEngineJNI(
+                                CLUSTER_ID,
+                                1,
+                                1,
+                                2,
+                                NODE_ID,
+                                "",
+                                0,
+                                64*1024,
+                                100,
+                                new HashinatorConfig(configBytes, 0, 0), false));
+            }
+        }).get();
+
+        es.execute(new Runnable() {
+            @Override
+            public void run() {
+                source2Engine.get().loadCatalog( 0, m_twoSiteCatalog.serialize());
+            }
+        });
+
+        initializeSourceEngine(2);
+
+        sourceEngine.loadCatalog( 0, m_twoSiteCatalog.serialize());
+
+        Future<byte[]> ft = es.submit(new Callable<byte[]>() {
+            @Override
+            public byte[] call() throws Exception {
+                try {
+                    byte[] rslt = source2Engine.get().loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0,
+                            returnUniqueViolations, false, Long.MAX_VALUE);
+                    return rslt;
+                }
+                catch (ReplicatedTableException e) {
+                    return null;
+                }
+                catch (Exception e) {
+                    return new byte[] {(byte)0};
+                }
+            }
+        });
+
+        byte[] srcRslt = null;
+        try {
+            srcRslt = sourceEngine.loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0,
+                    returnUniqueViolations, false, Long.MAX_VALUE);
+        }
+        catch (ConstraintFailureException e) {
+            // srcRslt already null
+        }
+        catch (Exception e) {
+            srcRslt = new byte[] {(byte)0};
+        }
+        byte[] src2Rslt = ft.get();
+
+        es.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    source2Engine.get().release();
+                }
+                catch (EEException | InterruptedException e) {
+                }
+            }
+        }).get();
+        terminateSourceEngine();
+        es.shutdown();
+        return Pair.of(srcRslt, src2Rslt);
+    }
+
+    public void testMultiSiteLoadTableWithException() throws Exception {
+        Pair<byte[], byte[]> loadResults = verifyMultiSiteLoadTable(false);
+        assertTrue(loadResults.getFirst() == null && loadResults.getSecond() == null);
+    }
+
+    public void testMultiSiteLoadTableWithoutException() throws Exception {
+        Pair<byte[], byte[]> loadResults = verifyMultiSiteLoadTable(true);
+        assertTrue(loadResults.getFirst() != null && loadResults.getSecond() != null);
+        assertTrue(loadResults.getFirst().length > 4 &&
+                Arrays.equals(loadResults.getFirst(), loadResults.getSecond()));
+
     }
 
     public void testStreamTables() throws Exception {
@@ -281,6 +395,10 @@ public class TestExecutionEngine extends TestCase {
         return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
     }
 
+    private int itemTableId(Catalog catalog) {
+        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("ITEM").getRelativeIndex();
+    }
+
     public void testGetStats() throws Exception {
         initializeSourceEngine(1);
         sourceEngine.loadCatalog( 0, m_catalog.serialize());
@@ -383,8 +501,8 @@ public class TestExecutionEngine extends TestCase {
     private static final int CLUSTER_ID = 2;
     private static final int NODE_ID = 1;
 
-    TPCCProjectBuilder m_project;
     Catalog m_catalog;
+    Catalog m_twoSiteCatalog;
 
     private void initializeSourceEngine(int engineCount) throws Exception {
         sourceEngine =
@@ -410,8 +528,8 @@ public class TestExecutionEngine extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo("Test");
-        m_project = new TPCCProjectBuilder();
-        m_catalog = m_project.createTPCCSchemaCatalog();
+        m_catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
+        m_twoSiteCatalog = TPCCProjectBuilder.getTPCCSchemaCatalogMultiSite(2);
     }
 
     @Override

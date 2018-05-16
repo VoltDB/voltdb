@@ -635,7 +635,7 @@ public class TestDDLCompiler extends TestCase {
 
     public void testNullAnnotation() throws IOException {
 
-        Catalog catalog  = new TPCCProjectBuilder().createTPCCSchemaCatalog();
+        Catalog catalog  = TPCCProjectBuilder.getTPCCSchemaCatalog();
         Database catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         for(Table t : catalog_db.getTables()) {

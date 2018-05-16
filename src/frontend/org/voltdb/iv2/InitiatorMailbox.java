@@ -117,7 +117,6 @@ public class InitiatorMailbox implements Mailbox
     synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami, boolean isMigratePartitionLeader) {
         RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId, isMigratePartitionLeader);
         if (hostLog.isDebugEnabled()) {
-
             hostLog.debug("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
                     m_partitionId + ", survivors: " + CoreUtils.hsIdCollectionToString(survivors.get()));
         }
@@ -542,6 +541,9 @@ public class InitiatorMailbox implements Mailbox
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
+        if (req.isMPIRequest()) {
+            m_scheduler.handleMPIFailoverMessage();
+        }
         for (Iv2RepairLogResponseMessage log : logs) {
             send(message.m_sourceHSId, log);
         }

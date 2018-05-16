@@ -37,10 +37,12 @@ public class TransactionTaskQueue
     final protected SiteTaskerQueue m_taskQueue;
 
     final private Scoreboard m_scoreboard;
+    private boolean m_scoreboardEnabled;
 
     private static class RelativeSiteOffset {
         private SiteTaskerQueue[] m_stashedMpQueues;
         private Scoreboard[] m_stashedMpScoreboards;
+        private TransactionTaskQueue[] m_txnTaskQueues;
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
         private Mailbox[] m_mailBoxes;
@@ -49,19 +51,22 @@ public class TransactionTaskQueue
             m_stashedMpScoreboards = null;
             m_lowestSiteId = firstSiteId;
             m_siteCount = siteCount;
+            m_txnTaskQueues = null;
         }
 
-        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox) {
+        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox, TransactionTaskQueue taskQueue) {
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
             if (m_stashedMpQueues == null) {
                 m_stashedMpQueues = new SiteTaskerQueue[m_siteCount];
                 m_stashedMpScoreboards = new Scoreboard[m_siteCount];
                 m_mailBoxes = new Mailbox[m_siteCount];
+                m_txnTaskQueues = new TransactionTaskQueue[m_siteCount];
             }
             m_stashedMpQueues[siteId-m_lowestSiteId] = queue;
             m_stashedMpScoreboards[siteId-m_lowestSiteId] = scoreboard;
             m_mailBoxes[siteId-m_lowestSiteId] = mailBox;
+            m_txnTaskQueues[siteId-m_lowestSiteId] = taskQueue;
         }
 
         // All sites receives FragmentTask messages, time to fire the task.
@@ -83,31 +88,34 @@ public class TransactionTaskQueue
 
         // All sites receives CompletedTransactionTask messages, time to fire the task.
         // If there are enough completeTransactionTask messages to fire another round of release, return false, otherwise true.
-        boolean releaseStashedComleteTxns(boolean missingTxn, long txnId)
+        boolean releaseStashedCompleteTxns(boolean missingTxn, long txnId)
         {
+            boolean missingTask = missingTxn ? true : hasMissingTxn(txnId);
             if (hostLog.isDebugEnabled()) {
-                if (missingTxn) {
+                if (missingTask) {
                     hostLog.debug("skipped incomplete rollback transaction message:" + TxnEgo.txnIdToString(txnId));
-                }
-                else {
+                } else {
                     hostLog.debug("release stashed complete transaction message:" + TxnEgo.txnIdToString(txnId));
                 }
             }
-            boolean missingTask = missingTxn ? true : hasMissingTxn(txnId);
             int tasksAtTail = 0;
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
                 // only release completions at head of queue
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst().getFirst();
-                // skip for test case
                 if (missingTask) {
-                  //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
+
+                    //flush the backlog to avoid no task is pushed to site queue
+                    if (!completion.isRestartable()) {
+                        if (hostLog.isDebugEnabled()) {
+                            hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(txnId));
+                        }
+                        m_txnTaskQueues[ii].flush(txnId);
+                    }
+                    //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
                     //up the site outstanding transaction queue and duplicate counter
                     final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(completion.getCompleteMessage());
                     resp.m_sourceHSId = m_mailBoxes[ii].getHSId();
                     m_mailBoxes[ii].deliver(resp);
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("handling missing complete response in scoreboard:" + completion);
-                    }
                 } else {
                     Iv2Trace.logSiteTaskerQueueOffer(completion);
                     m_stashedMpQueues[ii].offer(completion);
@@ -156,7 +164,8 @@ public class TransactionTaskQueue
     final private static RelativeSiteOffset s_stashedMpWrites = new RelativeSiteOffset();
     private static Object s_lock = new Object();
 
-    TransactionTaskQueue(SiteTaskerQueue queue)
+
+    TransactionTaskQueue(SiteTaskerQueue queue, boolean scoreboardEnabled)
     {
         m_taskQueue = queue;
         if (queue.getPartitionId() == MpInitiator.MP_INIT_PID) {
@@ -165,6 +174,21 @@ public class TransactionTaskQueue
         else {
             m_scoreboard = new Scoreboard();
         }
+        m_scoreboardEnabled = scoreboardEnabled;
+    }
+
+
+    // We start joining nodes with scoreboard disabled
+    // After all sites has been fully initilized and ready for snapshot, we should enable the scoreboard.
+    void enableScoreboard() {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("Scoreboard has been enabled.");
+        }
+        m_scoreboardEnabled = true;
+    }
+
+    public boolean scoreboardEnabled() {
+        return m_scoreboardEnabled;
     }
 
     public static void resetScoreboards(int firstSiteId, int siteCount) {
@@ -176,7 +200,7 @@ public class TransactionTaskQueue
     void initializeScoreboard(int siteId, Mailbox mailBox) {
         synchronized (s_lock) {
             if (m_taskQueue.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox);
+                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox, this);
             }
         }
     }
@@ -210,7 +234,7 @@ public class TransactionTaskQueue
              * holds the tasks until all the sites on the node receive the task.
              * Task with newer spHandle will
              */
-            else if (task.needCoordination()) {
+            else if (task.needCoordination() && m_scoreboardEnabled) {
                 coordinatedTaskQueueOffer(task);
             }
             else {
@@ -233,7 +257,7 @@ public class TransactionTaskQueue
              * holds the tasks until all the sites on the node receive the task.
              * Task with newer spHandle will
              */
-            if (task.needCoordination()) {
+            if (task.needCoordination() && m_scoreboardEnabled) {
                 coordinatedTaskQueueOffer(task);
             } else {
                 taskQueueOffer(task);
@@ -298,7 +322,7 @@ public class TransactionTaskQueue
                     hostLog.debug(sb.toString());
                 }
                 if (completionScore == s_stashedMpWrites.getSiteCount()) {
-                    done = s_stashedMpWrites.releaseStashedComleteTxns(missingTxn, task.getTxnId());
+                    done = s_stashedMpWrites.releaseStashedCompleteTxns(missingTxn, task.getTxnId());
                 }
                 else if (fragmentScore == s_stashedMpWrites.getSiteCount() && completionScore == 0) {
                     s_stashedMpWrites.releaseStashedFragments(task.getTxnId());
@@ -311,6 +335,7 @@ public class TransactionTaskQueue
     }
 
     public void handleCompletionForMissingTxn(CompleteTransactionTask missingTxnCompletion) {
+        if (!m_scoreboardEnabled) return;
         synchronized (s_lock) {
             long taskTxnId = missingTxnCompletion.getMsgTxnId();
             long taskTimestamp = missingTxnCompletion.getTimestamp();
@@ -337,7 +362,7 @@ public class TransactionTaskQueue
                     hostLog.debug(sb.toString());
                 }
                 if (completionScore == s_stashedMpWrites.getSiteCount()) {
-                    done = s_stashedMpWrites.releaseStashedComleteTxns(true, missingTxnCompletion.getMsgTxnId());
+                    done = s_stashedMpWrites.releaseStashedCompleteTxns(true, missingTxnCompletion.getMsgTxnId());
                 } else {
                     done = true;
                 }
@@ -380,7 +405,7 @@ public class TransactionTaskQueue
         while (iter.hasNext()) {
             TransactionTask task = iter.next();
             long lastQueuedTxnId = task.getTxnId();
-            if (task.needCoordination()) {
+            if (task.needCoordination() && m_scoreboardEnabled) {
                 coordinatedTaskQueueOffer(task);
             } else {
                 taskQueueOffer(task);
@@ -398,7 +423,7 @@ public class TransactionTaskQueue
                     task = iter.next();
                     if (task.getTxnId() == lastQueuedTxnId) {
                         iter.remove();
-                        if (task.needCoordination()) {
+                        if (task.needCoordination() && m_scoreboardEnabled) {
                             coordinatedTaskQueueOffer(task);
                         } else {
                             taskQueueOffer(task);
@@ -420,7 +445,7 @@ public class TransactionTaskQueue
     synchronized void restart()
     {
         TransactionTask task = m_backlog.getFirst();
-        if (task.needCoordination()) {
+        if (task.needCoordination() && m_scoreboardEnabled) {
             coordinatedTaskQueueOffer(task);
         } else {
             taskQueueOffer(task);
@@ -471,5 +496,11 @@ public class TransactionTaskQueue
         return pendingTasks;
     }
 
+    public TransactionTask peekFirstBacklogTask() {
+        if (m_backlog.isEmpty()) {
+            return null;
+        }
+        return m_backlog.getFirst();
+    }
 
 }

@@ -394,6 +394,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         else if (fragmentId == SysProcFragmentId.PF_restoreDigestScan)
         {
             VoltTable result = new VoltTable(
+                    new VoltTable.ColumnInfo("DIGEST_CONTINUED", VoltType.TINYINT),
                     new VoltTable.ColumnInfo("DIGEST", VoltType.STRING),
                     new VoltTable.ColumnInfo("RESULT", VoltType.STRING),
                     new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING));
@@ -415,7 +416,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce, SNAP_LOG);
 
                     for (JSONObject obj : digests) {
-                        result.addRow(obj.toString(), "SUCCESS", null);
+                        String jsonDigest = obj.toString();
+                        for (int start = 0; start < jsonDigest.length(); start += VoltType.MAX_VALUE_LENGTH) {
+                            String block = jsonDigest.substring(start, Math.min(jsonDigest.length(), start + VoltType.MAX_VALUE_LENGTH));
+                            byte digestContinued = (start+VoltType.MAX_VALUE_LENGTH < jsonDigest.length()) ? (byte)1 : (byte)0;
+                            result.addRow(digestContinued, block, "SUCCESS", null);
+                        }
                     }
                 } catch (Exception e) {
                     StringWriter sw = new StringWriter();
@@ -1783,7 +1789,13 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
                     throw new VoltAbortException(results[0].getString("ERR_MSG"));
                 }
-                JSONObject digest = new JSONObject(results[0].getString(0));
+                StringBuilder sb = new StringBuilder();
+                sb.append(results[0].getString("DIGEST"));
+                while (results[0].getLong("DIGEST_CONTINUED") == 1) {
+                    results[0].advanceRow();
+                    sb.append(results[0].getString("DIGEST"));
+                }
+                JSONObject digest = new JSONObject(sb.toString());
                 digests.add(digest);
 
                 /*
@@ -2820,7 +2832,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             pf.parameters,
                             false,
                             m_runner.getTxnState().isForReplay(),
-                            false);
+                            false,
+                            m_runner.getTxnState().getTimetamp());
             m.send(pf.siteId, ftm);
         }
 

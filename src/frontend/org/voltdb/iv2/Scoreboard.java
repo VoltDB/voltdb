@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.messaging.CompleteTransactionMessage;
 
@@ -36,13 +37,14 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 public class Scoreboard {
     private Deque<Pair<CompleteTransactionTask, Boolean>> m_compTasks = new ArrayDeque<>(2);
     private FragmentTaskBase m_fragTask;
+    protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
         // This happens when a non-restartable sysproc was aborted, since MPI doesn't send repair message for this transaction
         // we must allow the rollback completion to go through scoreboard.
         boolean isTxnRollback = (task.getCompleteMessage().isRollback() && task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP);
         // Dont' treat rollback transaction as missing
-        if (isTxnRollback) {
+        if (isTxnRollback  && !task.isRestartable()) {
             missingTxn = false;
         }
 
@@ -88,7 +90,7 @@ public class Scoreboard {
             // scoreboard has two completions
             Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();
             Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.peekLast();
-            // scorebaord can take completions from two transactions at most
+            // scoreboard can take completions from two transactions at most
             assert (task.getMsgTxnId() == head.getFirst().getMsgTxnId() || task.getMsgTxnId() == tail.getFirst().getMsgTxnId());
 
             // Keep newer completion, discard the older one
@@ -153,29 +155,6 @@ public class Scoreboard {
         return !m_compTasks.isEmpty() &&
                 m_compTasks.peekFirst().getFirst().getMsgTxnId() == txnId &&
                 m_compTasks.peekFirst().getFirst().getTimestamp() == timestamp;
-    }
-
-    //Find the CompleteTransactionTask to be released. The task could be in header or tail
-    //If the released one has the latest time stamp, then remove txn before the released one.
-    public CompleteTransactionTask releaseCompleteTransactionTaskAndRemoveStaleTxn(long txnId) {
-        Pair<CompleteTransactionTask, Boolean> header = m_compTasks.pollFirst();
-        if (m_compTasks.isEmpty()) {
-            return header.getFirst();
-        }
-
-        Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.pollFirst();
-        //match in the header
-        if (header.getFirst().getMsgTxnId() == txnId) {
-            if (txnId < tail.getFirst().getMsgTxnId()) {
-                m_compTasks.addLast(tail);
-            }
-            return header.getFirst();
-        } else { //match in the tail
-            if (header.getFirst().getMsgTxnId() > txnId) {
-                m_compTasks.addLast(header);
-            }
-            return tail.getFirst();
-        }
     }
 
     public boolean isTransactionMissing(long txnId) {
