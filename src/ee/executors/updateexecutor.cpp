@@ -215,7 +215,9 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                                                             indexesToUpdate);
             }
             modified_tuples = m_inputTable->tempTableTupleCount();
-            s_modifiedTuples = modified_tuples;
+            if (m_replicatedTableOperation) {
+                s_modifiedTuples = modified_tuples;
+            }
         }
         else {
             if (s_modifiedTuples == -1) {
