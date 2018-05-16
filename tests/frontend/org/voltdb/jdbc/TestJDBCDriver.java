@@ -725,27 +725,15 @@ public class TestJDBCDriver {
     // Test to check Query without Timeout
     @Test
     public  void testQueryNotTimeout() throws SQLException {
-        //this should not timeout at all proc will wait for 3 min before returning.
         PreparedStatement stmt = conn.prepareCall("{call ArbitraryDurationProc(?)}");
-        stmt.setLong(1, 180*1000);
-        boolean exceptionCalled = false;
-        try {
-            stmt.execute();
-        } catch (SQLException ex) {
-            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
-            exceptionCalled = true;
-        }
-        assertFalse(exceptionCalled);
 
-        stmt.setLong(1, 60000);
-        exceptionCalled = false;
+        // Make the proc wait 30 seconds before returning.
+        stmt.setLong(1, 30000);
         try {
             stmt.execute();
         } catch (SQLException ex) {
-            System.out.println("Query threw exception when not expected to: " + ex.getSQLState());
-            exceptionCalled = true;
+            fail("Query threw exception when not expected to: " + ex.getSQLState());
         }
-        assertFalse(exceptionCalled);
     }
 
     // execute a Query with a Timeout set
@@ -774,9 +762,9 @@ public class TestJDBCDriver {
         Properties props = new Properties();
         // Check default setting, timeout unit should be TimeUnit.SECONDS
         myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-        assertTrue(runQueryWithTimeout(7000, 1));
-        assertFalse(runQueryWithTimeout(7000, 30));
-        assertTrue(runQueryWithTimeout(7000, -1));
+        assertTrue(runQueryWithTimeout(4000, 1));
+        assertFalse(runQueryWithTimeout(4000, 30));
+        assertTrue(runQueryWithTimeout(4000, -1));
         myconn.close();
 
         // Check set time unit to MILLISECONDS
@@ -784,27 +772,21 @@ public class TestJDBCDriver {
         myconn = JDBCTestCommons.getJdbcConnection(
                 "jdbc:voltdb://localhost:21212?jdbc.querytimeout.unit=milliseconds",
                 props);
-        assertTrue(runQueryWithTimeout(7000, 1));
-        assertTrue(runQueryWithTimeout(7000, 30));
-        assertTrue(runQueryWithTimeout(7000, -1));
+        assertTrue(runQueryWithTimeout(4000, 1));
         myconn.close();
 
         // Check set time unit to MILLISECONDS
         // through Java Propeties
         props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "milliseconds");
         myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-        assertTrue(runQueryWithTimeout(7000, 1));
-        assertTrue(runQueryWithTimeout(7000, 30));
-        assertTrue(runQueryWithTimeout(7000, -1));
+        assertTrue(runQueryWithTimeout(4000, 1));
         myconn.close();
 
         // Check set time unit to other unsupported unit, should by default
         // still use TimeUnit.SECONDS
         props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "nanoseconds");
         myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
-        assertTrue(runQueryWithTimeout(7000, 1));
-        assertFalse(runQueryWithTimeout(7000, 30));
-        assertTrue(runQueryWithTimeout(7000, -1));
+        assertTrue(runQueryWithTimeout(4000, 1));
         myconn.close();
     }
 
