@@ -24,6 +24,7 @@
 package org.voltdb.iv2;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -84,6 +85,19 @@ public class TestScoreboard {
         assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
         assertEquals(2000L, scoreboard.getCompletionTasks().peekLast().getFirst().getMsgTxnId());
         assertEquals(CompleteTransactionMessage.INITIAL_TIMESTAMP, scoreboard.getCompletionTasks().peekLast().getFirst().getTimestamp());
+    }
+
+    @Test
+    public void testRestartCompletionStepsOnFragment() {
+        Scoreboard scoreboard = new Scoreboard();
+        MpRestartSequenceGenerator repairGen = new MpRestartSequenceGenerator(1, true);
+        FragmentTask ft1 = createFrag(1000L, CompleteTransactionMessage.INITIAL_TIMESTAMP);
+        scoreboard.addFragmentTask(ft1);
+        long expectedTimestamp = repairGen.getNextSeqNum();
+        CompleteTransactionTask comp1 = createComp(1000L, expectedTimestamp);
+        scoreboard.addCompletedTransactionTask(comp1, false);
+        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getFirst().getMsgTxnId());
+        assertNull(scoreboard.getFragmentTask());
     }
 
     @Test

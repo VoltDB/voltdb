@@ -382,6 +382,7 @@ public class TransactionTaskQueue
                     ", backlog head txnId is:" + (m_backlog.isEmpty()? "empty" : TxnEgo.txnIdToString(m_backlog.getFirst().getTxnId()))
                     );
         }
+
         int offered = 0;
         // If the first entry of the backlog is a completed transaction, clear it so it no longer
         // blocks the backlog then iterate the backlog for more work.
@@ -400,6 +401,12 @@ public class TransactionTaskQueue
         if (m_backlog.isEmpty() || !m_backlog.getFirst().getTransactionState().isDone()) {
             return offered;
         }
+
+        // Add a guard to protect the scenario that backlog been flushed multiple times for same txnId
+        if (m_backlog.getFirst().getTxnId() != txnId) {
+            return offered;
+        }
+
         m_backlog.removeFirst();
         Iterator<TransactionTask> iter = m_backlog.iterator();
         while (iter.hasNext()) {
@@ -496,7 +503,7 @@ public class TransactionTaskQueue
         return pendingTasks;
     }
 
-    public TransactionTask peekFirstBacklogTask() {
+    public synchronized TransactionTask peekFirstBacklogTask() {
         if (m_backlog.isEmpty()) {
             return null;
         }

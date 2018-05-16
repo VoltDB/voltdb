@@ -47,7 +47,6 @@ import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
-import org.voltdb.StartAction;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
