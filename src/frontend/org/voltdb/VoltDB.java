@@ -918,8 +918,9 @@ public class VoltDB {
             }
 
             if (m_clusterName != null && !m_clusterName.equals(stagedName)) {
-                hostLog.fatal("Cluster name " + m_clusterName + " does not match the name given at initialization " + stagedName);
-                referToDocAndExit();
+                //hostLog.fatal("Cluster name " + m_clusterName + " does not match the name given at initialization " + stagedName);
+                hostLog.fatal("Database initialization may not have been run to completion");
+            	referToDocAndExit();
             } else {
                 m_clusterName = stagedName;
             }
