@@ -435,6 +435,46 @@ public class TestTransactionTaskQueue extends TestCase
         verify();
     }
 
+    // As part of repair, MPI sends completion message of prior MP transaction to transaction queue
+    // backlog should let the message go through.
+    @Test
+    public void testLetPriorRepairCompletionGoThrough() throws InterruptedException {
+
+        // Every site receives first fragment
+        long prevTxnId = m_mpTxnEgo.getTxnId();
+        TransactionTask[] firstFrag = new TransactionTask[SITE_COUNT];
+        for (int i = 0; i < SITE_COUNT; i++) {
+            firstFrag[i] = createFrag(m_localTxnEgo[i].getTxnId(), prevTxnId, m_txnTaskQueues.get(i));
+            // Finish the transaction
+            firstFrag[i].getTransactionState().setDone();
+            addTask(firstFrag[i], m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        // Assume site receives fragment for next transaction (won't happen in real world).
+        m_mpTxnEgo = m_mpTxnEgo.makeNext();
+        long txnId = m_mpTxnEgo.getTxnId();
+        TransactionTask[] nextFrag = new TransactionTask[SITE_COUNT];
+        for (int i = 0; i < SITE_COUNT; i++) {
+            m_localTxnEgo[i] = m_localTxnEgo[i].makeNext();
+            nextFrag[i] = createFrag(m_localTxnEgo[i].getTxnId(), txnId, m_txnTaskQueues.get(i));
+            addTask(nextFrag[i], m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        // failure happens, MPI starts to repair
+
+        // Every site gets the repair completion to close previous transaction,
+        TransactionTask comp = null;
+        long seq = m_repairGenerator.getNextSeqNum();
+        for (int i = 0; i < SITE_COUNT; i++) {
+            comp = createRepairCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i), seq);
+            // Finish the transaction
+            firstFrag[i].getTransactionState().setDone();
+            addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+        }
+
+        verify();
+    }
+
     @Test
     public void testBasicParticipantOps() throws InterruptedException
     {
