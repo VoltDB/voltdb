@@ -2086,6 +2086,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         TreeMap<Integer, Initiator> initiators = new TreeMap<>();
         // Needed when static is reused by ServerThread
         TransactionTaskQueue.resetScoreboards(m_messenger.getNextSiteId(), m_nodeSettings.getLocalSitesCount());
+        TransactionTaskQueue.initBarrier(m_nodeSettings.getLocalSitesCount());
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),

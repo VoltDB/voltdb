@@ -168,7 +168,7 @@ public class TransactionTaskQueue
 
     final private static RelativeSiteOffset s_stashedMpWrites = new RelativeSiteOffset();
     private static Object s_lock = new Object();
-    private final static CyclicBarrier s_barrier = new CyclicBarrier(VoltDB.instance().getCatalogContext().getNodeSettings().getLocalSitesCount());
+    private static CyclicBarrier s_barrier;
 
     TransactionTaskQueue(SiteTaskerQueue queue, boolean scoreboardEnabled)
     {
@@ -180,6 +180,10 @@ public class TransactionTaskQueue
             m_scoreboard = new Scoreboard();
         }
         m_scoreboardEnabled = scoreboardEnabled;
+    }
+
+    public static void initBarrier(int siteCount) {
+        s_barrier = new CyclicBarrier(siteCount);
     }
 
 
