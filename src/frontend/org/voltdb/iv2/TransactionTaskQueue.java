@@ -222,10 +222,10 @@ public class TransactionTaskQueue
              * This branch happens during regular execution when a multi-part is in progress.
              * The first task for the multi-part is the head of the queue, and all the single parts
              * are being queued behind it. The txnid check catches tasks that are part of the multi-part
-             * and immediately queues them for execution.
+             * and immediately queues them for execution. If any multi-part txn with smaller txnId shows up,
+             * it must from repair process, just let it through.
              */
-            if (task.getTxnId() != m_backlog.getFirst().getTxnId())
-            {
+            if (txnState.isSinglePartition() || TxnEgo.getSequence(task.getTxnId()) > TxnEgo.getSequence(m_backlog.getFirst().getTxnId())) {
                 m_backlog.addLast(task);
                 retval = true;
             }
