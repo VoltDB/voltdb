@@ -196,11 +196,11 @@ public class ExtensibleSnapshotDigestData {
                 partitionList.put(localTxnId);
             }
             else {
-                if (remoteTxnId != localTxnId) {
+                if (!remoteTxnId.equals(localTxnId)) {
                     VoltDB.crashLocalVoltDB(
                             "Snapshot Transaction Ids for partition " + TxnEgo.getPartitionId(localTxnId) +
-                            " not consistent in snapshot between remote Host (" + TxnEgo.txnIdToString(remoteTxnId) +
-                            " and local host (" + TxnEgo.txnIdSeqToString(localTxnId) + ")", true, null);
+                            " not consistent in snapshot between remote Host " + TxnEgo.txnIdToString(remoteTxnId) +
+                            " and local host " + TxnEgo.txnIdToString(localTxnId), true, null);
                 }
             }
         }
