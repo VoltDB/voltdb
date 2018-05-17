@@ -190,6 +190,7 @@ public class TransactionTaskQueue
     // We start joining nodes with scoreboard disabled
     // After all sites has been fully initilized and ready for snapshot, we should enable the scoreboard.
     boolean enableScoreboard() {
+        assert (s_barrier != null);
         try {
             s_barrier.await(3L, TimeUnit.MINUTES);
         } catch (InterruptedException | BrokenBarrierException |TimeoutException e) {
