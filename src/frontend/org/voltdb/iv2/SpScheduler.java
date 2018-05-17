@@ -427,6 +427,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             handleInitiateResponseMessage((InitiateResponseMessage)message);
         }
         else if (message instanceof FragmentTaskMessage) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("DELIVER: " + message.toString());
+            }
             handleFragmentTaskMessage((FragmentTaskMessage)message);
         }
         else if (message instanceof FragmentResponseMessage) {
@@ -436,6 +439,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             handleFragmentResponseMessage((FragmentResponseMessage)message);
         }
         else if (message instanceof CompleteTransactionMessage) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("DELIVER: " + message.toString());
+            }
             handleCompleteTransactionMessage((CompleteTransactionMessage)message);
         }
         else if (message instanceof CompleteTransactionResponseMessage) {
