@@ -101,6 +101,7 @@ public class FunctionSQL extends Expression {
     private final static int   FUNC_SYSTEM_USER                      = 59;
     protected final static int FUNC_USER                             = 60;
     private final static int   FUNC_VALUE                            = 61;
+    private final static int   FUNC_PI                               = 111;
 
     //
     static final short[] noParamList              = new short[]{};
@@ -633,8 +634,9 @@ public class FunctionSQL extends Expression {
                 // End of VoltDB extension
                 break;
 
+            case FUNC_PI:
             case FUNC_CURRENT_TIMESTAMP :
-                name            = Tokens.T_CURRENT_TIMESTAMP;
+                name            = id == FUNC_CURRENT_TIMESTAMP ? Tokens.T_CURRENT_TIMESTAMP : Tokens.T_PI;
                 parseList       = emptyParamList;
                 parseListAlt    = noParamList;
                 isValueFunction = true;
@@ -1752,6 +1754,9 @@ public class FunctionSQL extends Expression {
 
                 break;
             }
+            case FUNC_PI :
+                dataType = Type.SQL_DOUBLE;
+                break;
             case FUNC_CURRENT_TIMESTAMP : {
                 // A VoltDB extension to disable TIME ZONE support
                 dataType = Type.SQL_TIMESTAMP;

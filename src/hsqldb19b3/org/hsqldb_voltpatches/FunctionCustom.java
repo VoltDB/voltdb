@@ -242,6 +242,7 @@ public class FunctionCustom extends FunctionSQL {
         customValueFuncMap.put(Tokens.SYSDATE, FUNC_SYSDATE);
         customValueFuncMap.put(Tokens.TODAY, FUNC_CURRENT_DATE);
         customValueFuncMap.put(Tokens.NOW, FUNC_CURRENT_TIMESTAMP);
+        customValueFuncMap.put(Tokens.PI, FUNC_PI);
     }
 
     private int extractSpec;
@@ -271,6 +272,7 @@ public class FunctionCustom extends FunctionSQL {
 
             // A VoltDB extension to customize the SQL function set support
             case Tokens.LOG :
+            case Tokens.PI :
             /* disable 1 line
             case Tokens.LN :
              ... disabled 1 line */
