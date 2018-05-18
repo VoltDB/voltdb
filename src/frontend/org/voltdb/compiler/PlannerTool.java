@@ -310,7 +310,6 @@ public class PlannerTool {
                     logException(e, "Error compiling query");
                     loggedMsg = " (Stack trace has been written to the log.)";
                 }
-                e.printStackTrace();
 
                 throw new RuntimeException("Error compiling query:" + e.toString() + loggedMsg,
                         e);
