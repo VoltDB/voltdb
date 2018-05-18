@@ -90,6 +90,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super(initiatorHSId, coordinatorHSId, msg);
         m_hash = msg.m_hash;
         m_flags = msg.m_flags;
+        m_restartable = msg.m_restartable;
     }
 
     public boolean isRollback()
