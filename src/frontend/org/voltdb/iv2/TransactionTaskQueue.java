@@ -30,7 +30,6 @@ import java.util.concurrent.TimeoutException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.Pair;
-import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 
@@ -522,11 +521,13 @@ public class TransactionTaskQueue
         return pendingTasks;
     }
 
-    public synchronized TransactionTask peekFirstBacklogTask() {
-        if (m_backlog.isEmpty()) {
-            return null;
+    //flush mp readonly transactions out of backlog
+    public void removeMPReadTransactions() {
+        TransactionTask  task = m_backlog.peekFirst();
+        while (task != null && task.getTransactionState().isReadOnly()) {
+            task.getTransactionState().setDone();
+            flush(task.getTxnId());
+            task = m_backlog.peekFirst();
         }
-        return m_backlog.getFirst();
     }
-
 }

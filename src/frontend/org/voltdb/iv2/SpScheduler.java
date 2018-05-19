@@ -67,7 +67,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
-import org.voltdb.messaging.MPIFailoverMessage;
+import org.voltdb.messaging.MPBacklogFlushMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
 import org.voltdb.utils.MiscUtils;
@@ -467,8 +467,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else if (message instanceof DummyTransactionResponseMessage) {
             handleDummyTransactionResponseMessage((DummyTransactionResponseMessage)message);
         }
-        else if (message instanceof MPIFailoverMessage) {
-            handleMPIFailoverMessage();
+        else if (message instanceof MPBacklogFlushMessage) {
+            cleanupTransactionBacklogOnRepair();
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -1775,27 +1775,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    // When MPI fails over, since repair log doesn't include any MP RO transaction, the new MPI needs to clean up
+    // Since repair log doesn't include any MP RO transaction, MPI needs to clean up
     // possible in-progress RO transaction. Note that if RO transaction is a multi-fragment read, some sites may have
-    // not received the fragment while some others have received it when the MPI failover occurs. If new MPI starts
-    // the next transaction without cleaning up prior RO transaction, on the sites that have received fragment, the
-    // backlogs of transaction task queue are still blocked on the fragment, it causes MP deadlock for the next transaction.
-    //
-    // Fix of this issue is to ask site leaders to clean their backlogs and duplicate counters when they receives repair log request
-    // from new MPI, site leaders also forward the message to its replicas.
+    // not received the fragment while some others have received. MPI starts the next transaction without cleaning up
+    // prior RO transaction, on the sites that have received fragment, the backlogs of transaction task queue are still blocked on the fragment, it causes MP deadlock for the next transaction.
+    // Fix: ask site leaders to clean their backlogs and duplicate counters when they receives repair log request
+    // site leaders also forward the message to its replicas.
     @Override
-    public void handleMPIFailoverMessage() {
+    public void cleanupTransactionBacklogOnRepair() {
         if (m_isLeader && m_sendToHSIds.length > 0) {
-            m_mailbox.send(m_sendToHSIds, new MPIFailoverMessage());
+            m_mailbox.send(m_sendToHSIds, new MPBacklogFlushMessage());
         }
-
-        long maxSeenMpTxnId = -1;
         Iterator<Entry<Long, TransactionState>> iter = m_outstandingTxns.entrySet().iterator();
         while (iter.hasNext()) {
             Entry<Long, TransactionState> entry = iter.next();
             TransactionState txnState = entry.getValue();
             if (TxnEgo.getPartitionId(entry.getKey()) == MpInitiator.MP_INIT_PID ) {
-                maxSeenMpTxnId = Math.max(entry.getKey(), maxSeenMpTxnId);
                 if (txnState.isReadOnly()) {
                     txnState.setDone();
                     m_duplicateCounters.entrySet().removeIf((e) -> e.getKey().m_txnId == entry.getKey());
@@ -1805,10 +1800,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         // flush all RO transactions out of backlog
-        while (m_pendingTasks.peekFirstBacklogTask() != null &&
-                m_pendingTasks.peekFirstBacklogTask().getTransactionState().isReadOnly()) {
-            m_pendingTasks.flush(maxSeenMpTxnId);
-        }
+        m_pendingTasks.removeMPReadTransactions();
     }
-
 }

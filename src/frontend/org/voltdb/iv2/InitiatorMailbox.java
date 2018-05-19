@@ -542,7 +542,7 @@ public class InitiatorMailbox implements Mailbox
                 req.isMPIRequest());
 
         if (req.isMPIRequest()) {
-            m_scheduler.handleMPIFailoverMessage();
+            m_scheduler.cleanupTransactionBacklogOnRepair();
         }
         for (Iv2RepairLogResponseMessage log : logs) {
             send(message.m_sourceHSId, log);
