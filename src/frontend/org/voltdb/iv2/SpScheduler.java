@@ -244,7 +244,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // (That is, InitiatorMailbox's API, used by BabySitter, is synchronized on the same
     // lock deliver() is synchronized on.)
     @Override
-    public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
+    public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId)
     {
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("[SpScheduler.updateReplicas] replicas to " + CoreUtils.hsIdCollectionToString(replicas) +
@@ -264,14 +264,30 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
         sendToHSIds.remove(m_mailbox.getHSId());
         m_sendToHSIds = Longs.toArray(sendToHSIds);
+
+        //
+        // A new site joins in, forward the current txn (stream snapshot save) message to new site
+        DuplicateCounterKey snapshotFragment = null;
+        if (mpTxnId != -1) {
+            // HACKY HACKY HACKY, we know at this time there will be only one fragment with this txnId, so it's safe to use
+            // Long.MAX_VALUE to match the duplicate counter key with the given txn id (there is only one!)
+            snapshotFragment = ((TreeMap<DuplicateCounterKey, DuplicateCounter>)m_duplicateCounters)
+                    .floorKey(new DuplicateCounterKey(mpTxnId, Long.MAX_VALUE));
+        }
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
         List<DuplicateCounterKey> doneCounters = new LinkedList<DuplicateCounterKey>();
         for (Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
             DuplicateCounter counter = entry.getValue();
-            int result = counter.updateReplicas(m_replicaHSIds);
-            if (result == DuplicateCounter.DONE) {
-                doneCounters.add(entry.getKey());
+            if (m_isLeader && snapshotFragment != null && entry.getKey().equals(snapshotFragment)) {
+                counter.addReplicas(replicasAdded);
+                // Forward fragment message to new replica
+                m_mailbox.send(replicasAdded, counter.getOpenMessage());
+            } else {
+                int result = counter.updateReplicas(m_replicaHSIds);
+                if (result == DuplicateCounter.DONE) {
+                    doneCounters.add(entry.getKey());
+                }
             }
         }
 
@@ -417,9 +433,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void deliver(VoltMessage message)
     {
-        if (tmLog.isTraceEnabled()) {
-            tmLog.trace("DELIVER: " + message.toString());
-        }
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
         }

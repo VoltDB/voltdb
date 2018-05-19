@@ -319,7 +319,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void updateReplicasForJoin(long txnId) {
         long[] replicasAdded = new long[0];
         if (m_term != null) {
-            replicasAdded = ((SpTerm)m_term).updateReplicas();
+            replicasAdded = ((SpTerm)m_term).updateReplicas(txnId);
         }
         ((SpScheduler)m_scheduler).forwardPendingTaskToRejoinNode(replicasAdded, txnId);
     }

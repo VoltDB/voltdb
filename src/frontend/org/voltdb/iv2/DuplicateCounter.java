@@ -85,6 +85,12 @@ public class DuplicateCounter
         }
     }
 
+    void addReplicas(long[] newReplicas) {
+        for (long replica : newReplicas) {
+            m_expectedHSIds.add(replica);
+        }
+    }
+
     void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage) {
         String msg = String.format(reason + " COMPARING: %d to %d\n"
                 + "REQUEST MESSAGE: %s\n"
