@@ -216,5 +216,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     abstract public boolean sequenceForReplay(VoltMessage m);
 
-    public void handleMPIFailoverMessage() {}
+    //flush out read only transactions upon host failure
+    public void cleanupTransactionBacklogOnRepair() {}
 }

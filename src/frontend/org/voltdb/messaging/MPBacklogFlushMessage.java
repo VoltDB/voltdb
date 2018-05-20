@@ -23,9 +23,9 @@ import java.nio.ByteBuffer;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
-public class MPIFailoverMessage extends VoltMessage {
+public class MPBacklogFlushMessage extends VoltMessage {
 
-    public MPIFailoverMessage()
+    public MPBacklogFlushMessage()
     {
         super();
     }
@@ -40,7 +40,7 @@ public class MPIFailoverMessage extends VoltMessage {
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        buf.put(VoltDbMessageFactory.MPI_FAILOVER_MESSAGE_ID);
+        buf.put(VoltDbMessageFactory.FLUSH_RO_TXN_MESSAGE_ID);
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
