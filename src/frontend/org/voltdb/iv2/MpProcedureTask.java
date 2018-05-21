@@ -271,9 +271,15 @@ public class MpProcedureTask extends ProcedureTask
                     m_msg.isForReplay(),
                     txnState.isNPartTxn());
             complete.setTruncationHandle(m_msg.getTruncationHandle());
+            if (!restartable) {
+             // Update the timestamp to txnState so following restarted fragments could use it
+                long ts = m_restartSeqGenerator.getNextSeqNum();
+                complete.setTimestamp(ts);
+                m_txnState.setTimestamp(ts);
+                //A flag for Scoreboard to determine if it is necessary to flush transaction queue.
+                complete.setRestartable(restartable);
+            }
 
-            //A flag for Scoreboard to determine if it is necessary to flush transaction queue.
-            complete.setRestartable(restartable);
             //If there are misrouted fragments, send message to current masters.
             final List<Long> initiatorHSIds = new ArrayList<Long>();
             if (txnState.isFragmentRestarted()) {
