@@ -109,11 +109,11 @@ public class TransactionTaskQueue
                 if (missingTask) {
 
                     //flush the backlog to avoid no task is pushed to site queue
-                    if (!completion.isRestartable()) {
+                    if (completion.isAbortDuringRepair()) {
                         if (hostLog.isDebugEnabled()) {
                             hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(txnId));
                         }
-                        m_txnTaskQueues[ii].flush(txnId);
+                        completion.doCommonSPICompleteActions();
                     }
                     //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
                     //up the site outstanding transaction queue and duplicate counter

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 
@@ -38,6 +39,9 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
+import com.amazonaws.services.dynamodbv2.model.Stream;
+import com.google_voltpatches.common.collect.Lists;
 
 import junit.framework.TestCase;
 
@@ -127,6 +131,7 @@ public class TestTransactionTaskQueue extends TestCase
         when(msg.getTxnId()).thenReturn(mpTxnId);
         when(msg.getTimestamp()).thenReturn(CompleteTransactionMessage.INITIAL_TIMESTAMP);
         when(msg.needsCoordination()).thenReturn(true);
+        when(msg.isAbortDuringRepair()).thenReturn(false);
         CompleteTransactionTask task =
                 new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
         return task;
@@ -134,12 +139,14 @@ public class TestTransactionTaskQueue extends TestCase
     private CompleteTransactionTask createRepairCompletion(TransactionState txn,
                                                        long mpTxnId,
                                                        TransactionTaskQueue queue,
-                                                       long seq)
+                                                       long seq,
+                                                       boolean isAbortDuringRepair)
     {
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         when(msg.getTimestamp()).thenReturn(seq);
         when(msg.needsCoordination()).thenReturn(true);
+        when(msg.isAbortDuringRepair()).thenReturn(txn.isDone()?false:isAbortDuringRepair);
         CompleteTransactionTask task =
             new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
         return task;
@@ -154,6 +161,7 @@ public class TestTransactionTaskQueue extends TestCase
         when(msg.getTxnId()).thenReturn(mpTxnId);
         when(msg.getTimestamp()).thenReturn(seq);
         when(msg.needsCoordination()).thenReturn(true);
+        when(msg.isAbortDuringRepair()).thenReturn(false);
         CompleteTransactionTask task =
                 new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
         return task;
@@ -166,20 +174,32 @@ public class TestTransactionTaskQueue extends TestCase
             teststorage.addLast(task);
         }
         dut.offer(task);
-        dut.flush(task.getTxnId());
     }
 
     private void addMissingCompletionTask(TransactionTask task, TransactionTaskQueue dut) {
         dut.handleCompletionForMissingTxn((CompleteTransactionTask) task);
-        dut.flush(task.getTxnId());
     }
 
-    private void repairThenRestart(TransactionTask[] repairTask, TransactionTask restartTask, boolean missingCompletion) {
+    private void repairOnly(TransactionTask[] repairTask, Boolean[] missingCompletions) {
+        long repairSeq = m_repairGenerator.getNextSeqNum();
+        boolean completionsSwallowedByScoreboard = Arrays.asList(missingCompletions).contains(new Boolean(true));
+        for (int i = 0; i < SITE_COUNT; i++) {
+            TransactionTask comp = createRepairCompletion(repairTask[i].getTransactionState(), repairTask[i].getTxnId(), m_txnTaskQueues.get(i), repairSeq, true);
+            if (missingCompletions[i]) {
+                addMissingCompletionTask(comp, m_txnTaskQueues.get(i));
+            } else {
+                addTask(comp, m_txnTaskQueues.get(i), completionsSwallowedByScoreboard ? null : m_expectedOrders.get(i));
+            }
+        }
+    }
+
+    private void repairThenRestart(TransactionTask[] repairTask, TransactionTask restartTask, boolean[] missingCompletions) {
         long restartSeq = m_restartGenerator.getNextSeqNum();
         long repairSeq = m_repairGenerator.getNextSeqNum();
         for (int i = 0; i < SITE_COUNT; i++) {
-            TransactionTask comp = createRepairCompletion(repairTask[i].getTransactionState(), repairTask[i].getTxnId(), m_txnTaskQueues.get(i), repairSeq);
-            if (missingCompletion) {
+            TransactionTask comp = createRepairCompletion(repairTask[i].getTransactionState(),
+                    repairTask[i].getTxnId(), m_txnTaskQueues.get(i), repairSeq, false);
+            if (missingCompletions[i]) {
                 addMissingCompletionTask(comp, m_txnTaskQueues.get(i));
             } else {
                 addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
@@ -300,7 +320,7 @@ public class TestTransactionTaskQueue extends TestCase
         TransactionTask comp = null;
         for (int i = 0; i < SITE_COUNT - 1; i++) {
             comp = createCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
-            addTask(comp, m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+            addTask(comp, m_txnTaskQueues.get(i), null);
         }
 
         m_mpTxnEgo = m_mpTxnEgo.makeNext();
@@ -310,19 +330,60 @@ public class TestTransactionTaskQueue extends TestCase
         for (int i = 0; i < SITE_COUNT - 1; i++) {
             m_localTxnEgo[i] = m_localTxnEgo[i].makeNext();
             firstFragOfNextTxn = createFrag(m_localTxnEgo[i].getTxnId(), txnId, m_txnTaskQueues.get(i));
-            addTask(firstFragOfNextTxn, m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+            addTask(firstFragOfNextTxn, m_txnTaskQueues.get(i), null);
         }
 
         // failure occurs, MPI checks repair logs from everybody, decide to repair previous transaction,
         // restart current transaction
 
-        repairThenRestart(firstFrag, firstFragOfNextTxn, false);
+        repairThenRestart(firstFrag, firstFragOfNextTxn, new boolean[]{false, false});
         flushBacklog(firstFrag);
 
         for (int i = 0; i < SITE_COUNT; i++) {
             comp = createCompletion(firstFragOfNextTxn.getTransactionState(), firstFragOfNextTxn.getTxnId(), m_txnTaskQueues.get(i));
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
+
+        verify();
+    }
+
+    // MpProc is in progress, a node failure cause MPI to repair previous transaction and restart current transaction
+    @Test
+    public void testNonRestartableMpRepair() throws InterruptedException {
+        // Even sites receives first fragment
+        long txnId = m_mpTxnEgo.getTxnId();
+        TransactionTask[] firstFrag = new TransactionTask[SITE_COUNT];
+        for (int i = 0; i < SITE_COUNT; i++) {
+            firstFrag[i] = createFrag(m_localTxnEgo[i].getTxnId(), txnId, m_txnTaskQueues.get(i));
+            if (i % 2 == 0) {
+                // This won't get past the scoreboard
+                addTask(firstFrag[i], m_txnTaskQueues.get(i), null);
+            }
+        }
+
+        m_mpTxnEgo = m_mpTxnEgo.makeNext();
+        txnId = m_mpTxnEgo.getTxnId();
+        m_localTxnEgo[0] = m_localTxnEgo[0].makeNext();
+
+        // it will stay at backlog
+        TransactionTask next = createSpProc(m_localTxnEgo[0].getTxnId(), m_txnTaskQueues.get(0));
+        addTask(next, m_txnTaskQueues.get(0), m_expectedOrders.get(0));
+        m_localTxnEgo[0] = m_localTxnEgo[0].makeNext();
+
+        // failure occurs, MPI checks repair logs from everybody, decide to repair previous transaction,
+        // restart current transaction
+
+        repairOnly(firstFrag, new Boolean[]{false, true});
+
+        // Push SPs to 2 sites to verify that the backlog is clear
+        next = createSpProc(m_localTxnEgo[0].getTxnId(), m_txnTaskQueues.get(0));
+        addTask(next, m_txnTaskQueues.get(0), m_expectedOrders.get(0));
+        m_localTxnEgo[0] = m_localTxnEgo[0].makeNext();
+
+        next = createSpProc(m_localTxnEgo[1].getTxnId(), m_txnTaskQueues.get(1));
+        addTask(next, m_txnTaskQueues.get(1), m_expectedOrders.get(1));
+        m_localTxnEgo[1] = m_localTxnEgo[1].makeNext();
+
 
         verify();
     }
@@ -334,12 +395,13 @@ public class TestTransactionTaskQueue extends TestCase
         long txnId = m_mpTxnEgo.getTxnId();
         for (int i = 0; i < SITE_COUNT; i++) {
             TransactionTask firstFrag = createFrag(m_localTxnEgo[i].getTxnId(), txnId, m_txnTaskQueues.get(i));
-            addTask(firstFrag, m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+            addTask(firstFrag, m_txnTaskQueues.get(i), null);
 
             m_localTxnEgo[i] = m_localTxnEgo[i].makeNext();
             TransactionTask staleFrag = createFrag(m_localTxnEgo[i].getTxnId(), txnId, m_txnTaskQueues.get(i), nextSeq, false);
             addTask(staleFrag, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
+
         verify();
     }
 
@@ -358,7 +420,7 @@ public class TestTransactionTaskQueue extends TestCase
         TransactionTask comp = null;
         for (int i = 0; i < SITE_COUNT - 1; i++) {
             comp = createCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
-            addTask(comp, m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+            addTask(comp, m_txnTaskQueues.get(i), null);
         }
 
         // failure occurs, MPI repair current transaction
@@ -366,7 +428,7 @@ public class TestTransactionTaskQueue extends TestCase
         // Every site gets the repair completion message
         long seq = m_repairGenerator.getNextSeqNum();
         for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRepairCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i), seq);
+            comp = createRepairCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i), seq, true);
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
         flushBacklog(firstFrag);
@@ -374,7 +436,7 @@ public class TestTransactionTaskQueue extends TestCase
         // But on one site, a staled completion arrives, it should be discarded.
         for (int i = SITE_COUNT - 1; i < SITE_COUNT; i++) {
             comp = createCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i));
-            addTask(comp, m_txnTaskQueues.get(i), new ArrayDeque<TransactionTask>());
+            addTask(comp, m_txnTaskQueues.get(i), null);
         }
 
         verify();
@@ -400,6 +462,12 @@ public class TestTransactionTaskQueue extends TestCase
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
 
+        // Every site's completion response flushes the TaskQueue
+        for (int i = 0; i < SITE_COUNT; i++) {
+            m_txnTaskQueues.get(i).flush(txnId);
+        }
+
+
         // Run next mp transaction
         m_mpTxnEgo = m_mpTxnEgo.makeNext();
         txnId = m_mpTxnEgo.getTxnId();
@@ -413,15 +481,15 @@ public class TestTransactionTaskQueue extends TestCase
 
         // Every site gets the repair completion to close previous transaction,
         // and restart completion to restart the current one.
-        repairThenRestart(firstFrag, firstFragOfNextTxn[0], true);
+        repairThenRestart(firstFrag, firstFragOfNextTxn[0], new boolean[]{true, true});
         flushBacklog(firstFrag);
 
         // failure occurs, MPI repair current transaction
-        repairThenRestart(firstFrag, firstFragOfNextTxn[0], true);
+        repairThenRestart(firstFrag, firstFragOfNextTxn[0], new boolean[]{true, true});
         flushBacklog(firstFrag);
 
         // failure occurs, MPI repair current transaction
-        repairThenRestart(firstFrag, firstFragOfNextTxn[0], true);
+        repairThenRestart(firstFrag, firstFragOfNextTxn[0], new boolean[]{true, true});
 
         // Transaction complete
         for (int i = 0; i < SITE_COUNT; i++) {
@@ -430,7 +498,6 @@ public class TestTransactionTaskQueue extends TestCase
             firstFragOfNextTxn[i].getTransactionState().setDone();
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
-
 
         verify();
     }
@@ -445,8 +512,6 @@ public class TestTransactionTaskQueue extends TestCase
         TransactionTask[] firstFrag = new TransactionTask[SITE_COUNT];
         for (int i = 0; i < SITE_COUNT; i++) {
             firstFrag[i] = createFrag(m_localTxnEgo[i].getTxnId(), prevTxnId, m_txnTaskQueues.get(i));
-            // Finish the transaction
-            firstFrag[i].getTransactionState().setDone();
             addTask(firstFrag[i], m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
 
@@ -457,7 +522,7 @@ public class TestTransactionTaskQueue extends TestCase
         for (int i = 0; i < SITE_COUNT; i++) {
             m_localTxnEgo[i] = m_localTxnEgo[i].makeNext();
             nextFrag[i] = createFrag(m_localTxnEgo[i].getTxnId(), txnId, m_txnTaskQueues.get(i));
-            addTask(nextFrag[i], m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+            addTask(nextFrag[i], m_txnTaskQueues.get(i), null);
         }
 
         // failure happens, MPI starts to repair
@@ -466,10 +531,15 @@ public class TestTransactionTaskQueue extends TestCase
         TransactionTask comp = null;
         long seq = m_repairGenerator.getNextSeqNum();
         for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRepairCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i), seq);
+            comp = createRepairCompletion(firstFrag[i].getTransactionState(), prevTxnId, m_txnTaskQueues.get(i), seq, false);
             // Finish the transaction
             firstFrag[i].getTransactionState().setDone();
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
+            // Add the frag after the completion because that is the order it will actually be handled
+            m_expectedOrders.get(i).add(nextFrag[i]);
+        }
+        for (int i = 0; i < SITE_COUNT; i++) {
+            m_txnTaskQueues.get(i).flush(prevTxnId);
         }
 
         verify();
