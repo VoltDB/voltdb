@@ -1068,7 +1068,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "user lacks privilege or object not found: SP"));
+                    "object not found: SP"));
         }
 
         // Having
@@ -1079,7 +1079,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "user lacks privilege or object not found: CT"));
+                    "object not found: CT"));
         }
 
         // Group by column.alias
@@ -1090,7 +1090,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
         catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "user lacks privilege or object not found: P1.SP"));
+                    "object not found: P1.SP"));
         }
 
         //

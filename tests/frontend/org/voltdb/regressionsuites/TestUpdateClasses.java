@@ -931,7 +931,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
                 fail("Invalid SQLStmt should fail during UpdateClasses");
             } catch (ProcCallException e) {
                 assertTrue(e.getMessage().contains("Failed to plan for statement"));
-                assertTrue(e.getMessage().contains("user lacks privilege or object not found: TT_INVALID_QUERY"));
+                assertTrue(e.getMessage().contains("object not found: TT_INVALID_QUERY"));
             }
         }
         finally {
