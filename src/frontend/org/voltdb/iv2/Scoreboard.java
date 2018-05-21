@@ -55,18 +55,19 @@ public class Scoreboard {
             return;
         }
 
-        // special case, scoreboard is empty
-        if (m_compTasks.peekFirst() == null) {
-            m_compTasks.addFirst(Pair.of(task, missingTxn));
-            return;
-        }
-
         // Restart completion steps on any pending prior fragment of the same transaction
         if (task.getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP &&
                 MpRestartSequenceGenerator.isForRestart(task.getTimestamp()) &&
                 m_fragTask != null && m_fragTask.getTxnId() == task.getMsgTxnId()) {
             m_fragTask = null;
         }
+
+        // special case, scoreboard is empty
+        if (m_compTasks.peekFirst() == null) {
+            m_compTasks.addFirst(Pair.of(task, missingTxn));
+            return;
+        }
+
         // scoreboard has one completion
         if (m_compTasks.size() == 1) {
             Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();

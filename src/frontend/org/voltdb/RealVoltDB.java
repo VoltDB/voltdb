@@ -2093,6 +2093,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             initiators.put(partition, initiator);
             m_partitionsToSitesAtStartupForExportInit.add(partition);
         }
+        if (StartAction.JOIN.equals(startAction)) {
+            TransactionTaskQueue.initBarrier(m_nodeSettings.getLocalSitesCount());
+        }
         return initiators;
     }
 
