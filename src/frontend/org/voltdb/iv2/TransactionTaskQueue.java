@@ -522,7 +522,7 @@ public class TransactionTaskQueue
     }
 
     //flush mp readonly transactions out of backlog
-    public void removeMPReadTransactions() {
+    public synchronized void removeMPReadTransactions() {
         TransactionTask  task = m_backlog.peekFirst();
         while (task != null && task.getTransactionState().isReadOnly()) {
             task.getTransactionState().setDone();
