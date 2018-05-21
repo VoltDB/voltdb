@@ -33,6 +33,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.ReplicatedTableException;
@@ -126,6 +127,14 @@ public class MpTransactionState extends TransactionState
         // since some masters may not have seen it.
         m_haveDistributedInitTask = false;
         m_isRestart = true;
+        //do not set m_haveSentfragment to false if a proc is non-restartable.
+        if (!isReadOnly() && m_haveSentfragment && m_initiationMsg != null
+                && m_initiationMsg.getStoredProcedureName() != null) {
+            SystemProcedureCatalog.Config sysproc = SystemProcedureCatalog.listing.get(m_initiationMsg.getStoredProcedureName());
+            if (sysproc != null && !sysproc.isRestartable()) {
+                return;
+            }
+        }
         m_haveSentfragment = false;
     }
 
