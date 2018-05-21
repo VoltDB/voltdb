@@ -28,7 +28,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.avro.SchemaCompatibility;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -54,6 +56,10 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
+
+import javax.persistence.criteria.CriteriaBuilder;
+
+import static org.voltcore.utils.Pair.of;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
@@ -2727,18 +2733,29 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      *         the order by expression is not a group by expression,
      *         but is functionally dependent on the group by expression.
      */
-    List<ParsedColInfo> getSortColumnsForSerialGroupBy() {
-        List<ParsedColInfo> answer = new ArrayList<>();
-        List<ParsedColInfo> gbCopy = new ArrayList<>(m_groupByColumns);
+    Pair<List<ParsedColInfo>, List<Integer>> getSortColumnsForSerialGroupBy() {
+        if (m_orderColumns.isEmpty()) {
+            // No order columns, so the order by
+            // index, if any, can't help us.
+            return null;
+        }
+        int numGroupByColumns = m_groupByColumns.size();
+        List<Integer> gbOrigIndexes       = new ArrayList<>(numGroupByColumns);
+        List<Integer> answerPermutation   = new ArrayList<>(numGroupByColumns);
+        List<ParsedColInfo> answerColumns = new ArrayList<>(numGroupByColumns);
+        for (int idx = 0; idx < numGroupByColumns; idx += 1) {
+            gbOrigIndexes.set(idx, idx);
+        }
         for (ParsedColInfo oColInfo : m_orderColumns) {
             AbstractExpression oExpr = oColInfo.expression;
             boolean foundIt = false;
-            for (int idx = 0; idx < gbCopy.size();) {
-                ParsedColInfo gColInfo = gbCopy.get(idx);
+            for (int idx = 0; idx < m_groupByColumns.size() && 0 <= gbOrigIndexes.get(idx) ;) {
+                ParsedColInfo gColInfo = m_groupByColumns.get(idx);
                 AbstractExpression gExpr = gColInfo.expression;
                 if (gExpr.equals(oExpr)) {
-                    answer.add(oColInfo);
-                    gbCopy.remove(idx);
+                    answerColumns.add(oColInfo);
+                    answerPermutation.add(gbOrigIndexes.get(idx));
+                    gbOrigIndexes.set(idx, -1);
                     foundIt = true;
                     break;
                 } else {
@@ -2755,7 +2772,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // not use yet.  We need to order by these
         // for serial aggregation, but not for
         // order by sorting.
-        answer.addAll(gbCopy);
-        return answer;
+        if (answerColumns != null) {
+            for (int idx = 0; idx < numGroupByColumns; idx += 1) {
+                if (0 <= gbOrigIndexes.get(idx)) {
+                    answerColumns.add(m_groupByColumns.get(idx));
+                    answerPermutation.add(gbOrigIndexes.get(idx));
+                }
+            }
+        }
+        return Pair.of(answerColumns, answerPermutation);
     }
 }
