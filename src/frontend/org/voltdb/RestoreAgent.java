@@ -1411,7 +1411,7 @@ SnapshotCompletionInterest, Promotable
                                      false, null);
         } else {
             m_truncationSnapshot = event.multipartTxnId;
-            m_truncationSnapshotPerPartition = event.partitionTxnIds;
+            m_truncationSnapshotPerPartition = event.localPartitionTxnIds;
             m_replayAgent.returnAllSegments();
             changeState();
         }

@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -33,6 +34,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -40,7 +42,12 @@ import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableList.Builder;
 import com.google_voltpatches.common.collect.ImmutableMap;
+
+import scala.collection.immutable.List;
+
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
@@ -172,6 +179,12 @@ public class SnapshotCompletionMonitor {
         String truncReqId = jsonObj.optString("truncReqId");
 
         if (hostCount == 0) {
+            JSONArray snapshotTxnIds = jsonObj.getJSONArray("snapshotPartitionTxnIds");
+            Builder<Long> allPartitionTxnIds = new ImmutableList.Builder<Long>();
+            for (int ii = 0; ii < snapshotTxnIds.length(); ii++) {
+                allPartitionTxnIds.add(snapshotTxnIds.getLong(ii));
+            }
+
             /*
              * Convert the JSON object containing the export sequence numbers for each
              * table and partition to a regular map
@@ -246,6 +259,7 @@ public class SnapshotCompletionMonitor {
                                 nonce,
                                 txnId,
                                 partitionTxnIdsMap,
+                                allPartitionTxnIds.build(),
                                 truncation,
                                 didSucceed,
                                 truncReqId,

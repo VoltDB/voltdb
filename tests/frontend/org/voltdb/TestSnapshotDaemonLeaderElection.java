@@ -117,6 +117,7 @@ public class TestSnapshotDaemonLeaderElection extends TestSnapshotDaemon {
                         "",
                         32,
                         Collections.<Integer, Long>emptyMap(),
+                        Collections.<Long>emptyList(),
                         true, /*DRProducerProtocol.PROTOCOL_VERSION*/0,
                         VoltDB.instance().getClusterCreateTime())).await();
         assertTrue(m_initiator.procedureName.equals("@SnapshotDelete"));

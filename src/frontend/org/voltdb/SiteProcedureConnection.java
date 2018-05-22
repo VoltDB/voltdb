@@ -200,6 +200,7 @@ public interface SiteProcedureConnection {
      */
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
+            List<Long> allPartitionTxnIds,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,

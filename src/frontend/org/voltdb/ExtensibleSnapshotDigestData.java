@@ -20,9 +20,11 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -30,6 +32,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 public class ExtensibleSnapshotDigestData {
@@ -40,6 +43,8 @@ public class ExtensibleSnapshotDigestData {
     public static final String PARTITION = "partition";
     public static final String EXPORT_SEQUENCE_NUMBER = "exportSequenceNumber";
     public static final String EXPORT_USO = "exportUso";
+
+    private final List<Long> m_snapshotPartitionTxnIds;
 
     /**
      * This field is the same values as m_exportSequenceNumbers once they have been extracted
@@ -69,10 +74,12 @@ public class ExtensibleSnapshotDigestData {
     private long m_terminus;
 
     public ExtensibleSnapshotDigestData(
+            List<Long> snapshotPartitionTxnIds,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             Map<Integer, JSONObject> drMixedClusterSizeConsumerState,
             final JSONObject jsData) {
+        m_snapshotPartitionTxnIds = snapshotPartitionTxnIds;
         m_exportSequenceNumbers = exportSequenceNumbers;
         m_drTupleStreamInfo = drTupleStreamInfo;
         m_drMixedClusterSizeConsumerState = drMixedClusterSizeConsumerState;
@@ -165,6 +172,38 @@ public class ExtensibleSnapshotDigestData {
         long jsTerminus = jsonObj.optLong(SnapshotUtil.JSON_TERMINUS, 0L);
         m_terminus = Math.max(jsTerminus, m_terminus);
         jsonObj.put(SnapshotUtil.JSON_TERMINUS, m_terminus);
+    }
+
+    private void mergeSnapshotPartitionTxnIdsToZK(JSONObject jsonObj) throws JSONException {
+        JSONArray partitionList = jsonObj.optJSONArray("snapshotPartitionTxnIds");
+        Map<Integer, Long> remoteTxnIds = null;
+        if (partitionList == null) {
+            remoteTxnIds = new HashMap<>();
+            partitionList = new JSONArray();
+            jsonObj.put("snapshotPartitionTxnIds", partitionList);
+        }
+        else {
+            remoteTxnIds = new HashMap<>(partitionList.length()*2);
+            for (int ii = 0; ii < partitionList.length(); ii++) {
+                Long txnId = partitionList.getLong(ii);
+                remoteTxnIds.put(TxnEgo.getPartitionId(txnId), txnId);
+            }
+        }
+
+        for (Long localTxnId : m_snapshotPartitionTxnIds) {
+            Long remoteTxnId = remoteTxnIds.get(TxnEgo.getPartitionId(localTxnId));
+            if (remoteTxnId == null) {
+                partitionList.put(localTxnId);
+            }
+            else {
+                if (!remoteTxnId.equals(localTxnId)) {
+                    VoltDB.crashLocalVoltDB(
+                            "Snapshot Transaction Ids for partition " + TxnEgo.getPartitionId(localTxnId) +
+                            " not consistent in snapshot between remote Host " + TxnEgo.txnIdToString(remoteTxnId) +
+                            " and local host " + TxnEgo.txnIdToString(localTxnId), true, null);
+                }
+            }
+        }
     }
 
     private void writeDRTupleStreamInfoToSnapshot(JSONStringer stringer) throws IOException {
@@ -329,6 +368,7 @@ public class ExtensibleSnapshotDigestData {
     }
 
     public void mergeToZooKeeper(JSONObject jsonObj, VoltLogger log) throws JSONException {
+        mergeSnapshotPartitionTxnIdsToZK(jsonObj);
         mergeExportSequenceNumbersToZK(jsonObj, log);
         mergeDRTupleStreamInfoToZK(jsonObj, log);
         mergeConsumerDrIdTrackerToZK(jsonObj);

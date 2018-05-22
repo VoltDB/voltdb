@@ -190,6 +190,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                     m_completionAction.setSnapshotTxnId(event.multipartTxnId);
 
                     setJoinComplete(siteConnection,
+                                    event.allPartitionTxnIds,
                                     event.exportSequenceNumbers,
                                     event.drSequenceNumbers,
                                     event.drMixedClusterSizeConsumerState,

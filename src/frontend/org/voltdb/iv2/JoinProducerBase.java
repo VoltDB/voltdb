@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -172,14 +173,15 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     // Completed all criteria: Kill the watchdog and inform the site.
     protected void setJoinComplete(SiteProcedureConnection siteConnection,
+                                   List<Long> allpartitionTxnIds,
                                    Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                    Map<Integer, Long> drSequenceNumbers,
                                    Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
                                    boolean requireExistingSequenceNumbers,
                                    long clusterCreateTime)
     {
-        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, drSequenceNumbers,
-                allConsumerSiteTrackers, requireExistingSequenceNumbers, clusterCreateTime);
+        siteConnection.setRejoinComplete(m_completionAction, allpartitionTxnIds, exportSequenceNumbers,
+                drSequenceNumbers, allConsumerSiteTrackers, requireExistingSequenceNumbers, clusterCreateTime);
     }
 
     protected void registerSnapshotMonitor(String nonce) {
