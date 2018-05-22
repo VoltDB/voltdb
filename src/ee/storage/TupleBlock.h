@@ -284,6 +284,10 @@ public:
     inline int64_t getAllocatedMemory() {
         return m_tupleLength * m_tuplesPerBlock;
     }
+
+    inline bool unique() {
+        return m_references == 1;
+    }
 private:
     char*   m_storage;
     std::atomic<uint32_t> m_references;
