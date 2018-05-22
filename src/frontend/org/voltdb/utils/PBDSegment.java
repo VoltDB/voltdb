@@ -165,7 +165,7 @@ public abstract class PBDSegment {
     // TODO: javadoc
     abstract int size();
 
-    abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry, int length) throws IOException;
+    abstract protected int writeTruncatedEntry(BinaryDeque.TruncatorResponse entry) throws IOException;
 
     /**
      * Parse the segment and truncate the file if necessary.
@@ -226,9 +226,7 @@ public abstract class PBDSegment {
                         final long partialEntryBeginOffset = reader.readOffset();
                         m_fc.position(partialEntryBeginOffset);
 
-                        // It is conceivable that a truncated buffer uses up more compressed space than the original
-                        // compressed buffer, but we won't worry about that until it happens.
-                        final int written = writeTruncatedEntry(retval, compressedLength + OBJECT_HEADER_BYTES);
+                        final int written = writeTruncatedEntry(retval);
                         sizeInBytes += written;
 
                         initNumEntries(reader.readIndex(), sizeInBytes);

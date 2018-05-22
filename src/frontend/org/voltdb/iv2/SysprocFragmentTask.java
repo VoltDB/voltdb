@@ -167,6 +167,19 @@ public class SysprocFragmentTask extends FragmentTaskBase
                     "The rejoining node's VoltDB process will now exit.", false, null);
         }
 
+        // special case for @PingPartitions for re-enabling scoreboard
+        if (SysProcFragmentId.isEnableScoreboardFragment(m_fragmentMsg.getPlanHash(0)) &&
+                ! m_queue.scoreboardEnabled()) {
+            // enable scoreboard
+            // For handling the rare corner case of MPI Failover during handling the last @PingPartitions,
+            // We would better to enable the scoreboard atomically. This requires a barrier for ensuring all sites has seen this last fragments.
+            if (m_queue.enableScoreboard()) {
+                // queue to the scoreboard
+                m_queue.offer(this);
+                return;
+            }
+        }
+
         taskLog.logTask(m_fragmentMsg);
 
         respondWithDummy();
@@ -308,11 +321,13 @@ public class SysprocFragmentTask extends FragmentTaskBase
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         sb.append("  TIMESTAMP: ");
         MpRestartSequenceGenerator.restartSeqIdToString(getTimestamp(), sb);
+        sb.append("  FRAGMENT ID: ").append(VoltSystemProcedure.hashToFragId(m_fragmentMsg.getPlanHash(0)));
+
         return sb.toString();
     }
 
     public boolean needCoordination() {
-        return !m_txnState.isReadOnly() && !isBorrowedTask();
+        return !(m_txnState.isReadOnly() || isBorrowedTask() || m_isNPartition);
     }
 
     public boolean isBorrowedTask() {

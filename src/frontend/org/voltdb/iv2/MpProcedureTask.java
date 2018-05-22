@@ -63,11 +63,11 @@ public class MpProcedureTask extends ProcedureTask
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters,
-                  long buddyHSId, boolean isRestart, int leaderNodeId)
+                  long buddyHSId, boolean isRestart, int leaderNodeId, boolean nPartTxn)
     {
         super(mailbox, procName,
               new MpTransactionState(mailbox, msg, pInitiators, partitionMasters,
-                                     buddyHSId, isRestart),
+                                     buddyHSId, isRestart, nPartTxn),
               queue);
         m_isRestart = isRestart;
         m_msg = msg;
@@ -139,7 +139,7 @@ public class MpProcedureTask extends ProcedureTask
                         "Failure while running system procedure " + txn.m_initiationMsg.getStoredProcedureName() +
                         ", and system procedures can not be restarted."));
             txn.setNeedsRollback(true);
-            completeInitiateTask(siteConnection);
+            completeInitiateTask(siteConnection, false);
             errorResp.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(errorResp);
 
@@ -161,7 +161,8 @@ public class MpProcedureTask extends ProcedureTask
                     true,
                     false,  // really don't want to have ack the ack.
                     !m_txnState.isReadOnly(),
-                    m_msg.isForReplay());
+                    m_msg.isForReplay(),
+                    txn.isNPartTxn());
             // TransactionTaskQueue uses it to find matching CompleteTransactionMessage
             long ts = m_restartSeqGenerator.getNextSeqNum();
             restart.setTimestamp(ts);
@@ -170,7 +171,8 @@ public class MpProcedureTask extends ProcedureTask
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             //restart.setForReplica(false);
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("MP restart cleanup CompleteTransactionMessage to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
+                hostLog.debug("MP restart cleanup CompleteTransactionMessage "+ MpRestartSequenceGenerator.restartSeqIdToString(ts) +
+                        " to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
             }
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
@@ -242,8 +244,11 @@ public class MpProcedureTask extends ProcedureTask
     }
 
     @Override
-    void completeInitiateTask(SiteProcedureConnection siteConnection)
-    {
+    void completeInitiateTask(SiteProcedureConnection siteConnection) {
+        completeInitiateTask(siteConnection, true);
+    }
+
+    void completeInitiateTask(SiteProcedureConnection siteConnection, boolean restartable){
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPSITE);
         if (traceLog != null) {
             traceLog.add(() -> VoltTrace.instant("sendcomplete",
@@ -251,29 +256,33 @@ public class MpProcedureTask extends ProcedureTask
                                                  "commit", Boolean.toString(!m_txnState.needsRollback()),
                                                  "dest", CoreUtils.hsIdCollectionToString(m_initiatorHSIds)));
         }
-
+        MpTransactionState txnState = (MpTransactionState)m_txnState;
         // Only send completions for MP transactions that have processed at least one fragment
-        CompleteTransactionMessage complete = new CompleteTransactionMessage(
-                m_initiator.getHSId(), // who is the "initiator" now??
-                m_initiator.getHSId(),
-                m_txnState.txnId,
-                m_txnState.isReadOnly(),
-                m_txnState.getHash(),
-                m_txnState.needsRollback(),
-                false,  // really don't want to have ack the ack.
-                false,
-                m_msg.isForReplay());
+        if (txnState.isReadOnly() || txnState.haveSentFragment()) {
+            CompleteTransactionMessage complete = new CompleteTransactionMessage(
+                    m_initiator.getHSId(), // who is the "initiator" now??
+                    m_initiator.getHSId(),
+                    m_txnState.txnId,
+                    m_txnState.isReadOnly(),
+                    m_txnState.getHash(),
+                    m_txnState.needsRollback(),
+                    false,  // really don't want to have ack the ack.
+                    false,
+                    m_msg.isForReplay(),
+                    txnState.isNPartTxn());
+            complete.setTruncationHandle(m_msg.getTruncationHandle());
 
-        complete.setTruncationHandle(m_msg.getTruncationHandle());
-
-        //If there are misrouted fragments, send message to current masters.
-        final List<Long> initiatorHSIds = new ArrayList<Long>();
-        if (((MpTransactionState)m_txnState).isFragmentRestarted()) {
-            initiatorHSIds.addAll(((MpTransactionState)m_txnState).getMasterHSIDs());
-        } else {
-            initiatorHSIds.addAll(m_initiatorHSIds);
+            //A flag for Scoreboard to determine if it is necessary to flush transaction queue.
+            complete.setRestartable(restartable);
+            //If there are misrouted fragments, send message to current masters.
+            final List<Long> initiatorHSIds = new ArrayList<Long>();
+            if (txnState.isFragmentRestarted()) {
+                initiatorHSIds.addAll(txnState.getMasterHSIDs());
+            } else {
+                initiatorHSIds.addAll(m_initiatorHSIds);
+            }
+            m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
         }
-        m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());
     }

@@ -24,7 +24,7 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="HOST">
+    <!--logger name="HOST">
         <level value="INFO"/>
     </logger -->
 
@@ -72,9 +72,9 @@
         <level value="TRACE"/>
     </logger -->
 
-    <logger name="TM">
+    <!-- logger name="TM">
         <level value="INFO"/>
-    </logger>
+    </logger -->
 
     <root>
         <priority value="info" />

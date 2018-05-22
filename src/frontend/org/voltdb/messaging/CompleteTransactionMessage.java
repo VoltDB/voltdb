@@ -31,12 +31,13 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_requiresAck;
     boolean m_rollbackForFault;
     long m_timestamp = INITIAL_TIMESTAMP;
-
+    boolean m_restartable = true;
     int m_hash;
     int m_flags = 0;
     static final int ISROLLBACK = 0;
     static final int REQUIRESACK = 1;
     static final int ISRESTART = 2;
+    static final int ISNPARTTXN = 3;
 
     private void setBit(int position, boolean value)
     {
@@ -73,13 +74,15 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId,
                                       long txnId, boolean isReadOnly, int hash,
                                       boolean isRollback, boolean requiresAck,
-                                      boolean isRestart, boolean isForReplay)
+                                      boolean isRestart, boolean isForReplay,
+                                      boolean isNPartTxn)
     {
         super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, isForReplay);
         m_hash = hash;
         setBit(ISROLLBACK, isRollback);
         setBit(REQUIRESACK, requiresAck);
         setBit(ISRESTART, isRestart);
+        setBit(ISNPARTTXN, isNPartTxn);
     }
 
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId, CompleteTransactionMessage msg)
@@ -87,6 +90,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super(initiatorHSId, coordinatorHSId, msg);
         m_hash = msg.m_hash;
         m_flags = msg.m_flags;
+        m_restartable = msg.m_restartable;
     }
 
     public boolean isRollback()
@@ -104,12 +108,21 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         return getBit(ISRESTART);
     }
 
+    public boolean isNPartTxn()
+    {
+        return getBit(ISNPARTTXN);
+    }
+
     public int getHash() {
         return m_hash;
     }
 
     public void setRequireAck(boolean requireAck) {
         setBit(REQUIRESACK, requireAck);
+    }
+
+    public boolean needsCoordination() {
+        return !isNPartTxn() && !isReadOnly();
     }
 
     // This is used when MP txn is restarted.
@@ -125,7 +138,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4 + 4 + 8;
+        msgsize += 4 + 4 + 8 + 1;
         return msgsize;
     }
 
@@ -137,6 +150,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         buf.putInt(m_hash);
         buf.putInt(m_flags);
         buf.putLong(m_timestamp);
+        buf.put(m_restartable ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -148,7 +162,16 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         m_hash = buf.getInt();
         m_flags = buf.getInt();
         m_timestamp = buf.getLong();
+        m_restartable = (buf.get() == 1);
         assert(buf.capacity() == buf.position());
+    }
+
+    public void setRestartable(boolean restartable) {
+        m_restartable = restartable;
+    }
+
+    public boolean isRestartable() {
+        return m_restartable;
     }
 
     @Override
@@ -162,9 +185,13 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("\n SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
+
+        if (isNPartTxn())
+            sb.append("\n  ").append(" N Partition TXN");
+
         sb.append("\n  TIMESTAMP: ");
         MpRestartSequenceGenerator.restartSeqIdToString(m_timestamp, sb);
-        sb.append("\n  TRUNCATION HANDLE:" + getTruncationHandle());
+        sb.append("\n  TRUNCATION HANDLE:" + TxnEgo.txnIdToString(getTruncationHandle()));
         sb.append("\n  HASH: " + String.valueOf(m_hash));
 
         if (isRollback())
@@ -181,6 +208,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
             sb.append("\n  SEND TO LEADER");
         }
 
+        if(!isRestartable()) {
+            sb.append("\n  THIS IS NOT RESTARTABLE");
+        }
         return sb.toString();
     }
 }

@@ -84,10 +84,10 @@ public class MpScheduler extends Scheduler
     // Let the one we can't be sure about linger here.  See ENG-4211 for more.
     long m_repairLogAwaitingCommit = Long.MIN_VALUE;
 
-    MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue, int leaderNodeId, int localSitesCount)
+    MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue, int leaderNodeId)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new MpTransactionTaskQueue(m_tasks, localSitesCount);
+        m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
         m_buddyHSIds = buddyHSIds;
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
@@ -334,7 +334,7 @@ public class MpScheduler extends Scheduler
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId);
+                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderNodeId, false);
         }
 
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
@@ -422,7 +422,7 @@ public class MpScheduler extends Scheduler
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), true, m_leaderNodeId);
+                    m_buddyHSIds.get(m_nextBuddy), true, m_leaderNodeId, false);
         }
 
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
@@ -469,7 +469,8 @@ public class MpScheduler extends Scheduler
                 m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
                 m_repairLogAwaitingCommit = message.getTxnId();
             }
-            m_outstandingTxns.remove(message.getTxnId());
+            MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
+            assert(txn != null);
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
             // We actually completed this MP transaction.  Create a fake CompleteTransactionMessage
@@ -477,7 +478,7 @@ public class MpScheduler extends Scheduler
             // even if all the masters somehow die before forwarding Complete on to their replicas.
             CompleteTransactionMessage ctm = new CompleteTransactionMessage(m_mailbox.getHSId(),
                     message.m_sourceHSId, message.getTxnId(), message.isReadOnly(), 0,
-                    !message.shouldCommit(), false, false, false);
+                    !message.shouldCommit(), false, false, false, txn.isNPartTxn());
             ctm.setTruncationHandle(m_repairLogTruncationHandle);
             // dump it in the repair log
             // hacky castage

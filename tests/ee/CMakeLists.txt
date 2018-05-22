@@ -101,6 +101,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   common/valuearray_test
   execution/add_drop_table
   execution/engine_test
+  execution/ExecutorVectorTest
   execution/FragmentManagerTest
   executors/CommonTableExpressionTest
   executors/MergeReceiveExecutorTest
@@ -126,6 +127,7 @@ SET (VOLTDB_MANUAL_SUCCEEDING_TEST_PROGRAMS
   storage/ExportTupleStream_test
   storage/filter_test
   storage/LargeTempTableBlockTest
+  storage/LargeTempTableTest
   storage/persistent_table_log_test
   storage/PersistentTableMemStatsTest
   storage/persistenttable_test

@@ -140,7 +140,9 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                            (int)targetTable->allocatedTupleCount());
 
             }
-            s_modifiedTuples = modified_tuples;
+            if (m_replicatedTableOperation) {
+                s_modifiedTuples = modified_tuples;
+            }
         }
         else {
             if (s_modifiedTuples == -1) {
