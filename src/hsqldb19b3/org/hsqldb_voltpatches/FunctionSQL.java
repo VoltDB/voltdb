@@ -932,6 +932,9 @@ public class FunctionSQL extends Expression {
             case FUNC_WIDTH_BUCKET : {
                 return null;
             }
+            case FUNC_PI : {
+                return Double.valueOf(Math.PI);
+            }
             case FUNC_SUBSTRING_CHAR : {
                 if (data[0] == null || data[1] == null) {
                     return null;
@@ -1920,6 +1923,10 @@ public class FunctionSQL extends Expression {
                 sb.append(Tokens.T_CEILING).append('(').                 //
                     append(nodes[0].getSQL()).append(')');
 
+                break;
+            }
+            case FUNC_PI : {
+                sb.append(Tokens.T_PI).append("()");                     //
                 break;
             }
             case FUNC_WIDTH_BUCKET : {

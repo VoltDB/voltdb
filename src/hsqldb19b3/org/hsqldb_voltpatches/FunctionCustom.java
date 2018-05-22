@@ -242,7 +242,6 @@ public class FunctionCustom extends FunctionSQL {
         customValueFuncMap.put(Tokens.SYSDATE, FUNC_SYSDATE);
         customValueFuncMap.put(Tokens.TODAY, FUNC_CURRENT_DATE);
         customValueFuncMap.put(Tokens.NOW, FUNC_CURRENT_TIMESTAMP);
-        customValueFuncMap.put(Tokens.PI, FUNC_PI);
     }
 
     private int extractSpec;
