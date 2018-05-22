@@ -247,12 +247,16 @@ public class InitiatorMailbox implements Mailbox
     }
 
     // Change the replica set configuration (during or after promotion)
-    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
-    {
-        return updateReplicasInternal(replicas, partitionMasters);
+    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters) {
+        return updateReplicasInternal(replicas, partitionMasters, -1L);
     }
 
-    protected long[] updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters) {
+    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long snapshotSaveTxnId)
+    {
+        return updateReplicasInternal(replicas, partitionMasters, snapshotSaveTxnId);
+    }
+
+    protected long[] updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters, long snapshotSaveTxnId) {
         assert(lockingVows());
         Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
@@ -260,7 +264,7 @@ public class InitiatorMailbox implements Mailbox
         if (m_algo != null) {
             m_algo.cancel();
         }
-        return m_scheduler.updateReplicas(replicas, partitionMasters);
+        return m_scheduler.updateReplicas(replicas, partitionMasters, snapshotSaveTxnId);
     }
 
     public long getMasterHsId(int partitionId)

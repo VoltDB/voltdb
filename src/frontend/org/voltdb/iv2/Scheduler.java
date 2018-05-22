@@ -207,7 +207,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void shutdown();
 
     @Override
-    abstract public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
+    abstract public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId);
 
     @Override
     abstract public void deliver(VoltMessage message);

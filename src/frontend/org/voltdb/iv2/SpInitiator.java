@@ -316,11 +316,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     //This will be called from Snapshot in elastic joining or rejoining cases.
-    public void updateReplicasForJoin(long txnId) {
+    public void updateReplicasForJoin(long snapshotSaveTxnId) {
         long[] replicasAdded = new long[0];
         if (m_term != null) {
-            replicasAdded = ((SpTerm)m_term).updateReplicas();
+            replicasAdded = ((SpTerm)m_term).updateReplicas(snapshotSaveTxnId);
         }
-        ((SpScheduler)m_scheduler).forwardPendingTaskToRejoinNode(replicasAdded, txnId);
+        ((SpScheduler)m_scheduler).forwardPendingTaskToRejoinNode(replicasAdded, snapshotSaveTxnId);
     }
 }
