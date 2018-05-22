@@ -148,8 +148,8 @@ public class CompleteTransactionTask extends TransactionTask
         return m_completeMsg.getTxnId();
     }
 
-    public boolean isRestartable() {
-        return m_completeMsg.isRestartable();
+    public boolean isAbortDuringRepair() {
+        return m_completeMsg.isAbortDuringRepair();
     }
 
     @Override

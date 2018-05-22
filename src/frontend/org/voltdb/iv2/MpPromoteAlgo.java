@@ -374,7 +374,9 @@ public class MpPromoteAlgo implements RepairAlgo
                             false,      // no acks in iv2.
                             restart,    // Indicate rollback for repair as appropriate
                             ftm.isForReplay(),
-                            ftm.isNPartTxn());
+                            ftm.isNPartTxn(),
+                            true);
+                    rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
                 }
             }
 
