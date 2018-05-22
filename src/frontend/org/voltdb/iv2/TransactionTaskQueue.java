@@ -107,7 +107,6 @@ public class TransactionTaskQueue
                 // only release completions at head of queue
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst().getFirst();
                 if (missingTask) {
-
                     //flush the backlog to avoid no task is pushed to site queue
                     if (completion.isAbortDuringRepair()) {
                         if (hostLog.isDebugEnabled()) {

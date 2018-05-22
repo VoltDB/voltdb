@@ -40,14 +40,6 @@ public class Scoreboard {
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
-//        // This happens when a non-restartable sysproc was aborted, since MPI doesn't send repair message for this transaction
-//        // we must allow the rollback completion to go through scoreboard.
-//        boolean isTxnRollback = (task.getCompleteMessage().isRollback() && task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP);
-//        // Dont' treat rollback transaction as missing
-//        if (isTxnRollback  && !task.isRestartable()) {
-//            missingTxn = false;
-//        }
-
         // This is an extremely rare case were a MPI restart completion arrives before the dead MPI's completion
         // Ignore this message because the restart completion is more recent and should step on the initial completion
         if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP &&

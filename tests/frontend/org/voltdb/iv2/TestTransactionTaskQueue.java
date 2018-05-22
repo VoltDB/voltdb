@@ -40,9 +40,6 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-import com.amazonaws.services.dynamodbv2.model.Stream;
-import com.google_voltpatches.common.collect.Lists;
-
 import junit.framework.TestCase;
 
 public class TestTransactionTaskQueue extends TestCase
@@ -340,14 +337,15 @@ public class TestTransactionTaskQueue extends TestCase
         flushBacklog(firstFrag);
 
         for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createCompletion(firstFragOfNextTxn.getTransactionState(), firstFragOfNextTxn.getTxnId(), m_txnTaskQueues.get(i));
+            comp = createCompletion(firstFragOfNextTxn.getTransactionState(),
+                    firstFragOfNextTxn.getTxnId(), m_txnTaskQueues.get(i));
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
 
         verify();
     }
 
-    // MpProc is in progress, a node failure cause MPI to repair previous transaction and restart current transaction
+    // MpProc is in progress, a node failure cause MPI to repair non-restartable transaction followed by SP txn
     @Test
     public void testNonRestartableMpRepair() throws InterruptedException {
         // Even sites receives first fragment
@@ -428,7 +426,8 @@ public class TestTransactionTaskQueue extends TestCase
         // Every site gets the repair completion message
         long seq = m_repairGenerator.getNextSeqNum();
         for (int i = 0; i < SITE_COUNT; i++) {
-            comp = createRepairCompletion(firstFrag[i].getTransactionState(), firstFrag[i].getTxnId(), m_txnTaskQueues.get(i), seq, true);
+            comp = createRepairCompletion(firstFrag[i].getTransactionState(),
+                    firstFrag[i].getTxnId(), m_txnTaskQueues.get(i), seq, false);
             addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
         }
         flushBacklog(firstFrag);
