@@ -82,12 +82,14 @@ public class OrderByPlanNode extends AbstractPlanNode {
     /**
      * Add multiple sort expressions to the order-by
      * @param sortExprs  List of the input expression on which to order the rows
-     * @param sortDirs List of the corresponding sort order for each input expression
+     * @param sortDirs List of the corresponding sort order for each input expression,
+     *                 or else null.  If sortDirs is null, we always sort descending.
      */
     public void addSortExpressions(List<AbstractExpression> sortExprs, List<SortDirectionType> sortDirs) {
-        assert(sortExprs.size() == sortDirs.size());
+        assert(sortDirs == null ? true : sortExprs.size() == sortDirs.size());
         for (int i = 0; i < sortExprs.size(); ++i) {
-            addSortExpression(sortExprs.get(i), sortDirs.get(i));
+            SortDirectionType sortDir = sortDirs != null ? sortDirs.get(i) : SortDirectionType.DESC;
+            addSortExpression(sortExprs.get(i), sortDir);
         }
     }
 

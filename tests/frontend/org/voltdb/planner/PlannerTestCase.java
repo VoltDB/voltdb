@@ -734,14 +734,18 @@ public class PlannerTestCase extends TestCase {
         public String match(AbstractPlanNode node) {
             PlanNodeType mainNodeType = node.getPlanNodeType();
             if (m_type != mainNodeType) {
-                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s",
-                                     m_type, mainNodeType);
+                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s "
+                                     + "at plan node id %d.",
+                                     m_type, mainNodeType,
+                                     node.getPlanNodeId());
             }
             for (PlanNodeType nodeType : m_branches) {
                 AbstractPlanNode inlineNode = node.getInlinePlanNode(nodeType);
                 if (inlineNode == null) {
-                    return String.format("Expected inline node type %s but didn't find it.",
-                                         nodeType.name());
+                    return String.format("Expected inline node type %s but didn't find it "
+                                         + "at plan node id %d.",
+                                         nodeType.name(),
+                                         node.getPlanNodeId());
                 }
             }
             if (m_branches.size() != node.getInlinePlanNodes().size()) {
@@ -758,11 +762,12 @@ public class PlannerTestCase extends TestCase {
                     sep = ", ";
                 }
                 String found = buf.toString();
-                return String.format("Expected %d inline nodes (%s), found %d (%s)",
+                return String.format("Expected %d inline nodes (%s), found %d (%s) at node id %d.",
                                      m_branches.size(),
                                      expected,
                                      node.getInlinePlanNodes().size(),
-                                     found);
+                                     found,
+                                     node.getPlanNodeId());
             }
             return null;
         }
@@ -787,9 +792,10 @@ public class PlannerTestCase extends TestCase {
             return (node) -> {
                         PlanNodeType pnt = (PlanNodeType)obj;
                         if (node.getPlanNodeType() != (PlanNodeType)obj) {
-                            return String.format("Expected Plan Node Type %s not %s",
+                            return String.format("Expected Plan Node Type %s not %s at node id %d",
                                                  pnt.name(),
-                                                 node.getPlanNodeType().name());
+                                                 node.getPlanNodeType().name(),
+                                                 node.getPlanNodeId());
                         }
                         return null;
                     };
@@ -820,6 +826,9 @@ public class PlannerTestCase extends TestCase {
                 if (err != null) {
                     return err;
                 }
+                // Nodes with multiple children, such as join
+                // nodes, will have their own matchers, and will
+                // stop here.
                 if (node.getChildCount() > 0) {
                     node = node.getChild(0);
                 }
@@ -828,10 +837,16 @@ public class PlannerTestCase extends TestCase {
                 }
             }
             if (idx < m_nodeSpecs.size()) {
-                return "Expected more nodes in plan.";
+                return "Expected "
+                       + (m_nodeSpecs.size() + 1)
+                       + " nodes in plan, not "
+                       + (idx+1) ;
             }
             if (node != null) {
-                return "Expected fewer nodes in plan at node: " + node.getPlanNodeType();
+                return "Expected fewer nodes in plan at node "
+                       + (idx + 1)
+                       + ": "
+                       + node.getPlanNodeType();
             }
             return null;
         }
@@ -982,6 +997,8 @@ public class PlannerTestCase extends TestCase {
      */
     protected void validatePlan(String SQL,
                                 FragmentSpec ... spec) {
+        // All this System.out.printf nonsense should be changed
+        // to a log message somehow.
         List<AbstractPlanNode> fragments;
         if (spec.length > 1) {
             fragments = compileToFragments(SQL);

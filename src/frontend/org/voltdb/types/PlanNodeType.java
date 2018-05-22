@@ -153,6 +153,7 @@ public enum PlanNodeType implements PlanMatcher {
         if (node.getPlanNodeType() == this) {
             return null;
         }
-        return "Expected a plan node of type " + this;
+        return "Expected a plan node of type " + this
+                + " in node " + node.getPlanNodeId() + ".";
     }
 }

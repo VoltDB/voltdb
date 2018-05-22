@@ -3532,7 +3532,7 @@ public class PlanAssembler {
 
         assert(m_parsedSelect.isGrouped());
 
-        // DISTINCT is redundant with GROUP BY IFF
+        // DISTINCT is redundant with GROUP BY IF
         // all of the grouping columns are present in the display columns.
         if (m_parsedSelect.displayColumnsContainAllGroupByColumns()) {
             return root;
@@ -3541,7 +3541,21 @@ public class PlanAssembler {
         // Now non complex aggregation cases are handled already
         assert(m_parsedSelect.hasComplexAgg());
 
-        AggregatePlanNode distinctAggNode = new HashAggregatePlanNode();
+        AggregatePlanNode distinctAggNode = null;
+        OrderByPlanNode orderByForSerialAggregation = null;
+        if (m_isLargeQuery) {
+            distinctAggNode = new AggregatePlanNode();
+            orderByForSerialAggregation = new OrderByPlanNode();
+            final List<AbstractExpression> displayExprs = new ArrayList<>();
+            m_parsedSelect.m_displayColumns.forEach((ParsedColInfo col) -> {
+                displayExprs.add(col.expression);
+            });
+            // Sort descending.  We don't really care about
+            // the order, but we want it to be fixed.
+            orderByForSerialAggregation.addSortExpressions(displayExprs, null);
+        } else {
+            distinctAggNode = new HashAggregatePlanNode();
+        }
         distinctAggNode.setOutputSchema(m_parsedSelect.getDistinctProjectionSchema());
 
         for (ParsedColInfo col : m_parsedSelect.distinctGroupByColumns()) {
@@ -3574,7 +3588,10 @@ public class PlanAssembler {
                 pushedDown = true;
             }
         }*/
-
+        if (orderByForSerialAggregation != null) {
+            orderByForSerialAggregation.addAndLinkChild(root);
+            root = orderByForSerialAggregation;
+        }
         distinctAggNode.addAndLinkChild(root);
         root = distinctAggNode;
 

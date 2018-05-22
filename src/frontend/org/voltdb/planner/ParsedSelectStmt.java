@@ -1063,6 +1063,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (! col.expression.equals(groupbyCol.expression)) {
                 continue;
             }
+            // If we don't have a natural name for this group by column,
+            // and the expression is equal to a display column, then
+            // set the column name and alias to the display list column.
+            if (groupbyCol.columnName == null || groupbyCol.columnName.isEmpty()) {
+                groupbyCol.columnName = col.columnName;
+            }
             groupbyCol.alias = col.alias;
             groupbyCol.groupByInDisplay = true;
             col.groupBy = true;
@@ -2740,26 +2746,29 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return null;
         }
         int numGroupByColumns = m_groupByColumns.size();
-        List<Integer> gbOrigIndexes       = new ArrayList<>(numGroupByColumns);
-        List<Integer> answerPermutation   = new ArrayList<>(numGroupByColumns);
+        List<Integer> gbOrigIndexes       = new ArrayList<>();
+        List<Integer> answerPermutation   = new ArrayList<>();
         List<ParsedColInfo> answerColumns = new ArrayList<>(numGroupByColumns);
+        // Remember which columns we have used, but setting
+        // the index here to -1 when we use them.
         for (int idx = 0; idx < numGroupByColumns; idx += 1) {
-            gbOrigIndexes.set(idx, idx);
+            gbOrigIndexes.add(idx);
         }
         for (ParsedColInfo oColInfo : m_orderColumns) {
             AbstractExpression oExpr = oColInfo.expression;
             boolean foundIt = false;
-            for (int idx = 0; idx < m_groupByColumns.size() && 0 <= gbOrigIndexes.get(idx) ;) {
-                ParsedColInfo gColInfo = m_groupByColumns.get(idx);
-                AbstractExpression gExpr = gColInfo.expression;
-                if (gExpr.equals(oExpr)) {
-                    answerColumns.add(oColInfo);
-                    answerPermutation.add(gbOrigIndexes.get(idx));
-                    gbOrigIndexes.set(idx, -1);
-                    foundIt = true;
-                    break;
-                } else {
-                    idx += 1;
+            // Hope there are not too many group by columns.
+            for (int idx = 0; idx < numGroupByColumns; idx += 1) {
+                if (0 <= gbOrigIndexes.get(idx)) {
+                    ParsedColInfo gColInfo = m_groupByColumns.get(idx);
+                    AbstractExpression gExpr = gColInfo.expression;
+                    if (gExpr.equals(oExpr)) {
+                        answerColumns.add(oColInfo);
+                        answerPermutation.add(gbOrigIndexes.get(idx));
+                        gbOrigIndexes.set(idx, -1);
+                        foundIt = true;
+                        break;
+                    }
                 }
             }
             // If we didn't find the order by column
