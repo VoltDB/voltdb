@@ -238,17 +238,18 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
 
     @Override
-    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters) {
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, long snapshotSaveTxnId) {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {
-                updateReplicasInternal(replicas, partitionMasters);
+                updateReplicasInternal(replicas, partitionMasters, snapshotSaveTxnId);
             }
         });
         return new long[0];
     }
 
-    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, boolean balanceSPI) {
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
+            boolean balanceSPI) {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {

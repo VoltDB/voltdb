@@ -206,8 +206,6 @@ public class RepairLog
 
             truncate(ctm.getTruncationHandle(), IS_MP);
             m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
-
-            m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
             m_lastSpHandle = ctm.getSpHandle();
         }
         else if (msg instanceof DumpMessage) {
