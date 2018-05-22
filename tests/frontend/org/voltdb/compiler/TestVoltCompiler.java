@@ -3564,7 +3564,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadDropStream() throws Exception {
         // non-existent stream
-        badDDLAgainstSimpleSchema(".object not found: E1.*",
+        badDDLAgainstSimpleSchema(".+object not found: E1.*",
                "DROP STREAM e1;\n"
                 );
 
