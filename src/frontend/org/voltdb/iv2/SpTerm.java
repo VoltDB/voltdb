@@ -157,12 +157,12 @@ public class SpTerm implements Term
 
     //replica update is delayed till this is called during joining or rejoing snapshot
     // mpTxnId: the MP transaction id of ongoing stream snapshot save
-    public long[] updateReplicas(long mpTxnId) {
+    public long[] updateReplicas(long snapshotSaveTxnId) {
         long[] replicasAdded = new long[0];
         if (m_replicasUpdatedRequired) {
             tmLog.info(m_whoami + " updated replica list to: "
                     + CoreUtils.hsIdCollectionToString(m_replicas));
-            replicasAdded = m_mailbox.updateReplicas(m_replicas, null, mpTxnId);
+            replicasAdded = m_mailbox.updateReplicas(m_replicas, null, snapshotSaveTxnId);
             m_replicasUpdatedRequired = false;
         }
         return replicasAdded;

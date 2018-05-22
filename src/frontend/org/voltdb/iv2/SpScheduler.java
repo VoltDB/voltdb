@@ -152,7 +152,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final TransactionTaskQueue m_pendingTasks;
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
-    private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
+    private final TreeMap<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
         new TreeMap<DuplicateCounterKey, DuplicateCounter>();
     // MP fragment tasks or completion tasks pending durability
     private final Map<Long, Queue<TransactionTask>> m_mpsPendingDurability =
@@ -244,7 +244,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // (That is, InitiatorMailbox's API, used by BabySitter, is synchronized on the same
     // lock deliver() is synchronized on.)
     @Override
-    public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId)
+    public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long snapshotSaveTxnId)
     {
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("[SpScheduler.updateReplicas] replicas to " + CoreUtils.hsIdCollectionToString(replicas) +
@@ -265,29 +265,25 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         sendToHSIds.remove(m_mailbox.getHSId());
         m_sendToHSIds = Longs.toArray(sendToHSIds);
 
-        //
         // A new site joins in, forward the current txn (stream snapshot save) message to new site
-        DuplicateCounterKey snapshotFragment = null;
-        if (mpTxnId != -1) {
+        if (m_isLeader && snapshotSaveTxnId != -1) {
             // HACKY HACKY HACKY, we know at this time there will be only one fragment with this txnId, so it's safe to use
             // Long.MAX_VALUE to match the duplicate counter key with the given txn id (there is only one!)
-            snapshotFragment = ((TreeMap<DuplicateCounterKey, DuplicateCounter>)m_duplicateCounters)
-                    .floorKey(new DuplicateCounterKey(mpTxnId, Long.MAX_VALUE));
+            Entry<DuplicateCounterKey, DuplicateCounter> snapshotFragment =
+                    m_duplicateCounters.floorEntry(new DuplicateCounterKey(snapshotSaveTxnId, Long.MAX_VALUE));
+            assert(snapshotFragment != null);
+            snapshotFragment.getValue().addReplicas(replicasAdded);
+            // Forward fragment message to new replica
+            m_mailbox.send(replicasAdded, snapshotFragment.getValue().getOpenMessage());
         }
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
         List<DuplicateCounterKey> doneCounters = new LinkedList<DuplicateCounterKey>();
         for (Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
             DuplicateCounter counter = entry.getValue();
-            if (m_isLeader && snapshotFragment != null && entry.getKey().equals(snapshotFragment)) {
-                counter.addReplicas(replicasAdded);
-                // Forward fragment message to new replica
-                m_mailbox.send(replicasAdded, counter.getOpenMessage());
-            } else {
-                int result = counter.updateReplicas(m_replicaHSIds);
-                if (result == DuplicateCounter.DONE) {
-                    doneCounters.add(entry.getKey());
-                }
+            int result = counter.updateReplicas(m_replicaHSIds);
+            if (result == DuplicateCounter.DONE) {
+                doneCounters.add(entry.getKey());
             }
         }
 
@@ -1760,8 +1756,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         boolean forwarding = false;
         // HACKY HACKY HACKY, we know at this time there will be only one fragment with this txnId, so it's safe to use
         // Long.MAX_VALUE to match the duplicate counter key with the given txn id (there is only one!)
-        DuplicateCounterKey snapshotFragment = ((TreeMap<DuplicateCounterKey, DuplicateCounter>)m_duplicateCounters)
-                .floorKey(new DuplicateCounterKey(txnId, Long.MAX_VALUE));
+        DuplicateCounterKey snapshotFragment = m_duplicateCounters.floorKey(new DuplicateCounterKey(txnId, Long.MAX_VALUE));
         assert (snapshotFragment != null);
         long snapshotSpHandle = snapshotFragment.m_spHandle;
         for (Map.Entry<DuplicateCounterKey, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {

@@ -251,12 +251,12 @@ public class InitiatorMailbox implements Mailbox
         return updateReplicasInternal(replicas, partitionMasters, -1L);
     }
 
-    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId)
+    public synchronized long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long snapshotSaveTxnId)
     {
-        return updateReplicasInternal(replicas, partitionMasters, mpTxnId);
+        return updateReplicasInternal(replicas, partitionMasters, snapshotSaveTxnId);
     }
 
-    protected long[] updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId) {
+    protected long[] updateReplicasInternal(List<Long> replicas, Map<Integer, Long> partitionMasters, long snapshotSaveTxnId) {
         assert(lockingVows());
         Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
@@ -264,7 +264,7 @@ public class InitiatorMailbox implements Mailbox
         if (m_algo != null) {
             m_algo.cancel();
         }
-        return m_scheduler.updateReplicas(replicas, partitionMasters, mpTxnId);
+        return m_scheduler.updateReplicas(replicas, partitionMasters, snapshotSaveTxnId);
     }
 
     public long getMasterHsId(int partitionId)
