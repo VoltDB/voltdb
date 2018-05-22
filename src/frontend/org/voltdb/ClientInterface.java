@@ -1292,17 +1292,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
             final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
             final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
+            final boolean leaderMigration = jsObj.getBoolean(Cartographer.JSON_LEADER_MIGRATION);
             for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
                 try {
                     cihm.connection.queueTask(new Runnable() {
                         @Override
                         public void run() {
-                            failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                            if (leaderMigration) {
+                                if (cihm.repairCallback != null) {
+                                    cihm.repairCallback.leaderMigrated(partitionId, initiatorHSId);
+                                }
+                            } else {
+                                failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                            }
                         }
                     });
                 } catch (UnsupportedOperationException ignore) {
                     // In case some internal connections don't implement queueTask()
-                    failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                    if (leaderMigration) {
+                        if (cihm.repairCallback != null) {
+                            cihm.repairCallback.leaderMigrated(partitionId, initiatorHSId);
+                        }
+                    } else {
+                        failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                    }
                 }
             }
 
