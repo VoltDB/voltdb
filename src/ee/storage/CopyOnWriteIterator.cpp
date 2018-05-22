@@ -15,6 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "storage/CopyOnWriteIterator.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "common/tabletuple.h"
 #include "storage/persistenttable.h"
 
@@ -114,17 +115,26 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
             char *finishedBlock = m_currentBlock->address();
 
             m_location = m_blockIterator.key();
+
             m_currentBlock = m_blockIterator.data();
             assert(m_currentBlock->address() == m_location);
             m_blockOffset = 0;
 
             // Remove the finished block from the map so that it can be released
             // back to the OS if all tuples in the block is deleted.
-            //
+            if (m_table->isReplicatedTable() && m_currentBlock->isEmpty()) {
+                // For shared replicated table, the block needs to be released in MP Context
+                VOLT_TRACE("COW move over an empty block for MPPOOL memory, should release it in MP Context.");
+                ScopedReplicatedResourceLock scopedLock;
+                ExecuteWithMpMemory useMpMemory;
+                m_blocks.erase(finishedBlock);
+            } else {
+                m_blocks.erase(finishedBlock);
+            }
             // This invalidates the iterators, so we have to get new iterators
             // using the current block's start address. m_blockIterator has to
             // point to the next block, hence the upper_bound() call.
-            m_blocks.erase(finishedBlock);
+
             m_blockIterator = m_blocks.upper_bound(m_currentBlock->address());
             m_end = m_blocks.end();
         }

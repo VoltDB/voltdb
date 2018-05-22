@@ -83,6 +83,11 @@ class PersistentTableSurgeon;
         virtual void notifyBlockWasCompactedAway(TBPtr block) = 0;
 
         /**
+         * Empty SharedReplicatedTable block hook.
+         */
+        virtual void notifyBlockWasEmptyForReplicatedTable(TBPtr block) = 0;
+
+        /**
          * Called for each tuple moved.
          */
         virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
