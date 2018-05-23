@@ -52,15 +52,16 @@ public class VoltDBPAggregateRule extends RelOptRule {
         RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
 
         // Transform to a physical Hash Aggregate
-        call.transformTo(VoltDBPHashAggregate.create(
-                            aggregate.getCluster(),
-                            convertedTraits,
-                            convertedInput,
-                            aggregate.indicator,
-                            aggregate.getGroupSet(),
-                            aggregate.getGroupSets(),
-                            aggregate.getAggCallList(),
-                            null));
+        VoltDBPHashAggregate hashAggr = new VoltDBPHashAggregate(
+                aggregate.getCluster(),
+                convertedTraits,
+                convertedInput,
+                aggregate.indicator,
+                aggregate.getGroupSet(),
+                aggregate.getGroupSets(),
+                aggregate.getAggCallList(),
+                null);
+        call.transformTo(hashAggr);
 
         // Transform to a physical Serial Aggregate with an enforcer - A Sort rel which collation
         // matches the aggreagte's GROUP BY columns (for now)
@@ -69,7 +70,7 @@ public class VoltDBPAggregateRule extends RelOptRule {
                 .replace(VoltDBPRel.VOLTDB_PHYSICAL)
                 .plus(groupByCollation);
         RelNode convertedSerialAggrInput = convert(input, serialAggrTraits);
-        call.transformTo(VoltDBPSerialAggregate.create(
+        VoltDBPSerialAggregate serialAggr = new VoltDBPSerialAggregate(
                 aggregate.getCluster(),
                 convertedTraits.plus(groupByCollation),
                 convertedSerialAggrInput,
@@ -77,7 +78,8 @@ public class VoltDBPAggregateRule extends RelOptRule {
                 aggregate.getGroupSet(),
                 aggregate.getGroupSets(),
                 aggregate.getAggCallList(),
-                null));
+                null);
+        call.transformTo(serialAggr);
 
     }
 

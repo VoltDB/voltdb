@@ -17,8 +17,6 @@
 
 package org.voltdb.calciteadapter.rules.physical;
 
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
@@ -26,13 +24,9 @@ import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPSort;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPTableIndexScan;
-import org.voltdb.calciteadapter.util.IndexUtil;
 import org.voltdb.calciteadapter.util.VoltDBRexUtil;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.Table;
 import org.voltdb.planner.AccessPath;
 import org.voltdb.types.SortDirectionType;
-import org.voltdb.utils.CatalogUtil;
 
 public class VoltDBPSortIndexScanRemoveRule extends RelOptRule {
 
@@ -68,7 +62,7 @@ public class VoltDBPSortIndexScanRemoveRule extends RelOptRule {
 //                    catTableable, columns, program.getCondition(), program, scan.getIndex(), SortDirectionType.INVALID);
 
             if (accessPath != null) {
-                VoltDBPTableIndexScan newScan = VoltDBPTableIndexScan.create(
+                VoltDBPTableIndexScan newScan = new VoltDBPTableIndexScan(
                     scan.getCluster(),
                     // IndexScan already have a collation trait, so replace it
                     scan.getTraitSet().replace(sortCollation),
@@ -78,8 +72,10 @@ public class VoltDBPSortIndexScanRemoveRule extends RelOptRule {
                     scan.getIndex(),
                     accessPath,
                     scan.getOffsetRexNode(),
-                    scan.getLimitRexNode()
-                    );
+                    scan.getLimitRexNode(),
+                    scan.getAggregateRelNode(),
+                    scan.getPreAggregateRowType(),
+                    scan.getPreAggregateProgram());
             call.transformTo(newScan);
             }
         }

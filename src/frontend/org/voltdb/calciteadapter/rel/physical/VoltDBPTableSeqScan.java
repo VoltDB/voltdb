@@ -26,6 +26,7 @@ import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
@@ -36,6 +37,13 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 
 public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
 
+    /**
+     * 
+     * @param cluster
+     * @param traitSet
+     * @param table
+     * @param voltDBTable
+     */
     public VoltDBPTableSeqScan(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelOptTable table,
@@ -44,18 +52,39 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                   traitSet,
                   table,
                   voltDBTable,
-                  RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())), null, null);
+                  RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())),
+                  null,
+                  null,
+                  null,
+                  null,
+                  null);
           assert traitSet.contains(VoltDBPRel.VOLTDB_PHYSICAL);
     }
 
+    /**
+     * 
+     * @param cluster
+     * @param traitSet
+     * @param table
+     * @param voltDBTable
+     * @param program
+     * @param offset
+     * @param limit
+     * @param aggregate
+     * @param preAggregateRowType
+     * @param preAggregateProgram
+     */
     public VoltDBPTableSeqScan(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelOptTable table,
             VoltDBTable voltDBTable,
             RexProgram program,
             RexNode offset,
-            RexNode limit) {
-          super(cluster, traitSet, table, voltDBTable, program, offset, limit);
+            RexNode limit,
+            RelNode aggregate,
+            RelDataType preAggregateRowType,
+            RexProgram preAggregateProgram) {
+          super(cluster, traitSet, table, voltDBTable, program, offset, limit, aggregate, preAggregateRowType, preAggregateProgram);
     }
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
@@ -84,27 +113,33 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
 
         addProjection(sspn);
         addPredicate(sspn);
-        addLimitOffset(sspn);
+        if (m_aggregate == null) {
+            // If there is an aggregate, the Limit / Offset will be inlined with aggregate node
+            addLimitOffset(sspn);
+        }
+        addAggregate(sspn);
 
         return sspn;
     }
 
     @Override
-    public RelNode copy(RelTraitSet traitSet, RexNode offset, RexNode limit) {
-        // Do we need a deep copy including the inputs?
+    public RelNode copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
         VoltDBPTableSeqScan newScan = new VoltDBPTableSeqScan(
                 getCluster(),
                 traitSet,
                 getTable(),
-                m_voltDBTable,
-                m_program,
+                getVoltDBTable(),
+                getProgram(),
                 offset,
-                limit);
+                limit,
+                getAggregateRelNode(),
+                getPreAggregateRowType(),
+                getPreAggregateProgram());
         return newScan;
     }
 
     @Override
-    public RelNode copy(RelTraitSet traitSet, RexProgram newProgram, RexBuilder programRexBuilder) {
+    public RelNode copyWithProgram(RelTraitSet traitSet, RexProgram newProgram, RexBuilder programRexBuilder) {
         // Merge two programs program / m_program into a new merged program
         RexProgram mergedProgram = RexProgramBuilder.mergePrograms(
                 newProgram,
@@ -118,7 +153,32 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                 getVoltDBTable(),
                 mergedProgram,
                 getOffsetRexNode(),
-                getLimitRexNode());
+                getLimitRexNode(),
+                getAggregateRelNode(),
+                getPreAggregateRowType(),
+                getPreAggregateProgram());
+        return newScan;
+    }
+
+    @Override
+    public RelNode copyWithAggregate(RelTraitSet traitSet, RelNode aggregate) {
+        // Need to create a Program for the inline aggregate because it will define
+        // the output row type for the scan
+        // Preserve the original program and row type
+        RexProgram aggProgram = RexProgram.createIdentity(aggregate.getRowType());
+        RelDataType preAggRowType = getPreAggregateRowType();
+        RexProgram preAggProgram = getProgram();
+        VoltDBPTableSeqScan newScan = new VoltDBPTableSeqScan(
+                getCluster(),
+                traitSet,
+                getTable(),
+                getVoltDBTable(),
+                aggProgram,
+                getOffsetRexNode(),
+                getLimitRexNode(),
+                aggregate,
+                preAggRowType,
+                preAggProgram);
         return newScan;
     }
 

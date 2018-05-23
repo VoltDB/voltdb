@@ -21,24 +21,55 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPTableScan;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPLimit;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPSerialAggregate;
 
 public class VoltDBPLimitScanMergeRule extends RelOptRule {
 
-    public static final VoltDBPLimitScanMergeRule INSTANCE = new VoltDBPLimitScanMergeRule();
+    public static final VoltDBPLimitScanMergeRule INSTANCE_1 = new VoltDBPLimitScanMergeRule(false);
+    public static final VoltDBPLimitScanMergeRule INSTANCE_2 = new VoltDBPLimitScanMergeRule(true);
 
-    private VoltDBPLimitScanMergeRule() {
+    /**
+     * Transform  VoltDBPLimit / AbstractVoltDBPTableScan to AbstractVoltDBPTableScan with Limit
+     * Transform  VoltDBPLimit / Calc / AbstractVoltDBPTableScan to Calc AbstractVoltDBPTableScan with Limit
+     * If a scan has already inline aggregate, the LIMIT can be inlined only if it is the serial aggregate.
+     * The Hash aggregate requires a full scan.
+     */
+    private VoltDBPLimitScanMergeRule(boolean hasCacl) {
         super(operand(VoltDBPLimit.class,
-                operand(AbstractVoltDBPTableScan.class, none())));
+                (hasCacl) ?
+                        operand(VoltDBPCalc.class,
+                                operand(AbstractVoltDBPTableScan.class, none())) :
+                        operand(AbstractVoltDBPTableScan.class, none())
+                                ));
+    }
+
+    @Override
+    public boolean matches(RelOptRuleCall call) {
+        int scanIdx = call.rels.length - 1;
+        AbstractVoltDBPTableScan scan = call.rel(scanIdx);
+        // Can not inline LIMIT / OFFSET if there is an inlined HASH aggregate
+        // Serial aggregate is fine
+        RelNode aggregate = scan.getAggregateRelNode();
+        return aggregate instanceof VoltDBPSerialAggregate || aggregate == null;
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltDBPLimit limitOffset = call.rel(0);
-        AbstractVoltDBPTableScan scan = call.rel(1);
+        int scanIdx = call.rels.length - 1;
+        AbstractVoltDBPTableScan scan = call.rel(scanIdx);
 
-        RelNode newScan = scan.copy(scan.getTraitSet(), limitOffset.getOffset(), limitOffset.getLimit());
-        call.transformTo(newScan);
+        RelNode newRel = scan.copyWithLimitOffset(
+                scan.getTraitSet(),
+                limitOffset.getOffset(),
+                limitOffset.getLimit());
+        if (call.rels.length == 3) {
+            VoltDBPCalc calc = call.rel(1);
+            newRel = calc.copy(calc.getTraitSet(), newRel, calc.getProgram());
+        }
+        call.transformTo(newRel);
     }
 
 }

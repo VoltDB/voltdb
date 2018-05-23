@@ -17,7 +17,6 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
@@ -101,80 +100,49 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
         return planner.getCostFactory().makeCost(rowCount, 0, 0);
     }
 
-//    public static VoltDBAggregate createFrom(
-//            Aggregate aggregate,
-//            RelNode child,
-//            RexNode postPredicate) {
-//        boolean coordinatorAggregate = false;
-//        RexNode combinedPostPredicate = postPredicate;
-//        if (aggregate instanceof VoltDBAggregate) {
-//            coordinatorAggregate = ((VoltDBAggregate) aggregate).isCoordinatorAggregate();
-//            if (postPredicate != null && ((VoltDBAggregate) aggregate).getPostPredicate() != null) {
-//                List<RexNode> combinedConditions = new ArrayList<>();
-//                combinedConditions.add(((VoltDBAggregate) aggregate).getPostPredicate());
-//                combinedConditions.add(postPredicate);
-//                combinedPostPredicate = RexUtil.composeConjunction(aggregate.getCluster().getRexBuilder(), combinedConditions, true);
-//            } else {
-//                combinedPostPredicate = (postPredicate == null) ?
-//                        ((VoltDBAggregate) aggregate).getPostPredicate() : postPredicate;
-//            }
-//        }
-//        return VoltDBAggregate.create(
-//                aggregate.getCluster(),
-//                aggregate.getTraitSet(),
-//                child,
-//                aggregate.indicator,
-//                aggregate.getGroupSet(),
-//                aggregate.getGroupSets(),
-//                aggregate.getAggCallList(),
-//                combinedPostPredicate,
-//                coordinatorAggregate);
-//    }
+    /**
+     * Copy self
+     * @param cluster
+     * @param traitSet
+     * @param input
+     * @param indicator
+     * @param groupSet
+     * @param groupSets
+     * @param aggCalls
+     * @param postPredicate
+     * @return
+     */
+    public abstract AbstractVoltDBPAggregate copy(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode input,
+            boolean indicator,
+            ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets,
+            List<AggregateCall> aggCalls,
+            RexNode postPredicate);
 
-//    public static VoltDBAggregate createFrom(
-//            Aggregate aggregate,
-//            RelNode child,
-//            boolean coordinatorAggregate) {
-//        RexNode postPredicate = (aggregate instanceof VoltDBAggregate) ?
-//                ((VoltDBAggregate) aggregate).getPostPredicate() : null;
-//        return VoltDBAggregate.create(
-//                        aggregate.getCluster(),
-//                        aggregate.getTraitSet(),
-//                        child,
-//                        aggregate.indicator,
-//                        aggregate.getGroupSet(),
-//                        aggregate.getGroupSets(),
-//                        aggregate.getAggCallList(),
-//                        postPredicate,
-//                        coordinatorAggregate);
-//    }
+    protected abstract AggregatePlanNode getAggregatePlanNode();
 
-//    public static VoltDBAggregate createFrom(
-//            Aggregate aggregate,
-//            RelNode child,
-//            RelCollation collation) {
-//        RexNode postPredicate = (aggregate instanceof VoltDBAggregate) ?
-//                ((VoltDBAggregate) aggregate).getPostPredicate() : null;
-//        VoltDBAggregate newAggregate = VoltDBAggregate.create(
-//                        aggregate.getCluster(),
-//                        aggregate.getTraitSet(),
-//                        child,
-//                        aggregate.indicator,
-//                        aggregate.getGroupSet(),
-//                        aggregate.getGroupSets(),
-//                        aggregate.getAggCallList(),
-//                        postPredicate,
-//                        false);
-//        newAggregate.traitSet = newAggregate.getTraitSet().replace(collation);
-//        return newAggregate;
-//    }
+    @Override
+    public AbstractPlanNode toPlanNode() {
+        AbstractPlanNode apn = toPlanNode(getInput().getRowType());
 
-    protected AbstractPlanNode toPlanNode(AggregatePlanNode apn) {
         // Convert child
-        VoltDBPRel inputNode = getInputNode(this, 0);
-        assert(inputNode != null);
-        AbstractPlanNode child = inputNode.toPlanNode();
+        AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
         apn.addAndLinkChild(child);
+
+        return apn;
+    }
+
+    /**
+     * Convert self to a VoltDB plan node
+     *
+     * @param inputRowType
+     * @return
+     */
+    public AbstractPlanNode toPlanNode(RelDataType inputRowType) {
+        AggregatePlanNode apn = getAggregatePlanNode();
 
         // Generate output schema
         NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(getRowType());
@@ -185,8 +153,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
         // - AGGR expressions form SELECT clause - corresponding aggrCall has name matching the filed name
         // - AGGR expressions from HAVING clause - aggrCall name is NULL
         RelDataType aggrRowType = getRowType();
-        RelDataType scanRowType = inputNode.getRowType();
-        List<RelDataTypeField> fields = scanRowType.getFieldList();
+        List<RelDataTypeField> fields = inputRowType.getFieldList();
         // Aggreagte fields start right after the grouping ones in order of the aggregate calls
         int aggrFieldIdx = 0 + getGroupCount();
         for(AggregateCall aggrCall : getAggCallList()) {
@@ -238,42 +205,4 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
         }
     }
 
-    private List<Integer> calculateGroupbyColumnsCovered(int groupByCount) {
-        ImmutableBitSet groupBy = getGroupSet();
-        List<Integer> coveredGroupByColumns = new ArrayList<>();
-        if (groupByCount == 0) {
-            return coveredGroupByColumns;
-        }
-
-//        RelTrait collationTrait = traitSet.getTrait(RelCollationTraitDef.INSTANCE);
-//        if (!(collationTrait instanceof RelCollation)) {
-//            return coveredGroupByColumns;
-//        }
-//
-//        for (RelFieldCollation field : aggrCollation.getFieldCollations()) {
-//            // ignore order of keys in GROUP BY expr
-//            int ithCovered = 0;
-//            boolean foundPrefixedColumn = false;
-//            for (int groupByIdx = groupBy.nextSetBit(ithCovered);
-//                    groupByIdx != -1;
-//                    groupByIdx = groupBy.nextSetBit(groupByIdx + 1)) {
-//                if (field.getFieldIndex() == groupByIdx) {
-//                    foundPrefixedColumn = true;
-//                    break;
-//                }
-//            }
-//            if ( ! foundPrefixedColumn) {
-//                // no prefix match any more
-//                break;
-//            }
-//
-//            coveredGroupByColumns.add(ithCovered);
-//
-//            if (coveredGroupByColumns.size() == groupByCount) {
-//                // covered all group by columns already
-//                break;
-//            }
-//        }
-        return coveredGroupByColumns;
-    }
 }

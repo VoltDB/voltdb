@@ -39,7 +39,9 @@ import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 
@@ -49,8 +51,12 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
 
     protected final RexProgram m_program;
 
+    // Inline Rels
     protected RexNode m_offset = null;
     protected RexNode m_limit = null;
+    protected RelNode m_aggregate = null;
+    protected RelDataType m_preAggregateRowType = null;
+    protected RexProgram m_preAggregateProgram = null;
 
     protected AbstractVoltDBPTableScan(RelOptCluster cluster,
             RelTraitSet traitSet,
@@ -58,12 +64,19 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
             VoltDBTable voltDBTable,
             RexProgram program,
             RexNode offset,
-            RexNode limit) {
+            RexNode limit,
+            RelNode aggregate,
+            RelDataType preAggregateRowType,
+            RexProgram preAggregateProgram) {
           super(cluster, traitSet.plus(VoltDBPRel.VOLTDB_PHYSICAL), table, voltDBTable);
           assert(program != null);
+          assert(aggregate == null || aggregate instanceof AbstractVoltDBPAggregate);
           m_program = program;
           m_offset = offset;
           m_limit = limit;
+          m_aggregate = aggregate;
+          m_preAggregateRowType = preAggregateRowType;
+          m_preAggregateProgram = preAggregateProgram;
     }
 
     public RexProgram getProgram() {
@@ -89,6 +102,9 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
         if (m_offset != null) {
             dg += "_offset_" + Integer.toString(getOffset());
         }
+        if (m_aggregate != null) {
+            dg += "_aggr_" + m_aggregate.toString();
+        }
         return dg;
     }
 
@@ -96,11 +112,11 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
         return m_voltDBTable;
     }
 
-    @Override public RelDataType deriveRowType() {
+    @Override
+    public RelDataType deriveRowType() {
         if (m_program == null) {
             return table.getRowType();
-        }
-        else {
+        } else {
             RelDataType rowDataType = m_program.getOutputRowType();
             if (rowDataType.getFieldCount() > 0) {
                 return rowDataType;
@@ -108,7 +124,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
                 return table.getRowType();
             }
         }
-      }
+    }
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
             RelMetadataQuery mq) {
@@ -130,6 +146,9 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
         }
         if (m_offset != null) {
             pw.item("offset", m_offset);
+        }
+        if (m_aggregate != null) {
+            pw.item("aggregate", m_aggregate);
         }
         return pw;
     }
@@ -158,20 +177,50 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
         }
     }
 
-    public abstract RelNode copy(RelTraitSet traitSet, RexNode offset, RexNode limit);
-
-    public abstract RelNode copy(RelTraitSet traitSet, RexProgram program, RexBuilder rexBuilder);
-
-    protected void addPredicate(AbstractScanPlanNode scan) {
-        RexLocalRef condition = m_program.getCondition();
-        if (condition != null) {
-            List<AbstractExpression> predList = new ArrayList<>();
-            predList.add(RexConverter.convert(m_program.expandLocalRef(condition)));
-            scan.setPredicate(predList);
-        }
+    public RelNode getAggregateRelNode() {
+        return m_aggregate;
     }
 
-    protected void addLimitOffset(AbstractScanPlanNode scan) {
+    public RelDataType getPreAggregateRowType() {
+        return m_preAggregateRowType;
+    }
+
+    public RexProgram getPreAggregateProgram() {
+        return m_preAggregateProgram;
+    }
+
+    public abstract RelNode copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit);
+
+    public abstract RelNode copyWithProgram(RelTraitSet traitSet, RexProgram program, RexBuilder rexBuilder);
+
+    public abstract RelNode copyWithAggregate(RelTraitSet traitSet, RelNode aggregate);
+
+    /**
+     * Convert Scan's predicate (condition) to VoltDB AbstractExpressions
+     * 
+     * @param scan
+     * @return
+     */
+    protected AbstractPlanNode addPredicate(AbstractScanPlanNode scan) {
+        // If there is an inline aggregate, the scan's original program is saved as a m_preAggregateProgram
+        RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
+        assert program != null;
+
+        RexLocalRef condition = program.getCondition();
+        if (condition != null) {
+            List<AbstractExpression> predList = new ArrayList<>();
+            predList.add(RexConverter.convert(program.expandLocalRef(condition)));
+            scan.setPredicate(predList);
+        }
+        return scan;
+    }
+
+    /**
+     * Convert Scan's LIMIT / OFFSET to an inline LimitPlanNode
+     * @param node
+     * @return
+     */
+    protected AbstractPlanNode addLimitOffset(AbstractPlanNode node) {
         if (m_limit != null || m_offset != null) {
             LimitPlanNode limitPlanNode = new LimitPlanNode();
             if (m_limit != null) {
@@ -182,16 +231,48 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
                 int offset = RexLiteral.intValue(m_offset);
                 limitPlanNode.setOffset(offset);
             }
-            scan.addInlinePlanNode(limitPlanNode);
+            node.addInlinePlanNode(limitPlanNode);
         }
+        return node;
     }
 
-    protected void addProjection(AbstractScanPlanNode scan) {
-        assert m_program != null;
+    /**
+     * Convert Scan's Project to an inline ProjectionPlanNode
+     * @param node
+     * @return
+     */
+    protected AbstractPlanNode addProjection(AbstractPlanNode node) {
+        // If there is an inline aggregate, the scan's original program is saved as a m_preAggregateProgram
+        RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
+        assert program != null;
 
         ProjectionPlanNode ppn = new ProjectionPlanNode();
-        ppn.setOutputSchemaWithoutClone(RexConverter.convertToVoltDBNodeSchema(m_program));
-        scan.addInlinePlanNode(ppn);
+        ppn.setOutputSchemaWithoutClone(RexConverter.convertToVoltDBNodeSchema(program));
+        node.addInlinePlanNode(ppn);
+        return node;
+    }
+
+    /**
+     * Convert Scan's aggregate to an inline AggregatePlanNode / HashAggregatePlanNode
+     * @param node
+     * @return
+     */
+    protected AbstractPlanNode addAggregate(AbstractPlanNode node) {
+        if (m_aggregate != null) {
+
+            assert(m_preAggregateRowType != null);
+            AbstractPlanNode aggr = ((AbstractVoltDBPAggregate)m_aggregate).toPlanNode(m_preAggregateRowType);
+            aggr.clearChildren();
+            node.addInlinePlanNode(aggr);
+            node.setOutputSchema(aggr.getOutputSchema());
+            node.setHaveSignificantOutputSchema(true);
+            // Inline limit /offset with Serial Aggregate only. This is enforced by the VoltDBPLimitScanMergeRule.
+            // The VoltDBPAggregateScanMergeRule should be triggered prior to the VoltDBPLimitScanMergeRule
+            // allowing the latter to avoid merging VoltDBLimit and Scan nodes if the scan already has an inline aggregate
+            assert(! (aggr instanceof HashAggregatePlanNode));
+            node = addLimitOffset(aggr);
+        }
+        return node;
     }
 
     protected double estimateRowCountWithLimit(double rowCount) {

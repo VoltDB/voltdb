@@ -90,7 +90,7 @@ public class VoltDBPCalcScanToIndexRule extends RelOptRule {
                         catTableable,
                         rexBuilder,
                         mergedProgram);
-                VoltDBPTableIndexScan indexScan = VoltDBPTableIndexScan.create(
+                VoltDBPTableIndexScan indexScan = new VoltDBPTableIndexScan(
                         scan.getCluster(),
                         // Need to add an index collation trait
                         scan.getTraitSet().plus(indexCollation),
@@ -100,7 +100,10 @@ public class VoltDBPCalcScanToIndexRule extends RelOptRule {
                         index,
                         accessPath,
                         scan.getLimitRexNode(),
-                        scan.getOffsetRexNode());
+                        scan.getOffsetRexNode(),
+                        scan.getAggregateRelNode(),
+                        scan.getPreAggregateRowType(),
+                        scan.getPreAggregateProgram());
                 call.transformTo(indexScan);
             }
         }

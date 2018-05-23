@@ -28,6 +28,7 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
+import org.voltdb.calciteadapter.rules.inlining.VoltDBPAggregateScanMergeRule;
 import org.voltdb.calciteadapter.rules.inlining.VoltDBPCalcAggregateMergeRule;
 import org.voltdb.calciteadapter.rules.inlining.VoltDBPCalcScanMergeRule;
 import org.voltdb.calciteadapter.rules.inlining.VoltDBPLimitScanMergeRule;
@@ -91,12 +92,16 @@ public class VoltDBRules {
     };
 
     public static RelOptRule[] INLINING_RULES = {
-            // VoltDB Inline Rules
+            // VoltDB Inline Rules. The rules order declaration
+            // has to match the order of rels from a real plan produced by the previous stage.
 
-            VoltDBPCalcScanMergeRule.INSTANCE
-            , VoltDBPLimitScanMergeRule.INSTANCE
+            VoltDBPCalcAggregateMergeRule.INSTANCE
+            , VoltDBPCalcScanMergeRule.INSTANCE
             , VoltDBPLimitSortMergeRule.INSTANCE
-            , VoltDBPCalcAggregateMergeRule.INSTANCE
+            , VoltDBPAggregateScanMergeRule.INSTANCE
+            , VoltDBPLimitScanMergeRule.INSTANCE_1
+            , VoltDBPLimitScanMergeRule.INSTANCE_2
+
     };
 
     public static Program VOLCANO_PROGRAM_0 = Programs.ofRules(

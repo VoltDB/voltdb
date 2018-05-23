@@ -25,6 +25,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
@@ -49,9 +50,7 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
     private final AccessPath m_accessPath;
 
     /**
-     * Constructor is private to force users to use the static create method
-     * which properly adds the index collation trait.
-     *
+     * 
      * @param cluster
      * @param traitSet
      * @param table
@@ -61,8 +60,11 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
      * @param accessPath
      * @param offset
      * @param limit
+     * @param aggregate
+     * @param preAggregateRowType
+     * @param preAggregateProgram
      */
-    private VoltDBPTableIndexScan(
+    public VoltDBPTableIndexScan(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelOptTable table,
@@ -71,9 +73,12 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
             Index index,
             AccessPath accessPath,
             RexNode offset,
-            RexNode limit) {
+            RexNode limit,
+            RelNode aggregate,
+            RelDataType preAggregateRowType,
+            RexProgram preAggregateProgram) {
         super(cluster, traitSet, table, voltDBTable,
-                updateProgram(program, accessPath), offset, limit);
+                updateProgram(program, accessPath), offset, limit, aggregate, preAggregateRowType, preAggregateProgram);
         assert (index != null);
         m_index = index;
         assert (accessPath != null);
@@ -115,12 +120,18 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
         IndexScanPlanNode ispn = new IndexScanPlanNode(tableScan, m_index);
 
         // Set limit/offset
-        addLimitOffset(ispn);
+        if (m_aggregate == null) {
+            // Limit / Offset will be inlined with aggregate node
+            addLimitOffset(ispn);
+        }
         // Set projection
         addProjection(ispn);
         // No need to set Index's predicate from its program condition.
         // It will be set from accessPath.OTHER expressions instead
         // addPredicate(ispn);
+
+        // Set aggregate
+        addAggregate(ispn);
 
         // At the moment this will override the predicate set by the addPredicate call
         return IndexUtil.buildIndexAccessPlanForTable(ispn, m_accessPath);
@@ -298,27 +309,30 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
     }
 
     @Override
-    public  RelNode copy(RelTraitSet traitSet, RexNode offset, RexNode limit) {
-        // Do we need a deep copy including the inputs?
-        return VoltDBPTableIndexScan.create(
+    public  RelNode copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
+        return new VoltDBPTableIndexScan(
                 getCluster(),
                 traitSet,
                 getTable(),
-                m_voltDBTable,
-                m_program,
-                m_index,
-                m_accessPath,
+                getVoltDBTable(),
+                getProgram(),
+                getIndex(),
+                getAccessPath(),
                 offset,
-                limit);
+                limit,
+                getAggregateRelNode(),
+                getPreAggregateRowType(),
+                getPreAggregateProgram());
     }
 
     @Override
-    public RelNode copy(RelTraitSet traitSet, RexProgram newProgram, RexBuilder rexBuilder) {
+    public RelNode copyWithProgram(RelTraitSet traitSet, RexProgram newProgram, RexBuilder rexBuilder) {
         // Merge two programs program / m_program into a new merged program
-        RexProgram mergedProgram = RexProgramBuilder.mergePrograms(
+        RexProgram  mergedProgram = RexProgramBuilder.mergePrograms(
                 newProgram,
                 m_program,
                 rexBuilder);
+
         // If a new program has a condition the condition needs to be added to the index's accessParh
         // as an OTHER expression to contribute to the Index Scan predicate.
         RexNode newCondition = newProgram.getCondition();
@@ -327,7 +341,7 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
             m_accessPath.getOtherExprs().add(expr);
         }
 
-        return VoltDBPTableIndexScan.create(
+        return new VoltDBPTableIndexScan(
                 getCluster(),
                 traitSet,
                 getTable(),
@@ -336,32 +350,33 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
                 getIndex(),
                 getAccessPath(),
                 getOffsetRexNode(),
-                getLimitRexNode());
-
+                getLimitRexNode(),
+                getAggregateRelNode(),
+                getPreAggregateRowType(),
+                getPreAggregateProgram());
     }
 
-    public static VoltDBPTableIndexScan create(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelOptTable table,
-            VoltDBTable voltDBTable,
-            RexProgram program,
-            Index index,
-            AccessPath accessPath,
-            RexNode offset,
-            RexNode limit) {
-
+    @Override
+    public RelNode copyWithAggregate(RelTraitSet traitSet, RelNode aggregate) {
+        // Need to create a Program for the inline aggregate because it will define
+        // the output row type for the scan
+        // Preserve the original program and row type
+        RexProgram aggProgram = RexProgram.createIdentity(aggregate.getRowType());
+        RelDataType preAggRowType = getPreAggregateRowType();
+        RexProgram preAggProgram = getProgram();
         return new VoltDBPTableIndexScan(
-                cluster,
+                getCluster(),
                 traitSet,
-                table,
-                voltDBTable,
-                program,
-                index,
-                accessPath,
-                offset,
-                limit);
-
+                getTable(),
+                getVoltDBTable(),
+                aggProgram,
+                getIndex(),
+                getAccessPath(),
+                getOffsetRexNode(),
+                getLimitRexNode(),
+                aggregate,
+                preAggRowType,
+                preAggProgram);
     }
 
 }

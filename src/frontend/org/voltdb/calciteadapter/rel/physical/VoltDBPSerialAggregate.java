@@ -22,17 +22,16 @@ import java.util.List;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
 
 public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
 
     /** Constructor */
-    private VoltDBPSerialAggregate(
+    public VoltDBPSerialAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -48,7 +47,7 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
     public VoltDBPSerialAggregate copy(RelTraitSet traitSet, RelNode input,
             boolean indicator, ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        return VoltDBPSerialAggregate.create(
+        return new VoltDBPSerialAggregate(
                 getCluster(),
                 traitSet,
                 input,
@@ -59,10 +58,11 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 m_postPredicate);
     }
 
-    public static VoltDBPSerialAggregate create(
+    @Override
+    public VoltDBPSerialAggregate copy(
             RelOptCluster cluster,
             RelTraitSet traitSet,
-            RelNode child,
+            RelNode input,
             boolean indicator,
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
@@ -71,7 +71,7 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
         return new VoltDBPSerialAggregate(
                 cluster,
                 traitSet,
-                child,
+                input,
                 indicator,
                 groupSet,
                 groupSets,
@@ -80,9 +80,14 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
     }
 
     @Override
-    public AbstractPlanNode toPlanNode() {
-        AggregatePlanNode apn = new AggregatePlanNode();
-        return super.toPlanNode(apn);
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.item("type", "serial");
+        return pw;
+    }
+
+    protected AggregatePlanNode getAggregatePlanNode() {
+        return new AggregatePlanNode();
     }
 
 }

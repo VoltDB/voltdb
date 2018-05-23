@@ -87,7 +87,7 @@ public class VoltDBPSortScanToIndexRule extends RelOptRule {
                         IndexLookupType.EQ,
                         sortDirection,
                         true);
-                VoltDBPTableIndexScan indexScan = VoltDBPTableIndexScan.create(
+                VoltDBPTableIndexScan indexScan = new VoltDBPTableIndexScan(
                         scan.getCluster(),
                         // Need to add sort collation trait
                         scan.getTraitSet().plus(sortCollation),
@@ -97,7 +97,10 @@ public class VoltDBPSortScanToIndexRule extends RelOptRule {
                         index,
                         accessPath,
                         scan.getLimitRexNode(),
-                        scan.getOffsetRexNode());
+                        scan.getOffsetRexNode(),
+                        scan.getAggregateRelNode(),
+                        scan.getPreAggregateRowType(),
+                        scan.getPreAggregateProgram());
 
                 call.transformTo(indexScan);
             }

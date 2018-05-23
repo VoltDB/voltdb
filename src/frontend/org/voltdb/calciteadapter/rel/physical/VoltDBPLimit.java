@@ -59,6 +59,7 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
 
     @Override
     public AbstractPlanNode toPlanNode() {
+
         LimitPlanNode lpn = new LimitPlanNode();
         lpn = new LimitPlanNode();
         if (m_limit != null) {
@@ -67,7 +68,15 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
         if (m_offset != null) {
             lpn.setLimit(RexLiteral.intValue(m_offset));
         }
+
+        if (this.getInput() != null) {
+            // Limit is not inlined
+            AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
+            lpn.addAndLinkChild(child);
+        }
+
         return lpn;
+
     }
 
     public RexNode getOffset() {

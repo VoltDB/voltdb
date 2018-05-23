@@ -27,13 +27,14 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 
 public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
 
 
     /** Constructor */
-    private VoltDBPHashAggregate(
+    public VoltDBPHashAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -56,7 +57,7 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
     public VoltDBPHashAggregate copy(RelTraitSet traitSet, RelNode input,
             boolean indicator, ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        return VoltDBPHashAggregate.create(
+        return new VoltDBPHashAggregate(
                 getCluster(),
                 traitSet,
                 input,
@@ -88,8 +89,29 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
     }
 
     @Override
-    public AbstractPlanNode toPlanNode() {
-        HashAggregatePlanNode hapn = new HashAggregatePlanNode();
-        return super.toPlanNode(hapn);
+    public VoltDBPHashAggregate copy(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode input,
+            boolean indicator,
+            ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets,
+            List<AggregateCall> aggCalls,
+            RexNode postPredicate) {
+        return new VoltDBPHashAggregate(
+                cluster,
+                traitSet,
+                input,
+                indicator,
+                groupSet,
+                groupSets,
+                aggCalls,
+                postPredicate);
+
     }
+
+    protected AggregatePlanNode getAggregatePlanNode() {
+        return new HashAggregatePlanNode();
+    }
+
 }

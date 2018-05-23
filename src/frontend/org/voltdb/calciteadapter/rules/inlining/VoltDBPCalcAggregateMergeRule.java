@@ -25,7 +25,6 @@ import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPAggregate;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPHashAggregate;
 
 /**
  * This simply merges/inlines Calc's condition into an Aggregate node.
@@ -57,7 +56,7 @@ public class VoltDBPCalcAggregateMergeRule extends RelOptRule {
         RexLocalRef conditionRefExpr = program.getCondition();
         RexNode conditionExpr = program.expandLocalRef(conditionRefExpr);
 
-        VoltDBPHashAggregate newAggregate = VoltDBPHashAggregate.create(
+        AbstractVoltDBPAggregate newAggregate = aggregate.copy(
                 aggregate.getCluster(),
                 aggregate.getTraitSet(),
                 aggregate.getInput(),

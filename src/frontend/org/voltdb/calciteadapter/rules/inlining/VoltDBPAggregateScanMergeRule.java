@@ -19,36 +19,25 @@ package org.voltdb.calciteadapter.rules.inlining;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPAggregate;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPTableScan;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
 
-/**
- * This simply merges/inline Calc(project and/or Condition) into a Scan.
- * It does not attempt to convert a Sequential scan into a Index scan.
- * This should be done by the VoltDBCalcToIndexRule
- *
- * @author mikealexeev
- *
- */
-public class VoltDBPCalcScanMergeRule extends RelOptRule {
+public class VoltDBPAggregateScanMergeRule extends RelOptRule {
 
-    public static final VoltDBPCalcScanMergeRule INSTANCE = new VoltDBPCalcScanMergeRule();
+    public static final VoltDBPAggregateScanMergeRule INSTANCE = new VoltDBPAggregateScanMergeRule();
 
-    private VoltDBPCalcScanMergeRule() {
-        super(operand(VoltDBPCalc.class,
+    private VoltDBPAggregateScanMergeRule() {
+        super(operand(AbstractVoltDBPAggregate.class,
                 operand(AbstractVoltDBPTableScan.class, none())));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBPCalc calc= call.rel(0);
+        AbstractVoltDBPAggregate aggregate = call.rel(0);
         AbstractVoltDBPTableScan scan = call.rel(1);
 
-        // Merge trait sets to make sure we are not loosing any required traits if any
-        RelTraitSet mergedTraitSet = scan.getTraitSet().merge(calc.getTraitSet());
-        RelNode newScan = scan.copyWithProgram(mergedTraitSet, calc.getProgram(), calc.getCluster().getRexBuilder());
+        RelNode newScan = scan.copyWithAggregate(scan.getTraitSet(), aggregate);
         call.transformTo(newScan);
     }
 
