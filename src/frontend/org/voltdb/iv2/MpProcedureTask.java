@@ -138,6 +138,7 @@ public class MpProcedureTask extends ProcedureTask
                         new VoltTable[] {},
                         "Failure while running system procedure " + txn.m_initiationMsg.getStoredProcedureName() +
                         ", and system procedures can not be restarted."));
+            errorResp.m_isFromNonRestartableSysproc = true;
             errorResp.m_sourceHSId = m_initiator.getHSId();
             m_txnState.setDone();
             m_queue.flush(getTxnId());
