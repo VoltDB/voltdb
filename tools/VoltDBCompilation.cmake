@@ -134,7 +134,7 @@ SET (VOLTDB_COMPILER_OLDE   "4.4.0")
 #
 # Note: Update this when adding a new compiler support.
 #
-SET (VOLTDB_COMPILER_NEWEST VOLTDB_COMPILER_U18p04)
+SET (VOLTDB_COMPILER_NEWEST ${VOLTDB_COMPILER_U18p04})
 #
 #
 #
