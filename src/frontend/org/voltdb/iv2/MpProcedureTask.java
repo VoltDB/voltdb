@@ -139,6 +139,8 @@ public class MpProcedureTask extends ProcedureTask
                         "Failure while running system procedure " + txn.m_initiationMsg.getStoredProcedureName() +
                         ", and system procedures can not be restarted."));
             errorResp.m_sourceHSId = m_initiator.getHSId();
+            m_txnState.setDone();
+            m_queue.flush(getTxnId());
             m_initiator.deliver(errorResp);
 
             if (hostLog.isDebugEnabled()) {
