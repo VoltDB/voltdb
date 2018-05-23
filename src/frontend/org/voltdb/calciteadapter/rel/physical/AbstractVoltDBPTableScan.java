@@ -41,6 +41,7 @@ import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -221,7 +222,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
      * @return
      */
     protected AbstractPlanNode addLimitOffset(AbstractPlanNode node) {
-        if (m_limit != null || m_offset != null) {
+        if (hasLimitOffset()) {
             LimitPlanNode limitPlanNode = new LimitPlanNode();
             if (m_limit != null) {
                 int limit = getLimit();
@@ -269,7 +270,8 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
             // Inline limit /offset with Serial Aggregate only. This is enforced by the VoltDBPLimitScanMergeRule.
             // The VoltDBPAggregateScanMergeRule should be triggered prior to the VoltDBPLimitScanMergeRule
             // allowing the latter to avoid merging VoltDBLimit and Scan nodes if the scan already has an inline aggregate
-            assert(! (aggr instanceof HashAggregatePlanNode));
+            assert((aggr instanceof HashAggregatePlanNode && !hasLimitOffset()) ||
+                    aggr instanceof AggregatePlanNode);
             node = addLimitOffset(aggr);
         }
         return node;
@@ -312,5 +314,9 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
             }
         }
         return rowCount;
+    }
+
+    private boolean hasLimitOffset() {
+        return (m_limit != null || m_offset != null);
     }
 }

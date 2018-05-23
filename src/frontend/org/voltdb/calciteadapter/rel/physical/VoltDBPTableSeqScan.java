@@ -166,7 +166,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
         // the output row type for the scan
         // Preserve the original program and row type
         RexProgram aggProgram = RexProgram.createIdentity(aggregate.getRowType());
-        RelDataType preAggRowType = getPreAggregateRowType();
+        RelDataType preAggRowType = getRowType();
         RexProgram preAggProgram = getProgram();
         VoltDBPTableSeqScan newScan = new VoltDBPTableSeqScan(
                 getCluster(),
