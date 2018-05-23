@@ -230,8 +230,8 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // t2 is partitioned on PKEY
         for (int i = 0; i < sql.length; i++) {
             vt.advanceRow();
-            String task = vt.getString(0);
-            String plan = vt.getString(1);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
             assertEquals(sql[i], task);
             // note that there is no send and receive data from all partitions unlike above query
             assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
@@ -258,8 +258,8 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // t2 is partitioned on PKEY
         for (int i = 0; i < sql.length; i++) {
             vt.advanceRow();
-            String task = vt.getString(0);
-            String plan = vt.getString(1);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
             assertEquals(sql[i], task);
             // note that there is no send and receive data from all partitions unlike above query
             assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
