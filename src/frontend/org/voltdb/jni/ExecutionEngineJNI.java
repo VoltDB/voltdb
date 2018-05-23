@@ -21,10 +21,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.RejectedExecutionException;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -42,8 +39,6 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.largequery.BlockId;
-import org.voltdb.largequery.LargeBlockManager;
-import org.voltdb.largequery.LargeBlockResponse;
 import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -74,9 +69,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * if it is even 1% empty.
      */
     public static final int EE_COMPACTION_THRESHOLD;
-
-    /** java.util.logging logger. */
-    private static final VoltLogger LOG = new VoltLogger("HOST");
 
     private static final boolean HOST_TRACE_ENABLED;
 
@@ -844,36 +836,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         return -1;
     }
 
-    /*
-     * Execute a large block task synchronously.  Log errors if they occur.
-     * Return true if successful and false otherwise.
-     */
-    private boolean executeLargeBlockTask(LargeBlockTask task) {
-        LargeBlockManager lbm = LargeBlockManager.getInstance();
-        assert (lbm != null);
-
-        LargeBlockResponse response = null;
-        try {
-            // The call to get() will block until the task completes.
-            response = lbm.submitTask(task).get();
-        }
-        catch (RejectedExecutionException ree) {
-            LOG.error("Could not queue large block task: " + ree.getMessage());
-        }
-        catch (ExecutionException ee) {
-            LOG.error("Could not execute large block task: " + ee.getMessage());
-        }
-        catch (InterruptedException ie) {
-            LOG.error("Large block task was interrupted: " + ie.getMessage());
-        }
-
-        if (response != null && !response.wasSuccessful()) {
-            LOG.error("Large block task failed: " + response.getException().getMessage());
-        }
-
-        return response == null ? false : response.wasSuccessful();
-    }
-
     /**
      * Store a large temp table block to disk.
      *
@@ -884,7 +846,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     public boolean storeLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
         LargeBlockTask task = LargeBlockTask.getStoreTask(new BlockId(siteId, blockCounter), block);
-        return executeLargeBlockTask(task);
+        return executeLargeBlockTaskSynchronously(task);
     }
 
     /**
@@ -898,7 +860,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     public boolean loadLargeTempTableBlock(long siteId, long blockCounter, ByteBuffer block) {
         LargeBlockTask task = LargeBlockTask.getLoadTask(new BlockId(siteId, blockCounter), block);
-        return executeLargeBlockTask(task);
+        return executeLargeBlockTaskSynchronously(task);
     }
 
     /**
@@ -910,7 +872,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     public boolean releaseLargeTempTableBlock(long siteId, long blockCounter) {
         LargeBlockTask task = LargeBlockTask.getReleaseTask(new BlockId(siteId, blockCounter));
-        return executeLargeBlockTask(task);
+        return executeLargeBlockTaskSynchronously(task);
     }
 
     @Override
