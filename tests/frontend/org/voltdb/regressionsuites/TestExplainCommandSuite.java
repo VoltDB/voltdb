@@ -205,8 +205,8 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // -2- select * from t1
         for (int i = 0; i < sql.length; i++) {
             vt.advanceRow();
-            String task = vt.getString(0);
-            String plan = vt.getString(1);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
             assertEquals(sql[i], task);
             assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
             assertTrue(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));

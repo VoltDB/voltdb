@@ -78,7 +78,7 @@ public class ExplainProc extends AdHocNTBase {
             }
 
             vt[i] = new VoltTable(new VoltTable.ColumnInfo("STATEMENT_NAME", VoltType.STRING),
-            		                  new VoltTable.ColumnInfo("SQL_STATEMENT", VoltType.STRING),
+                                  new VoltTable.ColumnInfo("SQL_STATEMENT", VoltType.STRING),
                                   new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
 
             for(Statement stmt : proc.getStatements()) {
