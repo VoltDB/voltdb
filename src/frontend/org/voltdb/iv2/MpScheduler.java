@@ -481,7 +481,7 @@ public class MpScheduler extends Scheduler
             // even if all the masters somehow die before forwarding Complete on to their replicas.
             CompleteTransactionMessage ctm = new CompleteTransactionMessage(m_mailbox.getHSId(),
                     message.m_sourceHSId, message.getTxnId(), message.isReadOnly(), 0,
-                    !message.shouldCommit(), false, false, false, txn.isNPartTxn(), false);
+                    !message.shouldCommit(), false, false, false, txn.isNPartTxn(), message.m_isFromNonRestartableSysproc);
             ctm.setTruncationHandle(m_repairLogTruncationHandle);
             // dump it in the repair log
             // hacky castage
