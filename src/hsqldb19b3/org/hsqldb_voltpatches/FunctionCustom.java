@@ -271,7 +271,6 @@ public class FunctionCustom extends FunctionSQL {
 
             // A VoltDB extension to customize the SQL function set support
             case Tokens.LOG :
-            case Tokens.PI :
             /* disable 1 line
             case Tokens.LN :
              ... disabled 1 line */
@@ -499,6 +498,7 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_PI :
                 name = Tokens.T_PI;
                 parseList = emptyParamList;
+                parseListAlt = noParamList;
                 break;
             case FUNC_SIN :
                 name = Tokens.T_SIN;

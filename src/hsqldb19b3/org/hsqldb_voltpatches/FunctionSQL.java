@@ -101,7 +101,6 @@ public class FunctionSQL extends Expression {
     private final static int   FUNC_SYSTEM_USER                      = 59;
     protected final static int FUNC_USER                             = 60;
     private final static int   FUNC_VALUE                            = 61;
-    private final static int   FUNC_PI                               = 111;
 
     //
     static final short[] noParamList              = new short[]{};
@@ -634,9 +633,8 @@ public class FunctionSQL extends Expression {
                 // End of VoltDB extension
                 break;
 
-            case FUNC_PI:
             case FUNC_CURRENT_TIMESTAMP :
-                name            = id == FUNC_CURRENT_TIMESTAMP ? Tokens.T_CURRENT_TIMESTAMP : Tokens.T_PI;
+                name            = Tokens.T_CURRENT_TIMESTAMP;
                 parseList       = emptyParamList;
                 parseListAlt    = noParamList;
                 isValueFunction = true;
@@ -931,9 +929,6 @@ public class FunctionSQL extends Expression {
             }
             case FUNC_WIDTH_BUCKET : {
                 return null;
-            }
-            case FUNC_PI : {
-                return Double.valueOf(Math.PI);
             }
             case FUNC_SUBSTRING_CHAR : {
                 if (data[0] == null || data[1] == null) {
@@ -1757,9 +1752,6 @@ public class FunctionSQL extends Expression {
 
                 break;
             }
-            case FUNC_PI :
-                dataType = Type.SQL_DOUBLE;
-                break;
             case FUNC_CURRENT_TIMESTAMP : {
                 // A VoltDB extension to disable TIME ZONE support
                 dataType = Type.SQL_TIMESTAMP;
@@ -1923,10 +1915,6 @@ public class FunctionSQL extends Expression {
                 sb.append(Tokens.T_CEILING).append('(').                 //
                     append(nodes[0].getSQL()).append(')');
 
-                break;
-            }
-            case FUNC_PI : {
-                sb.append(Tokens.T_PI).append("()");                     //
                 break;
             }
             case FUNC_WIDTH_BUCKET : {
