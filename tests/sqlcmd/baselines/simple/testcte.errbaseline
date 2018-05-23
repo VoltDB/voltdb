@@ -38,15 +38,15 @@ Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling qu
 Check for name leaks out of CTE queries.
 ------------------------------------------------------------
 This should fail.  The table cte should not be defined.
-Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: Error in "select * from cte" user lacks privilege or object not found: CTE
+Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: Error in "select * from cte" object not found: CTE
 ------------------------------------------------------------
 This should fail.  The table cte should not be defined.
-Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: Error in "select * from cte" user lacks privilege or object not found: CTE
+Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: Error in "select * from cte" object not found: CTE
 ------------------------------------------------------------
 This should succeed.  The table cte above should be cleared.
 ------------------------------------------------------------
 This should fail.  The table cte should be gone.
-[Ad Hoc DDL Input:1]: DDL Error: "user lacks privilege or object not found: CTE in statement [drop table cte]"
+[Ad Hoc DDL Input:1]: DDL Error: "object not found: CTE in statement [drop table cte]"
 ============================================================
 Cleaning up.
 Done.
