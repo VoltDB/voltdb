@@ -179,12 +179,15 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPath(String prefix) {
+                String HostID = ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
                     return m_dirContainingFiles.getPath() +
                            File.separator +
                            generation +
                            "-" +
                            tableName +
+                           "-" +
+                           HostID+
                            m_extension;
                 }
                 else {
@@ -197,18 +200,23 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
+                           HostID+
+                           "-" +
                            m_dateformat.get().format(start) +
                            m_extension;
                 }
             }
 
             String getPathForSchema() {
+                String HostID = ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
                     return m_dirContainingFiles.getPath() +
                            File.separator +
                            generation +
                            "-" +
                            tableName +
+                           "-" +
+                           HostID+
                            "-schema.json";
                 }
                 else {
@@ -219,6 +227,8 @@ public class ExportToFileClient extends ExportClientBase {
                            generation +
                            "-" +
                            tableName +
+                           "-" +
+                           HostID+
                            "-schema.json";
                 }
             }
