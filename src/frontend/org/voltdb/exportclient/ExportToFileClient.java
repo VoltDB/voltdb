@@ -179,7 +179,7 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPath(String prefix) {
-                String HostID = ""+VoltDB.instance().getHostMessenger().getHostId();
+                String Host = ""+VoltDB.instance().getHostMessenger().getHostname();
                 if (m_batched) {
                     return m_dirContainingFiles.getPath() +
                            File.separator +
@@ -187,7 +187,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
-                           HostID+
+                           Host+
                            m_extension;
                 }
                 else {
@@ -200,7 +200,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
-                           HostID+
+                           Host+
                            "-" +
                            m_dateformat.get().format(start) +
                            m_extension;
@@ -208,7 +208,7 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPathForSchema() {
-                String HostID = ""+VoltDB.instance().getHostMessenger().getHostId();
+                String Host = ""+VoltDB.instance().getHostMessenger().getHostname();
                 if (m_batched) {
                     return m_dirContainingFiles.getPath() +
                            File.separator +
@@ -216,7 +216,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
-                           HostID+
+                           Host+
                            "-schema.json";
                 }
                 else {
@@ -228,7 +228,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
-                           HostID+
+                           Host+
                            "-schema.json";
                 }
             }
