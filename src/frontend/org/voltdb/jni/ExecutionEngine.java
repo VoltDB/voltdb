@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -45,6 +47,9 @@ import org.voltdb.dr2.DRProtocol;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.largequery.LargeBlockManager;
+import org.voltdb.largequery.LargeBlockResponse;
+import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.types.PlanNodeType;
@@ -60,7 +65,7 @@ import org.voltdb.utils.VoltTrace;
 
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    protected static VoltLogger LOG = new VoltLogger("HOST");
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
@@ -445,7 +450,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         if (shouldTimedOut(latency)) {
 
             String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, true);
-            log.info(msg);
+            LOG.info(msg);
 
             // timing out the long running queries
             return -1 * latency;
@@ -470,7 +475,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             return LONG_OP_THRESHOLD;
         }
         String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, false);
-        log.info(msg);
+        LOG.info(msg);
 
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
         m_lastMsgTime = currentTime;
@@ -1206,6 +1211,36 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    /*
+     * Execute a large block task synchronously.  Log errors if they occur.
+     * Return true if successful and false otherwise.
+     */
+    protected boolean executeLargeBlockTaskSynchronously(LargeBlockTask task) {
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
+        assert (lbm != null);
+
+        LargeBlockResponse response = null;
+        try {
+            // The call to get() will block until the task completes.
+            response = lbm.submitTask(task).get();
+        }
+        catch (RejectedExecutionException ree) {
+            LOG.error("Could not queue large block task: " + ree.getMessage());
+        }
+        catch (ExecutionException ee) {
+            LOG.error("Could not execute large block task: " + ee.getMessage());
+        }
+        catch (InterruptedException ie) {
+            LOG.error("Large block task was interrupted: " + ie.getMessage());
+        }
+
+        if (response != null && !response.wasSuccessful()) {
+            LOG.error("Large block task failed: " + response.getException().getMessage());
+        }
+
+        return response == null ? false : response.wasSuccessful();
+    }
+
     /**
      * Useful in unit tests.  Allows one to supply a mocked logger
      * to verify that something was logged.
@@ -1214,7 +1249,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     @Deprecated
     public static void setVoltLoggerForTest(VoltLogger vl) {
-        log = vl;
+        LOG = vl;
     }
 
     /**
