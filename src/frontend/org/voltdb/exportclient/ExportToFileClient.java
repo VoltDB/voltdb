@@ -180,12 +180,7 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPath(String prefix) {
-                if(VoltDB.instance() == null) {
-                    System.out.println("instance is null");
-                } else if (VoltDB.instance().getHostMessenger() == null){
-                    System.out.println("getHostMessenger is null");
-                }
-                String Host = ""+VoltDB.instance().getHostMessenger().getHostId();
+                String hostId= ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
                     return m_uniquenames ?
                            m_dirContainingFiles.getPath() +
@@ -194,7 +189,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
-                           Host +
+                           hostId+
                            m_extension
                            :
                            m_dirContainingFiles.getPath() +
@@ -215,7 +210,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
-                           Host+
+                           hostId+
                            "-" +
                            m_dateformat.get().format(start) +
                            m_extension
@@ -235,12 +230,7 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPathForSchema() {
-                if(VoltDB.instance() == null) {
-                    System.out.println("instance is null");
-                } else if (VoltDB.instance().getHostMessenger() == null){
-                    System.out.println("getHostMessenger is null");
-                }
-                String Host = ""+VoltDB.instance().getHostMessenger().getHostId();
+                String hostId = ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
                     return m_uniquenames ?
                            m_dirContainingFiles.getPath() +
@@ -249,7 +239,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
-                           Host+
+                           hostId+
                            "-schema.json"
                            :
                            m_dirContainingFiles.getPath() +
@@ -269,7 +259,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-" +
                            tableName +
                            "-" +
-                           Host+
+                           hostId+
                            "-schema.json"
                            :
                            m_dirContainingFiles.getPath() +
