@@ -261,8 +261,8 @@ public class SnapshotSiteProcessor {
     }
 
     public void shutdown() throws InterruptedException {
-        m_snapshotCreateSetupBarrier = null;
-        m_snapshotCreateFinishBarrier = null;
+        m_snapshotCreateSetupBarrier.reset();
+        m_snapshotCreateFinishBarrier.reset();
         if (m_snapshotTargetTerminators != null) {
             for (Thread t : m_snapshotTargetTerminators) {
                 t.join();
