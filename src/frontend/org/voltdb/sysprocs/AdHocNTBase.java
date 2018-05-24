@@ -421,9 +421,10 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         String sql = new String(ahps.sql, StandardCharsets.UTF_8);
         String explain = planBatch.explainStatement(0, db, false);
 
-        VoltTable vt = new VoltTable(new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
+        VoltTable vt = new VoltTable(new VoltTable.ColumnInfo("STATEMENT_NAME", VoltType.STRING),
+                new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
                 new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
-        vt.addRow(sql, explain);
+        vt.addRow("sql0", sql, explain);
 
         ClientResponseImpl response =
                 new ClientResponseImpl(
