@@ -103,10 +103,7 @@ public abstract class TransactionTask extends SiteTasker
     void doCommonSPICompleteActions()
     {
         // Mark the transaction state as DONE
-        // Transaction state could be null when a CompleteTransactionTask is added to scorecboard.
-        if (m_txnState != null) {
-            m_txnState.setDone();
-        }
+        m_txnState.setDone();
         // Flush us out of the head of the TransactionTaskQueue.  Null check so we're reusable
         // for live rejoin replay
         if (m_queue != null) {
