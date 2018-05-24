@@ -101,6 +101,7 @@ public class ExportToFileClient extends ExportClientBase {
 
     protected boolean m_batched;
     protected boolean m_withSchema;
+    protected boolean m_uniquename;
 
     protected final ReentrantReadWriteLock m_batchLock = new ReentrantReadWriteLock();
 
@@ -179,19 +180,28 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPath(String prefix) {
-                String Host = ""+VoltDB.instance().getHostMessenger().getHostname();
+                String Host = ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
-                    return m_dirContainingFiles.getPath() +
+                    return m_uniquename ?
+                           m_dirContainingFiles.getPath() +
                            File.separator +
                            generation +
                            "-" +
                            tableName +
                            "-" +
-                           Host+
+                           Host +
+                           m_extension
+                           :
+                           m_dirContainingFiles.getPath() +
+                           File.separator +
+                           generation +
+                           "-" +
+                           tableName +
                            m_extension;
                 }
                 else {
-                    return m_dirContainingFiles.getPath() +
+                    return m_uniquename ?
+                           m_dirContainingFiles.getPath() +
                            File.separator +
                            prefix +
                            m_nonce +
@@ -203,24 +213,45 @@ public class ExportToFileClient extends ExportClientBase {
                            Host+
                            "-" +
                            m_dateformat.get().format(start) +
+                           m_extension
+                           :
+                           m_dirContainingFiles.getPath() +
+                           File.separator +
+                           prefix +
+                           m_nonce +
+                           "-" +
+                           generation +
+                           "-" +
+                           tableName +
+                           "-" +
+                           m_dateformat.get().format(start) +
                            m_extension;
                 }
             }
 
             String getPathForSchema() {
-                String Host = ""+VoltDB.instance().getHostMessenger().getHostname();
+                String Host = ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
-                    return m_dirContainingFiles.getPath() +
+                    return m_uniquename ?
+                           m_dirContainingFiles.getPath() +
                            File.separator +
                            generation +
                            "-" +
                            tableName +
                            "-" +
                            Host+
+                           "-schema.json"
+                           :
+                           m_dirContainingFiles.getPath() +
+                           File.separator +
+                           generation +
+                           "-" +
+                           tableName +
                            "-schema.json";
                 }
                 else {
-                    return m_dirContainingFiles.getPath() +
+                    return m_uniquename ?
+                           m_dirContainingFiles.getPath() +
                            File.separator +
                            m_nonce +
                            "-" +
@@ -229,6 +260,15 @@ public class ExportToFileClient extends ExportClientBase {
                            tableName +
                            "-" +
                            Host+
+                           "-schema.json"
+                           :
+                           m_dirContainingFiles.getPath() +
+                           File.separator +
+                           m_nonce +
+                           "-" +
+                           generation +
+                           "-" +
+                           tableName +
                            "-schema.json";
                 }
             }
@@ -852,6 +892,7 @@ public class ExportToFileClient extends ExportClientBase {
 
         BinaryEncoding encoding = BinaryEncoding.valueOf(
                 conf.getProperty("binaryencoding", "HEX").trim().toUpperCase());
+        boolean uniquename = Boolean.parseBoolean(conf.getProperty("uniquename"));
 
         //Dont do actual config in check mode.
         boolean configcheck = Boolean.parseBoolean(conf.getProperty(ExportManager.CONFIG_CHECK_ONLY, "false"));
@@ -870,7 +911,8 @@ public class ExportToFileClient extends ExportClientBase {
                 batched,
                 withSchema,
                 tz,
-                encoding);
+                encoding,
+                uniquename);
     }
 
     private void configureInternal(
@@ -884,7 +926,8 @@ public class ExportToFileClient extends ExportClientBase {
                               final boolean batched,
                               final boolean withSchema,
                               final TimeZone tz,
-                              final BinaryEncoding be) {
+                              final BinaryEncoding be,
+                              final boolean uniquename) {
         m_delimiter = delimiter;
         m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
@@ -906,6 +949,7 @@ public class ExportToFileClient extends ExportClientBase {
         m_skipinternal = skipinternal;
         m_batched = batched;
         m_withSchema = withSchema;
+        m_uniquename = uniquename;
 
         if (fullDelimiters != null) {
             fullDelimiters = StringEscapeUtils.unescapeHtml4(fullDelimiters);
