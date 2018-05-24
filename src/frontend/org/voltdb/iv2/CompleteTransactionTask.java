@@ -220,4 +220,9 @@ public class CompleteTransactionTask extends TransactionTask
     public CompleteTransactionMessage getCompleteMessage() {
         return m_completeMsg;
     }
+
+    @Override
+    public long getTxnId() {
+        return getMsgTxnId();
+    }
 }
