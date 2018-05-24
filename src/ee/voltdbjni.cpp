@@ -1470,4 +1470,20 @@ SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTe
         exit(-1);
     }
 }
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeSetViewsEnabled
+ * Signature: (J[BZ)V
+ */
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetViewsEnabled
+  (JNIEnv *env, jobject object, jlong engine_ptr, jbyteArray viewNamesAsBytes, jboolean enabled) {
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    jbyte *viewNamesChars = env->GetByteArrayElements(viewNamesAsBytes, NULL);
+    std::string viewNames(reinterpret_cast<char *>(viewNamesChars), env->GetArrayLength(viewNamesAsBytes));
+    env->ReleaseByteArrayElements(viewNamesAsBytes, viewNamesChars, JNI_ABORT);
+    engine->setViewsEnabled(viewNames, enabled);
+}
+
 /** @} */ // end of JNI doxygen group

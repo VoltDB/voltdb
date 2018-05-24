@@ -55,7 +55,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -92,7 +91,11 @@ import com.google_voltpatches.common.io.Files;
 public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     private final static VoltLogger LOG = new VoltLogger("CONSOLE");
     private final static int SITE_COUNT = 2;
-    private final static int TABLE_COUNT = 9;  // Must match schema used.
+    private final static int TABLE_COUNT = 10;  // Must match schema used.
+
+    protected int getTableCount() {
+        return TABLE_COUNT;
+    }
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
@@ -1764,14 +1767,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         for (Table table : tables)
         {
-            // Ignore materialized tables
-            if (table.getMaterializer() == null)
+            if (table.getMaterializer() != null
+                    && ! table.getIsreplicated()
+                    && table.getPartitioncolumn() == null) {
+                continue;
+            }
+            total_tables++;
+            if (table.getIsreplicated())
             {
-                total_tables++;
-                if (table.getIsreplicated())
-                {
-                    replicated++;
-                }
+                replicated++;
             }
         }
         //Make this failing test debuggable, why do we get the wrong number sometimes?
@@ -2144,7 +2148,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         try
         {
-            checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", TABLE_COUNT);
+            checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", getTableCount());
         }
         catch (Exception ex)
         {

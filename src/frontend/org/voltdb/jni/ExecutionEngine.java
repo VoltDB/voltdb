@@ -864,6 +864,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
+    /**
+     * Pause/resume the maintenance of materialized views specified in viewNames.
+     */
+    public abstract void setViewsEnabled(String viewNames, boolean enabled);
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
@@ -1154,6 +1159,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long mAckOffset,
             long seqNo,
             byte mTableSignature[]);
+
+    protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
 
     /**
      * Get the USO for an export table. This is primarily used for recovery.

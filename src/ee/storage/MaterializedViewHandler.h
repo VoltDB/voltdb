@@ -85,6 +85,9 @@ public:
      */
     virtual bool isDirty() { return m_dirty; }
     virtual void pollute() { m_dirty = true; }
+    virtual void setEnabled(bool enabled);
+    virtual bool isEnabled() { return m_enabled; }
+
     // handleTupleInsert and handleTupleDelete are event handlers.
     // They are called when a source table has data being inserted / deleted.
     // The update operation is considered as a sequence of delete and insert operation.
@@ -110,6 +113,12 @@ private:
     int m_aggColumnCount;
     std::vector<ExpressionType> m_aggTypes;
     bool m_dirty;
+    // Indicates whether the view can be included in a snapshot.
+    // If a view is partitioned but there is not an explicit partition column,
+    // then it cannot be included in a snapshot.
+    bool m_supportSnapshot;
+    // Indicates whether the view is enabled.
+    bool m_enabled;
     // Both the existingTuple and the updatedTuple have the same schema of the view table.
     // The difference is the updatedTuple has its own storage, it's a standalone tuple.
     // existingTuple is used to search in the view table for the row with designated group-by columns.
@@ -182,6 +191,8 @@ public:
      */
     virtual bool isDirty() { return m_partitionedHandler->isDirty(); }
     virtual void pollute() { m_partitionedHandler->pollute(); }
+    virtual void setEnabled(bool enabled) { m_partitionedHandler->setEnabled(enabled); }
+    virtual bool isEnabled() { return m_partitionedHandler->isEnabled(); }
 
     virtual void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
     virtual void handleTupleDelete(PersistentTable *sourceTable, bool fallible);

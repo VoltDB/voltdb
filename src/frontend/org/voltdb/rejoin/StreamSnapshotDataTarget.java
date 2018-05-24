@@ -38,14 +38,11 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.Pair;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.base.Preconditions;
