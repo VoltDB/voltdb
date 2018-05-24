@@ -101,7 +101,7 @@ public class ExportToFileClient extends ExportClientBase {
 
     protected boolean m_batched;
     protected boolean m_withSchema;
-    protected boolean m_uniquename;
+    protected boolean m_uniquenames;
 
     protected final ReentrantReadWriteLock m_batchLock = new ReentrantReadWriteLock();
 
@@ -187,7 +187,7 @@ public class ExportToFileClient extends ExportClientBase {
                 }
                 String Host = ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
-                    return m_uniquename ?
+                    return m_uniquenames ?
                            m_dirContainingFiles.getPath() +
                            File.separator +
                            generation +
@@ -205,7 +205,7 @@ public class ExportToFileClient extends ExportClientBase {
                            m_extension;
                 }
                 else {
-                    return m_uniquename ?
+                    return m_uniquenames ?
                            m_dirContainingFiles.getPath() +
                            File.separator +
                            prefix +
@@ -242,7 +242,7 @@ public class ExportToFileClient extends ExportClientBase {
                 }
                 String Host = ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
-                    return m_uniquename ?
+                    return m_uniquenames ?
                            m_dirContainingFiles.getPath() +
                            File.separator +
                            generation +
@@ -260,7 +260,7 @@ public class ExportToFileClient extends ExportClientBase {
                            "-schema.json";
                 }
                 else {
-                    return m_uniquename ?
+                    return m_uniquenames ?
                            m_dirContainingFiles.getPath() +
                            File.separator +
                            m_nonce +
@@ -688,7 +688,6 @@ public class ExportToFileClient extends ExportClientBase {
                 } finally {
                     m_batchLock.writeLock().unlock();
                 }
-
             }
         }
 
@@ -903,7 +902,7 @@ public class ExportToFileClient extends ExportClientBase {
 
         BinaryEncoding encoding = BinaryEncoding.valueOf(
                 conf.getProperty("binaryencoding", "HEX").trim().toUpperCase());
-        boolean uniquename = Boolean.parseBoolean(conf.getProperty("uniquename"));
+        boolean uniquenames = Boolean.parseBoolean(conf.getProperty("uniquenames"));
 
         //Dont do actual config in check mode.
         boolean configcheck = Boolean.parseBoolean(conf.getProperty(ExportManager.CONFIG_CHECK_ONLY, "false"));
@@ -923,7 +922,7 @@ public class ExportToFileClient extends ExportClientBase {
                 withSchema,
                 tz,
                 encoding,
-                uniquename);
+                uniquenames);
     }
 
     private void configureInternal(
@@ -938,7 +937,7 @@ public class ExportToFileClient extends ExportClientBase {
                               final boolean withSchema,
                               final TimeZone tz,
                               final BinaryEncoding be,
-                              final boolean uniquename) {
+                              final boolean uniquenames) {
         m_delimiter = delimiter;
         m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
@@ -960,7 +959,7 @@ public class ExportToFileClient extends ExportClientBase {
         m_skipinternal = skipinternal;
         m_batched = batched;
         m_withSchema = withSchema;
-        m_uniquename = uniquename;
+        m_uniquenames = uniquenames;
 
         if (fullDelimiters != null) {
             fullDelimiters = StringEscapeUtils.unescapeHtml4(fullDelimiters);

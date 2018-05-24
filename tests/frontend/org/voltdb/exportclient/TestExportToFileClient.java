@@ -367,7 +367,6 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 retry ++ ;
             }
         }
-
         assertEquals(2, retry);
     }
 
