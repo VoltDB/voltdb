@@ -191,7 +191,7 @@ public class ExportToFileClient extends ExportClientBase {
             String getPathForSchema() {
                 return constructFilename() + "-schema.json";
             }
-            
+
             public String constructFilename() {
                 String hostId= ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
