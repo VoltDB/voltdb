@@ -350,7 +350,7 @@ public class QueryPlanner implements AutoCloseable {
      * <li>
      *   Parse the VoltXMLElement to create an AbstractParsedStatement.  This has
      *   a second effect of loading lists of join orders and access paths for planning.
-     *   For us, and access path is a way of scanning something scannable.  It's a generalization
+     *   For us, an access path is a way of scanning something scannable.  It's a generalization
      *   of the notion of scanning a table or an index.
      * </li>
      * <li>

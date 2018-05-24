@@ -29,13 +29,7 @@ import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Constraint;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -1133,6 +1127,18 @@ public class PlanAssembler {
 
         AbstractPlanNode root = subSelectRoot;
 
+        /*if(m_parsedSelect.m_tableList.size() == 1 && m_parsedSelect.m_groupByExpressions.size() == 1) {
+            // TODO: scan m_parsedSelect.m_mvFixInfo for "similar" materialized view associated
+            Table t = m_parsedSelect.m_tableList.get(0);
+            String gbyExprs = m_parsedSelect.m_groupByExpressions.entrySet().iterator().next().getKey();
+            MaterializedViewInfo v = t.getViews().get(t.getTypeName());
+            if (v != null &&
+                v.getGroupbycols().get(gbyExprs) != null &&
+                    (v.getPredicate() == null && m_parsedSelect.getHavingPredicate() == null ||
+                     v.getPredicate() == m_parsedSelect.getHavingPredicate().toString())) // TODO: select fields
+                // TODO: match found
+            }
+        }*/
         boolean mvFixNeedsProjection = false;
         /*
          * If the access plan for the table in the join order was for a
@@ -2597,7 +2603,7 @@ public class PlanAssembler {
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
-        if (m_parsedSelect.hasAggregateOrGroupby()) {
+        if (/*false &&*/ m_parsedSelect.hasAggregateOrGroupby()) {
             AggregatePlanNode aggNode = null;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
