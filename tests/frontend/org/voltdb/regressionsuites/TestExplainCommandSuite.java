@@ -93,11 +93,11 @@ public class TestExplainCommandSuite extends RegressionSuite {
     public void testExplainView() throws IOException, ProcCallException {
         Client client = getClient();
         VoltTable vt = null;
-        
+
         // Test if the error checking is working properly.
         verifyProcFails(client, "View T does not exist.", "@ExplainView", "T");
         verifyProcFails(client, "Table T1 is not a view.", "@ExplainView", "T1");
-        
+
         vt = client.callProcedure("@ExplainView", "v" ).getResults()[0];
         vt.advanceRow();
         String task = vt.getString(0);
