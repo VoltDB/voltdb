@@ -1608,7 +1608,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     /*
-     * Register a custom mailbox, optinally specifying what the hsid should be.
+     * Register a custom mailbox, optionally specifying what the hsid should be.
      */
     public void createMailbox(Long proposedHSId, Mailbox mailbox) {
         long hsId = 0;
