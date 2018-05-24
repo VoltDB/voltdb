@@ -47,32 +47,37 @@ public class VoltDBPAggregateRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltDBLAggregate aggregate = call.rel(0);
-        RelTraitSet convertedTraits = aggregate.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
-        RelNode input = aggregate.getInput();
-        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
+        RelTraitSet convertedAggrTraits = aggregate.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
 
-        // Transform to a physical Hash Aggregate
-        VoltDBPHashAggregate hashAggr = new VoltDBPHashAggregate(
-                aggregate.getCluster(),
-                convertedTraits,
-                convertedInput,
-                aggregate.indicator,
-                aggregate.getGroupSet(),
-                aggregate.getGroupSets(),
-                aggregate.getAggCallList(),
-                null);
-        call.transformTo(hashAggr);
+        RelNode input = aggregate.getInput();
+        RelTraitSet convertedInputTraits = input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelNode convertedInput = convert(input, convertedInputTraits);
+
+        if (this.needHashAggregator(aggregate)) {
+            // Transform to a physical Hash Aggregate
+            VoltDBPHashAggregate hashAggr = new VoltDBPHashAggregate(
+                    aggregate.getCluster(),
+                    convertedAggrTraits,
+                    convertedInput,
+                    aggregate.indicator,
+                    aggregate.getGroupSet(),
+                    aggregate.getGroupSets(),
+                    aggregate.getAggCallList(),
+                    null);
+            call.transformTo(hashAggr);
+        }
 
         // Transform to a physical Serial Aggregate with an enforcer - A Sort rel which collation
         // matches the aggreagte's GROUP BY columns (for now)
-        RelCollation groupByCollation = buildGroupByCollation(aggregate);
-        RelTraitSet serialAggrTraits = input.getTraitSet()
-                .replace(VoltDBPRel.VOLTDB_PHYSICAL)
-                .plus(groupByCollation);
-        RelNode convertedSerialAggrInput = convert(input, serialAggrTraits);
+        if (hasGroupBy(aggregate)) {
+            RelCollation groupByCollation = buildGroupByCollation(aggregate);
+            convertedAggrTraits = convertedAggrTraits.plus(groupByCollation);
+            convertedInputTraits = convertedInputTraits.plus(groupByCollation);
+        }
+        RelNode convertedSerialAggrInput = convert(input, convertedInputTraits);
         VoltDBPSerialAggregate serialAggr = new VoltDBPSerialAggregate(
                 aggregate.getCluster(),
-                convertedTraits.plus(groupByCollation),
+                convertedAggrTraits,
                 convertedSerialAggrInput,
                 aggregate.indicator,
                 aggregate.getGroupSet(),
@@ -98,4 +103,13 @@ public class VoltDBPAggregateRule extends RelOptRule {
         return RelCollations.of(collationFields.toArray(new RelFieldCollation[collationFields.size()]));
     }
 
+    private boolean needHashAggregator(VoltDBLAggregate aggr) {
+        // A hash is required to build up per-group aggregates in parallel vs.
+        // when there is only one aggregation over the entire table
+        return hasGroupBy(aggr);
+    }
+
+    private boolean hasGroupBy(VoltDBLAggregate aggr) {
+        return !aggr.getGroupSet().isEmpty();
+    }
 }
