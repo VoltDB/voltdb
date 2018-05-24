@@ -180,96 +180,56 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPath(String prefix) {
-                String hostId= ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
-                    return m_uniquenames ?
-                           m_dirContainingFiles.getPath() +
-                           File.separator +
-                           generation +
-                           "-" +
-                           tableName +
-                           "-" +
-                           hostId+
-                           m_extension
-                           :
-                           m_dirContainingFiles.getPath() +
-                           File.separator +
-                           generation +
-                           "-" +
-                           tableName +
-                           m_extension;
+                    return constructFilename() + m_extension;
                 }
                 else {
-                    return m_uniquenames ?
-                           m_dirContainingFiles.getPath() +
-                           File.separator +
-                           prefix +
-                           m_nonce +
-                           "-" +
-                           generation +
-                           "-" +
-                           tableName +
-                           "-" +
-                           hostId+
-                           "-" +
-                           m_dateformat.get().format(start) +
-                           m_extension
-                           :
-                           m_dirContainingFiles.getPath() +
-                           File.separator +
-                           prefix +
-                           m_nonce +
-                           "-" +
-                           generation +
-                           "-" +
-                           tableName +
-                           "-" +
-                           m_dateformat.get().format(start) +
-                           m_extension;
+                    return constructFilename() + m_dateformat.get().format(start) + m_extension;
                 }
             }
 
             String getPathForSchema() {
-                String hostId = ""+VoltDB.instance().getHostMessenger().getHostId();
+                return constructFilename() + "-schema.json";
+            }
+            
+            public String constructFilename() {
+                String hostId= ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
                     return m_uniquenames ?
                            m_dirContainingFiles.getPath() +
-                           File.separator +
                            generation +
                            "-" +
                            tableName +
                            "-" +
                            hostId+
-                           "-schema.json"
+                           m_extension
                            :
                            m_dirContainingFiles.getPath() +
                            File.separator +
                            generation +
                            "-" +
-                           tableName +
-                           "-schema.json";
+                           tableName;
                 }
                 else {
                     return m_uniquenames ?
-                           m_dirContainingFiles.getPath() +
-                           File.separator +
-                           m_nonce +
-                           "-" +
-                           generation +
-                           "-" +
-                           tableName +
-                           "-" +
-                           hostId+
-                           "-schema.json"
-                           :
-                           m_dirContainingFiles.getPath() +
-                           File.separator +
-                           m_nonce +
-                           "-" +
-                           generation +
-                           "-" +
-                           tableName +
-                           "-schema.json";
+                            m_dirContainingFiles.getPath() +
+                            File.separator +
+                            m_nonce +
+                            "-" +
+                            generation +
+                            "-" +
+                            tableName +
+                            "-" +
+                            hostId+
+                            m_extension
+                            :
+                            m_dirContainingFiles.getPath() +
+                            File.separator +
+                            m_nonce +
+                            "-" +
+                            generation +
+                            "-" +
+                            tableName;
                 }
             }
 
