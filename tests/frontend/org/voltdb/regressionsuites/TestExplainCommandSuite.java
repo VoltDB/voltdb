@@ -85,7 +85,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             String name = vt.getString(0);
             String sql = vt.getString(1);
             String plan = vt.getString(2);
-            assertTrue( name.contains("sql0"));
+            assertEquals("sql0", name);
             assertTrue( sql.contains( "INSERT INTO T1 VALUES (?, ?, ?)" ));
             assertTrue( plan.contains( "INSERT into \"T1\"" ));
             assertTrue( plan.contains( "MATERIALIZE TUPLE from parameters and/or literals" ));
@@ -101,16 +101,13 @@ public class TestExplainCommandSuite extends RegressionSuite {
             if (i == 0) {
                 assertEquals("insert", name);
                 assertEquals("insert into t4 values(?);", task);
-            } else if (i == 1) {
-                assertEquals("select", name);
-                assertEquals("select * from t4 where A>=?;", task);
-            }
-            if (i == 0) {
                 assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
                 assertTrue(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
                 assertTrue(plan.contains("INSERT into \"T4\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 1) {
+            } else {
+                assertEquals("select", name);
+                assertEquals("select * from t4 where A>=?;", task);
                 assertTrue(plan.contains("RETURN RESULTS TO STORED PROCEDURE"));
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T4\""));
             }
@@ -242,7 +239,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             if (i == 0) {
                 assertTrue(plan.contains("INSERT into \"T1\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 1) {
+            } else {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T1\""));
             }
         }
@@ -270,7 +267,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             if (i == 0) {
                 assertTrue(plan.contains("INSERT into \"T2\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 1) {
+            } else {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
             }
         }
@@ -302,7 +299,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             } else if (i == 1) {
                 assertTrue(plan.contains("INSERT into \"T2\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 2) {
+            } else {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
             }
         }
