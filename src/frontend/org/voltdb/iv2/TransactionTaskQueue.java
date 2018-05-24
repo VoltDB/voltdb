@@ -112,7 +112,13 @@ public class TransactionTaskQueue
                         if (hostLog.isDebugEnabled()) {
                             hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(txnId));
                         }
-                        completion.doCommonSPICompleteActions();
+                        // Mark the transaction state as DONE
+                        // Transaction state could be null when a CompleteTransactionTask is added to scorecboard.
+                        if (completion.m_txnState != null) {
+                            completion.m_txnState.setDone();
+                        }
+                        // Flush us out of the head of the TransactionTaskQueue.
+                        m_txnTaskQueues[ii].flush(txnId);
                     }
                     //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
                     //up the site outstanding transaction queue and duplicate counter
