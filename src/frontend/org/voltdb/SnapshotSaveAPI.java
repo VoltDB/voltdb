@@ -220,19 +220,7 @@ public class SnapshotSaveAPI
             //request to start snapshot, most likely some nodes are down. So break out the barrier
             //for early exit.
             try {
-                synchronized (SnapshotSiteProcessor.m_shutdownLock) {
-                    if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
-                        result.addRow(
-                                context.getHostId(),
-                                hostname,
-                                "",
-                                "FAILURE",
-                                String.format("Node %d(%s) is shutting down, abort the snapshot attempt.", context.getHostId(), hostname));
-                        earlyResultTable = result;
-                        return earlyResultTable;
-                    }
-                    SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await(30, TimeUnit.SECONDS);
-                }
+                SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await(30, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
                 throw new InterruptException(0);
             }
@@ -313,19 +301,7 @@ public class SnapshotSaveAPI
                     }
                 }
             } finally {
-                synchronized (SnapshotSiteProcessor.m_shutdownLock) {
-                    if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
-                        result.addRow(
-                                context.getHostId(),
-                                hostname,
-                                "",
-                                "FAILURE",
-                                String.format("Node %d(%s) is shutting down, abort the snapshot attempt.", context.getHostId(), hostname));
-                        earlyResultTable = result;
-                        return earlyResultTable;
-                    }
-                    SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await(120, TimeUnit.SECONDS);
-                }
+                SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.await(120, TimeUnit.SECONDS);
             }
         } catch (TimeoutException e) {
             VoltDB.crashLocalVoltDB(

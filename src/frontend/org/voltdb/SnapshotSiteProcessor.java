@@ -84,8 +84,6 @@ public class SnapshotSiteProcessor {
      * of the targets and the distribution of the work.
      */
     public static final Object m_snapshotCreateLock = new Object();
-    /** Protect snapshotSaveAPI() path while site is shutting down */
-    public static final Object m_shutdownLock = new Object();
     public static CyclicBarrier m_snapshotCreateSetupBarrier = null;
     public static CyclicBarrier m_snapshotCreateFinishBarrier = null;
     public static final Runnable m_snapshotCreateSetupBarrierAction = new Runnable() {
@@ -263,10 +261,8 @@ public class SnapshotSiteProcessor {
     }
 
     public void shutdown() throws InterruptedException {
-        synchronized (m_shutdownLock) {
-            m_snapshotCreateSetupBarrier = null;
-            m_snapshotCreateFinishBarrier = null;
-        }
+        m_snapshotCreateSetupBarrier.reset();
+        m_snapshotCreateFinishBarrier.reset();
         if (m_snapshotTargetTerminators != null) {
             for (Thread t : m_snapshotTargetTerminators) {
                 t.join();
