@@ -45,9 +45,9 @@ RETURN RESULTS TO STORED PROCEDURE
 (Returned 1 rows in #.##s)
 
 explainproc P_EXPLAINTEST;
-SQL_STATEMENT               EXECUTION_PLAN                 
---------------------------- -------------------------------
-SELECT * FROM EXPLAINTEST;  RETURN RESULTS TO STORED PROCEDURE
+STATEMENT_NAME  SQL_STATEMENT               EXECUTION_PLAN                 
+--------------- --------------------------- -------------------------------
+sql0            SELECT * FROM EXPLAINTEST;  RETURN RESULTS TO STORED PROCEDURE
  RECEIVE FROM ALL PARTITIONS
   SEND PARTITION RESULTS TO COORDINATOR
    SEQUENTIAL SCAN of "EXPLAINTEST"
