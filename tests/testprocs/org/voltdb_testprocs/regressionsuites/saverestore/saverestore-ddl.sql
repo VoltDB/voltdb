@@ -8,7 +8,6 @@ CREATE TABLE PARTITION_TESTER (
   PT_GEOGVAL  GEOGRAPHY DEFAULT NULL,
   PRIMARY KEY (PT_ID)
 );
--- PARTITION TABLE PARTITION_TESTER ON COLUMN PT_ID;
 
 -- Simple table to test replicated save/restore
 CREATE TABLE REPLICATED_TESTER (
@@ -21,10 +20,8 @@ CREATE TABLE REPLICATED_TESTER (
   PRIMARY KEY (RT_ID)
 );
 
--- Single table, explicitly partitioned view. We snapshot this.
-CREATE VIEW MATVIEW1 (PT_ID, PT_INTVAL, NUM) AS SELECT PT_ID, PT_INTVAL, COUNT(*) FROM PARTITION_TESTER GROUP BY PT_ID, PT_INTVAL;
--- Single table, randomly partitioned view. We do not snapshot this.
-CREATE VIEW MATVIEW2 (PT_INTVAL, NUM) AS SELECT PT_INTVAL, COUNT(*) FROM PARTITION_TESTER GROUP BY PT_INTVAL;
+-- Simple materialized table to verify that we don't save materialized tables
+CREATE VIEW MATVIEW (PT_ID, PT_INTVAL, NUM) AS SELECT PT_ID, PT_INTVAL, COUNT(*) FROM PARTITION_TESTER GROUP BY PT_ID, PT_INTVAL;
 
 -- TABLES BELOW HERE WILL ALL CHANGE IN saverestore-altered-ddl.sql
 
@@ -56,7 +53,6 @@ CREATE TABLE CHANGE_COLUMNS (
 --  HASDEFAULT INTEGER DEFAULT '1234', --this column will appear
 --  HASNULL INTEGER -- this column will appear
 );
--- PARTITION TABLE CHANGE_COLUMNS ON COLUMN ID;
 
 CREATE TABLE ENG_2025 (
  key    varchar(250) not null,
@@ -79,7 +75,6 @@ CREATE TABLE JUMBO_ROW (
  STRING2       VARCHAR(1048564),
  PRIMARY KEY (PKEY)
 );
--- PARTITION TABLE JUMBO_ROW ON COLUMN PKEY;
 
 -- Table for super big rows that test max supported storage reached via multi-byte characters.
 CREATE TABLE JUMBO_ROW_UTF8 (
@@ -88,4 +83,3 @@ CREATE TABLE JUMBO_ROW_UTF8 (
  STRING2       VARCHAR(262141),
  PRIMARY KEY (PKEY)
 );
--- PARTITION TABLE JUMBO_ROW_UTF8 ON COLUMN PKEY;

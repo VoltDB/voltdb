@@ -34,14 +34,12 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Table;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.StreamSnapshotSink.RestoreWork;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.utils.CatalogUtil;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
@@ -54,8 +52,6 @@ public class RejoinProducer extends JoinProducerBase {
     private static ScheduledFuture<?> m_timeFuture;
     private Mailbox m_streamSnapshotMb = null;
     private StreamSnapshotSink m_rejoinSiteProcessor = null;
-    // Stores the name of the views to pause/resume during a rejoin stream snapshot restore process.
-    private String m_commaSeparatedNameOfViewsToPause = null;
 
     // True if we're handling a table-less rejoin.
     boolean m_schemaHasNoTables = false;
@@ -156,8 +152,10 @@ public class RejoinProducer extends JoinProducerBase {
     @Override
     public void deliver(RejoinMessage message)
     {
-        if (message.getType() == RejoinMessage.Type.INITIATION
-                || message.getType() == RejoinMessage.Type.INITIATION_COMMUNITY) {
+        if (message.getType() == RejoinMessage.Type.INITIATION) {
+            doInitiation(message);
+        }
+        else if (message.getType() == RejoinMessage.Type.INITIATION_COMMUNITY) {
             doInitiation(message);
         }
         else {
@@ -270,27 +268,6 @@ public class RejoinProducer extends JoinProducerBase {
     public void runForRejoin(SiteProcedureConnection siteConnection,
             TaskLog m_taskLog) throws IOException
     {
-        // After doInitialization(), the rejoin producer is inserted into the task queue,
-        // and then we come here repeatedly until the stream snapshot restore finishes.
-        // The first time when this producer method is run (m_commaSeparatedNameOfViewsToPause is null),
-        // we need to figure out which views to pause so that they are handled properly
-        // before the snapshot streams arrive.
-        if (m_commaSeparatedNameOfViewsToPause == null) {
-            // The very first execution of runForRejoin will lead us here.
-            StringBuilder commaSeparatedViewNames = new StringBuilder();
-            for (Table table : VoltDB.instance().getCatalogContext().tables) {
-                if (CatalogUtil.isSnapshottedView(table)) {
-                    commaSeparatedViewNames.append(table.getTypeName()).append(",");
-                }
-            }
-            // Get rid of the trailing comma.
-            if (commaSeparatedViewNames.length() > 0) {
-                commaSeparatedViewNames.setLength(commaSeparatedViewNames.length() - 1);
-            }
-            m_commaSeparatedNameOfViewsToPause = commaSeparatedViewNames.toString();
-            // Set enabled to false for the views we found.
-            siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, false);
-        }
         if (!m_schemaHasNoTables) {
             boolean sourcesReady = false;
             RestoreWork rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
@@ -344,9 +321,6 @@ public class RejoinProducer extends JoinProducerBase {
                     m_taskQueue.offer(this);
                     return;
                 }
-                assert(m_commaSeparatedNameOfViewsToPause != null);
-                // Resume the views.
-                siteConnection.setViewsEnabled(m_commaSeparatedNameOfViewsToPause, true);
                 SnapshotCompletionEvent event = null;
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 Map<Integer, Long> drSequenceNumbers = null;

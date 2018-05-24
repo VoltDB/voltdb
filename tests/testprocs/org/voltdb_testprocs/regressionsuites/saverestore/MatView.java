@@ -28,7 +28,7 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 public class MatView extends VoltProcedure {
-    public final SQLStmt agg = new SQLStmt("SELECT * FROM MATVIEW1;");
+    public final SQLStmt agg = new SQLStmt("SELECT * FROM MATVIEW;");
 
     public VoltTable[] run(long id) {
         voltQueueSQL(agg);

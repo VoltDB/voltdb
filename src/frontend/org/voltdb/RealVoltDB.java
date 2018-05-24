@@ -773,7 +773,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
-     * @param config configuration that gets passed in from command line.
+     * @param config configuration that gets passed in from commandline.
      */
     @Override
     public void initialize(Configuration config) {
@@ -957,7 +957,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_startMode = OperationMode.RUNNING;
 
             // set a bunch of things to null/empty/new for tests
-            // which reuse the process
+            // which reusue the process
             m_safeMpTxnId = Long.MAX_VALUE;
             m_lastSeenMpTxnId = Long.MIN_VALUE;
             m_clientInterface = null;

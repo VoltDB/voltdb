@@ -371,21 +371,6 @@ public abstract class CatalogUtil {
         return jarfile;
     }
 
-    public static boolean isSnapshottedView(Table table) {
-        if (table.getMaterializer() == null) {
-            // Return false if it is not a materialized view.
-            return false;
-        }
-        if (! table.getIsreplicated() && table.getPartitioncolumn() == null) {
-            // If the target table is an implicitly partitioned view now (maybe was not in snapshot),
-            // its maintenance is not turned off during the snapshot restore process.
-            // Let it take care of its own data by itself.
-            // Do not attempt to restore data for it.
-            return false;
-        }
-        return true;
-    }
-
     /**
      * Get a unique id for a plan fragment by munging the indices of it's parents
      * and grandparents in the catalog.

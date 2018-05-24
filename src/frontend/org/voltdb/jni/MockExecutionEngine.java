@@ -254,9 +254,4 @@ public class MockExecutionEngine extends ExecutionEngine {
     public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
         return 0;
     }
-
-    @Override
-    public void setViewsEnabled(String viewNames, boolean enabled) {
-        return;
-    }
 }
