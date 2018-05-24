@@ -115,4 +115,4 @@ CREATE PROCEDURE NRCTE AS
     SELECT E.LAST_NAME, E.EMP_ID, E.MANAGER_ID, EB.LEVEL+1, EB.PATH || '/' || E.LAST_NAME
       FROM EMPLOYEES E JOIN EMP_BASE EB ON E.MANAGER_ID = EB.EMP_ID;
       
-CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.regressionsuites.explainprocs.JavaClassCreateProcedure;
+CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.regressionsuites.explainprocs.JavaProcedure;

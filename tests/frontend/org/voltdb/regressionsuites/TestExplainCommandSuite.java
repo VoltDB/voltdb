@@ -86,13 +86,13 @@ public class TestExplainCommandSuite extends RegressionSuite {
             String sql = vt.getString(1);
             String plan = vt.getString(2);
             assertEquals("sql0", name);
-            assertTrue( sql.contains( "INSERT INTO T1 VALUES (?, ?, ?)" ));
-            assertTrue( plan.contains( "INSERT into \"T1\"" ));
-            assertTrue( plan.contains( "MATERIALIZE TUPLE from parameters and/or literals" ));
+            assertEquals("INSERT INTO T1 VALUES (?, ?, ?);", sql);
+            assertTrue(plan.contains("INSERT into \"T1\""));
+            assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
         }
 
         //test stored procedure loaded from Java class
-        vt = client.callProcedure("@ExplainProc", "JavaClassCreateProcedure").getResults()[0];
+        vt = client.callProcedure("@ExplainProc", "JavaProcedure").getResults()[0];
         for (int i = 0; i < 2; i++) {
             vt.advanceRow();
             String name = vt.getString(0);
@@ -232,7 +232,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             String name = vt.getString(0);
             String task = vt.getString(1);
             String plan = vt.getString(2);
-            assertEquals("sql"+i, name);
+            assertEquals("sql" + i, name);
             assertEquals(sql[i], task);
             assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
             assertTrue(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
@@ -259,7 +259,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             String name = vt.getString(0);
             String task = vt.getString(1);
             String plan = vt.getString(2);
-            assertEquals("sql"+i, name);
+            assertEquals("sql" + i, name);
             assertEquals(sql[i], task);
             // note that there is no send and receive data from all partitions unlike above query
             assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
@@ -289,7 +289,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             String name = vt.getString(0);
             String task = vt.getString(1);
             String plan = vt.getString(2);
-            assertEquals("sql"+i, name);
+            assertEquals("sql" + i, name);
             assertEquals(sql[i], task);
             // note that there is no send and receive data from all partitions unlike above query
             assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
