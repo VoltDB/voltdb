@@ -92,7 +92,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         }
 
         //test stored procedure loaded from Java class
-        vt = client.callProcedure("@ExplainProc", "CreateStoredProcedure").getResults()[0];
+        vt = client.callProcedure("@ExplainProc", "JavaClassCreateProcedure").getResults()[0];
         for (int i = 0; i < 2; i++) {
             vt.advanceRow();
             String name = vt.getString(0);

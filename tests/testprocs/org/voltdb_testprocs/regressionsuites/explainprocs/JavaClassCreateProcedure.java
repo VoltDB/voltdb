@@ -27,7 +27,7 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class CreateStoredProcedure extends VoltProcedure {
+public class JavaClassCreateProcedure extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("insert into t4 values(?)");
     public final SQLStmt select = new SQLStmt("select * from t4 where A>=?");
