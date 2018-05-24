@@ -90,7 +90,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             assertTrue( plan.contains( "INSERT into \"T1\"" ));
             assertTrue( plan.contains( "MATERIALIZE TUPLE from parameters and/or literals" ));
         }
-        
+
         //test stored procedure loaded from Java class
         vt = client.callProcedure("@ExplainProc", "CreateStoredProcedure").getResults()[0];
         for (int i = 0; i < 2; i++) {
