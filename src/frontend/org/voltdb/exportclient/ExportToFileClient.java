@@ -180,6 +180,11 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPath(String prefix) {
+                if(VoltDB.instance() == null) {
+                    System.out.println("instance is null");
+                } else if (VoltDB.instance().getHostMessenger() == null){
+                    System.out.println("getHostMessenger is null");
+                }
                 String Host = ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
                     return m_uniquename ?
@@ -230,6 +235,11 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPathForSchema() {
+                if(VoltDB.instance() == null) {
+                    System.out.println("instance is null");
+                } else if (VoltDB.instance().getHostMessenger() == null){
+                    System.out.println("getHostMessenger is null");
+                }
                 String Host = ""+VoltDB.instance().getHostMessenger().getHostId();
                 if (m_batched) {
                     return m_uniquename ?
@@ -666,6 +676,7 @@ public class ExportToFileClient extends ExportClientBase {
                         m_writer = m_firstBlockTask.get();
                     }
                 } catch (Exception e) {
+                    e.printStackTrace();
                     // if writeSchema or getWriter method fails, it will throw IOException
                     // try reset writer and restart the block
                     if (e.getCause() instanceof IOException) {

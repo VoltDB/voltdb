@@ -46,6 +46,8 @@ import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
+import org.voltdb.MockVoltDB;
+import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.utils.VoltFile;
@@ -58,6 +60,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 @PrepareForTest(ExportToFileClient.class)
 public class TestExportToFileClient extends ExportClientTestBase {
     static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
+    private static MockVoltDB s_mockVoltDB = new MockVoltDB("foo", "bar");
 
     @Override
     @Before
@@ -72,6 +75,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         }
         System.setProperty("__EXPORT_FILE_ROTATE_PERIOD_UNIT__", TimeUnit.SECONDS.name());
         ExportToFileClient.TEST_VOLTDB_ROOT = m_dir;
+        VoltDB.replaceVoltDBInstanceForTest(s_mockVoltDB);
     }
 
     @Test
