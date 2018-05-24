@@ -2104,7 +2104,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         DEP_setViewEnabled,
                         ParameterSet.fromArrayNoCopy(enabledAsInt, commaSeparatedViewNames),
                         false,        // isFinal
-                        m_runner.getTxnState().isForReplay());
+                        m_runner.getTxnState().isForReplay(),
+                        false,        // isNPartTxn
+                        m_runner.getTxnState().getTimetamp());
     }
 
     private void verifyRestoreWorkResult(VoltTable[] results, VoltTable[] restore_results) {

@@ -2738,7 +2738,7 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
         VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
         // Update all the partitioned table views first, then update all the replicated table views.
         int64_t dummyExceptionTracker = 0;
-        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, dummyExceptionTracker);
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, &dummyExceptionTracker, int64_t(-1));
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             // This loop just split the viewNames by commas and process each view individually.
             for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
