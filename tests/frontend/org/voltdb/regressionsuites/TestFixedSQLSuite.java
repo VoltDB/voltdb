@@ -3180,7 +3180,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     //
     // JUnit / RegressionSuite boilerplate
-    //
+    //z
     public TestFixedSQLSuite(String name) {
         super(name);
     }
