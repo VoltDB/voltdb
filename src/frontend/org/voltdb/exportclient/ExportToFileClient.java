@@ -178,9 +178,9 @@ public class ExportToFileClient extends ExportClientBase {
                 this.generation = generation;
                 this.creationTime = System.currentTimeMillis();
             }
-            
+
             String getPath(String prefix) {
-                String hostId= ""+VoltDB.instance().getHostMessenger().getHostId();
+                String hostId= "("+VoltDB.instance().getHostMessenger().getHostId()+")";
                 if (m_batched) {
                     return m_uniquenames ?
                            m_dirContainingFiles.getPath() +
@@ -230,7 +230,7 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPathForSchema() {
-                String hostId = ""+VoltDB.instance().getHostMessenger().getHostId();
+                String hostId = "("+VoltDB.instance().getHostMessenger().getHostId()+")";
                 if (m_batched) {
                     return m_uniquenames ?
                            m_dirContainingFiles.getPath() +
@@ -272,60 +272,6 @@ public class ExportToFileClient extends ExportClientBase {
                            "-schema.json";
                 }
             }
-
-//            String getPath(String prefix) {
-//                if (m_batched) {
-//                    return constructFilename() + m_extension;
-//                }
-//                else {
-//                    return constructFilename() + "-" + m_dateformat.get().format(start) + m_extension;
-//                }
-//            }
-//
-//            String getPathForSchema() {
-//                return constructFilename() + "-schema.json";
-//            }
-//
-//            public String constructFilename() {
-//                String hostId= ""+VoltDB.instance().getHostMessenger().getHostId();
-//                if (m_batched) {
-//                    return m_uniquenames ?
-//                           m_dirContainingFiles.getPath() +
-//                           generation +
-//                           "-" +
-//                           tableName +
-//                           "-" +
-//                           hostId+
-//                           m_extension
-//                           :
-//                           m_dirContainingFiles.getPath() +
-//                           File.separator +
-//                           generation +
-//                           "-" +
-//                           tableName;
-//                }
-//                else {
-//                    return m_uniquenames ?
-//                            m_dirContainingFiles.getPath() +
-//                            File.separator +
-//                            m_nonce +
-//                            "-" +
-//                            generation +
-//                            "-" +
-//                            tableName +
-//                            "-" +
-//                            hostId+
-//                            m_extension
-//                            :
-//                            m_dirContainingFiles.getPath() +
-//                            File.separator +
-//                            m_nonce +
-//                            "-" +
-//                            generation +
-//                            "-" +
-//                            tableName;
-//                }
-//            }
 
             @Override
             public int compareTo(FileHandle obj) {

@@ -420,6 +420,34 @@ public class TestExportToFileClient extends ExportClientTestBase {
         assertEquals(2, retry);
     }
 
+    @Test
+    public void testFilenameValidity() throws Exception
+    {
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", Long.toString(System.currentTimeMillis()));
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("period", "1"); // 1 second rolling period
+        props.put("batched", "true");
+        props.put("with-schema", "true");
+        props.put("uniquenames", "true");
+        client.configure(props);
+
+        boolean validName = true;
+        final File dir = new File(m_dir);
+        final File[] subdirs = dir.listFiles();
+        if (subdirs != null) {
+            for (File file : subdirs) {
+                if (!file.getName().startsWith("active") && !(file.getName().contains("(") && file.getName().contains(")"))) {
+                    validName = false;
+                    break;
+                }
+            }
+        }
+        assertTrue(validName);
+    }
+
     void verifyContent(File f, long ts) throws IOException
     {
         assertEquals(String.format("\"%d\",\"%d\",\"%d\",\"0\",\"%d\",\"%d\",\"1\",\"2\",\"3\",\"4\",\"5.5\",\"1970-01-01 00:00:00.000\",\"xx\",\"88.000000000000\","
