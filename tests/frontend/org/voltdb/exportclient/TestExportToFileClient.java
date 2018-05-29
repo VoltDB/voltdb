@@ -456,18 +456,18 @@ public class TestExportToFileClient extends ExportClientTestBase {
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
 
-        List<File> allFiles = new ArrayList<>();
+        List<File> remainingFiles = new ArrayList<>();
         if (subdirs != null) {
             for (File file : subdirs) {
                 if (file.isDirectory()) {
-                    allFiles.addAll(Arrays.asList(file.listFiles()));
+                    remainingFiles.addAll(Arrays.asList(file.listFiles()));
                 }
                 else if (!(file.getName().contains("(") && file.getName().contains(")"))) {
                     validName = false;
                     break;
                 }
             }
-            for (File file : allFiles) {
+            for (File file : remainingFiles) {
                 System.out.println(file.getName());
                 if (!(file.getName().contains("(") && file.getName().contains(")"))) {
                     validName = false;
@@ -510,18 +510,18 @@ public class TestExportToFileClient extends ExportClientTestBase {
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
 
-        List<File> allFiles = new ArrayList<>();
+        List<File> remainingFiles = new ArrayList<>();
         if (subdirs != null) {
             for (File file : subdirs) {
                 if (file.isDirectory()) {
-                    allFiles.addAll(Arrays.asList(file.listFiles()));
+                    remainingFiles.addAll(Arrays.asList(file.listFiles()));
                 }
                 else if (file.getName().contains("(") || file.getName().contains(")")) {
                     validName = false;
                     break;
                 }
             }
-            for (File file : allFiles) {
+            for (File file : remainingFiles) {
                 System.out.println(file.getName());
                 if (file.getName().contains("(") || file.getName().contains(")")) {
                     validName = false;
