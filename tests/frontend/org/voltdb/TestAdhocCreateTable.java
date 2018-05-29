@@ -76,6 +76,45 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
                 threw = true;
             }
             assertTrue("Shouldn't have been able to create table FOO twice.", threw);
+
+            // make sure cannot create table with default value equals to minimum value
+            boolean threw_tinyint = false;
+            boolean threw_smallint = false;
+            boolean threw_int = false;
+            boolean threw_bigint = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table t (c tinyint default -128);");
+            }
+            catch (ProcCallException pce) {
+                threw_tinyint = true;
+            }
+
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table t (c smallint default -32768);");
+            }
+            catch (ProcCallException pce) {
+                threw_smallint = true;
+            }
+
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table t (c integer default -2147483648);");
+            }
+            catch (ProcCallException pce) {
+                threw_int = true;
+            }
+
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create table t (c bigint default -9223372036854775808);");
+            }
+            catch (ProcCallException pce) {
+                threw_bigint = true;
+            }
+            assertTrue("Create table with default minimum value will throw exception.",
+                    threw_tinyint && threw_smallint && threw_int && threw_bigint);
         }
         finally {
             teardownSystem();
