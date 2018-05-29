@@ -333,7 +333,11 @@ public class MpPromoteAlgo implements RepairAlgo
     VoltMessage createRepairMessage(Iv2RepairLogResponseMessage msg)
     {
         if (msg.getPayload() instanceof CompleteTransactionMessage) {
-            CompleteTransactionMessage message = (CompleteTransactionMessage)msg.getPayload();
+            CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg.getPayload();
+            // Repair log messages that originated from this host may still be in the scoreboard,
+            // so build a new message to avoid corrupting the scoreboard's reference.
+            CompleteTransactionMessage message = new CompleteTransactionMessage(ctm.getInitiatorHSId(),
+                    ctm.getCoordinatorHSId(), ctm);
             message.setForReplica(false);
             message.setRequireAck(false);
             message.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
