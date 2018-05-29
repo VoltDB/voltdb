@@ -421,7 +421,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
     }
 
     @Test
-    public void testFilenameValidity() throws Exception
+    public void testFilenameBatchedUnique() throws Exception
     {
         ExportToFileClient client = new ExportToFileClient();
         Properties props = new Properties();
@@ -430,50 +430,163 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("outdir", m_dir);
         props.put("period", "1"); // 1 second rolling period
         props.put("with-schema", "true");
+        props.put("batched", "true");
+        props.put("uniquenames", "true");
         client.configure(props);
+        final AdvertisedDataSource source = constructTestSource(false, 0);
+        final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
+
+        long l = System.currentTimeMillis();
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1,
+                /* partitioning column */ (short) 2,
+                3, 4, 5.5, 6, "xx", new BigDecimal(88),
+                GEOG_POINT, GEOG);
+        vtable.advanceRow();
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
+        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        decoder.onBlockStart(row);
+        decoder.processRow(row);
+        decoder.onBlockCompletion(row);
+
 
         boolean validName = true;
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
 
-        props.put("batched", "true");
-        props.put("uniquenames", "true");
         if (subdirs != null) {
             for (File file : subdirs) {
-                if (!file.getName().startsWith("active") && !(file.getName().contains("(") && file.getName().contains(")"))) {
+                System.out.println(file.getName());
+                if (!(file.getName().contains("(") && file.getName().contains(")"))) {
                     validName = false;
                     break;
                 }
             }
         }
-
+        assertTrue(validName);
+    }
+       @Test
+    public void testFilenameBatchedNotUnique() throws Exception
+    {
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", Long.toString(System.currentTimeMillis()));
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("period", "1"); // 1 second rolling period
+        props.put("with-schema", "true");
         props.put("batched", "true");
         props.put("uniquenames", "false");
+        client.configure(props);
+        final AdvertisedDataSource source = constructTestSource(false, 0);
+        final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
+
+        long l = System.currentTimeMillis();
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1,
+                /* partitioning column */ (short) 2,
+                3, 4, 5.5, 6, "xx", new BigDecimal(88),
+                GEOG_POINT, GEOG);
+        vtable.advanceRow();
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
+        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        decoder.onBlockStart(row);
+        decoder.processRow(row);
+        decoder.onBlockCompletion(row);
+
+        boolean validName = true;
+        final File dir = new File(m_dir);
+        final File[] subdirs = dir.listFiles();
+
         if (subdirs != null) {
             for (File file : subdirs) {
-                if (!file.getName().startsWith("active") && (file.getName().contains("(") || file.getName().contains(")"))) {
+                System.out.println(file.getName());
+                if (file.getName().contains("(") || file.getName().contains(")")) {
                     validName = false;
                     break;
                 }
             }
         }
-
+        assertTrue(validName);
+    }
+       @Test
+    public void testFilenameUnbatchedUnique() throws Exception
+    {
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", Long.toString(System.currentTimeMillis()));
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("period", "1"); // 1 second rolling period
+        props.put("with-schema", "true");
         props.put("batched", "false");
         props.put("uniquenames", "true");
+        client.configure(props);
+        final AdvertisedDataSource source = constructTestSource(false, 0);
+        final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
+
+        long l = System.currentTimeMillis();
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1,
+                /* partitioning column */ (short) 2,
+                3, 4, 5.5, 6, "xx", new BigDecimal(88),
+                GEOG_POINT, GEOG);
+        vtable.advanceRow();
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
+        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        decoder.onBlockStart(row);
+        decoder.processRow(row);
+        decoder.onBlockCompletion(row);
+
+
+        boolean validName = true;
+        final File dir = new File(m_dir);
+        final File[] subdirs = dir.listFiles();
+
         if (subdirs != null) {
             for (File file : subdirs) {
-                if (!file.getName().startsWith("active") && !(file.getName().contains("(") && file.getName().contains(")"))) {
+                System.out.println(file.getName());
+                if (!(file.getName().contains("(") && file.getName().contains(")"))) {
                     validName = false;
                     break;
                 }
             }
         }
-
+        assertTrue(validName);
+    }
+       @Test
+    public void testFilenameUnBatchedNotUnique() throws Exception
+    {
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", Long.toString(System.currentTimeMillis()));
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("period", "1"); // 1 second rolling period
+        props.put("with-schema", "true");
         props.put("batched", "false");
         props.put("uniquenames", "false");
+        client.configure(props);
+        final AdvertisedDataSource source = constructTestSource(false, 0);
+        final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
+
+        long l = System.currentTimeMillis();
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1,
+                /* partitioning column */ (short) 2,
+                3, 4, 5.5, 6, "xx", new BigDecimal(88),
+                GEOG_POINT, GEOG);
+        vtable.advanceRow();
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
+        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        decoder.onBlockStart(row);
+        decoder.processRow(row);
+        decoder.onBlockCompletion(row);
+
+        boolean validName = true;
+        final File dir = new File(m_dir);
+        final File[] subdirs = dir.listFiles();
+
         if (subdirs != null) {
             for (File file : subdirs) {
-                if (!file.getName().startsWith("active") && (file.getName().contains("(") || file.getName().contains(")"))) {
+                System.out.println(file.getName());
+                if (file.getName().contains("(") || file.getName().contains(")")) {
                     validName = false;
                     break;
                 }
