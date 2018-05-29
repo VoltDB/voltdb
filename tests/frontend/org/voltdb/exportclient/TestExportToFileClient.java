@@ -477,7 +477,8 @@ public class TestExportToFileClient extends ExportClientTestBase {
         }
         assertTrue(validName);
     }
-       @Test
+
+    @Test
     public void testFilenameBatchedNotUnique() throws Exception
     {
         ExportToFileClient client = new ExportToFileClient();
@@ -530,7 +531,8 @@ public class TestExportToFileClient extends ExportClientTestBase {
         }
         assertTrue(validName);
     }
-       @Test
+
+    @Test
     public void testFilenameUnbatchedUnique() throws Exception
     {
         ExportToFileClient client = new ExportToFileClient();
@@ -574,7 +576,8 @@ public class TestExportToFileClient extends ExportClientTestBase {
         }
         assertTrue(validName);
     }
-       @Test
+
+    @Test
     public void testFilenameUnBatchedNotUnique() throws Exception
     {
         ExportToFileClient client = new ExportToFileClient();
