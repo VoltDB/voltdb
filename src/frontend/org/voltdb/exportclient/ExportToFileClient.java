@@ -178,7 +178,7 @@ public class ExportToFileClient extends ExportClientBase {
                 this.generation = generation;
                 this.creationTime = System.currentTimeMillis();
             }
-            
+
             String getPathUtility(String extension, String hostId, String prefix) {
                 String res = "";
                 if(m_batched) {
@@ -189,18 +189,8 @@ public class ExportToFileClient extends ExportClientBase {
                           tableName +
                           hostId +
                           extension;
-                } else if(extension.equals("-schema.json")){
-                    res = m_dirContainingFiles.getPath() +
-                          File.separator +
-                          m_nonce +
-                          "-" +
-                          generation +
-                          "-" +
-                          tableName +
-                          "-" +
-                          hostId +
-                          extension;
-                } else {
+                }
+                else {
                     res = m_dirContainingFiles.getPath() +
                           File.separator +
                           prefix +
