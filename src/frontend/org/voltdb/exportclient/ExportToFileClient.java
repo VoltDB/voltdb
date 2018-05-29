@@ -210,7 +210,7 @@ public class ExportToFileClient extends ExportClientBase {
             String getPath(String prefix) {
                 String hostId = "";
                 if(m_uniquenames) {
-                    hostId= "-("+VoltDB.instance().getHostMessenger().getHostId()+")";
+                    hostId = "-("+VoltDB.instance().getHostMessenger().getHostId()+")";
                 }
                 return getPathUtility(m_extension, hostId, prefix);
             }
@@ -218,7 +218,7 @@ public class ExportToFileClient extends ExportClientBase {
             String getPathForSchema() {
                 String hostId = "";
                 if(m_uniquenames) {
-                    hostId= "-("+VoltDB.instance().getHostMessenger().getHostId()+")";
+                    hostId = "-("+VoltDB.instance().getHostMessenger().getHostId()+")";
                 }
                 return getPathUtility("-schema.json", hostId, "");
             }
