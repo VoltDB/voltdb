@@ -198,7 +198,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
 
     /**
      * Convert Scan's predicate (condition) to VoltDB AbstractExpressions
-     * 
+     *
      * @param scan
      * @return
      */

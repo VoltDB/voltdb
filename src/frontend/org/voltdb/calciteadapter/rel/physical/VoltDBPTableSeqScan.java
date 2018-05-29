@@ -38,7 +38,7 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
 
     /**
-     * 
+     *
      * @param cluster
      * @param traitSet
      * @param table
@@ -62,7 +62,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
     }
 
     /**
-     * 
+     *
      * @param cluster
      * @param traitSet
      * @param table

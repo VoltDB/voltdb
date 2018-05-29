@@ -19,6 +19,7 @@ package org.voltdb.calciteadapter.rules.inlining;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPTableScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
@@ -27,8 +28,13 @@ import org.voltdb.calciteadapter.rel.physical.VoltDBPSerialAggregate;
 
 public class VoltDBPLimitScanMergeRule extends RelOptRule {
 
-    public static final VoltDBPLimitScanMergeRule INSTANCE_1 = new VoltDBPLimitScanMergeRule(false);
-    public static final VoltDBPLimitScanMergeRule INSTANCE_2 = new VoltDBPLimitScanMergeRule(true);
+    public static final VoltDBPLimitScanMergeRule INSTANCE_1 =
+            new VoltDBPLimitScanMergeRule(operand(VoltDBPLimit.class,
+                                            operand(VoltDBPCalc.class,
+                                                    operand(AbstractVoltDBPTableScan.class, none()))));
+    public static final VoltDBPLimitScanMergeRule INSTANCE_2 =
+            new VoltDBPLimitScanMergeRule(operand(VoltDBPLimit.class,
+                    operand(AbstractVoltDBPTableScan.class, none())));
 
     /**
      * Transform  VoltDBPLimit / AbstractVoltDBPTableScan to AbstractVoltDBPTableScan with Limit
@@ -36,13 +42,8 @@ public class VoltDBPLimitScanMergeRule extends RelOptRule {
      * If a scan has already inline aggregate, the LIMIT can be inlined only if it is the serial aggregate.
      * The Hash aggregate requires a full scan.
      */
-    private VoltDBPLimitScanMergeRule(boolean hasCacl) {
-        super(operand(VoltDBPLimit.class,
-                (hasCacl) ?
-                        operand(VoltDBPCalc.class,
-                                operand(AbstractVoltDBPTableScan.class, none())) :
-                        operand(AbstractVoltDBPTableScan.class, none())
-                                ));
+    private VoltDBPLimitScanMergeRule(RelOptRuleOperand operand) {
+        super(operand);
     }
 
     @Override

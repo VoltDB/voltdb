@@ -87,7 +87,15 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             RelMetadataQuery mq) {
         double rowCount = getInput().estimateRowCount(mq);
         RelTrait aggrCollationTrait = traitSet.getTrait(RelCollationTraitDef.INSTANCE);
-        // @TODO Give a discount to Serial Aggregation based on the numer of collation fields
+        // Give a discount to the Aggregate based on the number of the collation fields.
+        //  - Hash Aggregate - zero columns and zero discount
+        //  - Serial Aggregate - the collation size is equal to the number of the GROUP BY columns
+        //          and max discount 1 - 0.1 -  0.01 - 0.001 - ...
+        //  - Partial Aggregate - anything in between
+        // The required order will be enforced by some index which collation would match / satisfy
+        // the aggregate's collation. If a table has more than one index multiple Aggregate / IndexScan
+        // combinations are possible and we want to pick the one that has the maximum GROUP BY columns
+        // covered resulting in a more efficient aggregation (less hashing)
         if (aggrCollationTrait instanceof RelCollation) {
             RelCollation aggrCollation = (RelCollation) aggrCollationTrait;
             double discountFactor = 1.0;

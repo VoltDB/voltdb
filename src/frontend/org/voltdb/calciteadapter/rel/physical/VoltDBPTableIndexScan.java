@@ -50,7 +50,7 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
     private final AccessPath m_accessPath;
 
     /**
-     * 
+     *
      * @param cluster
      * @param traitSet
      * @param table
