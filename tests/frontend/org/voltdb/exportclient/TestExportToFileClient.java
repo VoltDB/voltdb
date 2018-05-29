@@ -435,7 +435,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         boolean validName = true;
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
-        
+
         props.put("batched", "true");
         props.put("uniquenames", "true");
         if (subdirs != null) {
@@ -446,7 +446,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 }
             }
         }
-        
+
         props.put("batched", "true");
         props.put("uniquenames", "false");
         if (subdirs != null) {
@@ -457,7 +457,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 }
             }
         }
-        
+
         props.put("batched", "false");
         props.put("uniquenames", "true");
         if (subdirs != null) {
@@ -468,7 +468,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 }
             }
         }
-        
+
         props.put("batched", "false");
         props.put("uniquenames", "false");
         if (subdirs != null) {
@@ -479,7 +479,6 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 }
             }
         }
-        
         assertTrue(validName);
     }
 
