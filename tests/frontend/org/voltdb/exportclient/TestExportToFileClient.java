@@ -429,14 +429,15 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("type", "csv");
         props.put("outdir", m_dir);
         props.put("period", "1"); // 1 second rolling period
-        props.put("batched", "true");
         props.put("with-schema", "true");
-        props.put("uniquenames", "true");
         client.configure(props);
 
         boolean validName = true;
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
+        
+        props.put("batched", "true");
+        props.put("uniquenames", "true");
         if (subdirs != null) {
             for (File file : subdirs) {
                 if (!file.getName().startsWith("active") && !(file.getName().contains("(") && file.getName().contains(")"))) {
@@ -445,6 +446,40 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 }
             }
         }
+        
+        props.put("batched", "true");
+        props.put("uniquenames", "false");
+        if (subdirs != null) {
+            for (File file : subdirs) {
+                if (!file.getName().startsWith("active") && (file.getName().contains("(") || file.getName().contains(")"))) {
+                    validName = false;
+                    break;
+                }
+            }
+        }
+        
+        props.put("batched", "false");
+        props.put("uniquenames", "true");
+        if (subdirs != null) {
+            for (File file : subdirs) {
+                if (!file.getName().startsWith("active") && !(file.getName().contains("(") && file.getName().contains(")"))) {
+                    validName = false;
+                    break;
+                }
+            }
+        }
+        
+        props.put("batched", "false");
+        props.put("uniquenames", "false");
+        if (subdirs != null) {
+            for (File file : subdirs) {
+                if (!file.getName().startsWith("active") && (file.getName().contains("(") || file.getName().contains(")"))) {
+                    validName = false;
+                    break;
+                }
+            }
+        }
+        
         assertTrue(validName);
     }
 
