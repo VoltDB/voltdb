@@ -91,7 +91,8 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
                     assertTrue(pce.getMessage().contains("data exception: numeric value out of range"));
                     threw = true;
                 }
-                assertTrue("Create table with default minimum value will throw exception.", threw);
+                assertTrue("Creating numeric table column using the reserved minimum value as "
+                        + "default should throw an exception.", threw);
             }
         }
         finally {
