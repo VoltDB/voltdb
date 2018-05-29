@@ -78,43 +78,20 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
             assertTrue("Shouldn't have been able to create table FOO twice.", threw);
 
             // make sure cannot create table with default value equals to minimum value
-            boolean threw_tinyint = false;
-            boolean threw_smallint = false;
-            boolean threw_int = false;
-            boolean threw_bigint = false;
-            try {
-                m_client.callProcedure("@AdHoc",
-                        "create table t (c tinyint default -128);");
-            }
-            catch (ProcCallException pce) {
-                threw_tinyint = true;
-            }
+            String[] testType = {"tinyint", "smallint", "integer", "bigint"};
+            String[] minVal = {"-128", "-32768", "-2147483648", "-9223372036854775808"};
 
-            try {
-                m_client.callProcedure("@AdHoc",
-                        "create table t (c smallint default -32768);");
+            for (int i = 0; i < 4; i++) {
+                threw = false;
+                try {
+                    m_client.callProcedure("@AdHoc",
+                            "create table t (c " + testType[i] + " default " + minVal[i] + " );");
+                }
+                catch (ProcCallException pce) {
+                    threw = true;
+                }
+                assertTrue("Create table with default minimum value will throw exception.", threw);
             }
-            catch (ProcCallException pce) {
-                threw_smallint = true;
-            }
-
-            try {
-                m_client.callProcedure("@AdHoc",
-                        "create table t (c integer default -2147483648);");
-            }
-            catch (ProcCallException pce) {
-                threw_int = true;
-            }
-
-            try {
-                m_client.callProcedure("@AdHoc",
-                        "create table t (c bigint default -9223372036854775808);");
-            }
-            catch (ProcCallException pce) {
-                threw_bigint = true;
-            }
-            assertTrue("Create table with default minimum value will throw exception.",
-                    threw_tinyint && threw_smallint && threw_int && threw_bigint);
         }
         finally {
             teardownSystem();
