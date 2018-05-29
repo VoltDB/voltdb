@@ -280,11 +280,7 @@ public class ExportToFileClient extends ExportClientBase {
 
         String getPathOfBatchDir(String prefix) {
             assert(m_batched);
-            String hostId = "";
-            if(m_uniquenames) {
-                hostId = "-("+VoltDB.instance().getHostMessenger().getHostId()+")";
-            }
-            return m_outDir.getPath() + File.separator + prefix + m_nonce + "-" + m_dateformat.get().format(start) + hostId;
+            return m_outDir.getPath() + File.separator + prefix + m_nonce + "-" + m_dateformat.get().format(start);
         }
 
         /**

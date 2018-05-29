@@ -462,14 +462,13 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 if (file.isDirectory()) {
                     remainingFiles.addAll(Arrays.asList(file.listFiles()));
                 }
-                else if (!(file.getName().contains("(") && file.getName().contains(")"))) {
+                else if (!file.getName().matches("\\d\\-mytable\\-\\(\\d\\).*\\.[a-z]{3,4}")) {
                     validName = false;
                     break;
                 }
             }
             for (File file : remainingFiles) {
-                System.out.println(file.getName());
-                if (!(file.getName().contains("(") && file.getName().contains(")"))) {
+                if (!file.getName().matches("\\d\\-mytable\\-\\(\\d\\).*\\.[a-z]{3,4}")) {
                     validName = false;
                     break;
                 }
@@ -516,14 +515,14 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 if (file.isDirectory()) {
                     remainingFiles.addAll(Arrays.asList(file.listFiles()));
                 }
-                else if (file.getName().contains("(") || file.getName().contains(")")) {
+                else if (!file.getName().matches("\\d\\-mytable.*\\.[a-z]{3,4}")) {
                     validName = false;
                     break;
                 }
             }
             for (File file : remainingFiles) {
-                System.out.println(file.getName());
-                if (file.getName().contains("(") || file.getName().contains(")")) {
+                if (!file.getName().matches("\\d\\-mytable.*\\.[a-z]{3,4}")) {
+                    System.out.println(file.getName());
                     validName = false;
                     break;
                 }
@@ -567,8 +566,8 @@ public class TestExportToFileClient extends ExportClientTestBase {
 
         if (subdirs != null) {
             for (File file : subdirs) {
-                System.out.println(file.getName());
-                if (!(file.getName().contains("(") && file.getName().contains(")"))) {
+                if (!file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+\\-\\(\\d\\).*\\.[a-z]{3,4}")) {
+                    System.out.println(file.getName());
                     validName = false;
                     break;
                 }
@@ -611,8 +610,8 @@ public class TestExportToFileClient extends ExportClientTestBase {
 
         if (subdirs != null) {
             for (File file : subdirs) {
-                System.out.println(file.getName());
-                if (file.getName().contains("(") || file.getName().contains(")")) {
+                if (!file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+.*\\.[a-z]{3,4}")) {
+                    System.out.println(file.getName());
                     validName = false;
                     break;
                 }
