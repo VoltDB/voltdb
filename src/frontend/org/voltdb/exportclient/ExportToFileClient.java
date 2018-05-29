@@ -626,7 +626,6 @@ public class ExportToFileClient extends ExportClientBase {
                         m_writer = m_firstBlockTask.get();
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
                     // if writeSchema or getWriter method fails, it will throw IOException
                     // try reset writer and restart the block
                     if (e.getCause() instanceof IOException) {
