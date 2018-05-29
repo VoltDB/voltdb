@@ -35,6 +35,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -453,8 +456,18 @@ public class TestExportToFileClient extends ExportClientTestBase {
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
 
+        List<File> allFiles = new ArrayList<>();
         if (subdirs != null) {
             for (File file : subdirs) {
+                if (file.isDirectory()) {
+                    allFiles.addAll(Arrays.asList(file.listFiles()));
+                }
+                else if (!(file.getName().contains("(") && file.getName().contains(")"))) {
+                    validName = false;
+                    break;
+                }
+            }
+            for (File file : allFiles) {
                 System.out.println(file.getName());
                 if (!(file.getName().contains("(") && file.getName().contains(")"))) {
                     validName = false;
@@ -496,8 +509,18 @@ public class TestExportToFileClient extends ExportClientTestBase {
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
 
+        List<File> allFiles = new ArrayList<>();
         if (subdirs != null) {
             for (File file : subdirs) {
+                if (file.isDirectory()) {
+                    allFiles.addAll(Arrays.asList(file.listFiles()));
+                }
+                else if (file.getName().contains("(") || file.getName().contains(")")) {
+                    validName = false;
+                    break;
+                }
+            }
+            for (File file : allFiles) {
                 System.out.println(file.getName());
                 if (file.getName().contains("(") || file.getName().contains(")")) {
                     validName = false;
