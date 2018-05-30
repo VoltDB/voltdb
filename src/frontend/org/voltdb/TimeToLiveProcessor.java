@@ -146,11 +146,13 @@ public class TimeToLiveProcessor extends StatsSource{
         final ClientInterface cl;
         final TTLStats stats;
         AtomicBoolean canceled = new AtomicBoolean(false);
-        public TTLTask(String table, TimeToLive timeToLive, ClientInterface clientInterface, TTLStats ttlStats) {
+        final int m_hostId;
+        public TTLTask(String table, TimeToLive timeToLive, ClientInterface clientInterface, TTLStats ttlStats, int hostId) {
             tableName = table;
             ttlRef = new AtomicReference<>(timeToLive);
             cl= clientInterface;
             stats = ttlStats;
+            m_hostId = hostId;
         }
         @Override
         public void run() {
@@ -159,7 +161,7 @@ public class TimeToLiveProcessor extends StatsSource{
                 cl.runTimeToLive(tableName, ttl.getTtlcolumn().getName(),
                         transformValue(ttl), CHUNK_SIZE, TIMEOUT, stats);
                 if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("Executing ttl on table " + tableName);
+                    hostLog.debug("Executing ttl on table " + tableName +  " host:" + m_hostId);
                 }
             }
         }
@@ -243,6 +245,9 @@ public class TimeToLiveProcessor extends StatsSource{
         if (m_timeToLiveExecutor == null && !ttlTables.isEmpty()) {
             m_timeToLiveExecutor = CoreUtils.getScheduledThreadPoolExecutor("TimeToLive", 1, CoreUtils.SMALL_STACK_SIZE);
             m_timeToLiveExecutor.setRemoveOnCancelPolicy(true);
+
+            //initialize stats
+            readTTLStats();
         }
 
         //remove dropped TTL tasks
@@ -277,10 +282,13 @@ public class TimeToLiveProcessor extends StatsSource{
             }
             TTLTask task = m_tasks.get(t.getTypeName());
             if (task == null) {
-                TTLStats stats = new TTLStats(t.getTypeName());
-                task = new TTLTask(t.getTypeName(), ttl, m_interface, stats);
+                TTLStats stats = m_stats.get(t.getTypeName());
+                if (stats == null) {
+                    stats = new TTLStats(t.getTypeName());
+                    m_stats.put(t.getTypeName(), stats);
+                }
+                task = new TTLTask(t.getTypeName(), ttl, m_interface, stats, m_hostId);
                 m_tasks.put(t.getTypeName(), task);
-                m_stats.put(t.getTypeName(), stats);
                 m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY, INTERVAL, TimeUnit.SECONDS));
                 createTTLStatsNode(stats);
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));
