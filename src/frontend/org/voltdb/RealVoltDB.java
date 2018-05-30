@@ -2892,7 +2892,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sslContextFactory.setKeyStorePassword(keyStorePassword);
 
         String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-        if (m_config.m_startAction != StartAction.PROBE || !trustStorePath.equals("")) {
+        if (m_config.m_startAction != StartAction.PROBE || trustStorePath == null) {
             if (m_config.m_sslEnable) {
                 trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
             }
