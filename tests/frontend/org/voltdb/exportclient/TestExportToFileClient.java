@@ -456,19 +456,18 @@ public class TestExportToFileClient extends ExportClientTestBase {
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
 
-        List<File> remainingFiles = new ArrayList<>();
+        List<File> allFiles = new ArrayList<>();
         if (subdirs != null) {
             for (File file : subdirs) {
                 if (file.isDirectory()) {
-                    remainingFiles.addAll(Arrays.asList(file.listFiles()));
+                    allFiles.addAll(Arrays.asList(file.listFiles()));
                 }
-                else if (!file.getName().matches("\\d\\-mytable\\-\\(\\d\\).*\\.[a-z]{3,4}")) {
-                    validName = false;
-                    break;
+                else {
+                    allFiles.add(file);
                 }
             }
-            for (File file : remainingFiles) {
-                if (!file.getName().matches("\\d\\-mytable\\-\\(\\d\\).*\\.[a-z]{3,4}")) {
+            for (File file : allFiles) {
+                if (!(file.getName().matches("\\d\\-mytable\\-\\(\\d\\)\\.[a-z]{3}")||file.getName().matches("\\d\\-mytable\\-\\(\\d\\)-schema\\.json"))) {
                     validName = false;
                     break;
                 }
@@ -509,20 +508,18 @@ public class TestExportToFileClient extends ExportClientTestBase {
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
 
-        List<File> remainingFiles = new ArrayList<>();
+        List<File> allFiles = new ArrayList<>();
         if (subdirs != null) {
             for (File file : subdirs) {
                 if (file.isDirectory()) {
-                    remainingFiles.addAll(Arrays.asList(file.listFiles()));
+                    allFiles.addAll(Arrays.asList(file.listFiles()));
                 }
-                else if (!file.getName().matches("\\d\\-mytable.*\\.[a-z]{3,4}")) {
-                    validName = false;
-                    break;
+                else {
+                    allFiles.add(file);
                 }
             }
-            for (File file : remainingFiles) {
-                if (!file.getName().matches("\\d\\-mytable.*\\.[a-z]{3,4}")) {
-                    System.out.println(file.getName());
+            for (File file : allFiles) {
+                if (!(file.getName().matches("\\d\\-mytable\\.[a-z]{3}") || file.getName().matches("\\d\\-mytable-schema\\.json"))) {
                     validName = false;
                     break;
                 }
@@ -566,8 +563,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
 
         if (subdirs != null) {
             for (File file : subdirs) {
-                if (!file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+\\-\\(\\d\\).*\\.[a-z]{3,4}")) {
-                    System.out.println(file.getName());
+                if (!(file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+\\-\\(\\d\\)\\.[a-z]{3}") || file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+\\-\\(\\d\\)-schema\\.json"))) {
                     validName = false;
                     break;
                 }
@@ -610,8 +606,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
 
         if (subdirs != null) {
             for (File file : subdirs) {
-                if (!file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+.*\\.[a-z]{3,4}")) {
-                    System.out.println(file.getName());
+                if (!(file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+\\.[a-z]{3}") || file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+-schema\\.json"))) {
                     validName = false;
                     break;
                 }
