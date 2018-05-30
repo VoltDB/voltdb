@@ -829,7 +829,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (m_licenseApi.isPro()) edition = "Pro Edition";
                     if (m_licenseApi.isEnterpriseTrial()) edition = "Enterprise Edition";
                     if (m_licenseApi.isProTrial()) edition = "Pro Edition";
-                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
+                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Edition";
                 }
 
                 // this also prints out the license type on the console
