@@ -2892,25 +2892,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sslContextFactory.setKeyStorePassword(keyStorePassword);
 
         String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-        if (m_config.m_sslEnable) {
-            trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
-        }
-        if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
-            throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
-        }
-        if (! new File(trustStorePath).exists()) {
-            throw new IllegalArgumentException("The specified SSL truststore file " + trustStorePath + " was not found.");
-        }
-        sslContextFactory.setTrustStorePath(trustStorePath);
+        if (m_config.m_startAction != StartAction.PROBE || !trustStorePath.equals("")) {
+            if (m_config.m_sslEnable) {
+                trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
+            }
+            if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
+                throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
+            }
+            if (! new File(trustStorePath).exists()) {
+                throw new IllegalArgumentException("The specified SSL truststore file " + trustStorePath + " was not found.");
+            }
+            sslContextFactory.setTrustStorePath(trustStorePath);
 
-        String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
-        if (m_config.m_sslEnable && null == trustStorePassword) {
-            trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+            String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
+            if (m_config.m_sslEnable && null == trustStorePassword) {
+                trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+            }
+            if (trustStorePassword == null) {
+                throw new IllegalArgumentException("An SSL truststore password was not specified.");
+            }
+            sslContextFactory.setTrustStorePassword(trustStorePassword);
         }
-        if (trustStorePassword == null) {
-            throw new IllegalArgumentException("An SSL truststore password was not specified.");
-        }
-        sslContextFactory.setTrustStorePassword(trustStorePassword);
         // exclude weak ciphers
         sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
                 "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
