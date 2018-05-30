@@ -2893,7 +2893,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
         if (m_config.m_sslEnable) {
-            trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
+            trustStorePath = null == trustStorePath  ? keyStorePath:getResourcePath(trustStorePath);
         }
         if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
             throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
@@ -2906,6 +2906,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
         if (m_config.m_sslEnable && null == trustStorePassword) {
             trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+            if (trustStorePath.equals(keyStorePath)) {
+                trustStorePassword = keyStorePassword;
+            }
         }
         if (trustStorePassword == null) {
             throw new IllegalArgumentException("An SSL truststore password was not specified.");
