@@ -69,6 +69,45 @@ public class NodeSchema implements Iterable<SchemaColumn> {
         m_columnsMapHelper = new TreeMap<>(BY_NAME);
     }
 
+    // Substitute table name only for all schema columns and map entries
+    public NodeSchema resetTableName(String tbName, String tbAlias) {
+       for(SchemaColumn sc : m_columns) {
+          sc.reset(tbName, tbAlias, sc.getColumnName(), sc.getColumnAlias());
+       }
+       for(Map.Entry<SchemaColumn, Integer> it : m_columnsMapHelper.entrySet()) {
+          it.getKey().reset(tbName, tbAlias, it.getKey().getColumnName(), it.getKey().getColumnAlias());
+       }
+       return this;
+    }
+
+    // Substitute column name with matching key to new value
+    public NodeSchema updateColNames(Map<String, String> m) {
+       for (SchemaColumn sc : m_columns) {
+          if (m.containsKey(sc.getColumnName())) {
+             sc.reset(sc.getTableName(), sc.getTableAlias(), m.get(sc.getColumnName()), sc.getColumnAlias());
+          }
+       }
+       for(Map.Entry<SchemaColumn, Integer> it : m_columnsMapHelper.entrySet()) {
+          SchemaColumn sc = it.getKey();
+          if(m.containsKey(sc.getColumnName())) {
+             it.getKey().reset(sc.getTableName(), sc.getTableAlias(), m.get(sc.getColumnName()), sc.getColumnAlias());
+          }
+       }
+       return this;
+    }
+
+    // Change any non-TupleValueExpression typed AbstractExpressions to TupleValueExpressions
+    public NodeSchema toTVE() {
+       NodeSchema ns = copyAndReplaceWithTVE();
+       m_columns.clear();
+       m_columnsMapHelper.clear();
+       for (int indx = 0; indx < ns.size(); ++indx) {
+          ns.getColumn(indx).setDifferentiator(indx);
+          addColumn(ns.getColumn(indx));
+       }
+       return this;
+    }
+
     /**
      * Add a column to this schema.
      *

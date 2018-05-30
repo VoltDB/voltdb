@@ -17,16 +17,7 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
@@ -49,6 +40,7 @@ import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtCommonTableScanShared;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.planner.parseinfo.TableLeafNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
@@ -170,6 +162,53 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     public ParsedSelectStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
         super(parent, paramValues, db);
+    }
+
+    // update table names, convert all expressions to TupleValueExpressions, and also update each expression's
+    // table names.
+    public static List<ParsedColInfo> updateTableNames(List<ParsedColInfo> src, String tblName, String tblAlias) {
+       for (int indx = 0; indx < src.size(); ++indx) {
+          src.get(indx).updateTableName(tblName, tblAlias).toTVE(indx);
+       }
+       return src;
+    }
+
+    // Substitute column name with matching key to new value
+    public static List<ParsedColInfo> updateColNames(List<ParsedColInfo> src, Map<String, String> m) {
+       for (ParsedColInfo ci : src) {
+          if (m.containsKey(ci.columnName)) {
+             ci.columnName = m.get(ci.columnName);
+          }
+       }
+       return src;
+    }
+
+    // Updates miscellaneous fields as part of rewriting as materialized view.
+    public ParsedSelectStmt rewriteAsMV(Table view) {
+       m_groupByColumns.clear();
+       m_distinctGroupByColumns = null;
+       m_groupByExpressions.clear();
+       m_distinctProjectSchema = null;
+       m_distinct = false;
+       m_hasAggregateExpression = false;
+       // Resets paramsBy* used by filtering, assuming that it's equivalent to "SELECT * from MV".
+       setParamsByIndex(new TreeMap<>());
+       m_paramsById = new HashMap<>();
+       m_paramValues = null;
+       m_sql = "SELECT * FROM " + view.getTypeName();   // TODO: need to overwrite SQL query?
+       m_tableList.clear();
+       m_tableList.add(view);
+       // update m_tableAliasMap
+       m_tableAliasMap.clear();
+       StmtTargetTableScan st = new StmtTargetTableScan(view);
+       for (ParsedColInfo ci : m_displayColumns) {      // populate m_TableAliasMap[].m_scanColumnList
+          st.resolveTVE((TupleValueExpression)(ci.expression));
+       }
+       defineTableScanByAlias(view.getTypeName(), st);
+       m_tableAliasListAsJoinOrder.clear();
+       m_tableAliasListAsJoinOrder.add(view.getTypeName());
+       m_joinTree = new TableLeafNode(0, null, null, st);
+       return this;
     }
 
     @Override

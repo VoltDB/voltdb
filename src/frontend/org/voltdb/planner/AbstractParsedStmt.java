@@ -104,13 +104,13 @@ public abstract class AbstractParsedStmt {
     // User specified join order, null if none is specified
     public String m_joinOrder = null;
 
-    private final HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<>();
+    protected final HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<>();
 
     // This list is used to identify the order of the table aliases returned by
     // the parser for possible use as a default join order.
     protected ArrayList<String> m_tableAliasListAsJoinOrder = new ArrayList<>();
 
-    protected final String[] m_paramValues;
+    protected String[] m_paramValues;
     public final Database m_db;
 
     // Parent statement if any

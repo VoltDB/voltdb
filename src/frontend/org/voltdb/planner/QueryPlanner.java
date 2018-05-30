@@ -17,31 +17,33 @@
 
 package org.voltdb.planner;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
+import javafx.util.Pair;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Constraint;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.compiler.MaterializedViewProcessor;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractReceivePlanNode;
-import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.*;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.ExpressionType;
 
 /**
  * The query planner accepts catalog data, SQL statements from the catalog, then
@@ -262,7 +264,7 @@ public class QueryPlanner implements AutoCloseable {
         return m_paramzInfo.getParamLiteralValues();
     }
 
-    public ParameterSet extractedParamValues(VoltType[] parameterTypes) throws Exception {
+    public ParameterSet extractedParamValues(VoltType[] parameterTypes) {
         if (m_paramzInfo == null) {
             return null;
         }
@@ -321,6 +323,64 @@ public class QueryPlanner implements AutoCloseable {
         }
 
         return plan;
+    }
+
+    private static boolean gbyMatches(ParsedSelectStmt stmt, MaterializedViewInfo mv) {
+        Iterable<ColumnRef> crMvGB_Iterable = () -> mv.getGroupbycols().iterator();
+        Iterable<Column> mvCols_Iterable = () -> mv.getDest().getColumns().iterator();
+        List<ParsedColInfo> gbySel = stmt.groupByColumns();
+        return !gbySel.isEmpty() &&              // select statement contains group-by column,
+                // those group-by-columns' table is MV's source table,
+                gbySel.get(0).tableName.equals(mv.getDest().getMaterializer().getTypeName()) &&
+                // and those group-by-column's columns are same as MV's group-by columns
+                gbySel.stream().map(it -> it.columnName).collect(Collectors.toSet())  /// select stmt's group-by column names
+                        .equals(StreamSupport.stream(crMvGB_Iterable.spliterator(), false)
+                                .map(cr -> cr.getColumn().getTypeName()).collect(Collectors.toSet())) &&
+                // and each column's aggregation type match, in the sense of set equality
+                StreamSupport.stream(mvCols_Iterable.spliterator(), false)
+                        .map(col -> {
+                            Column matCol = col.getMatviewsource();
+                            int colIndx = matCol == null ? -1 : matCol.getIndex();
+                            return new Pair<>(col.getAggregatetype(), colIndx);
+                        })
+                        .collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue()))
+                        .equals(stmt.displayColumns().stream()
+                                .map(ci -> {
+                                    if (ci.expression instanceof AggregateExpression) {
+                                        AggregateExpression ag = (AggregateExpression)ci.expression;
+                                        AbstractExpression left = ag.getLeft();
+                                        return new Pair<>(ag.getExpressionType().getValue(), // aggregation type value
+                                                left == null ?   // aggregate on what? For simple column, it contains column index; for "count(*)", set to -1.
+                                                        -1 : ((TupleValueExpression)left).getColumnIndex());
+                                    } else {    // otherwise, it's either column or distinct column
+                                        assert(ci.expression instanceof TupleValueExpression);
+                                        return new Pair<>(ExpressionType.VALUE_TUPLE.getValue(),
+                                                ((TupleValueExpression)ci.expression).getColumnIndex());
+                                    }
+                                })
+                                .collect(Collectors.toMap(p -> p.getKey(), p -> p.getValue())));
+    }
+
+    // returns all materialized view info => view table from table list
+    private static Map<MaterializedViewInfo, Table> getMviAndViews(List<Table> tbls) {
+        Map<MaterializedViewInfo, Table> map = new HashMap<>();
+        for(Table tbl : tbls) {
+            for (MaterializedViewInfo mv : tbl.getViews()) {
+                map.put(mv, mv.getDest());
+            }
+        }
+        return map;
+    }
+
+    // Get the map of view column name -> real table column name.
+    // The view column name is column alias when creating view.
+    private static HashMap<String, String> getViewColumnNameMaps(Table view) {
+        HashMap<String, String> map = new HashMap<>();
+        for (Column c : view.getColumns()) {
+            if(c.getMatviewsource() != null)
+                map.put(c.getMatviewsource().getTypeName(), c.getTypeName());
+        }
+        return map;
     }
 
     /**
@@ -409,7 +469,33 @@ public class QueryPlanner implements AutoCloseable {
                 return null;
             }
         }
-
+        if(parsedStmt instanceof ParsedSelectStmt && ((ParsedSelectStmt) parsedStmt).isGrouped()) {
+            ParsedSelectStmt stmt = (ParsedSelectStmt) parsedStmt;
+            // if multiple views exists on the same table:
+            // first filter by view column: should match stmt display columns arity;
+            // then the view's gby columns set should match select stmt's group-by columns.
+            final Set<MaterializedViewInfo> views = getMviAndViews(stmt.m_tableList)
+                    .entrySet().stream()
+                    .filter(pair -> pair.getValue().getColumns().size() == stmt.m_displayColumns.size() &&
+                            gbyMatches(stmt, pair.getKey()))
+                    .map(p -> p.getKey())
+                    .collect(Collectors.toSet());
+            if (views.size() == 1) {
+                MaterializedViewInfo mvi = views.iterator().next();
+                Table view = mvi.getDest();
+                final String viewName = view.getTypeName();
+                Map<String, String> colSubs = getViewColumnNameMaps(view);
+                stmt.getFinalProjectionSchema()
+                        .resetTableName(viewName, viewName)
+                        .updateColNames(colSubs)
+                        .toTVE();
+                stmt.updateTableNames(stmt.m_aggResultColumns, viewName, viewName);
+                stmt.updateColNames(stmt.m_aggResultColumns, colSubs);
+                stmt.updateTableNames(stmt.m_displayColumns, viewName, viewName);
+                stmt.updateColNames(stmt.m_displayColumns, colSubs);
+                stmt.rewriteAsMV(view);
+            }
+        }
         m_planSelector.outputParsedStatement(parsedStmt);
 
         if (m_isLargeQuery) {

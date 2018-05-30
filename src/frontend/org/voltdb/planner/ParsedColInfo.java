@@ -83,6 +83,22 @@ public class ParsedColInfo implements Cloneable {
         return fromOrderByXml(parsedStmt, orderByXml, adjuster);
     }
 
+    public ParsedColInfo updateTableName(String tblName, String tblAlias) {
+       tableName = tblName;
+       tableAlias = tblAlias;
+       return this;
+    }
+
+    // Convert any non-TupleValueExpression, i.e. AggregateExpression to TupleValueExpression,
+    // and syncs with (table/column) * (name/alias).
+    public ParsedColInfo toTVE(int diff) {
+       TupleValueExpression exp = new TupleValueExpression(tableName, tableAlias,
+             columnName, alias, expression, index);
+       exp.setDifferentiator(diff);
+       expression = exp;
+       return this;
+    }
+
     /** Construct a ParsedColInfo from Volt XML.
      *  Allow caller to specify actions to finalize the parsed expression.
      */
