@@ -77,11 +77,12 @@ public class ExplainProc extends AdHocNTBase {
                         "Procedure " + procName + " not in catalog");
             }
 
-            vt[i] = new VoltTable(new VoltTable.ColumnInfo("SQL_STATEMENT", VoltType.STRING),
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo("STATEMENT_NAME", VoltType.STRING),
+                                  new VoltTable.ColumnInfo("SQL_STATEMENT", VoltType.STRING),
                                   new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
 
             for(Statement stmt : proc.getStatements()) {
-                vt[i].addRow(stmt.getSqltext(), Encoder.hexDecodeToString(stmt.getExplainplan()));
+                vt[i].addRow(stmt.getTypeName(), stmt.getSqltext(), Encoder.hexDecodeToString(stmt.getExplainplan()));
             }
         }
 

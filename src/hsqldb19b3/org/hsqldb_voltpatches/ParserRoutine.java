@@ -153,6 +153,13 @@ public class ParserRoutine extends ParserDML {
 
                 Object defaultValue = e.getValue(session, dataType);
 
+                if ((dataType.typeCode == Types.TINYINT && ((int) defaultValue) == Byte.MIN_VALUE) ||
+                    (dataType.typeCode == Types.SQL_SMALLINT && ((int) defaultValue) == Short.MIN_VALUE) ||
+                    (dataType.typeCode == Types.SQL_INTEGER && ((int) defaultValue) == Integer.MIN_VALUE) ||
+                    (dataType.typeCode == Types.SQL_BIGINT && ((long) defaultValue) == Long.MIN_VALUE)){
+                    throw Error.error(ErrorCode.X_22003); // data exception: numeric value out of range
+                }
+
                 return new ExpressionValue(defaultValue, dataType);
             } else {
                 throw unexpectedToken();

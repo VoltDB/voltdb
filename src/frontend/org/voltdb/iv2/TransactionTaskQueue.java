@@ -30,7 +30,6 @@ import java.util.concurrent.TimeoutException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.Pair;
-import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 
@@ -108,12 +107,17 @@ public class TransactionTaskQueue
                 // only release completions at head of queue
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst().getFirst();
                 if (missingTask) {
-
                     //flush the backlog to avoid no task is pushed to site queue
-                    if (!completion.isRestartable()) {
+                    if (completion.isAbortDuringRepair()) {
                         if (hostLog.isDebugEnabled()) {
                             hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(txnId));
                         }
+                        // Mark the transaction state as DONE
+                        // Transaction state could be null when a CompleteTransactionTask is added to scorecboard.
+                        if (completion.m_txnState != null) {
+                            completion.m_txnState.setDone();
+                        }
+                        // Flush us out of the head of the TransactionTaskQueue.
                         m_txnTaskQueues[ii].flush(txnId);
                     }
                     //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
@@ -522,11 +526,13 @@ public class TransactionTaskQueue
         return pendingTasks;
     }
 
-    public synchronized TransactionTask peekFirstBacklogTask() {
-        if (m_backlog.isEmpty()) {
-            return null;
+    //flush mp readonly transactions out of backlog
+    public synchronized void removeMPReadTransactions() {
+        TransactionTask  task = m_backlog.peekFirst();
+        while (task != null && task.getTransactionState().isReadOnly()) {
+            task.getTransactionState().setDone();
+            flush(task.getTxnId());
+            task = m_backlog.peekFirst();
         }
-        return m_backlog.getFirst();
     }
-
 }

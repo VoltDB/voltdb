@@ -483,7 +483,7 @@ public interface ErrorCode {
     int X_42000 = 5000;                                   // syntax error or access rule violation - generic - 200x
 
     // HSQLDB database object names
-    int X_42501 = 5501;                                   // user lacks privilege or object not found
+    int X_42501 = 5501;                                   // object not found
     int X_42502 = 5502;                                   // dependent objects exist
     int X_42503 = 5503;                                   // system object cannot be modified
     int X_42504 = 5504;                                   // object name already exists

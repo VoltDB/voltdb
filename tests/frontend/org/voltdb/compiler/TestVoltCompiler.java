@@ -3573,7 +3573,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadDropStream() throws Exception {
         // non-existent stream
-        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: E1.*",
+        badDDLAgainstSimpleSchema(".+object not found: E1.*",
                "DROP STREAM e1;\n"
                 );
 
@@ -3595,7 +3595,7 @@ public class TestVoltCompiler extends TestCase {
                 );
 
         // stream with referencing procedure
-        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: USER_STREAM_2.*",
+        badDDLAgainstSimpleSchema(".+object not found: USER_STREAM_2.*",
                 "CREATE STREAM User_Stream_2 Partition On Column UserId" +
                         " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
                         "CREATE PROCEDURE Enter_User PARTITION ON TABLE User_Stream_2 column UserId" +
@@ -3770,9 +3770,9 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {
-        checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.TITLE\" in statement starting on lineno: 1",
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"object not found: BOOKS.TITLE\" in statement starting on lineno: 1",
                                     "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
-        checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.CASH\" in statement starting on lineno: 1",
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"object not found: BOOKS.CASH\" in statement starting on lineno: 1",
                                     "create view tview as select cash, count(*), max(( select cash from books as child where books.cash = child.cash )) from books group by cash;\n");
     }
 

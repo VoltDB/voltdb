@@ -123,12 +123,13 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters)
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, long mpTxnId)
     {
         return updateReplicas(replicas, partitionMasters, false);
     }
 
-    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,  boolean balanceSPI)
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
+            boolean balanceSPI)
     {
         // Handle startup and promotion semi-gracefully
         m_iv2Masters.clear();
@@ -478,7 +479,7 @@ public class MpScheduler extends Scheduler
             // even if all the masters somehow die before forwarding Complete on to their replicas.
             CompleteTransactionMessage ctm = new CompleteTransactionMessage(m_mailbox.getHSId(),
                     message.m_sourceHSId, message.getTxnId(), message.isReadOnly(), 0,
-                    !message.shouldCommit(), false, false, false, txn.isNPartTxn());
+                    !message.shouldCommit(), false, false, false, txn.isNPartTxn(), message.m_isFromNonRestartableSysproc);
             ctm.setTruncationHandle(m_repairLogTruncationHandle);
             // dump it in the repair log
             // hacky castage

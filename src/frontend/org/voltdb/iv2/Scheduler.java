@@ -207,7 +207,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void shutdown();
 
     @Override
-    abstract public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
+    abstract public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId);
 
     @Override
     abstract public void deliver(VoltMessage message);
@@ -216,5 +216,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     abstract public boolean sequenceForReplay(VoltMessage m);
 
-    public void handleMPIFailoverMessage() {}
+    //flush out read only transactions upon host failure
+    public void cleanupTransactionBacklogOnRepair() {}
 }
