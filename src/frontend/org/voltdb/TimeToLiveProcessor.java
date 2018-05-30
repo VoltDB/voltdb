@@ -116,6 +116,9 @@ public class TimeToLiveProcessor extends StatsSource{
                 byte[] payload = stats.toJSONString().getBytes(Charsets.UTF_8);
                 String path = ZKUtil.joinZKPath(VoltZK.ttl_statistics, stats.tableName);
                 zk.setData(path, payload, -1);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Updating ttl stats:" + stats.toString());
+                }
             } catch (KeeperException | InterruptedException  e) {
                 VoltDB.crashLocalVoltDB("Unable to update TTL stats to ZK, dying", true, e);
             }
@@ -155,6 +158,9 @@ public class TimeToLiveProcessor extends StatsSource{
                 TimeToLive ttl = ttlRef.get();
                 cl.runTimeToLive(tableName, ttl.getTtlcolumn().getName(),
                         transformValue(ttl), CHUNK_SIZE, TIMEOUT, stats);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Executing ttl on table " + tableName);
+                }
             }
         }
 
@@ -231,7 +237,6 @@ public class TimeToLiveProcessor extends StatsSource{
         List<Integer> liveHostIds = new ArrayList<Integer>(m_messenger.getLiveHostIds());
         Collections.sort(liveHostIds);
         if (m_hostId != liveHostIds.get(0)) {
-            shutDown();
             return;
         }
 
@@ -245,7 +250,7 @@ public class TimeToLiveProcessor extends StatsSource{
         Iterator<Map.Entry<String, TTLTask>> it = m_tasks.entrySet().iterator();
         while(it.hasNext()) {
             Map.Entry<String, TTLTask> task = it.next();
-            if (ttlTables.isEmpty() || !ttlTables.containsKey(task.getKey())) {
+            if (!ttlTables.containsKey(task.getKey())) {
                 task.getValue().stop();
                 it.remove();
                 m_stats.remove(task.getKey());
@@ -257,8 +262,8 @@ public class TimeToLiveProcessor extends StatsSource{
         Iterator<Map.Entry<String, ScheduledFuture<?>>> fut = m_futures.entrySet().iterator();
         while(fut.hasNext()) {
             Map.Entry<String, ScheduledFuture<?>> task = fut.next();
-            if (ttlTables.isEmpty() || !ttlTables.containsKey(task.getKey())) {
-                task.getValue().cancel(false);
+            if (!ttlTables.containsKey(task.getKey())) {
+                task.getValue().cancel(true);
                 fut.remove();
             }
         }
@@ -287,6 +292,10 @@ public class TimeToLiveProcessor extends StatsSource{
     }
 
     public void shutDown() {
+        for (Map.Entry<String, ScheduledFuture<?>> fut: m_futures.entrySet()) {
+            fut.getValue().cancel(true);
+            hostLog.info("Removing ttl task on this host for " + fut.getKey());
+        }
         if (m_timeToLiveExecutor != null) {
             try {
                 m_timeToLiveExecutor.shutdown();
