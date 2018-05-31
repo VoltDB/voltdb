@@ -90,7 +90,7 @@ public class TestPlansJoin extends PlannerTestCase {
         }
 
         query = "SELECT R2.C FROM R1 JOIN R2 USING(X)";
-        pattern = "user lacks privilege or object not found: X";
+        pattern = "object not found: X";
         failToCompile(query, pattern);
 
     }
@@ -150,7 +150,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         query = "SELECT R2.C FROM R1 JOIN R2 ON R1.X" +
                 joinOp + "R2.X";
-        pattern = "user lacks privilege or object not found: R1.X";
+        pattern = "object not found: R1.X";
         failToCompile(query, pattern);
 
         query = "SELECT * FROM R1 JOIN R2 ON R1.C" +
@@ -868,7 +868,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // USING expression can have only comma separated list of column names
         query = "SELECT * FROM R1 JOIN R2 USING (ABS(A))";
-        pattern = "user lacks privilege or object not found: ABS";
+        pattern = "object not found: ABS";
         failToCompile(query, pattern);
     }
 
@@ -2087,7 +2087,7 @@ public class TestPlansJoin extends PlannerTestCase {
         query = "SELECT R2.C FROM (R1 JOIN R2 ON R1.C" +
                 joinOp + "R2.C) JOIN R3 ON R1.C" +
                 joinOp + "R3.C";
-        pattern = "user lacks privilege or object not found: R1.C";
+        pattern = "object not found: R1.C";
         failToCompile(query, pattern);
 
         // JOIN with join hierarchy (HSQL limitation)

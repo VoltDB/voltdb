@@ -17,25 +17,23 @@
 
 package org.voltdb.iv2;
 
-import java.lang.InterruptedException;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.SortedSet;
 import java.util.concurrent.ExecutionException;
 
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
+import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 public class MpTerm implements Term
 {
@@ -80,7 +78,8 @@ public class MpTerm implements Term
             }
             m_knownLeaders = updatedLeaders;
 
-            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy, migratePartitionLeaderRequested);
+            ((MpInitiatorMailbox)m_mailbox).updateReplicas(new ArrayList<Long>(m_knownLeaders), cacheCopy,
+                    migratePartitionLeaderRequested);
         }
     };
 

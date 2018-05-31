@@ -418,7 +418,7 @@ public class CoreUtils {
     };
 
     /**
-     * Get a single thread executor that caches it's thread meaning that the thread will terminate
+     * Get a single thread executor that caches its thread meaning that the thread will terminate
      * after keepAlive milliseconds. A new thread will be created the next time a task arrives and that will be kept
      * around for keepAlive milliseconds. On creation no thread is allocated, the first task creates a thread.
      *

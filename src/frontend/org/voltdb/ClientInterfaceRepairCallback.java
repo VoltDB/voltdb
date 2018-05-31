@@ -19,4 +19,12 @@ package org.voltdb;
 
 public interface ClientInterfaceRepairCallback {
     public void repairCompleted(int partitionId, long initiatorHSId);
+
+    /**
+     * Callback invoked when managed leadership migration occurs. There should
+     * be no transaction to repair in this case.
+     * @param partitionId   The partition ID
+     * @param initiatorHSId The new leader's HSID
+     */
+    default void leaderMigrated(int partitionId, long initiatorHSId) {}
 }

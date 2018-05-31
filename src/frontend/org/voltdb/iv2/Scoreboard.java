@@ -40,19 +40,17 @@ public class Scoreboard {
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     public void addCompletedTransactionTask(CompleteTransactionTask task, Boolean missingTxn) {
-        // This happens when a non-restartable sysproc was aborted, since MPI doesn't send repair message for this transaction
-        // we must allow the rollback completion to go through scoreboard.
-        boolean isTxnRollback = (task.getCompleteMessage().isRollback() && task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP);
-        // Dont' treat rollback transaction as missing
-        if (isTxnRollback  && !task.isRestartable()) {
-            missingTxn = false;
-        }
-
         // This is an extremely rare case were a MPI restart completion arrives before the dead MPI's completion
         // Ignore this message because the restart completion is more recent and should step on the initial completion
         if (task.getTimestamp() == CompleteTransactionMessage.INITIAL_TIMESTAMP &&
-                ( hasRestartCompletion(task) || missingTxn)) {
+                (hasRestartCompletion(task) || missingTxn)) {
             return;
+        }
+
+        // Restart completion steps on any pending prior fragment of the same transaction
+        if (task.getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP &&
+                m_fragTask != null && m_fragTask.getTxnId() == task.getMsgTxnId()) {
+            m_fragTask = null;
         }
 
         // special case, scoreboard is empty
@@ -61,12 +59,6 @@ public class Scoreboard {
             return;
         }
 
-        // Restart completion steps on any pending prior fragment of the same transaction
-        if (task.getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP &&
-                MpRestartSequenceGenerator.isForRestart(task.getTimestamp()) &&
-                m_fragTask != null && m_fragTask.getTxnId() == task.getMsgTxnId()) {
-            m_fragTask = null;
-        }
         // scoreboard has one completion
         if (m_compTasks.size() == 1) {
             Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();

@@ -22,6 +22,10 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -103,12 +107,17 @@ public class TransactionTaskQueue
                 // only release completions at head of queue
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst().getFirst();
                 if (missingTask) {
-
                     //flush the backlog to avoid no task is pushed to site queue
-                    if (!completion.isRestartable()) {
+                    if (completion.isAbortDuringRepair()) {
                         if (hostLog.isDebugEnabled()) {
                             hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(txnId));
                         }
+                        // Mark the transaction state as DONE
+                        // Transaction state could be null when a CompleteTransactionTask is added to scorecboard.
+                        if (completion.m_txnState != null) {
+                            completion.m_txnState.setDone();
+                        }
+                        // Flush us out of the head of the TransactionTaskQueue.
                         m_txnTaskQueues[ii].flush(txnId);
                     }
                     //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
@@ -163,7 +172,7 @@ public class TransactionTaskQueue
 
     final private static RelativeSiteOffset s_stashedMpWrites = new RelativeSiteOffset();
     private static Object s_lock = new Object();
-
+    private static CyclicBarrier s_barrier;
 
     TransactionTaskQueue(SiteTaskerQueue queue, boolean scoreboardEnabled)
     {
@@ -177,14 +186,28 @@ public class TransactionTaskQueue
         m_scoreboardEnabled = scoreboardEnabled;
     }
 
+    public static void initBarrier(int siteCount) {
+        s_barrier = new CyclicBarrier(siteCount);
+    }
+
 
     // We start joining nodes with scoreboard disabled
     // After all sites has been fully initilized and ready for snapshot, we should enable the scoreboard.
-    void enableScoreboard() {
+    boolean enableScoreboard() {
+        assert (s_barrier != null);
+        try {
+            s_barrier.await(3L, TimeUnit.MINUTES);
+        } catch (InterruptedException | BrokenBarrierException |TimeoutException e) {
+            hostLog.error("Cannot re-enable the scoreboard.");
+            s_barrier.reset();
+            return false;
+        }
+
+        m_scoreboardEnabled = true;
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("Scoreboard has been enabled.");
         }
-        m_scoreboardEnabled = true;
+        return true;
     }
 
     public boolean scoreboardEnabled() {
@@ -222,10 +245,10 @@ public class TransactionTaskQueue
              * This branch happens during regular execution when a multi-part is in progress.
              * The first task for the multi-part is the head of the queue, and all the single parts
              * are being queued behind it. The txnid check catches tasks that are part of the multi-part
-             * and immediately queues them for execution.
+             * and immediately queues them for execution. If any multi-part txn with smaller txnId shows up,
+             * it must from repair process, just let it through.
              */
-            if (task.getTxnId() != m_backlog.getFirst().getTxnId())
-            {
+            if (txnState.isSinglePartition() || TxnEgo.getSequence(task.getTxnId()) > TxnEgo.getSequence(m_backlog.getFirst().getTxnId())) {
                 m_backlog.addLast(task);
                 retval = true;
             }
@@ -382,6 +405,7 @@ public class TransactionTaskQueue
                     ", backlog head txnId is:" + (m_backlog.isEmpty()? "empty" : TxnEgo.txnIdToString(m_backlog.getFirst().getTxnId()))
                     );
         }
+
         int offered = 0;
         // If the first entry of the backlog is a completed transaction, clear it so it no longer
         // blocks the backlog then iterate the backlog for more work.
@@ -400,6 +424,12 @@ public class TransactionTaskQueue
         if (m_backlog.isEmpty() || !m_backlog.getFirst().getTransactionState().isDone()) {
             return offered;
         }
+
+        // Add a guard to protect the scenario that backlog been flushed multiple times for same txnId
+        if (m_backlog.getFirst().getTxnId() != txnId) {
+            return offered;
+        }
+
         m_backlog.removeFirst();
         Iterator<TransactionTask> iter = m_backlog.iterator();
         while (iter.hasNext()) {
@@ -496,11 +526,13 @@ public class TransactionTaskQueue
         return pendingTasks;
     }
 
-    public TransactionTask peekFirstBacklogTask() {
-        if (m_backlog.isEmpty()) {
-            return null;
+    //flush mp readonly transactions out of backlog
+    public synchronized void removeMPReadTransactions() {
+        TransactionTask  task = m_backlog.peekFirst();
+        while (task != null && task.getTransactionState().isReadOnly()) {
+            task.getTransactionState().setDone();
+            flush(task.getTxnId());
+            task = m_backlog.peekFirst();
         }
-        return m_backlog.getFirst();
     }
-
 }

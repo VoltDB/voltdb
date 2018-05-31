@@ -333,7 +333,11 @@ public class MpPromoteAlgo implements RepairAlgo
     VoltMessage createRepairMessage(Iv2RepairLogResponseMessage msg)
     {
         if (msg.getPayload() instanceof CompleteTransactionMessage) {
-            CompleteTransactionMessage message = (CompleteTransactionMessage)msg.getPayload();
+            CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg.getPayload();
+            // Repair log messages that originated from this host may still be in the scoreboard,
+            // so build a new message to avoid corrupting the scoreboard's reference.
+            CompleteTransactionMessage message = new CompleteTransactionMessage(ctm.getInitiatorHSId(),
+                    ctm.getCoordinatorHSId(), ctm);
             message.setForReplica(false);
             message.setRequireAck(false);
             message.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
@@ -357,28 +361,29 @@ public class MpPromoteAlgo implements RepairAlgo
                 m_interruptedTxns.add(ftm.getInitiateTask());
             }
             CompleteTransactionMessage rollback = null;
-            if (ftm.isSysProcTask()) {
-                //A response for non-restartable proc will be sent to client immediately if it is restarted. Thus
-                //the transaction is marked as done and the state is removed. But sites may still have fragments in the backlog or site queue
-                //which may block Scoreboard to release downstream transactions. The message would help clean the transaction state.
-                String procName = ftm.getProcedureName();
-                if (procName != null) {
-                    final SystemProcedureCatalog.Config proc = SystemProcedureCatalog.listing.get(procName);
-                    if (proc != null && !proc.isRestartable()) {
-                        rollback = new CompleteTransactionMessage(
-                                ftm.getInitiatorHSId(),
-                                ftm.getCoordinatorHSId(),
-                                ftm.getTxnId(),
-                                ftm.isReadOnly(),
-                                0,
-                                true,       // Force rollback as our repair operation.
-                                false,      // no acks in iv2.
-                                restart,    // Indicate rollback for repair as appropriate
-                                ftm.isForReplay(),
-                                ftm.isNPartTxn());
-                    }
+            //A response for non-restartable proc will be sent to client immediately if it is restarted. Thus
+            //the transaction is marked as done and the state is removed. But sites may still have fragments in the backlog or site queue
+            //which may block Scoreboard to release downstream transactions. The message would help clean the transaction state.
+            String procName = ftm.getProcedureName();
+            if (procName != null) {
+                final SystemProcedureCatalog.Config proc = SystemProcedureCatalog.listing.get(procName);
+                if (proc != null && !proc.isRestartable()) {
+                    rollback = new CompleteTransactionMessage(
+                            ftm.getInitiatorHSId(),
+                            ftm.getCoordinatorHSId(),
+                            ftm.getTxnId(),
+                            ftm.isReadOnly(),
+                            0,
+                            true,       // Force rollback as our repair operation.
+                            false,      // no acks in iv2.
+                            restart,    // Indicate rollback for repair as appropriate
+                            ftm.isForReplay(),
+                            ftm.isNPartTxn(),
+                            true);
+                    rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
                 }
             }
+
             return rollback;
         }
     }
