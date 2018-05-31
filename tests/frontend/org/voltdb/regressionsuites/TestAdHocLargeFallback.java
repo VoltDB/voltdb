@@ -67,6 +67,7 @@ public class TestAdHocLargeFallback extends TestCase {
                 assertEquals(ClientResponse.SUCCESS,
                         client.callProcedure(adHocLarge ? "@AdHocLarge" : "@AdHoc", query).getStatus());
             }
+            client.close();
             cluster.shutDown();
             if (adHocLarge) {
                 cluster.verifyLogMessage(logMessage);
