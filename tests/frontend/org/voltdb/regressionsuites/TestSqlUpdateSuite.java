@@ -60,6 +60,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
     public void testUpdate() throws Exception {
         subtestUpdateBasic();
         subtestENG11918();
+        subtestENG13926();
         subtestUpdateWithSubquery();
         subtestUpdateWithCaseWhen();
     }
@@ -253,9 +254,24 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         }
 
         Client client = getClient();
-        client.callProcedure("@AdHoc", "INSERT INTO ENG_11918 (id, int, time) VALUES (101, 12, '1382-01-26 17:04:59');");
+        client.callProcedure("@AdHoc", "INSERT INTO ENG_11918 (id, int, time) VALUES "
+                + "(101, 12, '1382-01-26 17:04:59');");
         verifyStmtFails(client, "UPDATE ENG_11918 SET VCHAR = TIME WHERE INT != -0.539;",
                 "Input to SQL function CAST is outside of the supported range");
+    }
+
+    private void subtestENG13926() throws Exception {
+        if (isHSQL()) {
+            // This regression test covers VoltDB-specific error behavior
+            return;
+        }
+
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "INSERT INTO ENG_13926 (A, B, C, D) "
+                + "VALUES (-127, -127, -127, -127);");
+        verifyStmtFails(client, "UPDATE ENG_13926 SET C = C - 1;",
+                "Type BIGINT with value -128 can't be cast as TINYINT "
+                + "because the value is out of range for the destination type \'C\'");
     }
 
     //
