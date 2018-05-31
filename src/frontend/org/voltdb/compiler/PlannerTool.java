@@ -54,6 +54,7 @@ public class PlannerTool {
     private Database m_database;
     private byte[] m_catalogHash;
     private AdHocCompilerCache m_cache;
+    private long m_adHocLargeFallbackCount = 0;
 
     private final HSQLInterface m_hsql;
 
@@ -112,6 +113,10 @@ public class PlannerTool {
 
     public HSQLInterface getHSQLInterface() {
         return m_hsql;
+    }
+
+    public long getAdHocLargeFallbackCount() {
+        return m_adHocLargeFallbackCount;
     }
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
@@ -296,6 +301,9 @@ public class PlannerTool {
                 plan = planner.plan();
                 if (plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
+                }
+                if (plan.getIsLargeQuery() != isLargeQuery) {
+                    ++m_adHocLargeFallbackCount;
                 }
 
                 planHasExceptionsWhenParameterized = planner.wasBadPameterized();
