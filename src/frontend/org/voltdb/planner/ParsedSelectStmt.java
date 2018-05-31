@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.avro.SchemaCompatibility;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
@@ -56,10 +55,6 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
-
-import javax.persistence.criteria.CriteriaBuilder;
-
-import static org.voltcore.utils.Pair.of;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
