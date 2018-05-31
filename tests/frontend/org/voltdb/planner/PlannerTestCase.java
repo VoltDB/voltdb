@@ -30,7 +30,6 @@ import java.util.Map.Entry;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
@@ -342,7 +341,7 @@ public class PlannerTestCase extends TestCase {
     }
 
     protected void planForLargeQueries(boolean b) {
-        m_aide.planLargeQueries(b);
+        m_aide.planForLargeQueries(b);
     }
 
     public String getCatalogString() {
@@ -1025,7 +1024,7 @@ public class PlannerTestCase extends TestCase {
 
     private void printJSONString(AbstractPlanNode node) {
         try {
-            String jsonString = PlanSelector.outputPlanDebugString(node, m_aide.m_planLargeQueries);
+            String jsonString = PlanSelector.outputPlanDebugString(node, m_aide.m_planForLargeQueries);
             System.out.printf("Json:\n%s\n", jsonString);
         } catch (Exception ex) {
             ex.printStackTrace();
