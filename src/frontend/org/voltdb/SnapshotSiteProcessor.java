@@ -86,6 +86,8 @@ public class SnapshotSiteProcessor {
     public static final Object m_snapshotCreateLock = new Object();
     public static CyclicBarrier m_snapshotCreateSetupBarrier = null;
     public static CyclicBarrier m_snapshotCreateFinishBarrier = null;
+    // This flag is for test only
+    public static boolean requireNewBarrierInTest = true;
     public static final Runnable m_snapshotCreateSetupBarrierAction = new Runnable() {
         @Override
         public void run() {
@@ -100,10 +102,11 @@ public class SnapshotSiteProcessor {
 
     public static void readySnapshotSetupBarriers(int numSites) {
         synchronized (SnapshotSiteProcessor.m_snapshotCreateLock) {
-            if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier == null) {
+            if (requireNewBarrierInTest) {
                 SnapshotSiteProcessor.m_snapshotCreateFinishBarrier = new CyclicBarrier(numSites);
                 SnapshotSiteProcessor.m_snapshotCreateSetupBarrier =
                         new CyclicBarrier(numSites, SnapshotSiteProcessor.m_snapshotCreateSetupBarrierAction);
+                requireNewBarrierInTest = false;
             } else if (SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.isBroken()) {
                 SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.reset();
                 SnapshotSiteProcessor.m_snapshotCreateFinishBarrier.reset();
@@ -261,8 +264,13 @@ public class SnapshotSiteProcessor {
     }
 
     public void shutdown() throws InterruptedException {
-        m_snapshotCreateSetupBarrier = null;
-        m_snapshotCreateFinishBarrier = null;
+        if (m_snapshotCreateSetupBarrier != null) {
+            m_snapshotCreateSetupBarrier.reset();
+        }
+        if (m_snapshotCreateSetupBarrier != null) {
+            m_snapshotCreateFinishBarrier.reset();
+        }
+        requireNewBarrierInTest = true;
         if (m_snapshotTargetTerminators != null) {
             for (Thread t : m_snapshotTargetTerminators) {
                 t.join();

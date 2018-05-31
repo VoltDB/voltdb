@@ -57,7 +57,6 @@ import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDBInterface;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -206,7 +205,7 @@ public class TestSpSchedulerDedupe
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new ArrayList<Long>(), null);
+        dut.updateReplicas(new ArrayList<Long>(), null, -1);
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -225,7 +224,7 @@ public class TestSpSchedulerDedupe
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new ArrayList<Long>(), null);
+        dut.updateReplicas(new ArrayList<Long>(), null, -1);
         FragmentTaskMessage sptask = TestVoltMessageSerialization.createFragmentTaskMessage(txnid, true, primary_hsid, null);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -248,7 +247,7 @@ public class TestSpSchedulerDedupe
         dut.setLeaderState(true);
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
-        dut.updateReplicas(replicas, null);
+        dut.updateReplicas(replicas, null, -1);
         Iv2InitiateTaskMessage sptask = createMsg(txnid, false, true, primary_hsid);
         dut.deliver(sptask);
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
@@ -279,7 +278,7 @@ public class TestSpSchedulerDedupe
         dut.setLeaderState(true);
         List<Long> replicas = new ArrayList<Long>();
         replicas.add(2l);
-        dut.updateReplicas(replicas, null);
+        dut.updateReplicas(replicas, null, -1);
         Iv2InitiateTaskMessage initTask = createMsg(txnid, false, true, primary_hsid);
         FragmentTaskMessage sptask = TestVoltMessageSerialization.createFragmentTaskMessage(txnid, false, primary_hsid, initTask);
         dut.deliver(sptask);
