@@ -147,7 +147,8 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                     // print some debugging info before we error out.
                     if ( unDeletedRows > 0 ) {
                         long deletes = (Long)stats.get("ROWS_DELETED");
-                        if ( retries <= 2 ) {
+                        //allow more time for the case that nodes are down and rejoined.
+                        if ( retries <= 4 ) {
                             // We need to handle the case where we have just recovered and the nibble deleter hasn't caught up,
                             // don't fail completely unless we have failed two times consecutively after receiving valid responses
                             if (deletes > deleteCount) {
@@ -159,24 +160,12 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                                 log.info("nibble delete is not making progress, after attempt "+String.valueOf(retries)+" of 2");
                                 retries++;
                             }
-                            Thread.sleep(2000);
+                            Thread.sleep(5000);
                             continue;
                         }
                         // nibble deletes are failing.
                         log.info("Nibble delete is too far behind but thinks it's done. TTL stats:");
-                        for ( String key : stats.keySet() ) {
-                            log.info(key + ":"+ String.valueOf(stats.get(key)));
-                        }
-                        for ( int c = 0; c < data.getColumnCount(); c++) {
-                            System.out.print(data.getColumnName(c)+" ");
-                        }
-                        System.out.print("\n");
-                        while ( data.advanceRow() ) {
-                            for ( int c = 0; c < data.getColumnCount(); c++) {
-                                System.out.print(data.get(c,data.getColumnType(c)).toString() + " ") ;
-                            }
-                            System.out.print("\n");
-                        }
+                        log.info(stats);
                         Benchmark.hardStop("Nibble Delete failed to delete "+unDeletedRows+" from " + tableName + " and this shoudn't happen. Exiting.");
                     } else {
                         retries = 0;
