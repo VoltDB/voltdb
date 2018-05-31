@@ -31,7 +31,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.CompleteTransactionResponseMessage;
 
 public class TransactionTaskQueue
 {
@@ -107,28 +106,10 @@ public class TransactionTaskQueue
                 // only release completions at head of queue
                 CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst().getFirst();
                 if (missingTask) {
-                    //flush the backlog to avoid no task is pushed to site queue
-                    if (completion.isAbortDuringRepair()) {
-                        if (hostLog.isDebugEnabled()) {
-                            hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(txnId));
-                        }
-                        // Mark the transaction state as DONE
-                        // Transaction state could be null when a CompleteTransactionTask is added to scorecboard.
-                        if (completion.m_txnState != null) {
-                            completion.m_txnState.setDone();
-                        }
-                        // Flush us out of the head of the TransactionTaskQueue.
-                        m_txnTaskQueues[ii].flush(txnId);
-                    }
-                    //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
-                    //up the site outstanding transaction queue and duplicate counter
-                    final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(completion.getCompleteMessage());
-                    resp.m_sourceHSId = m_mailBoxes[ii].getHSId();
-                    m_mailBoxes[ii].deliver(resp);
-                } else {
-                    Iv2Trace.logSiteTaskerQueueOffer(completion);
-                    m_stashedMpQueues[ii].offer(completion);
+                    completion.setFragmentNotExecuted();
                 }
+                Iv2Trace.logSiteTaskerQueueOffer(completion);
+                m_stashedMpQueues[ii].offer(completion);
                 Pair<CompleteTransactionTask, Boolean> tail = m_stashedMpScoreboards[ii].getCompletionTasks().pollLast();
                 if (tail != null) {
                     m_stashedMpScoreboards[ii].getCompletionTasks().addFirst(tail);
@@ -192,7 +173,7 @@ public class TransactionTaskQueue
 
 
     // We start joining nodes with scoreboard disabled
-    // After all sites has been fully initilized and ready for snapshot, we should enable the scoreboard.
+    // After all sites has been fully initialized and ready for snapshot, we should enable the scoreboard.
     boolean enableScoreboard() {
         assert (s_barrier != null);
         try {
