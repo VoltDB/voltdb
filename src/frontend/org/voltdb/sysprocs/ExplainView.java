@@ -64,6 +64,9 @@ public class ExplainView extends AdHocNTBase {
                                   new VoltTable.ColumnInfo("EXECUTION_PLAN", VoltType.STRING));
             try {
                 ArrayList<String[]> viewExplanation = ViewExplainer.explain(viewTable);
+                if (viewExplanation.size() == 0) {
+                    vt[i].addRow("", "No query plan is being used.");
+                }
                 for (String[] row : viewExplanation) {
                     vt[i].addRow(row[0], row[1]);
                 }
