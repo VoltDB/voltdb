@@ -1343,6 +1343,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             DuplicateCounterKey staleMatch = m_duplicateCounters.ceilingKey(lowestPossible);
             while (staleMatch != null && staleMatch.compareTo(duplicateCounterKey) == -1) {
                 m_duplicateCounters.remove(staleMatch);
+                staleMatch = m_duplicateCounters.ceilingKey(lowestPossible);
             };
         }
 

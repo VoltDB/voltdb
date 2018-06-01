@@ -45,7 +45,6 @@ public class TransactionTaskQueue
     private static class RelativeSiteOffset {
         private SiteTaskerQueue[] m_stashedMpQueues;
         private Scoreboard[] m_stashedMpScoreboards;
-        private TransactionTaskQueue[] m_txnTaskQueues;
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
         private Mailbox[] m_mailBoxes;
@@ -54,22 +53,19 @@ public class TransactionTaskQueue
             m_stashedMpScoreboards = null;
             m_lowestSiteId = firstSiteId;
             m_siteCount = siteCount;
-            m_txnTaskQueues = null;
         }
 
-        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox, TransactionTaskQueue taskQueue) {
+        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox) {
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
             if (m_stashedMpQueues == null) {
                 m_stashedMpQueues = new SiteTaskerQueue[m_siteCount];
                 m_stashedMpScoreboards = new Scoreboard[m_siteCount];
                 m_mailBoxes = new Mailbox[m_siteCount];
-                m_txnTaskQueues = new TransactionTaskQueue[m_siteCount];
             }
             m_stashedMpQueues[siteId-m_lowestSiteId] = queue;
             m_stashedMpScoreboards[siteId-m_lowestSiteId] = scoreboard;
             m_mailBoxes[siteId-m_lowestSiteId] = mailBox;
-            m_txnTaskQueues[siteId-m_lowestSiteId] = taskQueue;
         }
 
         // All sites receives FragmentTask messages, time to fire the task.
@@ -204,7 +200,7 @@ public class TransactionTaskQueue
     void initializeScoreboard(int siteId, Mailbox mailBox) {
         synchronized (s_lock) {
             if (m_taskQueue.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox, this);
+                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox);
             }
         }
     }
