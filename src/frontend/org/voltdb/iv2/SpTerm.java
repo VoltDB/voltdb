@@ -81,7 +81,7 @@ public class SpTerm implements Term
             // for joining nodes that hasn't been fully initialized
             // still update replicas for allowing all replicas receive fragment tasks
             if (m_initJoin) {
-                if (replicas.size() == m_kFactor) {
+                if (replicas.size() == m_kFactor + 1) {
                     m_initJoin = false;
                 }
                 m_mailbox.updateReplicas(replicas, null);
