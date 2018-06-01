@@ -66,11 +66,11 @@ import org.voltdb.catalog.Database;
 public class GenerateEETests extends EEPlanGenerator {
     private static final String DDL_FILENAME = "testplans-ee-generators.sql";
 
-    @Override
-    public void setUp() throws Exception {
+    public void setUp(String[] args) throws Exception {
         super.setUp(GenerateEETests.class.getResource(DDL_FILENAME),
                     "testplansgenerator",
                     true);
+        processArgs(args);
     }
 
 
@@ -775,9 +775,8 @@ public class GenerateEETests extends EEPlanGenerator {
 
     public static void main(String args[]) {
         GenerateEETests tg = new GenerateEETests();
-        tg.processArgs(args);
         try {
-            tg.setUp();
+            tg.setUp(args);
             tg.generatedPlannerTest();
             tg.generatedInsertPolygonTest();
             tg.generatedCountPlan();

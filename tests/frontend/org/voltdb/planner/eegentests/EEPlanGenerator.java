@@ -82,11 +82,7 @@
  * the License.
  */package org.voltdb.planner.eegentests;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -214,6 +210,7 @@ public class EEPlanGenerator extends PlannerTestCase {
     //
     private String m_VoltDBRootDirName = Paths.get(".").toAbsolutePath().normalize().toString();
     private String m_testGenDir = "ee_auto_generated_unit_tests";
+    private String m_testNamesFile = "generated_tests.txt";
 
     protected String getPlanString(String sqlStmt, int fragmentNumber) throws JSONException {
         boolean planForSinglePartition = (fragmentNumber == 0);
@@ -861,7 +858,6 @@ public class EEPlanGenerator extends PlannerTestCase {
      * @throws Exception
      */
     protected void generateTests(String testFolder, String testClassName, DBConfig db) throws Exception {
-        System.out.printf("%s/%s/%s;", m_testGenDir, testFolder, testClassName);
         Map<String, String> params = new HashMap<>();
         params.put("SOURCE_PACKAGE_NAME",   db.getClassPackageName());
         params.put("SOURCE_CLASS_NAME",     db.getClassName());
@@ -879,6 +875,7 @@ public class EEPlanGenerator extends PlannerTestCase {
         params.put("ALL_TESTS",             db.getAllTests(params));
         params.put("DATABASE_CONFIG_BODY",  db.getDatabaseConfigBody(params));
         writeTestFile(testFolder, testClassName, params);
+        writeTestFileName(String.format("%s/%s/%s;", m_testGenDir, testFolder, testClassName), true);
     }
 
     public static boolean typeMatch(Object elem, VoltType type, int size) {
@@ -944,12 +941,34 @@ public class EEPlanGenerator extends PlannerTestCase {
                 m_VoltDBRootDirName = arg.substring("--test-source-dir=".length());
             } else if (arg.startsWith("--generated-source-dir=")) {
                 m_testGenDir = arg.substring("--generated-source-dir".length());
+            } else if (arg.startsWith("--test-names-file=")) {
+                m_testNamesFile = arg.substring("--test-names-file=".length());
             }
         }
     }
 
+    /**
+     * Write the named string to the output file.
+     *
+     * @param name The string to write.
+     * @param append If true, then append to the file.  Otherwise truncate the file first.
+     * @throws FileNotFoundException
+     */
+    protected void writeTestFileName(String name,
+                                     boolean append) throws FileNotFoundException {
+        File outFileName = new File(String.format("%s/%s/%s", m_VoltDBRootDirName, m_testGenDir, m_testNamesFile));
+        if ( ! outFileName.exists() ) {
+            append = false;
+        }
+        PrintStream ps = new PrintStream(new BufferedOutputStream(new FileOutputStream(outFileName, append)));
+        ps.print(name);
+        ps.close();
+    }
+
     private void writeTestFile(String testFolder, String testClassName, Map<String, String> params) throws Exception {
         String template = TESTFILE_TEMPLATE;
+        // This could be made much faster by looking for all the strings
+        // with a regular expression, rather than one at a time.
         for (Map.Entry<String, String> entry : params.entrySet()) {
             String pattern = "@" + entry.getKey() + "@";
             String value   = params.get(entry.getKey());

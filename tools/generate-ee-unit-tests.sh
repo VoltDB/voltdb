@@ -81,6 +81,11 @@ fi
 SRC_DIR="$VOLTDB_ROOT/tests/ee/"
 GENERATED_DIR='ee_auto_generated_unit_tests'
 OBJDIR="$VOLTDB_ROOT/obj/${BUILD_TYPE}"
+TEST_NAMES_FILE="$SRC_DIR/${GENERATED_DIR}/generated_tests.txt"
+#
+# Empty out the test names file.
+#
+rm -f "$TEST_NAMES_FILE"
 for CLASS in $TEST_CLASSES; do
     (set $ECHO; java $VERBOSE \
                      -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDB_ROOT}/lib/\*:${VOLTDB_ROOT}/third_party/java/jars/\* \
