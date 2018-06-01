@@ -83,17 +83,29 @@ public class ParsedColInfo implements Cloneable {
         return fromOrderByXml(parsedStmt, orderByXml, adjuster);
     }
 
+    /**
+     * Helpers
+     */
     public ParsedColInfo updateTableName(String tblName, String tblAlias) {
        tableName = tblName;
        tableAlias = tblAlias;
        return this;
     }
 
+    /**
+     * Helpers
+     */
+    public ParsedColInfo updateColName(String colName, String colAlias) {
+       columnName = colName;
+       alias = colAlias;
+       return this;
+    }
+
     // Convert any non-TupleValueExpression, i.e. AggregateExpression to TupleValueExpression,
     // and syncs with (table/column) * (name/alias).
-    public ParsedColInfo toTVE(int diff) {
+    public ParsedColInfo toTVE(int indx, int diff) {
        TupleValueExpression exp = new TupleValueExpression(tableName, tableAlias,
-             columnName, alias, expression, index);
+             columnName, alias, expression, indx);
        exp.setDifferentiator(diff);
        expression = exp;
        return this;

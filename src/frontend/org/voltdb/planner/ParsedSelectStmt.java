@@ -18,7 +18,9 @@
 package org.voltdb.planner;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
+import javafx.util.Pair;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
@@ -166,21 +168,20 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     // update table names, convert all expressions to TupleValueExpressions, and also update each expression's
     // table names.
-    public static List<ParsedColInfo> updateTableNames(List<ParsedColInfo> src, String tblName, String tblAlias) {
-       for (int indx = 0; indx < src.size(); ++indx) {
-          src.get(indx).updateTableName(tblName, tblAlias).toTVE(indx);
-       }
-       return src;
+    public static void updateTableNames(List<ParsedColInfo> src, String tblName) {
+        src.stream().forEach(ci -> ci.updateTableName(tblName, tblName).toTVE(ci.index, ci.index));
     }
 
-    // Substitute column name with matching key to new value
-    public static List<ParsedColInfo> updateColNames(List<ParsedColInfo> src, Map<String, String> m) {
-       for (ParsedColInfo ci : src) {
-          if (m.containsKey(ci.columnName)) {
-             ci.columnName = m.get(ci.columnName);
+    // stmt's display column (name, index) ==> view table column (name, index)
+    public static void fixColumns(List<ParsedColInfo> src,
+          Map<Integer, Pair<String, Integer>> m) {
+       // change to display column index-keyed map
+       src.stream().forEach(ci -> {
+          if (m.containsKey(ci.index)) {
+             Pair<String, Integer> viewInfo = m.get(ci.index);
+             ci.updateColName(viewInfo.getKey(), ci.alias);
           }
-       }
-       return src;
+       });
     }
 
     // Updates miscellaneous fields as part of rewriting as materialized view.
@@ -189,13 +190,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
        m_distinctGroupByColumns = null;
        m_groupByExpressions.clear();
        m_distinctProjectSchema = null;
-       m_distinct = false;
        m_hasAggregateExpression = false;
        // Resets paramsBy* used by filtering, assuming that it's equivalent to "SELECT * from MV".
        setParamsByIndex(new TreeMap<>());
        m_paramsById = new HashMap<>();
        m_paramValues = null;
-       m_sql = "SELECT * FROM " + view.getTypeName();   // TODO: need to overwrite SQL query?
+       // m_sql does not need updating
        m_tableList.clear();
        m_tableList.add(view);
        // update m_tableAliasMap

@@ -26,7 +26,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
+import javafx.util.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -81,29 +83,25 @@ public class NodeSchema implements Iterable<SchemaColumn> {
     }
 
     // Substitute column name with matching key to new value
-    public NodeSchema updateColNames(Map<String, String> m) {
-       for (SchemaColumn sc : m_columns) {
-          if (m.containsKey(sc.getColumnName())) {
-             sc.reset(sc.getTableName(), sc.getTableAlias(), m.get(sc.getColumnName()), sc.getColumnAlias());
-          }
-       }
-       for(Map.Entry<SchemaColumn, Integer> it : m_columnsMapHelper.entrySet()) {
-          SchemaColumn sc = it.getKey();
-          if(m.containsKey(sc.getColumnName())) {
-             it.getKey().reset(sc.getTableName(), sc.getTableAlias(), m.get(sc.getColumnName()), sc.getColumnAlias());
-          }
-       }
-       return this;
-    }
-
-    // Change any non-TupleValueExpression typed AbstractExpressions to TupleValueExpressions
-    public NodeSchema toTVE() {
-       NodeSchema ns = copyAndReplaceWithTVE();
+    // \pre: m_columns is a bi-map to \param m.
+    public NodeSchema toTVEAndFixColumns(Map<String, Pair<String, Integer>> nameMap) {
+      final NodeSchema ns = copyAndReplaceWithTVE();    // First convert all non-TVE expressions to TVE in a copy
        m_columns.clear();
        m_columnsMapHelper.clear();
-       for (int indx = 0; indx < ns.size(); ++indx) {
-          ns.getColumn(indx).setDifferentiator(indx);
-          addColumn(ns.getColumn(indx));
+       for(int indx = 0; indx < ns.size(); ++indx) {    // then update columns
+           final SchemaColumn sc = ns.getColumn(indx);
+           if(nameMap.containsKey(sc.getColumnName())) {
+               final String newColName = nameMap.get(sc.getColumnName()).getKey();
+               final Integer newColIndx = nameMap.get(sc.getColumnName()).getValue();
+               sc.reset(sc.getTableName(), sc.getTableAlias(), newColName, sc.getColumnAlias());
+               sc.setDifferentiator(indx);
+               TupleValueExpression exp = (TupleValueExpression) sc.getExpression();
+               exp.setColumnIndex(newColIndx);
+               exp.setColumnName(newColName);
+           }
+       }
+       for(SchemaColumn sc : ns) {
+           addColumn(sc);
        }
        return this;
     }
