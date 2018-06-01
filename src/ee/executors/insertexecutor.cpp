@@ -216,6 +216,9 @@ bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
         m_templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
 
+    VOLT_DEBUG("Initializing insert executor to insert into %s table %s",
+               static_cast<PersistentTable*>(m_targetTable)->isCatalogTableReplicated() ? "replicated" : "partitioned",
+               m_targetTable->name().c_str());
     VOLT_DEBUG("This is a %s insert on partition with id %d",
                m_node->isInline() ? "inline"
                        : (m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
@@ -346,7 +349,7 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
         m_targetTable = m_persistentTable;
     }
     m_targetTable->insertTuple(m_templateTuple);
-    VOLT_DEBUG("Target table:\n%s\n", m_targetTable->debug().c_str());
+    VOLT_TRACE("Target table:\n%s\n", m_targetTable->debug().c_str());
     // successfully inserted
     ++m_modifiedTuples;
     return;
@@ -355,10 +358,12 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
 void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
     // This should only be called from inlined insert executors because we have to change contexts every time
     ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-            m_replicatedTableOperation, m_engine->isLowestSite(), s_modifiedTuples);
+            m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
     if (possiblySynchronizedUseMpMemory.okToExecute()) {
         p_execute_tuple_internal(tuple);
-        s_modifiedTuples = m_modifiedTuples;
+        if (m_replicatedTableOperation) {
+            s_modifiedTuples = m_modifiedTuples;
+        }
     }
     else {
         if (s_modifiedTuples == -1) {
@@ -387,8 +392,8 @@ void InsertExecutor::p_execute_finish() {
     // add to the planfragments count of modified tuples
     m_engine->addToTuplesModified(m_modifiedTuples);
     VOLT_DEBUG("Finished inserting %" PRId64 " tuples", m_modifiedTuples);
-    VOLT_DEBUG("InsertExecutor output table:\n%s\n", m_tmpOutputTable->debug().c_str());
-    VOLT_DEBUG("InsertExecutor target table:\n%s\n", m_targetTable->debug().c_str());
+    VOLT_TRACE("InsertExecutor output table:\n%s\n", m_tmpOutputTable->debug().c_str());
+    VOLT_TRACE("InsertExecutor target table:\n%s\n", m_targetTable->debug().c_str());
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
@@ -403,7 +408,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     {
         if (p_execute_init_internal(inputSchema, m_tmpOutputTable, inputTuple)) {
             ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                    m_replicatedTableOperation, m_engine->isLowestSite(), s_modifiedTuples);
+                    m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
             if (possiblySynchronizedUseMpMemory.okToExecute()) {
                 //
                 // An insert is quite simple really. We just loop through our m_inputTable
@@ -413,7 +418,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 while (iterator.next(inputTuple)) {
                     p_execute_tuple_internal(inputTuple);
                 }
-                s_modifiedTuples = m_modifiedTuples;
+                if (m_replicatedTableOperation) {
+                    s_modifiedTuples = m_modifiedTuples;
+                }
             }
             else {
                 if (s_modifiedTuples == -1) {

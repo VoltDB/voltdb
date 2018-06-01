@@ -48,7 +48,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
+    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent, int leaderNodeId)
     {
         super(VoltZK.iv2mpi,
                 messenger,
@@ -56,7 +56,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 new MpScheduler(
                     MP_INIT_PID,
                     buddyHSIds,
-                    new SiteTaskerQueue(MP_INIT_PID)),
+                    new SiteTaskerQueue(MP_INIT_PID),
+                    leaderNodeId),
                 "MP",
                 agent,
                 StartAction.CREATE /* never for rejoin */);
@@ -116,7 +117,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
             m_term.start();
             while (!success) {
                 final RepairAlgo repair =
-                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, false);
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;

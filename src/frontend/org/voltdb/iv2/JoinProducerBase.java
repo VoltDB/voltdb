@@ -199,15 +199,6 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     protected abstract VoltLogger getLogger();
 
-    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
-        if (nonce.equals(m_snapshotNonce)) {
-            getLogger().debug("Started recording transactions after snapshot nonce " + nonce);
-            if (m_taskLog != null) {
-                m_taskLog.enableRecording(snapshotSpHandle);
-            }
-        }
-    }
-
     // Based on whether or not we just did real work, return ourselves to the task queue either now
     // or after waiting a few milliseconds
     protected void returnToTaskQueue(boolean sourcesReady)

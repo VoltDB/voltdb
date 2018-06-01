@@ -328,6 +328,24 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         return (status == SUCCESS) || (status == OPERATIONAL_FAILURE);
     }
 
+    public String toStatusJSONString() {
+        JSONStringer js = new JSONStringer();
+        try {
+            js.object();
+            js.keySymbolValuePair(JSON_STATUS_KEY, status);
+            js.keySymbolValuePair(JSON_APPSTATUS_KEY, appStatus);
+            js.keySymbolValuePair(JSON_STATUSSTRING_KEY, statusString);
+            js.keySymbolValuePair(JSON_APPSTATUSSTRING_KEY, appStatusString);
+            js.endObject();
+        }
+        catch (JSONException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to serialize a parameter set to JSON.", e);
+        }
+        return js.toString();
+    }
+
+
     @Override
     public String toJSONString() {
         JSONStringer js = new JSONStringer();

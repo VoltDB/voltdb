@@ -143,6 +143,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
             // and update their indexes against the table schema
             for (TupleValueExpression tve : allTves) {
                 tve.setColumnIndexUsingSchema(inputSchema);
+                assert (tve.getColumnIndex() >= 0 && tve.getColumnIndex() < inputSchema.size());
             }
         }
         // DON'T RE-SORT HERE

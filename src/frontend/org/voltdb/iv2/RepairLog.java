@@ -169,18 +169,22 @@ public class RepairLog
 
             m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
         } else if (msg instanceof FragmentTaskMessage) {
+            boolean newMp = false;
             final FragmentTaskMessage m = (FragmentTaskMessage) msg;
+            if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
+                m_lastMpHandle = m.getTxnId();
+                newMp = true;
+            }
 
-            // We can't repair read only SP transactions. Just don't log them to the repair log.
+            // We can't repair read only MP transactions. Just don't log them to the repair log.
             if (m.isReadOnly()) {
                 return;
             }
 
             truncate(m.getTruncationHandle(), IS_MP);
             // only log the first fragment of a procedure (and handle 1st case)
-            if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
+            if (newMp) {
                 m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
-                m_lastMpHandle = m.getTxnId();
                 m_lastSpHandle = m.getSpHandle();
             }
         }
@@ -188,7 +192,13 @@ public class RepairLog
             // a CompleteTransactionMessage which indicates restart is not the end of the
             // transaction.  We don't want to log it in the repair log.
             CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
-            // We can't repair read only SP transactions. Just don't log them to the repair log.
+
+            //Restore will send a complete transaction message with a lower mp transaction id because
+            //the restore transaction precedes the loading of the right mp transaction id from the snapshot
+            //Hence Math.max
+            m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
+
+            // We can't repair read only MP transactions. Just don't log them to the repair log.
             // Restart transaction do not need to be repaired here, don't log them as well.
             if (ctm.isReadOnly() || ctm.isRestart()) {
                 return;
@@ -196,10 +206,6 @@ public class RepairLog
 
             truncate(ctm.getTruncationHandle(), IS_MP);
             m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
-            //Restore will send a complete transaction message with a lower mp transaction id because
-            //the restore transaction precedes the loading of the right mp transaction id from the snapshot
-            //Hence Math.max
-            m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
             m_lastSpHandle = ctm.getSpHandle();
         }
         else if (msg instanceof DumpMessage) {

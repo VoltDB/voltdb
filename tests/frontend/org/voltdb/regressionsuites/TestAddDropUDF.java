@@ -86,7 +86,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 verifyStmtFails(client,
                         String.format("SELECT %s(%s) FROM T;", functionName,
                                 String.join(", ", Collections.nCopies(i, "a"))),
-                        "user lacks privilege or object not found: TESTFUNC");
+                        "object not found: TESTFUNC");
                 System.out.printf("Adding function %s named from method %s.%s\n",
                                   functionName, "BasicTestUDFSuite", methodName);
                 addFunction(client, functionName, "BasicTestUDFSuite." + methodName);
@@ -103,7 +103,7 @@ public class TestAddDropUDF extends RegressionSuite {
                 verifyStmtFails(client,
                         String.format("SELECT %s(%s) FROM T;", functionName,
                                 String.join(", ", Collections.nCopies(i, "a"))),
-                        "user lacks privilege or object not found: TESTFUNC");
+                        "object not found: TESTFUNC");
             }
         }
         dropEverything(client);
@@ -220,7 +220,7 @@ public class TestAddDropUDF extends RegressionSuite {
         // This should fail because we dropped the function.
         verifyStmtFails(client,
                 "create procedure proc as select ADD2biginT(BIG, BIG) from R1;",
-                "user lacks privilege or object not found: ADD2BIGINT");
+                "object not found: ADD2BIGINT");
 
         // See if we can do it all over again.
         cr = client.callProcedure("@AdHoc", "create function add2bigint from method org.voltdb_testfuncs.UserDefinedTestFunctions.add2Bigint;");

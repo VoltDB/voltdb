@@ -8,7 +8,6 @@
 /*.sublime-project
 /*.sublime-workspace
 /.tags
-/.idea
 /.DS_Store
 .DS_Store
 .cache/
@@ -18,8 +17,6 @@
 *~
 *runapp*.py
 *.log
-*.eml
-*.iml
 /build.local
 buildstring.txt
 host*+0000.txt
@@ -69,17 +66,19 @@ bundles
 *.lcbak
 .gradle/*
 build.gradle
-/lib/python/vdm/.idea/
 /lib/python/vdm/server/nohup.out/*
 /lib/python/vdm/tests/geb_vdm/.gradle/*
 /lib/python/vdm/tests/geb_vdm/build/*
 /lib/python/vdm/tests/server/test_reports/*
 /src/frontend/org/voltdb/.gradle/*
-/src/frontend/org/voltdb/.idea/*
-/tests/.idea/*
-/tests/geb/vmc/.idea/*
 /build/lib/voltdb.war
 /tests/geb/vmc/.nb-gradle/
 /lib/python/vdm/tests/geb_vdm/.nb-gradle/
 tools/meshmonitor/build/
 tools/meshmonitor/dist/
+
+# IntelliJ excluded files.
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/modules.xml
+

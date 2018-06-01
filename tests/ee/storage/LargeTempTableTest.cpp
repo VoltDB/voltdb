@@ -417,7 +417,7 @@ TEST_F(LargeTempTableTest, OverflowCache) {
     ASSERT_EQ(0, lttBlockCache->totalBlockCount());
     ASSERT_EQ(0, lttBlockCache->allocatedMemory());
 
-    LargeTempTableTopend* theTopend = dynamic_cast<LargeTempTableTopend*>(ExecutorContext::getExecutorContext()->getTopend());
+    LargeTempTableTopend* theTopend = dynamic_cast<LargeTempTableTopend*>(ExecutorContext::getExecutorContext()->getPhysicalTopend());
     ASSERT_EQ(0, theTopend->storedBlockCount());
 }
 

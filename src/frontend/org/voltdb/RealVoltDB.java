@@ -144,6 +144,7 @@ import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
@@ -238,9 +239,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "8.1";
+    static final String m_defaultVersionString = "8.2";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q8.1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q8.2\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -1221,7 +1222,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 for (Initiator ii : m_iv2Initiators.values()) {
                     localHSIds.add(ii.getInitiatorHSId());
                 }
-                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
+                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent(), m_globalServiceElector.getLeaderElectorNode());
                 m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
 
                 // Make a list of HDIds to join
@@ -2083,12 +2084,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                 List<Integer> m_partitionsToSitesAtStartupForExportInit)
     {
         TreeMap<Integer, Initiator> initiators = new TreeMap<>();
+        // Needed when static is reused by ServerThread
+        TransactionTaskQueue.resetScoreboards(m_messenger.getNextSiteId(), m_nodeSettings.getLocalSitesCount());
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
                     m_snapshotCompletionMonitor, startAction);
             initiators.put(partition, initiator);
             m_partitionsToSitesAtStartupForExportInit.add(partition);
+        }
+        if (StartAction.JOIN.equals(startAction)) {
+            TransactionTaskQueue.initBarrier(m_nodeSettings.getLocalSitesCount());
         }
         return initiators;
     }
@@ -4860,6 +4866,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public int getLowestPartitionId() {
         return m_iv2Initiators.firstKey();
+    }
+
+    public void updateReplicaForJoin(long siteId, long txnId) {
+        m_iv2Initiators.values().stream().filter(p->p.getInitiatorHSId() == siteId)
+            .forEach(s->((SpInitiator)s).updateReplicasForJoin(txnId));
+    }
+
+    @Override
+    public int getKFactor() {
+        return (m_catalogContext == null) ? 0 :
+                   getCatalogContext().getDeployment().getCluster().getKfactor();
     }
 }
 

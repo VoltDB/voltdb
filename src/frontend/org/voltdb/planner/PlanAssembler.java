@@ -1947,7 +1947,7 @@ public class PlanAssembler {
         OrderByPlanNode n = new OrderByPlanNode();
 
         for (ParsedColInfo col : cols) {
-            n.addSort(col.expression,
+            n.addSortExpression(col.expression,
                     col.ascending ? SortDirectionType.ASC
                                   : SortDirectionType.DESC);
         }
@@ -2287,7 +2287,7 @@ public class PlanAssembler {
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
 
         HashAggregatePlanNode reAggNodeForReplace = null;
-        if (m_parsedSelect.m_tableList.size() > 1 && !edgeCaseOuterJoin) {
+        if (m_parsedSelect.getScanCount() > 1 && !edgeCaseOuterJoin) {
             reAggNodeForReplace = reAggNode;
         }
         boolean find = mvFixInfo.processScanNodeWithReAggNode(sendNode, reAggNodeForReplace);
@@ -2295,7 +2295,7 @@ public class PlanAssembler {
 
         // If it is a normal joined query, replace the node under the
         // receive node with materialized view scan node.
-        if (m_parsedSelect.m_tableList.size() > 1 && !edgeCaseOuterJoin) {
+        if (m_parsedSelect.getScanCount() > 1 && !edgeCaseOuterJoin) {
             AbstractPlanNode joinNode = sendNodeChild;
             // No agg, limit pushed down at this point.
             assert(joinNode instanceof AbstractJoinPlanNode);
@@ -2528,13 +2528,13 @@ public class PlanAssembler {
                     pdir = orderByDirections.get(sidx);
                     dontsort[sidx] = true;
                 }
-                onode.addSort(partitionByExpression, pdir);
+                onode.addSortExpression(partitionByExpression, pdir);
             }
             for (int idx = 0; idx < winExpr.getOrderbySize(); ++idx) {
                 if (!dontsort[idx]) {
                     AbstractExpression orderByExpr = orderByExpressions.get(idx);
                     SortDirectionType  orderByDir  = orderByDirections.get(idx);
-                    onode.addSort(orderByExpr, orderByDir);
+                    onode.addSortExpression(orderByExpr, orderByDir);
                 }
             }
             onode.addAndLinkChild(root);
@@ -2555,7 +2555,7 @@ public class PlanAssembler {
                 List<AbstractExpression> orderExprs = scanNode.getFinalExpressionOrderFromIndexScan();
                 assert(orderExprs != null);
                 for (AbstractExpression ae : orderExprs) {
-                    onode.addSort(ae, dir);
+                    onode.addSortExpression(ae, dir);
                 }
                 // Link in the OrderByNode.
                 onode.addAndLinkChild(root);

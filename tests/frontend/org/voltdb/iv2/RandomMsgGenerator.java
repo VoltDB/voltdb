@@ -86,7 +86,7 @@ public class RandomMsgGenerator
         FragmentTaskMessage msg =
             new FragmentTaskMessage(0l, 0l, m_mpiTxnEgo.getTxnId(),
                     UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(), 0, MpInitiator.MP_INIT_PID),
-                    readOnly, isFinal, false);
+                    readOnly, isFinal, false, false, TransactionInfoBaseMessage.INITIAL_TIMESTAMP);
         return msg;
     }
 
@@ -95,7 +95,7 @@ public class RandomMsgGenerator
     {
         CompleteTransactionMessage msg =
             new CompleteTransactionMessage(0l, 0l, m_mpiTxnEgo.getTxnId(), readOnly, 0, isRollback,
-                    false, isRestart, false);
+                    false, isRestart, false, false, false);
         return msg;
     }
 

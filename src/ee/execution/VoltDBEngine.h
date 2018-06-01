@@ -270,7 +270,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        int64_t spHandle,
                        int64_t lastCommittedSpHandle,
                        int64_t uniqueId,
-                       bool returnUniqueViolations,
+                       bool returnConflictRows,
                        bool shouldDRStream,
                        int64_t undoToken);
 
@@ -796,7 +796,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ThreadLocalPool m_tlPool;
 
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
-        static int64_t s_loadTableResult;
+        static VoltEEExceptionType s_loadTableException;
 };
 
 inline bool startsWith(const string& s1, const string& s2) {

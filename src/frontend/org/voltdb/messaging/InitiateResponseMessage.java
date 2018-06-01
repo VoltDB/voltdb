@@ -58,6 +58,9 @@ public class InitiateResponseMessage extends VoltMessage {
     //when the site was leader partition
     boolean m_isForOldLeader = false;
 
+    // No need to serialize it
+    public boolean m_isFromNonRestartableSysproc = false;
+
     /** Empty constructor for de-serialization */
     public InitiateResponseMessage()
     {
@@ -328,7 +331,7 @@ public class InitiateResponseMessage extends VoltMessage {
             // TestSpSchedulerDedupe
             sb.append( "NULL" );
         } else {
-            sb.append(m_response.toJSONString());
+            sb.append(m_response.toStatusJSONString());
         }
 
         return sb.toString();

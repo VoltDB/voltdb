@@ -133,7 +133,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         // correlated
         sql = "select franchise_id, sum((select count(category) from store_types where type_id = stores.franchise_id)) as stores_in_category_AdHoc "
                 + " from stores group by franchise_id;";
-        failToCompile(sql, "user lacks privilege or object not found: STORES.FRANCHISE_ID");
+        failToCompile(sql, "object not found: STORES.FRANCHISE_ID");
     }
 
     public void testSelectParameterScalar() {

@@ -96,7 +96,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         assert(targetTable->isCatalogTableReplicated() ==
                 (m_replicatedTableOperation || SynchronizedThreadLock::isInSingleThreadMode()));
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
-                m_replicatedTableOperation, m_engine->isLowestSite(), s_modifiedTuples);
+                m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
         if (possiblySynchronizedUseMpMemory.okToExecute()) {
             if (m_truncate) {
                 VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
@@ -140,7 +140,9 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                            (int)targetTable->allocatedTupleCount());
 
             }
-            s_modifiedTuples = modified_tuples;
+            if (m_replicatedTableOperation) {
+                s_modifiedTuples = modified_tuples;
+            }
         }
         else {
             if (s_modifiedTuples == -1) {

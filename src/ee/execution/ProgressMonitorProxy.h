@@ -22,20 +22,11 @@
 
 namespace voltdb {
 
+class AbstractExecutor;
+
 class ProgressMonitorProxy {
 public:
-    ProgressMonitorProxy(ExecutorContext* executorContext, AbstractExecutor* exec)
-        : m_executorContext(executorContext)
-        , m_limits(NULL)
-        , m_tuplesRemainingUntilReport(
-              executorContext->pullTuplesRemainingUntilProgressReport(exec->getPlanNode()->getPlanNodeType()))
-        , m_countDown(m_tuplesRemainingUntilReport)
-    {
-        const AbstractTempTable *tt = exec->getTempOutputTable();
-        if (tt != NULL) {
-            m_limits = tt->getTempTableLimits();
-        }
-    }
+    ProgressMonitorProxy(ExecutorContext* executorContext, AbstractExecutor* exec);
 
     void countdownProgress()
     {

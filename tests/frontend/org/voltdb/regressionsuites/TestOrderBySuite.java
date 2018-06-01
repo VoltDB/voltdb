@@ -907,12 +907,13 @@ public class TestOrderBySuite extends RegressionSuite {
         assertTrue(vt.toString().contains("P_D32_10_IDX"));
 
         // Index P_D32_10_IDX ON P (P_D3 / 10, P_D2) does not cover ORDER BY expressions (P_D3 / 5, P_D2)
+        // Trivial coordinator makes MERGE RECEIVE possible
         sql = "select P_D0 from P where P.P_D3 / 10 > 0 order by P_D3 / 5, P_D2";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {0}, {2}, {3}};
         validateTableOfLongs(vt, expected);
         vt = client.callProcedure("@Explain", sql).getResults()[0];
-        assertFalse(vt.toString().contains("MERGE RECEIVE"));
+        assertTrue(vt.toString().contains("MERGE RECEIVE"));
         assertTrue(vt.toString().contains("P_D32_10_IDX"));
 
         // P_D0 is a partition column for P. All rows are from a single partition.

@@ -48,7 +48,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private boolean m_firstFragResponseSent = false;
 
     // a snapshot sink used to stream table data from multiple sources
-    private final StreamSnapshotSink m_dataSink;
+    private StreamSnapshotSink m_dataSink = null;
     private Mailbox m_streamSnapshotMb;
 
     private class CompletionAction extends JoinCompletionAction {
@@ -65,8 +65,9 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     {
         super(partitionId, "Elastic join producer:" + partitionId + " ", taskQueue);
         m_completionAction = new CompletionAction();
-        m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
-        m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb);
+        if (JOINLOG.isDebugEnabled()) {
+            JOINLOG.debug(m_whoami + "created");
+        }
     }
 
     /*
@@ -112,9 +113,16 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         connection.setPerPartitionTxnIds(partitionTxnIds, true);
     }
 
+    private void initMailBox() {
+        m_streamSnapshotMb = VoltDB.instance().getHostMessenger().createMailbox();
+        m_dataSink = new StreamSnapshotSink(m_streamSnapshotMb);
+    }
+
     private void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
+        initMailBox();
+
         registerSnapshotMonitor(message.getSnapshotNonce());
 
         // The lowest partition has a single source for all messages whereas all other partitions have a real
@@ -288,10 +296,5 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     public void close() throws IOException
     {
         m_taskLog.close();
-    }
-
-    @Override
-    public void enableRecording(long snapshotSpHandle) {
-        //Implemented by the nest task log, it is enabled immediately on construction
     }
 }

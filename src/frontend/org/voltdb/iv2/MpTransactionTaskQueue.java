@@ -51,7 +51,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
-        super(queue);
+        super(queue, false);
     }
 
     void setMpRoSitePool(MpRoSitePool sitePool)
@@ -133,7 +133,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 if (!balanceSPI || readonly) {
                     MpTransactionState txn = (MpTransactionState)next.getTransactionState();
                     // inject poison pill
-                    FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+                    FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L,
+                            false, false, false, txn.isNPartTxn(), txn.getTimetamp());
                     FragmentResponseMessage poison =
                             new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
                     // Provide a TransactionRestartException which will be converted

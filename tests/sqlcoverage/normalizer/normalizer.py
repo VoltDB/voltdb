@@ -51,10 +51,12 @@ def safecmp(x, y):
 def compare_results(suite, seed, statements_path, hsql_path, jni_path,
                     output_dir, report_invalid, report_all, extra_stats,
                     comparison_database, modified_sql_path,
-                    max_mismatches=0, within_minutes=0):
+                    max_mismatches=0, within_minutes=0, reproducer=0,
+                    ddl_file=None):
     """Just calls SQLCoverageReport.generate_html_reports(...).
     """
     return generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
                                  output_dir, report_invalid, report_all, extra_stats,
                                  comparison_database, modified_sql_path,
-                                 max_mismatches, within_minutes)
+                                 max_mismatches, within_minutes, reproducer,
+                                 ddl_file)

@@ -82,12 +82,52 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@ExplainProc", "T1.insert" ).getResults()[0];
         while (vt.advanceRow()) {
             System.out.println(vt);
-            String sql = vt.getString(0);
-            String plan = vt.getString(1);
-            assertTrue( sql.contains( "INSERT INTO T1 VALUES (?, ?, ?)" ));
-            assertTrue( plan.contains( "INSERT into \"T1\"" ));
-            assertTrue( plan.contains( "MATERIALIZE TUPLE from parameters and/or literals" ));
+            String name = vt.getString(0);
+            String sql = vt.getString(1);
+            String plan = vt.getString(2);
+            assertEquals("sql0", name);
+            assertEquals("INSERT INTO T1 VALUES (?, ?, ?);", sql);
+            assertTrue(plan.contains("INSERT into \"T1\""));
+            assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
         }
+
+        //test stored procedure loaded from Java class
+        vt = client.callProcedure("@ExplainProc", "JavaProcedure").getResults()[0];
+        for (int i = 0; i < 2; i++) {
+            vt.advanceRow();
+            String name = vt.getString(0);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
+            if (i == 0) {
+                assertEquals("insert", name);
+                assertEquals("insert into t4 values(?);", task);
+                assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
+                assertTrue(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
+                assertTrue(plan.contains("INSERT into \"T4\""));
+                assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
+            } else {
+                assertEquals("select", name);
+                assertEquals("select * from t4 where A>=?;", task);
+                assertTrue(plan.contains("RETURN RESULTS TO STORED PROCEDURE"));
+                assertTrue(plan.contains("SEQUENTIAL SCAN of \"T4\""));
+            }
+        }
+    }
+
+    public void testExplainView() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        // Test if the error checking is working properly.
+        verifyProcFails(client, "View T does not exist.", "@ExplainView", "T");
+        verifyProcFails(client, "Table T1 is not a view.", "@ExplainView", "T1");
+
+        vt = client.callProcedure("@ExplainView", "v" ).getResults()[0];
+        vt.advanceRow();
+        String task = vt.getString(0);
+        String plan = vt.getString(1);
+        assertEquals("", task);
+        assertEquals("No query plan is being used.", plan);
     }
 
     public void testExplainSingleTableView() throws IOException, ProcCallException {
@@ -205,15 +245,17 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // -2- select * from t1
         for (int i = 0; i < sql.length; i++) {
             vt.advanceRow();
-            String task = vt.getString(0);
-            String plan = vt.getString(1);
+            String name = vt.getString(0);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
+            assertEquals("sql" + i, name);
             assertEquals(sql[i], task);
             assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
             assertTrue(plan.contains("SEND PARTITION RESULTS TO COORDINATOR"));
             if (i == 0) {
                 assertTrue(plan.contains("INSERT into \"T1\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 1) {
+            } else {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T1\""));
             }
         }
@@ -230,8 +272,10 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // t2 is partitioned on PKEY
         for (int i = 0; i < sql.length; i++) {
             vt.advanceRow();
-            String task = vt.getString(0);
-            String plan = vt.getString(1);
+            String name = vt.getString(0);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
+            assertEquals("sql" + i, name);
             assertEquals(sql[i], task);
             // note that there is no send and receive data from all partitions unlike above query
             assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
@@ -239,7 +283,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             if (i == 0) {
                 assertTrue(plan.contains("INSERT into \"T2\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 1) {
+            } else {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
             }
         }
@@ -258,8 +302,10 @@ public class TestExplainCommandSuite extends RegressionSuite {
         // t2 is partitioned on PKEY
         for (int i = 0; i < sql.length; i++) {
             vt.advanceRow();
-            String task = vt.getString(0);
-            String plan = vt.getString(1);
+            String name = vt.getString(0);
+            String task = vt.getString(1);
+            String plan = vt.getString(2);
+            assertEquals("sql" + i, name);
             assertEquals(sql[i], task);
             // note that there is no send and receive data from all partitions unlike above query
             assertFalse(plan.contains("RECEIVE FROM ALL PARTITIONS"));
@@ -269,7 +315,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             } else if (i == 1) {
                 assertTrue(plan.contains("INSERT into \"T2\""));
                 assertTrue(plan.contains("MATERIALIZE TUPLE from parameters and/or literals"));
-            } else if (i == 2) {
+            } else {
                 assertTrue(plan.contains("SEQUENTIAL SCAN of \"T2\""));
             }
         }

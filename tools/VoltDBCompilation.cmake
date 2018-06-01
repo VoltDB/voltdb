@@ -119,6 +119,7 @@ SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} ${VOLTDB_LDFLAGS})
 # will build and run correctly.
 #
 ########################################################################
+SET (VOLTDB_COMPILER_U18p04 "7.3.0")
 SET (VOLTDB_COMPILER_U17p10 "7.2.0")
 SET (VOLTDB_COMPILER_U17p04 "6.3.0")
 SET (VOLTDB_COMPILER_U16p10 "6.2.0")
@@ -130,6 +131,13 @@ SET (VOLTDB_COMPILER_C7     "4.8.5")
 SET (VOLTDB_COMPILER_12p04  "4.6.3")
 SET (VOLTDB_COMPILER_C6     "4.4.7")
 SET (VOLTDB_COMPILER_OLDE   "4.4.0")
+#
+# Note: Update this when adding a new compiler support.
+#
+SET (VOLTDB_COMPILER_NEWEST ${VOLTDB_COMPILER_U18p04})
+#
+#
+#
 MESSAGE("Using compiler ${CMAKE_CXX_COMPILER_ID}")
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} -pthread)
@@ -137,16 +145,21 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   VOLTDB_ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas)
   # It turns out to be easier to go from a higher version to a lower
   # version, since we can't easily test <= and >=.
-  IF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p10 )
-    # COMPILER_VERSION > 7.2.0
+  IF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_NEWEST )
+    # COMPILER_VERSION > 7.3.0
     MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
-    MESSAGE ("We're using the options for 7.2.0, which is the newest one we've tried.  Good Luck.")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs)
+    MESSAGE ("We're using the options for ${CMAKE_COMPILER_NEWEST}, which is the newest one we've tried.  Good Luck.")
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
+    SET (CXX_VERSION_FLAG -std=c++11)
+  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p10 )
+    # 7.2.0 < COMPILER_VERSION <= 7.3.0
+    MESSAGE("Using the Ubuntu 17.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p04 )
-    # COMPILER_VERSION > 6.3.0
+    # < 6.3.0 COMPILER_VERSION <= 7.2.0
     MESSAGE("Using the Ubuntu 17.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
-    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs)
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs -Wno-array-bounds)
     SET (CXX_VERSION_FLAG -std=c++11)
   ELSEIF (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U16p10)
     # 6.2.0 < COMPILER_VERSION and COMPILER_VERSION <= 6.3.0
@@ -179,7 +192,7 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_CXX0X)
     # 4.6.0 < COMPILER_VERSION and COMPILER_VERSION <= 4.8.4
     # Use -std=c++0x.  This is in GCC's experimental C++11 compiler
-    # support region.
+    # support version, which is sufficient for our use.
     MESSAGE("Using the Centos 6 settings for ${CMAKE_CXX_COMPILER_VERSION}")
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
     SET (CXX_VERSION_FLAG -std=c++0x)

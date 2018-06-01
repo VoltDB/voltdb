@@ -57,6 +57,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.jni.ExecutionEngine;
@@ -872,7 +873,12 @@ public class ProcedureRunner {
                     clusterName, databaseName,
                     tableName, data, returnUniqueViolations, shouldDRStream, undo);
         } catch (EEException e) {
-            throw new VoltAbortException("Failed to load table: " + tableName);
+            String msg = "Failed to load table \"" + tableName + "\"";
+            if (e.getMessage() != null) {
+                msg += ": " + e.getMessage();
+            }
+
+            throw new VoltAbortException(msg);
         }
     }
 
@@ -1397,7 +1403,7 @@ public class ProcedureRunner {
         final int m_batchSize;
 
         // needed to get various IDs
-        private final TransactionState m_txnState;
+        private final MpTransactionState m_txnState;
 
         // the set of dependency ids for the expected results of the batch
         // one per sql statment
@@ -1418,7 +1424,7 @@ public class ProcedureRunner {
         // holds query results
         final VoltTable[] m_results;
 
-        BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask, String procedureName,
+        BatchState(int batchSize, MpTransactionState txnState, long siteId, boolean finalTask, String procedureName,
                 byte[] procToLoad, boolean perFragmentStatsRecording) {
             m_batchSize = batchSize;
             m_txnState = txnState;
@@ -1429,14 +1435,14 @@ public class ProcedureRunner {
 
             // the data and message for locally processed fragments
             m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId, siteId, m_txnState.txnId,
-                    m_txnState.uniqueId, m_txnState.isReadOnly(), false, txnState.isForReplay());
+                    m_txnState.uniqueId, m_txnState.isReadOnly(), false, txnState.isForReplay(), txnState.isNPartTxn(), txnState.getTimetamp());
             m_localTask.setProcedureName(procedureName);
             m_localTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
             m_localTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
 
             // the data and message for all sites in the transaction
             m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId, siteId, m_txnState.txnId,
-                    m_txnState.uniqueId, m_txnState.isReadOnly(), finalTask, txnState.isForReplay());
+                    m_txnState.uniqueId, m_txnState.isReadOnly(), finalTask, txnState.isForReplay(), txnState.isNPartTxn(), txnState.getTimetamp());
             m_distributedTask.setProcedureName(procedureName);
             // this works fine if procToLoad is NULL
             m_distributedTask.setProcNameToLoad(procToLoad);
@@ -1495,8 +1501,9 @@ public class ProcedureRunner {
      * Execute a batch of homogeneous queries, i.e. all reads or all writes.
      */
     VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
-
-        BatchState state = new BatchState(batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask,
+        MpTransactionState txnState = (MpTransactionState)m_txnState;
+        assert(txnState != null);
+        BatchState state = new BatchState(batch.size(), txnState, m_site.getCorrespondingSiteId(), finalTask,
                 m_procedureName, m_procNameToLoadForFragmentTasks, m_perCallStats.samplingStmts());
 
         // iterate over all sql in the batch, filling out the above data

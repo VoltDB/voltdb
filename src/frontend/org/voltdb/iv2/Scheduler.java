@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -206,7 +207,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void shutdown();
 
     @Override
-    abstract public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
+    abstract public long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId);
 
     @Override
     abstract public void deliver(VoltMessage message);
@@ -214,4 +215,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void enableWritingIv2FaultLog();
 
     abstract public boolean sequenceForReplay(VoltMessage m);
+
+    //flush out read only transactions upon host failure
+    public void cleanupTransactionBacklogOnRepair() {}
 }

@@ -138,9 +138,26 @@ public class CompleteTransactionTask extends TransactionTask
         return m_completeMsg.getSpHandle();
     }
 
+    public long getTimestamp()
+    {
+        return m_completeMsg.getTimestamp();
+    }
+
+    public long getMsgTxnId()
+    {
+        return m_completeMsg.getTxnId();
+    }
+
+    public boolean isAbortDuringRepair() {
+        return m_completeMsg.isAbortDuringRepair();
+    }
+
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("START replaying txn: " + this);
+        }
         if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
             // legacy interaces don't work this way and IV2 hasn't changed this
@@ -158,6 +175,9 @@ public class CompleteTransactionTask extends TransactionTask
         }
         else {
             m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
+        }
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE replaying txn: " + this);
         }
     }
 
@@ -184,10 +204,25 @@ public class CompleteTransactionTask extends TransactionTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("CompleteTransactionTask:");
-        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
-        sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
-        sb.append("  UNDO TOKEN: ").append(m_txnState.getBeginUndoToken());
+        if (m_txnState != null) {
+            sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+            sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
+            sb.append("  UNDO TOKEN: ").append(m_txnState.getBeginUndoToken());
+        }
         sb.append("  MSG: ").append(m_completeMsg.toString());
         return sb.toString();
+    }
+
+    public boolean needCoordination() {
+        return m_completeMsg.needsCoordination();
+    }
+
+    public CompleteTransactionMessage getCompleteMessage() {
+        return m_completeMsg;
+    }
+
+    @Override
+    public long getTxnId() {
+        return getMsgTxnId();
     }
 }

@@ -1582,12 +1582,14 @@ public class Expression {
     static class SimpleColumnContext {
         final Session m_session;
         final List<Expression> m_displayCols;
+        final int m_indexLimitVisible;
         final java.util.Set<Integer> m_ignoredDisplayColIndexes = new java.util.HashSet<>();
         private int m_startKey = -1;
 
-        SimpleColumnContext(Session session, List<Expression> displayCols) {
+        SimpleColumnContext(Session session, List<Expression> displayCols, int indexLimitVisible) {
             m_session = session;
             m_displayCols = displayCols;
+            m_indexLimitVisible = indexLimitVisible;
         }
 
         SimpleColumnContext withStartKey(int startKey) {
@@ -1624,7 +1626,7 @@ public class Expression {
         }
 
         public boolean disabledTheColumnForDisplay(int jj) {
-            return m_ignoredDisplayColIndexes.contains(jj);
+            return jj >= m_indexLimitVisible || m_ignoredDisplayColIndexes.contains(jj);
         }
 
 
@@ -1636,7 +1638,7 @@ public class Expression {
      * @throws HSQLParseException
      */
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException {
-        return voltGetXML(new SimpleColumnContext(session, null), null);
+        return voltGetXML(new SimpleColumnContext(session, null, 0), null);
     }
 
     /**
@@ -2009,7 +2011,7 @@ public class Expression {
         resolveTableColumns(table);
         Expression parent = null; // As far as I can tell, this argument just gets passed around but never used !?
         resolveTypes(session, parent);
-        return voltGetXML(new SimpleColumnContext(session, null), null);
+        return voltGetXML(new SimpleColumnContext(session, null, 0), null);
     }
 
     // A VoltDB extension to support indexed expressions

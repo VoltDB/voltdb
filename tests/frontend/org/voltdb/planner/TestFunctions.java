@@ -116,7 +116,7 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("select bin(9223372036854775809) from bit;", errorMsg);
 
         // invalid syntax
-        errorMsg = "user lacks privilege or object not found";
+        errorMsg = "object not found";
         failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE)from bit", errorMsg);
         failToCompile("select BIT_SHIFT_RIGHT(BIGINT_TYPE)from bit", errorMsg);
 
@@ -143,7 +143,7 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("SELECT  HEXTORAW(VARCHAR_TYPE) FROM NUMERICFUN",
                 "Function 'hextoraw' is not supported in VoltDB: Custom Function");
         failToCompile("SELECT  ATAN2(FLOAT_TYPE,FLOAT_TYPE) FROM NUMERICFUN",
-                "user lacks privilege or object not found: ATAN2");
+                "object not found: ATAN2");
 
     }
 
