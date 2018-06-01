@@ -31,6 +31,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     boolean m_isRestart;
     boolean m_isRecovering = false;
     boolean m_ackRequired = false;
+    boolean m_isAborted;
 
     /** Empty constructor for de-serialization */
     CompleteTransactionResponseMessage() {
@@ -44,6 +45,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_isRestart = msg.isRestart();
         m_spiHSId = msg.getCoordinatorHSId();
         m_ackRequired = msg.requiresAck();
+        m_isAborted = msg.isRestart() || msg.m_isAbortDuringRepair;
     }
 
     public long getTxnId()
@@ -66,6 +68,11 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         return m_isRestart;
     }
 
+    public boolean isAborted()
+    {
+        return m_isAborted;
+    }
+
     public boolean isRecovering()
     {
         return m_isRecovering;
@@ -85,7 +92,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8 + 8 + 8 + 1 + 1 + 1;
+        msgsize += 8 + 8 + 8 + 1 + 1 + 1 + 1;
         return msgsize;
     }
 
@@ -99,6 +106,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         buf.put((byte) (m_isRestart ? 1 : 0));
         buf.put((byte) (m_isRecovering ? 1 : 0));
         buf.put((byte) (m_ackRequired ? 1 : 0));
+        buf.put((byte) (m_isAborted ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -112,6 +120,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_isRestart = buf.get() == 1;
         m_isRecovering = buf.get() == 1;
         m_ackRequired = buf.get() == 1;
+        m_isAborted = buf.get() == 1;
         assert(buf.capacity() == buf.position());
     }
 
@@ -131,6 +140,8 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         sb.append(CoreUtils.hsIdToString(m_spiHSId));
         sb.append(" ISRESTART: ");
         sb.append(m_isRestart);
+        sb.append(" ISABORTED: ");
+        sb.append(m_isAborted);
         sb.append(" RECOVERING ");
         sb.append(m_isRecovering);
 
