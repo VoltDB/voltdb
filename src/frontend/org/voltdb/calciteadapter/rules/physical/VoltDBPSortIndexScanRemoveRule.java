@@ -55,12 +55,6 @@ public class VoltDBPSortIndexScanRemoveRule extends RelOptRule {
             AccessPath accessPath = scan.getAccessPath();
             accessPath.setSortDirection(sortDirection);
 
-//            Table catTableable = scan.getVoltDBTable().getCatTable();
-//            List<Column> columns = CatalogUtil.getSortedCatalogItems(catTableable.getColumns(), "index");
-//
-//            accessPath = IndexUtil.getCalciteRelevantAccessPathForIndex(
-//                    catTableable, columns, program.getCondition(), program, scan.getIndex(), SortDirectionType.INVALID);
-
             if (accessPath != null) {
                 VoltDBPTableIndexScan newScan = new VoltDBPTableIndexScan(
                     scan.getCluster(),
@@ -76,7 +70,7 @@ public class VoltDBPSortIndexScanRemoveRule extends RelOptRule {
                     scan.getAggregateRelNode(),
                     scan.getPreAggregateRowType(),
                     scan.getPreAggregateProgram());
-            call.transformTo(newScan);
+                call.transformTo(newScan);
             }
         }
     }

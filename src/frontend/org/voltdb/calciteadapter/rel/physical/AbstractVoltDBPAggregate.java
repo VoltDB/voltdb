@@ -196,20 +196,20 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
         return apn;
     }
 
-    private void setGroupByExpressions(AggregatePlanNode hapn) {
+    private void setGroupByExpressions(AggregatePlanNode apn) {
         ImmutableBitSet groupBy = getGroupSet();
         List<RelDataTypeField> rowTypeList = this.getRowType().getFieldList();
         for (int index = groupBy.nextSetBit(0); index != -1; index = groupBy.nextSetBit(index + 1)) {
             assert(index < rowTypeList.size());
             AbstractExpression groupByExpr = RelConverter.convertDataTypeField(rowTypeList.get(index));
-            hapn.addGroupByExpression(groupByExpr);
+            apn.addGroupByExpression(groupByExpr);
         }
     }
 
-    private void setPostPredicate(AggregatePlanNode hapn) {
+    private void setPostPredicate(AggregatePlanNode apn) {
         if (m_postPredicate != null) {
             AbstractExpression havingExpression = RexConverter.convert(m_postPredicate);
-            hapn.setPostPredicate(havingExpression);
+            apn.setPostPredicate(havingExpression);
         }
     }
 

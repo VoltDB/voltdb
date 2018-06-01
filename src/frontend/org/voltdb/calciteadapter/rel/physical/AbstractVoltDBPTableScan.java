@@ -149,7 +149,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
             pw.item("offset", m_offset);
         }
         if (m_aggregate != null) {
-            pw.item("aggregate", m_aggregate);
+            pw.item("aggregate", m_aggregate.getDigest());
         }
         return pw;
     }
