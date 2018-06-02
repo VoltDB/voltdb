@@ -42,6 +42,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TimeZone;
@@ -49,6 +50,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -1546,32 +1548,19 @@ public class SQLCommand
         }
 
         // read username and password from txt file
-        if (credentials.length() > 0) {
-            try {
-                fr = new FileReader(credentials);
-                br = new BufferedReader(fr);
-                String content = "";
-                String sCurrentLine;
-                while ((sCurrentLine = br.readLine()) != null) {
-                    content += sCurrentLine + " ";
-                }
-                String[] tokens = content.split("\\W+");
-                user = tokens[1];
-                password = tokens[3];
-            } catch (IOException e) {
-                System.err.println("Credential file not found or permission denied.");
-                System.exit(-1);
-            } finally {
-                try {
-                    if (br != null)
-                        br.close();
-                    if (fr != null)
-                        fr.close();
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-            }
+        File propFD = new File(credentials != null && !credentials.trim().isEmpty() ? credentials : "");
+        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+            throw new IllegalArgumentException("Credentials file " + credentials + " is not a read accessible file");
         }
+        Properties props = new Properties();
+        try {
+        	fr = new FileReader(credentials);
+            props.load(fr);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Credential file not found or permission denied.");
+        }
+        user = props.getProperty("username");
+        password = props.getProperty("password");
 
         try
         {
