@@ -1554,7 +1554,7 @@ public class SQLCommand
         }
         Properties props = new Properties();
         try {
-        	fr = new FileReader(credentials);
+            fr = new FileReader(credentials);
             props.load(fr);
         } catch (IOException e) {
             throw new IllegalArgumentException("Credential file not found or permission denied.");
