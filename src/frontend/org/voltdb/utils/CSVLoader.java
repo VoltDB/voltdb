@@ -466,7 +466,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         } else {
             Properties props = new Properties();
             try {
-        	    fr = new FileReader(config.credentials);
+                fr = new FileReader(config.credentials);
                 props.load(fr);
             } catch (IOException e) {
                 throw new IllegalArgumentException("Credential file not found or permission denied.");
