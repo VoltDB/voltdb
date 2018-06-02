@@ -25,6 +25,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -459,31 +460,19 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         final String[] serverlist = config.servers.split(",");
 
         // read username and password from txt file
-        if (config.credentials.length() > 0) {
+        File propFD = new File(config.credentials != null && !config.credentials.trim().isEmpty() ? config.credentials : "");
+        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+            throw new IllegalArgumentException("Credentials file " + config.credentials + " is not a read accessible file");
+        } else {
+            Properties props = new Properties();
             try {
-                fr = new FileReader(config.credentials);
-                br = new BufferedReader(fr);
-                String content = "";
-                String sCurrentLine;
-                while ((sCurrentLine = br.readLine()) != null) {
-                    content += sCurrentLine + " ";
-                }
-                String[] tokens = content.split("\\W+");
-                config.user = tokens[1];
-                config.password = tokens[3];
+        	    fr = new FileReader(config.credentials);
+                props.load(fr);
             } catch (IOException e) {
-                m_log.error("Credential file not found or permission denied.");
-                System.exit(-1);
-            } finally {
-                try {
-                    if (br != null)
-                        br.close();
-                    if (fr != null)
-                        fr.close();
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                throw new IllegalArgumentException("Credential file not found or permission denied.");
             }
+            config.user = props.getProperty("username");
+            config.password = props.getProperty("password");
         }
 
         // If we need to prompt the user for a password, do so.
