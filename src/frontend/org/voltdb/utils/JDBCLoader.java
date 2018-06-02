@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Properties;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -337,31 +338,19 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         final String[] serverlist = m_config.servers.split(",");
 
         // read username and password from txt file
-        if (cfg.credentials.length() > 0) {
+        File propFD = new File(m_config.credentials != null && !m_config.credentials.trim().isEmpty() ? m_config.credentials : "");
+        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+            throw new IllegalArgumentException("Credentials file " + m_config.credentials + " is not a read accessible file");
+        } else {
+            Properties props = new Properties();
             try {
-                fr = new FileReader(cfg.credentials);
-                br = new BufferedReader(fr);
-                String content = "";
-                String sCurrentLine;
-                while ((sCurrentLine = br.readLine()) != null) {
-                    content += sCurrentLine + " ";
-                }
-                String[] tokens = content.split("\\W+");
-                m_config.user = tokens[1];
-                m_config.password = tokens[3];
+                fr = new FileReader(m_config.credentials);
+                props.load(fr);
             } catch (IOException e) {
-                m_log.error("Credential file not found or permission denied.");
-                System.exit(-1);
-            } finally {
-                try {
-                    if (br != null)
-                        br.close();
-                    if (fr != null)
-                        fr.close();
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                throw new IllegalArgumentException("Credential file not found or permission denied.");
             }
+            m_config.user = props.getProperty("username");
+            m_config.password = props.getProperty("password");
         }
         // If we need to prompt the user for a VoltDB password, do so.
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter VoltDB password: ");
