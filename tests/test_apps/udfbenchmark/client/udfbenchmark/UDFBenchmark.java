@@ -23,16 +23,38 @@
 
 package udfbenchmark;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Timer;
 
 import org.voltdb.ClientAppBase;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
 
+import com.google_voltpatches.common.collect.ConcurrentHashMultiset;
+import com.google_voltpatches.common.collect.Multiset;
+
 public final class UDFBenchmark extends ClientAppBase {
+
+    static final String HORIZONTAL_RULE =
+            "----------" + "----------" + "----------" + "----------" +
+            "----------" + "----------" + "----------" + "----------" + "\n";
+
+    Timer timer;
+    long benchmarkStartTS;
 
     public UDFBenchmark(UDFBenchmarkConfig config) {
         super(config);
@@ -49,31 +71,44 @@ public final class UDFBenchmark extends ClientAppBase {
         UDFBenchmarkConfig config = (UDFBenchmarkConfig)m_config;
         m_appRunning = true;
 
-        // Partitioned table P1
-        printTaskHeader("Inserting rows into P1...");
-        generateData("P1", config.datasize);
-        printTaskHeader("Running benchmark on partitioned table P1...");
-        resetStats();
-        for (int i = 0; i < config.datasize; i++) {
-            m_client.callProcedure(new NullCallback(), "P1Tester", i);
-        }
-        m_client.drain();
-        m_timer.cancel();
-        printResults("udf-partitioned");
-        m_client.callProcedure("@AdHoc", "TRUNCATE TABLE P1;");
+        if (config.name.toLowerCase().contains("replicated")) {
+            // Replicated table R1
+            printTaskHeader("Inserting rows into R1...");
+            generateData("R1", config.datasize);
+            printTaskHeader("Running benchmark on replicated table R1...");
+            resetStats();
+            for (int i = 0; i < config.datasize; i++) {
+                m_client.callProcedure(new NullCallback(), "R1Tester", i);
+            }
+            m_client.drain();
+            m_timer.cancel();
 
-        // Replicated table R1
-        printTaskHeader("Inserting rows into R1...");
-        generateData("R1", config.datasize);
-        printTaskHeader("Running benchmark on replicated table R1...");
-        resetStats();
-        for (int i = 0; i < config.datasize; i++) {
-            m_client.callProcedure(new NullCallback(), "R1Tester", i);
+            // TODO: temp debug:
+            System.out.println("In UDFBenchmark.run:");
+            System.out.println("  about to call printResults with 'udf-replicated'.");
+
+            printResults("udf-replicated");
+            m_client.callProcedure("@AdHoc", "TRUNCATE TABLE R1;");
+
+        } else {
+            // Partitioned table P1
+            printTaskHeader("Inserting rows into P1...");
+            generateData("P1", config.datasize);
+            printTaskHeader("Running benchmark on partitioned table P1...");
+            resetStats();
+            for (int i = 0; i < config.datasize; i++) {
+                m_client.callProcedure(new NullCallback(), "P1Tester", i);
+            }
+            m_client.drain();
+            m_timer.cancel();
+
+            // TODO: temp debug:
+            System.out.println("In UDFBenchmark.run:");
+            System.out.println("  about to call printResults with 'udf-partitioned'.");
+
+            printResults("udf-partitioned");
+            m_client.callProcedure("@AdHoc", "TRUNCATE TABLE P1;");
         }
-        m_client.drain();
-        m_timer.cancel();
-        printResults("udf-replicated");
-        m_client.callProcedure("@AdHoc", "TRUNCATE TABLE R1;");
 
         // Finish up.
         m_appRunning = false;
@@ -126,6 +161,126 @@ public final class UDFBenchmark extends ClientAppBase {
                 SIMPLE_POLYGON_WTK);
         }
         m_client.drain();
+    }
+
+    /**
+     * Prints statistics about performance.
+     *
+     * @throws Exception if anything unexpected happens.
+     */
+    public synchronized void printResults(String statsName) throws Exception {
+        long thruput = 0;
+        long invocErrs = 0, invocAbrts = 0, invocTimeOuts = 0;
+        double avgLatcy = 0.0, k95pLatcy = 0.0, k99pLatcy = 0.0, internalLatcy = 0.0;
+        long totalInvoc = 0;
+        double duration = 0.0, minLatcy = 0.0, maxLatcy = 0.0;
+
+        // Currently not using this for loop, but it could be added back,
+        // if we choose to test against multiple clients
+//        for (int i = 0; i < m_config.clientscount; i++) {
+        ClientStats stats = m_fullStatsContext.fetchAndResetBaseline().getStats();
+
+        thruput += stats.getTxnThroughput();
+        invocErrs += stats.getInvocationErrors();
+        invocAbrts += stats.getInvocationAborts();
+        invocTimeOuts += stats.getInvocationTimeouts();
+
+        long temp = stats.getInvocationsCompleted() + stats.getInvocationAborts() + stats.getInvocationErrors() + stats.getInvocationTimeouts();
+        totalInvoc += temp;
+
+        avgLatcy += stats.getAverageLatency() * (double) temp;
+        k95pLatcy += stats.kPercentileLatency(0.95) * (double) temp;
+        k99pLatcy += stats.kPercentileLatency(0.99) * (double) temp;
+        internalLatcy += stats.getAverageInternalLatency() * (double) temp;
+//        }
+
+        avgLatcy = avgLatcy / (double) totalInvoc;
+        k95pLatcy = k95pLatcy / (double) totalInvoc;
+        k99pLatcy = k99pLatcy / (double) totalInvoc;
+        internalLatcy = internalLatcy / (double) totalInvoc;
+        duration = stats.getDuration();
+        minLatcy = stats.kPercentileLatencyAsDouble(0.0);
+        maxLatcy = stats.kPercentileLatencyAsDouble(1.0);
+
+
+        // Performance statistics
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Client Workload Statistics");
+        System.out.println(HORIZONTAL_RULE);
+
+        System.out.printf("Average throughput:            %,9d txns/sec\n", thruput);
+        System.out.printf("Average latency:               %,9.2f ms\n", avgLatcy);
+        System.out.printf("Minimum latency:               %,9.2f ms\n", minLatcy);
+        System.out.printf("Maximum latency:               %,9.2f ms\n", maxLatcy);
+        System.out.printf("95th percentile latency:       %,9.2f ms\n", k95pLatcy);
+        System.out.printf("99th percentile latency:       %,9.2f ms\n", k99pLatcy);
+
+        System.out.print("\n" + HORIZONTAL_RULE);
+        System.out.println(" System Server Statistics");
+        System.out.println(HORIZONTAL_RULE);
+        System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", internalLatcy);
+
+        System.out.print("\n" + HORIZONTAL_RULE);
+        System.out.println(" Transaction Results");
+        System.out.println(HORIZONTAL_RULE);
+
+        FileWriter fw = null;
+        UDFBenchmarkConfig config = (UDFBenchmarkConfig)m_config;
+
+        // TODO: temp debug:
+        System.out.println("In UDFBenchmark.printResults:");
+        System.out.println("  config.statsfile       :" + config.statsfile);
+        System.out.println("  config.statsfile.length:" + config.statsfile.length());
+        System.out.println("  stats.getStartTimestamp:" + stats.getStartTimestamp());
+        System.out.println("  stats.getEndTimestamp  :" + stats.getEndTimestamp());
+        System.out.println("  stats.getDuration      :" + stats.getDuration());
+        System.out.println("  stats.getInvocationsCompleted :" + stats.getInvocationsCompleted());
+        System.out.println("  stats.getTxnThroughput        :" + stats.getTxnThroughput());
+        System.out.println("  stats.getLatencyBucketsBy100ms:" + Arrays.toString(stats.getLatencyBucketsBy100ms()));
+        System.out.println("  stats.getLatencyBucketsBy10ms :" + Arrays.toString(stats.getLatencyBucketsBy10ms()));
+        System.out.println("  stats.getLatencyBucketsBy1ms  :" + Arrays.toString(stats.getLatencyBucketsBy1ms()));
+        System.out.println("  stats.kPercentileLatency(0)   :" + stats.kPercentileLatency(0.0));
+        System.out.println("  stats.kPercentileLatency(1)   :" + stats.kPercentileLatency(1.0));
+        System.out.println("  stats.kPercentileLatencyAsDouble(0):" + stats.kPercentileLatencyAsDouble(0.0));
+        System.out.println("  stats.kPercentileLatencyAsDouble(1):" + stats.kPercentileLatencyAsDouble(1.0));
+//        System.out.println("  config.duration        :" + config.duration);
+//        System.out.println("  config.duration * 1000 :" + config.duration * 1000);
+        System.out.println("  duration               :" + duration);
+        System.out.println("  duration * 1000        :" + duration * 1000);
+        System.out.println("  duration / 1000        :" + duration / 1000);
+        System.out.println("  totalInvoc   :" + totalInvoc);
+        System.out.println("  thruput      :" + thruput);
+        System.out.println("  avgLatcy     :" + avgLatcy);
+        System.out.println("  k95pLatcy    :" + k95pLatcy);
+        System.out.println("  k99pLatcy    :" + k99pLatcy);
+        System.out.println("  internalLatcy:" + internalLatcy);
+        System.out.println("  0.0 (2)      :" + 0.0);
+        System.out.println("  invocErrs    :" + invocErrs);
+        System.out.println("  invocAbrts   :" + invocAbrts);
+        System.out.println("  invocTimeOuts:" + invocTimeOuts);
+        if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+            fw = new FileWriter(config.statsfile);
+            // TODO: temp debug:
+            System.out.println("  FileWriter fw:" + fw);
+
+            fw.append(String.format("%d,%.6f,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d,%d,%d\n",
+                0,
+                duration / 1000,
+                totalInvoc,
+                minLatcy,
+                maxLatcy,
+                k95pLatcy,
+                k99pLatcy,
+                internalLatcy,
+                0.0,
+                0.0,
+                invocErrs,
+                invocAbrts,
+                invocTimeOuts));
+
+            fw.flush();
+            fw.close();
+        }
     }
 
     /**

@@ -25,10 +25,26 @@ package udfbenchmark;
 
 import org.voltdb.ClientAppBase;
 
-public class UDFBenchmarkConfig extends ClientAppBase.AppClientConfig {
+public class UDFBenchmarkConfig extends ClientAppBase.AppClientConfig //CLIConfig
+{
+
+    @Option(desc = "name of the benchmark to run")
+    String name = "UDF Benchmark";
+
+    @Option(desc = "Comma separated list of the form server[:port] to connect to.")
+    String servers = "localhost";
 
     @Option(desc = "Number of rows inserted for the benchmark.")
     int datasize = 10000000;
+
+    @Option(desc = "Interval for performance feedback, in seconds.")
+    long displayinterval = 60;
+
+    @Option(desc = "Warmup duration in seconds.")
+    int warmup = 2;
+
+    @Option(desc = "Filename to write raw summary statistics to.")
+    String statsfile = "udf-stats";
 
     @Override
     public void validateParameters() {

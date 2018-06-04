@@ -49,11 +49,11 @@ function clean() {
 function jars() {
     mkdir -p obj
     javac -classpath $APPCLASSPATH -d obj \
-        $APPNAME/*.java
+        client/$APPNAME/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
     pushd obj > /dev/null
-    jar cvf ../$APPNAME.jar $APPNAME/UDFLib*.class
+    jar cvf ../$APPNAME.jar $APPNAME/UDF*.class
     popd > /dev/null
 }
 
@@ -80,7 +80,8 @@ function server() {
 
 # run the client that drives the example
 function client() {
-    $APPNAME
+    $APPNAME udf-partitioned
+    $APPNAME udf-replicated
 }
 
 function udfbenchmark() {
@@ -89,10 +90,12 @@ function udfbenchmark() {
     rm -f udfstats-*
     java -classpath obj:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         $APPNAME.UDFBenchmark \
+        --name=$1 \
         --displayinterval=5 \
         --servers=localhost \
         --datasize=10000 \
-        --statsfile=udfstats-`date '+%Y-%m-%d'`
+        --latencyreport=true \
+        --statsfile=$1-stats-`date '+%Y-%m-%d'`
 }
 
 function help() {
