@@ -83,9 +83,6 @@ public class VoltDB {
     public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
-    public static final int INITIATOR_SITE_ID = 0;
-    public static final int SITES_TO_HOST_DIVISOR = 100;
-    public static final int MAX_SITES_PER_HOST = 128;
 
     // Staged filenames for advanced deployments
     public static final String INITIALIZED_MARKER = ".initialized";
