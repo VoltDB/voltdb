@@ -236,7 +236,6 @@ public class TestCSVLoaderSecurityEnabled {
         int validLineCnt = 0;
 
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
-        
         assertTrue(true);
     }
 
@@ -276,7 +275,6 @@ public class TestCSVLoaderSecurityEnabled {
         int validLineCnt = 0;
 
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
-        
         assertTrue(true);
     }
 
