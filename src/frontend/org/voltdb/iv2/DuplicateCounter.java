@@ -152,6 +152,13 @@ public class DuplicateCounter
     protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnSucceed)
     {
         if (!rejoining) {
+//            Test highlight mismatch at different position
+//            if(m_responseHashes != null) {
+//                int m = 4;
+//                for(int i = 3 ; i < 3 + 2*m ; i+=2) {
+//                    hashes[i] = m_responseHashes[i];
+//                }
+//            }
             if (m_responseHashes == null) {
                 m_responseHashes = hashes;
                 m_txnSucceed = txnSucceed;
