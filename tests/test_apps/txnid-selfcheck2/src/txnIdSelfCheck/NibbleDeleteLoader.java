@@ -171,13 +171,15 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             }
 
             VoltTable t = cr.getResults()[0];
+            System.out.println(t.toFormattedString());
+            t.resetRowPosition();
             while ( t.advanceRow() ) {
                 String table = t.getString(0);
                 if ( tableName.equalsIgnoreCase(table) ) {
                     // ROWS_DELETED  ROUNDS  ROWS_DELETED_LAST_ROUND  ROWS_REMAINING
                     stats.put("TIMESTAMP", t.getTimestampAsLong("TIMESTAMP"));
                     stats.put("TABLE", table);
-                    stats.put("ROWS_DELETED", t.getLong("ROWS_DELETED");
+                    stats.put("ROWS_DELETED", t.getLong("ROWS_DELETED"));
                     stats.put("ROWS_LEFT",t.getLong("ROWS_LEFT"));
                     break;
                 }
@@ -186,8 +188,26 @@ public class NibbleDeleteLoader extends BenchmarkThread {
 
         }
 
-        public void stop() {
+        public void shutdown(boolean diedEarly) {
             stop.set(true);
+            //last check
+            if (!diedEarly){
+                Map<String,Object> stats = getTTLStats(tableName);
+                if (stats.isEmpty()) {
+                    return;
+                }
+                int retries = 12;
+                long rowLeft = ((Long)stats.get("ROWS_LEFT")).longValue();
+                while (rowLeft != 0) {
+                    try { Thread.sleep(3000); } catch (Exception e2) {}
+                    stats = getTTLStats(tableName);
+                    rowLeft = ((Long)stats.get("ROWS_LEFT")).longValue();
+                    retries--;
+                    if (retries == 0 && rowLeft != 0) {
+                        Benchmark.hardStop("Nibble Delete hasn't finished on table '" + tableName + "' after a TTL of "+TTL+" seconds" );
+                    }
+                }
+            }
         }
     }
     @Override
@@ -251,19 +271,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             }
         }
 
-        this.monitor.stop();
+        this.monitor.shutdown(diedEarly);
         log.info("NibbleDeleteLoader completed for table " + tableName + " rows sent: " + insertsTried + " inserted: " + rowsLoaded.get());
-        if (!diedEarly) {
-            Map<String,Object> stats = getTTLStats(tableName);
-            int retries = 12;
-            while (stats.get("ROWS_LEFT") != 0) {
-                try { Thread.sleep(3000); } catch (Exception e2) {}
-                stats = getTTLStats(tableName);
-                retries--;
-                if (retries == 0 && stats.get("ROWS_LEFT") != 0) {
-                    Benchmark.hardStop("Nibble Delete hasn't finished on table '" + tableName + "' after a TTL of "+TTL+" seconds" );
-                }
-            }
-        }
     }
 }
