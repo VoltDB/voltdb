@@ -99,6 +99,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             String task = vt.getString(1);
             String plan = vt.getString(2);
             if (i == 0) {
+                System.out.println("The name is : "+name);
                 assertEquals("insert", name);
                 assertEquals("insert into t4 values(?);", task);
                 assertTrue(plan.contains("RECEIVE FROM ALL PARTITIONS"));
