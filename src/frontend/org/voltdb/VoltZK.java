@@ -107,7 +107,6 @@ public class VoltZK {
     public static final String leaders_initiators = "/db/leaders/initiators";
     public static final String leaders_globalservice = "/db/leaders/globalservice";
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
-    public static final String ttl_statistics = "/db/ttimeToLive";
 
     public static final String debugLeadersInfo(ZooKeeper zk) {
         StringBuilder builder = new StringBuilder("ZooKeeper:\n");
@@ -222,7 +221,6 @@ public class VoltZK {
             actionBlockers,
             request_truncation_snapshot,
             host_ids_be_stopped,
-            ttl_statistics,
             actionLock
     };
 

@@ -295,7 +295,6 @@ public class TestLowImpactDelete extends TestCase {
                 VoltTable result = response.getResults()[0];
                 assertEquals(1, result.getRowCount());
                 result.advanceRow();
-                long deleted = result.getLong("ROWS_DELETED");
                 long rowsLeft = result.getLong("ROWS_LEFT");
                 assertTrue (rowsLeft == 0);
                 try {
@@ -335,9 +334,8 @@ public class TestLowImpactDelete extends TestCase {
             Thread.sleep(60*1000);
             VoltTable vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
             System.out.println(vt.toFormattedString());
-            vt.resetRowPosition();
-            vt.advanceRow();
-            assertEquals(500, vt.getLong("ROWS_DELETED"));
+            vt = m_client.callProcedure("@AdHoc", "select count(*) from TTL").getResults()[0];
+            assertEquals(0, vt.asScalarLong());
 
             for (int i = 500; i < 1000; i++) {
                 try {
@@ -349,9 +347,8 @@ public class TestLowImpactDelete extends TestCase {
             Thread.sleep(60*1000);
             vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
             System.out.println(vt.toFormattedString());
-            vt.resetRowPosition();
-            vt.advanceRow();
-            assertEquals(1000, vt.getLong("ROWS_DELETED"));
+            vt = m_client.callProcedure("@AdHoc", "select count(*) from TTL").getResults()[0];
+            assertEquals(0, vt.asScalarLong());
         } catch (Exception e) {
             fail("Failed to get row count from Table ttl:" + e.getMessage());
         }

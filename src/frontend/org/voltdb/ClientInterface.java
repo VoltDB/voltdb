@@ -2334,8 +2334,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (error != null && !"".equals(error)) {
                         hostLog.warn("Errors occured when running TTL one table " + tableName + ":" +  error);
                     }
-                    stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"),
-                            t.getLong("DELETED_LAST_ROUND"),  t.getLong("ROUNDS"));
+                    stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"));
                 }
                 latch.countDown();
             }

@@ -78,6 +78,9 @@ public class StatsAgent extends OpsAgent
         case DRROLE:
             request.aggregateTables = aggregateDRRoleStats(request.aggregateTables);
             break;
+        case TTL:
+            request.aggregateTables = aggregateTTLStats(request.aggregateTables);
+            break;
         default:
         }
     }
@@ -344,17 +347,6 @@ public class StatsAgent extends OpsAgent
             collectTopoStats(psr,jsonConfig);
             return;
         }
-        else if (subselector.equalsIgnoreCase("TTL")) {
-            PendingOpsRequest psr = new PendingOpsRequest(
-                    selector,
-                    subselector,
-                    c,
-                    clientHandle,
-                    System.currentTimeMillis(),
-                    obj);
-            collectTTLStats(psr);
-            return;
-        }
         else if (subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
             PendingOpsRequest psr = new PendingOpsRequest(
                     selector,
@@ -460,18 +452,6 @@ public class StatsAgent extends OpsAgent
             sendClientResponse(psr);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to return TOPO results to client.", true, e);
-        }
-    }
-
-    private void collectTTLStats(PendingOpsRequest psr)
-    {
-        VoltTable[] ttlTable = new VoltTable[1];
-        ttlTable[0] = getStatsAggregate(StatsSelector.TTL, false, psr.startTime);
-        psr.aggregateTables  = ttlTable;
-        try {
-            sendClientResponse(psr);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to return TTL results to client.", true, e);
         }
     }
 
@@ -589,6 +569,9 @@ public class StatsAgent extends OpsAgent
         case GC:
             stats = collectStats(StatsSelector.GC, interval);
             break;
+        case TTL:
+            stats = collectStats(StatsSelector.TTL, interval);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -634,6 +617,9 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
+    private VoltTable[] aggregateTTLStats(VoltTable[] stats) {
+        return stats;
+    }
     // This is just a roll-up of MEMORY, TABLE, INDEX, PROCEDURE, INITIATOR, IO, and
     // STARVATION
     private VoltTable[] collectManagementStats(boolean interval)
