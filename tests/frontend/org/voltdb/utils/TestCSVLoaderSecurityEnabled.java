@@ -236,6 +236,48 @@ public class TestCSVLoaderSecurityEnabled {
         int validLineCnt = 0;
 
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+        
+        assertTrue(true);
+    }
+
+    @Test
+    public void testUsingCredentialFileIncludingSpecialCharactersInPassword() throws Exception {
+        try{
+            BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_credentials ) );
+            String[] credentials = {"username: operator", "password: mech!!!"};
+            for (String token : credentials) {
+                out_csv.write(token + "\n");
+            }
+            out_csv.flush();
+            out_csv.close();
+        }
+        catch( Exception e) {
+            System.err.print( e.getMessage() );
+        }
+
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--credentials="+path_credentials,
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--limitrows=100",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+                "1 ,1,1,11111111,first,2000.00,1.11,"+currentTime+",POINT(1 1),\"POLYGON((0 0, 1 0, 0 1, 0 0))\""
+        };
+        int invalidLineCnt = 1;
+        int validLineCnt = 0;
+
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+        
+        assertTrue(true);
     }
 
     // read from hard-coded data, no encoding

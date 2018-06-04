@@ -335,6 +335,73 @@ public class TestJDBCSecurityEnabled {
     }
 
     @Test
+    public void testUsingCrendentialFileIncludingSpecialCharactersInPassword() throws NoConnectionsException, IOException, ProcCallException, InterruptedException{
+
+        // write username / password to csv
+        String[] authData = {"Username: userWithAdminPerm", "Password: password!"};
+        try {
+            BufferedWriter output_csv = new BufferedWriter( new FileWriter( path_csv_user ) );
+            for (String line: authData) {
+                output_csv.write(line + "\n");
+            }
+            output_csv.flush();
+            output_csv.close();
+        } catch (Exception e) {
+            System.err.print( e.getMessage() );
+        }
+
+        // write data to csv
+        String []myData = { "1 ,2000.00,1.11" };
+        try {
+            BufferedWriter output_csv = new BufferedWriter( new FileWriter( path_csv_data ) );
+            for (String line: myData) {
+                output_csv.write(line + "\n");
+            }
+            output_csv.flush();
+            output_csv.close();
+        } catch (Exception e) {
+            System.err.print( e.getMessage() );
+        }
+
+        // read data to db using csvloader
+        String[] csvOptions = {
+                "-f" + path_csv_data,
+                "--reportdir=" + tmpCSVFileDir,
+                "--maxerrors=50",
+                "--credentials=" + path_csv_user,
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "TC"
+        };
+        CSVLoader.testMode = true;
+        CSVLoader.main(csvOptions);
+
+        String[] jdbcOptions = {
+                "--jdbcdriver=" + driver_class,
+                "--jdbcurl=" + jdbc_url,
+                "--jdbctable=" + "TC",
+                "--reportdir=" + tmpCSVFileDir,
+                "--maxerrors=50",
+                "--credentials=" + path_csv_user,
+                "--port=",
+                "T"
+        };
+
+        //Reload using JDBC
+        JDBCLoader.testMode = true;
+        JDBCLoader.main(jdbcOptions);
+
+        VoltTable modCount;
+        modCount = client.callProcedure("@AdHoc", "SELECT * FROM T;").getResults()[0];
+        System.out.println("data inserted to table T:\n" + modCount);
+        int rowct = modCount.getRowCount();
+        assertEquals(rowct, 1);
+    }
+
+    @Test
     public void testPerms() throws Exception {
         Properties props = new Properties();
         props.setProperty("password", "password");
