@@ -227,31 +227,20 @@ public class KafkaLoader implements ImporterLifecycle {
         FileReader fr = null;
         BufferedReader br = null;
 
-        if (m_cliOptions.credentials.length() > 0) {
+        // read username and password from txt file
+        File propFD = new File(m_cliOptions.credentials != null && !m_cliOptions.credentials.trim().isEmpty() ? m_cliOptions.credentials : "");
+        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+            throw new IllegalArgumentException("Credentials file " + m_cliOptions.credentials + " is not a read accessible file");
+        } else {
+            Properties props = new Properties();
             try {
                 fr = new FileReader(m_cliOptions.credentials);
-                br = new BufferedReader(fr);
-                String content = "";
-                String sCurrentLine;
-                while ((sCurrentLine = br.readLine()) != null) {
-                    content += sCurrentLine + " ";
-                }
-                String[] tokens = content.split("\\W+");
-                m_cliOptions.user = tokens[1];
-                m_cliOptions.password = tokens[3];
+                props.load(fr);
             } catch (IOException e) {
-                LOGGER.error("Credentials file not found or permission denied");
-                System.exit(-1);
-            } finally {
-                try {
-                    if (br != null)
-                        br.close();
-                    if (fr != null)
-                        fr.close();
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                throw new IllegalArgumentException("Credential file not found or permission denied.");
             }
+            m_cliOptions.user = props.getProperty("username");
+            m_cliOptions.password = props.getProperty("password");
         }
 
         // If we need to prompt the user for a VoltDB password, do so.

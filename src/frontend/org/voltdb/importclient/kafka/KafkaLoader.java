@@ -107,31 +107,20 @@ public class KafkaLoader {
         FileReader fr = null;
         BufferedReader br = null;
 
-        if (m_config.credentials.length() > 0) {
+        // read username and password from txt file
+        File propFD = new File(m_config.credentials != null && !m_config.credentials.trim().isEmpty() ? m_config.credentials : "");
+        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+            throw new IllegalArgumentException("Credentials file " + m_config.credentials + " is not a read accessible file");
+        } else {
+            Properties props = new Properties();
             try {
                 fr = new FileReader(m_config.credentials);
-                br = new BufferedReader(fr);
-                String content = "";
-                String sCurrentLine;
-                while ((sCurrentLine = br.readLine()) != null) {
-                    content += sCurrentLine + " ";
-                }
-                String[] tokens = content.split("\\W+");
-                m_config.user = tokens[1];
-                m_config.password = tokens[3];
+                props.load(fr);
             } catch (IOException e) {
-                m_log.error("Credentials file not found or permission denied");
-                System.exit(-1);
-            } finally {
-                try {
-                    if (br != null)
-                        br.close();
-                    if (fr != null)
-                        fr.close();
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                throw new IllegalArgumentException("Credential file not found or permission denied.");
             }
+            m_config.user = props.getProperty("username");
+            m_config.password = props.getProperty("password");
         }
 
         // Split server list
