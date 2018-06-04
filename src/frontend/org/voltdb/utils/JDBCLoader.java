@@ -338,19 +338,21 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         final String[] serverlist = m_config.servers.split(",");
 
         // read username and password from txt file
-        File propFD = new File(m_config.credentials != null && !m_config.credentials.trim().isEmpty() ? m_config.credentials : "");
-        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
-            throw new IllegalArgumentException("Credentials file " + m_config.credentials + " is not a read accessible file");
-        } else {
-            Properties props = new Properties();
-            try {
-                fr = new FileReader(m_config.credentials);
-                props.load(fr);
-            } catch (IOException e) {
-                throw new IllegalArgumentException("Credential file not found or permission denied.");
+        if (m_config.credentials != null && !m_config.credentials.trim().isEmpty()) {
+            File propFD = new File(m_config.credentials);
+            if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+                throw new IllegalArgumentException("Credentials file " + m_config.credentials + " is not a read accessible file");
+            } else {
+                Properties props = new Properties();
+                try {
+                    fr = new FileReader(m_config.credentials);
+                    props.load(fr);
+                } catch (IOException e) {
+                    throw new IllegalArgumentException("Credential file not found or permission denied.");
+                }
+                m_config.user = props.getProperty("username");
+                m_config.password = props.getProperty("password");
             }
-            m_config.user = props.getProperty("username");
-            m_config.password = props.getProperty("password");
         }
         // If we need to prompt the user for a VoltDB password, do so.
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter VoltDB password: ");

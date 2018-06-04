@@ -16,7 +16,6 @@
  */
 package org.voltdb.importclient.kafka10;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
@@ -225,22 +224,23 @@ public class KafkaLoader implements ImporterLifecycle {
 
     private void processKafkaMessages() throws Exception {
         FileReader fr = null;
-        BufferedReader br = null;
 
         // read username and password from txt file
-        File propFD = new File(m_cliOptions.credentials != null && !m_cliOptions.credentials.trim().isEmpty() ? m_cliOptions.credentials : "");
-        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
-            throw new IllegalArgumentException("Credentials file " + m_cliOptions.credentials + " is not a read accessible file");
-        } else {
-            Properties props = new Properties();
-            try {
-                fr = new FileReader(m_cliOptions.credentials);
-                props.load(fr);
-            } catch (IOException e) {
-                throw new IllegalArgumentException("Credential file not found or permission denied.");
+        if (m_cliOptions.credentials != null && !m_cliOptions.credentials.trim().isEmpty()) {
+            File propFD = new File(m_cliOptions.credentials);
+            if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+                throw new IllegalArgumentException("Credentials file " + m_cliOptions.credentials + " is not a read accessible file");
+            } else {
+                Properties props = new Properties();
+                try {
+                    fr = new FileReader(m_cliOptions.credentials);
+                    props.load(fr);
+                } catch (IOException e) {
+                    throw new IllegalArgumentException("Credential file not found or permission denied.");
+                }
+                m_cliOptions.user = props.getProperty("username");
+                m_cliOptions.password = props.getProperty("password");
             }
-            m_cliOptions.user = props.getProperty("username");
-            m_cliOptions.password = props.getProperty("password");
         }
 
         // If we need to prompt the user for a VoltDB password, do so.

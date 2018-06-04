@@ -460,19 +460,21 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         final String[] serverlist = config.servers.split(",");
 
         // read username and password from txt file
-        File propFD = new File(config.credentials != null && !config.credentials.trim().isEmpty() ? config.credentials : "");
-        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
-            throw new IllegalArgumentException("Credentials file " + config.credentials + " is not a read accessible file");
-        } else {
-            Properties props = new Properties();
-            try {
-                fr = new FileReader(config.credentials);
-                props.load(fr);
-            } catch (IOException e) {
-                throw new IllegalArgumentException("Credential file not found or permission denied.");
+        if (config.credentials != null && !config.credentials.trim().isEmpty()) {
+            File propFD = new File(config.credentials != null && !config.credentials.trim().isEmpty() ? config.credentials : "");
+            if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+                throw new IllegalArgumentException("Credentials file " + config.credentials + " is not a read accessible file");
+            } else {
+                Properties props = new Properties();
+                try {
+                    fr = new FileReader(config.credentials);
+                    props.load(fr);
+                } catch (IOException e) {
+                    throw new IllegalArgumentException("Credential file not found or permission denied.");
+                }
+                config.user = props.getProperty("username");
+                config.password = props.getProperty("password");
             }
-            config.user = props.getProperty("username");
-            config.password = props.getProperty("password");
         }
 
         // If we need to prompt the user for a password, do so.

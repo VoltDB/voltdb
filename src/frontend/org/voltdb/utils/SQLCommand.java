@@ -1403,7 +1403,6 @@ public class SQLCommand
         String credentials = "";
         String kerberos = "";
         FileReader fr = null;
-        BufferedReader br = null;
         List<String> queries = null;
         String ddlFileText = "";
         String sslConfigFile = null;
@@ -1548,19 +1547,21 @@ public class SQLCommand
         }
 
         // read username and password from txt file
-        File propFD = new File(credentials != null && !credentials.trim().isEmpty() ? credentials : "");
-        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
-            throw new IllegalArgumentException("Credentials file " + credentials + " is not a read accessible file");
-        } else {
-            Properties props = new Properties();
-            try {
-                fr = new FileReader(credentials);
-                props.load(fr);
-            } catch (IOException e) {
-                throw new IllegalArgumentException("Credential file not found or permission denied.");
+        if (credentials != null && !credentials.trim().isEmpty()) {
+            File propFD = new File(credentials);
+            if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+                throw new IllegalArgumentException("Credentials file " + credentials + " is not a read accessible file");
+            } else {
+                Properties props = new Properties();
+                try {
+                    fr = new FileReader(credentials);
+                    props.load(fr);
+                } catch (IOException e) {
+                    throw new IllegalArgumentException("Credential file not found or permission denied.");
+                }
+                user = props.getProperty("username");
+                password = props.getProperty("password");
             }
-            user = props.getProperty("username");
-            password = props.getProperty("password");
         }
 
         try
