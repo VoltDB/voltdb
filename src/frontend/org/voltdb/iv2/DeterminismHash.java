@@ -144,7 +144,7 @@ public class DeterminismHash {
             sb.append("\n  Ran Statement ").append(hashes[i]);
             sb.append(" with Parameters ").append(hashes[i + 1]);
             if(pos == m_hashMismatchPos) {
-                sb.append(" <--");
+                sb.append(" <--- ALERT: Hash mismatch starts from here!");
             }
             pos++;
         }
