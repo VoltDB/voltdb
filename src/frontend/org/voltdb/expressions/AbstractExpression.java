@@ -301,7 +301,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public void setValueSize(int size) {
         assert (size >= 0);
-        assert (size <= 10000000);
+        assert (size <= 10_000_000);
         m_valueSize = size;
     }
 
