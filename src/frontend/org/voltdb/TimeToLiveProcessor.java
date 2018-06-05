@@ -242,8 +242,8 @@ public class TimeToLiveProcessor extends StatsSource{
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
-        columns.add(new ColumnInfo("TIMESTAMP", VoltType.TIMESTAMP));
-        columns.add(new ColumnInfo("TABLE", VoltType.STRING));
+        columns.add(new ColumnInfo("LAST_DELETE_TIMESTAMP", VoltType.TIMESTAMP));
+        columns.add(new ColumnInfo("TABLE_NAME", VoltType.STRING));
         columns.add(new ColumnInfo("ROWS_DELETED", VoltType.INTEGER));
         columns.add(new ColumnInfo("ROWS_LEFT", VoltType.INTEGER));
     }
@@ -259,8 +259,8 @@ public class TimeToLiveProcessor extends StatsSource{
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
         TTLStats stats = m_stats.get(rowKey);
         if (stats != null) {
-            rowValues[columnNameToIndex.get("TIMESTAMP")] = stats.ts;
-            rowValues[columnNameToIndex.get("TABLE")] = rowKey;
+            rowValues[columnNameToIndex.get("LAST_DELETE_TIMESTAMP")] = stats.ts;
+            rowValues[columnNameToIndex.get("TABLE_NAME")] = rowKey;
             rowValues[columnNameToIndex.get("ROWS_DELETED")] = stats.rowsDeleted;
             rowValues[columnNameToIndex.get("ROWS_LEFT")] = stats.rowsLeft;
         }
