@@ -98,6 +98,7 @@ public class TestJDBCSecurityEnabled {
         new UserInfo("userWithSQLPerm", "password", new String[] {"GroupWithSQLPerm"}),
         new UserInfo("userWithSQLReadPerm", "password", new String[] {"GroupWithSQLReadPerm"}),
         new UserInfo("userWithAdminPerm", "password", new String[] {"GroupWithAdminPerm"}),
+        new UserInfo("userWithAdminPerm2", "password!!!", new String[] {"GroupWithAdminPerm"}),
         new UserInfo("userWithDefaultProcPerm", "password", new String[] {"GroupWithDefaultProcPerm"}),
         new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"GroupWithDefaultProcReadPerm"}),
         new UserInfo("userWithAllProcPerm", "password", new String[] {"GroupWithAllProcPerm"}),
@@ -338,7 +339,7 @@ public class TestJDBCSecurityEnabled {
     public void testUsingCrendentialFileIncludingSpecialCharactersInPassword() throws NoConnectionsException, IOException, ProcCallException, InterruptedException{
 
         // write username / password to csv
-        String[] authData = {"Username: userWithAdminPerm", "Password: password!"};
+        String[] authData = {"Username: userWithAdminPerm2", "Password: password!!!"};
         try {
             BufferedWriter output_csv = new BufferedWriter( new FileWriter( path_csv_user ) );
             for (String line: authData) {

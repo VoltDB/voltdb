@@ -85,7 +85,8 @@ public class TestCSVLoaderSecurityEnabled {
     };
 
     public static final UserInfo[] USERS = new UserInfo[] {
-        new UserInfo("operator", "mech", new String[] {"Operator"})
+        new UserInfo("operator", "mech", new String[] {"Operator"}),
+        new UserInfo("operator2", "mech!!!", new String[] {"Operator"})
     };
 
     public static void prepare() {
@@ -236,14 +237,13 @@ public class TestCSVLoaderSecurityEnabled {
         int validLineCnt = 0;
 
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
-        assertTrue(true);
     }
 
     @Test
     public void testUsingCredentialFileIncludingSpecialCharactersInPassword() throws Exception {
         try{
             BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_credentials ) );
-            String[] credentials = {"username: operator", "password: mech!!!"};
+            String[] credentials = {"username: operator2", "password: mech!!!"};
             for (String token : credentials) {
                 out_csv.write(token + "\n");
             }
@@ -275,7 +275,6 @@ public class TestCSVLoaderSecurityEnabled {
         int validLineCnt = 0;
 
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
-        assertTrue(true);
     }
 
     // read from hard-coded data, no encoding
