@@ -47,6 +47,7 @@ import org.voltdb.utils.BulkLoaderErrorHandler;
 import org.voltdb.utils.CSVBulkDataLoader;
 import org.voltdb.utils.CSVDataLoader;
 import org.voltdb.utils.CSVTupleDataLoader;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.RowWithMetaData;
 
 /**
@@ -227,20 +228,9 @@ public class KafkaLoader implements ImporterLifecycle {
 
         // read username and password from txt file
         if (m_cliOptions.credentials != null && !m_cliOptions.credentials.trim().isEmpty()) {
-            File propFD = new File(m_cliOptions.credentials);
-            if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
-                throw new IllegalArgumentException("Credentials file " + m_cliOptions.credentials + " is not a read accessible file");
-            } else {
-                Properties props = new Properties();
-                try {
-                    fr = new FileReader(m_cliOptions.credentials);
-                    props.load(fr);
-                } catch (IOException e) {
-                    throw new IllegalArgumentException("Credential file not found or permission denied.");
-                }
-                m_cliOptions.user = props.getProperty("username");
-                m_cliOptions.password = props.getProperty("password");
-            }
+            Properties props = MiscUtils.readPropertiesFromCredentials(m_cliOptions.credentials);
+            m_cliOptions.user = props.getProperty("username");
+            m_cliOptions.password = props.getProperty("password");
         }
 
         // If we need to prompt the user for a VoltDB password, do so.

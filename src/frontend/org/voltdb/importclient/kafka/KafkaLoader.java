@@ -45,6 +45,7 @@ import org.voltdb.utils.BulkLoaderErrorHandler;
 import org.voltdb.utils.CSVBulkDataLoader;
 import org.voltdb.utils.CSVDataLoader;
 import org.voltdb.utils.CSVTupleDataLoader;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.RowWithMetaData;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
@@ -107,20 +108,9 @@ public class KafkaLoader {
 
         // read username and password from txt file
         if (m_config.credentials != null && !m_config.credentials.trim().isEmpty()) {
-            File propFD = new File(m_config.credentials != null && !m_config.credentials.trim().isEmpty() ? m_config.credentials : "");
-            if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
-                throw new IllegalArgumentException("Credentials file " + m_config.credentials + " is not a read accessible file");
-            } else {
-                Properties props = new Properties();
-                try {
-                    fr = new FileReader(m_config.credentials);
-                    props.load(fr);
-                } catch (IOException e) {
-                    throw new IllegalArgumentException("Credential file not found or permission denied.");
-                }
-                m_config.user = props.getProperty("username");
-                m_config.password = props.getProperty("password");
-            }
+            Properties props = MiscUtils.readPropertiesFromCredentials(m_config.credentials);
+            m_config.user = props.getProperty("username");
+            m_config.password = props.getProperty("password");
         }
 
         // Split server list
