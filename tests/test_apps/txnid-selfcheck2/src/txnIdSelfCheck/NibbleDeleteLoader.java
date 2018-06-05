@@ -133,8 +133,8 @@ public class NibbleDeleteLoader extends BenchmarkThread {
                     Map<String,Object> stats = getTTLStats(tableName);
                     if (response.getStatus() == ClientResponse.SUCCESS ) {
                         long unDeletedRows  = response.getResults()[0].asScalarLong();
-                        log.info("Total inserted rows:" + rowsLoaded.get() + " Rows behind from being deleted:"+unDeletedRows);
-                        log.info("Stats Rows behind from being deleted:" + String.valueOf(stats.get("ROWS_LEFT")));
+                        log.info("Total inserted rows:" + rowsLoaded.get() + " Rows behind from being deleted:" + unDeletedRows);
+                        log.info("Stats Rows behind from being deleted:" + stats.get("ROWS_LEFT"));
                         long currentRemainingRows = rowsLoaded.get() - remainingRows;
                         if (currentRemainingRows == totalDeleted && totalDeleted > 0){
                             //nothing deleted in last round
@@ -180,17 +180,17 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             VoltTable t = cr.getResults()[0];
             System.out.println(t.toFormattedString());
             t.resetRowPosition();
+            stats.put("TABLE", tableName);
+            long deleted = 0;
+            long left = 0;
             while ( t.advanceRow() ) {
-                String table = t.getString("TABLE_NAME");
-                if ( tableName.equalsIgnoreCase(table) ) {
-                    // ROWS_DELETED ROWS_LEFT
-                    stats.put("TIMESTAMP", t.getTimestampAsLong("LAST_DELETE_TIMESTAMP"));
-                    stats.put("TABLE", tableName);
-                    stats.put("ROWS_DELETED", t.getLong("ROWS_DELETED"));
-                    stats.put("ROWS_LEFT",t.getLong("ROWS_LEFT"));
-                    break;
+                if ( tableName.equalsIgnoreCase(t.getString("TABLE_NAME")) ) {
+                   deleted += t.getLong("ROWS_DELETED");
+                   left += t.getLong("ROWS_LEFT");
                 }
             }
+            stats.put("ROWS_DELETED", deleted);
+            stats.put("ROWS_LEFT",left);
             return stats;
         }
 

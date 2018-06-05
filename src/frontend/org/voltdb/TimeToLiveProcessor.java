@@ -20,11 +20,9 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -45,26 +43,50 @@ import org.voltdb.utils.CatalogUtil;
 public class TimeToLiveProcessor extends StatsSource{
 
     static final int DELAY = Integer.getInteger("TIME_TO_LIVE_DELAY", 0);
-    static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 5);
+    static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 2);
     static final int CHUNK_SIZE = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
     static final int TIMEOUT = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
 
-    public static class TTLStats {
+    public static class TTLStats implements Comparable<TTLStats>{
+        final int hostId;
+        final String hostName;
+        final int siteId;
+        final int partitionId;
         final String tableName;
         long rowsLeft = 0L;
         long rowsDeleted = 0L;
         Timestamp ts;
-        public TTLStats(String tableName) {
+
+        public TTLStats(String tableName, int hostId, int siteId, int partitionId, String hostName) {
             this.tableName = tableName;
+            this.hostId = hostId;
+            this.siteId = siteId;
+            this.partitionId = partitionId;
+            this.hostName = hostName;
         }
-        public void update(long rowDeleted, long rowsLeft) {
+
+        public void update(long rowDeleted, long rowsLeft, long executionTimeStamp) {
             this.rowsDeleted = rowDeleted;
             this.rowsLeft = rowsLeft;
-            ts = new Timestamp(System.currentTimeMillis());
+            ts = new Timestamp(executionTimeStamp);
         }
+
         @Override
         public String toString() {
             return String.format("TTL stats on table %s: tuples deleted %d, tuples remaining %d", tableName, rowsDeleted, rowsLeft);
+        }
+
+        @Override
+        public int compareTo(TTLStats other){
+            if (!(other.tableName.equalsIgnoreCase(tableName))){
+                return (other.tableName.compareTo(tableName));
+            }
+            return (other.siteId - this.siteId);
+        }
+
+        @Override
+        public int hashCode() {
+            return (siteId + tableName.hashCode());
         }
     }
 
@@ -73,24 +95,20 @@ public class TimeToLiveProcessor extends StatsSource{
         final String tableName;
         AtomicReference<TimeToLive> ttlRef;
         final ClientInterface cl;
-        final TTLStats stats;
         AtomicBoolean canceled = new AtomicBoolean(false);
-        final int m_hostId;
-        public TTLTask(String table, TimeToLive timeToLive, ClientInterface clientInterface, TTLStats ttlStats, int hostId) {
+        public TTLTask(String table, TimeToLive timeToLive, ClientInterface clientInterface) {
             tableName = table;
             ttlRef = new AtomicReference<>(timeToLive);
             cl= clientInterface;
-            stats = ttlStats;
-            m_hostId = hostId;
         }
         @Override
         public void run() {
             if (!canceled.get()) {
                 TimeToLive ttl = ttlRef.get();
                 cl.runTimeToLive(tableName, ttl.getTtlcolumn().getName(),
-                        transformValue(ttl), CHUNK_SIZE, TIMEOUT, stats);
+                        transformValue(ttl), CHUNK_SIZE, TIMEOUT);
                 if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("Executing ttl on table " + tableName +  " host:" + m_hostId);
+                    hostLog.debug("Executing ttl on table " + tableName);
                 }
             }
         }
@@ -207,12 +225,7 @@ public class TimeToLiveProcessor extends StatsSource{
             }
             TTLTask task = m_tasks.get(t.getTypeName());
             if (task == null) {
-                TTLStats stats = m_stats.get(t.getTypeName());
-                if (stats == null) {
-                    stats = new TTLStats(t.getTypeName());
-                    m_stats.put(t.getTypeName(), stats);
-                }
-                task = new TTLTask(t.getTypeName(), ttl, m_interface, stats, m_hostId);
+                task = new TTLTask(t.getTypeName(), ttl, m_interface);
                 m_tasks.put(t.getTypeName(), task);
                 m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY, INTERVAL, TimeUnit.SECONDS));
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));
@@ -242,6 +255,11 @@ public class TimeToLiveProcessor extends StatsSource{
 
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
+        columns.add(new ColumnInfo("TIMESTAMP", VoltType.BIGINT));
+        columns.add(new ColumnInfo("HOST_ID", VoltType.BIGINT));
+        columns.add(new ColumnInfo("HOSTNAME", VoltType.STRING));
+        columns.add(new ColumnInfo("SITE_ID", VoltType.BIGINT));
+        columns.add(new ColumnInfo("PARTITION_ID", VoltType.BIGINT));
         columns.add(new ColumnInfo("LAST_DELETE_TIMESTAMP", VoltType.TIMESTAMP));
         columns.add(new ColumnInfo("TABLE_NAME", VoltType.STRING));
         columns.add(new ColumnInfo("ROWS_DELETED", VoltType.INTEGER));
@@ -250,8 +268,9 @@ public class TimeToLiveProcessor extends StatsSource{
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        Set<String> stats = new HashSet<>();
+        List<String> stats = new ArrayList<>();
         stats.addAll(m_stats.keySet());
+        Collections.sort(stats);
         return new DummyIterator(stats.iterator());
     }
 
@@ -259,10 +278,25 @@ public class TimeToLiveProcessor extends StatsSource{
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
         TTLStats stats = m_stats.get(rowKey);
         if (stats != null) {
+            rowValues[columnNameToIndex.get("TIMESTAMP")] = System.currentTimeMillis();
+            rowValues[columnNameToIndex.get("HOST_ID")] = stats.hostId;
+            rowValues[columnNameToIndex.get("HOSTNAME")] = stats.hostName;
+            rowValues[columnNameToIndex.get("SITE_ID")] = stats.siteId;
+            rowValues[columnNameToIndex.get("PARTITION_ID")] = stats.partitionId;
             rowValues[columnNameToIndex.get("LAST_DELETE_TIMESTAMP")] = stats.ts;
             rowValues[columnNameToIndex.get("TABLE_NAME")] = rowKey;
             rowValues[columnNameToIndex.get("ROWS_DELETED")] = stats.rowsDeleted;
             rowValues[columnNameToIndex.get("ROWS_LEFT")] = stats.rowsLeft;
         }
+    }
+
+    public void regsiterStats(String tableName, int siteId, int partitionId, long rowsDeleted, long rowsLeft, long timeStamp) {
+        final String key = tableName + siteId;
+        TTLStats stats = m_stats.get(key);
+        if (stats == null) {
+            stats = new TTLStats(tableName, m_hostId, siteId, partitionId, m_messenger.getHostname());
+            m_stats.put(tableName, stats);
+        }
+        stats.update(rowsDeleted, rowsLeft, timeStamp);
     }
 }

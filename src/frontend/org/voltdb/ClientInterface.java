@@ -2317,8 +2317,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    public void runTimeToLive(String tableName, String columnName, long ttlValue, int chunkSize, int timeout,
-            TimeToLiveProcessor.TTLStats stats) {
+    public void runTimeToLive(String tableName, String columnName, long ttlValue, int chunkSize, int timeout) {
 
         CountDownLatch latch = new CountDownLatch(1);
         final ProcedureCallback cb = new ProcedureCallback() {
@@ -2334,7 +2333,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (error != null && !"".equals(error)) {
                         hostLog.warn("Errors occured when running TTL one table " + tableName + ":" +  error);
                     }
-                    stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"));
                 }
                 latch.countDown();
             }

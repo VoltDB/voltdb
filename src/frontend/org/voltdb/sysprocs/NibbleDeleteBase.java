@@ -24,10 +24,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -219,10 +221,13 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
                                        cutoffValue == null ? params : new Object[] {cutoffValue},
                                        replicated);
         long deletedRows = result.asScalarLong();
-
+        long rowsLeft = rowCount - deletedRows;
         // Return rows be deleted in this run and rows left for next run
         VoltTable retTable = new VoltTable(schema);
-        retTable.addRow(deletedRows, rowCount - deletedRows);
+        retTable.addRow(deletedRows, rowsLeft);
+        RealVoltDB db = (RealVoltDB)VoltDB.instance();
+        db.registerTTLStats(tableName, CoreUtils.getSiteIdFromHSId(ctx.getSiteId()), ctx.getPartitionId(),
+                deletedRows, rowsLeft, System.currentTimeMillis());
         return retTable;
     }
 }
