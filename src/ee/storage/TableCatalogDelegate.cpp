@@ -80,10 +80,25 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     // sort it by Column index to preserve column order.
     auto numColumns = catalogTable.columns().size();
     bool needsDRTimestamp = isXDCR && catalogTable.isDRed();
-    TupleSchemaBuilder schemaBuilder(numColumns,
-                                     needsDRTimestamp ? 1 : 0); // number of hidden columns
+    bool needsHiddenCountForView = false;
 
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
+    for (colIterator = catalogTable.columns().begin();
+         colIterator != catalogTable.columns().end(); colIterator++) {
+        auto catalogColumn = colIterator->second;
+        if (catalogColumn->aggregatetype() == 0 || catalogColumn->aggregatetype() == 41) {
+          // not a view or there exists count(*), directly quit
+          break;
+        }
+    }
+    if (colIterator == catalogTable.columns().end()) {
+      // iterator meets the end, meaning no count(*) column
+      needsHiddenCountForView = true;
+    }
+
+    TupleSchemaBuilder schemaBuilder(numColumns,
+                                     (needsDRTimestamp ? 1 : 0) + (needsHiddenCountForView ? 1 : 0)); // hidden columns
+
     for (colIterator = catalogTable.columns().begin();
          colIterator != catalogTable.columns().end(); colIterator++) {
 
@@ -94,7 +109,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
                                        catalogColumn->nullable(),
                                        catalogColumn->inbytes());
     }
-
+    
     if (needsDRTimestamp) {
         // Create a hidden timestamp column for a DRed table in an
         // active-active context.
@@ -106,6 +121,10 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
                                              VALUE_TYPE_BIGINT,
                                              8,      // field size in bytes
                                              false); // nulls not allowed
+    }
+
+    if (needsHiddenCountForView) {
+      schemaBuilder.setHiddenColumnAtIndex(needsDRTimestamp ? 1 : 0, VALUE_TYPE_BIGINT, 8, false);
     }
 
     return schemaBuilder.build();

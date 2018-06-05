@@ -169,13 +169,13 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
                                             int32_t compactionThreshold) {
     assert (schema != NULL);
     uint16_t hiddenColumnCount = schema->hiddenColumnCount();
-    if (hiddenColumnCount == 1) {
+    if (hiddenColumnCount == 1 && ! m_isMaterialized) {
         m_drTimestampColumnIndex = 0; // The first hidden column
         // At some point if we have more than one hidden column in a table,
         // we'll need a system for keeping track of which are which.
     }
     else {
-        assert (hiddenColumnCount == 0);
+        assert (m_isMaterialized || hiddenColumnCount == 0);
     }
 
     Table::initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);

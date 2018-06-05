@@ -559,11 +559,6 @@ public class MaterializedViewProcessor {
             assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
         }
 
-        if (countStarFound == false) {
-            msg.append("must have count(*) after the GROUP BY columns (if any)");
-            throw m_compiler.new VoltCompilerException(msg.toString());
-        }
-
         AbstractExpression where = stmt.getSingleTableFilterExpression();
         if (where != null) {
             checkExpressions.add(where);
