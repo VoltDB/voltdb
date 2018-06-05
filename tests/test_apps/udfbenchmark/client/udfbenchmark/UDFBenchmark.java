@@ -83,10 +83,6 @@ public final class UDFBenchmark extends ClientAppBase {
             m_client.drain();
             m_timer.cancel();
 
-            // TODO: temp debug:
-            System.out.println("In UDFBenchmark.run:");
-            System.out.println("  about to call printResults with 'udf-replicated'.");
-
             printResults("udf-replicated");
             m_client.callProcedure("@AdHoc", "TRUNCATE TABLE R1;");
 
@@ -101,10 +97,6 @@ public final class UDFBenchmark extends ClientAppBase {
             }
             m_client.drain();
             m_timer.cancel();
-
-            // TODO: temp debug:
-            System.out.println("In UDFBenchmark.run:");
-            System.out.println("  about to call printResults with 'udf-partitioned'.");
 
             printResults("udf-partitioned");
             m_client.callProcedure("@AdHoc", "TRUNCATE TABLE P1;");
@@ -227,45 +219,12 @@ public final class UDFBenchmark extends ClientAppBase {
         FileWriter fw = null;
         UDFBenchmarkConfig config = (UDFBenchmarkConfig)m_config;
 
-        // TODO: temp debug:
-        System.out.println("In UDFBenchmark.printResults:");
-        System.out.println("  config.statsfile       :" + config.statsfile);
-        System.out.println("  config.statsfile.length:" + config.statsfile.length());
-        System.out.println("  stats.getStartTimestamp:" + stats.getStartTimestamp());
-        System.out.println("  stats.getEndTimestamp  :" + stats.getEndTimestamp());
-        System.out.println("  stats.getDuration      :" + stats.getDuration());
-        System.out.println("  stats.getInvocationsCompleted :" + stats.getInvocationsCompleted());
-        System.out.println("  stats.getTxnThroughput        :" + stats.getTxnThroughput());
-        System.out.println("  stats.getLatencyBucketsBy100ms:" + Arrays.toString(stats.getLatencyBucketsBy100ms()));
-        System.out.println("  stats.getLatencyBucketsBy10ms :" + Arrays.toString(stats.getLatencyBucketsBy10ms()));
-        System.out.println("  stats.getLatencyBucketsBy1ms  :" + Arrays.toString(stats.getLatencyBucketsBy1ms()));
-        System.out.println("  stats.kPercentileLatency(0)   :" + stats.kPercentileLatency(0.0));
-        System.out.println("  stats.kPercentileLatency(1)   :" + stats.kPercentileLatency(1.0));
-        System.out.println("  stats.kPercentileLatencyAsDouble(0):" + stats.kPercentileLatencyAsDouble(0.0));
-        System.out.println("  stats.kPercentileLatencyAsDouble(1):" + stats.kPercentileLatencyAsDouble(1.0));
-//        System.out.println("  config.duration        :" + config.duration);
-//        System.out.println("  config.duration * 1000 :" + config.duration * 1000);
-        System.out.println("  duration               :" + duration);
-        System.out.println("  duration * 1000        :" + duration * 1000);
-        System.out.println("  duration / 1000        :" + duration / 1000);
-        System.out.println("  totalInvoc   :" + totalInvoc);
-        System.out.println("  thruput      :" + thruput);
-        System.out.println("  avgLatcy     :" + avgLatcy);
-        System.out.println("  k95pLatcy    :" + k95pLatcy);
-        System.out.println("  k99pLatcy    :" + k99pLatcy);
-        System.out.println("  internalLatcy:" + internalLatcy);
-        System.out.println("  0.0 (2)      :" + 0.0);
-        System.out.println("  invocErrs    :" + invocErrs);
-        System.out.println("  invocAbrts   :" + invocAbrts);
-        System.out.println("  invocTimeOuts:" + invocTimeOuts);
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
             fw = new FileWriter(config.statsfile);
-            // TODO: temp debug:
-            System.out.println("  FileWriter fw:" + fw);
 
             fw.append(String.format("%d,%.6f,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d,%d,%d\n",
                 0,
-                duration / 1000,
+                duration / 1000, // convert from milliseconds to seconds
                 totalInvoc,
                 minLatcy,
                 maxLatcy,

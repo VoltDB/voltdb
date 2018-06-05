@@ -25,7 +25,7 @@ package udfbenchmark;
 
 import org.voltdb.ClientAppBase;
 
-public class UDFBenchmarkConfig extends ClientAppBase.AppClientConfig //CLIConfig
+public class UDFBenchmarkConfig extends ClientAppBase.AppClientConfig
 {
 
     @Option(desc = "name of the benchmark to run")
@@ -50,6 +50,12 @@ public class UDFBenchmarkConfig extends ClientAppBase.AppClientConfig //CLIConfi
     public void validateParameters() {
         if (datasize < 0) {
             exitWithMessageAndUsage("datasize must be 0 or a positive integer");
+        }
+        if (displayinterval < 0) {
+            exitWithMessageAndUsage("displayinterval must be 0 or a positive integer");
+        }
+        if (warmup < 0) {
+            exitWithMessageAndUsage("warmup must be 0 or a positive integer");
         }
     }
 }
