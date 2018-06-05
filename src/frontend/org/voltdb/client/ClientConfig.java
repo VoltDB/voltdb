@@ -506,4 +506,11 @@ public class ClientConfig {
             m_sslConfig = new SSLConfiguration.SslConfig();
         }
     }
+
+    public void setTrustStoreConfigFromDefault() {
+        String trustStore = System.getProperty("java.home") + File.separator + "lib" + File.separator + "security" + File.separator + "cacerts";
+        String trustStorePassword = "changeit";
+
+        m_sslConfig = new SSLConfiguration.SslConfig(null, null, trustStore, trustStorePassword);
+    }
 }

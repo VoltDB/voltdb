@@ -2835,6 +2835,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     //TODO: Is there a better place for this ssl setup work and constant defns
     private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
     private static final String DEFAULT_KEYSTORE_PASSWD = "password";
+    private static final String DEFAULT_TRUSTSTORE_RESOURCE = System.getProperty("java.home") + File.separator + "lib" + File.separator + "security" + File.separator + "cacerts";
+    private static final String DEFAULT_TRUSTSTORE_PASSWD = "changeit";
     private void setupSSL(ReadDeploymentResults readDepl) {
         SslType sslType = readDepl.deployment.getSsl();
         m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
@@ -2894,7 +2896,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
         if (m_config.m_startAction != StartAction.PROBE || trustStorePath != null) {
             if (m_config.m_sslEnable) {
-                trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
+                trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_TRUSTSTORE_RESOURCE):getResourcePath(trustStorePath);
             }
             if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
                 throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
@@ -2906,7 +2908,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
             if (m_config.m_sslEnable && null == trustStorePassword) {
-                trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+                trustStorePassword = DEFAULT_TRUSTSTORE_PASSWD;
             }
             if (trustStorePassword == null) {
                 throw new IllegalArgumentException("An SSL truststore password was not specified.");
