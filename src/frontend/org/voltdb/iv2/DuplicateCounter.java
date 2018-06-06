@@ -152,23 +152,23 @@ public class DuplicateCounter
     protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnSucceed)
     {
         if (!rejoining) {
-//            Test highlight mismatch at different position
+            int pos = -1;
             if (m_responseHashes == null) {
                 m_responseHashes = hashes;
                 m_txnSucceed = txnSucceed;
             }
-            else if (DeterminismHash.compareHashes(m_responseHashes, hashes) >= 0) {
+            else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation("HASH MISMATCH", hashes, message, DeterminismHash.compareHashes(m_responseHashes, hashes));
+                logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
                 return MISMATCH;
             }
             else if (m_txnSucceed != txnSucceed) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " succeeded on one partition but failed on another partition."
                         + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, -1);
+                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
                 return ABORT;
             }
             m_lastResponse = message;
