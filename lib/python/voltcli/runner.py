@@ -689,7 +689,7 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
             content = ""
             for line in credentialsFile:
                 content += line
-            user,usr,password,pswd = content.split( )
+            user,usr,password,pswd = content.replace(':', ' ').split()
             command.opts.username = usr
             command.opts.password = pswd
             credentialsFile.close()
