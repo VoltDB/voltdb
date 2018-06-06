@@ -902,7 +902,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public void setViewsEnabled(String viewNames, boolean enabled) {
-        if ("".equals(viewNames)) {
+        if (viewNames.equals("")) {
             return;
         }
         if (enabled) {

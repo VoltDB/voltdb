@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
@@ -1831,7 +1830,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public void setViewsEnabled(String viewNames, boolean enabled) {
-        if (StringUtil.isEmpty(viewNames)) {
+        if (viewNames.equals("")) {
             return;
         }
         if (enabled) {

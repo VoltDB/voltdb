@@ -1565,6 +1565,12 @@ VoltDBEngine::loadTable(int32_t tableId,
         return false;
     }
 
+    // If this is a paused non-empty single table view, load data into the delta table
+    // instead of the main table.
+    if (table->deltaTable() && table->materializedViewTrigger()) {
+        table = table->deltaTable();
+    }
+
     // When loading a replicated table, behavior should be:
     //   ConstraintFailureExceptions may be thrown on the lowest site thread.
     //   If throwUniqueViolations is true:
@@ -2733,7 +2739,7 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
     bool updateReplicated = false;
     // The loop below is executed exactly twice. The first iteration has updateReplicated = false, where we
     // update the partitioned views. The updateReplicated flag is flipped to true at the end of the iteration,
-    // which allows the loop to execute for a second time to update replicated views.
+    // which allows the loop to execute for a second round to update replicated views.
     do {
         VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
         // Update all the partitioned table views first, then update all the replicated table views.
