@@ -2457,6 +2457,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
+                if (deployment.getDr() != null) { 
+                	consoleLog.error("Database Replication is not supported " + 
+                			"in the community edition of VoltDB."); 
+                	shutdownDeployment = true; 
+                }
                 // check the start action for the community edition
                 if (m_config.m_startAction == StartAction.JOIN) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
@@ -2683,6 +2688,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     consoleLog.error("Command logging is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
+                }
+                if (deployment.getDr() != null) { 
+                	consoleLog.error("Database Replication is not supported " + 
+                			"in the community edition of VoltDB."); 
+                	shutdownDeployment = true; 
                 }
                 if (m_config.m_startAction == StartAction.JOIN) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
