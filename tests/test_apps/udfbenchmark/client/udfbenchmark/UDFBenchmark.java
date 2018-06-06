@@ -71,7 +71,7 @@ public final class UDFBenchmark extends ClientAppBase {
         UDFBenchmarkConfig config = (UDFBenchmarkConfig)m_config;
         m_appRunning = true;
 
-        if (config.name.toLowerCase().contains("replicated")) {
+        if (config.table.equalsIgnoreCase("replicated")) {
             // Replicated table R1
             printTaskHeader("Inserting rows into R1...");
             generateData("R1", config.datasize);
@@ -224,7 +224,7 @@ public final class UDFBenchmark extends ClientAppBase {
 
             fw.append(String.format("%d,%.6f,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d,%d,%d\n",
                 0,
-                duration / 1000, // convert from milliseconds to seconds
+                duration, // in milliseconds
                 totalInvoc,
                 minLatcy,
                 maxLatcy,

@@ -28,8 +28,8 @@ import org.voltdb.ClientAppBase;
 public class UDFBenchmarkConfig extends ClientAppBase.AppClientConfig
 {
 
-    @Option(desc = "name of the benchmark to run")
-    String name = "UDF Benchmark";
+    @Option(desc = "the type of table to be tested")
+    String table = "partitioned";
 
     @Option(desc = "Comma separated list of the form server[:port] to connect to.")
     String servers = "localhost";

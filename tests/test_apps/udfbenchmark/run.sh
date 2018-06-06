@@ -111,24 +111,24 @@ function udfbenchmark() {
 }
 
 function udf-partitioned() {
-    udf-with-name-arg udf-partitioned
+    udf-with-table-arg partitioned
 }
 
 function udf-replicated() {
-    udf-with-name-arg udf-replicated
+    udf-with-table-arg replicated
 }
 
-function udf-with-name-arg() {
+function udf-with-table-arg() {
     jarsifneeded;
     $SQLCMD --stop-on-error=false < ddl.sql
-    rm -f udfstats-*
+    rm -f udf-$1-stats
     java -classpath obj:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         $APPNAME.UDFBenchmark \
-        --name=$1 \
+        --table=$1 \
         --servers=localhost \
-        --datasize=10000 \
+        --datasize=10000000 \
         --latencyreport=true \
-        --statsfile=$1-stats
+        --statsfile=udf-$1-stats
 }
 
 function help() {
