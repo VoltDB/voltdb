@@ -1,5 +1,27 @@
 #!/usr/bin/env bash
 
+# This file is part of VoltDB.
+# Copyright (C) 2008-2018 VoltDB Inc.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
 APPNAME="udfbenchmark"
 DDL=ddl.sql
 
@@ -49,11 +71,11 @@ function clean() {
 function jars() {
     mkdir -p obj
     javac -classpath $APPCLASSPATH -d obj \
-        $APPNAME/*.java
+        client/$APPNAME/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
     pushd obj > /dev/null
-    jar cvf ../$APPNAME.jar $APPNAME/UDFLib*.class
+    jar cvf ../$APPNAME.jar $APPNAME/UDF*.class
     popd > /dev/null
 }
 
@@ -84,19 +106,33 @@ function client() {
 }
 
 function udfbenchmark() {
+    # default client to run
+    udf-partitioned
+}
+
+function udf-partitioned() {
+    udf-with-table-arg partitioned
+}
+
+function udf-replicated() {
+    udf-with-table-arg replicated
+}
+
+function udf-with-table-arg() {
     jarsifneeded;
     $SQLCMD --stop-on-error=false < ddl.sql
-    rm -f udfstats-*
+    rm -f udf-$1-stats
     java -classpath obj:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         $APPNAME.UDFBenchmark \
-        --displayinterval=5 \
+        --table=$1 \
         --servers=localhost \
-        --datasize=10000 \
-        --statsfile=udfstats-`date '+%Y-%m-%d'`
+        --datasize=10000000 \
+        --latencyreport=true \
+        --statsfile=udf-$1-stats
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|jars|server|client|$APPNAME}"
+    echo "Usage: ./run.sh {clean|jars|server|client|$APPNAME|udf-partitioned|udf-replicated}"
 }
 
 # Run the target passed as the first arg on the command line

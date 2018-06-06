@@ -25,15 +25,37 @@ package udfbenchmark;
 
 import org.voltdb.ClientAppBase;
 
-public class UDFBenchmarkConfig extends ClientAppBase.AppClientConfig {
+public class UDFBenchmarkConfig extends ClientAppBase.AppClientConfig
+{
+
+    @Option(desc = "the type of table to be tested")
+    String table = "partitioned";
+
+    @Option(desc = "Comma separated list of the form server[:port] to connect to.")
+    String servers = "localhost";
 
     @Option(desc = "Number of rows inserted for the benchmark.")
     int datasize = 10000000;
+
+    @Option(desc = "Interval for performance feedback, in seconds.")
+    long displayinterval = 60;
+
+    @Option(desc = "Warmup duration in seconds.")
+    int warmup = 2;
+
+    @Option(desc = "Filename to write raw summary statistics to.")
+    String statsfile = "udf-stats";
 
     @Override
     public void validateParameters() {
         if (datasize < 0) {
             exitWithMessageAndUsage("datasize must be 0 or a positive integer");
+        }
+        if (displayinterval < 0) {
+            exitWithMessageAndUsage("displayinterval must be 0 or a positive integer");
+        }
+        if (warmup < 0) {
+            exitWithMessageAndUsage("warmup must be 0 or a positive integer");
         }
     }
 }
