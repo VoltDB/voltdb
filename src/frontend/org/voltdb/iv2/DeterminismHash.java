@@ -118,7 +118,7 @@ public class DeterminismHash {
         int includedHashMin = Math.min(includedHashLeft, includedHashRight);
         int pos = 0;
         for(int i = HEADER_OFFSET ; i < HEADER_OFFSET + includedHashMin; i += 2) {
-            if(leftHashes[i] != rightHashes[i] || leftHashes[i+1] != rightHashes[i+1]) {
+            if(leftHashes[i] != rightHashes[i] || leftHashes[i + 1] != rightHashes[i + 1]) {
                 return pos;
             }
             pos++;
