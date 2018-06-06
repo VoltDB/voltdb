@@ -20,12 +20,10 @@ package org.voltdb.planner;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import javafx.util.Pair;
-import org.hsqldb_voltpatches.Expression;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -43,9 +41,6 @@ import org.voltdb.plannodes.*;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.Encoder;
-import scala.Int;
-
-import javax.persistence.Tuple;
 
 /**
  * The query planner accepts catalog data, SQL statements from the catalog, then
@@ -379,6 +374,21 @@ public class QueryPlanner implements AutoCloseable {
             } else
                 return subExprsMatch(m_expr1, m_expr2);
         }
+        // Get a copy with all subexpressions that are PVE converted to CVE
+        public static AbstractExpression copyAsCVE(AbstractExpression src) {
+            AbstractExpression left = src.getLeft(), right = src.getRight();
+            if (left != null) {
+                left = copyAsCVE(left);
+            }
+            if (right != null) {
+                right = copyAsCVE(right);
+            }
+            AbstractExpression dst = src instanceof ParameterValueExpression ?
+                    ((ParameterValueExpression) src).getOriginalValue().clone() : src.clone();
+            dst.setLeft(left);
+            dst.setRight(right);
+            return dst;
+        }
         private static boolean subExprsMatch(AbstractExpression e1, AbstractExpression e2) {
             return (new FilterMatcher(e1.getLeft(), e2.getLeft())).match() &&
                     (new FilterMatcher(e1.getRight(), e2.getRight())).match();
@@ -419,28 +429,56 @@ public class QueryPlanner implements AutoCloseable {
         }
     }
 
+    private static List<AbstractExpression> getGbyExpressions(MaterializedViewInfo mv) {
+        try {
+            return AbstractExpression.fromJSONArrayString(mv.getGroupbyexpressionsjson(), null);
+        } catch (JSONException e) {
+            return new ArrayList<>();
+        }
+    }
+
+    private static boolean gbyTablesEqual(ParsedSelectStmt stmt, MaterializedViewInfo mv) {
+        if (stmt.hasComplexGroupby() ^ mv.getGroupbyexpressionsjson().isEmpty()) {
+            if (stmt.hasComplexGroupby()) {     // when both have complex gby expressions, anonymize table/column of SEL stmt and compare the two expressions.
+                // And check expression tree structure, ignoring table/column names.
+                return getGbyExpressions(mv).equals(
+                        stmt.groupByColumns().stream()
+                                .map(ci -> FilterMatcher.copyAsCVE(ci.expression).anonymize())  // convert PVE (as in "a = ?") to CVE, avoid modifying SEL stmt
+                                .collect(Collectors.toList()));
+            } else {    // when neither SEL stmt nor MV has complex gby expression, check whether gby table name match.
+                return stmt.groupByColumns().get(0).tableName.equals(mv.getDest().getMaterializer().getTypeName());
+            }
+        } else          // when one has complex gby but the other doesn't
+            return false;
+    }
+
+    private static boolean gbyColumnsMatch(ParsedSelectStmt stmt, MaterializedViewInfo mv) {
+        return stmt.hasComplexGroupby() ||  // if SEL has complex GBY expr, then at this point we already checked their column index matching.
+                stmt.groupByColumns().stream()
+                        .map(it -> it.columnName).collect(Collectors.toList())  // compare as lists because "GROUP BY a, b" and "GROUP BY b, a" are different
+                        .equals(StreamSupport.stream(((Iterable<ColumnRef>) () -> mv.getGroupbycols().iterator()).spliterator(), false)
+                                .map(cr -> cr.getColumn().getTypeName()).collect(Collectors.toList()));
+    }
+
     private static Map<Pair<String, Integer>, Pair<String, Integer>> gbyMatches(
             ParsedSelectStmt stmt, MaterializedViewInfo mv) {
-        Iterable<ColumnRef> crMvGB_Iterable = () -> mv.getGroupbycols().iterator();
         List<ParsedColInfo> gbySel = stmt.groupByColumns();
         final FilterMatcher matcher = new FilterMatcher(stmt.m_joinTree.getJoinExpression(), predicate_of(mv));
-        if(!gbySel.isEmpty() &&              // select statement contains group-by column,
-                // those group-by-columns' table is MV's source table,
-                gbySel.get(0).tableName.equals(mv.getDest().getMaterializer().getTypeName()) &&
-                // And WHERE clauses match
-                matcher.match() &&
-                // And those group-by-column's columns are same as MV's group-by columns,
-                gbySel.stream().map(it -> it.columnName).collect(Collectors.toSet())  /// select stmt's group-by column names
-                        .equals(StreamSupport.stream(crMvGB_Iterable.spliterator(), false)
-                                .map(cr -> cr.getColumn().getTypeName()).collect(Collectors.toSet()))) {
-            /*
-            And each column's aggregation type match, in the sense of set equality;
-            Then return the map of
-            (select stmt's display column name, select stmt's display column index) =>
-            (view table column name, view table column index)
-            */
+        //  *** Matching criteria: ***
+        if(matcher.match() && !gbySel.isEmpty() &&              // 1. Filters match;
+                // 2. Select stmt contains group-by column;
+                // 3. Group-by-columns' table is same as MV's source table;
+                gbyTablesEqual(stmt, mv) &&
+                // 4. Those group-by-column's columns are same as MV's group-by columns;
+                // 5. Select stmt's group-by column names match with MV's
+                gbyColumnsMatch(stmt, mv)) {
+            //6. Each column's aggregation type match, in the sense of set equality;
+            //  *** Matching criteria ***
+
+            // Then return the map of (select stmt's display column name, select stmt's display column index) =>
+            // (view table column name, view table column index)
             return getViewColumnMaps(stmt, mv);
-        } else {
+        } else {    // If matching failed,
             return null;
         }
     }
@@ -448,11 +486,8 @@ public class QueryPlanner implements AutoCloseable {
     // returns all materialized view info => view table from table list
     private static Map<MaterializedViewInfo, Table> getMviAndViews(List<Table> tbls) {
         Map<MaterializedViewInfo, Table> map = new HashMap<>();
-        for(Table tbl : tbls) {
-            for (MaterializedViewInfo mv : tbl.getViews()) {
-                map.put(mv, mv.getDest());
-            }
-        }
+        tbls.forEach(tbl -> StreamSupport.stream(((Iterable<MaterializedViewInfo>) () -> tbl.getViews().iterator()).spliterator(), false)
+                .forEach(mv -> map.put(mv, mv.getDest())));
         return map;
     }
 
@@ -462,35 +497,38 @@ public class QueryPlanner implements AutoCloseable {
     // The view column name is column alias when creating view.
     private static Map<Pair<String, Integer>, Pair<String, Integer>> getViewColumnMaps(
             ParsedSelectStmt stmt, MaterializedViewInfo mv) {
-        Iterable<Column> mvCols_Iterable = () -> mv.getDest().getColumns().iterator();
-        Map<Pair<Integer, Integer>, Pair<String, Integer>>
-                // <aggType, viewSrcTblColIndx> => <viewTblColName, viewTblColIndx>
-                fromView = StreamSupport.stream(mvCols_Iterable.spliterator(), false)
-                .collect(Collectors.toMap(col -> {
-                            Column matCol = col.getMatviewsource();
-                            return new Pair<>(col.getAggregatetype(), matCol == null ? -1 : matCol.getIndex());
-                        },
-                        col -> new Pair<>(col.getTypeName(), col.getIndex()))),
-                // <aggType, viewSrcTblColIndx> => <displayColName, displayColIndx>
-                fromStmt = stmt.displayColumns().stream()
-                        .map(ci -> {
-                            final Pair<String, Integer> value = new Pair<>(ci.columnName, ci.index);
-                            if (ci.expression instanceof AggregateExpression) {
-                                AggregateExpression ag = (AggregateExpression)ci.expression;
-                                AbstractExpression left = ag.getLeft();
-                                return new Pair<>(new Pair<>(ag.getExpressionType().getValue(), // aggregation type value
-                                        // aggregate on what? For simple column, it contains column index; for "count(*)", set to -1.
-                                        left == null ? -1 : ((TupleValueExpression)left).getColumnIndex()), value);
-                            } else {    // otherwise, it's either column or distinct column
-                                return new Pair<>(new Pair<>(ExpressionType.VALUE_TUPLE.getValue(),
-                                        ((TupleValueExpression)ci.expression).getColumnIndex()), value);
-                            }
-                        })
-                        .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-        return fromView.keySet().equals(fromStmt.keySet()) ?
-                fromView.entrySet().stream()
-                        .collect(Collectors.toMap(kv -> fromStmt.get(kv.getKey()), Map.Entry::getValue)) :
-                null;   // when SEL stmt/VIEW columns mismatch
+        if (!stmt.hasComplexGroupby()) {
+            Map<Pair<Integer, Integer>, Pair<String, Integer>>
+                    // <aggType, viewSrcTblColIndx> => <viewTblColName, viewTblColIndx>
+                    fromView = StreamSupport.stream(((Iterable<Column>) () -> mv.getDest().getColumns().iterator()).spliterator(), false)
+                    .collect(Collectors.toMap(col -> {
+                                Column matCol = col.getMatviewsource();
+                                return new Pair<>(col.getAggregatetype(), matCol == null ? -1 : matCol.getIndex());
+                            },
+                            col -> new Pair<>(col.getTypeName(), col.getIndex()))),  // complex GBY expressions may introduce duplicated KV entries, just ignore.
+                    // <aggType, viewSrcTblColIndx> => <displayColName, displayColIndx>
+                    fromStmt = stmt.displayColumns().stream()
+                            .map(ci -> {
+                                final Pair<String, Integer> value = new Pair<>(ci.columnName, ci.index);
+                                if (ci.expression instanceof AggregateExpression) {
+                                    AbstractExpression left = ci.expression.getLeft();
+                                    return new Pair<>(new Pair<>(ci.expression.getExpressionType().getValue(), // aggregation type value
+                                            // aggregate on what? For simple column, it contains column index; for "count(*)", set to -1.
+                                            left == null ? -1 : ((TupleValueExpression) left).getColumnIndex()), value);
+                                } else {    // otherwise, it's either column or distinct column
+                                    return new Pair<>(new Pair<>(ExpressionType.VALUE_TUPLE.getValue(),
+                                            ((TupleValueExpression) ci.expression).getColumnIndex()), value);
+                                }
+                            })
+                            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+            return fromView.keySet().equals(fromStmt.keySet()) ?
+                    fromView.entrySet().stream()
+                            .collect(Collectors.toMap(kv -> fromStmt.get(kv.getKey()), Map.Entry::getValue)) :
+                    null;   // when SEL stmt/VIEW columns mismatch
+        } else {    // TODO
+            final List<AbstractExpression> gbys = getGbyExpressions(mv);
+            return null;
+        }
     }
 
     /**
@@ -510,7 +548,7 @@ public class QueryPlanner implements AutoCloseable {
                 .toTVEAndFixColumns(rel.entrySet().stream()
                         .collect(Collectors.toMap(kv -> kv.getKey().getKey(), Map.Entry::getValue)));
         // change to display column index-keyed map
-        Map<Integer, Pair<String, Integer>> colSubIndx = rel.entrySet().stream()
+        final Map<Integer, Pair<String, Integer>> colSubIndx = rel.entrySet().stream()
                 .collect(Collectors.toMap(kv -> kv.getKey().getValue(), Map.Entry::getValue));
         ParsedSelectStmt.updateTableNames(stmt.m_aggResultColumns, viewName);
         ParsedSelectStmt.fixColumns(stmt.m_aggResultColumns, colSubIndx);

@@ -89,6 +89,23 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
+     * Reset table/column name/alias. Useful when matching in complex
+     * gby/oby expressions in query rewrite.
+     */
+    public AbstractExpression anonymize() {
+       if (getLeft() != null) {
+          getLeft().anonymize();
+       }
+       if (getRight() != null) {
+          getRight().anonymize();
+       }
+       if (getArgs() != null) {
+          getArgs().forEach(AbstractExpression::anonymize);
+       }
+       return this;
+    }
+
+    /**
      * Get the inherent non-determinism state of this expression. This is not
      * valid before finalizeValueTypes is called.
      *
