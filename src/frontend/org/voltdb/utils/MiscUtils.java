@@ -1070,7 +1070,7 @@ public class MiscUtils {
      * @return a Properties variable which contains username and password.
      */
     public static Properties readPropertiesFromCredentials(String credentials) {
-	    Properties props = new Properties();
+        Properties props = new Properties();
         File propFD = new File(credentials);
         if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
             throw new IllegalArgumentException("Credentials file " + credentials + " is not a read accessible file");
@@ -1083,6 +1083,6 @@ public class MiscUtils {
                 throw new IllegalArgumentException("Credential file not found or permission denied.");
             }
         }
-    	return props;
+        return props;
     }
 }
