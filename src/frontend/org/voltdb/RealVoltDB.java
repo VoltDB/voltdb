@@ -1101,7 +1101,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 setStartMode(OperationMode.PAUSED);
             }
 
-            // Create the thread pool here. It's needed by buildClusterMesh()
+            // Create the thread pool here.
             m_periodicWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
             m_periodicPriorityWorkThread =
@@ -3312,6 +3312,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
 
+                if (m_catalogContext.m_ptool.getAdHocLargeFallbackCount() > 0) {
+                    hostLog.info(String.format("%d queries planned through @AdHocLarge were converted to normal @AdHoc plans.",
+                            m_catalogContext.m_ptool.getAdHocLargeFallbackCount()));
+                }
                 /*
                  * Various scheduled tasks get crashy in unit tests if they happen to run
                  * while other stuff is being shut down. Double catch of throwable is only for the sake of tests.

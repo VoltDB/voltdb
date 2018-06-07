@@ -28,7 +28,6 @@ import static org.mockito.Mockito.when;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 
@@ -173,21 +172,27 @@ public class TestTransactionTaskQueue extends TestCase
         dut.offer(task);
     }
 
-    private void addMissingCompletionTask(TransactionTask task, TransactionTaskQueue dut) {
+    private void addMissingCompletionTask(TransactionTask task, TransactionTaskQueue dut,
+                                          Deque<TransactionTask> teststorage) {
+        if (teststorage != null) {
+            teststorage.addLast(task);
+        }
         dut.handleCompletionForMissingTxn((CompleteTransactionTask) task);
     }
 
-    private void repairOnly(TransactionTask[] repairTask, Boolean[] missingCompletions) {
+    private CompleteTransactionTask[] repairOnly(TransactionTask[] repairTask, Boolean[] missingCompletions) {
         long repairSeq = m_repairGenerator.getNextSeqNum();
-        boolean completionsSwallowedByScoreboard = Arrays.asList(missingCompletions).contains(new Boolean(true));
+        CompleteTransactionTask completions[] = new CompleteTransactionTask[SITE_COUNT];
         for (int i = 0; i < SITE_COUNT; i++) {
-            TransactionTask comp = createRepairCompletion(repairTask[i].getTransactionState(), repairTask[i].getTxnId(), m_txnTaskQueues.get(i), repairSeq, true);
+            CompleteTransactionTask comp = createRepairCompletion(repairTask[i].getTransactionState(), repairTask[i].getTxnId(), m_txnTaskQueues.get(i), repairSeq, true);
+            completions[i] = comp;
             if (missingCompletions[i]) {
-                addMissingCompletionTask(comp, m_txnTaskQueues.get(i));
+                addMissingCompletionTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
             } else {
-                addTask(comp, m_txnTaskQueues.get(i), completionsSwallowedByScoreboard ? null : m_expectedOrders.get(i));
+                addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
             }
         }
+        return completions;
     }
 
     private void repairThenRestart(TransactionTask[] repairTask, TransactionTask restartTask, boolean[] missingCompletions) {
@@ -197,7 +202,7 @@ public class TestTransactionTaskQueue extends TestCase
             TransactionTask comp = createRepairCompletion(repairTask[i].getTransactionState(),
                     repairTask[i].getTxnId(), m_txnTaskQueues.get(i), repairSeq, false);
             if (missingCompletions[i]) {
-                addMissingCompletionTask(comp, m_txnTaskQueues.get(i));
+                addMissingCompletionTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
             } else {
                 addTask(comp, m_txnTaskQueues.get(i), m_expectedOrders.get(i));
             }
@@ -216,6 +221,12 @@ public class TestTransactionTaskQueue extends TestCase
         for (int i = 0; i < SITE_COUNT; i++) {
             task[i].getTransactionState().setDone();
             m_txnTaskQueues.get(i).flush(task[i].getTxnId());
+        }
+    }
+
+    private void execCompletions(CompleteTransactionTask[] task) {
+        for (int i = 0; i < SITE_COUNT; i++) {
+            task[i].run(null);
         }
     }
 
@@ -365,13 +376,16 @@ public class TestTransactionTaskQueue extends TestCase
 
         // it will stay at backlog
         TransactionTask next = createSpProc(m_localTxnEgo[0].getTxnId(), m_txnTaskQueues.get(0));
-        addTask(next, m_txnTaskQueues.get(0), m_expectedOrders.get(0));
+        addTask(next, m_txnTaskQueues.get(0), null);
         m_localTxnEgo[0] = m_localTxnEgo[0].makeNext();
 
         // failure occurs, MPI checks repair logs from everybody, decide to repair previous transaction,
         // restart current transaction
 
-        repairOnly(firstFrag, new Boolean[]{false, true});
+        CompleteTransactionTask[] completions = repairOnly(firstFrag, new Boolean[]{false, true});
+
+        // pending (backlogged) SP Txn in even partitions will be released after the completion
+        m_expectedOrders.get(0).add(next);
 
         // Push SPs to 2 sites to verify that the backlog is clear
         next = createSpProc(m_localTxnEgo[0].getTxnId(), m_txnTaskQueues.get(0));
@@ -382,6 +396,9 @@ public class TestTransactionTaskQueue extends TestCase
         addTask(next, m_txnTaskQueues.get(1), m_expectedOrders.get(1));
         m_localTxnEgo[1] = m_localTxnEgo[1].makeNext();
 
+        // since the completions (even for frags that were never processed) still execute on the sites,
+        // the completion tasks actually perform the flush
+        execCompletions(completions);
 
         verify();
     }

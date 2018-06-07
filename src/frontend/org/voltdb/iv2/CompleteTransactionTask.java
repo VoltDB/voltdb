@@ -35,6 +35,7 @@ public class CompleteTransactionTask extends TransactionTask
 {
     final private Mailbox m_initiator;
     final private CompleteTransactionMessage m_completeMsg;
+    private boolean m_fragmentNotExecuted = false;
 
     public CompleteTransactionTask(Mailbox initiator,
                                    TransactionState txnState,
@@ -46,48 +47,76 @@ public class CompleteTransactionTask extends TransactionTask
         m_completeMsg = msg;
     }
 
+    public void setFragmentNotExecuted()
+    {
+        m_fragmentNotExecuted = true;
+    }
+
+    private void doUnexecutedFragmentCleanup()
+    {
+        if (m_completeMsg.isAbortDuringRepair()) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(getTxnId()));
+            }
+            // Mark the transaction state as DONE
+            // Transaction state could be null when a CompleteTransactionTask is added to scoreboard.
+            if (m_txnState != null) {
+                m_txnState.setDone();
+            }
+            // Flush us out of the head of the TransactionTaskQueue.
+            if (m_queue != null) {
+                m_queue.flush(getTxnId());
+            }
+        }
+    }
+
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        hostLog.debug("STARTING: " + this);
-        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
-        if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.beginDuration("execcompletetxn",
-                                                       "txnId", TxnEgo.txnIdToString(getTxnId()),
-                                                       "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
+        if (m_fragmentNotExecuted) {
+            hostLog.debug("SKIPPING (Never Executed): " + this);
+            doUnexecutedFragmentCleanup();
         }
+        else {
+            hostLog.debug("STARTING: " + this);
+            final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.beginDuration("execcompletetxn",
+                                                           "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                           "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
+            }
 
-        if (!m_txnState.isReadOnly()) {
-            // the truncation point token SHOULD be part of m_txn. However, the
-            // legacy interaces don't work this way and IV2 hasn't changed this
-            // ownership yet. But truncateUndoLog is written assuming the right
-            // eventual encapsulation.
-            siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
-                    m_txnState.getBeginUndoToken(),
-                    m_txnState.m_spHandle,
-                    m_txnState.getUndoLog());
-        }
-        if (!m_completeMsg.isRestart()) {
-            doCommonSPICompleteActions();
+            if (!m_txnState.isReadOnly()) {
+                // the truncation point token SHOULD be part of m_txn. However, the
+                // legacy interfaces don't work this way and IV2 hasn't changed this
+                // ownership yet. But truncateUndoLog is written assuming the right
+                // eventual encapsulation.
+                siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
+                        m_txnState.getBeginUndoToken(),
+                        m_txnState.m_spHandle,
+                        m_txnState.getUndoLog());
+            }
+            if (!m_completeMsg.isRestart()) {
+                doCommonSPICompleteActions();
 
-            // Log invocation to DR
-            logToDR(siteConnection.getDRGateway());
-            hostLog.debug("COMPLETE: " + this);
-        }
-        else
-        {
-            // If we're going to restart the transaction, then reset the begin undo token so the
-            // first FragmentTask will set it correctly.  Otherwise, don't set the Done state or
-            // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
-            // for the restarted fragments.
-            m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
-            hostLog.debug("RESTART: " + this);
-        }
+                // Log invocation to DR
+                logToDR(siteConnection.getDRGateway());
+                hostLog.debug("COMPLETE: " + this);
+            }
+            else
+            {
+                // If we're going to restart the transaction, then reset the begin undo token so the
+                // first FragmentTask will set it correctly.  Otherwise, don't set the Done state or
+                // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
+                // for the restarted fragments.
+                m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
+                hostLog.debug("RESTART: " + this);
+            }
 
-        if (traceLog != null) {
-            traceLog.add(VoltTrace::endDuration);
+            if (traceLog != null) {
+                traceLog.add(VoltTrace::endDuration);
+            }
         }
-
         final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);
         resp.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(resp);
@@ -97,35 +126,39 @@ public class CompleteTransactionTask extends TransactionTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
-        if (!m_txnState.isReadOnly() && !m_completeMsg.isRollback()) {
-            // ENG-5276: Need to set the last committed spHandle so that the rejoining site gets the accurate
-            // per-partition txnId set for the next snapshot. Normally, this is done through undo log truncation.
-            // Since the task is not run here, we need to set the last committed spHandle explicitly.
-            //
-            // How does this work?
-            // - Blocking rejoin with idle cluster: The spHandle is updated here with the spHandle of the stream
-            //   snapshot that transfers the rejoin data. So the snapshot right after rejoin should have the spHandle
-            //   passed here.
-            // - Live rejoin with idle cluster: Same as blocking rejoin.
-            // - Live rejoin with workload: Transactions will be logged and replayed afterward. The spHandle will be
-            //   updated when they commit and truncate undo logs. So at the end of replay,
-            //   the spHandle should have the latest value. If all replayed transactions rolled back,
-            //   the spHandle is still guaranteed to be the spHandle of the stream snapshot that transfered the
-            //   rejoin data, which is the correct value.
-            siteConnection.setSpHandleForSnapshotDigest(m_txnState.m_spHandle);
+        if (m_fragmentNotExecuted) {
+            doUnexecutedFragmentCleanup();
         }
+        else {
+            if (!m_txnState.isReadOnly() && !m_completeMsg.isRollback()) {
+                // ENG-5276: Need to set the last committed spHandle so that the rejoining site gets the accurate
+                // per-partition txnId set for the next snapshot. Normally, this is done through undo log truncation.
+                // Since the task is not run here, we need to set the last committed spHandle explicitly.
+                //
+                // How does this work?
+                // - Blocking rejoin with idle cluster: The spHandle is updated here with the spHandle of the stream
+                //   snapshot that transfers the rejoin data. So the snapshot right after rejoin should have the spHandle
+                //   passed here.
+                // - Live rejoin with idle cluster: Same as blocking rejoin.
+                // - Live rejoin with workload: Transactions will be logged and replayed afterward. The spHandle will be
+                //   updated when they commit and truncate undo logs. So at the end of replay,
+                //   the spHandle should have the latest value. If all replayed transactions rolled back,
+                //   the spHandle is still guaranteed to be the spHandle of the stream snapshot that transfered the
+                //   rejoin data, which is the correct value.
+                siteConnection.setSpHandleForSnapshotDigest(m_txnState.m_spHandle);
+            }
 
-        if (!m_completeMsg.isRestart()) {
-            // future: offer to siteConnection.IBS for replay.
-            doCommonSPICompleteActions();
+            if (!m_completeMsg.isRestart()) {
+                // future: offer to siteConnection.IBS for replay.
+                doCommonSPICompleteActions();
+            }
+
+            if (!m_txnState.isReadOnly()) {
+                // We need to log the restarting message to the task log so we'll replay the whole
+                // stream faithfully
+                taskLog.logTask(m_completeMsg);
+            }
         }
-
-        if (!m_txnState.isReadOnly()) {
-            // We need to log the restarting message to the task log so we'll replay the whole
-            // stream faithfully
-            taskLog.logTask(m_completeMsg);
-        }
-
         final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);
         resp.setIsRecovering(true);
         resp.m_sourceHSId = m_initiator.getHSId();
