@@ -1,2 +1,0 @@
-trustStore=tests/frontend/org/voltdb/keystore
-trustStorePassword=password
