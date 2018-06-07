@@ -559,6 +559,13 @@ public class MaterializedViewProcessor {
             assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
         }
 
+        // Users can create SINGLE TABLE VIEWS without declaring count(*) in the stmt.
+        // Multiple table views still need this restriction.
+        if (stmt.m_tableList.size() > 1 && countStarFound == false) {
+            msg.append("(multiple table view) must have count(*) after the GROUP BY columns (if any)");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
         AbstractExpression where = stmt.getSingleTableFilterExpression();
         if (where != null) {
             checkExpressions.add(where);

@@ -109,7 +109,7 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
                                        catalogColumn->nullable(),
                                        catalogColumn->inbytes());
     }
-    
+
     if (needsDRTimestamp) {
         // Create a hidden timestamp column for a DRed table in an
         // active-active context.
