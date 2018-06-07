@@ -158,7 +158,7 @@ public class PlannerTool {
                 logException(e, "Error compiling query");
                 loggedMsg = " (Stack trace has been written to the log.)";
             }
-            throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg, e);
+            throw new RuntimeException(e.getMessage() + loggedMsg, e);
         }
 
         if (plan == null) {
@@ -318,8 +318,7 @@ public class PlannerTool {
                     logException(e, "Error compiling query");
                     loggedMsg = " (Stack trace has been written to the log.)";
                 }
-                throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
-                                           e);
+                throw new RuntimeException(e.getMessage() + loggedMsg, e);
             }
 
             //////////////////////
