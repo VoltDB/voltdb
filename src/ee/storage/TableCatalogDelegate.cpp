@@ -86,7 +86,8 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     for (colIterator = catalogTable.columns().begin();
          colIterator != catalogTable.columns().end(); colIterator++) {
         auto catalogColumn = colIterator->second;
-        if (catalogColumn->aggregatetype() == 0 || catalogColumn->aggregatetype() == 41) {
+        if (catalogColumn->aggregatetype() == EXPRESSION_TYPE_INVALID ||
+          catalogColumn->aggregatetype() == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
           // not a view or there exists count(*), directly quit
           break;
         }
@@ -96,8 +97,10 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
       needsHiddenCountForView = true;
     }
 
+    // DR timestamp and hidden COUNT(*) should not appear at the same time
+    assert(!(needsDRTimestamp && needsHiddenCountForView));
     TupleSchemaBuilder schemaBuilder(numColumns,
-                                     (needsDRTimestamp ? 1 : 0) + (needsHiddenCountForView ? 1 : 0)); // hidden columns
+                                     (needsDRTimestamp || needsHiddenCountForView) ? 1 : 0); // hidden columns
 
     for (colIterator = catalogTable.columns().begin();
          colIterator != catalogTable.columns().end(); colIterator++) {
