@@ -1,0 +1,301 @@
+begin Cluster                      "A set of connected hosts running one or more database application contexts"
+  Database* databases              "The set of databases the cluster is running"
+  Deployment* deployment           "Storage for settings passed in on deployment"
+  int localepoch                   "The number of seconds since the epoch that we're calling our local epoch"
+  bool securityEnabled             "Whether security and authentication should be enabled/disabled"
+  int httpdportno                  "The port number httpd will listen on. A 0 value implies 8080."
+  bool jsonapi                     "Is the http/json interface enabled?"
+  bool networkpartition            "Is network partition detection enabled?"
+  CommandLog* logconfig            "Command log configuration"
+  int heartbeatTimeout             "How long to wait, in seconds, between messages before deciding a host is dead"
+  bool useddlschema                "Manage the database schemas via catalog updates or live DDL"
+  bool drConsumerEnabled           "Manage whether this consumer cluster will pull local DR transactions"
+  bool drProducerEnabled           "Manage whether this producer cluster will log and distribute local DR transactions"
+  string drRole                    "DR role of the cluster, can be master, replica, or xdcr"
+  int drClusterId                  "Unique inter-cluster ID used to distinguish DR clusters"
+  int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
+  string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
+  string drConsumerSslPropertyFile "Path to DR consumer property file containing path to trust store and the trust store password"
+  int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers"
+  int preferredSource              "The cluster id from which this joining cluster should request snapshot"
+end
+
+begin Deployment javaonly         "Run-time deployment settings"
+  int kfactor                     "The required k-safety factor"
+  Systemsettings* systemsettings  "Values from the systemsettings element"
+end
+
+begin Systemsettings javaonly "Container for deployment systemsettings element"
+  int temptablemaxsize        "The maximum allocation size for temp tables in the EE"
+  int snapshotpriority        "The priority of snapshot work"
+  int elasticduration         "Maximum duration time for rebalancing"
+  int elasticthroughput       "Target throughput in megabytes for elasticity"
+  int querytimeout            "The maximum latency for a query batch before timing out"
+end
+
+begin Database                       "A set of schema, procedures and other metadata that together comprise an application"
+  string     schema                  "Full SQL DDL for the database's schema"
+  User*      users                   "The set of users"
+  Group*     groups                  "The set of groups"
+  Table*     tables                  "The set of Tables for the database"
+  Program*   programs                "The set of programs allowed to access this database"
+  Procedure* procedures              "The set of stored procedures/transactions for this database"
+  Function*  functions               "The set of user-defined functions for this database"
+  Connector* connectors              "Export connector configuration"
+  SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
+  bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
+  string securityprovider            "The security provider used to authenticate users"
+end
+
+begin CommandLog javaonly     "Configuration for a command log"
+  bool enabled                "Is command logging enabled"
+  bool synchronous            "Should commands be executed only once durable"
+  int fsyncInterval           "How often commands should be written to disk"
+  int maxTxns                 "How many txns waiting to go to disk should trigger a flush"
+  int logSize                 "Size of the command log in megabytes"
+end
+
+begin ConnectorTableInfo    "Per-export connector table configuration"
+  Table? table              "Reference to the table being appended"
+  bool appendOnly           "DEPRECATED: True if this table is an append-only table for export."
+end
+
+begin ConnectorProperty    "Connector configuration property"
+  string name              "Configuration property name"
+  string value             "Configuration property value"
+end
+
+begin Connector                 "Export connector"
+  string loaderclass            "The class name of the connector"
+  bool enabled                  "Is the connector enabled"
+  ConnectorTableInfo* tableInfo "Per table configuration"
+  ConnectorProperty* config     "Connector configuration properties"
+end
+
+begin Group javaonly
+  UserRef* users
+  bool admin            "Can perform all database operations"
+  bool defaultproc      "Can invoke default procedures"
+  bool defaultprocread  "Can invoke read-only default procedures"
+  bool sql              "Can invoke the adhoc system procedures"
+  bool sqlread          "Can invoke read-only adhoc system procedures"
+  bool allproc          "Can invoke any user defined procedures"
+end
+
+begin GroupRef javaonly
+  Group? group
+end
+
+begin UserRef javaonly
+  User? user
+end
+
+begin User javaonly
+  GroupRef* groups
+  string password "encrypted password version for catalog comparison usage"
+  string shadowPassword "SHA-1 double hashed hex encoded version of the password"
+  string sha256ShadowPassword "SHA-256 double hashed hex encoded version of the password"
+end
+
+begin Program javaonly "The name of a program with access (effectively a username for an app server)"
+end
+
+begin Procedure javaonly    "A stored procedure (transaction) in the system"
+  string classname          "The full class name for the Java class for this procedure"
+  UserRef* authUsers        "Users authorized to invoke this procedure"
+  GroupRef* authGroups      "Groups authorized to invoke this procedure"
+  bool readonly             "Can the stored procedure modify data"
+  bool singlepartition      "Does the stored procedure need data on more than one partition?"
+  bool everysite            "Does the stored procedure as a single procedure txn at every site?"
+  bool systemproc           "Is this procedure an internal system procedure?"
+  bool defaultproc          "Is this procedure a default auto-generated CRUD procedure?"
+  bool hasjava              "Is this a full java (or other JVM language) stored procedure or is it just a single stmt?"
+  bool hasseqscans          "Do any of the proc statements use sequential scans?"
+  string language           "What language is the procedure implemented with"
+  Table? partitiontable     "Which table contains the partition column for this procedure?"
+  Table? partitiontable2    "The second table that contains the partition column for this procedure"
+  Column? partitioncolumn   "Which column in the partitioned table is this procedure mapped on?"
+  Column? partitioncolumn2  "If two part, which column is this proc also partitioned on?"
+  int partitionparameter    "Which parameter identifies the partition column?"
+  int partitionparameter2   "If two part, which parameter is this proc also partitioned on?"
+  AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
+  // Note that UDF dependences are recorded on the
+  // individual statements.
+  Statement* statements     "The set of SQL statements this procedure may call"
+  ProcParameter* parameters "The set of parameters to this stored procedure"
+  bool allowedInShutdown    "Whether this procedure is allowed to be executed during shutdown"
+  bool transactional        "Whether the code needs to access state or just run anywhere"
+  bool restartable          "Whether this proc is allowed to restart when node failure happens?"
+end
+
+begin FunctionParameter      "A user-defined function parameter"
+  int parameterType          "The type of the parameter"
+end
+
+begin Function                   "A user-defined function"
+  int functionId                 "The function sequential ID"
+  string functionName            "The name of the function"
+  string className               "The class name of the function implementation"
+  string methodName              "The method name of the function implementation"
+  FunctionParameter* parameters  "The parameter types of this function"
+  int returnType                 "The return value type of this function"
+  // This is a comma-separated list of names of statements in procedures which
+  // depend on this function.
+  //   o The list starts and ends with commas, though the empty list is the
+  //     empty string.  This helps with deduplication.
+  //   o The names of the procedures are pairs "P:S", where "P" is a procedure
+  //     name and "S" is a statement name in the procedure.  The statement
+  //     names will only be unique within a single procedure.
+  // For example, a function which has dependers "P:S" and "Q:S" will
+  // have string ",P:S,Q:S,".
+  string stmtDependers          "The set of names of statements which depend on this function"
+end
+
+begin Table                                  "A table (relation) in the database"
+  Column* columns                            "The set of columns in the table"
+  Index* indexes                             "The set of indexes on the columns in the table"
+  Constraint* constraints                    "The set of constraints on the table"
+  bool isreplicated                          "Is the table replicated?"
+  Column? partitioncolumn                    "On which column is the table partitioned"
+  int estimatedtuplecount                    "A rough estimate of the number of tuples in the table; used for planning"
+  MaterializedViewInfo* views                "Information about materialized views based on this table's content"
+  MaterializedViewHandlerInfo* mvHandlerInfo "Only on result table of a materialized view"
+  Table? materializer                        "If this is a materialized view, this field stores the source table"
+  string signature                           "Catalog version independent signature of the table consisting of name and schema"
+  int tuplelimit                             "A maximum number of rows in a table"
+  bool isDRed                                "Is this table DRed?"
+  Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
+end
+
+begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"
+  Statement* fallbackQueryStmts         "Statements to search for mview min/max fallback value"
+  Statement* createQuery                "The SELECT statement that defines the view"
+  TableRef* sourceTables                "Source table(s) of this materialized view"
+  Table? destTable                      "The table which will be updated when the source table is updated"
+  int groupByColumnCount                "Number of group by columns"
+  bool isSafeWithNonemptySources        "Is this a materialized view which may be created with nonempty source tables"
+end
+
+begin MaterializedViewInfo          "Information used to build and update a materialized view"
+  Table? dest                       "The table which will be updated when the source table is updated"
+  ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
+  string predicate                  "A filtering predicate"
+  string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
+  string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
+  IndexRef* indexForMinMax          "The name of index on srcTable which can be used to maintain min()/max()"
+  Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
+  bool isSafeWithNonemptySources    "Is this a materialized view which may be created with nonempty source tables"
+end
+
+begin AuthProgram javaonly "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
+end
+
+begin ProcParameter javaonly "Metadata for a parameter to a stored procedure"
+  int type                   "The data type for the parameter (int/float/date/etc)"
+  bool isarray               "Is the parameter an array of value"
+  int index                  "The index of the parameter within the list of parameters for the stored procedure"
+end
+
+begin Statement           "A parameterized SQL statement embedded in a stored procedure"
+  string sqltext            "The text of the sql statement"
+  int querytype             ""
+  bool readonly             "Can the statement modify any data?"
+  bool singlepartition      "Does the statement only use data on one partition?"
+  bool replicatedtabledml   "Should the result of this statememt be divided by partition count before returned"
+  bool iscontentdeterministic "Is the result of this statement deterministic not accounting for row order"
+  bool isorderdeterministic "Is the result of this statement deterministic even accounting for row order"
+  string nondeterminismdetail "Explanation for any non-determinism in the statement result"
+  StmtParameter* parameters "The set of parameters to this SQL statement"
+  PlanFragment* fragments   "The set of plan fragments used to execute this statement"
+  int cost                  "The cost of this plan measured in arbitrary units"
+  int seqscancount          "The number of sequential table scans in the plan"
+  string explainplan        "A human-readable plan description"
+  string tablesread         "A CSV list of tables this statement reads"
+  string tablesupdated      "A CSV list of tables this statement may update"
+  string indexesused        "A CSV list of indexes this statement may use”
+  string cachekeyprefix     "Unique string that combines with the SQL text to identify a unique corresponding plan."
+  // This is the list of the user defined functions on which a statement may depend.
+  // It's a comma separated list of simple function names, which starts and ends with a comma,
+  // though the empty list is the empty string.
+  //
+  // The names are the keys in the Functions catalog map.
+  //
+  // So, the list with "a", "b" and "c" will look like ",a,b,c,".
+  // The extra commas help with deduplication.
+  //
+    string functionDependees "The names of UDFs on which this statement depends"
+end
+
+begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
+  int sqltype                  "The SQL type of the parameter (int/float/date/etc)"
+  int javatype                 "The Java class of the parameter (int/float/date/etc)"
+  bool isarray                 "Is the parameter an array of value"
+  int index                    "The index of the parameter in the set of statement parameters"
+end
+
+begin PlanFragment               "Instructions to the executor to execute part of an execution plan"
+  bool hasdependencies           "Dependencies must be received before this plan fragment can execute"
+  bool multipartition            "Should this plan fragment be sent to all partitions"
+  string plannodetree            "A serialized representation of the plan-graph/plan-pipeline"
+  bool nontransactional          "True if this fragment doesn't read from or write to any persistent tables"
+  string planhash                "SHA-1 Hash of the plan assumed to be unique"
+end
+
+begin Index                        "A index structure on a database table's columns"
+  bool unique                      "May the index contain duplicate keys?"
+  bool assumeUnique                "User allow unique index on partition table without including partition key?"
+  bool countable                   "Index counter feature"
+  int type                         "What data structure is the index using and what kinds of keys does it support?"
+  ColumnRef* columns               "Columns referenced by the index"
+  string expressionsjson           "A serialized representation of the optional expression trees"
+  string predicatejson             "A serialized representation of the optional predicate for partial indexes"
+  bool isSafeWithNonemptySources   "Is this an index which may be created with non-empty source tables"
+end
+
+begin TableRef
+  Table? table
+end
+
+begin ColumnRef    "A reference to a table column"
+  int index        "The index within the set"
+  Column? column   "The table column being referenced"
+end
+
+begin IndexRef     "A reference to an index"
+  string name      "The name of the index referenced"
+end
+
+begin Constraint            "A constraint on a database table"
+  int type                  "The type of constraint"
+  string oncommit           "(currently unused)"
+  Index? index              "The index used by this constraint (if needed)"
+  Table? foreignkeytable    "The table referenced by the foreign key (if needed)"
+  ColumnRef* foreignkeycols "The columns in the foreign table referenced by the constraint (if needed)"
+end
+
+begin ConstraintRef      "A reference to a table constraint"
+  Constraint? constraint "The constraint that is referenced"
+end
+
+begin Column                    "A table column"
+  int index                     "The column's order in the table"
+  int type                      "The type of the column (int/double/date/etc)"
+  int size                      "(currently unused)"
+  bool nullable                 "Is the column nullable?"
+  string name                   "Name of column"
+  string defaultvalue           "Default value of the column"
+  int defaulttype               "Type of the default value of the column"
+  ConstraintRef* constraints    "Constraints that use this column"
+  int aggregatetype             "If part of a materialized view, represents aggregate type"
+  Column? matviewsource         "If part of a materialized view, represents source column"
+  MaterializedViewInfo? matview "Deprecated, keep for DR back-compatible reason."
+  bool inbytes                  "If a varchar column and size was specified in bytes"
+end
+
+begin SnapshotSchedule javaonly "A schedule for the database to follow when creating automated snapshots"
+  bool enabled                  "Is this auto snapshot schedule enabled?"
+  string frequencyUnit          "Unit of time frequency is specified in"
+  int frequencyValue            "Frequency in some unit"
+  int retain                    "How many snapshots to retain"
+  string prefix                 "Prefix for snapshot filenames"
+end

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+
+<html lang="en">
+    <head>
+        <meta name="generator" content="HTML Tidy, see www.w3.org">
+        <meta charset="utf-8">
+
+        <title>VoltDB Catalog Report</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="">
+        <meta name="author" content=""><!-- Le styles -->
+        <link type="text/css" href="http://assets.voltdb.com/b/css/bootstrap.min.css" rel="stylesheet">
+<style type="text/css">
+          body {
+            padding-top: 60px;
+            padding-bottom: 40px;
+          }
+          .invert {
+            background-color: #0079BB;
+          }
+          td.invert>p {
+            color: white;
+          }
+          td.invert>p>a {
+            color: #eeeeee;
+          }
+        
+</style>
+        <link type="text/css" href="http://assets.voltdb.com/b/css/bootstrap-responsive.css" rel="stylesheet">
+        <link type="text/css" href="http://assets.voltdb.com/t/css/theme.bootstrap.css" rel="stylesheet">
+        <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+        <!--[if lt IE 9]>
+                            <script src="http://assets.voltdb.com/b/js/html5shiv.js"></script>
+                                                    <![endif]-->
+        <!-- Fav and touch icons -->
+        <link rel="apple-touch-icon-precomposed" sizes="144x144" href=
+        "../../assets/ico/apple-touch-icon-144-precomposed.png">
+        <link rel="apple-touch-icon-precomposed" sizes="114x114" href=
+        "../../assets/ico/apple-touch-icon-114-precomposed.png">
+        <link rel="apple-touch-icon-precomposed" sizes="72x72" href=
+        "../../assets/ico/apple-touch-icon-72-precomposed.png">
+        <link rel="apple-touch-icon-precomposed" href="../../assets/ico/apple-touch-icon-57-precomposed.png">
+        <link rel="shortcut icon" href="../../assets/ico/favicon.png">
+    </head>
+
+    <body>
+        <div class="navbar navbar-inverse navbar-fixed-top">
+            <div class="navbar-inner">
+                <div class="container">
+                    <a class="brand" href="..">VoltDB Catalog Report</a> 
+
+                    <div class="nav-collapse collapse">
+                        <ul class="nav">
+                            <li id='o-nav'><a href="..">Overview</a></li>
+
+                            <li id='s-nav'><a href="../#s">Schema</a></li>
+
+                            <li id='p-nav'><a href="../#p">Procedures &amp; SQL</a></li>
+
+                            <li id='r-nav'><a href="../#r">System Report</a></li>
+                            
+                            <li id='z-nav'><a href="../#z">Size Worksheet</a></li>
+
+                            <li id='m-nav' class="active"><a href='.'>Memory Report</a></li>
+                        </ul>
+                    </div>
+                    <!--/.nav-collapse -->
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div id='o' class='reportpage'>
+                <a name='o'></a> 
+
+                <h1>Process Memory Report</h1>
+                <br>
+
+                <div class='well text-center' style='font-size: 20px;'>
+                    <div align="center">
+                        <table border='0' cellpadding='5' width='100%'>
+                            <tr>
+                                <td colspan='3' bgcolor='#f5f5f5' align='center'><b>Memory Usage and Usage History</b>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td bgcolor='#f5f5f5'>2 min</td>
+
+                                <td align='center' colspan='2'><img src='#2MINCHARTURL#'> </td>
+                            </tr>
+
+                            <tr>
+                                <td bgcolor='#f5f5f5'>30 min</td>
+
+                                <td align='center' colspan='2'><img src='#30MINCHARTURL#'> </td>
+                            </tr>
+
+                            <tr>
+                                <td bgcolor='#f5f5f5'>24 hr</td>
+
+                                <td align='center' colspan='2'><img src='#24HRCHARTURL#'> </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <br>
+
+                <div class='row'>
+                    <div class='span6'>
+                        <div class='well'>
+                            <h4>System Information:</h4> 
+
+                            <ul>
+                                <li>System has #TOTALMEMORY# mb of memory.</li>
+
+                                <li>Using #USED#% of system memory for VoltDB</li>
+
+                                <li>#RISK#% of system memory has been reserved for VoltDB</li>
+
+                                <li>Rss: #RSS#mb</li>
+
+                                <li>Java Max Heap #JAVAMAXHEAP#mb</li>
+
+                                <li>Java Used: #USEDJAVA#mb</li>
+
+                                <li>Java Claimed: #CLAIMEDJAVA#mb</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class='span6'>
+                        <div class='well'>
+                            <h4>Chart Explanation:</h4>
+
+                            <ul>
+                                <li>The pink area is the memory used by the JVM.</li>
+
+                                <li>The red area is the RSS used by VoltDB outside of the JVM, but within the
+                                process.</li>
+
+                                <li>Note the red and pink areas are stacked, and together represent RSS.</li>
+
+                                <li>The dotted yellow line represents the amount of memory reserved for the JVM
+                                (including memory reserved but unused), plus non-Java memory in use by VoltDB.<br>
+                                 If the JVM were to use all of the memory it was permitted to use, the RSS would reach
+                                the yellow line.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <br>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
+

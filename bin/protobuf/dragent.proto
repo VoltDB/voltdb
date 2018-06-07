@@ -1,0 +1,170 @@
+syntax = "proto2";
+
+package pmsg;
+option java_package = "org.voltdb.pmsg";
+option java_outer_classname = "DRAgent";
+
+message UUID {
+    required fixed64 instance = 1;
+    required fixed64 count = 2;
+}
+
+message Ack {
+    optional int32 partitionId = 1;
+    optional fixed64 timestamp = 2;
+    optional fixed64 averageRowLatencyNanos = 3;
+}
+
+message SnapshotReq {
+    optional string nonce = 1;
+    optional int32 globalPartitionCount = 2;
+}
+
+message Reset {
+    optional int32 partitionId = 1;
+    optional fixed64 timestamp = 2;
+}
+
+message Pause {
+    optional int32 partitionId = 1;
+}
+
+message Connect {
+    optional int32 clusterId = 1;
+    optional fixed64 clusterCreationId = 2;
+    optional int32 protocolVersion = 3;
+    optional fixed64 clusterRecoveryId = 4;
+    optional NodeInfo nodeInfo = 5;
+}
+
+message Subscribe {
+    optional int32 partitionId = 1;
+    optional fixed64 timestamp = 2;
+    optional bool isCovering = 3;
+    optional fixed64 rewindToUniqueId = 4;
+    optional bool isSyncing = 5;
+}
+
+message Query {
+    // whether or not to include other clusters in the mesh
+    optional bool includeMesh = 1 [default = false];
+}
+
+message StartCursor {
+    repeated ClusterInfo clusterInfo = 1;
+}
+
+message Response {
+    enum ReplicationMode {
+        IDLE = 1;
+        SYNCING_REPLICATED = 2;
+        SYNCING_PARTITIONED = 3;
+        ACTIVE = 4;
+        UNAVAILABLE = 5;
+    }
+    required UUID id = 1;
+    optional ReplicationMode mode = 2;
+    optional fixed64 snapshotTimestamp = 3;
+    optional fixed64 instanceIdHash = 4;
+    optional string version = 5;
+    // all known nodes globally
+    //  first entry is self
+    repeated NodeInfo nodeInfo = 6;
+    optional int32 globalPartitionCount = 7;
+    // local partitions
+    repeated PartitionInfo partitionInfo = 8;
+    // status. 0 means ok
+    optional int32 status = 9 [default = 0];
+    optional CtrlEnvelope.Type type = 10;
+    optional fixed64 catalogCRC = 11;
+    optional string catalogSignature = 12;
+    optional string failureCause = 13;
+    optional bool isEndOfStream = 14;
+    optional int32 protocolVersion = 15;
+}
+
+// More structured Response object for use with VoltDB 7.0 and higher.
+message CtrlProtoResponse {
+    required UUID id = 1;
+    optional CtrlEnvelope.Type type = 2;
+    // status. 0 means ok
+    optional int32 status = 3 [default = 0];
+    optional string failureCause = 4;
+    optional ConnectResponse connectResponse = 5;
+    optional QueryResponse queryResponse = 6;
+    optional AckResponse ackResponse = 7;
+}
+
+message AckResponse {
+    optional bool isEndOfStream = 1;
+}
+
+message ConnectResponse {
+    optional fixed64 catalogCRC = 1;
+    optional string catalogSignature = 2;
+    optional int32 protocolVersion = 3;
+    repeated ClusterInfo clusterInfo = 4;
+}
+
+message QueryResponse {
+    optional bool includeMesh = 1 [default = false];
+    repeated ClusterInfo clusterInfo = 2;
+    optional fixed64 hashinatorSignature = 3;
+}
+
+message ClusterInfo {
+    required int32 clusterId = 1;
+    required fixed64 creationId = 2;
+
+    optional fixed64 recoveryId = 3;
+    optional int32 protocolVersion = 4;
+    optional int32 globalPartitionCount = 5;
+
+    repeated NodeInfo nodeInfo = 6;
+    repeated PartitionInfo partitionInfo = 7;
+}
+
+message NodeInfo {
+    optional string hostname = 1;
+    optional int32 drport = 2; // can be combined with hostname
+    optional bool isUp = 3;
+}
+
+message PartitionInfo {
+    optional int32 partitionId = 1; // should be required
+
+    // info for event synchronization
+    optional int64 nextUniqueId = 10; // rename to nextDRId
+
+    optional bool isSynced = 9 [default = true]; // for backward compatibility only
+
+    // Intentionally skip fields 2, 3, 4, 5, 6, 7, 8, 11 -- deprecated
+}
+
+message CtrlEnvelope {
+    enum Type {
+        ACK = 1;
+        RESET = 2;
+        PAUSE = 3;
+        QUERY = 4;
+        RESPONSE = 5;
+        SNAPSHOT_REQ = 6;
+        SNAPSHOT_TERM = 7;
+        STOP_SYNC = 8;
+        CONNECT = 9;
+        SUBSCRIBE = 10;
+        START_CURSOR = 11;
+    }
+    required Type type = 1;
+    required UUID id = 2;
+    optional Ack ack = 3;
+    optional Reset reset = 4;
+    optional Pause pause = 5;
+    optional Response response = 6;
+    optional SnapshotReq snapshotReq = 7;
+    optional Subscribe subscribe = 8;
+    // Intentionally skip field 9 -- deprecated message type
+    optional Connect connect = 10;
+    optional Query query = 11;
+    optional StartCursor startCursor = 12;
+}

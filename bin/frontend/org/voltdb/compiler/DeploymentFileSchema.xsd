@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+
+    WORTH READING:
+
+    This schema describes the Volt deployment file,
+    deployment.xml. org.voltdb.VoltDB processes deployment.xml file using
+    the jaxb XML to Java bindings.
+
+    If you modify this schema, the jaxb bindings must be regenerated.
+    It is normally handled by the ant build.
+
+    It's also easy to do manually:
+
+    cd src/frontend
+    xjc -p org.voltdb.compiler.deploymentfile org/voltdb/compiler/DeploymentFileSchema.xsd
+
+    Binding objects are created in the org.voltdb.compiler.deploymentfile
+    package. These generated files are checked in to svn.
+
+    You can check that changes to this file produce a valid schema using
+    the public tool at http://www.w3.org/2001/03/webdata/xsv.
+
+    For more information about jaxb, see:
+    http://java.sun.com/developer/technicalArticles/WebServices/jaxb/
+
+  -->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+            elementFormDefault="unqualified">
+
+  <!-- <deployment> -->
+  <xs:element name="deployment" type="deploymentType"/>
+  <xs:complexType name="deploymentType">
+    <xs:all>
+      <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
+      <xs:element name="paths" minOccurs="0" maxOccurs="1" type="pathsType" />
+      <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
+      <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
+      <xs:element name="ssl" minOccurs="0" maxOccurs="1" type="sslType"/>
+      <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
+      <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
+      <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
+      <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
+      <xs:element name="commandlog" minOccurs="0" maxOccurs="1" type="commandLogType" />
+      <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
+                  type="systemSettingsType" />
+      <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
+      <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
+      <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
+      <xs:element name="snmp" minOccurs="0" type="snmpType"/>
+    </xs:all>
+  </xs:complexType>
+
+  <xs:simpleType name="schemaType">
+      <xs:restriction base="xs:string">
+          <xs:enumeration value="catalog"/>
+          <xs:enumeration value="ddl"/>
+      </xs:restriction>
+  </xs:simpleType>
+
+  <!-- restriction on id -->
+  <xs:simpleType name="clusterIdType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="0"/>
+      <xs:maxInclusive value="127"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- <cluster> -->
+  <xs:complexType name="clusterType">
+    <xs:attribute name="hostcount" type="xs:int" default="1"/>
+    <xs:attribute name="sitesperhost" type="xs:int" default="8"/>
+    <xs:attribute name="kfactor" type="xs:int" default="0"/>
+    <xs:attribute name="id" type="clusterIdType"/>
+    <xs:attribute name="schema" type="schemaType" default="ddl"/>
+  </xs:complexType>
+
+  <!-- <snmp> -->
+  <xs:complexType name="snmpType">
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="target" type="xs:string"/>
+    <xs:attribute name="community" type="xs:string" default="public"/>
+    <xs:attribute name="username" type="xs:string" />
+    <xs:attribute name="authprotocol" type="xs:string" default="SHA"/>
+    <xs:attribute name="authkey" type="xs:string" default="voltdbauthkey" />
+    <xs:attribute name="privacyprotocol" type="xs:string" default="AES" />
+    <xs:attribute name="privacykey" type="xs:string" default="voltdbprivacykey" />
+  </xs:complexType>
+
+  <!-- <paths> -->
+  <xs:complexType name="pathEntry">
+      <xs:attribute name="path" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="pathsType">
+    <xs:all>
+        <xs:element name="voltdbroot" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="voltdbroot"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="snapshots" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="snapshots"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="exportoverflow" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="export_overflow"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="droverflow" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="dr_overflow"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="commandlog" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="command_log"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="commandlogsnapshot" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="command_log_snapshot"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="largequeryswap" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="large_query_swap"/>
+            </xs:complexType>
+        </xs:element>
+    </xs:all>
+  </xs:complexType>
+
+  <xs:simpleType name="memorySizeType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="elasticDurationType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="elasticThroughputType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="latencyType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="featureNameType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="snapshots"/>
+      <xs:enumeration value="exportoverflow"/>
+      <xs:enumeration value="droverflow"/>
+      <xs:enumeration value="commandlog"/>
+      <xs:enumeration value="commandlogsnapshot"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="diskLimitType">
+      <xs:sequence>
+          <xs:element name="feature" minOccurs="1" maxOccurs="unbounded">
+             <xs:complexType>
+                <xs:attribute name="name" type="featureNameType"/>
+                <xs:attribute name="size" type="xs:string"/>
+                <xs:attribute name="alert" type="xs:string"/>
+             </xs:complexType>
+          </xs:element>
+      </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="resourceMonitorType">
+      <xs:all>
+        <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="size" type="xs:string" default="80%"/>
+                <xs:attribute name="alert" type="xs:string" default="70%"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="disklimit" type="diskLimitType"
+                    minOccurs="0" maxOccurs="1"/>
+      </xs:all>
+      <xs:attribute name="frequency" type="xs:int" default="60"/>
+  </xs:complexType>
+
+  <!-- <systemsettings> -->
+  <xs:complexType name="systemSettingsType">
+    <xs:all>
+        <xs:element name="temptables" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="maxsize" type="memorySizeType" default="100"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="priority" type="snapshotPriorityType" default="6"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="elastic" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="duration" type="elasticDurationType" default="50"/>
+                <xs:attribute name="throughput" type="elasticThroughputType" default="2"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="query" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="timeout" type="latencyType" default="10000"/>
+            </xs:complexType>
+        </xs:element>
+         <xs:element name="procedure" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="loginfo" type="latencyType" default="10000"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- <security> -->
+  <xs:complexType name="securityType">
+    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+    <xs:attribute name="provider" type="SecurityProviderString" default="hash"/>
+  </xs:complexType>
+
+  <!-- <command log> -->
+  <xs:complexType name="commandLogType">
+    <xs:all>
+        <xs:element name="frequency" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="time" type="logFrequencyTimeType" default="200"/>
+                <xs:attribute name="transactions" type="logFrequencyTxnsType" default="2147483647"/>
+            </xs:complexType>
+        </xs:element>
+    </xs:all>
+    <xs:attribute name="synchronous" type="xs:boolean" default="false"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="logsize" type="logSizeType" default="1024" />
+  </xs:complexType>
+
+  <!-- <partition-detection> -->
+  <xs:complexType name="partitionDetectionType">
+      <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+   </xs:complexType>
+
+  <!-- <heartbeat-config> -->
+  <xs:complexType name="heartbeatType">
+    <xs:attribute name="timeout" type="timeoutType" use="optional" default="90"/>
+  </xs:complexType>
+
+  <xs:simpleType name="timeoutType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- restriction on frequency of snapshot work.
+       0-10 where 0 means no priority control and 1
+       means high priority and 10 means lowest priority -->
+  <xs:simpleType name="snapshotPriorityType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- restriction on command log size in megabytes -->
+  <xs:simpleType name="logSizeType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="3"/>
+      <xs:maxInclusive value="102400"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- restriction on command log fsync frequency -->
+  <xs:simpleType name="logFrequencyTimeType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+      <xs:maxInclusive value="5000"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- restriction on command log fsync txns -->
+  <xs:simpleType name="logFrequencyTxnsType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+      <xs:maxInclusive value="2147483647"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- restriction on snapshot retention knob -->
+  <xs:simpleType name="snapshotRetainType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+      <xs:maxInclusive value="5000"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- <httpd> -->
+  <xs:complexType name="httpdType">
+    <xs:sequence>
+      <xs:element name="jsonapi" minOccurs="0" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="port" type="xs:int"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <xs:complexType name="keyOrTrustStoreType">
+      <xs:attribute name="path" type="xs:string" use="required"/>
+      <xs:attribute name="password" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- ssl -->
+  <xs:complexType name="sslType">
+    <xs:sequence>
+      <xs:element name="keystore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+      <xs:element name="truststore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
+    </xs:sequence>
+    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+    <xs:attribute name="external" type="xs:boolean" default="false"/>
+    <xs:attribute name="dr" type="xs:boolean" default="false"/>
+    <xs:attribute name="internal" type="xs:boolean" default="false"/>
+  </xs:complexType>
+
+  <!-- <snapshot> -->
+  <xs:complexType name="snapshotType">
+    <xs:attribute name="frequency" type="xs:string" use="optional" default="24h" />
+    <xs:attribute name="retain" type="snapshotRetainType" use="optional" default="2" />
+    <xs:attribute name="prefix" type="xs:string" use="optional" default="AUTOSNAP" />
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- <export> -->
+  <xs:complexType name="exportType">
+    <xs:sequence>
+      <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ExportConfigurationType">
+    <xs:sequence>
+      <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="target" type="xs:string" use="required" />
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="type" type="ServerExportEnum" default="file"/>
+    <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
+  </xs:complexType>
+
+  <!-- <import> -->
+  <xs:complexType name="importType">
+    <xs:sequence>
+      <xs:element name="configuration" type="ImportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ImportConfigurationType">
+    <xs:sequence>
+      <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="format-property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="module" type="xs:string" />
+    <xs:attribute name="type" type="ServerImportEnum" use="required" />
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="format" type="xs:string" default="csv"/>
+    <xs:attribute name="version" type="xs:string" default="10"/>
+  </xs:complexType>
+
+  <xs:complexType name="PropertyType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="name" type="PropertyNameString" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:simpleType name="PropertyNameString">
+    <xs:restriction base="xs:normalizedString">
+      <xs:maxLength value="256"/>
+      <xs:minLength value="1"/>
+      <xs:pattern value="\??\p{L}[\p{L}\d_-]*(\.[\p{L}\d_-]+)*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ServerExportEnum">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="file"/>
+      <xs:enumeration value="jdbc"/>
+      <xs:enumeration value="kafka"/>
+      <xs:enumeration value="http"/>
+      <xs:enumeration value="rabbitmq"/>
+      <xs:enumeration value="elasticsearch"/>
+      <xs:enumeration value="custom"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ServerImportEnum">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="kafka"/>
+      <xs:enumeration value="kinesis"/>
+      <xs:enumeration value="custom"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- <users> -->
+  <xs:complexType name="usersType">
+    <xs:sequence>
+      <xs:element name="user" minOccurs="1" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="name" type="userRoleNameString" use="required"/>
+          <xs:attribute name="roles" type="userRoleNameString"/>
+          <xs:attribute name="password" type="xs:string" use="required"/>
+          <xs:attribute name="plaintext" type="xs:boolean" default="true"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="userRoleNameString">
+	<xs:restriction base="xs:string">
+      <xs:pattern value="[\S]+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!--  Security provider enumeration -->
+  <xs:simpleType name="SecurityProviderString">
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="hash"/>
+        <xs:enumeration value="kerberos"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- DR -->
+  <xs:complexType name="drType">
+    <xs:sequence>
+        <!-- Currently, only one DR data source is allowed -->
+        <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="clusterIdType"/>
+    <xs:attribute name="listen" type="xs:boolean" default="true" />
+    <xs:attribute name="port" type="xs:int" default="5555"/>
+    <xs:attribute name="flushInterval" default="1000">
+        <xs:simpleType>
+            <xs:restriction base="xs:int">
+                <xs:minInclusive value="20"/>
+            </xs:restriction>
+        </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="role" type="drRoleType" default="master" />
+  </xs:complexType>
+
+  <!-- DR cluster role -->
+  <xs:simpleType name="drRoleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="master"/>
+      <xs:enumeration value="replica"/>
+      <xs:enumeration value="xdcr"/>
+      <xs:enumeration value="none"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="connectionType">
+    <xs:attribute name="source" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <!-- Validate that this is either empty or a comma-separated list of hostnames -->
+          <xs:minLength value="0"/>
+          <xs:pattern value="[*]{0}|([a-zA-Z0-9\-\.]+(:[0-9]*)?(,\s*[a-zA-Z0-9\-\.]+(:[0-9]*)?)*)"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="preferred-source" type="clusterIdType"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true" />
+    <xs:attribute name="ssl" type="xs:string"/>
+  </xs:complexType>
+
+</xs:schema>
