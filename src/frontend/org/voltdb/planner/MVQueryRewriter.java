@@ -1,81 +1,108 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2018 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.voltdb.planner;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.voltdb.catalog.*;
-import org.json_voltpatches.JSONException;
+import javafx.util.Pair;
 
+import org.voltdb.catalog.*;
+import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.expressions.*;
-
-import javafx.util.Pair;
+import org.json_voltpatches.JSONException;
 
 /**
  * Tries to find a matching materialized view for the given SELECT statement, and rewrite the query.
  */
 final class MVQueryRewriter {
-   private final ParsedSelectStmt m_stmt;
-   private MaterializedViewInfo m_mvi = null;
-   /**
-    * Relation of SELECT stmt's display column name, display column index ===>
-    * VIEW table's column name, column index
-    */
-   private Map<Pair<String, Integer>, Pair<String, Integer>> m_rel;
+    private final ParsedSelectStmt m_stmt;
+    private MaterializedViewInfo m_mvi = null;
+    /**
+     * Relation of SELECT stmt's display column name, display column index ===>
+     * VIEW table's column name, column index
+     */
+    private Map<Pair<String, Integer>, Pair<String, Integer>> m_rel = null;
 
-    public MVQueryRewriter(ParsedSelectStmt stmt) {
+    public MVQueryRewriter(ParsedSelectStmt stmt) {            // Constructor does not modify SELECT stmt
         m_stmt = stmt;
-        if (!stmt.hasOrderByColumns() && stmt.isGrouped()) {   // MVI has GBY, and does not have OBY.
-            final Map<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>> map =
-                    getMviAndViews(m_stmt.m_tableList).entrySet().stream()
-                            .map(kv -> {
-                                final MaterializedViewInfo mv = kv.getKey();
-                                final Table tbl = kv.getValue();
-                                return new Pair<>(mv,
-                                        tbl.getColumns().size() == m_stmt.m_displayColumns.size() ?
-                                                gbyMatches(mv) : null);
-                            }).filter(p -> p.getValue() != null)
-                            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-            if (!map.isEmpty()) {       // SELECT query is rewriteable
-                final Map.Entry<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>> entry =
-                        map.entrySet().iterator().next();
+        if (!m_stmt.hasOrderByColumns() && m_stmt.isGrouped()) {   // MVI has GBY, and does not have OBY.
+            final Optional<Pair<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>>>
+                    any = getMviAndViews(m_stmt.m_tableList).entrySet().stream()          // Scan all MV associated with SEL source tables,
+                    .flatMap(kv -> {
+                        final MaterializedViewInfo mv = kv.getKey();                // Filter first by #columns of VIEW tables,
+                        final Map<Pair<String, Integer>, Pair<String, Integer>> rel = gbyMatches(mv);
+                        return rel != null ?                                      // and then by individual column index/agg type
+                                Stream.of(new Pair<>(mv, rel)) : // tracing back to MV's source table
+                                null;
+                    }).findFirst();
+            if (any.isPresent()) {                                                   // SELECT query can be rewritten
+                final Pair<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>>
+                        entry = any.get();
                 m_rel = entry.getValue();
                 m_mvi = entry.getKey();
-                return;
             }
         }
-        m_rel = null;
     }
 
-   /**
-    * Try to rewrite SELECT stmt if there is a matching materialized view.
-    * @return if SELECT stmt had been rewritten. When matching fails, the SELECT
-    * stmt will be unchanged.
-    */
-   public boolean rewrite() {
-      if (m_mvi != null) {
-          final Table view = m_mvi.getDest();
-          final String viewName = view.getTypeName();
-          // Get the map of select stmt's display column index -> view table (column name, column index)
-          m_stmt.getFinalProjectionSchema()
-                  .resetTableName(viewName, viewName)
-                  .toTVEAndFixColumns(m_rel.entrySet().stream()
-                          .collect(Collectors.toMap(kv -> kv.getKey().getKey(), Map.Entry::getValue)));
-          // change to display column index-keyed map
-          final Map<Integer, Pair<String, Integer>> colSubIndx =
-                  m_rel.entrySet().stream().collect(Collectors.toMap(kv -> kv.getKey().getValue(), Map.Entry::getValue));
-          ParsedSelectStmt.updateTableNames(m_stmt.m_aggResultColumns, viewName);
-          ParsedSelectStmt.fixColumns(m_stmt.m_aggResultColumns, colSubIndx);
-          ParsedSelectStmt.updateTableNames(m_stmt.m_displayColumns, viewName);
-          ParsedSelectStmt.fixColumns(m_stmt.m_displayColumns, colSubIndx);
-          m_stmt.rewriteAsMV(view);
-          m_mvi = null; // makes this method re-entrant safe
-          return true;
-      } else {
-          return false;
-      }
-   }
+    /**
+     * Try to rewrite SELECT stmt if there is a matching materialized view.
+     * @return if SELECT stmt had been rewritten. Updates SELECT stmt transactionally.
+     */
+    public boolean rewrite() {
+        if (m_mvi != null) {
+            final Table view = m_mvi.getDest();
+            final String viewName = view.getTypeName();
+            // Get the map of select stmt's display column index -> view table (column name, column index)
+            m_stmt.getFinalProjectionSchema()
+                    .resetTableName(viewName, viewName)
+                    .toTVEAndFixColumns(m_rel.entrySet().stream()
+                            .collect(Collectors.toMap(kv -> kv.getKey().getKey(), Map.Entry::getValue)));
+            // change to display column index-keyed map
+            final Map<Integer, Pair<String, Integer>> colSubIndx =
+                    m_rel.entrySet().stream().collect(Collectors.toMap(kv -> kv.getKey().getValue(), Map.Entry::getValue));
+            ParsedSelectStmt.updateTableNames(m_stmt.m_aggResultColumns, viewName);
+            ParsedSelectStmt.fixColumns(m_stmt.m_aggResultColumns, colSubIndx);
+            ParsedSelectStmt.updateTableNames(m_stmt.m_displayColumns, viewName);
+            ParsedSelectStmt.fixColumns(m_stmt.m_displayColumns, colSubIndx);
+            m_stmt.rewriteAsMV(view);
+            m_mvi = null; // makes this method re-entrant safe
+            return true;
+        } else {      // scans all sub-queries for rewriting opportunities
+            return m_stmt.allScans().stream()
+                    .map(scan -> scan instanceof StmtSubqueryScan && rewriteTableAlias((StmtSubqueryScan) scan))
+                    .reduce(Boolean::logicalOr)
+                    .equals(true);
+        }
+    }
+
+    /**
+     * Checks for any opportunity to rewrite sub-queries
+     * @param scan target subquery
+     * @return whether rewritten was applied
+     */
+    private static boolean rewriteTableAlias(StmtSubqueryScan scan) {
+        final AbstractParsedStmt stmt = scan.getSubqueryStmt();
+        return stmt instanceof ParsedSelectStmt && (new MVQueryRewriter((ParsedSelectStmt)stmt)).rewrite();
+    }
 
     private boolean gbyTablesEqual(MaterializedViewInfo mv) {
         if (m_stmt.hasComplexGroupby() ^ mv.getGroupbyexpressionsjson().isEmpty()) {
@@ -83,7 +110,7 @@ final class MVQueryRewriter {
                 // And check expression tree structure, ignoring table/column names.
                 return getGbyExpressions(mv).equals(
                         m_stmt.groupByColumns().stream()  // convert PVE (as in "a = ?") to CVE, avoid modifying SELECT stmt
-                                .map(ci -> FilterMatcher.copyAsCVE(ci.expression).anonymize())
+                                .map(ci -> copyAsCVE(ci.expression).anonymize())
                                 .collect(Collectors.toList()));
             } else {    // when neither has complex GBY expression, check whether GBY table names match.
                 return m_stmt.groupByColumns().get(0).tableName
@@ -104,13 +131,12 @@ final class MVQueryRewriter {
     /**
      * Apply matching rules of SELECT stmt against a materialized view, and gives back column relationship
      * between the two.
+     * @pre !m_stmt.groupByColumns().isEmpty() -- guarded by constructor: m_stmt.isGrouped()
      * @param mv target materialized view
      * @return the map of (select stmt's display column name, select stmt's display column index) =>
      * (view table column name, view table column index) if matches; else null.
      */
     private Map<Pair<String, Integer>, Pair<String, Integer>> gbyMatches(MaterializedViewInfo mv) {
-        List<ParsedColInfo> gbySel = m_stmt.groupByColumns();
-        assert(!gbySel.isEmpty());  // guaranteed by constructor logic
         final FilterMatcher filter = new FilterMatcher(m_stmt.m_joinTree.getJoinExpression(), predicate_of(mv));
         //  *** Matching criteria/order: ***
         // 1. Filters match;
@@ -127,19 +153,40 @@ final class MVQueryRewriter {
     }
 
     // Get the map of (select stmt's display column name, select stmt's display column index) =>
-    //                  (view table column name, view table column index)
+    //                  (view table column name, view table column index) if given materialized view's
+    // columns matches with SELECT stmt; else return null.
     private Map<Pair<String, Integer>, Pair<String, Integer>> getViewColumnMaps(MaterializedViewInfo mv) {
-        if (!m_stmt.hasComplexGroupby()) {
-            Map<Pair<Integer, Integer>, Pair<String, Integer>>
-                    // <aggType, viewSrcTblColIndx> => <viewTblColName, viewTblColIndx>
-                    fromView = StreamSupport.stream(((Iterable<Column>) () -> mv.getDest().getColumns().iterator()).spliterator(), false)
-                    .collect(Collectors.toMap(col -> {
-                                Column matCol = col.getMatviewsource();
-                                return new Pair<>(col.getAggregatetype(), matCol == null ? -1 : matCol.getIndex());
-                            },
-                            col -> new Pair<>(col.getTypeName(), col.getIndex()))),  // complex GBY expressions may introduce duplicated KV entries, just ignore.
-                    // <aggType, viewSrcTblColIndx> => <displayColName, displayColIndx>
-                    fromStmt = m_stmt.displayColumns().stream()
+        Iterable<Column> ciViewColumns = () -> mv.getDest().getColumns().iterator();
+        final boolean hasComplexGroupBy = m_stmt.hasComplexGroupby();
+        // deals with complex GBY expressions
+        final List<AbstractExpression> mvGbys = hasComplexGroupBy ? getGbyExpressions(mv) : new ArrayList<>();
+        final List<AbstractExpression> selGbyExpr = hasComplexGroupBy ?
+                m_stmt.getGroupByColumns().stream().map(ci -> copyAsCVE(ci.expression).anonymize()).collect(Collectors.toList()) :
+                new ArrayList<>();
+        if (mvGbys.equals(selGbyExpr)) {                                   // When GBY expressions match
+            final Map<Integer, Integer> selGbyColIndexMap =                // SELECT stmt GBY column index ==> VIEW table column index
+                    m_stmt.displayColumns().stream().flatMap(ci -> {
+                        if (ci.expression instanceof OperatorExpression) {
+                            int indx = mvGbys.indexOf(copyAsCVE(ci.expression).anonymize());
+                            if (indx >= 0) {
+                                return Stream.of(new AbstractMap.SimpleEntry<>(ci.index, indx));
+                            }
+                        }
+                        return null;
+                    }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            // <aggType, viewSrcTblColIndx> ==> <viewTblColName, viewTblColIndx>
+            final Map<Pair<Integer, Integer>, Pair<String, Integer>> nonGbyFromView =
+                    StreamSupport.stream(ciViewColumns.spliterator(), false)
+                            .skip(mvGbys.size())        // safe to use skip on view table, as first k columns are always in GBY
+                            .collect(Collectors.toMap(col -> {
+                                        final Column matCol = col.getMatviewsource();
+                                        return new Pair<>(col.getAggregatetype(), matCol == null ? -1 : matCol.getIndex());
+                                    },
+                                    col -> new Pair<>(col.getTypeName(), col.getIndex())));
+            // <aggType, viewSrcTblColIndx> ==> <displayColName, displayColIndx>
+            final Map<Pair<Integer, Integer>, Pair<String, Integer>> nonGbyFromStmt =
+                    m_stmt.displayColumns().stream()
+                            .filter(ci -> !selGbyColIndexMap.containsKey(ci.index))
                             .map(ci -> {
                                 final Pair<String, Integer> value = new Pair<>(ci.columnName, ci.index);
                                 if (ci.expression instanceof AggregateExpression) {
@@ -153,14 +200,21 @@ final class MVQueryRewriter {
                                 }
                             })
                             .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
-            return fromView.keySet().equals(fromStmt.keySet()) ?
-                    fromView.entrySet().stream()
-                            .collect(Collectors.toMap(kv -> fromStmt.get(kv.getKey()), Map.Entry::getValue)) :
-                    null;   // when SEL stmt/VIEW columns mismatch
-        } else {    // TODO
-            final List<AbstractExpression> gbys = getGbyExpressions(mv);
-            return null;
+            if (nonGbyFromView.keySet().containsAll(nonGbyFromStmt.keySet())) {   // when {SELECT stmt non-GBY columns} \belongs {VIEW columns non-GBY columns}
+                final List<String> gbyNames = StreamSupport.stream(ciViewColumns.spliterator(), false)
+                        .limit(mvGbys.size()).map(Column::getTypeName).collect(Collectors.toList());
+                final Map<Pair<String, Integer>, Pair<String, Integer>> rel = nonGbyFromStmt.entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getValue, kv -> nonGbyFromView.get(kv.getKey())));
+                rel.putAll(m_stmt.m_displayColumns.stream()
+                        .filter(ci -> selGbyColIndexMap.containsKey(ci.index))
+                        .map(ci -> {
+                            final Integer viewColIndx = selGbyColIndexMap.get(ci.index);
+                            return new Pair<>(new Pair<>(ci.columnName, ci.index), new Pair<>(gbyNames.get(viewColIndx), viewColIndx));
+                        }).collect(Collectors.toMap(Pair::getKey, Pair::getValue)));
+                return rel;
+            }
         }
+        return null;
     }
 
     // returns all materialized view info => view table from table list
@@ -169,6 +223,22 @@ final class MVQueryRewriter {
         tbls.forEach(tbl -> StreamSupport.stream(((Iterable<MaterializedViewInfo>) () -> tbl.getViews().iterator()).spliterator(), false)
                 .forEach(mv -> map.put(mv, mv.getDest())));
         return map;
+    }
+
+    // Get a copy with all subexpressions that are PVE converted to CVE
+    private static AbstractExpression copyAsCVE(AbstractExpression src) {
+        AbstractExpression left = src.getLeft(), right = src.getRight();
+        if (left != null) {
+            left = copyAsCVE(left);
+        }
+        if (right != null) {
+            right = copyAsCVE(right);
+        }
+        AbstractExpression dst = src instanceof ParameterValueExpression ?
+                ((ParameterValueExpression) src).getOriginalValue().clone() : src.clone();
+        dst.setLeft(left);
+        dst.setRight(right);
+        return dst;
     }
 
     // JSON deserializers -- pretend that deserialization will never fail
@@ -231,21 +301,6 @@ final class MVQueryRewriter {
                                 (new FilterMatcher(m_expr1.getRight(), m_expr2.getLeft())).match());
             } else
                 return subExprsMatch(m_expr1, m_expr2);
-        }
-        // Get a copy with all subexpressions that are PVE converted to CVE
-        public static AbstractExpression copyAsCVE(AbstractExpression src) {
-            AbstractExpression left = src.getLeft(), right = src.getRight();
-            if (left != null) {
-                left = copyAsCVE(left);
-            }
-            if (right != null) {
-                right = copyAsCVE(right);
-            }
-            AbstractExpression dst = src instanceof ParameterValueExpression ?
-                    ((ParameterValueExpression) src).getOriginalValue().clone() : src.clone();
-            dst.setLeft(left);
-            dst.setRight(right);
-            return dst;
         }
         private static boolean subExprsMatch(AbstractExpression e1, AbstractExpression e2) {
             return (new FilterMatcher(e1.getLeft(), e2.getLeft())).match() &&

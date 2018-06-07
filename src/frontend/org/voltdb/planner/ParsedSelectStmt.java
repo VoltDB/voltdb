@@ -18,7 +18,6 @@
 package org.voltdb.planner;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import javafx.util.Pair;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -169,46 +168,46 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // update table names, convert all expressions to TupleValueExpressions, and also update each expression's
     // table names.
     public static void updateTableNames(List<ParsedColInfo> src, String tblName) {
-        src.stream().forEach(ci -> ci.updateTableName(tblName, tblName).toTVE(ci.index, ci.index));
+        src.forEach(ci -> ci.updateTableName(tblName, tblName).toTVE(ci.index, ci.index));
     }
 
     // stmt's display column (name, index) ==> view table column (name, index)
-    public static void fixColumns(List<ParsedColInfo> src,
-          Map<Integer, Pair<String, Integer>> m) {
+    public static void fixColumns(List<ParsedColInfo> src, Map<Integer, Pair<String, Integer>> m) {
        // change to display column index-keyed map
-       src.stream().forEach(ci -> {
+       src.forEach(ci -> {
           if (m.containsKey(ci.index)) {
              Pair<String, Integer> viewInfo = m.get(ci.index);
-             ci.updateColName(viewInfo.getKey(), ci.alias);
+              ci.updateColName(viewInfo.getKey(), ci.alias);
           }
        });
     }
 
     // Updates miscellaneous fields as part of rewriting as materialized view.
     public ParsedSelectStmt rewriteAsMV(Table view) {
-       m_groupByColumns.clear();
-       m_distinctGroupByColumns = null;
-       m_groupByExpressions.clear();
-       m_distinctProjectSchema = null;
-       m_hasAggregateExpression = false;
-       // Resets paramsBy* used by filtering, assuming that it's equivalent to "SELECT * from MV".
-       setParamsByIndex(new TreeMap<>());
-       m_paramsById = new HashMap<>();
-       m_paramValues = null;
-       // m_sql does not need updating
-       m_tableList.clear();
-       m_tableList.add(view);
-       // update m_tableAliasMap
-       m_tableAliasMap.clear();
-       StmtTargetTableScan st = new StmtTargetTableScan(view);
-       for (ParsedColInfo ci : m_displayColumns) {      // populate m_TableAliasMap[].m_scanColumnList
-          st.resolveTVE((TupleValueExpression)(ci.expression));
-       }
-       defineTableScanByAlias(view.getTypeName(), st);
-       m_tableAliasListAsJoinOrder.clear();
-       m_tableAliasListAsJoinOrder.add(view.getTypeName());
-       m_joinTree = new TableLeafNode(0, null, null, st);
-       return this;
+        m_groupByColumns.clear();
+        m_distinctGroupByColumns = null;
+        m_groupByExpressions.clear();
+        m_distinctProjectSchema = null;
+        m_hasAggregateExpression = m_hasComplexGroupby = m_hasComplexAgg = false;
+        // Resets paramsBy* filters, assuming that it's equivalent to "SELECT * from MV".
+        // In future, this needs update to accomodate for revised filters (e.g. removes
+        // one or more filters).
+        setParamsByIndex(new TreeMap<>());
+        m_paramsById.clear();
+        m_paramValues = null;
+        // m_sql does not need updating
+        m_tableList.clear();
+        m_tableList.add(view);
+        // reset m_tableAliasMap that keeps tracks of sub-queries
+        m_tableAliasMap.clear();
+        StmtTargetTableScan st = new StmtTargetTableScan(view);
+        // populate m_TableAliasMap[].m_scanColumnList
+        m_displayColumns.forEach(ci -> st.resolveTVE((TupleValueExpression)(ci.expression)));
+        defineTableScanByAlias(view.getTypeName(), st);
+        m_tableAliasListAsJoinOrder.clear();
+        m_tableAliasListAsJoinOrder.add(view.getTypeName());
+        m_joinTree = new TableLeafNode(0, null, null, st);
+        return this;
     }
 
     @Override
@@ -2459,6 +2458,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         return exprs;
 
+    }
+
+    public List<ParsedColInfo> getGroupByColumns() {
+       return m_groupByColumns;
     }
 
     private static void addAllSubexpressionsOfClassFromColList(

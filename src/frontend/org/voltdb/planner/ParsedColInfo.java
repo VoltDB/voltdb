@@ -98,6 +98,11 @@ public class ParsedColInfo implements Cloneable {
     public ParsedColInfo updateColName(String colName, String colAlias) {
        columnName = colName;
        alias = colAlias;
+       if (expression instanceof TupleValueExpression) {
+          TupleValueExpression expr = (TupleValueExpression) expression;
+          expr.setColumnName(colName);
+          expr.setColumnAlias(colAlias);
+       }
        return this;
     }
 
