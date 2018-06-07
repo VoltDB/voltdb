@@ -621,7 +621,9 @@ public class MaterializedViewProcessor {
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
-        if (displayColCount <= groupColCount) {
+        // ENG-10892, since count(*) can be removed from SV table
+        if ((stmt.m_tableList.size() > 1 && displayColCount <= groupColCount) ||
+                displayColCount < groupColCount) {
             msg.append("has too few columns.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }

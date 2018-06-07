@@ -1557,12 +1557,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project2);
-        assertFalse(success);
-        captured = capturer.toString("UTF-8");
-        lines = captured.split("\n");
-
-        assertTrue(foundLineMatching(lines,
-                ".*V2.*must have count(.*) after the GROUP BY columns \\(if any\\)*"));
+        assertTrue(success);
 
         // Real config for tests
         VoltProjectBuilder project = new VoltProjectBuilder();

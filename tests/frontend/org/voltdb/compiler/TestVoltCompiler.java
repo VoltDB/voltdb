@@ -1984,13 +1984,6 @@ public class TestVoltCompiler extends TestCase {
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
 
-        // Display columns should be more than group by columns.
-        errorMsg = "Materialized view \"MY_VIEW\" has too few columns.";
-        ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
-                "create view my_view as select id, wage from t group by id, wage;" +
-                "partition table t on column num;";
-        checkDDLErrorMessage(ddl, errorMsg);
-
         // multiple count(*) in ddl
         ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
                 "create view my_view as select id, wage, count(*), min(wage), count(*) from t group by id, wage;" +
