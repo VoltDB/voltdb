@@ -210,6 +210,7 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                                 new ColumnInfo("ROWS_LEFT", VoltType.BIGINT),
                                 new ColumnInfo("ROUNDS", VoltType.INTEGER),
                                 new ColumnInfo("DELETED_LAST_ROUND", VoltType.BIGINT),
+                                new ColumnInfo("LAST_DELETE_TIMESTAMP", VoltType.BIGINT),
                                 new ColumnInfo("STATUS", VoltType.BIGINT),
                                 new ColumnInfo("MESSAGE", VoltType.STRING));
 
@@ -231,7 +232,8 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
         rowsDeleted = status.rowsJustDeleted;
         // If any partition receive failure, report the delete status plus the error message back.
         if (!status.errorMessages.isEmpty()) {
-            returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, ClientResponse.GRACEFUL_FAILURE, status.errorMessages);
+            returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, System.currentTimeMillis(),
+                    ClientResponse.GRACEFUL_FAILURE, status.errorMessages);
             return returnTable;
         }
         // handle the case where we're jammed from the start (no rows deleted)
@@ -250,7 +252,8 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
             rounds++;
             // If any partition receive failure, report the delete status plus the error message back.
             if (!status.errorMessages.isEmpty()) {
-                returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, ClientResponse.GRACEFUL_FAILURE, status.errorMessages);
+                returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, System.currentTimeMillis(),
+                        ClientResponse.GRACEFUL_FAILURE, status.errorMessages);
                 return returnTable;
             }
 
@@ -260,7 +263,8 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
         if (hostLog.isDebugEnabled()){
             hostLog.debug("TTL results for table " + tableName + " deleted " + rowsDeleted + " left " + status.rowsLeft + " in " + rounds + " rounds");
         }
-        returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, ClientResponse.SUCCESS, "");
+        returnTable.addRow(rowsDeleted, status.rowsLeft, rounds, status.rowsJustDeleted, System.currentTimeMillis(),
+                ClientResponse.SUCCESS, "");
         return returnTable;
     }
 }

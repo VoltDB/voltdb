@@ -4887,11 +4887,5 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return (m_catalogContext == null) ? 0 :
                    getCatalogContext().getDeployment().getCluster().getKfactor();
     }
-
-    public void registerTTLStats(String tableName, int siteId, int partitionId, long rowsDeleted, long rowsLeft, long timeStamp) {
-        if (m_timeToLiveProcessor != null) {
-            m_timeToLiveProcessor.regsiterStats(tableName, siteId, partitionId, rowsDeleted, rowsLeft, timeStamp);
-        }
-    }
 }
 
