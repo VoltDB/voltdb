@@ -978,7 +978,10 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         } else {
             return kErrorCode_Error;
         }
-    } catch (const FatalException &e) {
+    } catch (const SerializableEEException &see) {
+        return kErrorCode_Error;
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
