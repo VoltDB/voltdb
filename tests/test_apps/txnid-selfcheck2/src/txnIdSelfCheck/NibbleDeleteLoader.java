@@ -186,7 +186,7 @@ public class NibbleDeleteLoader extends BenchmarkThread {
             while ( t.advanceRow() ) {
                 if ( tableName.equalsIgnoreCase(t.getString("TABLE_NAME")) ) {
                    deleted += t.getLong("ROWS_DELETED");
-                   left += t.getLong("ROWS_LEFT");
+                   left += t.getLong("ROWS_REMAINING");
                 }
             }
             stats.put("ROWS_DELETED", deleted);
