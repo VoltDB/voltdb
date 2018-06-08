@@ -1991,12 +1991,18 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(compileDDL(ddl, compiler));
 
         // Multiple table view should throw error msg without count(*) columns.
-        errorMsg = "Materialized view \"V\" (multiple table view) must have count(*) after the GROUP BY columns (if any)";
+        errorMsg = "Materialized view \"V\" joins multiple tables, therefore must include COUNT(*) after any GROUP BY columns.";
         ddl = "CREATE TABLE T1 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                 "CREATE TABLE T2 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                 "CREATE VIEW V (aint, sumint) AS " +
                 "SELECT T1.a, sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
         checkDDLErrorMessage(ddl, errorMsg);
+
+        // Check single table view GB without aggregates.
+        ddl = "CREATE TABLE T (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                "CREATE VIEW V AS " +
+                "SELECT A, B FROM T GROUP BY A, B;";
+        assertTrue(compileDDL(ddl, compiler));
 
         subTestDDLCompilerMatViewJoin();
     }

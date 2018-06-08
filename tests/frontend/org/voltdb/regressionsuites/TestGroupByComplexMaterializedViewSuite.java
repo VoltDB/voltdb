@@ -1481,12 +1481,16 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,14}, {2,7}, {3,7}});
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V2_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{10,2}});
 
         client.callProcedure("@AdHoc", "DELETE FROM T_ENG10892 WHERE A = 1 AND B = 3;");
         vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,8}, {2,2}, {2,5}, {3,7}});
         vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1,8}, {2,7}, {3,7}});
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V2_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{8,2}});
 
         // test if single table view will delete the row if its hidden count(*) = 0.
         client.callProcedure("@AdHoc", "DELETE FROM T_ENG10892 WHERE A = 3 AND B = 7;");
@@ -1774,7 +1778,9 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 "A INTEGER NOT NULL, " +
                 "B INTEGER NOT NULL);" +
 
-                "CREATE VIEW V_ENG10892 (X,Y) AS SELECT A, SUM(B) FROM T_ENG10892 GROUP BY A;";
+                "CREATE VIEW V_ENG10892 (X,Y) AS SELECT A, SUM(B) FROM T_ENG10892 GROUP BY A;" +
+
+                "CREATE VIEW V2_ENG10892 AS SELECT SUM(A), MIN(B) FROM T_ENG10892;";
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
