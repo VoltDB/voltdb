@@ -1144,10 +1144,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 Class<?> elasticJoinCoordClass =
                         MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
+                    int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+                    if(determination.startAction == StartAction.JOIN) {
+                        int kfactorPlusOne = kfactor + 1;
+                        String waitMessage = "The joining process will begin after " + kfactorPlusOne + " new nodes have been started, waiting...";
+                        if(kfactor != 0) {
+                            consoleLog.info(waitMessage);
+                        }
+                    }
                     Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
                     m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
                     m_messenger.registerMailbox(m_joinCoordinator);
-                    m_joinCoordinator.initialize(m_catalogContext.getDeployment().getCluster().getKfactor());
+                    m_joinCoordinator.initialize(kfactor);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
                 }
@@ -1259,6 +1267,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // do the many init tasks in the Inits class
             Inits inits = new Inits(m_statusTracker, this, 1, m_durable);
             inits.doInitializationWork();
+
+            if(determination.startAction == StartAction.JOIN) {
+                int kfactorPlusOne = m_catalogContext.getDeployment().getCluster().getKfactor() + 1;
+                String waitMessage = "All " + kfactorPlusOne + " new nodes have been started, joining new nodes to the cluster...";
+                if(kfactorPlusOne != 1) {
+                    consoleLog.info(waitMessage);
+                }
+            }
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
             // This is done under Inits.doInitializationWork(), so need to wait until we get here.
