@@ -589,7 +589,7 @@ public class SQLParser extends SQLPatternFactory
             "^\\s*" +            // optional indent at start of line
             "explaincatalog" +   // required command, whitespace terminated
             "\\s*",              // extra spaces
-            Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+            Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
     private static final Pattern ExplainProcCallPreamble = Pattern.compile(
             "^\\s*" +            // optional indent at start of line
