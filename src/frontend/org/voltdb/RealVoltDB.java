@@ -2193,7 +2193,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
-    public boolean isClusterCompelte() {
+    public boolean isClusterComplete() {
         return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
     }
 
@@ -2205,7 +2205,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         //MigratePartitionLeader service will be started up only after the last rejoining has finished
-        if(!isClusterCompelte() || m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0) {
+        if(!isClusterComplete() || m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0) {
             return;
         }
 
@@ -2467,6 +2467,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Trick here is to print out all applicable problems and then stop, rather than stopping
              * after the first one is found.
              */
+            deployment.getDr();
             if (!m_config.m_isEnterprise) {
                 boolean shutdownDeployment = false;
                 boolean shutdownAction = false;

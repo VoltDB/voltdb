@@ -387,7 +387,7 @@ public class InitiatorMailbox implements Mailbox
         }
 
         //one more check to make sure all the hosts are up before any changes are made
-        if (!db.isClusterCompelte()) {
+        if (!db.isClusterComplete()) {
             return;
         }
 
