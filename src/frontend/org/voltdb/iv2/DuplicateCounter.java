@@ -85,7 +85,17 @@ public class DuplicateCounter
         }
     }
 
-    void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage) {
+    void addReplicas(long[] newReplicas) {
+        for (long replica : newReplicas) {
+            m_expectedHSIds.add(replica);
+        }
+    }
+
+    void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage, int misMatchPos) {
+        if (misMatchPos >= 0) {
+            ((InitiateResponseMessage) recentMessage).setMismatchPos(misMatchPos);
+            ((InitiateResponseMessage) m_lastResponse).setMismatchPos(misMatchPos);
+        }
         String msg = String.format(reason + " COMPARING: %d to %d\n"
                 + "REQUEST MESSAGE: %s\n"
                 + "PREV RESPONSE MESSAGE: %s\n"
@@ -138,31 +148,23 @@ public class DuplicateCounter
     protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message, boolean txnSucceed)
     {
         if (!rejoining) {
+            int pos = -1;
             if (m_responseHashes == null) {
                 m_responseHashes = hashes;
                 m_txnSucceed = txnSucceed;
             }
-            else if (!DeterminismHash.compareHashes(m_responseHashes, hashes)) {
+            else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation("HASH MISMATCH", hashes, message);
+                logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
                 return MISMATCH;
             }
             else if (m_txnSucceed != txnSucceed) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " succeeded on one partition but failed on another partition."
                         + " Shutting down to preserve data integrity.");
-                String msg = String.format("PARTIAL ROLLBACK/ABORT COMPARING: %d to %d\n"
-                        + "PREV MESSAGE: %s\n"
-                        + "CURR MESSAGE: %s\n",
-                        hashes[0], m_responseHashes[0],
-                        m_lastResponse.toString(), message.toString());
-                tmLog.error(msg);
-                tmLog.fatal("Stored procedure " + getStoredProcedureName()
-                            + " succeeded on one partition but failed on another partition."
-                            + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message);
+                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
                 return ABORT;
             }
             m_lastResponse = message;
