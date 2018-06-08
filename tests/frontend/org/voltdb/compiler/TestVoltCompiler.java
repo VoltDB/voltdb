@@ -2004,6 +2004,12 @@ public class TestVoltCompiler extends TestCase {
                 "SELECT A, B FROM T GROUP BY A, B;";
         assertTrue(compileDDL(ddl, compiler));
 
+        // Check single table view aggregates without GB column.
+        ddl = "CREATE TABLE T (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                "CREATE VIEW V AS " +
+                "SELECT SUM(A), MAX(B) FROM T;";
+        assertTrue(compileDDL(ddl, compiler));
+
         subTestDDLCompilerMatViewJoin();
     }
 
