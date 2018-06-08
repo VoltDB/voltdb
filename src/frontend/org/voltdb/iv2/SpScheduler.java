@@ -1324,6 +1324,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Don't mark txn done for restarts
             txnDone = false;
         }
+        if (msg.isAborted() && counter != null) {
+            // The last completion was an abort due to a repair/abort or restart/abort so we need to remove duplicate counters
+            // for stale versions of the restarted Txn that never made it past the scoreboard
+            final DuplicateCounterKey lowestPossible = new DuplicateCounterKey(msg.getTxnId(), 0);
+            DuplicateCounterKey staleMatch = m_duplicateCounters.ceilingKey(lowestPossible);
+            while (staleMatch != null && staleMatch.compareTo(duplicateCounterKey) == -1) {
+                m_duplicateCounters.remove(staleMatch);
+                staleMatch = m_duplicateCounters.ceilingKey(lowestPossible);
+            };
+        }
 
         if (counter != null) {
             txnDone = counter.offer(msg) == DuplicateCounter.DONE;

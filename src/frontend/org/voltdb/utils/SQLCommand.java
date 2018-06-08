@@ -921,6 +921,12 @@ public class SQLCommand
                 return;
             }
 
+            // explaincatalog => @ExplainCatalog
+            if (SQLParser.parseExplainCatalogCall(statement)) {
+                printResponse(m_client.callProcedure("@ExplainCatalog"), false);
+                return;
+            }
+
             String explainProcName = SQLParser.parseExplainProcCall(statement);
             if (explainProcName != null) {
                 // We've got a statement that starts with "explainproc", send the statement to

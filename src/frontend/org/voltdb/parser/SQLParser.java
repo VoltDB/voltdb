@@ -584,6 +584,12 @@ public class SQLParser extends SQLPatternFactory
             // explain.
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    // Match queries that start with "explaincatalog" (case insensitive).  We'll convert them to @ExplainCatalog invocations.
+    private static final Pattern ExplainCatalogCallPreamble = Pattern.compile(
+            "^\\s*" +            // optional indent at start of line
+            "explaincatalog" +   // required command, whitespace terminated
+            "\\s*",              // extra spaces
+            Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
     private static final Pattern ExplainProcCallPreamble = Pattern.compile(
             "^\\s*" +            // optional indent at start of line
@@ -1839,6 +1845,17 @@ public class SQLParser extends SQLPatternFactory
             return null;
         }
         return statement.substring(matcher.end());
+    }
+
+    /**
+     * Parse EXPLAINCATALOG
+     * @param statement  statement to parse
+     * @return           true if recognized
+     */
+    public static boolean parseExplainCatalogCall(String statement)
+    {
+        Matcher matcher = ExplainCatalogCallPreamble.matcher(statement);
+        return matcher.matches();
     }
 
     /**

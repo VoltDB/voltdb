@@ -31,7 +31,6 @@ import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.planner.CorePlan;
-import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
 
@@ -355,7 +354,11 @@ public class AdHocPlannedStmtBatch implements Cloneable {
         String aggplan = new String(plannedStatement.core.aggregatorFragment, Constants.UTF8ENCODING);
         PlanNodeTree pnt = new PlanNodeTree();
         try {
+            String result = null;
             JSONObject jobj = new JSONObject(aggplan);
+            if (getJSONString) {
+                result = jobj.toString(4);
+            }
             pnt.loadFromJSONPlan(jobj, db);
 
             if (plannedStatement.core.collectorFragment != null) {
@@ -367,14 +370,11 @@ public class AdHocPlannedStmtBatch implements Cloneable {
                 collpnt.loadFromJSONPlan(jobMP, db);
                 assert(collpnt.getRootPlanNode() instanceof SendPlanNode);
                 pnt.getRootPlanNode().reattachFragment(collpnt.getRootPlanNode());
+                if (getJSONString) {
+                    result += "\n" + jobMP.toString(4);
+                }
             }
-            String result;
-            if (getJSONString) {
-                PlanNodeList pnl = new PlanNodeList(pnt, false);
-                JSONObject jsonObject = new JSONObject(pnl.toJSONString());
-                result = jsonObject.toString(4);
-            }
-            else {
+            if (! getJSONString) {
                 result = pnt.getRootPlanNode().toExplainPlanString();
             }
             return result;
