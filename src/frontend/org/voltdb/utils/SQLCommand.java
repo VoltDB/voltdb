@@ -94,12 +94,6 @@ public class SQLCommand
     private static boolean m_testFrontEndOnly;
     private static String m_testFrontEndResult;
 
-    private static String[] describeAdjectives = {"beautiful", "very nice", "wonderful", "mischievous",
-                                                  "bothersome", "troubling", "magnificent", "friendly",
-                                                  "happy go lucky", "sad and lonely", "fine", "whiny little",
-                                                  "practically perfect", "very overrated", "very underrated",
-                                                  "forgiving", "lucky", "grateful", "devilish", "terrible"};
-
     // Special exception type to inform main to return m_exitCode and stop SQLCmd
     @SuppressWarnings("serial")
     private static class SQLCmdEarlyExitException extends RuntimeException {}
@@ -503,13 +497,6 @@ public class SQLCommand
             if (!primaryKey.equals("")) {
                 System.out.println("Primary Key (" + primaryKey + ")");
             }
-
-            // for fun
-            int h = tableName.hashCode();
-            int a = Math.abs(h) % describeAdjectives.length;
-            String adj = describeAdjectives[a];
-            System.out.println(tableName + " is a " + adj + " table");
-
             return true;
         }
 
