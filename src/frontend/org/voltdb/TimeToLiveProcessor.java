@@ -52,14 +52,20 @@ public class TimeToLiveProcessor extends StatsSource{
     public static class TTLStats {
         final String tableName;
         long rowsLeft = 0L;
+
+        //Total rows deleted on this TTL control. The total count
+        //will be reset if this node fails and another node takes over
+        //TTL control
         long rowsDeleted = 0L;
+        long rowsLastDeleted = 0L;
         Timestamp ts;
         public TTLStats(String tableName) {
             this.tableName = tableName;
         }
         public void update(long rowDeleted, long rowsLeft, long lastExecutionTimestamp) {
-            this.rowsDeleted = rowDeleted;
+            this.rowsLastDeleted = rowDeleted;
             this.rowsLeft = rowsLeft;
+            this.rowsDeleted += rowDeleted;
             ts = new Timestamp(lastExecutionTimestamp);
         }
         @Override
@@ -240,6 +246,7 @@ public class TimeToLiveProcessor extends StatsSource{
         columns.add(new ColumnInfo("TIMESTAMP", VoltType.BIGINT));
         columns.add(new ColumnInfo("TABLE_NAME", VoltType.STRING));
         columns.add(new ColumnInfo("ROWS_DELETED", VoltType.INTEGER));
+        columns.add(new ColumnInfo("ROWS_DELETED_LAST_ROUND", VoltType.INTEGER));
         columns.add(new ColumnInfo("ROWS_LEFT", VoltType.INTEGER));
         columns.add(new ColumnInfo("LAST_DELETE_TIMESTAMP", VoltType.TIMESTAMP));
     }
@@ -258,6 +265,7 @@ public class TimeToLiveProcessor extends StatsSource{
             rowValues[columnNameToIndex.get("TIMESTAMP")] = System.currentTimeMillis();
             rowValues[columnNameToIndex.get("TABLE_NAME")] = rowKey;
             rowValues[columnNameToIndex.get("ROWS_DELETED")] = stats.rowsDeleted;
+            rowValues[columnNameToIndex.get("ROWS_DELETED_LAST_ROUND")] = stats.rowsLastDeleted;
             rowValues[columnNameToIndex.get("ROWS_LEFT")] = stats.rowsLeft;
             rowValues[columnNameToIndex.get("LAST_DELETE_TIMESTAMP")] = stats.ts;
         }
