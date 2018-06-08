@@ -456,10 +456,10 @@ public class SQLCommand
                 }
             }
             columnData.resetRowPosition();
-            String headerFormat = "%-" + maxNameWidth + "s|%-16s|%-8s|%-9s|%-16s\n";
-            String rowFormat = "%-" + maxNameWidth + "s|%-16s|%8d|%-9s|%-16s\n";
+            String headerFormat = "%-" + maxNameWidth + "s|%-16s|%-11s|%-9s|%-16s\n";
+            String rowFormat = "%-" + maxNameWidth + "s|%-16s|%11d|%-9s|%-16s\n";
             System.out.printf(headerFormat,"COLUMN","DATATYPE","SIZE","NULLABLE","REMARKS");
-            String DASHES = new String(new char[53+maxNameWidth]).replace("\0", "-");
+            String DASHES = new String(new char[56+maxNameWidth]).replace("\0", "-");
             System.out.println(DASHES);
             while (columnData.advanceRow()) {
                 String tname = columnData.getString(2);
