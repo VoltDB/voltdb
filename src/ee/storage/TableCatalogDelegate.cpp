@@ -83,18 +83,21 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     bool needsHiddenCountForView = false;
 
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
-    for (colIterator = catalogTable.columns().begin();
-         colIterator != catalogTable.columns().end(); colIterator++) {
-        auto catalogColumn = colIterator->second;
-        if (catalogColumn->aggregatetype() == EXPRESSION_TYPE_INVALID ||
-          catalogColumn->aggregatetype() == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
-          // not a view or there exists count(*), directly quit
-          break;
-        }
-    }
-    if (colIterator == catalogTable.columns().end()) {
-      // iterator meets the end, meaning no count(*) column
-      needsHiddenCountForView = true;
+
+    // only looking for potential existing table count(*) when this is a Materialized view table
+    if (isTableMaterialized(catalogTable)) {
+      for (colIterator = catalogTable.columns().begin();
+           colIterator != catalogTable.columns().end(); colIterator++) {
+          auto catalogColumn = colIterator->second;
+          if (catalogColumn->aggregatetype() == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+            // there exists count(*), directly quit
+            break;
+          }
+      }
+      if (colIterator == catalogTable.columns().end()) {
+        // iterator meets the end, meaning no count(*) column
+        needsHiddenCountForView = true;
+      }
     }
 
     // DR timestamp and hidden COUNT(*) should not appear at the same time

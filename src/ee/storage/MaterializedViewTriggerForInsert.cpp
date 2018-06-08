@@ -129,7 +129,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
 
     int aggOffset = (int)m_groupByColumnCount;
     // m_aggExprs has complex aggregation operations which does not include COUNT(*)
-    // but COUNT(*) is included in m_aggColumnCount
     int numCountStar = 0;
     // set values for the other columns
     // update or insert the row
