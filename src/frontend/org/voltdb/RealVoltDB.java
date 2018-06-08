@@ -2457,7 +2457,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
-                if (deployment.getDr() != null) {
+                if (deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {
                     consoleLog.warn("Database Replication is not supported " +
                             "in the community edition of VoltDB.");
                 }
