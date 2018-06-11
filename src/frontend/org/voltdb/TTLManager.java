@@ -18,10 +18,8 @@ package org.voltdb;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,7 +31,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Table;
@@ -74,22 +71,21 @@ public class TTLManager extends StatsSource{
         }
     }
 
-    public static class TTLTask implements Runnable {
+    public class TTLTask implements Runnable {
 
         final String tableName;
         AtomicReference<TimeToLive> ttlRef;
-        final ClientInterface cl;
         final TTLStats stats;
         AtomicBoolean canceled = new AtomicBoolean(false);
-        public TTLTask(String table, TimeToLive timeToLive, ClientInterface clientInterface, TTLStats ttlStats) {
+        public TTLTask(String table, TimeToLive timeToLive, TTLStats ttlStats) {
             tableName = table;
             ttlRef = new AtomicReference<>(timeToLive);
-            cl= clientInterface;
             stats = ttlStats;
         }
         @Override
         public void run() {
-            if (!canceled.get()) {
+            ClientInterface cl = VoltDB.instance().getClientInterface();
+            if (!canceled.get() && cl != null && cl.isAcceptingConnections()) {
                 TimeToLive ttl = ttlRef.get();
                 cl.runTimeToLive(tableName, ttl.getTtlcolumn().getName(),
                         transformValue(ttl), CHUNK_SIZE, TIMEOUT, stats);
@@ -144,26 +140,28 @@ public class TTLManager extends StatsSource{
     }
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private ScheduledThreadPoolExecutor m_timeToLiveExecutor;
-    private static TTLManager m_self;
-    private final int m_hostId;
-    private final HostMessenger m_messenger ;
-    private final ClientInterface m_interface;
+    private static volatile TTLManager m_self;
     private final Map<String, TTLTask> m_tasks = new ConcurrentHashMap<>();
     private final Map<String, ScheduledFuture<?>> m_futures = new ConcurrentHashMap<>();
     private final Map<String, TTLStats> m_stats = new ConcurrentHashMap<>();
 
-    public static synchronized void initialze(int hostId, HostMessenger hostMessenger, ClientInterface clientInterface) {
-        m_self = new TTLManager(hostId, hostMessenger, clientInterface);
+    public static void initialze() {
+        if (m_self == null) {
+            synchronized (TTLManager.class) {
+                if (m_self == null) {
+                    m_self = new TTLManager();
+                }
+            }
+        }
     }
 
-    private TTLManager(int hostId, HostMessenger hostMessenger, ClientInterface clientInterface) {
+    private TTLManager() {
         super(false);
-        m_hostId = hostId;
-        m_messenger = hostMessenger;
-        m_interface = clientInterface;
     }
 
     public static TTLManager instance() {
+        //could be called before initialized.
+        initialze();
         return m_self;
     }
 
@@ -176,13 +174,7 @@ public class TTLManager extends StatsSource{
         //do not trigger TTL on replica clusters
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
         if (db.getReplicationRole() == ReplicationRole.REPLICA) {
-            return;
-        }
-
-        //if the host id is not the smallest or no TTL table, then shutdown the task if it is running.
-        List<Integer> liveHostIds = new ArrayList<Integer>(m_messenger.getLiveHostIds());
-        Collections.sort(liveHostIds);
-        if (m_hostId != liveHostIds.get(0)) {
+            shutDown();
             return;
         }
 
@@ -228,7 +220,7 @@ public class TTLManager extends StatsSource{
                     stats = new TTLStats(t.getTypeName());
                     m_stats.put(t.getTypeName(), stats);
                 }
-                task = new TTLTask(t.getTypeName(), ttl, m_interface, stats);
+                task = new TTLTask(t.getTypeName(), ttl, stats);
                 m_tasks.put(t.getTypeName(), task);
                 m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY, INTERVAL, TimeUnit.SECONDS));
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));

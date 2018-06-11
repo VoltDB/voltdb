@@ -1550,7 +1550,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             assert (m_clientInterface != null);
             m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
-            TTLManager.initialze(m_myHostId, m_messenger, m_clientInterface);
+            TTLManager.initialze();
             getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, TTLManager.instance());
             // Start elastic join service
             try {
@@ -1708,7 +1708,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // let the client interface know host(s) have failed to clean up any outstanding work
                     // especially non-transactional work
                     m_clientInterface.handleFailedHosts(failedHosts);
-                    TTLManager.instance().start();
                 }
             });
         }
@@ -3756,7 +3755,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
                 }
 
-                TTLManager.instance().start();
+                if (m_myHostId == CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMultiPartitionInitiator())) {
+                    TTLManager.instance().start();
+                }
                 // restart resource usage monitoring task
                 startHealthMonitor();
 
@@ -4033,8 +4034,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         //Tell import processors that they can start ingesting data.
         ImportManager.instance().readyForData();
 
-        TTLManager.instance().start();
-
         if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
                     "Node data recovery completed after " + delta + " seconds with " + megabytes +
@@ -4289,7 +4288,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
-        TTLManager.instance().start();
     }
 
     private void databaseIsRunning() {
