@@ -211,7 +211,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                  isLargeQuery);
         }
         catch (Exception e) {
-            throw new AdHocPlanningException(e.getMessage());
+            throw new AdHocPlanningException("Unexpected Ad Hoc Planning Error: " + e.getMessage());
         }
         catch (StackOverflowError error) {
             // Overly long predicate expressions can cause a
