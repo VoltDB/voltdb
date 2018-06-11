@@ -1145,12 +1145,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
                     int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-                    if(determination.startAction == StartAction.JOIN) {
+                    if(determination.startAction == StartAction.JOIN && kfactor > 0) {
                         int kfactorPlusOne = kfactor + 1;
                         String waitMessage = "The join process will begin after a total of " + kfactorPlusOne + " nodes are added, waiting...";
-                        if(kfactor != 0) {
-                            consoleLog.info(waitMessage);
-                        }
+                        consoleLog.info(waitMessage);
                     }
                     Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
                     m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
@@ -1268,12 +1266,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             Inits inits = new Inits(m_statusTracker, this, 1, m_durable);
             inits.doInitializationWork();
 
-            if(determination.startAction == StartAction.JOIN) {
-                int kfactorPlusOne = m_catalogContext.getDeployment().getCluster().getKfactor() + 1;
+            int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+            if(determination.startAction == StartAction.JOIN && kfactor > 0) {
+                int kfactorPlusOne = kfactor + 1;
                 String waitMessage = "" + kfactorPlusOne + " nodes added, joining new nodes to the cluster...";
-                if(kfactorPlusOne != 1) {
-                    consoleLog.info(waitMessage);
-                }
+                consoleLog.info(waitMessage);
             }
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
