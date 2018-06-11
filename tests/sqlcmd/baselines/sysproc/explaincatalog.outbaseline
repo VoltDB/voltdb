@@ -103,7 +103,7 @@ set $PREV elasticduration 50
 set $PREV elasticthroughput 2
 set $PREV querytimeout 10000
 add /clusters#cluster logconfig log
-set /clusters#cluster/logconfig#log enabled true
+set /clusters#cluster/logconfig#log enabled false
 set $PREV synchronous false
 set $PREV fsyncInterval 200
 set $PREV maxTxns 2147483647
