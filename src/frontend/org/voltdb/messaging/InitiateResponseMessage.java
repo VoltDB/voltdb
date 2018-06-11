@@ -28,6 +28,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.TxnEgo;
 
 /**
@@ -51,6 +52,8 @@ public class InitiateResponseMessage extends VoltMessage {
     private boolean m_mispartitioned;
     private StoredProcedureInvocation m_invocation;
     private Pair<Long, byte[]> m_currentHashinatorConfig;
+
+    int m_hashMismatchPos = -1;
 
     /** Empty constructor for de-serialization */
     public InitiateResponseMessage()
@@ -175,6 +178,11 @@ public class InitiateResponseMessage extends VoltMessage {
         m_response = r;
     }
 
+    public void setMismatchPos(int pos) {
+        m_hashMismatchPos = pos;
+    }
+
+
     public boolean isReadOnly() {
         return m_readOnly;
     }
@@ -272,6 +280,10 @@ public class InitiateResponseMessage extends VoltMessage {
             sb.append("\n  COMMIT");
         else
             sb.append("\n  ROLLBACK/ABORT, ");
+        int[] hashes = m_response.getHashes();
+        if (hashes != null) {
+            sb.append("\n RESPONSE HASH: ").append(DeterminismHash.description(hashes, m_hashMismatchPos));
+        }
         sb.append("\n CLIENT RESPONSE: \n");
         if (m_response == null) {
             // This is not going to happen in the real world, but only in the test cases

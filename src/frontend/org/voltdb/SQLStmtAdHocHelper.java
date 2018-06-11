@@ -73,4 +73,8 @@ public class SQLStmtAdHocHelper {
         sqlStmt.sqlText = null;
         sqlStmt.sqlTextStr = sql;
     }
+
+    public static int getHash(SQLStmt sqlStmt) {
+        return sqlStmt.sqlCRC;
+    }
 }

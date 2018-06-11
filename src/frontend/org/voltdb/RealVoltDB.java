@@ -96,9 +96,11 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.common.Constants;
@@ -195,7 +197,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "</deployment>"
     };
 
-    private final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
@@ -3987,5 +3989,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     private String getTerminusNonce() {
         return terminusNonceSupplier.get();
+    }
+
+    public static void printDiagnosticInformation(CatalogContext context, String procName, LoadedProcedureSet procSet) {
+        StringBuilder sb = new StringBuilder();
+        final CatalogMap<Procedure> catalogProcedures = context.database.getProcedures();
+        sb.append("Statements within " + procName + ": ").append("\n");
+        for (final Procedure proc : catalogProcedures) {
+            if (proc.getTypeName().equals(procName)) {
+                sb.append(CatalogUtil.printUserProcedureDetail(proc));
+            }
+        }
+        sb.append("Default CRUD Procedures: ").append("\n");
+        for (Entry<String, Procedure> pair : context.m_defaultProcs.m_defaultProcMap.entrySet()) {
+            sb.append(CatalogUtil.printCRUDProcedureDetail(pair.getValue(), procSet));
+        }
+        hostLog.error(sb.toString());
     }
 }

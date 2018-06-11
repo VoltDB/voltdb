@@ -197,4 +197,9 @@ public class FunctionSQLInvoked extends Expression {
     public String describe(Session session) {
         return super.describe(session);
     }
+
+    /************************* Volt DB Extensions *************************/
+    // When we start to use it, we need to override equals and hashCode function
+
+    /**********************************************************************/
 }

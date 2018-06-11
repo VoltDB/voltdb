@@ -42,6 +42,7 @@ import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.Consistency;
 import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
@@ -56,6 +57,7 @@ import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.DumpPlanThenExitMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -405,6 +407,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof DumpMessage) {
             handleDumpMessage();
+        } else if (message instanceof DumpPlanThenExitMessage) {
+            handleDumpPlanMessage((DumpPlanThenExitMessage)message);
         }
         else if (message instanceof DummyTransactionTaskMessage) {
             handleDummyTransactionTaskMessage((DummyTransactionTaskMessage) message);
@@ -727,7 +731,29 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                VoltDB.crashGlobalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
+                if (m_isLeader && m_sendToHSIds.length > 0) {
+                    StringBuilder sb = new StringBuilder();
+                    for (long hsId : m_sendToHSIds) {
+                        sb.append(CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId)).append(" ");
+                    }
+                    hostLog.info("Send dump plan message to other replicas: " + sb.toString());
+                    m_mailbox.send(m_sendToHSIds, new DumpPlanThenExitMessage(counter.getStoredProcedureName()));
+                }
+                RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                        counter.getStoredProcedureName(), m_procSet);
+                VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                if (m_isLeader && m_sendToHSIds.length > 0) {
+                    StringBuilder sb = new StringBuilder();
+                    for (long hsId : m_sendToHSIds) {
+                        sb.append(CoreUtils.getHostIdFromHSId(hsId) + ":" + CoreUtils.getSiteIdFromHSId(hsId)).append(" ");
+                    }
+                    hostLog.info("Send dump plan message to other replicas: " + sb.toString());
+                    m_mailbox.send(m_sendToHSIds, new DumpPlanThenExitMessage(counter.getStoredProcedureName()));
+                }
+                RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                        counter.getStoredProcedureName(), m_procSet);
+                VoltDB.crashLocalVoltDB("HASH MISMATCH: transaction succeeded on one replica but failed on another replica.", true, null);
             }
         }
         else {
@@ -996,6 +1022,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashGlobalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
+            } else if (result == DuplicateCounter.ABORT) {
+                VoltDB.crashGlobalVoltDB("PARTIAL ROLLBACK/ABORT running multi-part procedure.", true, null);
             }
             // doing duplicate suppression: all done.
             return;
@@ -1233,6 +1261,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    public void handleDumpPlanMessage(DumpPlanThenExitMessage msg)
+    {
+        hostLog.error("This node is going to shutdown because a hash mismatch error was detected on " +
+                       CoreUtils.getHostIdFromHSId(msg.m_sourceHSId) + ":" + CoreUtils.getSiteIdFromHSId(msg.m_sourceHSId));
+        RealVoltDB.printDiagnosticInformation(VoltDB.instance().getCatalogContext(),
+                msg.getProcName(), m_procSet);
+        VoltDB.crashLocalVoltDB("HASH MISMATCH", true, null);
+    }
 
     @Override
     public void setCommandLog(CommandLog cl) {
