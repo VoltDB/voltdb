@@ -270,7 +270,7 @@ public class TestJDBCSecurityEnabled {
     public void testJDBCLoaderWithCredentialsFile() throws NoConnectionsException, IOException, ProcCallException, InterruptedException{
 
         // write username / password to csv
-        String[] authData = {"Username: userWithAdminPerm", "Password: password"};
+        String[] authData = {"username: userWithAdminPerm", "password: password"};
         try {
             BufferedWriter output_csv = new BufferedWriter( new FileWriter( path_csv_user ) );
             for (String line: authData) {
@@ -339,7 +339,7 @@ public class TestJDBCSecurityEnabled {
     public void testUsingCrendentialFileIncludingSpecialCharactersInPassword() throws NoConnectionsException, IOException, ProcCallException, InterruptedException{
 
         // write username / password to csv
-        String[] authData = {"Username: userWithAdminPerm2", "Password: password!!!"};
+        String[] authData = {"username: userWithAdminPerm2", "password: password!!!"};
         try {
             BufferedWriter output_csv = new BufferedWriter( new FileWriter( path_csv_user ) );
             for (String line: authData) {
