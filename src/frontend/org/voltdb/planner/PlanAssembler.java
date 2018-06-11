@@ -2592,7 +2592,7 @@ public class PlanAssembler {
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
-        if (/*false &&*/ m_parsedSelect.hasAggregateOrGroupby()) {
+        if (m_parsedSelect.hasAggregateOrGroupby()) {
             AggregatePlanNode aggNode = null;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
@@ -3263,7 +3263,9 @@ public class PlanAssembler {
             return root;
         }
 
-        assert(m_parsedSelect.isGrouped());
+        // When SELECT has been rewritten, the GBY gets cleared. Bypass this check since
+        // there is no longer GBY.
+        assert(m_parsedSelect.hasBeenRewritten() || m_parsedSelect.isGrouped());
 
         // DISTINCT is redundant with GROUP BY IFF
         // all of the grouping columns are present in the display columns.

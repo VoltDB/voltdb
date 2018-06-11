@@ -73,12 +73,10 @@ public class NodeSchema implements Iterable<SchemaColumn> {
 
     // Substitute table name only for all schema columns and map entries
     public NodeSchema resetTableName(String tbName, String tbAlias) {
-       for(SchemaColumn sc : m_columns) {
-          sc.reset(tbName, tbAlias, sc.getColumnName(), sc.getColumnAlias());
-       }
-       for(Map.Entry<SchemaColumn, Integer> it : m_columnsMapHelper.entrySet()) {
-          it.getKey().reset(tbName, tbAlias, it.getKey().getColumnName(), it.getKey().getColumnAlias());
-       }
+       m_columns.forEach(sc ->
+             sc.reset(tbName, tbAlias, sc.getColumnName(), sc.getColumnAlias()));
+       m_columnsMapHelper.forEach((k, v) ->
+             k.reset(tbName, tbAlias, k.getColumnName(), k.getColumnAlias()));
        return this;
     }
 
@@ -90,14 +88,15 @@ public class NodeSchema implements Iterable<SchemaColumn> {
        m_columnsMapHelper.clear();
        for(int indx = 0; indx < ns.size(); ++indx) {    // then update columns
            final SchemaColumn sc = ns.getColumn(indx);
+           assert(sc.getExpression() instanceof TupleValueExpression);
            if(nameMap.containsKey(sc.getColumnName())) {
                final String newColName = nameMap.get(sc.getColumnName()).getKey();
-               final Integer newColIndx = nameMap.get(sc.getColumnName()).getValue();
                sc.reset(sc.getTableName(), sc.getTableAlias(), newColName, sc.getColumnAlias());
                sc.setDifferentiator(indx);
                TupleValueExpression exp = (TupleValueExpression) sc.getExpression();
-               exp.setColumnIndex(newColIndx);
+               exp.setColumnIndex(indx);
                exp.setColumnName(newColName);
+               exp.setDifferentiator(indx);
            }
        }
        for(SchemaColumn sc : ns) {

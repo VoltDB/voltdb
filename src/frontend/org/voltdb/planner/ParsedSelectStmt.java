@@ -84,6 +84,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasAggregateDistinct = false;
     private boolean m_hasPartitionColumnInDistinctGroupby = false;
     private boolean m_isComplexOrderBy = false;
+    private boolean m_isRewritten = false;      // gets set when SELECT query is rewritten by query optimizer
 
     // Limit plan node information.
     public static class LimitOffset {
@@ -189,6 +190,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_groupByExpressions.clear();
         m_distinctProjectSchema = null;
         m_hasAggregateExpression = m_hasComplexGroupby = m_hasComplexAgg = false;
+        m_isRewritten = true;
         // Resets paramsBy* filters, assuming that it's equivalent to "SELECT * from MV".
         // In future, this needs update to accomodate for revised filters (e.g. removes
         // one or more filters).
@@ -1370,6 +1372,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public LimitPlanNode getLimitNodeDist() {
         return new LimitPlanNode(m_limitOffset.m_limitNodeDist);
+    }
+
+    public boolean hasBeenRewritten() {
+       return m_isRewritten;
     }
 
     @Override
