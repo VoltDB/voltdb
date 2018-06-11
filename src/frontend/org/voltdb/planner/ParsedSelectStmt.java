@@ -19,7 +19,7 @@ package org.voltdb.planner;
 
 import java.util.*;
 
-import javafx.util.Pair;
+import org.voltcore.utils.Pair;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
@@ -178,7 +178,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
        src.forEach(ci -> {
           if (m.containsKey(ci.index)) {
              Pair<String, Integer> viewInfo = m.get(ci.index);
-              ci.updateColName(viewInfo.getKey(), ci.alias);
+              ci.updateColName(viewInfo.getFirst(), ci.alias);
           }
        });
     }

@@ -26,9 +26,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 
-import javafx.util.Pair;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -90,7 +89,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
            final SchemaColumn sc = ns.getColumn(indx);
            assert(sc.getExpression() instanceof TupleValueExpression);
            if(nameMap.containsKey(sc.getColumnName())) {
-               final String newColName = nameMap.get(sc.getColumnName()).getKey();
+               final String newColName = nameMap.get(sc.getColumnName()).getFirst();
                sc.reset(sc.getTableName(), sc.getTableAlias(), newColName, sc.getColumnAlias());
                sc.setDifferentiator(indx);
                TupleValueExpression exp = (TupleValueExpression) sc.getExpression();

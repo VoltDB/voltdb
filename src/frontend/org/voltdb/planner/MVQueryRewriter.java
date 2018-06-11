@@ -21,7 +21,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import javafx.util.Pair;
+import org.voltcore.utils.Pair;
 
 import org.voltdb.catalog.*;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -57,8 +57,8 @@ final class MVQueryRewriter {
             if (any.isPresent()) {                                                   // SELECT query can be rewritten
                 final Pair<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>>
                         entry = any.get();
-                m_rel = entry.getValue();
-                m_mvi = entry.getKey();
+                m_rel = entry.getSecond();
+                m_mvi = entry.getFirst();
             }
         }
     }
@@ -75,10 +75,10 @@ final class MVQueryRewriter {
             m_stmt.getFinalProjectionSchema()
                     .resetTableName(viewName, viewName)
                     .toTVEAndFixColumns(m_rel.entrySet().stream()
-                            .collect(Collectors.toMap(kv -> kv.getKey().getKey(), Map.Entry::getValue)));
+                            .collect(Collectors.toMap(kv -> kv.getKey().getFirst(), Map.Entry::getValue)));
             // change to display column index-keyed map
             final Map<Integer, Pair<String, Integer>> colSubIndx =
-                    m_rel.entrySet().stream().collect(Collectors.toMap(kv -> kv.getKey().getValue(), Map.Entry::getValue));
+                    m_rel.entrySet().stream().collect(Collectors.toMap(kv -> kv.getKey().getSecond(), Map.Entry::getValue));
             ParsedSelectStmt.updateTableNames(m_stmt.m_aggResultColumns, viewName);
             ParsedSelectStmt.fixColumns(m_stmt.m_aggResultColumns, colSubIndx);
             ParsedSelectStmt.updateTableNames(m_stmt.m_displayColumns, viewName);
@@ -199,7 +199,7 @@ final class MVQueryRewriter {
                                             ((TupleValueExpression) ci.expression).getColumnIndex()), value);
                                 }
                             })
-                            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+                            .collect(Collectors.toMap(Pair::getFirst, Pair::getSecond));
             if (nonGbyFromView.keySet().containsAll(nonGbyFromStmt.keySet())) {   // when {SELECT stmt non-GBY columns} \belongs {VIEW columns non-GBY columns}
                 final List<String> gbyNames = StreamSupport.stream(ciViewColumns.spliterator(), false)
                         .limit(mvGbys.size()).map(Column::getTypeName).collect(Collectors.toList());
@@ -210,7 +210,7 @@ final class MVQueryRewriter {
                         .map(ci -> {
                             final Integer viewColIndx = selGbyColIndexMap.get(ci.index);
                             return new Pair<>(new Pair<>(ci.columnName, ci.index), new Pair<>(gbyNames.get(viewColIndx), viewColIndx));
-                        }).collect(Collectors.toMap(Pair::getKey, Pair::getValue)));
+                        }).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond)));
                 return rel;
             }
         }

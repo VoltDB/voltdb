@@ -17,8 +17,6 @@
 
 package org.voltdb.planner;
 
-import javafx.util.Pair;
-
 import java.util.*;
 
 import org.hsqldb_voltpatches.HSQLInterface;
