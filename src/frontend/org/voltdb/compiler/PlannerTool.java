@@ -154,7 +154,7 @@ public class PlannerTool {
              * are at least somewhat expected.
              */
             String loggedMsg = "";
-            if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
+            if (!(e instanceof PlanningErrorException || e instanceof HSQLParseException)) {
                 logException(e, "Error compiling query");
                 loggedMsg = " (Stack trace has been written to the log.)";
             }
