@@ -165,6 +165,11 @@ public class TimeToLiveProcessor extends StatsSource{
      */
     public void scheduleTimeToLiveTasks(Map<String, Table> ttlTables) {
 
+        //do not trigger TTL on replica clusters
+        if (VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA) {
+            return;
+        }
+
         //if the host id is not the smallest or no TTL table, then shutdown the task if it is running.
         List<Integer> liveHostIds = new ArrayList<Integer>(m_messenger.getLiveHostIds());
         Collections.sort(liveHostIds);
