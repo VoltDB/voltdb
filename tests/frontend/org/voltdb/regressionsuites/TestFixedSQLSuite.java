@@ -2680,7 +2680,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         runQueryGetDouble(client, sql, Double.parseDouble(StringUtils.repeat("1", 255) + "3.1111E1"));
 
         sql = "SELECT NUM + " + StringUtils.repeat("1", 368) + ".1111E1 FROM R1";
-        verifyStmtFails(client, sql, "java.lang.NumberFormatException");
+        verifyStmtFails(client, sql, "Error compiling query");
 
 
         // test stored procedure
