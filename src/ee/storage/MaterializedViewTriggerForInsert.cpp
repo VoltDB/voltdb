@@ -246,7 +246,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
 
     int aggOffset = (int)m_groupByColumnCount;
     // m_aggExprs has complex aggregation operations which does not include COUNT(*)
-    // but COUNT(*) is included in m_aggColumnCount
     int numCountStar = 0;
     // set values for the other columns
     // update or insert the row
@@ -255,7 +254,6 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
 
             NValue existingValue = m_existingTuple.getNValue(aggOffset+aggIndex);
-
             if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
                 m_updatedTuple.setNValue( (int)(aggOffset+aggIndex),
                                  m_existingTuple.getNValue( (int)(aggOffset+aggIndex) ).op_increment());
@@ -297,6 +295,12 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
         }
+        // ENG-10892, if no COUNT(*) column exists
+        if (numCountStar == 0) {
+            // check which hidden column COUNT(*) lies in, it is always the last one
+            assert(m_dest->schema()->hiddenColumnCount() == 1);
+            m_updatedTuple.setHiddenNValue(0, m_existingTuple.getHiddenNValue(0).op_increment());
+        }
 
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
@@ -325,6 +329,12 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
                 }
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+        }
+        // ENG-10892, if no COUNT(*) column exists
+        if (numCountStar == 0) {
+            // check which hidden column COUNT(*) lies in, it is always the last one
+            assert(m_dest->schema()->hiddenColumnCount() == 1);
+            m_updatedTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(1));
         }
         m_dest->insertPersistentTuple(m_updatedTuple, fallible);
     }
@@ -417,6 +427,7 @@ std::size_t MaterializedViewTriggerForInsert::parseGroupBy(catalog::Materialized
 std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::MaterializedViewInfo *mvInfo) {
     const string& expressionsAsText = mvInfo->aggregationExpressionsJson();
     bool usesComplexAgg = expressionsAsText.length() > 0;
+    bool existsCountStar = false;
     // set up the mapping from input col to output col
     const catalog::CatalogMap<catalog::Column>& columns = mvInfo->dest()->columns();
     m_aggTypes.resize(columns.size() - m_groupByColumnCount);
@@ -437,6 +448,7 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
         switch(m_aggTypes[aggIndex]) {
             case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
                 m_countStarColumnIndex = destCol->index();
+                existsCountStar = true;
             case EXPRESSION_TYPE_AGGREGATE_SUM:
             case EXPRESSION_TYPE_AGGREGATE_COUNT:
             case EXPRESSION_TYPE_AGGREGATE_MIN:
@@ -463,6 +475,12 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
         VOLT_TRACE("Aggregate Expression: %s\n", expressionsAsText.c_str());
         ExpressionUtil::loadIndexedExprsFromJson(m_aggExprs, expressionsAsText);
     }
+
+    // user did not assign COUNT(*) explicitly
+    if (!existsCountStar) {
+        m_countStarColumnIndex = -1;
+    }
+
     return m_aggTypes.size();
 }
 
@@ -491,6 +509,11 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
             newValue = NValue::getNullValue(m_updatedTuple.getSchema()->columnType(aggOffset+aggIndex));
         }
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
+    }
+    // ENG-10892, if no COUNT(*) exists
+    if (m_countStarColumnIndex == -1) {
+        assert(m_dest->schema()->hiddenColumnCount() == 1);
+        m_updatedTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(0));
     }
     m_dest->insertPersistentTuple(m_updatedTuple, fallible);
 }
