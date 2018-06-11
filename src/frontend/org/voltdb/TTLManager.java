@@ -42,7 +42,7 @@ import org.voltdb.utils.CatalogUtil;
 
 //schedule and process time-to-live feature via @LowImpactDelete. The host with smallest host id
 //will get the task done.
-public class TimeToLiveProcessor extends StatsSource{
+public class TTLManager extends StatsSource{
 
     static final int DELAY = Integer.getInteger("TIME_TO_LIVE_DELAY", 0);
     static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1);
@@ -144,7 +144,7 @@ public class TimeToLiveProcessor extends StatsSource{
     }
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private ScheduledThreadPoolExecutor m_timeToLiveExecutor;
-
+    private static TTLManager m_self;
     private final int m_hostId;
     private final HostMessenger m_messenger ;
     private final ClientInterface m_interface;
@@ -152,21 +152,30 @@ public class TimeToLiveProcessor extends StatsSource{
     private final Map<String, ScheduledFuture<?>> m_futures = new ConcurrentHashMap<>();
     private final Map<String, TTLStats> m_stats = new ConcurrentHashMap<>();
 
-    public TimeToLiveProcessor(int hostId, HostMessenger hostMessenger, ClientInterface clientInterface) {
+    public static synchronized void initialze(int hostId, HostMessenger hostMessenger, ClientInterface clientInterface) {
+        m_self = new TTLManager(hostId, hostMessenger, clientInterface);
+    }
+
+    private TTLManager(int hostId, HostMessenger hostMessenger, ClientInterface clientInterface) {
         super(false);
         m_hostId = hostId;
         m_messenger = hostMessenger;
         m_interface = clientInterface;
     }
 
+    public static TTLManager instance() {
+        return m_self;
+    }
+
     /**
      * schedule TTL tasks per configurations
      * @param ttlTables A list of tables for TTL
      */
-    public void scheduleTimeToLiveTasks(Map<String, Table> ttlTables) {
+    public void start() {
 
         //do not trigger TTL on replica clusters
-        if (VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA) {
+        RealVoltDB db = (RealVoltDB)VoltDB.instance();
+        if (db.getReplicationRole() == ReplicationRole.REPLICA) {
             return;
         }
 
@@ -177,6 +186,7 @@ public class TimeToLiveProcessor extends StatsSource{
             return;
         }
 
+        Map<String, Table> ttlTables = CatalogUtil.getTimeToLiveTables(db.m_catalogContext.database);
         if (m_timeToLiveExecutor == null && !ttlTables.isEmpty()) {
             m_timeToLiveExecutor = CoreUtils.getScheduledThreadPoolExecutor("TimeToLive", 1, CoreUtils.SMALL_STACK_SIZE);
             m_timeToLiveExecutor.setRemoveOnCancelPolicy(true);

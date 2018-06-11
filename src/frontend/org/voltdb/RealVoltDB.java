@@ -368,8 +368,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private int m_maxThreadsCount;
 
-    private TimeToLiveProcessor m_timeToLiveProcessor;
-
     @Override
     public boolean isRunningWithOldVerbs() {
         return m_isRunningWithOldVerb;
@@ -1552,7 +1550,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             assert (m_clientInterface != null);
             m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
-            m_timeToLiveProcessor = new TimeToLiveProcessor(m_myHostId, m_messenger, m_clientInterface);
+            TTLManager.initialze(m_myHostId, m_messenger, m_clientInterface);
+            getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, TTLManager.instance());
             // Start elastic join service
             try {
                 if (m_config.m_isEnterprise) {
@@ -1709,7 +1708,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // let the client interface know host(s) have failed to clean up any outstanding work
                     // especially non-transactional work
                     m_clientInterface.handleFailedHosts(failedHosts);
-                    m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
+                    TTLManager.instance().start();
                 }
             });
         }
@@ -3445,10 +3444,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 PartitionDRGateway.m_partitionDRGateways = ImmutableMap.of();
 
-                if (m_timeToLiveProcessor != null) {
-                    m_timeToLiveProcessor.shutDown();
-                }
-                m_timeToLiveProcessor = null;
+                TTLManager.instance().shutDown();
                 // probably unnecessary, but for tests it's nice because it
                 // will do the memory checking and run finalizers
                 System.gc();
@@ -3760,7 +3756,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
                 }
 
-                m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
+                TTLManager.instance().start();
                 // restart resource usage monitoring task
                 startHealthMonitor();
 
@@ -4037,6 +4033,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         //Tell import processors that they can start ingesting data.
         ImportManager.instance().readyForData();
 
+        TTLManager.instance().start();
+
         if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
                     "Node data recovery completed after " + delta + " seconds with " + megabytes +
@@ -4080,8 +4078,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
-        m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
-        getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, m_timeToLiveProcessor);
         hostLog.info("Logging host rejoin completion to ZK");
         m_statusTracker.setNodeState(NodeState.UP);
         Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
@@ -4293,8 +4289,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
-        m_timeToLiveProcessor.scheduleTimeToLiveTasks(CatalogUtil.getTimeToLiveTables(m_catalogContext.database));
-        getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, m_timeToLiveProcessor);
+        TTLManager.instance().start();
     }
 
     private void databaseIsRunning() {
