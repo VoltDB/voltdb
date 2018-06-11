@@ -447,8 +447,7 @@ public class SQLCommand
             // get max column name width
             int maxNameWidth = 10;
             while (columnData.advanceRow()) {
-                String tname = columnData.getString(2);
-                if (tname.equalsIgnoreCase(tableName)) {
+                if (tableName.equalsIgnoreCase(columnData.getString(2))) {
                     String colname = columnData.getString(3);
                     if (colname.length() > maxNameWidth) {
                         maxNameWidth = colname.length();
@@ -462,20 +461,44 @@ public class SQLCommand
             String DASHES = new String(new char[56+maxNameWidth]).replace("\0", "-");
             System.out.println(DASHES);
             while (columnData.advanceRow()) {
-                String tname = columnData.getString(2);
-                if (tname.equalsIgnoreCase(tableName)) {
+                if (tableName.equalsIgnoreCase(columnData.getString(2))) {
                     String colName = columnData.getString(3);
                     String dataType = columnData.getString(5);
                     long size = columnData.getLong(6);
+                    if (columnData.wasNull()) {
+                        if (dataType.equals("GEOGRAPHY")) {
+                            size = 32768;
+                        }
+                        if (dataType.equals("GEOGRAPHY_POINT")) {
+                            size = 16;
+                        }
+                    } else if (dataType.equals("TINYINT")) {
+                        size = 1;
+                    } else if (dataType.equals("SMALLINT")) {
+                        size = 2;
+                    } else if (dataType.equals("INTEGER")) {
+                        size = 4;
+                    } else if (dataType.equals("BIGINT")) {
+                        size = 8;
+                    } else if (dataType.equals("FLOAT")) {
+                        size = 8;
+                    } else if (dataType.equals("DECIMAL")) {
+                        size = 16;
+                    } else if (dataType.equals("TIMESTAMP")) {
+                        size = 8;
+                    }
+
                     String partitionColumn = columnData.getString(11);
                     if (columnData.wasNull()) {
                         partitionColumn = "";
                     }
+
                     String isNullable = columnData.getString(17);
                     String notNull = "";
                     if (isNullable.equals("NO")) {
                         notNull = "NOT NULL";
                     }
+
                     System.out.printf(rowFormat,colName,dataType,size,notNull,partitionColumn);
                 }
             }
@@ -485,8 +508,7 @@ public class SQLCommand
             String primaryKey = "";
             VoltTable keyData = m_client.callProcedure("@SystemCatalog", "PRIMARYKEYS").getResults()[0];
             while (keyData.advanceRow()) {
-                String tname = keyData.getString(2);
-                if (tname.equalsIgnoreCase(tableName)) {
+                if (tableName.equalsIgnoreCase(keyData.getString(2))) {
                     String colName = keyData.getString(3);
                     if (!primaryKey.equals("")) {
                         primaryKey += ",";
