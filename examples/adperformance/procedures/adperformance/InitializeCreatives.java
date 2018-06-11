@@ -31,15 +31,13 @@ public class InitializeCreatives extends VoltProcedure {
         "INSERT INTO creatives VALUES (?,?,?);"
         );
 
-    public long run(int advertisers, int campaigns, int creatives)
+    public long run(int advertiser, int campaigns, int creatives)
         throws VoltAbortException {
         long creativeMaxID = 0;
-        for (int advertiser=1; advertiser<=advertisers; advertiser++) {
-            for (int campaign=1; campaign<=campaigns; campaign++) {
-                for (int i=1; i<=creatives; i++) {
-                    creativeMaxID++;
-                    voltQueueSQL(insert, creativeMaxID, campaign, advertiser);
-                }
+        for (int campaign=1; campaign<=campaigns; campaign++) {
+            for (int i=1; i<=creatives; i++) {
+                creativeMaxID++;
+                voltQueueSQL(insert, creativeMaxID, campaign, advertiser);
             }
         }
 
