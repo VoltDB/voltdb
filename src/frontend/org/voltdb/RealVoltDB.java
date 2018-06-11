@@ -1147,7 +1147,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
                     if(determination.startAction == StartAction.JOIN) {
                         int kfactorPlusOne = kfactor + 1;
-                        String waitMessage = "The joining process will begin after " + kfactorPlusOne + " new nodes have been started, waiting...";
+                        String waitMessage = "The join process will begin after a total of " + kfactorPlusOne + " nodes are added, waiting...";
                         if(kfactor != 0) {
                             consoleLog.info(waitMessage);
                         }
@@ -1270,7 +1270,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             if(determination.startAction == StartAction.JOIN) {
                 int kfactorPlusOne = m_catalogContext.getDeployment().getCluster().getKfactor() + 1;
-                String waitMessage = "All " + kfactorPlusOne + " new nodes have been started, joining new nodes to the cluster...";
+                String waitMessage = "" + kfactorPlusOne + " nodes added, joining new nodes to the cluster...";
                 if(kfactorPlusOne != 1) {
                     consoleLog.info(waitMessage);
                 }
