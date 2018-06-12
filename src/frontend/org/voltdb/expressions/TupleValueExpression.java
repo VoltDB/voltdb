@@ -238,7 +238,11 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     boolean matchesTableAlias(String tableAlias) {
-        return m_tableAlias == null || m_tableAlias.equals(tableAlias);
+       if (m_tableAlias == null) {
+          return m_tableName.equals(tableAlias);
+       } else {
+          return m_tableAlias.equals(tableAlias);
+       }
     }
 
     public int getTableIndex() {

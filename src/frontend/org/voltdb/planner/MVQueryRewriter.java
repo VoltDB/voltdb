@@ -44,7 +44,8 @@ final class MVQueryRewriter {
 
     public MVQueryRewriter(ParsedSelectStmt stmt) {            // Constructor does not modify SELECT stmt
         m_stmt = stmt;
-        if (!m_stmt.hasOrderByColumns() && m_stmt.isGrouped() && m_stmt.getHavingPredicate() == null) {   // MVI has GBY, does not have OBY or HAVING clause
+        if (m_stmt.m_tableList.size() == 1 &&                   // For now, support rewrite SELECT from a single table
+                !m_stmt.hasOrderByColumns() && m_stmt.isGrouped() && m_stmt.getHavingPredicate() == null) {   // MVI has GBY, does not have OBY or HAVING clause
             final Optional<Pair<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>>>
                     any = getMviAndViews(m_stmt.m_tableList).entrySet().stream()          // Scan all MV associated with SEL source tables,
                     .flatMap(kv -> {
@@ -121,11 +122,11 @@ final class MVQueryRewriter {
     }
 
     private boolean gbyColumnsMatch(MaterializedViewInfo mv) {
-        return m_stmt.hasComplexGroupby() ||  // if SEL has complex GBY expr, then at this point we already checked their column index matching.
-                m_stmt.groupByColumns().stream()
-                        .map(it -> it.columnName).collect(Collectors.toList())  // compare as lists because "GROUP BY a, b" and "GROUP BY b, a" are different
+        return m_stmt.hasComplexGroupby() ||  // if SEL has complex GBY expr, then at this caller point we already checked their column index matching.
+                m_stmt.groupByColumns().stream()    // compares GBY columns, ignoring order
+                        .map(it -> it.columnName).collect(Collectors.toSet())
                         .equals(StreamSupport.stream(((Iterable<ColumnRef>) () -> mv.getGroupbycols().iterator()).spliterator(), false)
-                                .map(cr -> cr.getColumn().getTypeName()).collect(Collectors.toList()));
+                                .map(cr -> cr.getColumn().getTypeName()).collect(Collectors.toSet()));
     }
 
     /**
@@ -160,13 +161,13 @@ final class MVQueryRewriter {
         final boolean hasComplexGroupBy = m_stmt.hasComplexGroupby();
         // deals with complex GBY expressions
         final List<AbstractExpression> mvGbys = hasComplexGroupBy ? getGbyExpressions(mv) : new ArrayList<>();
-        final List<AbstractExpression> selGbyExpr = hasComplexGroupBy ?
-                m_stmt.getGroupByColumns().stream().map(ci -> copyAsCVE(ci.expression).anonymize()).collect(Collectors.toList()) :
-                new ArrayList<>();
-        if (mvGbys.equals(selGbyExpr)) {                                   // When GBY expressions match
+        final Set<AbstractExpression> selGbyExpr = hasComplexGroupBy ?
+                m_stmt.getGroupByColumns().stream().map(ci -> copyAsCVE(ci.expression).anonymize()).collect(Collectors.toSet()) :
+                new HashSet<>();
+        if (mvGbys.stream().collect(Collectors.toSet()).equals(selGbyExpr)) { // When GBY expressions match (ignoring order),
             final Map<Integer, Integer> selGbyColIndexMap =                // SELECT stmt GBY column index ==> VIEW table column index
                     m_stmt.displayColumns().stream().flatMap(ci -> {
-                        if (ci.expression instanceof OperatorExpression) {
+                        if (ci.expression instanceof OperatorExpression || ci.expression instanceof FunctionExpression) {
                             int indx = mvGbys.indexOf(copyAsCVE(ci.expression).anonymize());
                             if (indx >= 0) {
                                 return Stream.of(new AbstractMap.SimpleEntry<>(ci.index, indx));
@@ -314,7 +315,12 @@ final class MVQueryRewriter {
                     // types must be either (PVE, CVE) or (CVE, PVE)
                     ((e1 instanceof ParameterValueExpression && e2 instanceof ConstantValueExpression ||
                             e1 instanceof ConstantValueExpression && e2 instanceof ParameterValueExpression) &&
-                            asCVE(e1).equals(asCVE(e2)));
+                            equalsAsCVE(e1, e2));
+        }
+
+        private static boolean equalsAsCVE(AbstractExpression e1, AbstractExpression e2) {
+            final ConstantValueExpression ce1 = asCVE(e1), ce2 = asCVE(e2);
+            return ce1 != null && ce2 != null ? ce1.equals(ce2) : ce1 == ce2;
         }
         /**
          * Convert a ConstantValueExpression or ParameterValueExpression into a ConstantValueExpression.

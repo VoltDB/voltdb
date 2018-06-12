@@ -2,9 +2,9 @@ create table t1(a int unique not null primary key, b int not null, a1 int, b1 in
 create index ta on t1(a);
 
 -- T2 is partitioned
-create table t2(c int, b int not null);
-create index tc on t2(c);
-partition table t2 on column b;
+create table t2(c0 int, b0 int not null);
+create index tc on t2(c0);
+partition table t2 on column b0;
 
 -- create view v2 as select distinct a1 distinct_a1, count(*) as counts from t1 where b >= 20 group by a1;
 create view v2 as select distinct a1 distinct_a1, count(*) counts from t1 where b > 2 group by a1;
@@ -24,7 +24,9 @@ create view v4 as select a * 2 + a1 a2pa1, b - a b_minus_a, sum(a1) sum_a1, min(
 create view v4_1 as select b1, count(*) counts from t1 where c in ('foo', 'bar', 'pattern') group by b1;
 
 -- Testing on T2 with paritioning
-create view vt2 as select distinct c distinct_c, sum(b) sum_b, count(*) counts from t2 group by c; -- random partitioned
-create view vt2_1 as select b b, sum(c) sum_c, count(*) counts from t2 group by b; -- partitioned view
+create view vt2 as select distinct c0 distinct_c, sum(b0) sum_b, count(*) counts from t2 group by c0;
+create view vt2_1 as select b0 b, sum(c0) sum_c, count(*) counts from t2 group by b0;
 
+-- stored procedures
+create procedure pv52_nullary as select a1 distinct_a1, count(b) count_b, sum(a) sum_a, count(*) from t1 group by a1;
 
