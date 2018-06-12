@@ -1607,8 +1607,8 @@ VoltDBEngine::loadTable(int32_t tableId,
                                           shouldDRStream,
                                           ExecutorContext::currentUndoQuantum() == NULL);
         }
-        catch (const SQLException &sqe) {
-            s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
+        catch (const ConstraintFailureException &cfe) {
+            s_loadTableException = VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION;
             if (returnConflictRows) {
                 // This should not happen because all errors are swallowed and constraint violations are returned
                 // as failed rows in the result
@@ -1617,9 +1617,13 @@ VoltDBEngine::loadTable(int32_t tableId,
             else {
                 // pre-serialize the exception here since we need to cleanup tuple memory within this sync block
                 resetReusedResultOutputBuffer();
-                sqe.serialize(getExceptionOutputSerializer());
+                cfe.serialize(getExceptionOutputSerializer());
                 return false;
             }
+        }
+        catch (const SQLException &sqe) {
+            s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
+            throw;
         }
         catch (const SerializableEEException& serializableExc) {
             // Exceptions that are not constraint failures are treated as fatal.   This is legacy
@@ -1642,6 +1646,21 @@ VoltDBEngine::loadTable(int32_t tableId,
 
         // Indicate to other threads that load happened successfully.
         s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
+    }
+    else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION) {
+        // An constraint failure exception was thrown on the lowest site thread and
+        // handle it on the other threads too.
+        if (!returnConflictRows) {
+            std::ostringstream oss;
+            oss << "Replicated load table failed (constraint violation) on other thread for table \""
+                << table->name() << "\".\n";
+            VOLT_DEBUG("%s", oss.str().c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
+        }
+        else {
+            // Offending rows will be serialized on lowest site thread.
+            return false;
+        }
     }
     else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_SQL) {
         // An constraint failure exception was thrown on the lowest site thread and

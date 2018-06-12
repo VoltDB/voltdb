@@ -1571,6 +1571,98 @@ std::string PersistentTable::debug(const std::string& spacer) const {
     return buffer.str();
 }
 
+/**
+     * Loads tuple data from the serialized table.
+     * Used for snapshot restore and bulkLoad
+     */
+void PersistentTable::loadTuplesForLoadTable(SerializeInputBE& serialInput,
+                                      Pool* stringPool,
+                                      ReferenceSerializeOutput* uniqueViolationOutput,
+                                      bool shouldDRStreamRows,
+                                      bool ignoreTupleLimit) {
+        serialInput.readInt(); // rowstart
+
+        serialInput.readByte();
+
+        int16_t colcount = serialInput.readShort();
+        assert(colcount >= 0);
+
+        // Store the following information so that we can provide them to the user
+        // on failure
+        ValueType types[colcount];
+        boost::scoped_array<std::string> names(new std::string[colcount]);
+
+        // skip the column types
+        for (int i = 0; i < colcount; ++i) {
+            types[i] = (ValueType) serialInput.readEnumInSingleByte();
+        }
+
+        // skip the column names
+        for (int i = 0; i < colcount; ++i) {
+            names[i] = serialInput.readTextString();
+        }
+
+        // Check if the column count matches what the temp table is expecting
+        int16_t expectedColumnCount = static_cast<int16_t>(m_schema->columnCount() + m_schema->hiddenColumnCount());
+        if (colcount != expectedColumnCount) {
+            std::stringstream message(std::stringstream::in
+                                      | std::stringstream::out);
+            message << "Column count mismatch. Expecting "
+                    << expectedColumnCount
+                    << ", but " << colcount << " given" << std::endl;
+            message << "Expecting the following columns:" << std::endl;
+            message << debug() << std::endl;
+            message << "The following columns are given:" << std::endl;
+            for (int i = 0; i < colcount; i++) {
+                message << "column " << i << ": " << names[i]
+                        << ", type = " << getTypeName(types[i]) << std::endl;
+            }
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          message.str().c_str());
+        }
+
+        int tupleCount = serialInput.readInt();
+        assert(tupleCount >= 0);
+
+        TableTuple target(m_schema);
+        //Reserve space for a length prefix for rows that violate unique constraints
+        //If there is no output supplied it will just throw
+        size_t lengthPosition = 0;
+        int32_t serializedTupleCount = 0;
+        size_t tupleCountPosition = 0;
+        if (uniqueViolationOutput != NULL) {
+            lengthPosition = uniqueViolationOutput->reserveBytes(4);
+        }
+
+        for (int i = 0; i < tupleCount; ++i) {
+            nextFreeTuple(&target);
+            target.setActiveTrue();
+            target.setDirtyFalse();
+            target.setPendingDeleteFalse();
+            target.setPendingDeleteOnUndoReleaseFalse();
+
+            try {
+                target.deserializeFrom(serialInput, stringPool);
+            } catch (SQLException &e) {
+                deleteTupleStorage(target);
+                throw;
+            }
+            processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRows, ignoreTupleLimit);
+        }
+
+        //If unique constraints are being handled, write the length/size of constraints that occured
+        if (uniqueViolationOutput != NULL) {
+            if (serializedTupleCount == 0) {
+                uniqueViolationOutput->writeIntAt(lengthPosition, 0);
+            } else {
+                uniqueViolationOutput->writeIntAt(lengthPosition,
+                                                  static_cast<int32_t>(uniqueViolationOutput->position() - lengthPosition - sizeof(int32_t)));
+                uniqueViolationOutput->writeIntAt(tupleCountPosition,
+                                                  serializedTupleCount);
+            }
+        }
+}
+
 /*
  * Implemented by persistent table and called by Table::loadTuplesFrom or Table::loadTuplesForLoadTable
  * to do additional processing for views, Export, DR and non-inline
@@ -1581,17 +1673,12 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
                                          int32_t& serializedTupleCount,
                                          size_t& tupleCountPosition,
                                          bool shouldDRStreamRows,
-                                         bool ignoreTupleLimit,
-                                         SQLException* sqe) {
-    if (sqe != NULL) {
-        deleteTupleStorage(tuple);
-        throw;
-    }
+                                         bool ignoreTupleLimit) {
     try {
         if (!ignoreTupleLimit && visibleTupleCount() >= m_tupleLimit) {
-                    std::ostringstream str;
-                    str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
-                    throw ConstraintFailureException(this, tuple, str.str(), (! uniqueViolationOutput) ? &m_surgeon : NULL);
+            std::ostringstream str;
+            str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
+            throw ConstraintFailureException(this, tuple, str.str(), (! uniqueViolationOutput) ? &m_surgeon : NULL);
         }
         insertTupleCommon(tuple, tuple, true, shouldDRStreamRows, !uniqueViolationOutput);
     } catch (ConstraintFailureException& e) {

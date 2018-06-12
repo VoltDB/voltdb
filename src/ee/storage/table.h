@@ -224,16 +224,6 @@ class Table {
     void loadTuplesFrom(SerializeInputBE& serialInput,
                         Pool* stringPool = NULL);
 
-    /**
-     * Loads tuple data from the serialized table.
-     * Used for snapshot restore and bulkLoad
-     */
-    void loadTuplesForLoadTable(SerializeInputBE& serialInput,
-                        Pool* stringPool = NULL,
-                        ReferenceSerializeOutput* uniqueViolationOutput = NULL,
-                        bool shouldDRStreamRows = false,
-                        bool ignoreTupleLimit = true);
-
 
     // ------------------------------------------------------------------
     // EXPORT
@@ -308,8 +298,7 @@ protected:
                                     int32_t& serializedTupleCount,
                                     size_t& tupleCountPosition,
                                     bool shouldDRStreamRow = false,
-                                    bool ignoreTupleLimit = true,
-                                    SQLException* sqe = NULL) { }
+                                    bool ignoreTupleLimit = true) { }
 
     virtual void swapTuples(TableTuple& sourceTupleWithNewValues, TableTuple& destinationTuple) {
         throwFatalException("Unsupported operation");
