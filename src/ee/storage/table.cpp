@@ -608,9 +608,12 @@ void Table::loadTuplesForLoadTable(SerializeInputBE& serialInput,
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
 
-        target.deserializeFrom(serialInput, stringPool);
-
-        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRows, ignoreTupleLimit);
+        try {
+            target.deserializeFrom(serialInput, stringPool);
+            processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRows, ignoreTupleLimit);
+        } catch (SQLException &sqe) {
+            processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRows, ignoreTupleLimit, &sqe);
+        }
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured

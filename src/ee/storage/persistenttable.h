@@ -663,7 +663,8 @@ private:
                                     int32_t& serializedTupleCount,
                                     size_t& tupleCountPosition,
                                     bool shouldDRStreamRows = false,
-                                    bool ignoreTupleLimit = true);
+                                    bool ignoreTupleLimit = true,
+                                    SQLException* sqe = NULL);
 
     enum LookupType {
         LOOKUP_BY_VALUES,

@@ -1581,7 +1581,12 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
                                          int32_t& serializedTupleCount,
                                          size_t& tupleCountPosition,
                                          bool shouldDRStreamRows,
-                                         bool ignoreTupleLimit) {
+                                         bool ignoreTupleLimit,
+                                         SQLException* sqe) {
+    if (sqe != NULL) {
+        deleteTupleStorage(tuple);
+        throw;
+    }
     try {
         if (!ignoreTupleLimit && visibleTupleCount() >= m_tupleLimit) {
                     std::ostringstream str;

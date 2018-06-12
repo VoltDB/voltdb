@@ -308,7 +308,8 @@ protected:
                                     int32_t& serializedTupleCount,
                                     size_t& tupleCountPosition,
                                     bool shouldDRStreamRow = false,
-                                    bool ignoreTupleLimit = true) { }
+                                    bool ignoreTupleLimit = true,
+                                    SQLException* sqe = NULL) { }
 
     virtual void swapTuples(TableTuple& sourceTupleWithNewValues, TableTuple& destinationTuple) {
         throwFatalException("Unsupported operation");
