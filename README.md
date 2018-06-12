@@ -1,5 +1,5 @@
 What is VoltDB?
-====================
+===================
 
 Thank you for your interest in VoltDB!
 
