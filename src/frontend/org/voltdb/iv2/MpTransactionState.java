@@ -496,7 +496,7 @@ public class MpTransactionState extends TransactionState
         }
     }
 
-    private boolean trackDependency(long hsid, int depId, VoltTable table, int drBufferSize)
+    private boolean trackDependency(long hsid, int depId, VoltTable table)
     {
         // Remove the distributed fragment for this site from remoteDeps
         // for the dependency Id depId.
@@ -529,15 +529,6 @@ public class MpTransactionState extends TransactionState
             // null dependency table is from a joining node, has no content, drop it
             if (table.getStatusCode() != VoltTableUtil.NULL_DEPENDENCY_STATUS) {
                 tables.add(table);
-                // aggregate dr buffer change size
-                m_drBufferChangedAgg += drBufferSize;
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("[trackDependency]:  drBufferSize added :" + drBufferSize +
-                            " aggregated drBufferSize: " + m_drBufferChangedAgg +
-                            " for transaction: " + TxnEgo.txnIdToString(txnId) +
-                            " for depId: " + depId +
-                            " for partition: " + CoreUtils.hsIdToString(hsid));
-                }
             }
         }
         else if (tmLog.isDebugEnabled()){
@@ -549,26 +540,34 @@ public class MpTransactionState extends TransactionState
     private boolean handleReceivedFragResponse(FragmentResponseMessage msg)
     {
         boolean expectedMsg = false;
+        final long src_hsid = msg.getExecutorSiteId();
         for (int i = 0; i < msg.getTableCount(); i++)
         {
             int this_depId = msg.getTableDependencyIdAtIndex(i);
             VoltTable this_dep = msg.getTableAtIndex(i);
-            long src_hsid = msg.getExecutorSiteId();
-            int drBufferChanged = msg.getDRBufferChangedAtIndex(i);
-            expectedMsg |= trackDependency(src_hsid, this_depId, this_dep, drBufferChanged);
+            expectedMsg |= trackDependency(src_hsid, this_depId, this_dep);
         }
+        int drBufferChanged = msg.getDRBufferChangedAtIndex(msg.getTableCount()-1);
+        // aggregate dr buffer change size
+        m_drBufferChangedAgg += drBufferChanged;
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("[trackDependency]:  drBufferSize added :" + drBufferChanged +
+                        " aggregated drBufferSize: " + m_drBufferChangedAgg +
+                        " for transaction: " + TxnEgo.txnIdToString(txnId) +
+                        " for partition: " + CoreUtils.hsIdToString(src_hsid));
+        }
+
         return expectedMsg;
     }
 
     private boolean checkDoneReceivingFragResponses()
     {
-        boolean done = true;
         for (Set<Long> depid : m_remoteDeps.values()) {
             if (depid.size() != 0) {
-                done = false;
+                return false;
             }
         }
-        return done;
+        return true;
     }
 
     // Runs from Mailbox's network thread
