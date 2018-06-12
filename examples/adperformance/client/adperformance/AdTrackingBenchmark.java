@@ -326,11 +326,13 @@ public class AdTrackingBenchmark {
         System.out.println("Loading Creatives table based on " + advertisers +
                            " advertisers, each with " + campaignsPerAdvertiser +
                            " campaigns, each with " + creativesPerCampaign + " creatives...");
-        client.callProcedure(new BenchmarkCallback("InitializeCreatives"),
-                             "InitializeCreatives",
-                             advertisers,
-                             campaignsPerAdvertiser,
-                             creativesPerCampaign);
+        for (int advertiser=1; advertiser<=advertisers; advertiser++) {
+            client.callProcedure(new BenchmarkCallback("InitializeCreatives"),
+                                 "InitializeCreatives",
+                                 advertiser,
+                                 campaignsPerAdvertiser,
+                                 creativesPerCampaign);
+        }
     }
 
     public static class BenchmarkCallback implements ProcedureCallback {
