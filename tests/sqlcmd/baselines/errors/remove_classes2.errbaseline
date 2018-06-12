@@ -1,1 +1,1 @@
-Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: SQL Syntax error in "REMOVE CLASSES" unexpected token: REMOVE
+SQL error while compiling query: SQL Syntax error in "REMOVE CLASSES" unexpected token: REMOVE
