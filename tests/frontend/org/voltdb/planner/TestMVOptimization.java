@@ -55,6 +55,11 @@ public class TestMVOptimization extends PlannerTestCase {
     public void testSimple() {      // Test SELECT stmt that is "almost" same as view definition, with except of column aliasing
         assertMatch("SELECT a1 a1, COUNT(b) count_b, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1",
                 explainSimpleMVScan("V5_2"));
+        // Negative test: MV does not support HAVING clause
+        assertMatch("SELECT a1 a1, COUNT(b) count_b, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1 HAVING SUM(a) >= 0",
+                "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" " +
+                        "using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" (for deterministic order only) " +
+                        "inline Hash AGGREGATION ops: COUNT(T1.B), SUM(T1.A), COUNT(*) HAVING (SUM_A >= 0)");
     }
 
     public void testDistinct() {  // Test SELECT stmt that is "almost" same as view definition with exception of GBY column distinctiveness

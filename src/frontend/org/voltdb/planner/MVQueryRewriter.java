@@ -44,7 +44,7 @@ final class MVQueryRewriter {
 
     public MVQueryRewriter(ParsedSelectStmt stmt) {            // Constructor does not modify SELECT stmt
         m_stmt = stmt;
-        if (!m_stmt.hasOrderByColumns() && m_stmt.isGrouped()) {   // MVI has GBY, and does not have OBY.
+        if (!m_stmt.hasOrderByColumns() && m_stmt.isGrouped() && m_stmt.getHavingPredicate() == null) {   // MVI has GBY, does not have OBY or HAVING clause
             final Optional<Pair<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>>>
                     any = getMviAndViews(m_stmt.m_tableList).entrySet().stream()          // Scan all MV associated with SEL source tables,
                     .flatMap(kv -> {
