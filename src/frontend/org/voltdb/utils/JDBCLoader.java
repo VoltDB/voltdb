@@ -16,16 +16,20 @@
  */
 package org.voltdb.utils;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Properties;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -206,6 +210,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         @Option(desc = "password to use when connecting to servers")
         String password = "";
 
+        @Option(desc = "credentials that contains username and password information")
+        String credentials = "";
+
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
@@ -323,11 +330,19 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         final JDBCLoaderConfig cfg = new JDBCLoaderConfig();
         cfg.parse(JDBCLoader.class.getName(), args);
 
+        FileReader fr = null;
+        BufferedReader br = null;
         m_config = cfg;
         configuration();
         // Split server list
         final String[] serverlist = m_config.servers.split(",");
 
+        // read username and password from txt file
+        if (m_config.credentials != null && !m_config.credentials.trim().isEmpty()) {
+            Properties props = MiscUtils.readPropertiesFromCredentials(m_config.credentials);
+            m_config.user = props.getProperty("username");
+            m_config.password = props.getProperty("password");
+        }
         // If we need to prompt the user for a VoltDB password, do so.
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter VoltDB password: ");
 

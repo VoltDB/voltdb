@@ -21,9 +21,11 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -288,6 +290,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "password to use when connecting to servers")
         String password = "";
 
+        @Option(desc = "credentials that contains username and password information")
+        String credentials = "";
+
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
@@ -415,6 +420,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         start = System.currentTimeMillis();
         long insertTimeStart = start;
         long insertTimeEnd;
+        FileReader fr = null;
+        BufferedReader br = null;
         final CSVConfig cfg = new CSVConfig();
         cfg.parse(CSVLoader.class.getName(), args);
         config = cfg;
@@ -443,7 +450,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                           config.skip,
                           config.header);
 
-                   listReader = new CsvListReader(tokenizer, csvPreference);
+                listReader = new CsvListReader(tokenizer, csvPreference);
             }
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
@@ -451,6 +458,13 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         }
         // Split server list
         final String[] serverlist = config.servers.split(",");
+
+        // read username and password from txt file
+        if (config.credentials != null && !config.credentials.trim().isEmpty()) {
+            Properties props = MiscUtils.readPropertiesFromCredentials(config.credentials);
+            config.user = props.getProperty("username");
+            config.password = props.getProperty("password");
+        }
 
         // If we need to prompt the user for a password, do so.
         config.password = CLIConfig.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
