@@ -311,8 +311,8 @@ public class MaterializedViewFixInfo {
 
         // Condition (1): Group by columns must be part of or all from MV DDL group by TVEs.
         for (ParsedColInfo gcol: groupByColumns) {
-            assert(gcol.expression instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression) gcol.expression;
+            assert(gcol.m_expression instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) gcol.m_expression;
             if (tve.getTableName().equals(getMVTableName()) &&
                     ! mvDDLGroupbyColumnNames.contains(tve.getColumnName())) {
                 return false;
@@ -325,10 +325,10 @@ public class MaterializedViewFixInfo {
                 // Skip a group-by column pass-through.
                 continue;
             }
-            if (dcol.expression instanceof AggregateExpression == false) {
+            if (dcol.m_expression instanceof AggregateExpression == false) {
                 return false;
             }
-            AggregateExpression aggExpr = (AggregateExpression) dcol.expression;
+            AggregateExpression aggExpr = (AggregateExpression) dcol.m_expression;
             if (aggExpr.getLeft() instanceof TupleValueExpression == false) {
                 return false;
             }

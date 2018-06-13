@@ -138,7 +138,7 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         }
 
         for (ParsedColInfo col : orderByColumns()) {
-            AbstractExpression e = col.expression;
+            AbstractExpression e = col.m_expression;
             if (!(e instanceof TupleValueExpression)) {
                 continue;
             }
@@ -182,7 +182,7 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
 
         for (ParsedColInfo colInfo : m_orderColumns) {
-            AbstractExpression expr = colInfo.expression;
+            AbstractExpression expr = colInfo.m_expression;
             if (expr == null) {
                 continue;
             }

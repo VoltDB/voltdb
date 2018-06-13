@@ -1935,7 +1935,7 @@ public abstract class AbstractParsedStmt {
         HashMap<String, List<AbstractExpression> > baseTableAliases =
                 new HashMap<>();
         for (ParsedColInfo col : orderByColumns()) {
-            AbstractExpression expr = col.expression;
+            AbstractExpression expr = col.m_expression;
             //
             // Compute the set of tables mentioned in the expression.
             //   1. Search out all the TVEs.
@@ -2072,7 +2072,7 @@ public abstract class AbstractParsedStmt {
         HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence =
                 analyzeValueEquivalence();
         for (ParsedColInfo colInfo : candidateColumns) {
-            AbstractExpression colExpr = colInfo.expression;
+            AbstractExpression colExpr = colInfo.m_expression;
             if (colExpr instanceof TupleValueExpression) {
                 Set<AbstractExpression> tveEquivs = valueEquivalence.get(colExpr);
                 if (tveEquivs != null) {
@@ -2124,7 +2124,7 @@ public abstract class AbstractParsedStmt {
             }
         }
         for (ParsedColInfo colInfo : candidateColumns) {
-            AbstractExpression expr = colInfo.expression;
+            AbstractExpression expr = colInfo.m_expression;
             if (expr instanceof TupleValueExpression) {
                 TupleValueExpression tve = (TupleValueExpression) expr;
                 // If one of the indices is completely covered

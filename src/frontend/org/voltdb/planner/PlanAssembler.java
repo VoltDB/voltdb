@@ -223,11 +223,11 @@ public class PlanAssembler {
         }
 
         for (ParsedColInfo groupbyCol : groupbyColumns) {
-            StmtTableScan scanTable = m_parsedSelect.getStmtTableScanByAlias(groupbyCol.tableAlias);
+            StmtTableScan scanTable = m_parsedSelect.getStmtTableScanByAlias(groupbyCol.m_tableAlias);
             // table alias may be from AbstractParsedStmt.TEMP_TABLE_NAME.
             if (scanTable != null && scanTable.getPartitioningColumns() != null) {
                 for (SchemaColumn pcol : scanTable.getPartitioningColumns()) {
-                    if  (pcol != null && pcol.getColumnName().equals(groupbyCol.columnName) ) {
+                    if  (pcol != null && pcol.getColumnName().equals(groupbyCol.m_columnName) ) {
                         return true;
                     }
                 }
@@ -1942,8 +1942,8 @@ public class PlanAssembler {
         OrderByPlanNode n = new OrderByPlanNode();
 
         for (ParsedColInfo col : cols) {
-            n.addSortExpression(col.expression,
-                    col.ascending ? SortDirectionType.ASC
+            n.addSortExpression(col.m_expression,
+                    col.m_ascending ? SortDirectionType.ASC
                                   : SortDirectionType.DESC);
         }
 
@@ -2649,7 +2649,7 @@ public class PlanAssembler {
                     outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
                     outputColumnIndex += 1) {
                 ParsedColInfo col = m_parsedSelect.m_aggResultColumns.get(outputColumnIndex);
-                AbstractExpression rootExpr = col.expression;
+                AbstractExpression rootExpr = col.m_expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
                 SchemaColumn top_schema_col = null;
@@ -2668,21 +2668,21 @@ public class PlanAssembler {
                     TupleValueExpression tve = new TupleValueExpression(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
-                            "", col.alias,
+                            "", col.m_alias,
                             rootExpr, outputColumnIndex);
-                    tve.setDifferentiator(col.differentiator);
+                    tve.setDifferentiator(col.m_differentiator);
 
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
-                            "", col.alias,
+                            "", col.m_alias,
                             tve, outputColumnIndex);
                     top_schema_col = new SchemaColumn(
                             AbstractParsedStmt.TEMP_TABLE_NAME,
                             AbstractParsedStmt.TEMP_TABLE_NAME,
-                            "", col.alias,
+                            "", col.m_alias,
                             tve, outputColumnIndex);
 
                     /*
@@ -2770,20 +2770,20 @@ public class PlanAssembler {
                      * add them to the aggregate's output.
                      */
                     schema_col = new SchemaColumn(
-                            col.tableName, col.tableAlias,
-                            col.columnName, col.alias,
-                            col.expression,
+                            col.m_tableName, col.m_tableAlias,
+                            col.m_columnName, col.m_alias,
+                            col.m_expression,
                             outputColumnIndex);
                     AbstractExpression topExpr = null;
-                    if (col.groupBy) {
-                        topExpr = m_parsedSelect.m_groupByExpressions.get(col.alias);
+                    if (col.m_groupBy) {
+                        topExpr = m_parsedSelect.m_groupByExpressions.get(col.m_alias);
                     }
                     else {
-                        topExpr = col.expression;
+                        topExpr = col.m_expression;
                     }
                     top_schema_col = new SchemaColumn(
-                            col.tableName, col.tableAlias,
-                            col.columnName, col.alias,
+                            col.m_tableName, col.m_tableAlias,
+                            col.m_columnName, col.m_alias,
                             topExpr, outputColumnIndex);
                 }
 
@@ -2792,10 +2792,10 @@ public class PlanAssembler {
             }// end for each ParsedColInfo in m_aggResultColumns
 
             for (ParsedColInfo col : m_parsedSelect.groupByColumns()) {
-                aggNode.addGroupByExpression(col.expression);
+                aggNode.addGroupByExpression(col.m_expression);
 
                 if (topAggNode != null) {
-                    topAggNode.addGroupByExpression(m_parsedSelect.m_groupByExpressions.get(col.alias));
+                    topAggNode.addGroupByExpression(m_parsedSelect.m_groupByExpressions.get(col.m_alias));
                 }
             }
             aggNode.setOutputSchema(agg_schema);
@@ -2912,7 +2912,7 @@ public class PlanAssembler {
                 int ithCovered = 0;
                 boolean foundPrefixedColumn = false;
                 for (; ithCovered < groupBys.size(); ithCovered++) {
-                    AbstractExpression gbExpr = groupBys.get(ithCovered).expression;
+                    AbstractExpression gbExpr = groupBys.get(ithCovered).m_expression;
                     if ( ! (gbExpr instanceof TupleValueExpression)) {
                         continue;
                     }
@@ -2955,7 +2955,7 @@ public class PlanAssembler {
                 // ignore order of keys in GROUP BY expr
                 List<AbstractExpression> binding = null;
                 for (int ithCovered = 0; ithCovered < groupBys.size(); ithCovered++) {
-                    AbstractExpression gbExpr = groupBys.get(ithCovered).expression;
+                    AbstractExpression gbExpr = groupBys.get(ithCovered).m_expression;
                     binding = gbExpr.bindingToIndexedExpression(indexExpr);
                     if (binding != null) {
                         bindings.addAll(binding);
@@ -3188,7 +3188,7 @@ public class PlanAssembler {
 
     private static boolean isOrderByAggregationValue(List<ParsedColInfo> orderBys) {
         for (ParsedColInfo col : orderBys) {
-            AbstractExpression rootExpr = col.expression;
+            AbstractExpression rootExpr = col.m_expression;
             // Fix ENG-3487: can't usually push down limits
             // when results are ordered by aggregate values.
             for (AbstractExpression tve :
@@ -3280,7 +3280,7 @@ public class PlanAssembler {
         distinctAggNode.setOutputSchema(m_parsedSelect.getDistinctProjectionSchema());
 
         for (ParsedColInfo col : m_parsedSelect.distinctGroupByColumns()) {
-            distinctAggNode.addGroupByExpression(col.expression);
+            distinctAggNode.addGroupByExpression(col.m_expression);
         }
 
         // TODO(xin): push down the DISTINCT for certain cases

@@ -322,7 +322,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         List<ParsedColInfo> displayColumns = leftmostSelectChild.displayColumns();
         ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(leftmostSelectChild, orderByNode, adjuster);
 
-        AbstractExpression order_exp = order_col.expression;
+        AbstractExpression order_exp = order_col.m_expression;
         assert(order_exp != null);
 
         // Mark the order by column if it is in displayColumns
@@ -330,13 +330,13 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         // tagging the actual display column as being also an order by column
         // helps later when trying to determine ORDER BY coverage (for determinism).
         for (ParsedColInfo col : displayColumns) {
-            if (col.alias.equals(order_col.alias) || col.expression.equals(order_exp)) {
-                col.orderBy = true;
-                col.ascending = order_col.ascending;
+            if (col.m_alias.equals(order_col.m_alias) || col.m_expression.equals(order_exp)) {
+                col.m_orderBy = true;
+                col.m_ascending = order_col.m_ascending;
 
-                order_col.alias = col.alias;
-                order_col.columnName = col.columnName;
-                order_col.tableName = col.tableName;
+                order_col.m_alias = col.m_alias;
+                order_col.m_columnName = col.m_columnName;
+                order_col.m_tableName = col.m_tableName;
                 break;
             }
         }
@@ -457,16 +457,16 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         int orderByIndex = 0;
         ParsedSelectStmt leftmostSelectChild = getLeftmostSelectStmt();
         for (ParsedColInfo col : leftmostSelectChild.m_displayColumns) {
-            displayIndexMap.put(col.expression, orderByIndex);
-            assert(col.alias != null);
+            displayIndexMap.put(col.m_expression, orderByIndex);
+            assert(col.m_alias != null);
             displayIndexToColumnMap.put(orderByIndex, col);
             orderByIndex++;
         }
 
         // place the TVEs from Display columns in the ORDER BY expression
         for (ParsedColInfo orderCol : m_orderColumns) {
-            AbstractExpression expr = orderCol.expression.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
-            orderCol.expression = expr;
+            AbstractExpression expr = orderCol.m_expression.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
+            orderCol.m_expression = expr;
         }
     }
 

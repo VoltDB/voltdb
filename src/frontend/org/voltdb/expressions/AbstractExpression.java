@@ -852,8 +852,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (ii != null) {
             ParsedColInfo col = indexToColumnMap.get(ii);
             TupleValueExpression tve = new TupleValueExpression(
-                    col.tableName, col.tableAlias,
-                    col.columnName, col.alias,
+                    col.m_tableName, col.m_tableAlias,
+                    col.m_columnName, col.m_alias,
                     this, ii);
             if (this instanceof TupleValueExpression) {
                 tve.setOrigStmtId(((TupleValueExpression)this).getOrigStmtId());

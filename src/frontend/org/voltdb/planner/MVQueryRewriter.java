@@ -111,10 +111,10 @@ final class MVQueryRewriter {
                 // And check expression tree structure, ignoring table/column names.
                 return getGbyExpressions(mv).equals(
                         m_stmt.groupByColumns().stream()  // convert PVE (as in "a = ?") to CVE, avoid modifying SELECT stmt
-                                .map(ci -> copyAsCVE(ci.expression).anonymize())
+                                .map(ci -> copyAsCVE(ci.m_expression).anonymize())
                                 .collect(Collectors.toList()));
             } else {    // when neither has complex GBY expression, check whether GBY table names match.
-                return m_stmt.groupByColumns().get(0).tableName
+                return m_stmt.groupByColumns().get(0).m_tableName
                         .equals(mv.getDest().getMaterializer().getTypeName());
             }
         } else          // unequal when one has complex gby and the other doesn't
@@ -124,7 +124,7 @@ final class MVQueryRewriter {
     private boolean gbyColumnsMatch(MaterializedViewInfo mv) {
         return m_stmt.hasComplexGroupby() ||  // if SEL has complex GBY expr, then at this caller point we already checked their column index matching.
                 m_stmt.groupByColumns().stream()    // compares GBY columns, ignoring order
-                        .map(it -> it.columnName).collect(Collectors.toSet())
+                        .map(it -> it.m_columnName).collect(Collectors.toSet())
                         .equals(StreamSupport.stream(((Iterable<ColumnRef>) () -> mv.getGroupbycols().iterator()).spliterator(), false)
                                 .map(cr -> cr.getColumn().getTypeName()).collect(Collectors.toSet()));
     }
@@ -162,15 +162,15 @@ final class MVQueryRewriter {
         // deals with complex GBY expressions
         final List<AbstractExpression> mvGbys = hasComplexGroupBy ? getGbyExpressions(mv) : new ArrayList<>();
         final Set<AbstractExpression> selGbyExpr = hasComplexGroupBy ?
-                m_stmt.getGroupByColumns().stream().map(ci -> copyAsCVE(ci.expression).anonymize()).collect(Collectors.toSet()) :
+                m_stmt.getGroupByColumns().stream().map(ci -> copyAsCVE(ci.m_expression).anonymize()).collect(Collectors.toSet()) :
                 new HashSet<>();
         if (mvGbys.stream().collect(Collectors.toSet()).equals(selGbyExpr)) { // When GBY expressions match (ignoring order),
             final Map<Integer, Integer> selGbyColIndexMap =                // SELECT stmt GBY column index ==> VIEW table column index
                     m_stmt.displayColumns().stream().flatMap(ci -> {
-                        if (ci.expression instanceof OperatorExpression || ci.expression instanceof FunctionExpression) {
-                            int indx = mvGbys.indexOf(copyAsCVE(ci.expression).anonymize());
+                        if (ci.m_expression instanceof OperatorExpression || ci.m_expression instanceof FunctionExpression) {
+                            int indx = mvGbys.indexOf(copyAsCVE(ci.m_expression).anonymize());
                             if (indx >= 0) {
-                                return Stream.of(new AbstractMap.SimpleEntry<>(ci.index, indx));
+                                return Stream.of(new AbstractMap.SimpleEntry<>(ci.m_index, indx));
                             }
                         }
                         return null;
@@ -187,17 +187,17 @@ final class MVQueryRewriter {
             // <aggType, viewSrcTblColIndx> ==> <displayColName, displayColIndx>
             final Map<Pair<Integer, Integer>, Pair<String, Integer>> nonGbyFromStmt =
                     m_stmt.displayColumns().stream()
-                            .filter(ci -> !selGbyColIndexMap.containsKey(ci.index))
+                            .filter(ci -> !selGbyColIndexMap.containsKey(ci.m_index))
                             .map(ci -> {
-                                final Pair<String, Integer> value = new Pair<>(ci.columnName, ci.index);
-                                if (ci.expression instanceof AggregateExpression) {
-                                    AbstractExpression left = ci.expression.getLeft();
-                                    return new Pair<>(new Pair<>(ci.expression.getExpressionType().getValue(), // aggregation type value
+                                final Pair<String, Integer> value = new Pair<>(ci.m_columnName, ci.m_index);
+                                if (ci.m_expression instanceof AggregateExpression) {
+                                    AbstractExpression left = ci.m_expression.getLeft();
+                                    return new Pair<>(new Pair<>(ci.m_expression.getExpressionType().getValue(), // aggregation type value
                                             // aggregate on what? For simple column, it contains column index; for "count(*)", set to -1.
                                             left == null ? -1 : ((TupleValueExpression) left).getColumnIndex()), value);
                                 } else {    // otherwise, it's either column or distinct column
                                     return new Pair<>(new Pair<>(ExpressionType.VALUE_TUPLE.getValue(),
-                                            ((TupleValueExpression) ci.expression).getColumnIndex()), value);
+                                            ((TupleValueExpression) ci.m_expression).getColumnIndex()), value);
                                 }
                             })
                             .collect(Collectors.toMap(Pair::getFirst, Pair::getSecond));
@@ -207,10 +207,10 @@ final class MVQueryRewriter {
                 final Map<Pair<String, Integer>, Pair<String, Integer>> rel = nonGbyFromStmt.entrySet().stream()
                         .collect(Collectors.toMap(Map.Entry::getValue, kv -> nonGbyFromView.get(kv.getKey())));
                 rel.putAll(m_stmt.m_displayColumns.stream()
-                        .filter(ci -> selGbyColIndexMap.containsKey(ci.index))
+                        .filter(ci -> selGbyColIndexMap.containsKey(ci.m_index))
                         .map(ci -> {
-                            final Integer viewColIndx = selGbyColIndexMap.get(ci.index);
-                            return new Pair<>(new Pair<>(ci.columnName, ci.index), new Pair<>(gbyNames.get(viewColIndx), viewColIndx));
+                            final Integer viewColIndx = selGbyColIndexMap.get(ci.m_index);
+                            return new Pair<>(new Pair<>(ci.m_columnName, ci.m_index), new Pair<>(gbyNames.get(viewColIndx), viewColIndx));
                         }).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond)));
                 return rel;
             }
