@@ -163,4 +163,22 @@ public class TestMVOptimization extends PlannerTestCase {
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"V5_1\" " +
                         "using its primary key index (for deterministic order only) inline LIMIT with parameter");
     }
+
+    public void testUnionStmt() {
+        checkQueriesPlansAreTheSame(
+                "(SELECT a1, SUM(a) FROM t1 as FOO where b >= 2 or b1 in (3, 300, 30) group by a1) UNION ALL (SELECT a1, SUM(a) from t3 group by a1)",
+                "(SELECT distinct_a1, sum_a FROM v5_1) UNION ALL (SELECT a1, SUM(a) from t3 group by a1)");
+        // nested union stmt
+        checkQueriesPlansAreTheSame(
+                "(SELECT SUM(a) sum_a, COUNT(b) count_b FROM t1 as FOO GROUP BY a1) INTERSECT (\n" +
+                        " (SELECT SUM(a) sum_a, COUNT(b) count_b FROM t3 WHERE abs(b) > abs(a) GROUP BY a1) UNION \n" +
+                        "   (SELECT SUM(a) sum_a, COUNT(b) count_b FROM t3 GROUP BY a1))",
+                "(SELECT sum_a00, count_b00 FROM v5_2) INTERSECT (\n" +
+                        " (SELECT sum_a, count_b FROM vt3) UNION (SELECT SUM(a) sum_a, COUNT(b) count_b FROM t3 GROUP BY a1))");
+        checkQueriesPlansAreTheSame(
+                "(SELECT SUM(a) sum_a, COUNT(b) count_b FROM t1 as FOO GROUP BY a1) INTERSECT (\n" +
+                        " (SELECT SUM(a) sum_a, COUNT(b) count_b FROM t3 WHERE abs(b) > abs(a) GROUP BY a1) UNION \n" +
+                        "   (SELECT SUM(a) sum_a, COUNT(b) count_b FROM t3 WHERE abs(b) > abs(a) GROUP BY a1))",
+                "(SELECT sum_a00, count_b00 FROM v5_2) INTERSECT ((SELECT sum_a, count_b FROM vt3) UNION (SELECT sum_a, count_b FROM vt3))");
+    }
 }

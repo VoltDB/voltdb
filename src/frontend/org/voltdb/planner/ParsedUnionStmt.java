@@ -55,9 +55,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     // Limit plan node information.
     private final LimitOffset m_limitOffset = new LimitOffset();
     // Order by
-    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<>();
+    private final List<ParsedColInfo> m_orderColumns = new ArrayList<>();
 
-    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<>();
+    public List<AbstractParsedStmt> m_children = new ArrayList<>();
     public UnionType m_unionType = UnionType.NOUNION;
 
     /**

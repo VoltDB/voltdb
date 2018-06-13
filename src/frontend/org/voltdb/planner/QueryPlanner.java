@@ -403,6 +403,9 @@ public class QueryPlanner implements AutoCloseable {
         if(parsedStmt instanceof ParsedSelectStmt) {
             MVQueryRewriter rewriter = new MVQueryRewriter((ParsedSelectStmt) parsedStmt);
             rewriter.rewrite();
+        } else if (parsedStmt instanceof ParsedUnionStmt) {
+            MVQueryRewriter rewriter = new MVQueryRewriter((ParsedUnionStmt) parsedStmt);
+            rewriter.rewrite();
         }
         m_planSelector.outputParsedStatement(parsedStmt);
 

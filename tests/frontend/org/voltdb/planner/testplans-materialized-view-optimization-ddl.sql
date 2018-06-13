@@ -6,7 +6,12 @@ create table t2(c0 int, b0 int not null);
 create index tc on t2(c0);
 partition table t2 on column b0;
 
--- create view v2 as select distinct a1 distinct_a1, count(*) as counts from t1 where b >= 20 group by a1;
+-- Another table
+create table t3(a int, a1 int, b int);
+create index tb on t3(a1, b);
+
+create view vt3 as select a1 a1, min(b) min_b, sum(a) sum_a, count(b) count_b, count(*) counts from t3 where abs(b) > abs(a) group by a1;
+
 create view v2 as select distinct a1 distinct_a1, count(*) counts from t1 where b > 2 group by a1;
 create view v5_1 as select distinct a1 distinct_a1, count(b1) count_b1, sum(a) sum_a, count(*) counts from t1 where b >= 2 or b1 in (3,30,300) group by a1;
 
@@ -26,7 +31,4 @@ create view v4_1 as select b1, count(*) counts from t1 where c in ('foo', 'bar',
 -- Testing on T2 with paritioning
 create view vt2 as select distinct c0 distinct_c, sum(b0) sum_b, count(*) counts from t2 group by c0;
 create view vt2_1 as select b0 b, sum(c0) sum_c, count(*) counts from t2 group by b0;
-
--- stored procedures
-create procedure pv52_nullary as select a1 distinct_a1, count(b) count_b, sum(a) sum_a, count(*) from t1 group by a1;
 

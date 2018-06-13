@@ -168,12 +168,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     // update table names, convert all expressions to TupleValueExpressions, and also update each expression's
     // table names.
-    public static void updateTableNames(List<ParsedColInfo> src, String tblName) {
+    static void updateTableNames(List<ParsedColInfo> src, String tblName) {
         src.forEach(ci -> ci.updateTableName(tblName, tblName).toTVE(ci.m_index, ci.m_index));
     }
 
     // stmt's display column (name, index) ==> view table column (name, index)
-    public static void fixColumns(List<ParsedColInfo> src, Map<Integer, Pair<String, Integer>> m) {
+    static void fixColumns(List<ParsedColInfo> src, Map<Integer, Pair<String, Integer>> m) {
        // change to display column index-keyed map
        src.forEach(ci -> {
           if (m.containsKey(ci.m_index)) {
@@ -184,7 +184,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     // Updates miscellaneous fields as part of rewriting as materialized view.
-    public ParsedSelectStmt rewriteAsMV(Table view) {
+    ParsedSelectStmt rewriteAsMV(Table view) {
         m_groupByColumns.clear();
         m_distinctGroupByColumns = null;
         m_groupByExpressions.clear();
@@ -202,14 +202,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_tableList.add(view);
         // reset m_tableAliasMap that keeps tracks of sub-queries
         m_tableAliasMap.clear();
-        StmtTargetTableScan st = new StmtTargetTableScan(view);
-        // populate m_TableAliasMap[].m_scanColumnList
-        m_displayColumns.forEach(ci -> st.resolveTVE((TupleValueExpression)(ci.m_expression)));
-        defineTableScanByAlias(view.getTypeName(), st);
         m_tableAliasListAsJoinOrder.clear();
         m_tableAliasListAsJoinOrder.add(view.getTypeName());
-        m_joinTree = new TableLeafNode(0, null, null, st);
+        m_joinTree = new TableLeafNode(0, null, null, generateStmtTableScan(view));
         return this;
+    }
+
+    // Generate table scan, and add the scan to m_tableAliasMap
+    public StmtTargetTableScan generateStmtTableScan(Table view) {
+        StmtTargetTableScan st = new StmtTargetTableScan(view);
+        m_displayColumns.forEach(ci -> st.resolveTVE((TupleValueExpression)(ci.m_expression)));
+        defineTableScanByAlias(view.getTypeName(), st);
+        return st;
     }
 
     @Override
