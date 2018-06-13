@@ -224,16 +224,6 @@ class Table {
     void loadTuplesFrom(SerializeInputBE& serialInput,
                         Pool* stringPool = NULL);
 
-    /**
-     * Loads tuple data from the serialized table.
-     * Used for snapshot restore and bulkLoad
-     */
-    void loadTuplesForLoadTable(SerializeInputBE& serialInput,
-                        Pool* stringPool = NULL,
-                        ReferenceSerializeOutput* uniqueViolationOutput = NULL,
-                        bool shouldDRStreamRows = false,
-                        bool ignoreTupleLimit = true);
-
 
     // ------------------------------------------------------------------
     // EXPORT
