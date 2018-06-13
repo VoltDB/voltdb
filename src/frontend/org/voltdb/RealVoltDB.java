@@ -3328,7 +3328,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();
-
+                TTLManager.instance().shutDown();
                 // clear resMonitorWork
                 resMonitorWork = null;
 
@@ -3442,8 +3442,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 PartitionDRGateway.m_partitionDRGateways = ImmutableMap.of();
-
-                TTLManager.instance().shutDown();
                 // probably unnecessary, but for tests it's nice because it
                 // will do the memory checking and run finalizers
                 System.gc();

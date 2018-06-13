@@ -45,8 +45,8 @@ public class TTLManager extends StatsSource{
     //exception is thrown if  DR consumer gets a chunk of larger than 50MB
     //DRTupleStream.cpp
     public static final String DR_LIMIT_MSG = "bytes exceeds max DR Buffer size";
-    static final int DELAY = Integer.getInteger("TIME_TO_LIVE_DELAY", 0);
-    static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1);
+    static final int DELAY = Integer.getInteger("TIME_TO_LIVE_DELAY", 0) * 1000;
+    static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1) * 1000;
     static final int CHUNK_SIZE = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
     static final int TIMEOUT = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
 
@@ -207,7 +207,6 @@ public class TTLManager extends StatsSource{
         }
 
         //random initial delay
-        final int randomDelay = ttlTables.size() * INTERVAL;
         final Random random = new Random();
         for (Table t : ttlTables.values()) {
             TimeToLive ttl = t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
@@ -225,7 +224,7 @@ public class TTLManager extends StatsSource{
                 }
                 task = new TTLTask(t.getTypeName(), ttl, stats);
                 m_tasks.put(t.getTypeName(), task);
-                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, random.nextInt(randomDelay), INTERVAL, TimeUnit.SECONDS));
+                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY + random.nextInt(INTERVAL), INTERVAL, TimeUnit.MILLISECONDS));
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));
             } else {
                 task.updateTask(ttl);
