@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -41,6 +42,9 @@ import org.voltdb.utils.CatalogUtil;
 //will get the task done.
 public class TTLManager extends StatsSource{
 
+    //exception is thrown if  DR consumer gets a chunk of larger than 50MB
+    //DRTupleStream.cpp
+    public static final String DR_LIMIT_MSG = "bytes exceeds max DR Buffer size";
     static final int DELAY = Integer.getInteger("TIME_TO_LIVE_DELAY", 0);
     static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1);
     static final int CHUNK_SIZE = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
@@ -88,12 +92,17 @@ public class TTLManager extends StatsSource{
             if (!canceled.get() && cl != null && cl.isAcceptingConnections()) {
                 TimeToLive ttl = ttlRef.get();
                 cl.runTimeToLive(tableName, ttl.getTtlcolumn().getName(),
-                        transformValue(ttl), CHUNK_SIZE, TIMEOUT, stats);
+                        transformValue(ttl), CHUNK_SIZE, TIMEOUT, stats, this);
             }
         }
 
         public void cancel() {
             canceled.set(true);
+            ScheduledFuture<?> fut = m_futures.get(tableName);
+            if (fut != null) {
+                fut.cancel(true);
+                m_futures.remove(tableName);
+            }
         }
 
         public void updateTask(TimeToLive updatedTTL) {
@@ -169,7 +178,7 @@ public class TTLManager extends StatsSource{
      * schedule TTL tasks per configurations
      * @param ttlTables A list of tables for TTL
      */
-    public void start() {
+    public void scheduleTTLTasks() {
 
         //do not trigger TTL on replica clusters
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
@@ -197,15 +206,9 @@ public class TTLManager extends StatsSource{
             }
         }
 
-        Iterator<Map.Entry<String, ScheduledFuture<?>>> fut = m_futures.entrySet().iterator();
-        while(fut.hasNext()) {
-            Map.Entry<String, ScheduledFuture<?>> task = fut.next();
-            if (!ttlTables.containsKey(task.getKey())) {
-                task.getValue().cancel(true);
-                fut.remove();
-            }
-        }
-
+        //random initial delay
+        final int randomDelay = ttlTables.size() * INTERVAL;
+        final Random random = new Random();
         for (Table t : ttlTables.values()) {
             TimeToLive ttl = t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
             if (!CatalogUtil.isColumnIndexed(t, ttl.getTtlcolumn())) {
@@ -222,7 +225,7 @@ public class TTLManager extends StatsSource{
                 }
                 task = new TTLTask(t.getTypeName(), ttl, stats);
                 m_tasks.put(t.getTypeName(), task);
-                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY, INTERVAL, TimeUnit.SECONDS));
+                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, random.nextInt(randomDelay), INTERVAL, TimeUnit.SECONDS));
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));
             } else {
                 task.updateTask(ttl);

@@ -3755,8 +3755,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
                 }
 
+                //TTL control works on the host with MPI
                 if (m_myHostId == CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMultiPartitionInitiator())) {
-                    TTLManager.instance().start();
+                    TTLManager.instance().scheduleTTLTasks();
                 }
                 // restart resource usage monitoring task
                 startHealthMonitor();

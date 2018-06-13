@@ -138,32 +138,40 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
         parameter.addRow(value);
         Map<Integer, String> errorMessages = new HashMap<>();
         if (isReplicated) {
-            CompletableFuture<ClientResponse> cf = callProcedure("@NibbleDeleteMP", tableName, columnName, comparisonOp, parameter, chunksize);
-            ClientResponse cr;
             try {
-                cr = cf.get(ONE, TimeUnit.MINUTES);
+                CompletableFuture<ClientResponse> cf = callProcedure("@NibbleDeleteMP", tableName, columnName, comparisonOp, parameter, chunksize);
+                ClientResponse cr;
+                try {
+                    cr = cf.get(ONE, TimeUnit.MINUTES);
+                } catch (Exception e) {
+                    return new NibbleStatus(-1, rowsJustDeleted, "Received exception while waiting response back "
+                            + "from smart delete system procedure:" + e.getMessage());
+                }
+                ClientResponseImpl cri = (ClientResponseImpl) cr;
+                switch(cri.getStatus()) {
+                case ClientResponse.SUCCESS:
+                    VoltTable result = cri.getResults()[0];
+                    result.advanceRow();
+                    rowsJustDeleted = result.getLong("DELETED_ROWS");
+                    rowsLeft = result.getLong("LEFT_ROWS");
+                    break;
+                case ClientResponse.RESPONSE_UNKNOWN:
+                    // Could because node failure, nothing to do here I guess
+                    break;
+                default:
+                    errorMessages.put(MpInitiator.MP_INIT_PID, cri.toJSONString());
+                }
             } catch (Exception e) {
-                return new NibbleStatus(-1, rowsJustDeleted, "Received exception while waiting response back "
-                        + "from smart delete system procedure:" + e.getMessage());
-            }
-            ClientResponseImpl cri = (ClientResponseImpl) cr;
-            switch(cri.getStatus()) {
-            case ClientResponse.SUCCESS:
-                VoltTable result = cri.getResults()[0];
-                result.advanceRow();
-                rowsJustDeleted = result.getLong("DELETED_ROWS");
-                rowsLeft = result.getLong("LEFT_ROWS");
-                break;
-            case ClientResponse.RESPONSE_UNKNOWN:
-                // Could because node failure, nothing to do here I guess
-                break;
-            default:
-                errorMessages.put(MpInitiator.MP_INIT_PID, cri.toJSONString());
+                return new NibbleStatus(rowsLeft, rowsJustDeleted, e.getMessage());
             }
         } else {
             // for single partitioned table, run the smart delete everywhere
             CompletableFuture<ClientResponseWithPartitionKey[]> pf = null;
-            pf = callAllPartitionProcedure("@NibbleDeleteSP", tableName, columnName, comparisonOp, parameter, chunksize);
+            try {
+                pf = callAllPartitionProcedure("@NibbleDeleteSP", tableName, columnName, comparisonOp, parameter, chunksize);
+            } catch (Exception e) {
+                return new NibbleStatus(rowsLeft, rowsJustDeleted, e.getMessage());
+            }
             ClientResponseWithPartitionKey[] crs;
             try {
                 crs = pf.get(ONE, TimeUnit.MINUTES);
