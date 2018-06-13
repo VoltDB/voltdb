@@ -547,14 +547,16 @@ public class MpTransactionState extends TransactionState
             VoltTable this_dep = msg.getTableAtIndex(i);
             expectedMsg |= trackDependency(src_hsid, this_depId, this_dep);
         }
-        int drBufferChanged = msg.getDRBufferChangedAtIndex(msg.getTableCount()-1);
-        // aggregate dr buffer change size
-        m_drBufferChangedAgg += drBufferChanged;
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("[trackDependency]:  drBufferSize added :" + drBufferChanged +
-                        " aggregated drBufferSize: " + m_drBufferChangedAgg +
-                        " for transaction: " + TxnEgo.txnIdToString(txnId) +
-                        " for partition: " + CoreUtils.hsIdToString(src_hsid));
+        if (msg.getTableCount() > 0) {
+            int drBufferChanged = msg.getDRBufferChangedAtIndex(msg.getTableCount() - 1);
+            // sum the dr buffer change size among all partitions for last fragment (which already aggregate all previous fragment buffer size)
+            m_drBufferChangedAgg += drBufferChanged;
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("[trackDependency]:  drBufferSize added :" + drBufferChanged +
+                    " aggregated drBufferSize: " + m_drBufferChangedAgg +
+                    " for transaction: " + TxnEgo.txnIdToString(txnId) +
+                    " for partition: " + CoreUtils.hsIdToString(src_hsid));
+            }
         }
 
         return expectedMsg;
