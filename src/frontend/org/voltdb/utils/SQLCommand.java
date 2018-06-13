@@ -42,6 +42,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TimeZone;
@@ -49,6 +50,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -1261,6 +1263,7 @@ public class SQLCommand
         + "              [--port=port_number]\n"
         + "              [--user=user]\n"
         + "              [--password=password]\n"
+        + "              [--credentials=file_spec]\n"
         + "              [--kerberos=jaas_login_configuration_entry_key]\n"
         + "              [--ssl or --ssl=ssl-configuration-file]\n"
         + "              [--query=query]\n"
@@ -1283,6 +1286,10 @@ public class SQLCommand
         + "\n"
         + "[--password=password]\n"
         + "  Password of the user for database login.\n"
+        + "  Default: (not defined - connection made without credentials).\n"
+        + "\n"
+        + "[--credentials=credentials]\n"
+        + "  File that contains username and password information.\n"
         + "  Default: (not defined - connection made without credentials).\n"
         + "\n"
         + "[--kerberos=jaas_login_configuration_entry_key]\n"
@@ -1501,7 +1508,9 @@ public class SQLCommand
         int port = 21212;
         String user = "";
         String password = "";
+        String credentials = "";
         String kerberos = "";
+        FileReader fr = null;
         List<String> queries = null;
         String ddlFileText = "";
         String sslConfigFile = null;
@@ -1526,6 +1535,10 @@ public class SQLCommand
             else if (arg.startsWith("--password=")) {
                 password = extractArgInput(arg);
                 if (password == null) return -1;
+            }
+            else if (arg.startsWith("--credentials")) {
+                credentials = extractArgInput(arg);
+                if (credentials == null) return -1;
             }
             else if (arg.startsWith("--kerberos=")) {
                 kerberos = extractArgInput(arg);
@@ -1639,6 +1652,13 @@ public class SQLCommand
         // Phone home to see if there is a newer version of VoltDB
         if (m_versionCheck) {
             openURLAsync();
+        }
+
+        // read username and password from txt file
+        if (credentials != null && !credentials.trim().isEmpty()) {
+            Properties props = MiscUtils.readPropertiesFromCredentials(credentials);
+            user = props.getProperty("username");
+            password = props.getProperty("password");
         }
 
         try
