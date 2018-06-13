@@ -143,7 +143,7 @@ public class TestLoadingSuite extends RegressionSuite {
             fail();
         }
         catch (ProcCallException e) {
-            e.printStackTrace();
+            assertTrue(e.getMessage().contains("no longer supports loading partitioned tables"));
         }
 
         // test rollback to a replicated table (constraint)
@@ -155,7 +155,7 @@ public class TestLoadingSuite extends RegressionSuite {
             fail(); // prev stmt should throw exception
         }
         catch (ProcCallException e) {
-            e.printStackTrace();
+            assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
         }
 
         // test rollback to a replicated table (sql exception)
@@ -167,7 +167,7 @@ public class TestLoadingSuite extends RegressionSuite {
             fail(); // prev stmt should throw exception
         }
         catch (ProcCallException e) {
-            e.printStackTrace();
+            assertTrue(e.getMessage().contains("SQL ERROR"));
         }
 
         // 4 rows in the db from the previous test

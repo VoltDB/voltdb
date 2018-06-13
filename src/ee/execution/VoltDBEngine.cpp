@@ -1586,13 +1586,16 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     // When loading a replicated table, behavior should be:
-    //   SQLException may be thrown on the lowest site thread.
-    //   If throwUniqueViolations is true:
+    //   ConstraintFailureException may be thrown on the lowest site thread.
+    //   If returnConflictRows is false:
     //       Lowest site thread: throw the exception.
     //       Other site threads: throw replicated table exceptions.
-    //   else (throwUniqueViolations is false)
+    //   else (returnConflictRows is true)
     //       Lowest site thread: serialize the offending rows, return 1.
-    //       Other site thread: return 1.
+    //       Other site thread: copy the serialized buffer from lowest site, return 1.
+    //
+    //   SQLException may also be thrown on the loweset site thread (e.g. from the TableTuple.deserializeFrom())
+    //   will always re/throw from every sites
     //
     //   For all other kinds of exceptions, throw a FatalException.  This is legacy behavior.
     //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
@@ -1626,8 +1629,8 @@ VoltDBEngine::loadTable(int32_t tableId,
             throw;
         }
         catch (const SerializableEEException& serializableExc) {
-            // Exceptions that are not constraint failures are treated as fatal.   This is legacy
-            // behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
+            // Exceptions that are not constraint failures or sql exeception are treated as fatal.
+            // This is legacy behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
             // other kind of exception?
             s_loadTableException = serializableExc.getType();
             throwFatalException("%s", serializableExc.message().c_str());
@@ -1657,25 +1660,17 @@ VoltDBEngine::loadTable(int32_t tableId,
             VOLT_DEBUG("%s", oss.str().c_str());
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
         }
-        else {
-            // Offending rows will be serialized on lowest site thread.
-            return false;
-        }
+        // Offending rows will be serialized on lowest site thread.
+        return false;
     }
     else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_SQL) {
-        // An constraint failure exception was thrown on the lowest site thread and
+        // An sql exception was thrown on the lowest site thread and
         // handle it on the other threads too.
-        if (!returnConflictRows) {
-            std::ostringstream oss;
-            oss << "Replicated load table failed (sql exception) on other thread for table \""
-                << table->name() << "\".\n";
-            VOLT_DEBUG("%s", oss.str().c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
-        }
-        else {
-            // Offending rows will be serialized on lowest site thread.
-            return false;
-        }
+        std::ostringstream oss;
+        oss << "Replicated load table failed (sql exception) on other thread for table \""
+            << table->name() << "\".\n";
+        VOLT_DEBUG("%s", oss.str().c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
     }
     else if (s_loadTableException != VOLT_EE_EXCEPTION_TYPE_NONE) { // some other kind of exception occurred on lowest site thread
         // This is fatal.
