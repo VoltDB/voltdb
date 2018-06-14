@@ -35,16 +35,18 @@ import org.voltdb.types.TimestampType;
 public class TrackEvent extends VoltProcedure {
 
     public final SQLStmt selectCreative = new SQLStmt(
-        "SELECT campaign_id, advertiser_id FROM creatives WHERE creative_id = ?;");
+        "SELECT campaign_id, advertiser_id, creative_image_url, creative_name, "
+        + "creative_description FROM creatives WHERE creative_id = ?;");
 
     public final SQLStmt selectInventory = new SQLStmt(
-        "SELECT site_id, page_id FROM inventory WHERE inventory_id = ?;");
+        "SELECT site_id, page_id, site_directory, page_url "
+        + "FROM inventory WHERE inventory_id = ?;");
 
     public final SQLStmt insertEvent = new SQLStmt(
         "INSERT INTO event_data VALUES (" +
         "?,?,?,?,?,?,?," +
-        "?,?,?,?,?,?,?" +
-        ");");
+        "?,?,?,?,?,?,?," +
+        "?,?,?,?,?);");
 
     public long run( TimestampType utc_time,
                      long ip_address,
@@ -71,12 +73,17 @@ public class TrackEvent extends VoltProcedure {
         VoltTableRow creative = lookups[0].fetchRow(0);
         int campaign_id = (int)creative.getLong(0);
         int advertiser_id = (int)creative.getLong(1);
+        String creative_image_url = creative.getString(2);
+        String creative_name = creative.getString(3);
+        String creative_description = creative.getString(4);
 
         VoltTableRow inventory = lookups[1].fetchRow(0);
         int site_id = (int)inventory.getLong(0);
         int page_id = (int)inventory.getLong(1);
+        String site_directory = inventory.getString(2);
+        String page_url = inventory.getString(3);
 
-    voltQueueSQL( insertEvent,
+        voltQueueSQL( insertEvent,
                       utc_time,
                       ip_address,
                       cookie_uid,
@@ -86,8 +93,13 @@ public class TrackEvent extends VoltProcedure {
                       cost,
                       campaign_id,
                       advertiser_id,
+                      creative_image_url,
+                      creative_name,
+                      creative_description,
                       site_id,
                       page_id,
+                      site_directory,
+                      page_url,
                       is_impression,
                       is_clickthrough,
                       is_conversion
@@ -95,7 +107,6 @@ public class TrackEvent extends VoltProcedure {
 
         voltExecuteSQL();
 
-    return ClientResponse.SUCCESS;
-
+        return ClientResponse.SUCCESS;
     }
 }

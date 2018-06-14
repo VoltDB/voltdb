@@ -312,11 +312,13 @@ public class AdTrackingBenchmark {
         for (int i=1; i<=sites; i++) {
             for (int j=1; j<=pagesPerSite; j++) {
                 inventoryMaxID++;
-                client.callProcedure(new BenchmarkCallback("INVENTORY.insert"),
-                                     "INVENTORY.insert",
+                client.callProcedure(new BenchmarkCallback("INVENTORY.upsert"),
+                                     "INVENTORY.upsert",
                                      inventoryMaxID,
                                      i,
-                                     j);
+                                     j,
+                                     "~/Example/Directory",
+                                     "https://www.voltdb.com");
                 // show progress
                 if (inventoryMaxID % 5000 == 0) System.out.println("  " + inventoryMaxID);
             }
@@ -326,11 +328,16 @@ public class AdTrackingBenchmark {
         System.out.println("Loading Creatives table based on " + advertisers +
                            " advertisers, each with " + campaignsPerAdvertiser +
                            " campaigns, each with " + creativesPerCampaign + " creatives...");
-        client.callProcedure(new BenchmarkCallback("InitializeCreatives"),
-                             "InitializeCreatives",
-                             advertisers,
-                             campaignsPerAdvertiser,
-                             creativesPerCampaign);
+        long creativeMaxID = 0;
+        for (int advertiser=1; advertiser<=advertisers; advertiser++) {
+            client.callProcedure(new BenchmarkCallback("InitializeCreatives"),
+                                 "InitializeCreatives",
+                                 creativeMaxID,
+                                 advertiser,
+                                 campaignsPerAdvertiser,
+                                 creativesPerCampaign);
+            creativeMaxID += campaignsPerAdvertiser * creativesPerCampaign;
+        }
     }
 
     public static class BenchmarkCallback implements ProcedureCallback {
@@ -526,8 +533,5 @@ public class AdTrackingBenchmark {
 
         AdTrackingBenchmark benchmark = new AdTrackingBenchmark(config);
         benchmark.runBenchmark();
-
-        printHeading("Note: The database must be restarted before running this benchmark again.");
-
     }
 }
