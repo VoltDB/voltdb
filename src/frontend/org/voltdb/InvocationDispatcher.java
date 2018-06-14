@@ -221,7 +221,7 @@ public final class InvocationDispatcher {
         // this kicks off the initial NT procedures being loaded
         notifyNTProcedureServiceOfCatalogUpdate();
 
-        // update the partition count and partition keys for rounting purpose
+        // update the partition count and partition keys for routing purpose
         updatePartitionInformation();
     }
 
