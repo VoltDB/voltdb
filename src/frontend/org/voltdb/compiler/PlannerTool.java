@@ -159,7 +159,7 @@ public class PlannerTool {
                 loggedMsg = " (Stack trace has been written to the log.)";
             }
             if (e.getMessage() != null) {
-            	throw new RuntimeException("SQL error while compiling query: " + e.getMessage() + loggedMsg, e);
+                throw new RuntimeException("SQL error while compiling query: " + e.getMessage() + loggedMsg, e);
             }
             throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg, e);
         }
@@ -322,7 +322,7 @@ public class PlannerTool {
                     loggedMsg = " (Stack trace has been written to the log.)";
                 }
                 if (e.getMessage() != null) {
-                	throw new RuntimeException("SQL error while compiling query: " + e.getMessage() + loggedMsg, e);
+                    throw new RuntimeException("SQL error while compiling query: " + e.getMessage() + loggedMsg, e);
                 }
                 throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg, e);
             }
