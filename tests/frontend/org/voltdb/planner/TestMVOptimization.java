@@ -22,15 +22,8 @@
  */
 
 package org.voltdb.planner;
-import java.util.Arrays;
 import java.util.List;
-
-import org.voltdb.VoltProcedure;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.SQLStmt;
-import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.VoltTable;
-import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
 
 public class TestMVOptimization extends PlannerTestCase {
     @Override
@@ -114,6 +107,14 @@ public class TestMVOptimization extends PlannerTestCase {
         assertMatch("SELECT a1, SUM(a), COUNT(b1), COUNT(*) FROM t1 WHERE b >= 2 OR b1 IN (3, 300, 30, 3) GROUP BY a1", expected);
         assertMatch("SELECT a1, SUM(a), COUNT(b1), COUNT(*) FROM t1 WHERE b1 IN (3, 300, 30) OR b >= 2 GROUP BY a1", expected);
         assertMatch("SELECT a1, SUM(a), COUNT(b1), COUNT(*) FROM t1 WHERE b1 IN (3, 300, 30) OR 2 <= b GROUP BY a1", expected);
+        // functions in filter
+        checkQueriesPlansAreTheSame("SELECT COUNT(a1), SUM(a) FROM t1 WHERE a + b1 > a1 OR power(a, a1) + b1 <= mod(a1, b) + abs(b) GROUP BY a1",
+                "SELECT count_a1, sum_a FROM v5_4");
+        // function order for power() changed
+        assertMatch("SELECT COUNT(a1), SUM(a) FROM t1 WHERE a + b1 > a1 OR power(a1, a) + b1 <= mod(a1, b) + abs(b) GROUP BY a1",
+                "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" " +
+                        "(for deterministic order only) filter by (((A + B1) > A1) OR ((power(A1, A) + B1) <= (mod(A1, B) + abs(B)))) " +
+                        "inline Hash AGGREGATION ops: COUNT(T1.A1), SUM(T1.A)");
     }
 
     public void testGroupByMultipleColumns() {
@@ -141,6 +142,19 @@ public class TestMVOptimization extends PlannerTestCase {
                         "    GROUP BY a * 2 + a1, b - a) AS foo",
                 "RETURN RESULTS TO STORED PROCEDURE SEQUENTIAL SCAN of \"FOO\" " +
                         "INDEX SCAN of \"V4\" using its primary key index (for deterministic order only)");
+        // NOTE: right now the query plan is not optimal, missing opportunity to use index lookup inside nested query
+        assertMatch("SELECT * FROM (\n" +
+                        " SELECT distinct a1 distinct_a, COUNT(*) count_of FROM t1 WHERE b > 2 GROUP BY a1) foo\n" +
+                        "INNER JOIN (SELECT a1 distinct_a, COUNT(*) count_of FROM t1 WHERE b >= 2 OR b1 in (3, 30, 300) GROUP BY a1) bar\n" +
+                        "  ON foo.distinct_a = bar.distinct_a \n" +
+                        "LEFT JOIN (SELECT a1 distinct_a, COUNT(*) count_of FROM t1 WHERE b < 200 GROUP BY a1) baz\n" +
+                        "  ON bar.distinct_a = baz.distinct_a",
+                "RETURN RESULTS TO STORED PROCEDURE NEST LOOP LEFT JOIN filter by (BAZ.DISTINCT_A = BAR.DISTINCT_A) " +
+                        "NEST LOOP INNER JOIN filter by (BAR.DISTINCT_A = FOO.DISTINCT_A) SEQUENTIAL SCAN of \"FOO\" " +
+                        "INDEX SCAN of \"V2\" using its primary key index (for deterministic order only) " +
+                        "SEQUENTIAL SCAN of \"BAR\" INDEX SCAN of \"V5_1\" using its primary key index (for deterministic order only) " +
+                        "SEQUENTIAL SCAN of \"BAZ\" INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" (for deterministic order only) " +
+                        "filter by (B < 200) inline Hash AGGREGATION ops: COUNT(*)");
     }
 
     public void testPartitionedTables() {

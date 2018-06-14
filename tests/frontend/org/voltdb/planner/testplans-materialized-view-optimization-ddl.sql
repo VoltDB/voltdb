@@ -19,6 +19,9 @@ create view v5_1 as select distinct a1 distinct_a1, count(b1) count_b1, sum(a) s
 create view v5_2 as select distinct a1 distinct_a, sum(a) sum_a00, count(b) count_b00, count(*) counts from t1 group by a1;
 create view v5_3 as select a1 distinct_a, sum(a) sum_a00, count(b) count_b00, count(*) counts from t1 group by a1;
 
+-- Function in filter
+create view v5_4 as select distinct a1 distinct_a1, count(a1) count_a1, sum(a) sum_a, count(*) counts from t1 where mod(a1, b) + abs(b) >= b1 + power(a, a1) OR a1 < a + b1 group by a1;
+
 -- multiple groups
 create view v3 as select a a, b b, sum(a1) sum_a1, min(b1) min_b1, count(*) counts from t1 group by a, b;
 
