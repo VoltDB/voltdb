@@ -69,6 +69,7 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
@@ -3034,5 +3035,26 @@ public abstract class CatalogUtil {
      */
     public static boolean isProcedurePartitioned(Procedure proc) {
         return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
+    }
+
+    public static Map<String, Table> getTimeToLiveTables(Database db) {
+        Map<String, Table> ttls = Maps.newHashMap();
+        for (Table t : db.getTables()) {
+            if (t.getTimetolive() != null && t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME) != null) {
+                ttls.put(t.getTypeName(),t);
+            }
+        }
+        return ttls;
+    }
+
+    public static boolean isColumnIndexed(Table table, Column column) {
+        for (Index index : table.getIndexes()) {
+            for (ColumnRef colRef : index.getColumns()) {
+                if(column.equals(colRef.getColumn())){
+                 return true;
+                }
+            }
+        }
+        return false;
     }
 }

@@ -165,6 +165,13 @@ begin Table                                  "A table (relation) in the database
   int tuplelimit                             "A maximum number of rows in a table"
   bool isDRed                                "Is this table DRed?"
   Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
+  TimeToLive* timeToLive                     "Time to live"
+end
+
+begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"
+  int ttlValue                        "time value-life span of data"
+  string ttlUnit                      "time unit, second, minute, hour or day. default: second"
+  Column? ttlColumn                   "A column used to determine the duration of data"
 end
 
 begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"

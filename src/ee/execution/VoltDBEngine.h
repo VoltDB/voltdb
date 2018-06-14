@@ -754,16 +754,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         char* m_templateSingleLongTable;
 
         const static int m_templateSingleLongTableSize =
-            4 + // depid
-            4 + // table size
-            1 + // status code
-            4 + // header size
-            2 + // column count
-            1 + // column type
-            4 + 15 + // column name (length + modified_tuples)
-            4 + // tuple count
-            4 + // first row size
-            8;// modified tuples
+                4 + // depid
+                4 + // table size
+                4 + // header size
+                2 + // status code
+                1 + // column count
+                1 + // column type
+                4 + 15 + // column name (length + modified_tuples)
+                4 + // tuple count
+                4 + // first row size
+                8;// modified tuples
 
         Topend* m_topend;
 

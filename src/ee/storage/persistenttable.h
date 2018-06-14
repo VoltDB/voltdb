@@ -563,6 +563,16 @@ public:
     void instantiateDeltaTable(bool needToCheckMemoryContext = true);
     void releaseDeltaTable(bool needToCheckMemoryContext = true);
 
+    /**
+     * Loads tuple data from the serialized table.
+     * Used for snapshot restore and bulkLoad
+     */
+    void loadTuplesForLoadTable(SerializeInputBE& serialInput,
+                                Pool* stringPool = NULL,
+                                ReferenceSerializeOutput* uniqueViolationOutput = NULL,
+                                bool shouldDRStreamRows = false,
+                                bool ignoreTupleLimit = true);
+
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false, bool isReplicated = false);
@@ -661,7 +671,7 @@ private:
      */
     void deleteTupleStorage(TableTuple& tuple, TBPtr block = TBPtr(NULL), bool deleteLastEmptyBlock = false);
 
-    /*
+    /**
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * for loadNextDependency or processRecoveryMessage
      */
