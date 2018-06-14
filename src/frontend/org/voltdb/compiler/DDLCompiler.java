@@ -41,6 +41,7 @@ import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
@@ -56,6 +57,7 @@ import org.voltdb.catalog.FunctionParameter;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TimeToLive;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -785,6 +787,19 @@ public class DDLCompiler {
         }
     }
 
+    private void handleTTL(Database db) throws VoltCompilerException {
+        for (Table table : db.getTables()) {
+            TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
+            if (ttl == null) {
+                continue;
+            }
+            if (ttl.getTtlcolumn().getNullable()) {
+                String msg = "Column '" + table.getTypeName() + "." + ttl.getTtlcolumn().getName() + "' cannot be nullable for TTL." ;
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
+    }
+
     private TreeSet<String> getExportTableNames() {
         TreeSet<String> exportTableNames = new TreeSet<>();
         NavigableMap<String, NavigableSet<String>> exportsByTargetName = m_tracker.getExportedTables();
@@ -832,6 +847,7 @@ public class DDLCompiler {
 
         fillTrackerFromXML();
         handlePartitions(db);
+        handleTTL(db);
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
     }
 
@@ -1262,6 +1278,7 @@ public class DDLCompiler {
 
         // Need the columnTypes sorted by column index.
         SortedMap<Integer, VoltType> columnTypes = new TreeMap<>();
+        VoltXMLElement ttlNode = null;
         for (VoltXMLElement subNode : node.children) {
 
             if (subNode.name.equals("columns")) {
@@ -1312,6 +1329,23 @@ public class DDLCompiler {
                         addConstraintToCatalog(table, constraintNode,
                                 indexReplacementMap, indexMap);
                     }
+                }
+            }
+            if (subNode.name.equalsIgnoreCase(TimeToLiveVoltDB.TTL_NAME)) {
+                ttlNode = subNode;
+            }
+        }
+
+        if (ttlNode != null) {
+            TimeToLive ttl =   table.getTimetolive().add(TimeToLiveVoltDB.TTL_NAME);
+            String column = ttlNode.attributes.get("column");
+            int ttlValue = Integer.parseInt(ttlNode.attributes.get("value"));
+            ttl.setTtlunit(ttlNode.attributes.get("unit"));
+            ttl.setTtlvalue(ttlValue);
+            for (Column col : table.getColumns()) {
+                if (column.equalsIgnoreCase(col.getName())) {
+                    ttl.setTtlcolumn(col);
+                    break;
                 }
             }
         }
