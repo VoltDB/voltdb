@@ -80,10 +80,31 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
     // sort it by Column index to preserve column order.
     auto numColumns = catalogTable.columns().size();
     bool needsDRTimestamp = isXDCR && catalogTable.isDRed();
-    TupleSchemaBuilder schemaBuilder(numColumns,
-                                     needsDRTimestamp ? 1 : 0); // number of hidden columns
+    bool needsHiddenCountForView = false;
 
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
+
+    // only looking for potential existing table count(*) when this is a Materialized view table
+    if (isTableMaterialized(catalogTable)) {
+      for (colIterator = catalogTable.columns().begin();
+           colIterator != catalogTable.columns().end(); colIterator++) {
+          auto catalogColumn = colIterator->second;
+          if (catalogColumn->aggregatetype() == EXPRESSION_TYPE_AGGREGATE_COUNT_STAR) {
+            // there exists count(*), directly quit
+            break;
+          }
+      }
+      if (colIterator == catalogTable.columns().end()) {
+        // iterator meets the end, meaning no count(*) column
+        needsHiddenCountForView = true;
+      }
+    }
+
+    // DR timestamp and hidden COUNT(*) should not appear at the same time
+    assert(!(needsDRTimestamp && needsHiddenCountForView));
+    TupleSchemaBuilder schemaBuilder(numColumns,
+                                     (needsDRTimestamp || needsHiddenCountForView) ? 1 : 0); // hidden columns
+
     for (colIterator = catalogTable.columns().begin();
          colIterator != catalogTable.columns().end(); colIterator++) {
 
@@ -106,6 +127,10 @@ TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catal
                                              VALUE_TYPE_BIGINT,
                                              8,      // field size in bytes
                                              false); // nulls not allowed
+    }
+
+    if (needsHiddenCountForView) {
+      schemaBuilder.setHiddenColumnAtIndex(needsDRTimestamp ? 1 : 0, VALUE_TYPE_BIGINT, 8, false);
     }
 
     return schemaBuilder.build();

@@ -18,6 +18,7 @@
 package org.voltdb.utils;
 
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
@@ -35,6 +36,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1061,5 +1063,26 @@ public class MiscUtils {
             }
         }
         return partitionMap;
+    }
+
+    /**
+     * Get username and password from credentials file.
+     * @return a Properties variable which contains username and password.
+     */
+    public static Properties readPropertiesFromCredentials(String credentials) {
+        Properties props = new Properties();
+        File propFD = new File(credentials);
+        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+            throw new IllegalArgumentException("Credentials file " + credentials + " is not a read accessible file");
+        } else {
+            FileReader fr = null;
+            try {
+                fr = new FileReader(credentials);
+                props.load(fr);
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Credential file not found or permission denied.");
+            }
+        }
+        return props;
     }
 }

@@ -829,7 +829,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (m_licenseApi.isPro()) edition = "Pro Edition";
                     if (m_licenseApi.isEnterpriseTrial()) edition = "Enterprise Edition";
                     if (m_licenseApi.isProTrial()) edition = "Pro Edition";
-                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
+                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Edition";
                 }
 
                 // this also prints out the license type on the console
@@ -1101,7 +1101,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 setStartMode(OperationMode.PAUSED);
             }
 
-            // Create the thread pool here. It's needed by buildClusterMesh()
+            // Create the thread pool here.
             m_periodicWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
             m_periodicPriorityWorkThread =
@@ -1144,10 +1144,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 Class<?> elasticJoinCoordClass =
                         MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
+                    int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+                    if(determination.startAction == StartAction.JOIN && kfactor > 0) {
+                        int kfactorPlusOne = kfactor + 1;
+                        String waitMessage = "The join process will begin after a total of " + kfactorPlusOne + " nodes are added, waiting...";
+                        consoleLog.info(waitMessage);
+                    }
                     Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
                     m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
                     m_messenger.registerMailbox(m_joinCoordinator);
-                    m_joinCoordinator.initialize(m_catalogContext.getDeployment().getCluster().getKfactor());
+                    m_joinCoordinator.initialize(kfactor);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
                 }
@@ -1259,6 +1265,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // do the many init tasks in the Inits class
             Inits inits = new Inits(m_statusTracker, this, 1, m_durable);
             inits.doInitializationWork();
+
+            int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+            if(determination.startAction == StartAction.JOIN && kfactor > 0) {
+                int kfactorPlusOne = kfactor + 1;
+                String waitMessage = "" + kfactorPlusOne + " nodes added, joining new nodes to the cluster...";
+                consoleLog.info(waitMessage);
+            }
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
             // This is done under Inits.doInitializationWork(), so need to wait until we get here.
@@ -2458,6 +2471,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
                 }
+                if (deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {
+                    consoleLog.warn("Database Replication is not supported " +
+                            "in the community edition of VoltDB.");
+                }
                 // check the start action for the community edition
                 if (m_config.m_startAction == StartAction.JOIN) {
                     consoleLog.error("Start action \"" + m_config.m_startAction.getClass().getSimpleName() +
@@ -3313,6 +3330,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
 
+                if (m_catalogContext.m_ptool.getAdHocLargeFallbackCount() > 0) {
+                    hostLog.info(String.format("%d queries planned through @AdHocLarge were converted to normal @AdHoc plans.",
+                            m_catalogContext.m_ptool.getAdHocLargeFallbackCount()));
+                }
                 /*
                  * Various scheduled tasks get crashy in unit tests if they happen to run
                  * while other stuff is being shut down. Double catch of throwable is only for the sake of tests.

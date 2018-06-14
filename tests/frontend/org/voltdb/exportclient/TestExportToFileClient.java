@@ -35,6 +35,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -46,6 +49,8 @@ import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
+import org.voltdb.MockVoltDB;
+import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.utils.VoltFile;
@@ -58,6 +63,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 @PrepareForTest(ExportToFileClient.class)
 public class TestExportToFileClient extends ExportClientTestBase {
     static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
+    private static MockVoltDB s_mockVoltDB = new MockVoltDB("foo", "bar");
 
     @Override
     @Before
@@ -72,6 +78,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         }
         System.setProperty("__EXPORT_FILE_ROTATE_PERIOD_UNIT__", TimeUnit.SECONDS.name());
         ExportToFileClient.TEST_VOLTDB_ROOT = m_dir;
+        VoltDB.replaceVoltDBInstanceForTest(s_mockVoltDB);
     }
 
     @Test
@@ -363,7 +370,6 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 retry ++ ;
             }
         }
-
         assertEquals(2, retry);
     }
 
@@ -415,6 +421,198 @@ public class TestExportToFileClient extends ExportClientTestBase {
         }
 
         assertEquals(2, retry);
+    }
+
+    @Test
+    public void testFilenameBatchedUnique() throws Exception
+    {
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", Long.toString(System.currentTimeMillis()));
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("period", "1"); // 1 second rolling period
+        props.put("with-schema", "true");
+        props.put("batched", "true");
+        props.put("uniquenames", "true");
+        client.configure(props);
+        final AdvertisedDataSource source = constructTestSource(false, 0);
+        final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
+
+        long l = System.currentTimeMillis();
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1,
+                /* partitioning column */ (short) 2,
+                3, 4, 5.5, 6, "xx", new BigDecimal(88),
+                GEOG_POINT, GEOG);
+        vtable.advanceRow();
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
+        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        decoder.onBlockStart(row);
+        decoder.processRow(row);
+        decoder.onBlockCompletion(row);
+
+
+        boolean validName = true;
+        final File dir = new File(m_dir);
+        final File[] subdirs = dir.listFiles();
+
+        List<File> allFiles = new ArrayList<>();
+        if (subdirs != null) {
+            for (File file : subdirs) {
+                if (file.isDirectory()) {
+                    allFiles.addAll(Arrays.asList(file.listFiles()));
+                }
+                else {
+                    allFiles.add(file);
+                }
+            }
+            for (File file : allFiles) {
+                if (!(file.getName().matches("\\d\\-mytable\\-\\(\\d\\)\\.[a-z]{3}")||file.getName().matches("\\d\\-mytable\\-\\(\\d\\)-schema\\.json"))) {
+                    validName = false;
+                    break;
+                }
+            }
+        }
+        assertTrue(validName);
+    }
+
+    @Test
+    public void testFilenameBatchedNotUnique() throws Exception
+    {
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", Long.toString(System.currentTimeMillis()));
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("period", "1"); // 1 second rolling period
+        props.put("with-schema", "true");
+        props.put("batched", "true");
+        props.put("uniquenames", "false");
+        client.configure(props);
+        final AdvertisedDataSource source = constructTestSource(false, 0);
+        final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
+
+        long l = System.currentTimeMillis();
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1,
+                /* partitioning column */ (short) 2,
+                3, 4, 5.5, 6, "xx", new BigDecimal(88),
+                GEOG_POINT, GEOG);
+        vtable.advanceRow();
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
+        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        decoder.onBlockStart(row);
+        decoder.processRow(row);
+        decoder.onBlockCompletion(row);
+
+        boolean validName = true;
+        final File dir = new File(m_dir);
+        final File[] subdirs = dir.listFiles();
+
+        List<File> allFiles = new ArrayList<>();
+        if (subdirs != null) {
+            for (File file : subdirs) {
+                if (file.isDirectory()) {
+                    allFiles.addAll(Arrays.asList(file.listFiles()));
+                }
+                else {
+                    allFiles.add(file);
+                }
+            }
+            for (File file : allFiles) {
+                if (!(file.getName().matches("\\d\\-mytable\\.[a-z]{3}") || file.getName().matches("\\d\\-mytable-schema\\.json"))) {
+                    validName = false;
+                    break;
+                }
+            }
+        }
+        assertTrue(validName);
+    }
+
+    @Test
+    public void testFilenameUnbatchedUnique() throws Exception
+    {
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", Long.toString(System.currentTimeMillis()));
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("period", "1"); // 1 second rolling period
+        props.put("with-schema", "true");
+        props.put("batched", "false");
+        props.put("uniquenames", "true");
+        client.configure(props);
+        final AdvertisedDataSource source = constructTestSource(false, 0);
+        final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
+
+        long l = System.currentTimeMillis();
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1,
+                /* partitioning column */ (short) 2,
+                3, 4, 5.5, 6, "xx", new BigDecimal(88),
+                GEOG_POINT, GEOG);
+        vtable.advanceRow();
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
+        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        decoder.onBlockStart(row);
+        decoder.processRow(row);
+        decoder.onBlockCompletion(row);
+
+
+        boolean validName = true;
+        final File dir = new File(m_dir);
+        final File[] subdirs = dir.listFiles();
+
+        if (subdirs != null) {
+            for (File file : subdirs) {
+                if (!(file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+\\-\\(\\d\\)\\.[a-z]{3}") || file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+\\-\\(\\d\\)-schema\\.json"))) {
+                    validName = false;
+                    break;
+                }
+            }
+        }
+        assertTrue(validName);
+    }
+
+    @Test
+    public void testFilenameUnBatchedNotUnique() throws Exception
+    {
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", Long.toString(System.currentTimeMillis()));
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("period", "1"); // 1 second rolling period
+        props.put("with-schema", "true");
+        props.put("batched", "false");
+        props.put("uniquenames", "false");
+        client.configure(props);
+        final AdvertisedDataSource source = constructTestSource(false, 0);
+        final ExportToFileClient.ExportToFileDecoder decoder = client.constructExportDecoder(source);
+
+        long l = System.currentTimeMillis();
+        vtable.addRow(l, l, l, 0, l, l, (byte) 1,
+                /* partitioning column */ (short) 2,
+                3, 4, 5.5, 6, "xx", new BigDecimal(88),
+                GEOG_POINT, GEOG);
+        vtable.advanceRow();
+        byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 0, 1L);
+        ExportRow row = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        decoder.onBlockStart(row);
+        decoder.processRow(row);
+        decoder.onBlockCompletion(row);
+
+        boolean validName = true;
+        final File dir = new File(m_dir);
+        final File[] subdirs = dir.listFiles();
+
+        if (subdirs != null) {
+            for (File file : subdirs) {
+                if (!(file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+\\.[a-z]{3}") || file.getName().matches(".*\\d+\\-\\d\\-mytable\\-\\d+-schema\\.json"))) {
+                    validName = false;
+                    break;
+                }
+            }
+        }
+        assertTrue(validName);
     }
 
     void verifyContent(File f, long ts) throws IOException

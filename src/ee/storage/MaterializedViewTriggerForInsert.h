@@ -178,7 +178,7 @@ protected:
     // This MUST be declared/initialized AFTER m_aggExprs/m_aggColIndexes/m_aggTypes.
     std::size_t m_aggColumnCount;
     // Store the index of last COUNT(*) for optimization
-    std::size_t m_countStarColumnIndex;
+    int m_countStarColumnIndex;
 
     // vector of target table indexes to update.
     // Ideally, these should be a subset of the target table indexes that

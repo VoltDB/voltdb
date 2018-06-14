@@ -203,13 +203,16 @@ class VoltDBManagementCenterPage extends Page {
         }
         if (columnWise) {
             result = [:]
-            def makeColumn = { index,rowset -> rowset.collect { row -> row.find('td',index).text() } }
+            // Note: need to use '@innerHTML' rather than 'text()' here,
+            // because the latter removes leading and trailing whitespace
+            def makeColumn = { index,rowset -> rowset.collect { row -> row.find('td',index).@innerHTML } }
             def colNum = 0
             columnHeaders.each { result.put(it, makeColumn(colNum++, rows)) }
             return result
         } else {
             result.add(columnHeaders)
-            rows.each { result.add(it.find('td')*.text()) }
+            // Same comment as above (use '@innerHTML', not 'text()')
+            rows.each { result.add(it.find('td')*.@innerHTML) }
         }
         return result
     }

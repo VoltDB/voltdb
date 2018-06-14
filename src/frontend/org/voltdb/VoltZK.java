@@ -489,6 +489,8 @@ public class VoltZK {
             VoltZK.removeActionBlocker(zk, node, hostLog);
             return "Can't do " + request + " " + errorMsg;
         }
+
+        hostLog.info("Create action blocker " + node + " successfully.");
         // successfully create a ZK node
         return null;
     }
@@ -507,6 +509,7 @@ public class VoltZK {
         } catch (InterruptedException e) {
             return false;
         }
+        log.info("Remove action blocker " + node + " successfully.");
         return true;
     }
 

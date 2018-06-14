@@ -192,7 +192,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                                         m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
                     } catch (SQLException& ex) {
                         std::string errorMsg = ex.message()
-                                            + " '" + (targetTable->getColumnNames()).at(m_inputTargetMap[map_ctr].first) + "'";
+                                + " '" + (targetTable->getColumnNames()).at(m_inputTargetMap[map_ctr].second) + "'";
                         throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
                     }
                 }
