@@ -109,7 +109,7 @@ public class TestMVOptimization extends PlannerTestCase {
         assertMatch("SELECT a1, SUM(a), COUNT(b1), COUNT(*) FROM t1 WHERE b1 IN (3, 300, 30) OR 2 <= b GROUP BY a1", expected);
         // functions in filter
         checkQueriesPlansAreTheSame("SELECT COUNT(a1), SUM(a) FROM t1 WHERE a + b1 > a1 OR power(a, a1) + b1 <= mod(a1, b) + abs(b) GROUP BY a1",
-                "SELECT count_a1, sum_a FROM v5_4");
+                "SELECT count_a1, sum_a FROM v5_3");
         // function order for power() changed
         assertMatch("SELECT COUNT(a1), SUM(a) FROM t1 WHERE a + b1 > a1 OR power(a1, a) + b1 <= mod(a1, b) + abs(b) GROUP BY a1",
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" " +

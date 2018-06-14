@@ -20,6 +20,7 @@ package org.voltdb.planner;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -269,13 +270,15 @@ final class MVQueryRewriter {
 
     // returns all materialized view info => view table from table list
     private static Map<MaterializedViewInfo, Table> getMviAndViews(List<Table> tbls) {
-        Map<MaterializedViewInfo, Table> map = new HashMap<>();
-        tbls.forEach(tbl -> StreamSupport.stream(((Iterable<MaterializedViewInfo>) () -> tbl.getViews().iterator()).spliterator(), false)
-                .forEach(mv -> map.put(mv, mv.getDest())));
-        return map;
+        return tbls.stream().flatMap(tbl ->
+                StreamSupport.stream(((Iterable<MaterializedViewInfo>) () -> tbl.getViews().iterator()).spliterator(), false)
+                        .map(mv -> new Pair<>(mv, mv.getDest())))
+                .collect(Collectors.toMap(Pair::getFirst, Pair::getSecond));
     }
 
-    // Get a copy with all subexpressions that are PVE converted to CVE
+    // Get a copy of *any* AbstractExpression, with itself and all subexpressions that are PVE converted to CVE
+    // TODO: this might cause trouble with caching stored procedure with values and reusing it wrongly.
+    // For scope of ENG-2878, caching would not cause this trouble because parameter
     private static AbstractExpression copyAsCVE(AbstractExpression src) {
         AbstractExpression left = src.getLeft(), right = src.getRight();
         if (left != null) {

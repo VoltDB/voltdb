@@ -3263,9 +3263,7 @@ public class PlanAssembler {
             return root;
         }
 
-        // When SELECT has been rewritten, the GBY gets cleared. Bypass this check since
-        // there is no longer GBY.
-        assert(m_parsedSelect.hasBeenRewritten() || m_parsedSelect.isGrouped());
+        assert(m_parsedSelect.isGrouped());
 
         // DISTINCT is redundant with GROUP BY IFF
         // all of the grouping columns are present in the display columns.
