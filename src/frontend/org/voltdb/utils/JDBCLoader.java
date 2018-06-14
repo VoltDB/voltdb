@@ -66,7 +66,6 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
      * log file name
      */
     static String pathLogfile = "jdbcloaderLog.log";
-    private static final VoltLogger m_log = new VoltLogger("JDBCLOADER");
     private static JDBCLoaderConfig m_config = null;
     private static long start = 0;
     private static BufferedWriter out_invaliderowfile;
@@ -109,16 +108,16 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                     }
                     out_invaliderowfile.write(currItem.errorInfo[0]);
                     String message = "Invalid input on line " + currItem.lineNumber + ". " + currItem.errorInfo[1];
-                    m_log.error(message);
                     out_logfile.write(message + "\n  Content: " + currItem.errorInfo[0]);
 
                     m_errorCount.incrementAndGet();
 
-                } catch (FileNotFoundException e) {
-                    m_log.error("JDBC Loader report directory '" + m_config.reportdir
-                            + "' does not exist.",e);
                 } catch (Exception x) {
-                    m_log.error(x);
+                    try {
+                        out_logfile.write(x.getMessage());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
 
             }
@@ -365,8 +364,10 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         try {
             csvClient = JDBCLoader.getClient(c_config, serverlist, m_config.port);
         } catch (Exception e) {
-            m_log.error("Error connecting to the servers: "
-                    + m_config.servers, e);
+//            m_log.error("Error connecting to the servers: "
+//                    + m_config.servers, e);
+            System.err.println("Error connecting to the servers: "
+                               + m_config.servers + ": " + e.getMessage());
             System.exit(-1);
         }
         assert (csvClient != null);
@@ -417,15 +418,13 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             ackCount = insertCount - dataLoader.getFailedRows();
 
             if (errHandler.hasReachedErrorLimit()) {
-                m_log.warn("The number of failed rows exceeds the configured maximum failed rows: "
-                           + m_config.maxerrors);
+                System.out.println("The number of failed rows exceeds the configured maximum failed rows: "
+                        + m_config.maxerrors);
             }
-
-            if (m_log.isDebugEnabled()) {
-                m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
-                m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
-            }
-            m_log.info("Read " + insertCount + " rows from file and successfully inserted "
+            
+            System.out.println("Parsing CSV file took " + readerTime + " milliseconds.");
+            System.out.println("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
+            System.out.println("Read " + insertCount + " rows from file and successfully inserted "
                        + ackCount + " rows (final)");
             errHandler.produceFiles(ackCount, insertCount);
             close_cleanup();
@@ -435,7 +434,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                 System.exit(errHandler.m_errorInfo.isEmpty() ? 0 : -1);
             }
         } catch (Exception ex) {
-            m_log.error("Exception Happened while loading CSV data", ex);
+            System.err.println("Exception Happened while loading CSV data : " + ex.getMessage());
             System.exit(1);
         }
     }
@@ -456,7 +455,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                 dir.mkdirs();
             }
         } catch (Exception x) {
-            m_log.error(x);
+            System.err.println(x.getMessage());
             System.exit(-1);
         }
 
@@ -474,7 +473,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             out_logfile = new BufferedWriter(new FileWriter(pathLogfile));
             out_reportfile = new BufferedWriter(new FileWriter(pathReportfile));
         } catch (IOException e) {
-            m_log.error(e);
+            System.err.println(e.getMessage());
             System.exit(-1);
         }
     }
@@ -513,9 +512,10 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
     private void produceFiles(long ackCount, long insertCount) {
         long latency = System.currentTimeMillis() - start;
-        m_log.info("Elapsed time: " + latency / 1000F
+//        m_log.info("Elapsed time: " + latency / 1000F
+//                + " seconds");
+        System.out.println("Elapsed time: " + latency / 1000F
                 + " seconds");
-
         try {
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
@@ -536,18 +536,15 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             out_reportfile.write("JDBCLoader rate: " + insertCount
                     / elapsedTimeSec + " row/s\n");
 
-            m_log.info("Invalid row file: " + pathInvalidrowfile);
-            m_log.info("Log file: " + pathLogfile);
-            m_log.info("Report file: " + pathReportfile);
+            System.out.println("Invalid row file: " + pathInvalidrowfile);
+            System.out.println("Log file: " + pathLogfile);
+            System.out.println("Report file: " + pathReportfile);
 
             out_invaliderowfile.flush();
             out_logfile.flush();
             out_reportfile.flush();
-        } catch (FileNotFoundException e) {
-            m_log.error("JDBC Loader report directory '" + m_config.reportdir
-                    + "' does not exist.",e);
         } catch (Exception x) {
-            m_log.error(x);
+            System.err.println(x.getMessage());
         }
 
     }
