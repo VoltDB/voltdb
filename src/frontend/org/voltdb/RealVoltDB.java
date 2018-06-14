@@ -4900,5 +4900,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return (m_catalogContext == null) ? 0 :
                    getCatalogContext().getDeployment().getCluster().getKfactor();
     }
+
+    @Override
+    public boolean isJoining() {
+        return m_joining;
+    }
 }
 
