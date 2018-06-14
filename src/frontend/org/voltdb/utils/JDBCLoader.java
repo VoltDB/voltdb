@@ -509,8 +509,6 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
     private void produceFiles(long ackCount, long insertCount) {
         long latency = System.currentTimeMillis() - start;
-//        m_log.info("Elapsed time: " + latency / 1000F
-//                + " seconds");
         System.out.println("Elapsed time: " + latency / 1000F
                 + " seconds");
         try {
