@@ -364,10 +364,8 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         try {
             csvClient = JDBCLoader.getClient(c_config, serverlist, m_config.port);
         } catch (Exception e) {
-//            m_log.error("Error connecting to the servers: "
-//                    + m_config.servers, e);
             System.err.println("Error connecting to the servers: "
-                               + m_config.servers + ": " + e.getMessage());
+                               + m_config.servers + ": " + e);
             System.exit(-1);
         }
         assert (csvClient != null);
@@ -433,7 +431,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                 System.exit(errHandler.m_errorInfo.isEmpty() ? 0 : -1);
             }
         } catch (Exception ex) {
-            System.err.println("Exception Happened while loading CSV data : " + ex.getMessage());
+            System.err.println("Exception Happened while loading CSV data : " + ex);
             System.exit(1);
         }
     }
