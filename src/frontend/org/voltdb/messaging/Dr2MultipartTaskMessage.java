@@ -27,6 +27,7 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
 
     private int m_producerPID;
     private boolean m_drain;
+    private boolean m_reneg;
     private byte m_producerClusterId;
     private short m_producerPartitionCnt;
 
@@ -46,6 +47,7 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
         m_lastExecutedMPUniqueID = lastExecutedMPUniqueID;
         m_producerPID = producerPID;
         m_drain = false;
+        m_reneg = false;
     }
 
     public static Dr2MultipartTaskMessage createDrainMessage(byte producerClusterId, int producerPID) {
@@ -54,6 +56,19 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
         msg.m_producerClusterId = producerClusterId;
         msg.m_producerPartitionCnt = -1;
         msg.m_drain = true;
+        msg.m_reneg = false;
+        msg.m_invocation = null;
+        msg.m_lastExecutedMPUniqueID = Long.MIN_VALUE;
+        return msg;
+    }
+
+    public static Dr2MultipartTaskMessage createRenegMessage(byte producerClusterId, int producerPID) {
+        final Dr2MultipartTaskMessage msg = new Dr2MultipartTaskMessage();
+        msg.m_producerPID = producerPID;
+        msg.m_producerClusterId = producerClusterId;
+        msg.m_producerPartitionCnt = -1;
+        msg.m_drain = false;
+        msg.m_reneg = true;
         msg.m_invocation = null;
         msg.m_lastExecutedMPUniqueID = Long.MIN_VALUE;
         return msg;
@@ -69,6 +84,10 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
 
     public boolean isDrain() {
         return m_drain;
+    }
+
+    public boolean isReneg() {
+        return m_reneg;
     }
 
     public byte getProducerClusterId() {
@@ -87,6 +106,7 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
         m_producerPID = buf.getInt();
         m_drain = buf.get() == 1;
+        m_reneg = buf.get() == 1;
         m_producerClusterId = buf.get();
         m_producerPartitionCnt = buf.getShort();
         m_lastExecutedMPUniqueID = buf.getLong();
@@ -103,6 +123,7 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
         buf.put(VoltDbMessageFactory.DR2_MULTIPART_TASK_ID);
         buf.putInt(m_producerPID);
         buf.put((byte) (m_drain ? 1 : 0));
+        buf.put((byte) (m_reneg ? 1 : 0));
         buf.put(m_producerClusterId);
         buf.putShort(m_producerPartitionCnt);
         buf.putLong(m_lastExecutedMPUniqueID);
@@ -120,6 +141,7 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
         int size = super.getSerializedSize()
                    + 4  // producer partition ID
                    + 1  // is drain or not
+                   + 1  // is reneg or not
                    + 1  // producer clusterId
                    + 2  // producer partition count
                    + 8; // last executed MP unique ID
