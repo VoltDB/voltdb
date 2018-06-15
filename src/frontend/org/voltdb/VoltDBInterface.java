@@ -337,4 +337,9 @@ public interface VoltDBInterface
     int getLowestPartitionId();
 
     public int getKFactor();
+
+    /**
+     * @return true if current node is joining and haven't finished the snapshot
+     */
+    public boolean isJoining();
 }
