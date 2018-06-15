@@ -12,6 +12,9 @@ Several SQL features in VoltDB are demonstrated in this application, including:
   - VIEW group by expressions
   - [TRUNCATE](http://voltdb.com/docs/UsingVoltDB/sqlfunctruncate.php) Timestamp function
   - [DECODE](http://voltdb.com/docs/UsingVoltDB/sqlfuncdecode.php) function
+  - TTL indexing for data expiration
+
+Time to Live (TTL), enables the user to operate on a constant stream of incoming events by setting an expiration index to automatically free up memory for user convenience. In this example, the user can follow the real-time aggregation statistics to see the deletion of data beginning after the default TTL = 1 minute.
 
 Quickstart
 ---------------------------
@@ -73,12 +76,12 @@ You can control various characteristics of the demo by modifying the parameters 
 
 **Parameters Affecting Simulation:**
 
-    --sites=100                   (number of web sites where ad events may occur)
-    --pagespersite=10             (number of pages per web site)
-    --advertisers=100             (number of advertisers)
+    --sites=200                   (number of web sites where ad events may occur)
+    --pagespersite=20             (number of pages per web site)
+    --advertisers=40              (number of advertisers)
     --campaignsperadvertiser=10   (number of campaigns per advertiser)
-    --creativespercampaign=5      (number of creatives or banners per campaign)
+    --creativespercampaign=10     (number of creatives or banners per campaign)
 
 Customizing this Example
 ---------------------------
-See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
+See the "HOWTOs" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
