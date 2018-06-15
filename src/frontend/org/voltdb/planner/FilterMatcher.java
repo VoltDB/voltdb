@@ -57,6 +57,8 @@ final class FilterMatcher {
             // 1. CVE and PVE need to be translated before compared.
             // 2. Comparisons could be reversed, e.g. "a >= b" and "b <= a" are the same relation
             return valueConstantsMatch(m_expr1, m_expr2) || comparisonsMatch(m_expr1, m_expr2);
+        } else if (m_expr1 instanceof ConstantValueExpression) {
+            return m_expr1.equals(m_expr2);
         } else if (m_expr1 instanceof TupleValueExpression) {
             return tvesMatch((TupleValueExpression) m_expr1, (TupleValueExpression) m_expr2);
         } else if (m_expr1 instanceof VectorValueExpression) {

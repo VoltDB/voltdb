@@ -373,6 +373,8 @@ public class QueryPlanner implements AutoCloseable {
     private CompiledPlan compileFromXML(VoltXMLElement xmlSQL, String[] paramValues) {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
+        // Simple constant expressions (i.e. "1 + 1" or "(2 * 4 + 2)/3") are evaluated and substituted by HSQL;
+        // but expressions with functions (i.e. "cast(power(2, 3) to int)" are not.
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null, m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
         if (parsedStmt == null) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();

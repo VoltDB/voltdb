@@ -366,15 +366,19 @@ public class PlannerTestCase extends TestCase {
         return explain;
     }
 
-    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
-        String explainStr1, explainStr2;
-        List<AbstractPlanNode> pns = compileToFragments(sql1);
-        explainStr1 = buildExplainPlan(pns);
-        pns = compileToFragments(sql2);
-        explainStr2 = buildExplainPlan(pns);
-
-        assertEquals(explainStr1, explainStr2);
+    protected void checkQueriesPlansAreDifferent(String sql1, String sql2, String msg) {
+        assertFalse(msg, areQueryPlansEqual(sql1, sql2));
     }
+
+    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
+        assertEquals(buildExplainPlan(compileToFragments(sql1)), buildExplainPlan(compileToFragments(sql2)));
+    }
+
+    private boolean areQueryPlansEqual(String sql1, String sql2) {
+        return buildExplainPlan(compileToFragments(sql1))
+                .equals(buildExplainPlan(compileToFragments(sql2)));
+    }
+
 
     /**
      * Call this function to verify that an order by plan node has the

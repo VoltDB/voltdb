@@ -38,7 +38,7 @@ public class TestMVOptimization extends PlannerTestCase {
                 "\" using its primary key index (for deterministic order only)";
     }
 
-    private String explain(final String query) {        // normalize ws
+    private String explain(final String query) {        // normalize white spaces into single white space, and delete new lines
         List<AbstractPlanNode> pns = compileToFragments(query);
         assertFalse(pns.isEmpty());
         return pns.get(pns.size() - 1).toExplainPlanString()
@@ -89,8 +89,7 @@ public class TestMVOptimization extends PlannerTestCase {
         checkQueriesPlansAreTheSame("SELECT COUNT(b) count_b, a1 a1, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1",
                 "SELECT count_b00, distinct_a, sum_a00, counts from v5_2");
         // GBY multiple columns
-        checkQueriesPlansAreTheSame("SELECT MIN(B1) FROM T1 GROUP BY A, B",
-                "SELECT min_b1 from v3");
+        checkQueriesPlansAreTheSame("SELECT MIN(B1) FROM T1 GROUP BY A, B", "SELECT min_b1 from v3");
         // GBY complex expressions
         checkQueriesPlansAreTheSame("SELECT b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a * 2 + a1, b - a;",
                 "SELECT b_minus_a, sum_a1, min_b1, counts from v4");
@@ -111,10 +110,30 @@ public class TestMVOptimization extends PlannerTestCase {
         checkQueriesPlansAreTheSame("SELECT COUNT(a1), SUM(a) FROM t1 WHERE a + b1 > a1 OR power(a, a1) + b1 <= mod(a1, b) + abs(b) GROUP BY a1",
                 "SELECT count_a1, sum_a FROM v5_3");
         // function order for power() changed
-        assertMatch("SELECT COUNT(a1), SUM(a) FROM t1 WHERE a + b1 > a1 OR power(a1, a) + b1 <= mod(a1, b) + abs(b) GROUP BY a1",
-                "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" " +
-                        "(for deterministic order only) filter by (((A + B1) > A1) OR ((power(A1, A) + B1) <= (mod(A1, B) + abs(B)))) " +
-                        "inline Hash AGGREGATION ops: COUNT(T1.A1), SUM(T1.A)");
+        checkQueriesPlansAreDifferent("SELECT COUNT(a1), SUM(a) FROM t1 WHERE a + b1 > a1 OR power(a1, a) + b1 <= mod(a1, b) + abs(b) GROUP BY a1",
+                "SELECT count_a1, sum_a FROM v5_3", "Function POWER's args changed");
+    }
+
+    public void testPlanCaching() { // Test that constants in filters of ad hoc queries don't get cached incorrectly
+        explain("SELECT SUM(a), COUNT(b1) FROM t1 WHERE b >= 4 / 2 OR b1 in (300, 30, 300, 3) GROUP BY a1");
+        explain("SELECT SUM(a), COUNT(b1) FROM t1 WHERE b >= cast(power(2, 1) as int) OR b1 in (300, 30, 300, 3) GROUP BY a1");
+        checkQueriesPlansAreTheSame("SELECT SUM(a), COUNT(b1) FROM t1 WHERE 200 / 100 <= b OR b1 in (3, 30, 300, 300) GROUP BY a1",
+                "SELECT sum_a, count_b1 FROM v5_1");
+        checkQueriesPlansAreTheSame("SELECT SUM(a), COUNT(b1) FROM t1 WHERE b >= 2 OR b1 in (300, 30, 300, 3) GROUP BY a1",
+                "SELECT sum_a, count_b1 FROM v5_1");
+        // const expressions are evaluated when no function
+        checkQueriesPlansAreTheSame("SELECT SUM(a), COUNT(b1) FROM t1 WHERE b >= 4 / 2 OR b1 in (300, 30, 300, 3) GROUP BY a1",
+                "SELECT sum_a, count_b1 FROM v5_1");
+        // and expressions with functions are not evaluated
+        checkQueriesPlansAreDifferent("SELECT SUM(a), COUNT(b1) FROM t1 WHERE b >= cast(power(2, 1) as int) OR b1 in (300, 30, 300, 3) GROUP BY a1",
+                "SELECT sum_a, count_b1 FROM v5_1",
+                "Constant expression with functions are not evaluated: should not match view");
+        // Change in PVE value -- shouldn't match
+        checkQueriesPlansAreDifferent("SELECT SUM(a), COUNT(b1) FROM t1 WHERE b >= 4 OR b1 in (3, 30, 303) GROUP BY a1",
+                "SELECT sum_a, count_b1 FROM v5_1", "filter PVE value different");
+        // Change in vector value expression  -- shouldn't match
+        checkQueriesPlansAreDifferent("SELECT SUM(a), COUNT(b1) FROM t1 WHERE b >= 2 OR b1 in (3, 30, 303) GROUP BY a1",
+                "SELECT sum_a, count_b1 FROM v5_1", "filter vector value expression different");
     }
 
     public void testGroupByMultipleColumns() {
@@ -129,11 +148,9 @@ public class TestMVOptimization extends PlannerTestCase {
         checkQueriesPlansAreTheSame("SELECT a * 2 + a1, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a * 2 + a1, b - a;",
                 "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4");
         // negative test: equivalent but different expression
-        assertMatch(
-                "SELECT a1 + a * 2, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a1 + a * 2, b - a;",
-                "RETURN RESULTS TO STORED PROCEDURE" +
-                        " INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" (for deterministic order only)" +
-                        " inline Hash AGGREGATION ops: SUM(T1.A1), MIN(T1.B1), COUNT(*)");
+        checkQueriesPlansAreDifferent("SELECT a1 + a * 2, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a1 + a * 2, b - a;",
+                "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4",
+                "GBY expression equivalent but different: should not match view");
     }
 
     public void testNestedSelQuery() {  // test SELECT stmt matching & rewriting inside sub-query
