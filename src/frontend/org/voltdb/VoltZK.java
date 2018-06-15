@@ -61,7 +61,6 @@ public class VoltZK {
     public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
-    public static final String importerBase = "/db/import";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
@@ -99,6 +98,7 @@ public class VoltZK {
 
     // root for MigratePartitionLeader information nodes
     public static final String migrate_partition_leader_info = "/core/migrate_partition_leader_info";
+    public static final String drConsumerPartitionMigration = "/db/dr_consumer_partition_migration";
 
     public static final String iv2masters = "/db/iv2masters";
     public static final String iv2appointees = "/db/iv2appointees";
@@ -210,6 +210,7 @@ public class VoltZK {
             root,
             mailboxes,
             cluster_metadata,
+            drConsumerPartitionMigration,
             operationMode,
             iv2masters,
             iv2appointees,

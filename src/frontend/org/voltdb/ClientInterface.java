@@ -2263,7 +2263,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     partitionId);
             VoltZK.createMigratePartitionLeaderInfo(m_zk, spiInfo);
 
-            notifyPartitionMigrationStatus(partitionId, targetHSId);
+            notifyPartitionMigrationStatus(partitionId, targetHSId, false);
             
             synchronized (m_executeTaskAdpater) {
                 createTransaction(m_executeTaskAdpater.connectionId(),
@@ -2285,11 +2285,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 //not necessary a failure.
                 tmLog.warn(String.format("Fail to move the leader of partition %d to host %d. %s",
                         partitionId, targetHostId, resp.getStatusString()));
-                //TODO: Notify repaircallbacks that partition migration failed
+                notifyPartitionMigrationStatus(partitionId, targetHSId, true);
             }
         } catch (IOException | InterruptedException e) {
             tmLog.warn(String.format("errors in leader change for partition %d: %s", partitionId, e.getMessage()));
-            //TODO: Notify repaircallbacks that partition migration failed
+            notifyPartitionMigrationStatus(partitionId,
+                    m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
+                    true);
         } finally {
             //wait for the Cartographer to see the new partition leader. The leader promotion process should happen instantly.
             //If the new leader does not show up in 5 min, the cluster may have experienced host-down events.
@@ -2324,26 +2326,36 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             
             if (!migrationComplete) {
-                //TODO: Notify repaircallbacks that partition migration failed
+                notifyPartitionMigrationStatus(partitionId,
+                        m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
+                        true);
             }
         }
     }
     
-    private void notifyPartitionMigrationStatus(int partitionId, long targetHSId) {
+    private void notifyPartitionMigrationStatus(int partitionId, long targetHSId, boolean failed) {
         for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
             try {
                 cihm.connection.queueTask(new Runnable() {
                     @Override
                     public void run() {
                         if (cihm.repairCallback != null) {
-                            cihm.repairCallback.leaderMigrationStarted(partitionId, targetHSId);
+                            if (failed) {
+                                cihm.repairCallback.leaderMigrationFailed(partitionId, targetHSId);
+                            } else {
+                                cihm.repairCallback.leaderMigrationStarted(partitionId, targetHSId);
+                            }
                         }
                     }
                 });
             } catch (UnsupportedOperationException ignore) {
                 // In case some internal connections don't implement queueTask()
                 if (cihm.repairCallback != null) {
-                    cihm.repairCallback.leaderMigrationStarted(partitionId, targetHSId);
+                    if (failed) {
+                        cihm.repairCallback.leaderMigrationFailed(partitionId, targetHSId);
+                    } else {
+                        cihm.repairCallback.leaderMigrationStarted(partitionId, targetHSId);
+                    }
                 }
             }
         }
