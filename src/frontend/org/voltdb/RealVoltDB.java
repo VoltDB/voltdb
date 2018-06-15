@@ -829,7 +829,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (m_licenseApi.isPro()) edition = "Pro Edition";
                     if (m_licenseApi.isEnterpriseTrial()) edition = "Enterprise Edition";
                     if (m_licenseApi.isProTrial()) edition = "Pro Edition";
-                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
+                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Edition";
                 }
 
                 // this also prints out the license type on the console
@@ -1563,7 +1563,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             assert (m_clientInterface != null);
             m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
-
+            TTLManager.initialze();
+            getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, TTLManager.instance());
             // Start elastic join service
             try {
                 if (m_config.m_isEnterprise) {
@@ -3348,7 +3349,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();
-
+                TTLManager.instance().shutDown();
                 // clear resMonitorWork
                 resMonitorWork = null;
 
@@ -3462,7 +3463,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 PartitionDRGateway.m_partitionDRGateways = ImmutableMap.of();
-
                 // probably unnecessary, but for tests it's nice because it
                 // will do the memory checking and run finalizers
                 System.gc();
@@ -3772,6 +3772,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 //Before starting resource monitor update any Snmp configuration changes.
                 if (m_snmp != null) {
                     m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
+                }
+
+                //TTL control works on the host with MPI
+                if (m_myHostId == CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMultiPartitionInitiator())) {
+                    TTLManager.instance().scheduleTTLTasks();
                 }
                 // restart resource usage monitoring task
                 startHealthMonitor();
