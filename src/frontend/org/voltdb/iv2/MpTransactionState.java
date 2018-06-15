@@ -200,7 +200,7 @@ public class MpTransactionState extends TransactionState
 
     // Overrides needed by MpProcedureRunner
     @Override
-    public void setupProcedureResume(boolean isFinal, int[] dependencies)
+    public void setupProcedureResume(int[] dependencies)
     {
         // Reset state so we can run this batch cleanly
         m_localWork = null;
@@ -211,10 +211,9 @@ public class MpTransactionState extends TransactionState
     }
 
     // I met this List at bandcamp...
-    public void setupProcedureResume(boolean isFinal, List<Integer> deps)
+    public void setupProcedureResume(List<Integer> deps)
     {
-        setupProcedureResume(isFinal,
-                com.google_voltpatches.common.primitives.Ints.toArray(deps));
+        setupProcedureResume(com.google_voltpatches.common.primitives.Ints.toArray(deps));
     }
 
     @Override

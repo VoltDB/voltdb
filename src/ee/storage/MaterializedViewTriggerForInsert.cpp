@@ -39,14 +39,23 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
+    , m_supportSnapshot(true)
+    , m_enabled(true)
 {
     VOLT_TRACE("Construct MaterializedViewTriggerForInsert...");
 
     m_mvInfo = mvInfo;
+    const catalog::Table* catalogDestTable = mvInfo->dest();
+    if (! catalogDestTable->isreplicated() && catalogDestTable->partitioncolumn() == NULL) {
+        // If the destination table is partitioned but there is no partition column,
+        // we cannot snapshot this view.
+        m_supportSnapshot = false;
+    }
 
     // best not to have to worry about the destination table disappearing
     // out from under the source table that feeds it.
     m_dest->incrementRefcount();
+    m_dest->setMaterializedViewTrigger(this);
 
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
@@ -67,7 +76,110 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
     BOOST_FOREACH (auto aggExpr, m_aggExprs) {
         delete aggExpr;
     }
+    m_dest->setMaterializedViewTrigger(NULL);
     m_dest->decrementRefcount();
+}
+
+void MaterializedViewTriggerForInsert::setEnabled(bool enabled) {
+    if (! m_supportSnapshot) {
+        // If this view should not respond to any view status toggle requests
+        // (because the view is implicitly partitioned), ignore them.
+        return;
+    }
+    // If the value is not changed, no action needs to be taken.
+    if (m_enabled == enabled) {
+        return;
+    }
+    // Only views that can be snapshotted are allowed to be disabled.
+    m_enabled = enabled;
+    // We already ensured this in its parent call.
+    const bool noNeedToCheckMemoryContext = false;
+    if (! m_enabled && ! m_dest->isPersistentTableEmpty()) {
+        // If the view maintenance is disabled, and the view is not empty,
+        // we need to use a delta table to hold the view content restored from
+        // the snapshot and do a manual merge afterwards.
+        m_dest->instantiateDeltaTable(noNeedToCheckMemoryContext);
+    }
+    else if (m_enabled && m_dest->deltaTable()) {
+        // When we turn on the maintenance, if a delta table exists, it means that the view table was
+        // not empty at the time when we paused it.
+        // In this case, we need to do a merge. Log a message for it.
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Merging the pre-existing content in view %s with the snapshot data.",
+                 m_dest->name().c_str());
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+
+        PersistentTable* delta = m_dest->deltaTable();
+        TableIterator ti = delta->iterator();
+        TableTuple deltaTuple(delta->schema());
+        while (ti.next(deltaTuple)) {
+            // Notice that here we are passing view table tuples, not source table tuples like we do
+            // in processTupleInsert() and processTupleDelete().
+            // To differentiate that, we use findExistingTupleUsingDelta() instead of findExistingTuple().
+            bool found = findExistingTupleUsingDelta(deltaTuple);
+            if (found) {
+                mergeTupleForInsert(deltaTuple);
+                // Shouldn't need to update group-key-only indexes such as the primary key
+                // since their keys shouldn't ever change, but do update other indexes.
+                m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                                       m_updatableIndexList, false);
+            }
+            else {
+                m_dest->insertPersistentTuple(deltaTuple, false);
+            }
+        }
+        // The way we are currently using to call this function for replicated tables is already synchronized.
+        // Only the lowest site should be instantiating and releasing the delta table.
+        m_dest->releaseDeltaTable(noNeedToCheckMemoryContext);
+    }
+}
+
+void MaterializedViewTriggerForInsert::mergeTupleForInsert(const TableTuple &deltaTuple) {
+    // set up the group-by columns
+    for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+        // note that if the tuple is in the mv's target table,
+        // tuple values should be pulled from the existing tuple in
+        // that table. This works around a memory ownership issue
+        // related to out-of-line strings.
+        NValue value = m_existingTuple.getNValue(colindex);
+        m_updatedTuple.setNValue(colindex, value);
+    }
+    // Aggregations
+    int aggOffset = m_groupByColumnCount;
+    for (int aggIndex = 0, columnIndex = aggOffset; aggIndex < m_aggColumnCount; aggIndex++, columnIndex++) {
+        NValue existingValue = m_existingTuple.getNValue(columnIndex);
+        NValue newValue = deltaTuple.getNValue(columnIndex);
+        if (newValue.isNull()) {
+            newValue = existingValue;
+        }
+        else {
+            switch(m_aggTypes[aggIndex]) {
+                case EXPRESSION_TYPE_AGGREGATE_SUM:
+                case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                    if (!existingValue.isNull()) {
+                        newValue = existingValue.op_add(newValue);
+                    }
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_MIN:
+                    // ignore any new value that is not strictly an improvement
+                    if (!existingValue.isNull() && newValue.compare(existingValue) >= 0) {
+                        newValue = existingValue;
+                    }
+                    break;
+                case EXPRESSION_TYPE_AGGREGATE_MAX:
+                    // ignore any new value that is not strictly an improvement
+                    if (!existingValue.isNull() && newValue.compare(existingValue) <= 0) {
+                        newValue = existingValue;
+                    }
+                    break;
+                default:
+                    assert(false); // Should have been caught when the matview was loaded.
+                    // no break
+            }
+        }
+        m_updatedTuple.setNValue(columnIndex, newValue);
+    }
 }
 
 void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
@@ -103,6 +215,11 @@ NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
 
 void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newTuple,
                                                           bool fallible) {
+    // If the view is not enabled, ignore it.
+    // Snapshots will only do inserts, so this check is not added to handleTupleDelete.
+    if (! m_enabled) {
+        return;
+    }
     // don't change the view if this tuple doesn't match the predicate
     if (failsPredicate(newTuple)) {
         return;
@@ -224,9 +341,10 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
 }
 
 void MaterializedViewTriggerForInsert::setDestTable(PersistentTable * dest) {
-    PersistentTable * oldDest = m_dest;
+    PersistentTable* oldDest = m_dest;
     m_dest = dest;
     dest->incrementRefcount();
+    dest->setMaterializedViewTrigger(this);
 
     // Re-initialize dependencies on the dest table, allowing for widened columns
     m_index = m_dest->primaryKeyIndex();
@@ -400,6 +518,24 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
     m_dest->insertPersistentTuple(m_updatedTuple, fallible);
 }
 
+// Find the existing tuple using a tuple from the delta table.
+bool MaterializedViewTriggerForInsert::findExistingTupleUsingDelta(const TableTuple &tuple) {
+    // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
+    // We directly return the only row in the view. See ENG-7872.
+    if (m_groupByColumnCount == 0) {
+        TableIterator iterator = m_dest->iterator();
+        iterator.next(m_existingTuple);
+        assert( ! m_existingTuple.isNullTuple());
+        return true;
+    }
+
+    IndexCursor indexCursor(m_index->getTupleSchema());
+    m_index->moveToKeyByTuple(&tuple, indexCursor);
+
+    m_existingTuple = m_index->nextValueAtKey(indexCursor);
+    return ! m_existingTuple.isNullTuple();
+}
+
 bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple) {
     // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
     // We directly return the only row in the view. See ENG-7872.
@@ -410,7 +546,8 @@ bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple
         return true;
     }
 
-    // find the key for this tuple (which is the group by columns)
+    // Assemble a desired view table tuple (only includes the index key columns)
+    // based on the information we stored in this trigger.
     for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
         NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
         m_searchKeyValue[colindex] = value;

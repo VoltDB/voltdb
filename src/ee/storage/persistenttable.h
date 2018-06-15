@@ -81,6 +81,7 @@ class MaterializedViewInfo;
 
 namespace voltdb {
 class CoveringCellIndexTest_TableCompaction;
+class MaterializedViewTriggerForInsert;
 class MaterializedViewTriggerForWrite;
 class MaterializedViewHandler;
 class TableIndex;
@@ -544,6 +545,8 @@ public:
     std::pair<TableIndex const*, uint32_t> getUniqueIndexForDR();
 
     MaterializedViewHandler* materializedViewHandler() const { return m_mvHandler; }
+    MaterializedViewTriggerForInsert* materializedViewTrigger() const { return m_mvTrigger; }
+    void setMaterializedViewTrigger(MaterializedViewTriggerForInsert* trigger) { m_mvTrigger = trigger; }
 
     PersistentTable* deltaTable() const { return m_deltaTable; }
 
@@ -555,6 +558,10 @@ public:
     std::vector<uint64_t> getBlockAddresses() const;
 
     bool doDRActions(AbstractDRTupleStream* drStream);
+
+    // Create a delta table attached to this persistent table using exactly the same table schema.
+    void instantiateDeltaTable(bool needToCheckMemoryContext = true);
+    void releaseDeltaTable(bool needToCheckMemoryContext = true);
 
     /**
      * Loads tuple data from the serialized table.
@@ -818,6 +825,7 @@ private:
 
     // If this is a view table, maintain a handler to handle the view update work.
     MaterializedViewHandler* m_mvHandler;
+    MaterializedViewTriggerForInsert* m_mvTrigger;
 
     // If this is a source table of a view, notify all the relevant view handlers
     // when an update is needed.
