@@ -39,7 +39,6 @@ public class Constants
 
     public static final String KERBEROS = "kerberos";
 
-    public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
     public static final String DEFAULT_KEYSTORE_PASSWD = "password";
     public static final String DEFAULT_TRUSTSTORE_RESOURCE = System.getProperty("java.home") + File.separator + "lib" + File.separator + "security" + File.separator + "cacerts";
