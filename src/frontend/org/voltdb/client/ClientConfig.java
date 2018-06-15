@@ -34,6 +34,7 @@ import javax.security.auth.login.LoginException;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltcore.utils.ssl.SSLConfiguration.SslConfig;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.common.Constants;
 
 /**
  * Container for configuration settings for a Client
@@ -508,8 +509,8 @@ public class ClientConfig {
     }
 
     public void setTrustStoreConfigFromDefault() {
-        String trustStore = System.getProperty("java.home") + File.separator + "lib" + File.separator + "security" + File.separator + "cacerts";
-        String trustStorePassword = "changeit";
+        String trustStore = Constants.DEFAULT_TRUSTSTORE_RESOURCE;
+        String trustStorePassword = Constants.DEFAULT_TRUSTSTORE_PASSWD;
 
         m_sslConfig = new SSLConfiguration.SslConfig(null, null, trustStore, trustStorePassword);
     }
