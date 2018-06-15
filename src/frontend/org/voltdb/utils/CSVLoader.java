@@ -158,11 +158,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                     m_errorCount++;
 
                 } catch (Exception x) {
-                    try {
-                        out_logfile.write(x.getMessage());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    System.err.println(x.getMessage());
                 }
             }
         }
@@ -540,18 +536,13 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             try {
                listReader.close();
             } catch (Exception ex) {
-               System.err.println("Error closing reader: " + ex);
-            } finally {
-               System.out.println("Rows Queued by Reader: " + rowsQueued);
+                //Do nothing here.
             }
 
             if (errHandler.hasReachedErrorLimit()) {
                System.out.println("The number of failed rows exceeds the configured maximum failed rows: "
                                   + config.maxerrors);
             }
-
-            System.out.println("Parsing CSV file took " + readerTime + " milliseconds.");
-            System.out.println("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
             System.out.println("Read " + insertCount + " rows from file and successfully inserted "
                                + ackCount + " rows (final)");
             errHandler.produceFiles(ackCount, insertCount);

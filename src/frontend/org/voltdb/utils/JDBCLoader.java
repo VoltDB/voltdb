@@ -113,13 +113,8 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                     m_errorCount.incrementAndGet();
 
                 } catch (Exception x) {
-                    try {
-                        out_logfile.write(x.getMessage());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    System.err.println(x.getMessage());
                 }
-
             }
         }
     }
@@ -419,8 +414,6 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                 System.out.println("The number of failed rows exceeds the configured maximum failed rows: "
                         + m_config.maxerrors);
             }
-            System.out.println("Parsing CSV file took " + readerTime + " milliseconds.");
-            System.out.println("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
             System.out.println("Read " + insertCount + " rows from file and successfully inserted "
                        + ackCount + " rows (final)");
             errHandler.produceFiles(ackCount, insertCount);
