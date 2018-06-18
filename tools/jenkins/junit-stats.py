@@ -16,16 +16,17 @@ from jenkinsbot import JenkinsBot
 from mysql.connector.errors import Error as MySQLError
 from urllib2 import HTTPError, URLError, urlopen
 
-# Get job names from environment variables
-COMMUNITY = os.environ.get('community', None)
-PRO = os.environ.get('pro', None)
-
-# Number of failures in a row for a test needed to trigger a new Jira issue
+# Number of failures in a row for a test needed to trigger a new JIRA issue
 TOLERANCE = 3
 
 # Slack channel to notify if and when issue is reported
 JUNIT = os.environ.get('junit', None)
 
+# set to True if you need to suppress updating the database or JIRA
+DRY_RUN = True
+
+from string import maketrans
+TT = maketrans("[]-", "___")
 
 class Stats(object):
     def __init__(self):
@@ -39,9 +40,9 @@ class Stats(object):
         ex: junit-stats branch-2-community-junit-master 550-550
         You can also specify 'job' and 'build_range' environment variables
         """
-        logging.basicConfig(stream=sys.stdout)
+        logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
-    def read_url(self, url):
+    def read_url(self, url, ignore404=False):
         """
         :param url: url to download data from
         :return: Dictionary representation of json object
@@ -50,13 +51,44 @@ class Stats(object):
         data = None
         try:
             data = eval(urlopen(url).read())
-        except (HTTPError, URLError):
-            logging.exception('Could not open data from url: %s. The url may not be formed correctly.' % url)
+        except (HTTPError, URLError) as e:
+            if not (e.code == 404 and ignore404):
+                logging.exception('Could not open data from url: %s. The url may not be formed correctly.' % url)
         except IOError:
             logging.exception('Could not read data from url: %s. The data at the url may not be readable.' % url)
         except:
             logging.exception('Something unexpected went wrong.')
         return data
+
+    def file_jira_issue(self, issue):
+        jenkinsbot = JenkinsBot()
+        error_url = issue['url']
+        error_report = self.read_url(error_url + '/api/python')
+        if error_report is None:
+            return
+
+        failed_since = error_report['failedSince']
+        summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
+        description = error_url + '\n\n------------------stack trace----------------------------\n\n' \
+                      + str(error_report['errorStackTrace']) + '\n\n--------------------stdout----------------------------\n\n' \
+                      + str(error_report['stdout'] + '\n\n--------------------stderr-----------------------------\n\n' \
+                      + str(error_report['stderr']))
+        current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
+                                            'master/version.txt'))
+        try:
+            if not DRY_RUN:
+                new_issue = jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version,
+                                                        ['junit-consistent-failure', 'automatic'])
+            else:
+                return None
+
+            new_issue_url = "https://issues.voltdb.com/browse/" + new_issue.key
+
+        except:
+            logging.exception('Error with creating issue')
+            new_issue_url = None
+
+        return new_issue_url
 
     def get_build_data(self, job, build_range):
         """
@@ -65,7 +97,6 @@ class Stats(object):
         :param job: Full job name on Jenkins
         :param build_range: Build range that exists for the job on Jenkins, ie "700-713", "1804-1804"
         """
-
         if job is None or build_range is None:
             print('Either a job or build range was not specified.')
             print(self.cmdhelp)
@@ -94,8 +125,6 @@ class Stats(object):
         latest_build = build['number']
         host = build['builtOn']
 
-        issues = []
-
         try:
             db = mysql.connector.connect(host=self.dbhost, user=self.dbuser, password=self.dbpass, database='qa')
             cursor = db.cursor()
@@ -107,7 +136,7 @@ class Stats(object):
             build_url = self.jhost + '/job/' + job + '/' + str(build) + '/api/python'
             build_report = self.read_url(build_url)
             if build_report is not None:
-                host = build_report.get('builtOn', 'unknown')
+                host = build_report.get('builtOn', 'unknown').split('-')[0]  # split for hosts which are voltxx-controller-...
 
             test_url = self.jhost + '/job/' + job + '/' + str(build) + '/testReport/api/python'
             test_report = self.read_url(test_url)
@@ -159,27 +188,22 @@ class Stats(object):
                 add_job = ('INSERT INTO `junit-builds` '
                            '(name, stamp, url, build, fails, total, percent) '
                            'VALUES (%(name)s, %(timestamp)s, %(url)s, %(build)s, %(fails)s, %(total)s, %(percent)s)')
-                try:
-                    cursor.execute(add_job, job_data)
-                    db.commit()
-                except MySQLError:
-                    logging.exception('Could not add job data to database')
 
-                # Some of the test results are structured differently, depending on the matrix configurations.
-                child_reports = test_report.get('childReports', None)
-                if child_reports is None:
-                    child_reports = [
-                        {
-                            'result': test_report,
-                            'child': {
-                                'url': test_url.replace('testReport/api/python', '')
-                            }
-                        }
-                    ]
+                logging.debug(add_job % job_data)
+
+                if not DRY_RUN:
+                    try:
+                        cursor.execute(add_job, job_data)
+                        db.commit()
+                    except MySQLError:
+                        logging.exception('Could not add job data to database')
+
+                for run in job_report['runs']:
+                    child = self.read_url(run['url'] + "/testReport/api/python")
 
                 # Traverse through reports into test suites and get failed test case data to write to database.
-                for child in child_reports:
-                    suites = child['result']['suites']
+                # for child in child_reports:
+                    suites = child['suites']
                     for suite in suites:
                         cases = suite['cases']
                         test_stamp = suite.get('timestamp', None)
@@ -190,85 +214,96 @@ class Stats(object):
                             test_stamp = datetime.strptime(test_stamp, '%Y-%m-%dT%H:%M:%S')
                             # Convert test stamp from GMT to EST and store as string
                             test_stamp = (test_stamp - timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S')
+
                         for case in cases:
                             name = case['className'] + '.' + case['name']
                             status = case['status']
-                            url_name = name.replace('.test', '/test').replace('.Test', '/Test').replace('-', '_')
-                            if "vdm-py-test" in child['child']['url']:
-                                testcase_url = child['child']['url'] + 'testReport/' + '(root)/' + url_name
-                            else:
-                                testcase_url = child['child']['url'] + 'testReport/' + url_name
+                            logging.debug(name)
+                            # we don't need a url if the test didn't fail
+                            testcase_url = None
+                            if status != 'PASSED' and status != 'FIXED':
+                                name = name.translate(TT)
+                                testcase_url = run['url'] + '/testReport/' + name
+                                n = testcase_url.count('.')
+                                # find the testcase url that works
+                                for i in range(1, n+1):
+                                    try:
+                                        page = self.read_url(testcase_url+"/api/python", ignore404=True)
+                                    except:
+                                        pass
+                                    if type(page) == dict and 'status' in page:
+                                        break
+                                    testcase_url = '/'.join(testcase_url.rsplit('.', 1))
+                                if page is None:
+                                    raise RuntimeError("testcase url invalid: " + testcase_url)
+
+                            assert status in ['PASSED', 'FAILED', 'FIXED', 'REGRESSION'], status
+
+                            test_data = {
+                                'name': name,
+                                'job': job,
+                                'status': status,
+                                'timestamp': test_stamp,
+                                'url': testcase_url,
+                                'build': build,
+                                'host': host,
+                                'new_issue_url': None
+                            }
+
+                            logging.debug(test_data)
+
                             # Record tests that don't pass.
-                            if status != 'PASSED':
-                                test_data = {
-                                    'name': name,
-                                    'job': job,
-                                    'status': status,
-                                    'timestamp': test_stamp,
-                                    'url': testcase_url,
-                                    'build': build,
-                                    'host': host
+                            # we do record tests that are 'FIXED' and 'REGRESSION'
+                            if status != 'PASSED' and status != 'FIXED':
+
+                                #1. query to see if we already have one failure in same job
+                                #if we don't, skip filing the ticket
+                                params1 = {
+                                    'name': test_data['name'],
+                                    'job_number': test_data['build'],
+                                    'job': test_data['job']
                                 }
 
-                                if status == 'FAILED' and (job == PRO or job == COMMUNITY):
-                                    #1. query to see if we already have one failure in same job
-                                    #if we don't, skip filing the ticket
-                                    params1 = {
-                                        'name': test_data['name'],
-                                        'job_number': test_data['build'],
-                                        'job': test_data['job']
-                                    }
-                                    query1 = ("""
-                                        SELECT count(*)
-                                              FROM `junit-test-failures`
-                                            WHERE job=%(job)s
-                                                AND name = %(name)s
-                                                AND build = %(job_number)s-1
-                                                AND status = 'FAILED';
-                                    """)
+                                query1 = ("""
+                                    SELECT count(*), count(issue_url)
+                                          FROM `junit-test-failures` f
+                                        WHERE job=%(job)s
+                                            AND name = %(name)s
+                                            AND build BETWEEN (
+                                                  select COALESCE(max(build), 1)
+                                                  FROM `junit-test-failures`
+                                                  WHERE job=f.job
+                                                  AND name = f.name
+                                                  AND build < %(job_number)s
+                                                  AND status != 'FAILED' and status != 'REGRESSION')
+                                              AND %(job_number)s
+                                            AND (status = 'FAILED' OR status = 'REGRESSION')
+                                            ORDER BY build desc;
+                                """)
 
-                                    cursor.execute(query1,params1)
-                                    output1 = cursor.fetchone()
-                                    output1 = output1[0]
-                                    # 2. query to see if we already have two failures for same test in alt-job type
-                                    #and if we do skip filing the ticket.
-                                    params2 = {
-                                    'name': test_data['name']
-                                    }
-                                    if test_data['job'] == PRO:
-                                        params2['job'] = COMMUNITY
+                                logging.debug("Q1 %s" % (query1 % params1))
 
-                                    elif test_data['job'] == COMMUNITY:
-                                        params2['job'] = PRO
+                                cursor.execute(query1, params1)
+                                output1 = cursor.fetchone()
 
-                                    query2 = ("""
-                                        SELECT COUNT(*) AS fails
-                                            FROM
-                                                (SELECT DISTINCT job,
-                                                                 name,
-                                                                 status,
-                                                                 build,
-                                                                 stamp
-                                                 FROM `junit-test-failures`
-                                                 WHERE job=%(job)s
-                                                   AND name = %(name)s
-                                                 ORDER BY stamp DESC
-                                                 LIMIT 2) AS t
-                                            WHERE t.status = 'FAILED';
-                                    """)
+                                if output1[0] >= (TOLERANCE-1) and output1[1] == 0:
+                                    logging.info("will file: %s %s %s %s" % (output1, job, build, name))
+                                    try:
+                                        test_data['new_issue_url'] = self.file_jira_issue(test_data)
+                                        pass
+                                    except:
+                                        logging.exception("failed to file a jira ticket")
 
-                                    cursor.execute(query2,params2)
-                                    output2 = cursor.fetchone()
-                                    output2 = output2[0]
-                                    # if next most recent in job is a fail and two most recent in alt-job are not fails
-                                    if output1 ==1 and output2 != 2:
-                                        issues.append(test_data)
+                            # record test results to database (with issue url)
+                            # if an issue was filed, its url will be recorded in the database
+                            add_test = ('INSERT INTO `junit-test-failures` '
+                                        '(name, job, status, stamp, url, build, host, issue_url) '
+                                        'VALUES (%(name)s, %(job)s, %(status)s, %(timestamp)s, '
+                                        '%(url)s, %(build)s, %(host)s, %(new_issue_url)s)')
 
-                                add_test = ('INSERT INTO `junit-test-failures` '
-                                            '(name, job, status, stamp, url, build, host) '
-                                            'VALUES (%(name)s, %(job)s, %(status)s, %(timestamp)s, '
-                                            '%(url)s, %(build)s, %(host)s)')
+                            logging.debug("%s" % (add_test % test_data))
 
+                            if not DRY_RUN:
                                 try:
                                     cursor.execute(add_test, test_data)
                                     db.commit()
@@ -285,34 +320,9 @@ class Stats(object):
         cursor.close()
         db.close()
 
-        if job != PRO and job != COMMUNITY:
-            return
-
-        try:
-            jenkinsbot = JenkinsBot()
-            for issue in issues:
-                # Only report pro and community job
-                error_url = issue['url']
-                error_report = self.read_url(error_url + '/api/python')
-                if error_report is None:
-                    continue
-
-                age = error_report['age']
-                yesterday = datetime.now() - timedelta(days=1)
-                timestamp = issue['timestamp']
-                old = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S') < yesterday
-
-                failed_since = error_report['failedSince']
-                summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
-                description = error_url + '\n' + str(error_report['errorStackTrace'])
-                current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
-                                                    'master/version.txt'))
-                jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version, ['junit-consistent-failure', 'automatic'])
-        except:
-            logging.exception('Error with creating issue')
-
 
 if __name__ == '__main__':
+
     stats = Stats()
     job = os.environ.get('job', None)
     build_range = os.environ.get('build_range', None)
