@@ -74,7 +74,7 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
         AbstractVoltDBPExchange exchangeRel = call.rel(1);
 
         // The fragment limit always has 0 offset and its limit =
-        // sum og the coordinator's limit and offset
+        // sum of the coordinator's limit and offset
         int fragmentLimit = RexLiteral.intValue(limitRel.getLimit());
         if (limitRel.getOffset() != null) {
             fragmentLimit += RexLiteral.intValue(limitRel.getOffset());
