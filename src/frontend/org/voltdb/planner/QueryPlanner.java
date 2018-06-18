@@ -402,12 +402,13 @@ public class QueryPlanner implements AutoCloseable {
                 return null;
             }
         }
-        if(parsedStmt instanceof ParsedSelectStmt) {
-            MVQueryRewriter rewriter = new MVQueryRewriter((ParsedSelectStmt) parsedStmt);
-            rewriter.rewrite();
-        } else if (parsedStmt instanceof ParsedUnionStmt) {
-            MVQueryRewriter rewriter = new MVQueryRewriter((ParsedUnionStmt) parsedStmt);
-            rewriter.rewrite();
+        if(parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt) {
+            final MVQueryRewriter rewriter = parsedStmt instanceof ParsedSelectStmt ?
+                    new MVQueryRewriter((ParsedSelectStmt) parsedStmt) :
+                    new MVQueryRewriter((ParsedUnionStmt) parsedStmt);
+            if(rewriter.rewrite() && m_paramzInfo != null) {
+                m_paramzInfo.setParamLiteralValues(new String[0]);
+            }
         }
         m_planSelector.outputParsedStatement(parsedStmt);
 

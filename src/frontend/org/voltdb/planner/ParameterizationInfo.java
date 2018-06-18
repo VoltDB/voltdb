@@ -44,7 +44,7 @@ import org.voltdb.utils.VoltTypeUtil;
 public class ParameterizationInfo {
 
     private final VoltXMLElement m_parameterizedXmlSQL;
-    private final String[] m_paramLiteralValues;
+    private String[] m_paramLiteralValues;
 
     /**
      * Stores the current count of parameters that we've
@@ -288,6 +288,7 @@ public class ParameterizationInfo {
     }
 
     public ParameterSet extractedParamValues(VoltType[] parameterTypes) {
+        // Make sure to update {\code parameterTypes} accordingly when rewriting query
         assert(m_paramLiteralValues.length == parameterTypes.length);
         Object[] params = new Object[m_paramLiteralValues.length];
 
@@ -306,5 +307,13 @@ public class ParameterizationInfo {
 
     public String[] getParamLiteralValues() {
         return m_paramLiteralValues;
+    }
+
+    /**
+     * Used to override parameters in query when the query is rewritten.
+     * @param literalValues newer literal values to set after query rewrite.
+     */
+    public void setParamLiteralValues(String[] literalValues) {
+        m_paramLiteralValues = literalValues;
     }
 }
