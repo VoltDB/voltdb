@@ -36,7 +36,7 @@ public class CompleteTransactionTask extends TransactionTask
     final private Mailbox m_initiator;
     final private CompleteTransactionMessage m_completeMsg;
     private boolean m_fragmentNotExecuted = false;
-    private boolean m_repaireCompletionMatched = false;
+    private boolean m_repairCompletionMatched = false;
     public CompleteTransactionTask(Mailbox initiator,
                                    TransactionState txnState,
                                    TransactionTaskQueue queue,
@@ -53,18 +53,21 @@ public class CompleteTransactionTask extends TransactionTask
     }
 
     public void setRepairCompletionMatched() {
-        // In the repair process, some sites many have received CompleteTransactionResposneMessage so
-        // the TransactionTaskQueue and outstandingTxn are cleaned on these sites. When a repair CompleteTransactionMessage reaches
-        // these sites, a CompelteTransactionTask will be placed on ScoreBoard as unmatched (missing).
-        //
-        // However, if a site still has the transaction state, i.e.in outstanding transaction and TransactionTaskQueue, a CompelteTransactionTask
-        // is placed on ScoreBoard as matched. The heads of TransactionTaskQueues for these matched sites may still have the CompelteTransactionTask
-        // of the transaction. The flag is used to flush these TransactionTaskQueues to unblock these sites.
-        m_repaireCompletionMatched = true;
+        // When CompleteTransactionTask is released from Scorboard, all the sites will process it and forward it to its
+        // replica. After a site has received CompleteTransactionResponseMessage from itself and its replica, the transaction state will be
+        // removed from its duplicate counter and outstanding transaction list, i.e. the transaction state is removed.
+        // When a repair process kicks in upon node failure or joining, some sites have cleaned up transaction state
+        // and some have not. A repair CompleteTransactionMessage is collected and is broadcasted to all the partition leaders.
+        // Then a repair CompelteTransactionTask is placed onto Scoreboard as unmatched (missing) from sites where the transaction state has been cleaned, and
+        // as matched from sites where the transaction state is still available.
+        // After Scoreboard has again collected all repair CompleteTransactionTask, CompleteTransactionTask is released.
+        // If a site still has the transaction state, then the CompleteTransactionTask should flush its TransactionTaskQueue to unblock the site.
+        // The flag is created for this purpose.
+        m_repairCompletionMatched = true;
     }
     private void doUnexecutedFragmentCleanup()
     {
-        if (m_completeMsg.isAbortDuringRepair() || m_repaireCompletionMatched) {
+        if (m_completeMsg.isAbortDuringRepair() || m_repairCompletionMatched) {
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(getTxnId()));
             }
