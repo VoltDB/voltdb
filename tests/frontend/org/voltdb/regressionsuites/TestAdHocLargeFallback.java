@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertEquals;
+
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
@@ -30,9 +32,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-import junit.framework.TestCase;
-
-public class TestAdHocLargeFallback extends TestCase {
+public class TestAdHocLargeFallback extends JUnit4LocalClusterTest {
 
     @Test
     public void testAdHocLargeFallbackLogMessage() throws Exception {
