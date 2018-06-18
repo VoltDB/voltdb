@@ -36,6 +36,10 @@ public class TestAdHocLargeFallback extends TestCase {
 
     @Test
     public void testAdHocLargeFallbackLogMessage() throws Exception {
+        if (LocalCluster.isMemcheckDefined()) {
+            // don't run this test under valgrind, as it needs IPC support.
+            return;
+        }
         System.out.println("testAdHocLargeFallbackLogMessage");
         String testSchema = "create table t (i integer not null, "
                 + "inl_vc00 varchar(63 bytes), "
