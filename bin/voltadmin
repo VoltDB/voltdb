@@ -33,7 +33,6 @@
 # from version.txt in the script's parent directory. It can be copied to other
 # names, and also to other locations if the path-building is adjusted. The
 # description should also be changed if re-used for another base command.
-
 import sys
 import os
 
