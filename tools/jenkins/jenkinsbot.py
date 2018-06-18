@@ -41,7 +41,7 @@ JUNIT = os.environ.get('junit', None)
 # Jira credentials and info
 JIRA_USER = os.environ.get('jirauser', None)
 JIRA_PASS = os.environ.get('jirapass', None)
-JIRA_PROJECT = os.environ.get('jiraproject', 'ENG')
+JIRA_PROJECT = os.environ.get('jiraproject', None)
 
 # Queries
 
@@ -581,10 +581,12 @@ table {
     width: 100%;
     font-family: verdana,arial,sans-serif;
 }
+
 th, td {
     padding: 8px;
     border-bottom: 1px solid #ddd;
 }
+
 tr:hover{
     background-color:#f5f5f5
 }
@@ -751,7 +753,7 @@ tr:hover{
         """
         if user and passwd and project:
             try:
-                jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(user, passwd), options=dict(verify=False))
+                jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(user, passwd))
             except:
                 self.logger.exception('Could not connect to Jira')
                 return
@@ -811,16 +813,10 @@ tr:hover{
         issue_dict['priority'] = {'name': 'Blocker'}
 
         new_issue = jira.create_issue(fields=issue_dict)
-
-        new_issue_url = 'https://issues.voltdb.com/browse/' + new_issue.key
-
         self.logger.info('NEW: Reported issue with summary "' + summary + '"')
 
         if self.connect_to_slack():
             self.post_message(channel, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
-
-        return new_issue
-
 
 if __name__ == '__main__':
     jenkinsbot = JenkinsBot()
