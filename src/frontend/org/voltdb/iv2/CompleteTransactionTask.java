@@ -36,7 +36,7 @@ public class CompleteTransactionTask extends TransactionTask
     final private Mailbox m_initiator;
     final private CompleteTransactionMessage m_completeMsg;
     private boolean m_fragmentNotExecuted = false;
-
+    private boolean m_repaireCompletionMatched = false;
     public CompleteTransactionTask(Mailbox initiator,
                                    TransactionState txnState,
                                    TransactionTaskQueue queue,
@@ -52,9 +52,17 @@ public class CompleteTransactionTask extends TransactionTask
         m_fragmentNotExecuted = true;
     }
 
+    public void setRepairCompletionMatched() {
+        // In the repair process, some sites many have received CompleteTransactionResposneMessage so
+        // the TransactionTaskQueue and outstandingTxn are cleaned on these sites. When a repair CompleteTransactionMessage reaches
+        // these sites, a CompelteTransactionTask will be placed on ScoreBoard as unmatched. However, if a site still has the transaction state
+        // (in outstanding transaction and TransactionTaskQueue, a CompelteTransactionTask will be placed on ScoreBoard as matched.
+        // The flag is used to flush the TransactionTaskQueue for the matched.
+        m_repaireCompletionMatched = true;
+    }
     private void doUnexecutedFragmentCleanup()
     {
-        if (m_completeMsg.isAbortDuringRepair()) {
+        if (m_completeMsg.isAbortDuringRepair() || m_repaireCompletionMatched) {
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(getTxnId()));
             }

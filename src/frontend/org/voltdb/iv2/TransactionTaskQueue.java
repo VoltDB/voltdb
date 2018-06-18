@@ -100,12 +100,16 @@ public class TransactionTaskQueue
             int tasksAtTail = 0;
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
                 // only release completions at head of queue
-                CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst().getFirst();
+                Pair<CompleteTransactionTask, Boolean> task = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst();
+                CompleteTransactionTask completion = task.getFirst();
                 if (missingTask) {
                     completion.setFragmentNotExecuted();
+                    if (task.getSecond()) {
+                        completion.setRepairCompletionMatched();
+                    }
                 }
                 Iv2Trace.logSiteTaskerQueueOffer(completion);
-                m_stashedMpQueues[ii].offer(completion);
+                m_stashedMpQueues[ii].offer( completion);
                 Pair<CompleteTransactionTask, Boolean> tail = m_stashedMpScoreboards[ii].getCompletionTasks().pollLast();
                 if (tail != null) {
                     m_stashedMpScoreboards[ii].getCompletionTasks().addFirst(tail);
