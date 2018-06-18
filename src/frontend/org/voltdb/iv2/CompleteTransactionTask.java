@@ -55,9 +55,11 @@ public class CompleteTransactionTask extends TransactionTask
     public void setRepairCompletionMatched() {
         // In the repair process, some sites many have received CompleteTransactionResposneMessage so
         // the TransactionTaskQueue and outstandingTxn are cleaned on these sites. When a repair CompleteTransactionMessage reaches
-        // these sites, a CompelteTransactionTask will be placed on ScoreBoard as unmatched. However, if a site still has the transaction state
-        // (in outstanding transaction and TransactionTaskQueue, a CompelteTransactionTask will be placed on ScoreBoard as matched.
-        // The flag is used to flush the TransactionTaskQueue for the matched.
+        // these sites, a CompelteTransactionTask will be placed on ScoreBoard as unmatched (missing).
+        //
+        // However, if a site still has the transaction state, i.e.in outstanding transaction and TransactionTaskQueue, a CompelteTransactionTask
+        // is placed on ScoreBoard as matched. The heads of TransactionTaskQueues for these matched sites may still have the CompelteTransactionTask
+        // of the transaction. The flag is used to flush these TransactionTaskQueues to unblock these sites.
         m_repaireCompletionMatched = true;
     }
     private void doUnexecutedFragmentCleanup()
