@@ -17,6 +17,7 @@
 
 package org.voltdb.common;
 
+import java.io.File;
 import java.nio.charset.Charset;
 
 public class Constants
@@ -37,6 +38,11 @@ public class Constants
     public static final byte AUTH_HANDSHAKE = 5;
 
     public static final String KERBEROS = "kerberos";
+
+    public static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
+    public static final String DEFAULT_KEYSTORE_PASSWD = "password";
+    public static final String DEFAULT_TRUSTSTORE_RESOURCE = System.getProperty("java.home") + File.separator + "lib" + File.separator + "security" + File.separator + "cacerts";
+    public static final String DEFAULT_TRUSTSTORE_PASSWD = "changeit";
 
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = -1;
