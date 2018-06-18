@@ -12,9 +12,9 @@ Several SQL features in VoltDB are demonstrated in this application, including:
   - VIEW group by expressions
   - [TRUNCATE](http://voltdb.com/docs/UsingVoltDB/sqlfunctruncate.php) Timestamp function
   - [DECODE](http://voltdb.com/docs/UsingVoltDB/sqlfuncdecode.php) function
-  - TTL indexing for data expiration
+  - TTL processing for data expiration
 
-Time to Live (TTL), enables the user to operate on a constant stream of incoming events by setting an expiration index to automatically free up memory for user convenience. In this example, the user can follow the real-time aggregation statistics to see the deletion of data beginning after the default TTL = 1 minute.
+Time to Live (TTL) helps the application operate on a constant stream of incoming events by setting an expiration timestamp to automatically delete old data. Call [@Statistics TABLE](https://docs.voltdb.com/v7docs/UsingVoltDB/sysprocstatistics.php#sysprocstattable) for aggregation statistics to watch the deletion of data on the "event_data" table beginning after the default TTL = 1 minute.
 
 Quickstart
 ---------------------------
