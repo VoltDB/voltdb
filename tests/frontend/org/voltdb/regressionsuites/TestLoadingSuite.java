@@ -155,8 +155,11 @@ public class TestLoadingSuite extends RegressionSuite {
             fail(); // prev stmt should throw exception
         }
         catch (ProcCallException e) {
-            if (!isValgrind()) { // Unfortunately IPC for loadTable will only throw EEexeception if the return error_code is not success.
-                // It didn't deserilize from exception buffer like JNI path
+            // Unfortunately the IPC path for loadTable will always throw EEException
+            // if the return error_code is not success.
+            // It didn't deserilize from exception buffer like JNI path,
+            // so the error type and message was not preserved.
+            if (!isValgrind()) {
                 assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
             }
         }
