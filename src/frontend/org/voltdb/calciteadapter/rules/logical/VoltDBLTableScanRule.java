@@ -21,13 +21,8 @@ import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Project;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPProject;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPTableSeqScan;
 
 
 public class VoltDBLTableScanRule extends RelOptRule {

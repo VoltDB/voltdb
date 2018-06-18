@@ -47,7 +47,8 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
     public VoltDBPTableSeqScan(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelOptTable table,
-            VoltDBTable voltDBTable) {
+            VoltDBTable voltDBTable,
+            int splitCount) {
           this(cluster,
                   traitSet,
                   table,
@@ -57,7 +58,8 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                   null,
                   null,
                   null,
-                  null);
+                  null,
+                  splitCount);
           assert traitSet.contains(VoltDBPRel.VOLTDB_PHYSICAL);
     }
 
@@ -83,8 +85,19 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
             RexNode limit,
             RelNode aggregate,
             RelDataType preAggregateRowType,
-            RexProgram preAggregateProgram) {
-          super(cluster, traitSet, table, voltDBTable, program, offset, limit, aggregate, preAggregateRowType, preAggregateProgram);
+            RexProgram preAggregateProgram,
+            int splitCount) {
+          super(cluster,
+                traitSet,
+                table,
+                voltDBTable,
+                program,
+                offset,
+                limit,
+                aggregate,
+                preAggregateRowType,
+                preAggregateProgram,
+                splitCount);
     }
 
     @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
@@ -101,7 +114,11 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
         rowCount = estimateRowCountWithPredicate(rowCount);
         // SeqScanPlanNode does not pay attention to limit
 //        rowCount = estimateRowCountWithLimit(rowCount);
-        return rowCount;
+
+        // If table is distributed divide the row count by the split count.
+        // The exchange node would combine individual fragments counts into a total.
+        int splitCount = mq.splitCount(this);
+        return rowCount / splitCount;
     }
 
     @Override
@@ -134,7 +151,8 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                 limit,
                 getAggregateRelNode(),
                 getPreAggregateRowType(),
-                getPreAggregateProgram());
+                getPreAggregateProgram(),
+                m_splitCount);
         return newScan;
     }
 
@@ -156,7 +174,8 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                 getLimitRexNode(),
                 getAggregateRelNode(),
                 getPreAggregateRowType(),
-                getPreAggregateProgram());
+                getPreAggregateProgram(),
+                m_splitCount);
         return newScan;
     }
 
@@ -178,7 +197,8 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                 getLimitRexNode(),
                 aggregate,
                 preAggRowType,
-                preAggProgram);
+                preAggProgram,
+                m_splitCount);
         return newScan;
     }
 

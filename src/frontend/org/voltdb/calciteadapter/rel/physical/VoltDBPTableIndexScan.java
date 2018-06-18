@@ -76,9 +76,19 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
             RexNode limit,
             RelNode aggregate,
             RelDataType preAggregateRowType,
-            RexProgram preAggregateProgram) {
-        super(cluster, traitSet, table, voltDBTable,
-                updateProgram(program, accessPath), offset, limit, aggregate, preAggregateRowType, preAggregateProgram);
+            RexProgram preAggregateProgram,
+            int splitCount) {
+        super(cluster,
+              traitSet,
+              table,
+              voltDBTable,
+              updateProgram(program, accessPath),
+              offset,
+              limit,
+              aggregate,
+              preAggregateRowType,
+              preAggregateProgram,
+              splitCount);
         assert (index != null);
         m_index = index;
         assert (accessPath != null);
@@ -275,7 +285,11 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
 
         double rowCount = estimateRowCountWithPredicate(tuplesToRead);
         rowCount = estimateRowCountWithLimit(rowCount);
-        return rowCount;
+
+        // If table is distributed divide the row count by the split count.
+        // The exchange node would combine individual fragments counts into a total.
+        int splitCount = mq.splitCount(this);
+        return rowCount / splitCount;
     }
 
     private double getSearchExpressionKeyWidth(final double colCount) {
@@ -322,7 +336,8 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
                 limit,
                 getAggregateRelNode(),
                 getPreAggregateRowType(),
-                getPreAggregateProgram());
+                getPreAggregateProgram(),
+                getSplitCount());
     }
 
     @Override
@@ -353,7 +368,8 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
                 getLimitRexNode(),
                 getAggregateRelNode(),
                 getPreAggregateRowType(),
-                getPreAggregateProgram());
+                getPreAggregateProgram(),
+                getSplitCount());
     }
 
     @Override
@@ -376,7 +392,13 @@ public class VoltDBPTableIndexScan extends AbstractVoltDBPTableScan {
                 getLimitRexNode(),
                 aggregate,
                 preAggRowType,
-                preAggProgram);
+                preAggProgram,
+                getSplitCount());
+    }
+
+    @Override
+    public int getSplitCount() {
+        return m_splitCount;
     }
 
 }

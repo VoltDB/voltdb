@@ -42,4 +42,5 @@ public class VoltDBLCalc extends Calc implements VoltDBLRel {
                 RexProgram program) {
             return new VoltDBLCalc(this.getCluster(), traitSet, child, program);
         }
+
 }

@@ -76,7 +76,8 @@ public class VoltDBPCalcAggregateMergeRule extends RelOptRule {
                 calc.getCluster(),
                 calc.getTraitSet(),
                 newAggregate,
-                newProgram);
+                newProgram,
+                calc.getSplitCount());
 
         call.transformTo(newCalc);
     }

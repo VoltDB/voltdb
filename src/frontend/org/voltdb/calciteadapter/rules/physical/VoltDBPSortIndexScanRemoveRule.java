@@ -69,7 +69,8 @@ public class VoltDBPSortIndexScanRemoveRule extends RelOptRule {
                     scan.getLimitRexNode(),
                     scan.getAggregateRelNode(),
                     scan.getPreAggregateRowType(),
-                    scan.getPreAggregateProgram());
+                    scan.getPreAggregateProgram(),
+                    scan.getSplitCount());
                 call.transformTo(newScan);
             }
         }

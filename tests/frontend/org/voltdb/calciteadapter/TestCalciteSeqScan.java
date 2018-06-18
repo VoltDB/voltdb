@@ -126,6 +126,21 @@ public class TestCalciteSeqScan extends TestCalciteBase {
 
     }
 
+    public void testSeqScanPartitioned4() throws Exception {
+        String sql;
+        sql = "select i from P1 offset 4";
+        comparePlans(sql);
+    }
+
+    public void testSeqScanPartitioned5() throws Exception {
+        String sql;
+        sql = "select i from P1 limit 3 offset 4";
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"ID\":6,\"PLAN_NODE_TYPE\":\"PROJECTION\"", "\"ID\":7,\"PLAN_NODE_TYPE\":\"PROJECTION\"");
+        ignores.put("\"ID\":7,\"PLAN_NODE_TYPE\":\"LIMIT\"", "\"ID\":6,\"PLAN_NODE_TYPE\":\"LIMIT\"");
+        comparePlans(sql, ignores);
+    }
+
     public void testSeqScanWithFilterPartitioned() throws Exception {
         String sql;
         sql = "select i from P1 where si = 5";

@@ -31,7 +31,6 @@ import org.voltdb.plannodes.HashAggregatePlanNode;
 
 public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
 
-
     /** Constructor */
     public VoltDBPHashAggregate(
             RelOptCluster cluster,
@@ -41,8 +40,37 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
+            RexNode postPredicate,
+            int splitCount) {
+      super(cluster,
+            traitSet,
+            child,
+            indicator,
+            groupSet,
+            groupSets,
+            aggCalls,
+            postPredicate,
+            splitCount);
+    }
+
+    public VoltDBPHashAggregate(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode child,
+            boolean indicator,
+            ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets,
+            List<AggregateCall> aggCalls,
             RexNode postPredicate) {
-      super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate);
+        this(cluster,
+                traitSet,
+                child,
+                indicator,
+                groupSet,
+                groupSets,
+                aggCalls,
+                postPredicate,
+                1);
     }
 
     @Override
@@ -64,28 +92,26 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                m_postPredicate);
+                m_postPredicate,
+                m_splitCount);
     }
 
-    public static VoltDBPHashAggregate create(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls,
-            RexNode postPredicate) {
+    public VoltDBPHashAggregate copy(RelTraitSet traitSet, RelNode input,
+            boolean indicator, ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls,
+            int splitCount) {
         return new VoltDBPHashAggregate(
-                cluster,
+                getCluster(),
                 traitSet,
-                child,
+                input,
                 indicator,
                 groupSet,
                 groupSets,
                 aggCalls,
-                postPredicate);
+                m_postPredicate,
+                splitCount);
     }
+
 
     @Override
     public VoltDBPHashAggregate copy(
@@ -105,7 +131,8 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                postPredicate);
+                postPredicate,
+                m_splitCount);
 
     }
 

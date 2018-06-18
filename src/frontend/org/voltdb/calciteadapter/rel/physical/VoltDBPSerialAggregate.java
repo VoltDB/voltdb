@@ -39,8 +39,37 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
+            RexNode postPredicate,
+            int splitCount) {
+      super(cluster,
+            traitSet,
+            child,
+            indicator,
+            groupSet,
+            groupSets,
+            aggCalls,
+            postPredicate,
+            splitCount);
+    }
+
+    public VoltDBPSerialAggregate(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode child,
+            boolean indicator,
+            ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets,
+            List<AggregateCall> aggCalls,
             RexNode postPredicate) {
-      super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls, postPredicate);
+        this(cluster,
+                traitSet,
+                child,
+                indicator,
+                groupSet,
+                groupSets,
+                aggCalls,
+                postPredicate,
+                1);
     }
 
     @Override
@@ -55,7 +84,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                m_postPredicate);
+                m_postPredicate,
+                m_splitCount);
     }
 
     @Override
@@ -76,7 +106,30 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                postPredicate);
+                postPredicate,
+                m_splitCount);
+    }
+
+    public VoltDBPSerialAggregate copy(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode input,
+            boolean indicator,
+            ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets,
+            List<AggregateCall> aggCalls,
+            RexNode postPredicate,
+            int splitCount) {
+        return new VoltDBPSerialAggregate(
+                cluster,
+                traitSet,
+                input,
+                indicator,
+                groupSet,
+                groupSets,
+                aggCalls,
+                postPredicate,
+                splitCount);
     }
 
     @Override

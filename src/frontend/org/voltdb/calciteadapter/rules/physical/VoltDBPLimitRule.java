@@ -43,8 +43,12 @@ public class VoltDBPLimitRule extends RelOptRule {
                 .replace(VoltDBPRel.VOLTDB_PHYSICAL);
         RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
-        call.transformTo(new VoltDBPLimit(limitOffset.getCluster(),
-                convertedTraits, convertedInput, limitOffset.getOffset(),
-                limitOffset.getLimit()));
+        call.transformTo(new VoltDBPLimit(
+                limitOffset.getCluster(),
+                convertedTraits,
+                convertedInput,
+                limitOffset.getOffset(),
+                limitOffset.getLimit(),
+                1));
     }
 }

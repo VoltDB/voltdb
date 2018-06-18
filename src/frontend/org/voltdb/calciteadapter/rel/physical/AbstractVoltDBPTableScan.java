@@ -51,6 +51,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
     public static final int MAX_TABLE_ROW_COUNT = 1000000;
 
     protected final RexProgram m_program;
+    protected final int m_splitCount;
 
     // Inline Rels
     protected RexNode m_offset = null;
@@ -68,7 +69,8 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
             RexNode limit,
             RelNode aggregate,
             RelDataType preAggregateRowType,
-            RexProgram preAggregateProgram) {
+            RexProgram preAggregateProgram,
+            int splitCount) {
           super(cluster, traitSet.plus(VoltDBPRel.VOLTDB_PHYSICAL), table, voltDBTable);
           assert(program != null);
           assert(aggregate == null || aggregate instanceof AbstractVoltDBPAggregate);
@@ -78,6 +80,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
           m_aggregate = aggregate;
           m_preAggregateRowType = preAggregateRowType;
           m_preAggregateProgram = preAggregateProgram;
+          m_splitCount = splitCount;
     }
 
     public RexProgram getProgram() {
@@ -94,6 +97,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
         // specially when we merge scans with other redundant nodes like sort for example.
         // Are there better ways of doing this?
         String dg = super.computeDigest();
+        dg += "_split_" + m_splitCount;
         if (m_program != null) {
             dg += "_program_" + m_program.toString();
         }
@@ -139,6 +143,8 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
+        pw.item("split", m_splitCount);
+
         if (m_program != null) {
             m_program.explainCalc(pw);
         }
@@ -319,4 +325,10 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
     private boolean hasLimitOffset() {
         return (m_limit != null || m_offset != null);
     }
+
+    @Override
+    public int getSplitCount() {
+        return m_splitCount;
+    }
+
 }

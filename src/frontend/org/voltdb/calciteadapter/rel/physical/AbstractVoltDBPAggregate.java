@@ -50,6 +50,8 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
     // HAVING expression
     final protected RexNode m_postPredicate;
 
+    final protected int m_splitCount;
+
     /** Constructor */
     protected AbstractVoltDBPAggregate(
             RelOptCluster cluster,
@@ -59,14 +61,17 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate) {
+            RexNode postPredicate,
+            int splitCOunt) {
       super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
       m_postPredicate = postPredicate;
+      m_splitCount = splitCOunt;
     }
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
+        pw.item("split", m_splitCount);
         if (m_postPredicate != null) {
             pw.item("having", m_postPredicate);
         }
@@ -76,6 +81,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
     @Override
     protected String computeDigest() {
         String digest = super.computeDigest();
+        digest += "_split_" + m_splitCount;
         if (m_postPredicate != null) {
             digest += m_postPredicate.toString();
         }
@@ -211,6 +217,11 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             AbstractExpression havingExpression = RexConverter.convert(m_postPredicate);
             apn.setPostPredicate(havingExpression);
         }
+    }
+
+    @Override
+    public int getSplitCount() {
+        return m_splitCount;
     }
 
 }

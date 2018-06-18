@@ -20,6 +20,7 @@ package org.voltdb.calciteadapter.rel.physical;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.converter.RexConverter;
@@ -29,15 +30,18 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 
 public class VoltDBPCalc extends Calc implements VoltDBPRel {
 
+    private final int m_splitCount;
+
     public VoltDBPCalc(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
-            RexProgram program) {
+            RexProgram program,
+            int splitCount) {
             super(cluster, traitSet, input, program);
             assert VoltDBPRel.VOLTDB_PHYSICAL.equals(getConvention());
+            m_splitCount = splitCount;
         }
-
 
     @Override
     public AbstractPlanNode toPlanNode() {
@@ -61,7 +65,36 @@ public class VoltDBPCalc extends Calc implements VoltDBPRel {
                 getCluster(),
                 traitSet,
                 child,
-                program);
+                program,
+                m_splitCount);
+    }
+
+    public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program, int splitCount) {
+        return new VoltDBPCalc(
+                getCluster(),
+                traitSet,
+                child,
+                program,
+                splitCount);
+    }
+
+    @Override
+    public int getSplitCount() {
+        return m_splitCount;
+    }
+
+    @Override
+    protected String computeDigest() {
+        String digest = super.computeDigest();
+        digest += "_split_" + m_splitCount;
+        return digest;
+    }
+
+    @Override
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.item("split", m_splitCount);
+        return pw;
     }
 
 }

@@ -46,10 +46,11 @@ public class VoltDBPSortConvertRule extends ConverterRule {
             Sort sort = (Sort) rel;
             RelTraitSet traits = sort.getInput().getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
             RelNode newRel = new VoltDBPSort(
-                    sort.getCluster(),
-                  traits.plus(sort.getCollation()),
-                  convert(sort.getInput(), traits.simplify()),
-                  sort.getCollation());
+                                sort.getCluster(),
+                                traits.plus(sort.getCollation()),
+                                convert(sort.getInput(), traits.simplify()),
+                                sort.getCollation(),
+                                1);
 
             return newRel;
           }

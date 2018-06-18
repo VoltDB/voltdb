@@ -103,7 +103,8 @@ public class VoltDBPCalcScanToIndexRule extends RelOptRule {
                         scan.getOffsetRexNode(),
                         scan.getAggregateRelNode(),
                         scan.getPreAggregateRowType(),
-                        scan.getPreAggregateProgram());
+                        scan.getPreAggregateProgram(),
+                        scan.getSplitCount());
                 call.transformTo(indexScan);
             }
         }

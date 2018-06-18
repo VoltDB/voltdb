@@ -34,27 +34,37 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
     private RexNode m_offset;
     private RexNode m_limit;
 
+    private final int m_splitCount;
+
     public VoltDBPLimit(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
             RexNode offset,
-            RexNode limit) {
+            RexNode limit,
+            int splitCount) {
             super(cluster, traitSet, input);
             assert traitSet.contains(VoltDBPRel.VOLTDB_PHYSICAL);
             m_offset = offset;
             m_limit = limit;
+            m_splitCount = splitCount;
         }
 
     public VoltDBPLimit copy(RelTraitSet traitSet, RelNode input,
-            RexNode offset, RexNode limit) {
-        return new VoltDBPLimit(getCluster(), traitSet, input, offset, limit);
+            RexNode offset, RexNode limit, int splitCount) {
+        return new VoltDBPLimit(
+                getCluster(),
+                traitSet,
+                input,
+                offset,
+                limit,
+                splitCount);
     }
 
     @Override
     public VoltDBPLimit copy(RelTraitSet traitSet,
             List<RelNode> inputs) {
-        return copy(traitSet, sole(inputs), m_offset, m_limit);
+        return copy(traitSet, sole(inputs), m_offset, m_limit, m_splitCount);
     }
 
     @Override
@@ -66,7 +76,7 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
             lpn.setLimit(RexLiteral.intValue(m_limit));
         }
         if (m_offset != null) {
-            lpn.setLimit(RexLiteral.intValue(m_offset));
+            lpn.setOffset(RexLiteral.intValue(m_offset));
         }
 
         if (this.getInput() != null) {
@@ -90,6 +100,7 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
+        pw.item("split", m_splitCount);
         if (m_limit != null) {
             pw.item("limit", m_limit);
         }
@@ -97,6 +108,18 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
             pw.item("offset", m_offset);
         }
         return pw;
+    }
+
+    @Override
+    protected String computeDigest() {
+        String digest = super.computeDigest();
+        digest += "_split_" + m_splitCount;
+        return digest;
+    }
+
+    @Override
+    public int getSplitCount() {
+        return m_splitCount;
     }
 
 }

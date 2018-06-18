@@ -26,6 +26,8 @@ import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParser;
@@ -134,6 +136,14 @@ public class CalcitePlanner {
 
             // Convert the input sql to a relational expression
             convertedRel = volcanoPlanner.rel(validatedSql).project();
+
+            // VoltDB Metadata Provider
+            JaninoRelMetadataProvider relMetadataProvider = JaninoRelMetadataProvider.of(
+                    VoltDBDefaultRelMetadataProvider.INSTANCE);
+            RelMetadataQuery.THREAD_PROVIDERS.set(relMetadataProvider);
+            // @TODO Do I need it? Do I need it to do for each phase / root rel?
+            // @TODO Setting the seems to be enough. Ask Hanu
+//            convertedRel.accept(new VoltDBDefaultRelMetadataProvider.MetaDataProviderModifier(relMetadataProvider));
 
             // Transform the relational expression
 

@@ -24,6 +24,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.metadata.RelMdCollation;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -38,14 +39,18 @@ import com.google.common.base.Supplier;
 
 public class VoltDBPProject extends Project implements VoltDBPRel {
 
+    private final int m_splitCount;
+
     public VoltDBPProject(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
             List<? extends RexNode> projects,
-            RelDataType rowType) {
+            RelDataType rowType,
+            int splitCount) {
         super(cluster, traitSet, input, projects, rowType);
         assert traitSet.contains(VoltDBPRel.VOLTDB_PHYSICAL);
+        m_splitCount = splitCount;
     }
 
         /** Creates an VoltDBProject, specifying row type rather than field
@@ -63,14 +68,19 @@ public class VoltDBPProject extends Project implements VoltDBPRel {
                           return RelMdCollation.project(mq, input, projects);
                         }
                       });
-          return new VoltDBPProject(cluster, traitSet, input, projects, rowType);
+          return new VoltDBPProject(cluster, traitSet, input, projects, rowType, 1);
         }
 
         @Override
         public VoltDBPProject copy(RelTraitSet traitSet, RelNode input,
             List<RexNode> projects, RelDataType rowType) {
-          return new VoltDBPProject(getCluster(), traitSet, input,
-              projects, rowType);
+          return new VoltDBPProject(
+                  getCluster(),
+                  traitSet,
+                  input,
+                  projects,
+                  rowType,
+                  m_splitCount);
         }
 
         public VoltDBPProject copy() {
@@ -79,7 +89,8 @@ public class VoltDBPProject extends Project implements VoltDBPRel {
                     getTraitSet(),
                     getInput(),
                     getProjects(),
-                    deriveRowType());
+                    deriveRowType(),
+                    m_splitCount);
           }
 
         @Override
@@ -90,4 +101,24 @@ public class VoltDBPProject extends Project implements VoltDBPRel {
             ppn.addAndLinkChild(child);
             return ppn;
         }
+
+        @Override
+        public int getSplitCount() {
+            return m_splitCount;
+        }
+
+        @Override
+        protected String computeDigest() {
+            String digest = super.computeDigest();
+            digest += "_split_" + m_splitCount;
+            return digest;
+        }
+
+        @Override
+        public RelWriter explainTerms(RelWriter pw) {
+            super.explainTerms(pw);
+            pw.item("split", m_splitCount);
+            return pw;
+        }
+
 }
