@@ -585,6 +585,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             for (ParsedColInfo orderCol : m_orderColumns) {
                 AbstractExpression expr = orderCol.expression;
                 expr = expr.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
+                assert (expr instanceof  TupleValueExpression);
                 orderCol.expression = expr;
             }
         }
@@ -1121,10 +1122,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
 
+        int origNumAggResultCols = m_aggResultColumns.size();
         insertAggExpressionsToAggResultColumns(m_aggregationList, order_col);
+        if (m_aggResultColumns.size() > origNumAggResultCols && m_groupByColumns.isEmpty()) {
+            // There are aggregate functions in the order by clause that are not
+            // in the select list, and this is not a GB query.  In this case, the presence
+            // of an aggregate function in the OB clause may make this an aggregate query.
+            m_isComplexOrderBy = true;
+        }
+
         if (m_aggregationList.size() >= 1) {
             m_hasAggregateExpression = true;
         }
+
         // Add TVEs in ORDER BY statement if we have,
         // stop recursive finding when we have it in AggResultColumns
         List<TupleValueExpression> tveList = new ArrayList<>();
@@ -1466,7 +1476,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_having == null &&
                 m_groupByColumns.isEmpty() &&
                 ! hasLimitOrOffsetParameters() &&
-                displaysAgg()) {
+                performsAggregation()) {
             if (m_limitOffset.getOffset() == 0) {
                 return ConstantValueExpression.getTrue();
             }
@@ -1848,9 +1858,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void detectComplexOrderby() {
-        m_isComplexOrderBy = false;
-
-        if (! hasOrderByColumns() || ! isGrouped()) {
+        if (! hasOrderByColumns() || ! m_hasAggregateExpression) {
             return;
         }
 
@@ -2221,7 +2229,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean hasAOneRowResult() {
-        if ( ( ! isGrouped() ) && displaysAgg()) {
+        if ( ( ! isGrouped() ) && performsAggregation()) {
             return true;
         }
         return producesOneRowOutput();
@@ -2236,13 +2244,22 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
-    private boolean displaysAgg() {
+    private boolean performsAggregation() {
         for (ParsedColInfo displayCol : m_displayColumns) {
             if (displayCol.expression.hasAnySubexpressionOfClass(
                     AggregateExpression.class)) {
                 return true;
             }
         }
+
+        for (ParsedColInfo orderCol : m_orderColumns) {
+            if (orderCol.expression.hasAnySubexpressionOfClass(
+                    AggregateExpression.class)) {
+                return true;
+            }
+        }
+
+
         return false;
     }
 

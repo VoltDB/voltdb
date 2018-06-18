@@ -3199,6 +3199,42 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{"foo", 1}}, vt);
     }
 
+    public void testEng13929() throws Exception {
+        if (isHSQL()) {
+            // HSQL gets wrong answers for these.
+            // Our answers match PostgreSQL.
+            return;
+        }
+
+        Client client = getClient();
+        VoltTable vt;
+        String sql;
+
+        // In this bug our planner had trouble with
+        // a query where the aggregate function was in a group by clause
+        sql = "SELECT 'foo' " +
+                "FROM ENG_13852_R11 T1 " +
+                "ORDER BY COUNT(*) DESC;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][] {{"foo"}}, vt);
+
+        // Similar query with AVG
+        sql = "SELECT 79 AS const_num " +
+                "FROM ENG_13852_R11 T1 " +
+                "ORDER BY AVG(const_num);";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][]{{79}}, vt);
+
+        // Similar query with GB clause
+        sql = "SELECT 'foo' " +
+                "FROM ENG_13852_R11 T1 " +
+                "GROUP BY tiny " +
+                "ORDER BY COUNT(*)";
+        // For some reason, HSQL doesn't like this
+        // (but is OK with aggregates on OB clause when no GB clause)
+        verifyStmtFails(client, sql, "invalid ORDER BY expression");
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -3250,7 +3286,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-        // end of HSQDB config */
+        // end of HSQLDB config */
         return builder;
     }
 }
