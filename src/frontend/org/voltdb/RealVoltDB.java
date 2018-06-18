@@ -2851,8 +2851,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     //TODO: Is there a better place for this ssl setup work and constant defns
-    private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
-    private static final String DEFAULT_KEYSTORE_PASSWD = "password";
     private void setupSSL(ReadDeploymentResults readDepl) {
         SslType sslType = readDepl.deployment.getSsl();
         m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
@@ -2891,7 +2889,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private SslContextFactory getSSLContextFactory(SslType sslType) {
         SslContextFactory sslContextFactory = new SslContextFactory();
         String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
-        keyStorePath = null == keyStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
+        keyStorePath = null == keyStorePath  ? getResourcePath(Constants.DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
         if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
             throw new IllegalArgumentException("A path for the SSL keystore file was not specified.");
         }
@@ -2901,8 +2899,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sslContextFactory.setKeyStorePath(keyStorePath);
 
         String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
-        if (m_config.m_sslEnable && null == keyStorePassword) {
-            keyStorePassword = DEFAULT_KEYSTORE_PASSWD;
+        if (null == keyStorePassword) {
+            keyStorePassword = Constants.DEFAULT_KEYSTORE_PASSWD;
         }
         if (keyStorePassword == null) {
             throw new IllegalArgumentException("An SSL keystore password was not specified.");
@@ -2910,9 +2908,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sslContextFactory.setKeyStorePassword(keyStorePassword);
 
         String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-        if (m_config.m_sslEnable) {
-            trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
-        }
+        trustStorePath = null == trustStorePath  ? getResourcePath(Constants.DEFAULT_TRUSTSTORE_RESOURCE):getResourcePath(trustStorePath);
         if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
             throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
         }
@@ -2922,13 +2918,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sslContextFactory.setTrustStorePath(trustStorePath);
 
         String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
-        if (m_config.m_sslEnable && null == trustStorePassword) {
-            trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+        if (null == trustStorePassword) {
+            trustStorePassword = Constants.DEFAULT_TRUSTSTORE_PASSWD;
         }
         if (trustStorePassword == null) {
             throw new IllegalArgumentException("An SSL truststore password was not specified.");
         }
         sslContextFactory.setTrustStorePassword(trustStorePassword);
+
         // exclude weak ciphers
         sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
                 "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
