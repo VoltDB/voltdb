@@ -585,7 +585,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             for (ParsedColInfo orderCol : m_orderColumns) {
                 AbstractExpression expr = orderCol.expression;
                 expr = expr.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
-                assert (expr instanceof  TupleValueExpression);
+                assert (! expr.hasAnySubexpressionOfClass(AggregateExpression.class));
                 orderCol.expression = expr;
             }
         }
@@ -1858,7 +1858,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void detectComplexOrderby() {
-        if (! hasOrderByColumns() || ! m_hasAggregateExpression) {
+        if (! hasOrderByColumns() || (! m_hasAggregateExpression && m_groupByColumns.isEmpty())) {
             return;
         }
 
