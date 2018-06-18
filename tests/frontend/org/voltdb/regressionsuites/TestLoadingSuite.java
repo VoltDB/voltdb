@@ -155,7 +155,13 @@ public class TestLoadingSuite extends RegressionSuite {
             fail(); // prev stmt should throw exception
         }
         catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
+            // Unfortunately the IPC path for loadTable will always throw EEException
+            // if the return error_code is not success.
+            // It didn't deserilize from exception buffer like JNI path,
+            // so the error type and message was not preserved.
+            if (!isValgrind()) {
+                assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
+            }
         }
 
         // test rollback to a replicated table (sql exception)
@@ -167,7 +173,9 @@ public class TestLoadingSuite extends RegressionSuite {
             fail(); // prev stmt should throw exception
         }
         catch (ProcCallException e) {
-            assertTrue(e.getMessage().contains("SQL ERROR"));
+            if (!isValgrind()) {
+                assertTrue(e.getMessage().contains("SQL ERROR"));
+            }
         }
 
         // 4 rows in the db from the previous test
