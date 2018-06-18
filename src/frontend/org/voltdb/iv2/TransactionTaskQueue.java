@@ -103,7 +103,7 @@ public class TransactionTaskQueue
                 CompleteTransactionTask completion = task.getFirst();
                 if (missingTxn) {
                     completion.setFragmentNotExecuted();
-                    if (task.getSecond()) {
+                    if (!task.getSecond()) {
                         completion.setRepairCompletionMatched();
                     }
                 }
