@@ -52,7 +52,6 @@
 #   JAVA_HOME        The java implementation to use.  Overrides JAVA_HOME.
 #   JAVA_HEAP_MAX    The maximum amount of heap to use, in MB. Default is 1024.
 #   VOLTDB_OPTS     Extra Java runtime options.
-#   LOG4J_CONFIG_PATH     Path to alternate log4j configuration
 
 # resolve symlinks and canonicalize the path (make it absolute)
 pushd . > /dev/null
@@ -96,18 +95,6 @@ fi
 if [ "$JAVA" = "" ]; then
   echo "Couldn't find java version to run (make sure JAVA_HOME is set)."
   exit 1
-fi
-
-# check envvars to see if a user overrides log4j conf
-if [ -z "${LOG4J_CONFIG_PATH}" ]; then
-  if [ -f "$VOLTDB_HOME/src/frontend/log4j.xml" ]; then
-    LOG4J_CONFIG_PATH=$VOLTDB_HOME/src/frontend/log4j.xml
-  elif [ -f "$VOLTDB_HOME/voltdb/log4j.xml" ]; then
-    LOG4J_CONFIG_PATH=$VOLTDB_HOME/voltdb/log4j.xml
-  else
-    echo "Couldn't find log4j configuration file."
-    exit 1
-  fi
 fi
 
 VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-[0-9].*.jar | grep -v "doc.jar" | head -1`
