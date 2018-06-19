@@ -99,6 +99,7 @@ Command succeeded.
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
+@Ping                     
 @Promote                  
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
@@ -142,6 +143,7 @@ Command succeeded.
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
+@Ping                     
 @Promote                  
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
@@ -253,6 +255,7 @@ Command succeeded.
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
+@Ping                     
 @Promote                  
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
@@ -310,6 +313,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
+@Ping                     
 @Promote                  
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
@@ -353,6 +357,7 @@ Command succeeded.
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
+@Ping                     
 @Promote                  
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint
@@ -470,6 +475,7 @@ Command succeeded.
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
+@Ping                     
 @Promote                  
 @Quiesce                  
 @ResetDR                  	tinyint, tinyint, tinyint

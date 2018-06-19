@@ -118,6 +118,9 @@ public class AsyncBenchmark {
         @Option(desc = "Whether to preload a specified number of keys and values.")
         boolean preload = true;
 
+        @Option(desc = "Fraction of ops that are to STORE (vs STORER).")
+        double partrepratio = 1.00;
+
         @Option(desc = "Fraction of ops that are gets (vs puts).")
         double getputratio = 0.90;
 
@@ -461,10 +464,18 @@ public class AsyncBenchmark {
         if (config.preload) {
             System.out.println("Preloading data store...");
             for(int i=0; i < config.poolsize; i++) {
+                String keyStr = String.format(processor.KeyFormat, i);
+                byte[] valArr = processor.generateForStore().getStoreValue();
+                if (config.partrepratio != 1.00) {
+                    client.callProcedure(new NullCallback(),
+                                         "STORER.upsert",
+                                         keyStr,
+                                         valArr);
+                }
                 client.callProcedure(new NullCallback(),
                                      "STORE.upsert",
-                                     String.format(processor.KeyFormat, i),
-                                     processor.generateForStore().getStoreValue());
+                                     keyStr,
+                                     valArr);
             }
             client.drain();
             System.out.println("Preloading complete.\n");
@@ -482,12 +493,18 @@ public class AsyncBenchmark {
             // Decide whether to perform a GET or PUT operation
             if (rand.nextDouble() < config.getputratio) {
                 // Get a key/value pair using inbuilt select procedure, asynchronously
-                client.callProcedure(new NullCallback(), "STORE.select", processor.generateRandomKeyForRetrieval());
+                if (rand.nextDouble() < config.partrepratio) {
+                    client.callProcedure(new NullCallback(), "STORE.select", processor.generateRandomKeyForRetrieval());
+                }
+                else {
+                    client.callProcedure(new NullCallback(), "selectR", processor.generateRandomKeyForRetrieval());
+                }
             }
             else {
+                String table = rand.nextDouble() < config.partrepratio ? "STORE" : "STORER";
                 // Put a key/value pair using inbuilt upsert procedure, asynchronously
                 final PayloadProcessor.Pair pair = processor.generateForStore();
-                client.callProcedure(new NullCallback(), "STORE.upsert", pair.Key, pair.getStoreValue());
+                client.callProcedure(new NullCallback(), table+".upsert", pair.Key, pair.getStoreValue());
             }
         }
 
@@ -507,12 +524,18 @@ public class AsyncBenchmark {
             // Decide whether to perform a GET or PUT operation
             if (rand.nextDouble() < config.getputratio) {
                 // Get a key/value pair using inbuilt select procedure, asynchronously
-                client.callProcedure(new GetCallback(), "STORE.select", processor.generateRandomKeyForRetrieval());
+                if (rand.nextDouble() < config.partrepratio) {
+                    client.callProcedure(new GetCallback(), "STORE.select", processor.generateRandomKeyForRetrieval());
+                }
+                else {
+                    client.callProcedure(new GetCallback(), "selectR", processor.generateRandomKeyForRetrieval());
+                }
             }
             else {
+                String table = rand.nextDouble() < config.partrepratio ? "STORE" : "STORER";
                 // Put a key/value pair using inbuilt upsert procedure, asynchronously
                 final PayloadProcessor.Pair pair = processor.generateForStore();
-                client.callProcedure(new PutCallback(pair), "STORE.upsert", pair.Key, pair.getStoreValue());
+                client.callProcedure(new PutCallback(pair), table+".upsert", pair.Key, pair.getStoreValue());
             }
         }
 

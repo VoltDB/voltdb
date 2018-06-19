@@ -228,9 +228,7 @@ public:
         TableTuple dstTuple = dstStorage.tuple();
         TableIterator iterator = srcTable->iteratorDeletingAsWeGo();
         while (iterator.next(srcTuple)) {
-
             projector.exec(dstTuple, srcTuple);
-
             dstTable->insertTuple(dstTuple);
         }
     }
@@ -269,7 +267,6 @@ public:
             std::cout << "Too many rows in dst table\n";
             return false;
         }
-
         return true;
     }
 

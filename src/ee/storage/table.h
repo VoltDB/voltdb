@@ -215,18 +215,14 @@ class Table {
      * Used for recovery where the schema is not sent.
      */
     void loadTuplesFromNoHeader(SerializeInputBE& serialInput,
-                                Pool* stringPool = NULL,
-                                ReferenceSerializeOutput* uniqueViolationOutput = NULL,
-                                bool shouldDRStreamRows = false);
+                                Pool* stringPool = NULL);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
     void loadTuplesFrom(SerializeInputBE& serialInput,
-                        Pool* stringPool = NULL,
-                        ReferenceSerializeOutput* uniqueViolationOutput = NULL,
-                        bool shouldDRStreamRows = false);
+                        Pool* stringPool = NULL);
 
 
     // ------------------------------------------------------------------
@@ -301,7 +297,8 @@ protected:
                                     ReferenceSerializeOutput* uniqueViolationOutput,
                                     int32_t& serializedTupleCount,
                                     size_t& tupleCountPosition,
-                                    bool shouldDRStreamRow) { }
+                                    bool shouldDRStreamRow = false,
+                                    bool ignoreTupleLimit = true) { }
 
     virtual void swapTuples(TableTuple& sourceTupleWithNewValues, TableTuple& destinationTuple) {
         throwFatalException("Unsupported operation");

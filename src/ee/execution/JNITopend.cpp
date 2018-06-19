@@ -15,10 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "JNITopend.h"
-#include <cassert>
-#include <iostream>
 
-#include "common/debuglog.h"
 #include "common/StreamBlock.h"
 #include "storage/table.h"
 
@@ -255,7 +252,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
 
     m_storeLargeTempTableBlockMID = m_jniEnv->GetMethodID(jniClass,
                                                           "storeLargeTempTableBlock",
-                                                          "(JJJLjava/nio/ByteBuffer;)Z");
+                                                          "(JJLjava/nio/ByteBuffer;)Z");
     if (m_storeLargeTempTableBlockMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_storeLargeTempTableBlockMID != 0);
@@ -264,7 +261,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
 
     m_loadLargeTempTableBlockMID = m_jniEnv->GetMethodID(jniClass,
                                                          "loadLargeTempTableBlock",
-                                                          "(JJLjava/nio/ByteBuffer;)J");
+                                                          "(JJLjava/nio/ByteBuffer;)Z");
     if (m_loadLargeTempTableBlockMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_loadLargeTempTableBlockMID != 0);
@@ -439,14 +436,11 @@ bool JNITopend::storeLargeTempTableBlock(LargeTempTableBlock* block) {
         throw std::exception();
     }
 
-    int64_t address = reinterpret_cast<int64_t>(storage.get());
-
     LargeTempTableBlockId blockId = block->id();
     jboolean success = m_jniEnv->CallBooleanMethod(m_javaExecutionEngine,
                                                    m_storeLargeTempTableBlockMID,
                                                    blockId.getSiteId(),
                                                    blockId.getBlockCounter(),
-                                                   address,
                                                    blockByteBuffer);
     // It's assumed that when control returns to this method the block
     // will have been persisted to disk.  The memory for the block
@@ -471,15 +465,15 @@ bool JNITopend::loadLargeTempTableBlock(LargeTempTableBlock* block) {
         throw std::exception();
     }
 
-    int64_t origAddress = m_jniEnv->CallLongMethod(m_javaExecutionEngine,
-                                                   m_loadLargeTempTableBlockMID,
-                                                   block->id(),
-                                                   blockByteBuffer);
-    if (origAddress != 0) {
-        block->setData(reinterpret_cast<char*>(origAddress), std::move(storage));
+    bool success = m_jniEnv->CallBooleanMethod(m_javaExecutionEngine,
+                                               m_loadLargeTempTableBlockMID,
+                                               block->id(),
+                                               blockByteBuffer);
+    if (success) {
+        block->setData(std::move(storage));
     }
 
-    return origAddress != 0;
+    return success;
 }
 
 bool JNITopend::releaseLargeTempTableBlock(LargeTempTableBlockId blockId) {

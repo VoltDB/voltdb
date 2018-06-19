@@ -32,7 +32,7 @@ import org.voltdb.CommandLog;
  */
 public interface InitiatorMessageHandler
 {
-    void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
+    long[] updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters, long mpTxnId);
 
     void setCommandLog(CommandLog cl);
     void setMailbox(Mailbox mailbox);

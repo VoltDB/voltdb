@@ -48,7 +48,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TableStreamType;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -68,7 +67,7 @@ import org.voltdb.utils.SnapshotVerifier;
  */
 public class TestSaveRestoreSerializationFailures extends SaveRestoreBase {
     private final static int SITE_COUNT = 2;
-    private final static int TABLE_COUNT = 9;  // Must match schema used.
+    private final static int TABLE_COUNT = 10;  // Must match schema used.
 
     public TestSaveRestoreSerializationFailures(String name) {
         super(name);

@@ -32,7 +32,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Future;
 
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -45,14 +48,15 @@ import org.voltdb.utils.VoltFile;
  * directory large_query_swap under voltdbroot.
  */
 public class LargeBlockManager {
-    private final Path m_largeQuerySwapPath;
-    private final Map<BlockId, Path> m_blockPathMap = new HashMap<>();
-    private final Object m_accessLock = new Object();
-
     private static LargeBlockManager INSTANCE = null;
 
     private final static Set<OpenOption> OPEN_OPTIONS = new HashSet<>();
     private final static FileAttribute<Set<PosixFilePermission>> PERMISSIONS;
+
+    private final Path m_largeQuerySwapPath;
+    private final Map<BlockId, Path> m_blockPathMap = new HashMap<>();
+    private final Object m_accessLock = new Object();
+    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("LargeBlockManager", 1000);
 
     static {
         OPEN_OPTIONS.add(StandardOpenOption.CREATE_NEW);
@@ -80,7 +84,7 @@ public class LargeBlockManager {
 
     /**
      * This method is called as the database is shutting down.
-     * It releases any stored blocks and clears theh swap directory.
+     * It releases any stored blocks and clears the swap directory.
      * @throws IOException
      */
     public static void shutdown() throws IOException {
@@ -155,39 +159,27 @@ public class LargeBlockManager {
         }
     }
 
+    public Future<LargeBlockResponse> submitTask(LargeBlockTask task) {
+        return m_es.submit(task);
+    }
+
     /**
      * Store the given block with the given ID to disk.
-     * @param id           the ID of the block
-     * @param origAddress  the original address of the block
+     * @param blockId      the ID of the block
      * @param block        the bytes for the block
      * @throws IOException
      */
-    public void storeBlock(BlockId blockId, long origAddress, ByteBuffer block) throws IOException {
+    void storeBlock(BlockId blockId, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
             if (m_blockPathMap.containsKey(blockId)) {
                 throw new IllegalArgumentException("Request to store block that is already stored: "
                                                     + blockId.toString());
             }
 
-            // We need to store the original memory address of the block so that the EE
-            // can update pointers to non-inlined data in the tuples, when the block is later loaded.
-            //
-            // At some point the block header will contain more items because
-            // we'll need to track more metadata on disk before the block itself:
-            //   - When we can pass temporary results to the coordinator site in MP plans, we'll need also to store
-            //     the number of tuples in the block.  Currently blocks are loaded and stored in the same EE
-            //     so all metadata is retained there.
-            //   - When we return a large result to the client, we may need a place to
-            //     store the schema of the result.
-            ByteBuffer origAddressBuffer = ByteBuffer.allocate(8);
-            origAddressBuffer.putLong(origAddress);
-            origAddressBuffer.position(0);
-
             int origPosition = block.position();
             block.position(0);
             Path blockPath = makeBlockPath(blockId);
             try (SeekableByteChannel channel = Files.newByteChannel(blockPath, OPEN_OPTIONS, PERMISSIONS)) {
-                channel.write(origAddressBuffer);
                 channel.write(block);
             }
             finally {
@@ -200,43 +192,35 @@ public class LargeBlockManager {
 
     /**
      * Read the block with the given ID into the given byte buffer.
-     * @param id      ID of the block to load
-     * @param block   The block to write the bytes to
+     * @param blockId  block id of the block to load
+     * @param block    The block to write the bytes to
      * @return The original address of the block
      * @throws IOException
      */
-    public long loadBlock(BlockId blockId, ByteBuffer block) throws IOException {
+    void loadBlock(BlockId blockId, ByteBuffer block) throws IOException {
         synchronized (m_accessLock) {
             if (! m_blockPathMap.containsKey(blockId)) {
                 throw new IllegalArgumentException("Request to load block that is not stored: " + blockId);
             }
 
-            ByteBuffer origAddressBuffer = ByteBuffer.allocate(8);
-
             int origPosition = block.position();
             block.position(0);
             Path blockPath = m_blockPathMap.get(blockId);
             try (SeekableByteChannel channel = Files.newByteChannel(blockPath)) {
-                channel.read(origAddressBuffer);
                 channel.read(block);
             }
             finally {
                 block.position(origPosition);
             }
-
-            origAddressBuffer.position(0);
-            long origAddress = origAddressBuffer.getLong();
-            return origAddress;
         }
     }
 
     /**
      * The block with the given site id and block counter is no longer needed, so delete it from disk.
-     * @param siteId         The siteId of the block to release.
-     * @param blockCounter   The ID of the block to release.
+     * @param blockId        The blockId of the block to release.
      * @throws IOException
      */
-    public void releaseBlock(BlockId blockId) throws IOException {
+    void releaseBlock(BlockId blockId) throws IOException {
         synchronized (m_accessLock) {
             if (! m_blockPathMap.containsKey(blockId)) {
                 throw new IllegalArgumentException("Request to release block that is not stored: " + blockId);

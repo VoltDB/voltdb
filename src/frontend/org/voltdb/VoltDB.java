@@ -83,9 +83,6 @@ public class VoltDB {
     public static final int DEFAULT_HTTP_PORT = 8080;
     public static final int DEFAULT_HTTPS_PORT = 8443;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
-    public static final int INITIATOR_SITE_ID = 0;
-    public static final int SITES_TO_HOST_DIVISOR = 100;
-    public static final int MAX_SITES_PER_HOST = 128;
 
     // Staged filenames for advanced deployments
     public static final String INITIALIZED_MARKER = ".initialized";
@@ -918,7 +915,7 @@ public class VoltDB {
             }
 
             if (m_clusterName != null && !m_clusterName.equals(stagedName)) {
-                hostLog.fatal("Cluster name " + m_clusterName + " does not match the name given at initialization " + stagedName);
+                hostLog.fatal("The database root directory has changed. Either initialization did not complete properly or the directory has been corrupted. You must reinitialize the database directory before using it.");
                 referToDocAndExit();
             } else {
                 m_clusterName = stagedName;

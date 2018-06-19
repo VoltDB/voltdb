@@ -369,6 +369,7 @@ class JavaBundle(object):
 
 
     def start(self, verb, runner):
+        verb.add_options(cli.StringOption(None, '--credentials', "credentials", "contains username and password information"))
         pass
 
     def go(self, verb, runner):
@@ -587,6 +588,7 @@ class ConnectionBundle(object):
                            default_port = self.default_port),
             cli.StringOption('-p', '--password', 'password', "the connection password"),
             cli.StringOption('-u', '--user', 'username', 'the connection user name'),
+            cli.StringOption(None, '--credentials', 'credentials', 'the credentials file which contains user name and password'),
             cli.StringOption(None, '--ssl', 'ssl_config','''enable and config ssl''', default=None),
             cli.BooleanOption(None, '--kerberos', 'kerberos', '''enable kerberos'''))
 

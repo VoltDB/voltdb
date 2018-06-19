@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,9 +25,8 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -97,5 +95,9 @@ public class EveryPartitionTask extends TransactionTask
         sb.append("  SP HANDLE ID: ").append(getSpHandle());
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_mailbox.getHSId()));
         return sb.toString();
+    }
+
+    public boolean needCoordination() {
+        return false;
     }
 }

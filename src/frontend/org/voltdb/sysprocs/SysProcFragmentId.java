@@ -221,4 +221,19 @@ public class SysProcFragmentId
     // @SwapTables
     public static final long PF_swapTables = 320;
     public static final long PF_swapTablesAggregate = 321;
+
+    // @PingPartitions
+    public static final long PF_pingPartitions = 330;
+    public static final long PF_pingPartitionsAggregate = 331;
+    public static final long PF_enableScoreboard = 332;
+    public static final long PF_enableScoreboardAggregate = 333;
+
+    // Pause/resume materialized views
+    public static final long PF_setViewEnabled = 340;
+
+    public static boolean isEnableScoreboardFragment(byte[] planHash) {
+        long fragId = VoltSystemProcedure.hashToFragId(planHash);
+
+        return (fragId == PF_enableScoreboard);
+    }
 }

@@ -226,7 +226,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               int remoteClusterId, long undoToken) throws EEException
+                               int remoteClusterId, int remotePartitionId, long undoToken) throws EEException
     {
         throw new UnsupportedOperationException();
     }
@@ -253,5 +253,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
         return 0;
+    }
+
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        return;
     }
 }

@@ -26,10 +26,9 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import junit.framework.TestCase;
-
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
@@ -40,8 +39,11 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.TxnEgo;
 
 import com.google_voltpatches.common.collect.Sets;
+
+import junit.framework.TestCase;
 
 public class TestVoltMessageSerialization extends TestCase {
 
@@ -180,7 +182,7 @@ public class TestVoltMessageSerialization extends TestCase {
     }
 
     public void testFragmentTask() throws IOException {
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false, false, TransactionInfoBaseMessage.INITIAL_TIMESTAMP);
         ft.addFragment(new byte[20], 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
         ft.setBatch(75);
@@ -216,7 +218,7 @@ public class TestVoltMessageSerialization extends TestCase {
         param_set2.flattenToBuffer(param2_buf);
         param2_buf.flip();
 
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false, false, TransactionInfoBaseMessage.INITIAL_TIMESTAMP);
         ft.addFragment(new byte[20], 12, param1_buf);
         ft.addFragment(new byte[20], 24, param2_buf);
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
@@ -255,7 +257,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testFragmentTaskWithInitiateTask() throws IOException {
         // The fragment task.
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false, false, TransactionInfoBaseMessage.INITIAL_TIMESTAMP);
         ft.addFragment(new byte[20], 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
@@ -309,7 +311,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
 
     public void testFragmentResponse() throws IOException {
-        FragmentTaskMessage ft = new FragmentTaskMessage(15, 12, 37, 99, false, false, false);
+        FragmentTaskMessage ft = new FragmentTaskMessage(15, 12, 37, 99, false, false, false, false, TransactionInfoBaseMessage.INITIAL_TIMESTAMP);
 
         VoltTable table = new VoltTable(
                 new VoltTable.ColumnInfo("bearhugg", VoltType.STRING)
@@ -371,7 +373,7 @@ public class TestVoltMessageSerialization extends TestCase {
     {
         CompleteTransactionMessage ctm =
             new CompleteTransactionMessage(12345, 54321, 67890, false, 77, false,
-                                           true, false, true);
+                                           true, false, true, false, false);
 
         CompleteTransactionMessage ctm2 = (CompleteTransactionMessage) checkVoltMessage(ctm);
         assertEquals(ctm.m_isRollback, ctm2.m_isRollback);
@@ -384,7 +386,7 @@ public class TestVoltMessageSerialization extends TestCase {
     {
         CompleteTransactionMessage ctm =
             new CompleteTransactionMessage(12345, 54321, 67890, false, 0, false,
-                                           true, false, true);
+                                           true, false, true, false, false);
 
         CompleteTransactionResponseMessage ctrm =
             new CompleteTransactionResponseMessage(ctm);
@@ -486,5 +488,21 @@ public class TestVoltMessageSerialization extends TestCase {
         } catch(IOException e) {
             assertTrue(e.getMessage().contains("is negative"));
         }
+    }
+
+    public static FragmentTaskMessage createFragmentTaskMessage(long txnId, boolean readOnly, long destHSId, Iv2InitiateTaskMessage initTask) {
+        FragmentTaskMessage frag =
+            new FragmentTaskMessage(destHSId, // don't care
+                                    destHSId, // don't care
+                                    txnId,
+                                    System.currentTimeMillis(),
+                                    readOnly,
+                                    false,
+                                    false,
+                                    false,
+                                    TransactionInfoBaseMessage.INITIAL_TIMESTAMP);
+        frag.m_initiateTask = initTask;
+        frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
+        return frag;
     }
 }

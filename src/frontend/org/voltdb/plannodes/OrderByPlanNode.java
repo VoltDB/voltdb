@@ -80,11 +80,23 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * Add a sort to the order-by
+     * Add multiple sort expressions to the order-by
+     * @param sortExprs  List of the input expression on which to order the rows
+     * @param sortDirs List of the corresponding sort order for each input expression
+     */
+    public void addSortExpressions(List<AbstractExpression> sortExprs, List<SortDirectionType> sortDirs) {
+        assert(sortExprs.size() == sortDirs.size());
+        for (int i = 0; i < sortExprs.size(); ++i) {
+            addSortExpression(sortExprs.get(i), sortDirs.get(i));
+        }
+    }
+
+    /**
+     * Add a sort expression to the order-by
      * @param sortExpr  The input expression on which to order the rows
      * @param sortDir
      */
-    public void addSort(AbstractExpression sortExpr, SortDirectionType sortDir)
+    public void addSortExpression(AbstractExpression sortExpr, SortDirectionType sortDir)
     {
         assert(sortExpr != null);
         // PlanNodes all need private deep copies of expressions

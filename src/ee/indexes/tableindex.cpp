@@ -45,7 +45,6 @@
 
 #include <iostream>
 #include "indexes/tableindex.h"
-#include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "storage/TableCatalogDelegate.hpp"
 

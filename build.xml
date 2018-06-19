@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
-<project default="default" 
-         name="VoltDB" 
+<project default="default"
+         name="VoltDB"
          xmlns:if="ant:if"
          xmlns:unless="ant:unless"
          xmlns:jacoco="antlib:org.jacoco.ant">
@@ -135,11 +135,17 @@
     <not><isset property="volt.client.memory"/></not>
 </condition>
 
-<!-- Default always round trip DDL in junit. Jenkins will turn this off on master  -->
+<!-- Default is that debug logging is turned off  -->
 <condition property="VOLT_LOG_LEVEL" value="500">
     <not><isset property="VOLT_LOG_LEVEL"/></not>
 </condition>
 
+<!-- By default, do not do extra checking on the EE memory pools  -->
+<condition property="VOLT_POOL_CHECKING" value="false">
+    <not><isset property="VOLT_POOL_CHECKING"/></not>
+</condition>
+
+<!-- Default always round trip DDL in junit. Jenkins will turn this off on master  -->
 <condition property="verifycatalogdebug" value="true">
     <not><isset property="verifycatalogdebug"/></not>
 </condition>
@@ -953,7 +959,7 @@ CLEANING
     <arg line="-c 'rm -rf voltdb/*.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -rf voltdb/*.so voltdb/*.jnilib'"/>
+    <arg line="-c 'rm -rf voltdb/*.so voltdb/*.jnilib voltdb/*.dylib'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf src/ee/catalog/*'"/>
@@ -1456,6 +1462,7 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
@@ -1475,6 +1482,7 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
@@ -1492,6 +1500,7 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
@@ -1509,6 +1518,7 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
@@ -1527,6 +1537,7 @@ NATIVE EE STUFF
         <arg line="--generator='${cmake.generator}'" />
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
+        <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
@@ -2143,6 +2154,9 @@ TEST CASES
     <condition property="config_verbose" value="-r" else="">
         <isset property="sql_coverage_verbose"/>
     </condition>
+    <condition property="config_reproduce" value="-R ${reproduce}" else="">
+        <isset property="reproduce"/>
+    </condition>
     <condition property="config_genonly" value="-g" else="">
         <isset property="sql_coverage_genonly"/>
     </condition>
@@ -2203,6 +2217,7 @@ TEST CASES
         <arg line="${config_invalid}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />
+        <arg line="${config_reproduce}" />
         <arg file="${sqlcov.dir}" />
         <arg line='"${simpleserver.command}"' />
         <arg line="${hostname}" />

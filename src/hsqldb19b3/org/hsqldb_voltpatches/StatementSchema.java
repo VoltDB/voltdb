@@ -110,6 +110,7 @@ public class StatementSchema extends Statement {
             case StatementTypes.ALTER_TYPE :
             case StatementTypes.ALTER_TABLE :
             case StatementTypes.ALTER_TRANSFORM :
+            case StatementTypes.ALTER_TTL :
                 group = StatementTypes.X_SQL_SCHEMA_MANIPULATION;
                 break;
 
@@ -133,6 +134,7 @@ public class StatementSchema extends Statement {
             case StatementTypes.DROP_INDEX :
             case StatementTypes.DROP_CONSTRAINT :
             case StatementTypes.DROP_COLUMN :
+            case StatementTypes.DROP_TTL:
                 group = StatementTypes.X_SQL_SCHEMA_MANIPULATION;
                 break;
 
@@ -415,6 +417,33 @@ public class StatementSchema extends Statement {
 
                     tableWorks.dropColumn(colindex, cascade);
 
+                    break;
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+            }
+            case StatementTypes.DROP_TTL : {
+                try {
+                    HsqlName name       = (HsqlName) arguments[0];
+                    Table table = session.database.schemaManager.getUserTable(session, name);
+                    checkSchemaUpdateAuthorisation(session, table.getSchemaName());
+                    session.commit(false);
+                    table.dropTTL();
+                    break;
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+            }
+            case StatementTypes.ALTER_TTL : {
+                try {
+                    HsqlName name       = (HsqlName) arguments[0];
+                    Table table = session.database.schemaManager.getUserTable(session, name);
+                    checkSchemaUpdateAuthorisation(session, table.getSchemaName());
+                    session.commit(false);
+                    int ttlValue = (Integer) arguments[1];
+                    String ttlUnit = (String)arguments[2];
+                    String ttlColumn = (String)arguments[3];
+                    table.alterTTL(ttlValue, ttlUnit, ttlColumn);
                     break;
                 } catch (HsqlException e) {
                     return Result.newErrorResult(e, sql);
@@ -975,7 +1004,7 @@ public class StatementSchema extends Statement {
                         tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique, predicate).setAssumeUnique(assumeUnique);
                         break;
                     }
-                    org.hsqldb_voltpatches.index.Index addedIndex = 
+                    org.hsqldb_voltpatches.index.Index addedIndex =
                     tableWorks.addIndex(indexColumns, name, unique, predicate);
                     // End of VoltDB extension
                     // tableWorks.addIndex(indexColumns, name, unique);

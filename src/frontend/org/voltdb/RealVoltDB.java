@@ -144,6 +144,7 @@ import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
@@ -238,9 +239,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "8.1";
+    static final String m_defaultVersionString = "8.2";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q8.1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q8.2\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -772,7 +773,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
-     * @param config configuration that gets passed in from commandline.
+     * @param config configuration that gets passed in from command line.
      */
     @Override
     public void initialize(Configuration config) {
@@ -828,7 +829,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (m_licenseApi.isPro()) edition = "Pro Edition";
                     if (m_licenseApi.isEnterpriseTrial()) edition = "Enterprise Edition";
                     if (m_licenseApi.isProTrial()) edition = "Pro Edition";
-                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
+                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Edition";
                 }
 
                 // this also prints out the license type on the console
@@ -956,7 +957,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_startMode = OperationMode.RUNNING;
 
             // set a bunch of things to null/empty/new for tests
-            // which reusue the process
+            // which reuse the process
             m_safeMpTxnId = Long.MAX_VALUE;
             m_lastSeenMpTxnId = Long.MIN_VALUE;
             m_clientInterface = null;
@@ -1100,7 +1101,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 setStartMode(OperationMode.PAUSED);
             }
 
-            // Create the thread pool here. It's needed by buildClusterMesh()
+            // Create the thread pool here.
             m_periodicWorkThread =
                     CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
             m_periodicPriorityWorkThread =
@@ -1143,10 +1144,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 Class<?> elasticJoinCoordClass =
                         MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
+                    int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+                    if(determination.startAction == StartAction.JOIN && kfactor > 0) {
+                        int kfactorPlusOne = kfactor + 1;
+                        String waitMessage = "The join process will begin after a total of " + kfactorPlusOne + " nodes are added, waiting...";
+                        consoleLog.info(waitMessage);
+                    }
                     Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
                     m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
                     m_messenger.registerMailbox(m_joinCoordinator);
-                    m_joinCoordinator.initialize(m_catalogContext.getDeployment().getCluster().getKfactor());
+                    m_joinCoordinator.initialize(kfactor);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
                 }
@@ -1221,7 +1228,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 for (Initiator ii : m_iv2Initiators.values()) {
                     localHSIds.add(ii.getInitiatorHSId());
                 }
-                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
+                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent(), m_globalServiceElector.getLeaderElectorNode());
                 m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
 
                 // Make a list of HDIds to join
@@ -1258,6 +1265,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // do the many init tasks in the Inits class
             Inits inits = new Inits(m_statusTracker, this, 1, m_durable);
             inits.doInitializationWork();
+
+            int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+            if(determination.startAction == StartAction.JOIN && kfactor > 0) {
+                int kfactorPlusOne = kfactor + 1;
+                String waitMessage = "" + kfactorPlusOne + " nodes added, joining new nodes to the cluster...";
+                consoleLog.info(waitMessage);
+            }
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
             // This is done under Inits.doInitializationWork(), so need to wait until we get here.
@@ -1420,7 +1434,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             m_memoryStats,
                             m_commandLog,
                             m_config.m_executionCoreBindings.poll(),
-                            shouldInitiatorCreateMPDRGateway(iv2init));
+                            isLowestSiteId(iv2init));
                 }
 
                 // LeaderAppointer startup blocks if the initiators are not initialized.
@@ -1549,7 +1563,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             assert (m_clientInterface != null);
             m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
-
+            TTLManager.initialze();
+            getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, TTLManager.instance());
             // Start elastic join service
             try {
                 if (m_config.m_isEnterprise) {
@@ -2083,12 +2098,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                 List<Integer> m_partitionsToSitesAtStartupForExportInit)
     {
         TreeMap<Integer, Initiator> initiators = new TreeMap<>();
+        // Needed when static is reused by ServerThread
+        TransactionTaskQueue.resetScoreboards(m_messenger.getNextSiteId(), m_nodeSettings.getLocalSitesCount());
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
                     m_snapshotCompletionMonitor, startAction);
             initiators.put(partition, initiator);
             m_partitionsToSitesAtStartupForExportInit.add(partition);
+        }
+        if (StartAction.JOIN.equals(startAction)) {
+            TransactionTaskQueue.initBarrier(m_nodeSettings.getLocalSitesCount());
         }
         return initiators;
     }
@@ -2450,6 +2470,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     consoleLog.error("Command logging is not supported " +
                             "in the community edition of VoltDB.");
                     shutdownDeployment = true;
+                }
+                if (deployment.getDr() != null && deployment.getDr().getRole() != DrRoleType.NONE) {
+                    consoleLog.warn("Database Replication is not supported " +
+                            "in the community edition of VoltDB.");
                 }
                 // check the start action for the community edition
                 if (m_config.m_startAction == StartAction.JOIN) {
@@ -2827,8 +2851,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     //TODO: Is there a better place for this ssl setup work and constant defns
-    private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
-    private static final String DEFAULT_KEYSTORE_PASSWD = "password";
     private void setupSSL(ReadDeploymentResults readDepl) {
         SslType sslType = readDepl.deployment.getSsl();
         m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
@@ -2867,7 +2889,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private SslContextFactory getSSLContextFactory(SslType sslType) {
         SslContextFactory sslContextFactory = new SslContextFactory();
         String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
-        keyStorePath = null == keyStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
+        keyStorePath = null == keyStorePath  ? getResourcePath(Constants.DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
         if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
             throw new IllegalArgumentException("A path for the SSL keystore file was not specified.");
         }
@@ -2877,8 +2899,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sslContextFactory.setKeyStorePath(keyStorePath);
 
         String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
-        if (m_config.m_sslEnable && null == keyStorePassword) {
-            keyStorePassword = DEFAULT_KEYSTORE_PASSWD;
+        if (null == keyStorePassword) {
+            keyStorePassword = Constants.DEFAULT_KEYSTORE_PASSWD;
         }
         if (keyStorePassword == null) {
             throw new IllegalArgumentException("An SSL keystore password was not specified.");
@@ -2886,9 +2908,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sslContextFactory.setKeyStorePassword(keyStorePassword);
 
         String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-        if (m_config.m_sslEnable) {
-            trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
-        }
+        trustStorePath = null == trustStorePath  ? getResourcePath(Constants.DEFAULT_TRUSTSTORE_RESOURCE):getResourcePath(trustStorePath);
         if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
             throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
         }
@@ -2898,13 +2918,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         sslContextFactory.setTrustStorePath(trustStorePath);
 
         String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
-        if (m_config.m_sslEnable && null == trustStorePassword) {
-            trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+        if (null == trustStorePassword) {
+            trustStorePassword = Constants.DEFAULT_TRUSTSTORE_PASSWD;
         }
         if (trustStorePassword == null) {
             throw new IllegalArgumentException("An SSL truststore password was not specified.");
         }
         sslContextFactory.setTrustStorePassword(trustStorePassword);
+
         // exclude weak ciphers
         sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
                 "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
@@ -3306,6 +3327,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
 
+                if (m_catalogContext.m_ptool.getAdHocLargeFallbackCount() > 0) {
+                    hostLog.info(String.format("%d queries planned through @AdHocLarge were converted to normal @AdHoc plans.",
+                            m_catalogContext.m_ptool.getAdHocLargeFallbackCount()));
+                }
                 /*
                  * Various scheduled tasks get crashy in unit tests if they happen to run
                  * while other stuff is being shut down. Double catch of throwable is only for the sake of tests.
@@ -3321,7 +3346,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();
-
+                TTLManager.instance().shutDown();
                 // clear resMonitorWork
                 resMonitorWork = null;
 
@@ -3435,7 +3460,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 PartitionDRGateway.m_partitionDRGateways = ImmutableMap.of();
-
                 // probably unnecessary, but for tests it's nice because it
                 // will do the memory checking and run finalizers
                 System.gc();
@@ -3745,6 +3769,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 //Before starting resource monitor update any Snmp configuration changes.
                 if (m_snmp != null) {
                     m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
+                }
+
+                //TTL control works on the host with MPI
+                if (m_myHostId == CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMultiPartitionInitiator())) {
+                    TTLManager.instance().scheduleTTLTasks();
                 }
                 // restart resource usage monitoring task
                 startHealthMonitor();
@@ -4375,7 +4404,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 for (Initiator iv2init : m_iv2Initiators.values()) {
                     iv2init.initDRGateway(m_config.m_startAction,
                                           m_producerDRGateway,
-                                          shouldInitiatorCreateMPDRGateway(iv2init));
+                                          isLowestSiteId(iv2init));
                 }
 
                 m_producerDRGateway.truncateDRLog();
@@ -4408,7 +4437,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private boolean shouldInitiatorCreateMPDRGateway(Initiator initiator) {
+    private boolean isLowestSiteId(Initiator initiator) {
         // The initiator map is sorted, the initiator that has the lowest local
         // partition ID gets to create the MP DR gateway
         return initiator.getPartitionId() == m_iv2Initiators.firstKey();
@@ -4846,6 +4875,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public HTTPAdminListener getHttpAdminListener() {
         return m_adminListener;
+    }
+
+    @Override
+    public long getLowestSiteId() {
+        return m_iv2Initiators.firstEntry().getValue().getInitiatorHSId();
+    }
+
+    @Override
+    public int getLowestPartitionId() {
+        return m_iv2Initiators.firstKey();
+    }
+
+    public void updateReplicaForJoin(long siteId, long txnId) {
+        m_iv2Initiators.values().stream().filter(p->p.getInitiatorHSId() == siteId)
+            .forEach(s->((SpInitiator)s).updateReplicasForJoin(txnId));
+    }
+
+    @Override
+    public int getKFactor() {
+        return (m_catalogContext == null) ? 0 :
+                   getCatalogContext().getDeployment().getCluster().getKfactor();
+    }
+
+    @Override
+    public boolean isJoining() {
+        return m_joining;
     }
 }
 

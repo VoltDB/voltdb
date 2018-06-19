@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -1292,17 +1293,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
             final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
             final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
+            final boolean leaderMigration = jsObj.getBoolean(Cartographer.JSON_LEADER_MIGRATION);
             for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
                 try {
                     cihm.connection.queueTask(new Runnable() {
                         @Override
                         public void run() {
-                            failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                            if (leaderMigration) {
+                                if (cihm.repairCallback != null) {
+                                    cihm.repairCallback.leaderMigrated(partitionId, initiatorHSId);
+                                }
+                            } else {
+                                failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                            }
                         }
                     });
                 } catch (UnsupportedOperationException ignore) {
                     // In case some internal connections don't implement queueTask()
-                    failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                    if (leaderMigration) {
+                        if (cihm.repairCallback != null) {
+                            cihm.repairCallback.leaderMigrated(partitionId, initiatorHSId);
+                        }
+                    } else {
+                        failOverConnection(partitionId, initiatorHSId, cihm.connection);
+                    }
                 }
             }
 
@@ -2300,6 +2314,41 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         () -> {VoltZK.removeActionBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
                         5, 0, TimeUnit.SECONDS);
             }
+        }
+    }
+
+    public void runTimeToLive(String tableName, String columnName, long ttlValue, int chunkSize, int timeout,
+            TTLManager.TTLStats stats, TTLManager.TTLTask task) {
+
+        CountDownLatch latch = new CountDownLatch(1);
+        final ProcedureCallback cb = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse resp) throws Exception {
+                if (resp.getStatus() != ClientResponse.SUCCESS) {
+                    hostLog.warn(String.format("Fail to execute TTL on table:%s, column:%s, status:%",
+                            tableName, columnName, resp.getStatusString()));
+                }
+                VoltTable t = resp.getResults()[0];
+                t.advanceRow();
+                String error = t.getString("MESSAGE");
+                if (!error.isEmpty()) {
+                    hostLog.warn("Errors occured when running TTL on table " + tableName + ":" +  error);
+                    if (error.indexOf(TTLManager.DR_LIMIT_MSG) > -1) {
+                        //over DR limit
+                        hostLog.warn("TTL is disabled for table " + tableName);
+                        task.cancel();
+                    }
+                } else {
+                    stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"), t.getLong("LAST_DELETE_TIMESTAMP"));
+                }
+                latch.countDown();
+            }
+        };
+        m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
+                true, 1000 * 120, cb, "@LowImpactDelete", new Object[] {tableName, columnName, ttlValue, "<", chunkSize, timeout});
+        try {
+            latch.await(1, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
         }
     }
 }

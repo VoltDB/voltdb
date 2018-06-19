@@ -35,6 +35,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.ReplicatedTableException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
@@ -47,7 +48,7 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
 
-public class SysprocFragmentTask extends TransactionTask
+public class SysprocFragmentTask extends FragmentTaskBase
 {
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
@@ -119,6 +120,9 @@ public class SysprocFragmentTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         waitOnDurabilityBackpressureFuture();
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + this);
+        }
         if (!m_txnState.isReadOnly()) {
             if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
@@ -145,6 +149,9 @@ public class SysprocFragmentTask extends TransactionTask
         response.setRespBufferable(m_respBufferable);
         response.setForOldLeader(m_fragmentMsg.isForOldLeader());
         m_initiator.deliver(response);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE: " + this);
+        }
     }
 
     /**
@@ -160,13 +167,19 @@ public class SysprocFragmentTask extends TransactionTask
                     "The rejoining node's VoltDB process will now exit.", false, null);
         }
 
-        //If this is a snapshot creation we have the nonce of the snapshot
-        //Provide it to the site so it can decide to enable recording in the task log
-        //if it is our rejoin snapshot start
-        if (SysProcFragmentId.isFirstSnapshotFragment(m_fragmentMsg.getPlanHash(0))) {
-            siteConnection.notifyOfSnapshotNonce((String)m_fragmentMsg.getParameterSetForFragment(0).toArray()[1],
-                    m_fragmentMsg.getSpHandle());
+        // special case for @PingPartitions for re-enabling scoreboard
+        if (SysProcFragmentId.isEnableScoreboardFragment(m_fragmentMsg.getPlanHash(0)) &&
+                ! m_queue.scoreboardEnabled()) {
+            // enable scoreboard
+            // For handling the rare corner case of MPI Failover during handling the last @PingPartitions,
+            // We would better to enable the scoreboard atomically. This requires a barrier for ensuring all sites has seen this last fragments.
+            if (m_queue.enableScoreboard()) {
+                // queue to the scoreboard
+                m_queue.offer(this);
+                return;
+            }
         }
+
         taskLog.logTask(m_fragmentMsg);
 
         respondWithDummy();
@@ -175,6 +188,9 @@ public class SysprocFragmentTask extends TransactionTask
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("START replaying txn: " + this);
+        }
         if (!m_txnState.isReadOnly()) {
             if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
@@ -182,6 +198,9 @@ public class SysprocFragmentTask extends TransactionTask
         }
 
         processFragmentTask(siteConnection);
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("COMPLETE replaying txn: " + this);
+        }
     }
 
 
@@ -243,6 +262,17 @@ public class SysprocFragmentTask extends TransactionTask
                                     m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
+            } catch (final ReplicatedTableException e) {
+                hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
+                        new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
+                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(new
+                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                                    m_rawDummyResult, 0, m_rawDummyResult.length));
+                }
+                break;
             }
             catch (final SpecifiedException e) {
                 // Note that with SpecifiedException, the error code here might get changed before
@@ -289,6 +319,23 @@ public class SysprocFragmentTask extends TransactionTask
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        sb.append("  TIMESTAMP: ");
+        MpRestartSequenceGenerator.restartSeqIdToString(getTimestamp(), sb);
+        sb.append("  FRAGMENT ID: ").append(VoltSystemProcedure.hashToFragId(m_fragmentMsg.getPlanHash(0)));
+
         return sb.toString();
+    }
+
+    public boolean needCoordination() {
+        return !(m_txnState.isReadOnly() || isBorrowedTask() || m_isNPartition);
+    }
+
+    public boolean isBorrowedTask() {
+        return false;
+    }
+
+    @Override
+    public long getTimestamp() {
+        return m_fragmentMsg.getTimestamp();
     }
 }

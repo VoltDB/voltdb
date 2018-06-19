@@ -101,6 +101,7 @@ public class ExportToFileClient extends ExportClientBase {
 
     protected boolean m_batched;
     protected boolean m_withSchema;
+    protected boolean m_uniquenames;
 
     protected final ReentrantReadWriteLock m_batchLock = new ReentrantReadWriteLock();
 
@@ -178,49 +179,48 @@ public class ExportToFileClient extends ExportClientBase {
                 this.creationTime = System.currentTimeMillis();
             }
 
-            String getPath(String prefix) {
-                if (m_batched) {
-                    return m_dirContainingFiles.getPath() +
-                           File.separator +
-                           generation +
-                           "-" +
-                           tableName +
-                           m_extension;
+            String getPathUtility(String extension, String hostId, String prefix) {
+                String res = "";
+                if(m_batched) {
+                    res = m_dirContainingFiles.getPath() +
+                          File.separator +
+                          generation +
+                          "-" +
+                          tableName +
+                          hostId +
+                          extension;
                 }
                 else {
-                    return m_dirContainingFiles.getPath() +
-                           File.separator +
-                           prefix +
-                           m_nonce +
-                           "-" +
-                           generation +
-                           "-" +
-                           tableName +
-                           "-" +
-                           m_dateformat.get().format(start) +
-                           m_extension;
+                    res = m_dirContainingFiles.getPath() +
+                          File.separator +
+                          prefix +
+                          m_nonce +
+                          "-" +
+                          generation +
+                          "-" +
+                          tableName +
+                          "-" +
+                          m_dateformat.get().format(start) +
+                          hostId +
+                          extension;
                 }
+                return res;
+            }
+
+            String getPath(String prefix) {
+                String hostId = "";
+                if(m_uniquenames) {
+                    hostId = "-("+VoltDB.instance().getHostMessenger().getHostId()+")";
+                }
+                return getPathUtility(m_extension, hostId, prefix);
             }
 
             String getPathForSchema() {
-                if (m_batched) {
-                    return m_dirContainingFiles.getPath() +
-                           File.separator +
-                           generation +
-                           "-" +
-                           tableName +
-                           "-schema.json";
+                String hostId = "";
+                if(m_uniquenames) {
+                    hostId = "-("+VoltDB.instance().getHostMessenger().getHostId()+")";
                 }
-                else {
-                    return m_dirContainingFiles.getPath() +
-                           File.separator +
-                           m_nonce +
-                           "-" +
-                           generation +
-                           "-" +
-                           tableName +
-                           "-schema.json";
-                }
+                return getPathUtility("-schema.json", hostId, "");
             }
 
             @Override
@@ -627,7 +627,6 @@ public class ExportToFileClient extends ExportClientBase {
                 } finally {
                     m_batchLock.writeLock().unlock();
                 }
-
             }
         }
 
@@ -842,6 +841,7 @@ public class ExportToFileClient extends ExportClientBase {
 
         BinaryEncoding encoding = BinaryEncoding.valueOf(
                 conf.getProperty("binaryencoding", "HEX").trim().toUpperCase());
+        boolean uniquenames = Boolean.parseBoolean(conf.getProperty("uniquenames"));
 
         //Dont do actual config in check mode.
         boolean configcheck = Boolean.parseBoolean(conf.getProperty(ExportManager.CONFIG_CHECK_ONLY, "false"));
@@ -860,7 +860,8 @@ public class ExportToFileClient extends ExportClientBase {
                 batched,
                 withSchema,
                 tz,
-                encoding);
+                encoding,
+                uniquenames);
     }
 
     private void configureInternal(
@@ -874,7 +875,8 @@ public class ExportToFileClient extends ExportClientBase {
                               final boolean batched,
                               final boolean withSchema,
                               final TimeZone tz,
-                              final BinaryEncoding be) {
+                              final BinaryEncoding be,
+                              final boolean uniquenames) {
         m_delimiter = delimiter;
         m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
@@ -896,6 +898,7 @@ public class ExportToFileClient extends ExportClientBase {
         m_skipinternal = skipinternal;
         m_batched = batched;
         m_withSchema = withSchema;
+        m_uniquenames = uniquenames;
 
         if (fullDelimiters != null) {
             fullDelimiters = StringEscapeUtils.unescapeHtml4(fullDelimiters);

@@ -39,6 +39,8 @@ public abstract class DependencyPair {
 
     public abstract VoltTable getTableDependency();
 
+    public int getDRBufferChange() {return 0;}
+
     /*
      * Concrete class for a DependencyPair that is created from a VoltTable but may
      * need to be serialized into a ByteArray.
@@ -73,17 +75,22 @@ public abstract class DependencyPair {
         private final byte[] dependencyByteArray;
         private final int startPosition;
         private final int totalLen;
+        private final int drBufferChange;
         private VoltTable dependencyTable = null;
 
         public BufferDependencyPair(int depId, byte[] dependency, int startPosition, int totalLen) {
+            this(depId, dependency, startPosition, totalLen, 0);
+        }
+
+        public BufferDependencyPair(int depId, byte[] dependency, int startPosition, int totalLen, int drBufferSize) {
             super(depId);
             assert(dependency != null);
             assert(dependency.length >= 4);
             this.dependencyByteArray = dependency;
             this.startPosition = startPosition;
             this.totalLen = totalLen;
+            this.drBufferChange = drBufferSize;
         }
-
 
         public ByteBuffer getBufferDependency() {
             return ByteBuffer.wrap(dependencyByteArray, startPosition, totalLen);
@@ -94,6 +101,11 @@ public abstract class DependencyPair {
                 dependencyTable = PrivateVoltTableFactory.createVoltTableFromByteArray(dependencyByteArray, startPosition, totalLen);
             }
             return dependencyTable;
+        }
+
+        @Override
+        public int getDRBufferChange() {
+            return drBufferChange;
         }
     }
 }

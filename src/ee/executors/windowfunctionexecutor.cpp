@@ -17,16 +17,7 @@
 
 #include "executors/windowfunctionexecutor.h"
 
-#include <sstream>
-#include <memory>
-#include <limits.h>
-
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
-#include "execution/ExecutorVector.h"
 #include "execution/ProgressMonitorProxy.h"
-#include "expressions/dateconstants.h"
-#include "plannodes/windowfunctionnode.h"
 #include "storage/tableiterator.h"
 
 namespace voltdb {
@@ -48,8 +39,8 @@ struct TableWindow {
     std::string debug() {
         std::stringstream stream;
         stream << "Table Window: [Middle: "
-                << m_middleEdge.getLocation() << ", Leading: "
-                << m_leadingEdge.getLocation() << "], "
+                << m_middleEdge.getFoundTuples() << ", Leading: "
+                << m_leadingEdge.getFoundTuples() << "], "
                 << "ssize = " << m_orderByGroupSize
                 << "\n";
         return stream.str();
@@ -671,7 +662,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     return true;
 }
 
-WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType     edgeType, TableWindow &tableWindow)
+WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType edgeType, TableWindow &tableWindow)
 {
     // This is just an alias for the buffered input tuple.
     TableTuple &nextTuple = getBufferedInputTuple();

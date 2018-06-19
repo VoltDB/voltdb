@@ -20,12 +20,16 @@ package org.voltdb.iv2;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.FragmentTaskMessage;
 
 public class ParticipantTransactionState extends TransactionState
 {
-    ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice)
+    final boolean m_npTransaction;
+
+    ParticipantTransactionState(long txnId, FragmentTaskMessage notice)
     {
         super(null, notice);
+        m_npTransaction = notice.isNPartTxn();
     }
 
     /**
@@ -34,9 +38,10 @@ public class ParticipantTransactionState extends TransactionState
      * @param notice
      * @param readOnly
      */
-    ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice, boolean readOnly)
+    ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice, boolean readOnly, boolean npTransaction)
     {
         super(null, notice, readOnly);
+        m_npTransaction = npTransaction;
     }
 
     @Override

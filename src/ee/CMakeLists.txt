@@ -62,6 +62,7 @@ BANNER("Configuring the VoltDB Execution Engine Runtime."
        "${PROJECT_NAME}:        PROJECT_BINARY_DIRECTORY is ${${PROJECT_NAME}_BINARY_DIR}"
        "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
        "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
+       "VOLT_POOL_CHECKING:     ${VOLT_POOL_CHECKING}"
    )
 
 IF ( (CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND ( (CMAKE_VERSION VERSION_GREATER 3.0.0) OR (CMAKE_VERSION VERSION_EQUAL 3.0.0) ) )
@@ -129,6 +130,7 @@ SET (VOLTDB_SRC
   catalog/table.cpp
   catalog/tableref.cpp
   common/debuglog.cpp
+  common/ExecuteWithMpMemory.cpp
   common/executorcontext.cpp
   common/FatalException.cpp
   common/InterruptException.cpp
@@ -143,6 +145,7 @@ SET (VOLTDB_SRC
   common/SQLException.cpp
   common/StreamPredicateList.cpp
   common/StringRef.cpp
+  common/SynchronizedThreadLock.cpp
   common/tabletuple.cpp
   common/ThreadLocalPool.cpp
   common/Topend.cpp
@@ -152,9 +155,11 @@ SET (VOLTDB_SRC
   common/types.cpp
   common/UndoLog.cpp
   common/ValueFactory.cpp
+  common/UndoReleaseAction.cpp
   execution/ExecutorVector.cpp
   execution/FragmentManager.cpp
   execution/JNITopend.cpp
+  execution/ProgressMonitorProxy.cpp
   execution/VoltDBEngine.cpp
   executors/abstractexecutor.cpp
   executors/abstractjoinexecutor.cpp
@@ -166,6 +171,7 @@ SET (VOLTDB_SRC
   executors/indexcountexecutor.cpp
   executors/indexscanexecutor.cpp
   executors/insertexecutor.cpp
+  executors/largeorderbyexecutor.cpp
   executors/limitexecutor.cpp
   executors/materializedscanexecutor.cpp
   executors/materializeexecutor.cpp
@@ -269,6 +275,7 @@ SET (VOLTDB_SRC
   storage/TupleBlock.cpp
   storage/TupleStreamBase.cpp
   structures/ContiguousAllocator.cpp
+  structures/CompactingPool.cpp
 )
 
 ########################################################################
@@ -278,9 +285,9 @@ SET (VOLTDB_SRC
 #
 ########################################################################
 SET (VOLTDB_THIRD_PARTY_SRC
-  ${CMAKE_SOURCE_DIR}/third_party/cpp/jsoncpp/jsoncpp.cpp
   ${CMAKE_SOURCE_DIR}/third_party/cpp/crc/crc32c.cc
   ${CMAKE_SOURCE_DIR}/third_party/cpp/crc/crc32ctables.cc
+  ${CMAKE_SOURCE_DIR}/third_party/cpp/jsoncpp/jsoncpp.cpp
   ${CMAKE_SOURCE_DIR}/third_party/cpp/murmur3/MurmurHash3.cpp
   ${CMAKE_SOURCE_DIR}/third_party/cpp/sha1/sha1.cpp
 )

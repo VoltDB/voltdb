@@ -27,6 +27,7 @@ from voltcli import environment
 from voltcli import utility
 from getpass import getpass
 
+
 #===============================================================================
 # Global data
 #===============================================================================
@@ -674,6 +675,24 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
     # Parse the command line.
     parser = VoltCLIParser(verbspace)
     command = parser.parse(*args)
+
+    """
+    Read username/password from txt file
+    """
+    if hasattr(command.opts, 'credentials') and command.opts.credentials is not None:
+        credentials = command.opts.credentials
+        try:
+            credentialsFile = open(credentials, "r")
+        except IOError:
+            print "Credentials file not found or permission denied."
+        else:
+            content = ""
+            for line in credentialsFile:
+                content += line
+            user,usr,password,pswd = content.replace(':', ' ').split()
+            command.opts.username = usr
+            command.opts.password = pswd
+            credentialsFile.close()
 
     # Initialize utility function options according to parsed options.
     utility.set_verbose(command.opts.verbose)

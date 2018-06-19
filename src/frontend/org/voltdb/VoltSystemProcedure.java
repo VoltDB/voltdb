@@ -162,7 +162,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         // the stack frame drop terminates the recursion and resumes
         // execution of the current stored procedure.
         assert (txnState != null);
-        txnState.setupProcedureResume(false, new int[] { aggregatorOutputDependencyId });
+        txnState.setupProcedureResume(new int[] { aggregatorOutputDependencyId });
 
         final ArrayList<VoltTable> results = new ArrayList<>();
         executeSysProcPlanFragmentsAsync(pfs);
@@ -200,7 +200,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     public void executeSysProcPlanFragmentsAsync(
             SynthesizedPlanFragment pfs[]) {
 
-        TransactionState txnState = m_runner.getTxnState();
+        MpTransactionState txnState = (MpTransactionState)m_runner.getTxnState();
+        assert(txnState != null);
 
         int fragmentIndex = 0;
         for (SynthesizedPlanFragment pf : pfs) {
@@ -222,7 +223,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     pf.outputDepId,
                     pf.parameters,
                     false,
-                    txnState.isForReplay());
+                    txnState.isForReplay(),
+                    txnState.isNPartTxn(),
+                    txnState.getTimetamp());
 
             //During @MigratePartitionLeader, a fragment may be mis-routed. fragmentIndex is used to check which fragment is mis-routed and
             //to determine how the follow-up fragments are processed.

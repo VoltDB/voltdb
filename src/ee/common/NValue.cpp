@@ -19,12 +19,6 @@
 #include "common/StlFriendlyNValue.h"
 #include "common/executorcontext.hpp"
 #include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
-#include "logging/LogManager.h"
-
-#include <cstdio>
-#include <sstream>
-#include <algorithm>
-#include <set>
 
 namespace voltdb {
 Pool* NValue::getTempStringPool() {
@@ -535,7 +529,9 @@ void NValue::streamTimestamp(std::stringstream& value) const
         // and converting it to 1000000 micros
         micro += 1000000;
     }
-    char mbstr[27];    // Format: "YYYY-MM-DD HH:MM:SS."- 20 characters + terminator
+    char mbstr[64];    // Format: "YYYY-MM-DD HH:MM:SS."- 27 characters + terminator
+                       //         But GCC-7 thinks it may be longer.  So we need
+                       //         extra space.
     snprintf(mbstr, sizeof(mbstr), "%04d-%02d-%02d %02d:%02d:%02d.%06d",
              (int)as_date.year(), (int)as_date.month(), (int)as_date.day(),
              (int)as_time.hours(), (int)as_time.minutes(), (int)as_time.seconds(), (int)micro);
@@ -651,6 +647,7 @@ int64_t NValue::parseTimestampString(const std::string &str)
         if (micro >= 2000000 || micro < 1000000) {
             throwTimestampFormatError(str);
         }
+        /* fall through */ // gcc-7 needs this comment.
     case 10:
         if (date_str.at(4) != '-' || date_str.at(7) != '-') {
             throwTimestampFormatError(str);

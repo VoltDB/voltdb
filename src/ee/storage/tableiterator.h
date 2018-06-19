@@ -89,7 +89,10 @@ public:
     bool next(TableTuple &out);
 
     bool hasNext() const;
-    uint32_t getLocation() const;
+
+    uint32_t getFoundTuples() const {
+        return m_foundTuples;
+    }
 
     void setTempTableDeleteAsGo(bool flag) {
         switch (m_iteratorType) {
@@ -142,10 +145,10 @@ protected:
     TableIterator(Table *, TBMapI);
 
     /** Constructor for temp tables */
-    TableIterator(Table *, std::vector<TBPtr>::iterator);
+    TableIterator(Table *, std::vector<TBPtr>::iterator, bool deleteAsGo);
 
     /** Constructor for large temp tables */
-    TableIterator(Table *, std::vector<LargeTempTableBlockId>::iterator);
+    TableIterator(Table *, std::vector<LargeTempTableBlockId>::iterator, bool deleteAsGo);
 
     /** moves iterator to beginning of table.
         (Called only for persistent tables) */
@@ -181,10 +184,6 @@ protected:
     void setBlockIterator(const TBMapI& it) {
         assert (m_iteratorType == PERSISTENT);
         m_state.m_persBlockIterator = it;
-    }
-
-    uint32_t getFoundTuples() const {
-        return m_foundTuples;
     }
 
     /**
@@ -324,7 +323,7 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
 }
 
 // Construct iterator for temp tables
-inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
+inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start, bool deleteAsGo)
     : m_table(parent)
     , m_tupleLength(parent->m_tupleLength)
     , m_activeTuples((int) m_table->m_tupleCount)
@@ -332,12 +331,12 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
     , m_dataPtr(NULL)
     , m_dataEndPtr(NULL)
     , m_iteratorType(TEMP)
-    , m_state(start, false)
+    , m_state(start, deleteAsGo)
 {
 }
 
 //  Construct an iterator for large temp tables
-inline TableIterator::TableIterator(Table *parent, std::vector<LargeTempTableBlockId>::iterator start)
+inline TableIterator::TableIterator(Table *parent, std::vector<LargeTempTableBlockId>::iterator start, bool deleteAsGo)
     : m_table(parent)
     , m_tupleLength(parent->m_tupleLength)
     , m_activeTuples((int) m_table->m_tupleCount)
@@ -345,7 +344,7 @@ inline TableIterator::TableIterator(Table *parent, std::vector<LargeTempTableBlo
     , m_dataPtr(NULL)
     , m_dataEndPtr(NULL)
     , m_iteratorType(LARGE_TEMP)
-    , m_state(start, false)
+    , m_state(start, deleteAsGo)
 {
 }
 
@@ -537,7 +536,7 @@ inline bool TableIterator::largeTempNext(TableTuple &out) {
             }
 
             LargeTempTableBlock* block = lttCache->fetchBlock(*blockIdIterator);
-            m_dataPtr = block->address();
+            m_dataPtr = block->tupleStorage();
 
             uint32_t unusedTupleBoundary = block->unusedTupleBoundary();
             m_dataEndPtr = m_dataPtr + (unusedTupleBoundary * m_tupleLength);

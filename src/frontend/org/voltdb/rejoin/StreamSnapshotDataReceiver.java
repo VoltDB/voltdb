@@ -19,12 +19,14 @@ package org.voltdb.rejoin;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotSiteProcessor;
@@ -42,17 +44,45 @@ implements Runnable {
      * element is a pair of <sourceHSId, blockData>. The hsId should remain the
      * same for the length of the data transfer process for this partition.
      */
-    private final LinkedBlockingQueue<Pair<Long, Pair<Long, BBContainer>>> m_queue =
-            new LinkedBlockingQueue<Pair<Long, Pair<Long, BBContainer>>>();
+    private final LinkedBlockingQueue<StreamSnapshotSink.DecodedContainer> m_queue =
+            new LinkedBlockingQueue<StreamSnapshotSink.DecodedContainer>();
 
     private final Mailbox m_mb;
-    private final FixedDBBPool m_bufferPool;
+    private final Queue<BBContainer> m_dataBufferPool;
+    private final Queue<BBContainer> m_compressedDataBufferPool;
     private volatile boolean m_closed = false;
 
-    public StreamSnapshotDataReceiver(Mailbox mb, FixedDBBPool bufferPool) {
+    private class TrackedDataBBContainer extends BBContainer {
+        private final BBContainer m_delegate;
+        TrackedDataBBContainer(BBContainer container) {
+            super(container.b());
+            m_delegate = container;
+        }
+        @Override
+        public void discard() {
+            checkDoubleFree();
+            m_dataBufferPool.offer(m_delegate);
+        }
+    }
+
+    private class TrackedCompressedDataBBContainer extends BBContainer {
+        private final BBContainer m_delegate;
+        TrackedCompressedDataBBContainer(BBContainer container) {
+            super(container.b());
+            m_delegate = container;
+        }
+        @Override
+        public void discard() {
+            checkDoubleFree();
+            m_compressedDataBufferPool.offer(m_delegate);
+        }
+    }
+
+    public StreamSnapshotDataReceiver(Mailbox mb, Queue<BBContainer> dataPool, Queue<BBContainer> compressedDataPool) {
         super();
         m_mb = mb;
-        m_bufferPool = bufferPool;
+        m_dataBufferPool = dataPool;
+        m_compressedDataBufferPool = compressedDataPool;
     }
 
     public void close() {
@@ -64,7 +94,7 @@ implements Runnable {
      *
      * @return null if the queue is empty.
      */
-    public Pair<Long, Pair<Long, BBContainer>> poll() {
+    public StreamSnapshotSink.DecodedContainer poll() {
         return m_queue.poll();
     }
 
@@ -74,7 +104,7 @@ implements Runnable {
      * @return
      * @throws InterruptedException
      */
-    public Pair<Long, Pair<Long, BBContainer>> take() throws InterruptedException {
+    public StreamSnapshotSink.DecodedContainer take() throws InterruptedException {
         return m_queue.take();
     }
 
@@ -84,11 +114,6 @@ implements Runnable {
 
     @Override
     public void run() {
-        BlockingQueue<BBContainer> bufferQueue =
-            m_bufferPool.getQueue(SnapshotSiteProcessor.m_snapshotBufferLength);
-        BlockingQueue<BBContainer> compressionBufferQueue =
-            m_bufferPool.getQueue(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
-
         try {
             while (true) {
                 BBContainer container = null;
@@ -111,11 +136,17 @@ implements Runnable {
                     // mailbox. If the buffer is grabbed before receiving the message,
                     // this thread could hold on to a buffer it may not need and other receivers
                     // will be blocked if the pool has no more buffers left.
-                    container = bufferQueue.take();
+                    container = m_dataBufferPool.poll();
+                    if (container == null) {
+                        container = new TrackedDataBBContainer(DBBPool.allocateDirect(SnapshotSiteProcessor.m_snapshotBufferLength));
+                    }
                     ByteBuffer messageBuffer = container.b();
                     messageBuffer.clear();
 
-                    compressionBufferC = compressionBufferQueue.take();
+                    compressionBufferC = m_compressedDataBufferPool.poll();
+                    if (compressionBufferC == null) {
+                        compressionBufferC = new TrackedCompressedDataBBContainer(DBBPool.allocateDirect(SnapshotSiteProcessor.m_snapshotBufferCompressedLen));
+                    }
                     compressionBuffer = compressionBufferC.b();
                     compressionBuffer.clear();
                     compressionBuffer.limit(data.length);
@@ -126,7 +157,7 @@ implements Runnable {
                                     compressionBuffer,
                                     messageBuffer);
                     messageBuffer.limit(uncompressedSize);
-                    m_queue.offer(Pair.of(dataMsg.m_sourceHSId, Pair.of(dataMsg.getTargetId(), container)));
+                    m_queue.offer(new StreamSnapshotSink.DecodedContainer(dataMsg.m_sourceHSId, dataMsg.getTargetId(), container));
                     success = true;
                 } finally {
                     if (!success && container != null) {
@@ -153,8 +184,6 @@ implements Runnable {
                 return;
             }
             rejoinLog.error("Error reading a message from a recovery stream.", e);
-        } catch (InterruptedException e) {
-            return;
         }
     }
 }

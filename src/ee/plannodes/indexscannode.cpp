@@ -44,9 +44,6 @@
  */
 #include "indexscannode.h"
 
-#include "common/debuglog.h"
-#include "expressions/abstractexpression.h"
-
 #include <sstream>
 
 namespace voltdb {

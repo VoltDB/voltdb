@@ -100,8 +100,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
             StartAction startAction)
     {
         super(VoltZK.iv2masters, messenger, partition,
-                new SpScheduler(partition, new SiteTaskerQueue(partition), snapMonitor),
+                new SpScheduler(partition, new SiteTaskerQueue(partition), snapMonitor, startAction != StartAction.JOIN),
                 "SP", agent, startAction);
+        ((SpScheduler)m_scheduler).initializeScoreboard(CoreUtils.getSiteIdFromHSId(getInitiatorHSId()), m_initiatorMailbox);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
         ((SpScheduler)m_scheduler).m_repairLog = m_repairLog;
@@ -117,7 +118,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          boolean hasMPDRGateway)
+                          boolean isLowestSiteId)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -128,7 +129,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 numberOfPartitions, startAction, agent, memStats, cl,
-                coreBindIds, hasMPDRGateway);
+                coreBindIds, isLowestSiteId);
 
         m_tickProducer.start();
 
@@ -312,5 +313,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
     public Scheduler getScheduler() {
         return m_scheduler;
+    }
+
+    //This will be called from Snapshot in elastic joining or rejoining cases.
+    public void updateReplicasForJoin(long snapshotSaveTxnId) {
+        long[] replicasAdded = new long[0];
+        if (m_term != null) {
+            replicasAdded = ((SpTerm)m_term).updateReplicas(snapshotSaveTxnId);
+        }
+        ((SpScheduler)m_scheduler).forwardPendingTaskToRejoinNode(replicasAdded, snapshotSaveTxnId);
     }
 }

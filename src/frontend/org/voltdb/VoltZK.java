@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,6 +26,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -36,6 +39,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltcore.zk.ZooKeeperLock;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
 
 /**
@@ -196,6 +200,8 @@ public class VoltZK {
     // Host ids that be stopped by calling @StopNode
     public static final String host_ids_be_stopped = "/db/host_ids_be_stopped";
 
+    public static final String actionLock = "/db/action_lock";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
@@ -214,7 +220,8 @@ public class VoltZK {
             cluster_settings,
             actionBlockers,
             request_truncation_snapshot,
-            host_ids_be_stopped
+            host_ids_be_stopped,
+            actionLock
     };
 
     /**
@@ -382,6 +389,25 @@ public class VoltZK {
      * @return null for success, non-null for error string
      */
     public static String createActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
+        //Acquire a lock before creating a blocker and validate actions.
+        ZooKeeperLock zklock = new ZooKeeperLock(zk, VoltZK.actionLock, "lock");
+        String lockingMessage = null;
+        try {
+            if(!zklock.acquireLockWithTimeout(TimeUnit.SECONDS.toMillis(60))) {
+                lockingMessage = "Could not acquire a lock to create action blocker:" + request;
+            } else {
+                lockingMessage = setActionBlocker(zk, node, mode, hostLog, request);
+            }
+        } finally {
+            try {
+                zklock.releaseLock();
+            } catch (IOException e) {}
+        }
+        return lockingMessage;
+    }
+
+    private static String setActionBlocker(ZooKeeper zk, String node, CreateMode mode, VoltLogger hostLog, String request) {
+
         try {
             zk.create(node,
                       null,
@@ -463,6 +489,8 @@ public class VoltZK {
             VoltZK.removeActionBlocker(zk, node, hostLog);
             return "Can't do " + request + " " + errorMsg;
         }
+
+        hostLog.info("Create action blocker " + node + " successfully.");
         // successfully create a ZK node
         return null;
     }
@@ -474,13 +502,14 @@ public class VoltZK {
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
                 if (log != null) {
-                    log.error("Failed to remove action blocker: " + e.getMessage(), e);
+                    log.error("Failed to remove action blocker: " + node + "\n" + e.getMessage(), e);
                 }
                 return false;
             }
         } catch (InterruptedException e) {
             return false;
         }
+        log.info("Remove action blocker " + node + " successfully.");
         return true;
     }
 

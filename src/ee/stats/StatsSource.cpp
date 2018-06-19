@@ -18,14 +18,9 @@
 #include "stats/StatsSource.h"
 
 #include "common/executorcontext.hpp"
-#include "common/types.h"
-#include "common/ValueFactory.hpp"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include <vector>
-#include <string>
-#include <cassert>
 
 using namespace voltdb;
 using namespace std;
@@ -63,8 +58,6 @@ StatsSource::StatsSource()  : m_statsTable(NULL) {
  */
 void StatsSource::configure(string name) {
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
-    m_siteId = executorContext->m_siteId;
-    m_partitionId = executorContext->m_partitionId;
     m_hostId = executorContext->m_hostId;
     m_hostname = ValueFactory::getStringValue(executorContext->m_hostname);
 
@@ -85,16 +78,17 @@ void StatsSource::configure(string name) {
     m_statsTuple = m_statsTable->tempTuple();
 }
 
+void StatsSource::updateTableName(const std::string& tableName) {
+    m_tableName.free();
+    m_tableName = ValueFactory::getStringValue(tableName);
+}
+
 StatsSource::~StatsSource() {
     m_hostname.free();
 }
 
-/**
- * Retrieve the name of this set of statistics
- * @return Name of statistics
- */
-string StatsSource::getName() {
-    return m_name;
+const string StatsSource::getTableName() {
+    return m_tableName.toString();
 }
 
 /**
@@ -104,8 +98,8 @@ string StatsSource::getName() {
  * @param now Timestamp to return with each row
  * @return Pointer to a table containing the statistics.
  */
-Table* StatsSource::getStatsTable(bool interval, int64_t now) {
-    getStatsTuple(interval, now);
+Table* StatsSource::getStatsTable(int64_t siteId, int32_t partitionId, bool interval, int64_t now) {
+    getStatsTuple(siteId, partitionId, interval, now);
     return m_statsTable.get();
 }
 
@@ -116,17 +110,18 @@ Table* StatsSource::getStatsTable(bool interval, int64_t now) {
  * @param Timestamp to embed in each row
  * @return Pointer to a table tuple containing the latest version of the statistics.
  */
-TableTuple* StatsSource::getStatsTuple(bool interval, int64_t now) {
+TableTuple* StatsSource::getStatsTuple(int64_t siteId, int32_t partitionId, bool interval, int64_t now) {
     m_interval = interval;
-    assert (m_statsTable != NULL);
     if (m_statsTable == NULL) {
+        VOLT_DEBUG("Table stats for site %" PRId64 ", partition %d is missing", siteId, partitionId);
+        assert (m_statsTable != NULL);
         return NULL;
     }
     m_statsTuple.setNValue(0, ValueFactory::getBigIntValue(now));
     m_statsTuple.setNValue(1, ValueFactory::getIntegerValue(static_cast<int32_t>(m_hostId)));
     m_statsTuple.setNValue(2, m_hostname);
-    m_statsTuple.setNValue(3, ValueFactory::getIntegerValue(static_cast<int32_t>(m_siteId >> 32)));
-    m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(m_partitionId));
+    m_statsTuple.setNValue(3, ValueFactory::getIntegerValue(static_cast<int32_t>(siteId >> 32)));
+    m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(partitionId));
     updateStatsTuple(&m_statsTuple);
 
     // this was put in to collect history, but wasn't bounded so it leaked

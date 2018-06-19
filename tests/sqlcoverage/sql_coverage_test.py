@@ -40,6 +40,7 @@ from voltdbclient import *
 from optparse import OptionParser
 from Query import VoltQueryClient
 from SQLCoverageReport import generate_summary
+from SQLCoverageReport import Reproduce
 from SQLGenerator import SQLGenerator
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement
@@ -267,8 +268,9 @@ def get_config_path(basedir, config_key, config_value):
 
 
 def run_config(suite_name, config, basedir, output_dir, random_seed,
-               report_invalid, report_all, generate_only, subversion_generation,
-               submit_verbosely, ascii_only, args, testConfigKit):
+               report_invalid, report_all, reproducer, generate_only,
+               subversion_generation, submit_verbosely, ascii_only,
+               args, testConfigKit):
 
     # Store the current, initial system time (in seconds since January 1, 1970)
     time0 = time.time()
@@ -422,7 +424,8 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
         compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
         success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
                                   jni_path, output_dir, report_invalid, report_all, extraStats,
-                                  comparison_database, modified_sql_path, max_mismatches, within_minutes)
+                                  comparison_database, modified_sql_path, max_mismatches,
+                                  within_minutes, reproducer, config.get("ddl"))
     except:
         print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
         traceback.print_exc()
@@ -752,6 +755,9 @@ if __name__ == "__main__":
     parser.add_option("-G", "--postgis", action="store_true",
                       dest="postgis", default=False,
                       help="compare VoltDB results to PostgreSQL, with the PostGIS extension")
+    parser.add_option("-R", "--reproduce", dest="reproduce", default="DML",
+                      help="Provide steps to reproduce failures, up to the specified level "
+                         + "(NONE, DDL, DML, CTE, ALL)")
     (options, args) = parser.parse_args()
 
     if options.seed == None:
@@ -759,7 +765,7 @@ if __name__ == "__main__":
         print "Random seed: %d" % seed
     else:
         seed = int(options.seed)
-        print "Using supplied seed: " + str(seed)
+        print "Using supplied seed: %d" % seed
     random.seed(seed)
 
     if len(args) < 3:
@@ -806,6 +812,17 @@ if __name__ == "__main__":
         # testConfigKits["hostport"]
         testConfigKits = create_testConfigKits(options, basedir)
 
+    reproducer = Reproduce.NONE  # if unspecified
+    if options.reproduce.upper() == "DDL":
+        reproducer = Reproduce.DDL
+    elif options.reproduce.upper() == "DML":
+        reproducer = Reproduce.DML
+    elif options.reproduce.upper() == "CTE":
+        reproducer = Reproduce.CTE
+    elif options.reproduce.upper() == "ALL":
+        reproducer = Reproduce.ALL
+    print 'Using reproducer: %s (%d)' % (options.reproduce, reproducer)
+
     success = True
     statistics = {}
     for config_name in configs_to_run:
@@ -819,7 +836,7 @@ if __name__ == "__main__":
             # To add one more key
             testConfigKits["testCatalog"] = testCatalog
         result = run_config(config_name, config, basedir, report_dir, seed,
-                            options.report_invalid, options.report_all,
+                            options.report_invalid, options.report_all, reproducer,
                             options.generate_only, options.subversion_generation,
                             options.report_all, options.ascii_only, args, testConfigKits)
         statistics[config_name] = result["keyStats"]

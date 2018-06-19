@@ -21,65 +21,67 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "structures/CompactingPool.h"
-
 #include "harness.h"
+
 #include <iostream>
 #include <cstring>
 #include <boost/scoped_ptr.hpp>
 
+#include "common/ThreadLocalPool.h"
+
+#include "structures/CompactingPool.h"
+
 using namespace voltdb;
-using namespace std;
 
 class CompactingPoolTest : public Test
 {
-public:
-    CompactingPoolTest()
-    {
-    }
-
-    ~CompactingPoolTest()
-    {
-    }
+    // When run in pool-checking mode,
+    // we need an instance of ThreadLocalPool
+    // to initialize thread partition ID.
+    ThreadLocalPool m_tlPool;
 };
 
 TEST_F(CompactingPoolTest, basic_ops)
 {
-    int32_t size = 17;
-    int32_t num_elements = 7;
-    CompactingPool dut(size, num_elements);
+    const int32_t ELEMENT_SIZE = 17;
+    const int32_t ELEMENTS_PER_BUFFER = 7;
+    CompactingPool dut(ELEMENT_SIZE, ELEMENTS_PER_BUFFER);
 
     // test freeing with just one element is happy
     char* elem = reinterpret_cast<char*>(dut.malloc(&elem));
-    EXPECT_EQ((size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY())* num_elements,
+    EXPECT_EQ((ELEMENT_SIZE + CompactingPool::FIXED_OVERHEAD_PER_ENTRY())* ELEMENTS_PER_BUFFER,
             dut.getBytesAllocated());
     dut.free(elem);
     EXPECT_EQ(0, dut.getBytesAllocated());
 
     // fill up a buffer + 1, then free something in the middle and
     // verify that we shrink appropriately
-    char* elems[num_elements + 1];
-    for (int i = 0; i <= num_elements; i++) {
+    char* elems[ELEMENTS_PER_BUFFER + 2];
+    for (int i = 0; i <= ELEMENTS_PER_BUFFER; i++) {
         elems[i] = reinterpret_cast<char*>(dut.malloc(&(elems[i])));
-        memset(elems[i], i, size);
+        memset(elems[i], i, ELEMENT_SIZE);
     }
     EXPECT_EQ(2, *reinterpret_cast<int8_t*>(elems[2]));
-    EXPECT_EQ((size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * num_elements * 2,
+    EXPECT_EQ((ELEMENT_SIZE + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * ELEMENTS_PER_BUFFER * 2,
             dut.getBytesAllocated());
     dut.free(elems[2]);
     // 2 should now have the last element, filled with num_elements
-    EXPECT_EQ(num_elements, *reinterpret_cast<int8_t*>(elems[2]));
+    EXPECT_EQ(ELEMENTS_PER_BUFFER, *reinterpret_cast<int8_t*>(elems[2]));
     // and we should have shrunk back to 1 buffer
-    EXPECT_EQ((size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * num_elements,
+    EXPECT_EQ((ELEMENT_SIZE + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * ELEMENTS_PER_BUFFER,
             dut.getBytesAllocated());
 
     // add an element and free it and verify that we don't mutate anything else
-    elems[num_elements + 1] = reinterpret_cast<char*>(dut.malloc(&(elems[num_elements + 1])));
-    EXPECT_EQ((size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * num_elements * 2,
+    elems[ELEMENTS_PER_BUFFER + 1] = reinterpret_cast<char*>(dut.malloc(&(elems[ELEMENTS_PER_BUFFER + 1])));
+    EXPECT_EQ((ELEMENT_SIZE + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * ELEMENTS_PER_BUFFER * 2,
             dut.getBytesAllocated());
-    dut.free(elems[num_elements + 1]);
-    EXPECT_EQ((size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * num_elements,
+    dut.free(elems[ELEMENTS_PER_BUFFER + 1]);
+    EXPECT_EQ((ELEMENT_SIZE + CompactingPool::FIXED_OVERHEAD_PER_ENTRY()) * ELEMENTS_PER_BUFFER,
             dut.getBytesAllocated());
+
+    while (dut.getBytesAllocated() > 0) {
+        dut.free(elems[0]);
+    }
 }
 
 TEST_F(CompactingPoolTest, bytes_allocated_test)

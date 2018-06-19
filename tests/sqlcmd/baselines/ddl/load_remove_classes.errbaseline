@@ -1,4 +1,4 @@
 Expect the following to fail with intrun not defined.
-[UsesUDF.class]: Failed to plan for statement (usesUDF) "select intrun(0) from EMPLOYEE;". Error: "Error in "select intrun(0) from EMPLOYEE;" user lacks privilege or object not found: INTRUN"
+[UsesUDF.class]: Failed to plan for statement (usesUDF) "select intrun(0) from EMPLOYEE;". Error: "Error in "select intrun(0) from EMPLOYEE;" object not found: INTRUN"
 Expect this drop function to fail, since the procedure UsesUDF can't be planned.
 [UsesUDF.class]: Cannot drop user defined function "intrun".  The statement UsesUDF.usesUDF depends on it.

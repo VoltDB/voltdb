@@ -659,6 +659,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
     /**
      * For the specified list of table ids, return the number of mispartitioned rows using
      * the provided hashinator config
@@ -679,13 +684,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte log[]) {
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, int remotePartitionId, byte log[]) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 

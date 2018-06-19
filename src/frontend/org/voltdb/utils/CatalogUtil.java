@@ -69,6 +69,7 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
@@ -369,6 +370,21 @@ public abstract class CatalogUtil {
         }
 
         return jarfile;
+    }
+
+    public static boolean isSnapshottedView(Table table) {
+        if (table.getMaterializer() == null) {
+            // Return false if it is not a materialized view.
+            return false;
+        }
+        if (! table.getIsreplicated() && table.getPartitioncolumn() == null) {
+            // If the target table is an implicitly partitioned view now (maybe was not in snapshot),
+            // its maintenance is not turned off during the snapshot restore process.
+            // Let it take care of its own data by itself.
+            // Do not attempt to restore data for it.
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -3019,5 +3035,26 @@ public abstract class CatalogUtil {
      */
     public static boolean isProcedurePartitioned(Procedure proc) {
         return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
+    }
+
+    public static Map<String, Table> getTimeToLiveTables(Database db) {
+        Map<String, Table> ttls = Maps.newHashMap();
+        for (Table t : db.getTables()) {
+            if (t.getTimetolive() != null && t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME) != null) {
+                ttls.put(t.getTypeName(),t);
+            }
+        }
+        return ttls;
+    }
+
+    public static boolean isColumnIndexed(Table table, Column column) {
+        for (Index index : table.getIndexes()) {
+            for (ColumnRef colRef : index.getColumns()) {
+                if(column.equals(colRef.getColumn())){
+                 return true;
+                }
+            }
+        }
+        return false;
     }
 }

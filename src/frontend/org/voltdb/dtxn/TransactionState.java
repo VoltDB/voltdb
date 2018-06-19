@@ -52,6 +52,8 @@ public abstract class TransactionState extends OrderableTransaction  {
     // IZZY: make me protected/private
     public final long m_spHandle;
     private ArrayList<UndoAction> m_undoLog;
+    // This timestamp is only used for restarted transactions
+    protected long m_restartTimestamp = TransactionInfoBaseMessage.INITIAL_TIMESTAMP;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -171,7 +173,7 @@ public abstract class TransactionState extends OrderableTransaction  {
         throw new UnsupportedOperationException(msg);
     }
 
-    public void setupProcedureResume(boolean isFinal, int[] dependencies) {
+    public void setupProcedureResume(int[] dependencies) {
         String msg = "The current transaction context of type " + this.getClass().getName();
         msg += " doesn't support receiving dependencies.";
         throw new UnsupportedOperationException(msg);
@@ -209,5 +211,13 @@ public abstract class TransactionState extends OrderableTransaction  {
     }
 
     public void terminateTransaction() {
+    }
+
+    public void setTimestamp(long timestamp) {
+        m_restartTimestamp = timestamp;
+    }
+
+    public long getTimetamp() {
+        return m_restartTimestamp;
     }
 }

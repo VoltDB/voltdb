@@ -47,8 +47,8 @@ import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.SerializationHelper;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -106,31 +106,34 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** Commands are serialized over the connection */
     private enum Commands {
-        Initialize(0),
-        LoadCatalog(2),
-        ToggleProfiler(3),
-        Tick(4),
-        GetStats(5),
-        QueryPlanFragments(6),
-        PlanFragment(7),
-        LoadTable(9),
-        releaseUndoToken(10),
-        undoUndoToken(11),
-        CustomPlanFragment(12),
-        SetLogLevels(13),
-        Quiesce(16),
-        ActivateTableStream(17),
-        TableStreamSerializeMore(18),
-        UpdateCatalog(19),
-        ExportAction(20),
-        RecoveryMessage(21),
-        TableHashCode(22),
-        Hashinate(23),
-        GetPoolAllocations(24),
-        GetUSOs(25),
-        updateHashinator(27),
-        executeTask(28),
-        applyBinaryLog(29);
+        Initialize(0)
+        , LoadCatalog(2)
+        , ToggleProfiler(3)
+        , Tick(4)
+        , GetStats(5)
+        , QueryPlanFragments(6)
+        , PlanFragment(7)
+        , LoadTable(9)
+        , releaseUndoToken(10)
+        , undoUndoToken(11)
+        , CustomPlanFragment(12)
+        , SetLogLevels(13)
+        , Quiesce(16)
+        , ActivateTableStream(17)
+        , TableStreamSerializeMore(18)
+        , UpdateCatalog(19)
+        , ExportAction(20)
+        , RecoveryMessage(21)
+        , TableHashCode(22)
+        , Hashinate(23)
+        , GetPoolAllocations(24)
+        , GetUSOs(25)
+        , UpdateHashinator(27)
+        , ExecuteTask(28)
+        , ApplyBinaryLog(29)
+        , ShutDown(30)
+        , SetViewsEnabled(31);
+
         Commands(final int id) {
             m_id = id;
         }
@@ -824,6 +827,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int clusterIndex,
             final long siteId,
             final int partitionId,
+            final int sitesPerHost,
             final int hostId,
             final String hostname,
             final int drClusterId,
@@ -832,7 +836,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream) {
+            final boolean isLowestSiteId) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -855,13 +859,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_clusterIndex,
                 m_siteId,
                 m_partitionId,
+                sitesPerHost,
                 m_hostId,
                 m_hostname,
                 drClusterId,
                 defaultDrBufferSize,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
-                createDrReplicatedStream);
+                isLowestSiteId);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -879,9 +884,25 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     public void release() throws EEException, InterruptedException {
         System.out.println("Shutdown IPC connection in progress.");
         System.out.println("But first, a little history:\n" + m_history );
+        shutDown();
         m_connection.close();
         System.out.println("Shutdown IPC connection done.");
         m_dataNetworkOrigin.discard();
+    }
+
+    private void shutDown() {
+        int result = ExecutionEngine.ERRORCODE_ERROR;
+        m_data.clear();
+        m_data.putInt(Commands.ShutDown.m_id);
+        try {
+            m_data.flip();
+            m_connection.write();
+            result = m_connection.readStatusByte();
+        } catch (final IOException e) {
+            System.out.println("Excpeption: " + e.getMessage());
+            throw new RuntimeException();
+        }
+        checkErrorCode(result);
     }
 
     private static final Object printLockObject = new Object();
@@ -893,6 +914,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int clusterIndex,
             final long siteId,
             final int partitionId,
+            final int sitesPerHost,
             final int hostId,
             final String hostname,
             final int drClusterId,
@@ -910,6 +932,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(clusterIndex);
         m_data.putLong(siteId);
         m_data.putInt(partitionId);
+        m_data.putInt(sitesPerHost);
         m_data.putInt(hostId);
         m_data.putInt(drClusterId);
         m_data.putInt(defaultDrBufferSize);
@@ -1671,7 +1694,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     public void updateHashinator(HashinatorConfig config)
     {
         m_data.clear();
-        m_data.putInt(Commands.updateHashinator.m_id);
+        m_data.putInt(Commands.UpdateHashinator.m_id);
         m_data.putInt(config.configBytes.length);
         m_data.put(config.configBytes);
         try {
@@ -1685,16 +1708,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               int remoteClusterId, long undoToken)
+                               int remoteClusterId, int remotePartitionId, long undoToken)
     throws EEException
     {
         m_data.clear();
-        m_data.putInt(Commands.applyBinaryLog.m_id);
+        m_data.putInt(Commands.ApplyBinaryLog.m_id);
         m_data.putLong(txnId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
         m_data.putInt(remoteClusterId);
+        m_data.putInt(remotePartitionId);
         m_data.putLong(undoToken);
         m_data.put(log.array());
 
@@ -1743,7 +1767,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public byte[] executeTask(TaskType taskType, ByteBuffer task) {
         m_data.clear();
-        m_data.putInt(Commands.executeTask.m_id);
+        m_data.putInt(Commands.ExecuteTask.m_id);
         m_data.putLong(taskType.taskId);
         m_data.put(task.array());
         try {
@@ -1802,5 +1826,31 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
         }
         return m_succeededFragmentsCount;
+    }
+
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        if (viewNames.equals("")) {
+            return;
+        }
+        if (enabled) {
+            System.out.println("The maintenance of the following views is restarting: " + viewNames);
+        }
+        else {
+            System.out.println("The maintenance of the following views will be paused to accelerate the restoration: " + viewNames);
+        }
+        m_data.clear();
+        m_data.putInt(Commands.SetViewsEnabled.m_id);
+        try {
+            final byte viewNameBytes[] = viewNames.getBytes("UTF-8");
+            m_data.put(enabled ? (byte)1 : (byte)0);
+            m_data.put(viewNameBytes);
+            m_data.put((byte)'\0');
+            m_data.flip();
+            m_connection.write();
+        } catch (final IOException e) {
+            System.out.println("Excpeption: " + e.getMessage());
+            throw new RuntimeException();
+        }
     }
 }

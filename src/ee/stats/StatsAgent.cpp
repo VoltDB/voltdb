@@ -17,14 +17,9 @@
 #include "StatsAgent.h"
 
 #include "StatsSource.h"
-#include "common/ids.h"
-#include "common/tabletuple.h"
-#include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
 #include "storage/TableStats.h"
 #include "storage/temptable.h"
-
-#include <cassert>
 
 using namespace voltdb;
 using namespace std;
@@ -60,11 +55,15 @@ StatsAgent::StatsAgent() {}
 void StatsAgent::registerStatsSource(StatisticsSelectorType sst,
                                      CatalogId catalogId,
                                      StatsSource* statsSource) {
-    m_statsCategoryByStatsSelector[sst].insert(
-        pair<CatalogId, StatsSource*>(catalogId, statsSource));
+    assert(statsSource != NULL);
+    m_statsCategoryByStatsSelector[sst].insert(make_pair(catalogId, statsSource));
+    VOLT_DEBUG("Partition %d registered %s stats source (%p) for table %s at index %d.",
+               ThreadLocalPool::getEnginePartitionId(),
+               sst == StatisticsSelectorType::STATISTICS_SELECTOR_TYPE_TABLE ? "a table" : "an index",
+               statsSource, statsSource->getTableName().c_str(), catalogId);
 }
 
-void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst) {
+void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst, int32_t relativeIndexOfTable) {
     // get the map of id-to-source
     map<StatisticsSelectorType,
       multimap<CatalogId, StatsSource*> >::iterator it1 =
@@ -73,7 +72,19 @@ void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst) {
     if (it1 == m_statsCategoryByStatsSelector.end()) {
         return;
     }
-    it1->second.clear();
+    if (relativeIndexOfTable == -1) {
+        it1->second.clear();
+        VOLT_DEBUG("Partition %d unregistered all %s stats sources.",
+                   ThreadLocalPool::getEnginePartitionId(),
+                   sst == StatisticsSelectorType::STATISTICS_SELECTOR_TYPE_TABLE ? "table" : "index");
+    }
+    else {
+        it1->second.erase(relativeIndexOfTable);
+        VOLT_DEBUG("Partition %d unregistered %s stats source for table at index %d.",
+                   ThreadLocalPool::getEnginePartitionId(),
+                   sst == StatisticsSelectorType::STATISTICS_SELECTOR_TYPE_TABLE ? "a table" : "an index",
+                   relativeIndexOfTable);
+    }
 }
 
 /**
@@ -84,6 +95,7 @@ void StatsAgent::unregisterStatsSource(StatisticsSelectorType sst) {
  * @param Timestamp to embed in each row
  */
 TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
+                                int64_t siteId, int32_t partitionId,
                                 vector<CatalogId> catalogIds,
                                 bool interval, int64_t now) {
     if (catalogIds.size() < 1) {
@@ -112,7 +124,7 @@ TempTable* StatsAgent::getStats(StatisticsSelectorType sst,
                 continue;
             }
 
-            TableTuple *statsTuple = ss->getStatsTuple(interval, now);
+            TableTuple *statsTuple = ss->getStatsTuple(siteId, partitionId, interval, now);
             statsTable->insertTuple(*statsTuple);
         }
     }

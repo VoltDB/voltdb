@@ -25,11 +25,7 @@ package org.voltdb.largequery;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.endsWith;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -38,6 +34,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.concurrent.Future;
 
 import org.junit.After;
 import org.junit.AfterClass;
@@ -60,7 +57,7 @@ public class TestLargeBlockManagerSuite {
 
     @AfterClass
     public static void tearDown() throws IOException {
-        assert(m_tempDir != null);
+        assert (m_tempDir != null);
         VoltFile.recursivelyDelete(m_tempDir.toFile());
         assert (! Files.exists(m_tempDir));
     }
@@ -71,39 +68,51 @@ public class TestLargeBlockManagerSuite {
     }
 
     @Test
-    public void testBasic() throws IOException {
+    public void testExecutorServiceInterface() throws Exception {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
         assertNotNull(lbm);
 
-        ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
+        // Create a mocked large temp table block:
+        int blockSize = 12 + 32; // block header and space for four longs
+        long address = 0xDEADBEEF;
+        ByteBuffer block = ByteBuffer.allocate(blockSize);
+        block.putLong(address);  // original address of block in memory
+        block.putInt(4);  // tuple count of block
+        // Insert "data": this is not what actual data from the EE would look like here,
+        // but it does not matter here.
         for (long i = 1000; i < 5000; i += 1000) {
             block.putLong(i);
         }
 
         // Store a block...
-        long siteId = 555;
-        long blockId = 333;
-        long address = 0xDEADBEEF;
-        lbm.storeBlock(new BlockId(siteId, blockId), address, block);
+        BlockId blockId = new BlockId(555, 333);
+        LargeBlockTask storeTask = LargeBlockTask.getStoreTask(blockId, block);
+        Future<LargeBlockResponse> responseFuture = lbm.submitTask(storeTask);
+        assertTrue(responseFuture.get().wasSuccessful());
 
-        Path blockPath = lbm.makeBlockPath(new BlockId(siteId, blockId));
+        // Make sure we actually wrote something
+        Path blockPath = lbm.makeBlockPath(blockId);
         assertThat(blockPath.toString(), endsWith("large_query_swap/555___333.block"));
         assertTrue(Files.exists(blockPath));
 
         // Load the block back into memory
-        ByteBuffer loadedBlock = ByteBuffer.allocateDirect(32);
-        long origAddress = lbm.loadBlock(new BlockId(siteId, blockId), loadedBlock);
-        assertEquals(address, origAddress);
-
-        // Ensure the block contains the expected data
+        ByteBuffer loadedBlock = ByteBuffer.allocateDirect(blockSize);
+        LargeBlockTask loadTask = LargeBlockTask.getLoadTask(blockId, loadedBlock);
+        responseFuture = lbm.submitTask(loadTask);
+        assertTrue(responseFuture.get().wasSuccessful());
         loadedBlock.position(0);
+        long actualAddress = loadedBlock.getLong();
+        assertEquals(address, actualAddress);
+        int tupleCount = loadedBlock.getInt();
+        assertEquals(4, tupleCount);
         for (long i = 1000;  i < 5000; i += 1000) {
             assertEquals(i, loadedBlock.getLong());
         }
 
-        // Release the block
-        lbm.releaseBlock(new BlockId(siteId, blockId));
-        assertTrue( ! Files.exists(blockPath));
+        // Release the block.
+        LargeBlockTask releaseTask = LargeBlockTask.getReleaseTask(blockId);
+        responseFuture = lbm.submitTask(releaseTask);
+        assertTrue(responseFuture.get().wasSuccessful());
     }
 
     @Test
@@ -112,13 +121,16 @@ public class TestLargeBlockManagerSuite {
         long[] ids = {11, 22, 33, 101, 202, 303, 505, 606, 707};
         long address = 0xDEADBEEF;
 
+        int blockSize = 12 + 32; // block header and space for four longs
         for (long id : ids) {
-            ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
+            ByteBuffer block = ByteBuffer.allocate(blockSize);
+            block.putLong(address);
+            block.putInt(4);
             for (long i = 1000; i < 5000; i += 1000) {
                 block.putLong(i);
             }
 
-            lbm.storeBlock(new BlockId(id + 100, id), address, block);
+            lbm.storeBlock(new BlockId(id + 100, id), block);
         }
 
         for (long id : ids) {
@@ -147,53 +159,54 @@ public class TestLargeBlockManagerSuite {
     }
 
     @Test
-    public void testErrors() throws IOException {
+    public void testErrors() throws Exception {
         LargeBlockManager lbm = LargeBlockManager.getInstance();
 
-        ByteBuffer block = ByteBuffer.allocate(32); // space for four longs
+        int blockSize = 12 + 32; // block header and space for four longs
+        long address = 0xDEADBEEF;
+
+        ByteBuffer block = ByteBuffer.allocate(blockSize);
+        block.putLong(address);
+        block.putInt(4);
         for (long i = 1000; i < 5000; i += 1000) {
             block.putLong(i);
         }
 
         // Store a block...
-        long siteId = 555;
-        long blockId = 555;
-        long address = 0xDEADBEEF;
-        lbm.storeBlock(new BlockId(siteId, blockId), address, block);
+        BlockId blockId = new BlockId(555, 555);
+        LargeBlockTask storeTask = LargeBlockTask.getStoreTask(blockId, block);
+        Future<LargeBlockResponse> responseFuture = lbm.submitTask(storeTask);
+        assertTrue(responseFuture.get().wasSuccessful());
 
-        Path blockPath = lbm.makeBlockPath(new BlockId(siteId, blockId));
+        Path blockPath = lbm.makeBlockPath(blockId);
         assertThat(blockPath.toString(), endsWith("large_query_swap/555___555.block"));
         assertTrue(Files.exists(blockPath));
 
-        try {
-            // Redundantly store a block (should fail)
-            lbm.storeBlock(new BlockId(siteId, blockId), address, block);
-            fail("Expected redundant store to throw an exception");
-        }
-        catch (IllegalArgumentException iac) {
-            assertThat(iac.getMessage(), containsString("Request to store block that is already stored"));
-        }
+        // Redundantly store a block (should fail)
+        responseFuture = lbm.submitTask(storeTask);
+        LargeBlockResponse response = responseFuture.get();
+        assertFalse(response.wasSuccessful());
+        assertThat(response.getException().getMessage(),
+                containsString("Request to store block that is already stored"));
 
-        try {
-            // Try to load a block with a counter that does not exist
-            lbm.loadBlock(new BlockId(siteId, 444), block);
-            fail("Expected attempted load of non-existant block to fail");
-        }
-        catch (IllegalArgumentException iac) {
-            assertThat(iac.getMessage(), containsString("Request to load block that is not stored: " + siteId + "::444"));
-        }
+        LargeBlockTask loadTask = LargeBlockTask.getLoadTask(new BlockId(555, 444), block);
+        responseFuture = lbm.submitTask(loadTask);
+        response = responseFuture.get();
+        assertFalse(response.wasSuccessful());
+        assertThat(response.getException().getMessage(),
+                containsString("Request to load block that is not stored: 555::444"));
 
-        try {
-            // Try to release a block that does not exist
-            lbm.releaseBlock(new BlockId(110, 444));
-            fail("Expected attempted release of non-existant block to fail");
-        }
-        catch (IllegalArgumentException iac) {
-            assertThat(iac.getMessage(), containsString("Request to release block that is not stored: 110::444"));
-        }
+        LargeBlockTask releaseTask = LargeBlockTask.getReleaseTask(new BlockId(110, 444));
+        responseFuture = lbm.submitTask(releaseTask);
+        response = responseFuture.get();
+        assertFalse(response.wasSuccessful());
+        assertThat(response.getException().getMessage(),
+                containsString("Request to release block that is not stored: 110::444"));
 
         // Clean up
-        lbm.releaseBlock(new BlockId(555, 555));
+        releaseTask = LargeBlockTask.getReleaseTask(blockId);
+        responseFuture = lbm.submitTask(releaseTask);
+        assertTrue(responseFuture.get().wasSuccessful());
     }
 
     @Test

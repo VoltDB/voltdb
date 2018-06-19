@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -45,6 +47,9 @@ import org.voltdb.dr2.DRProtocol;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.largequery.LargeBlockManager;
+import org.voltdb.largequery.LargeBlockResponse;
+import org.voltdb.largequery.LargeBlockTask;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.types.PlanNodeType;
@@ -60,7 +65,7 @@ import org.voltdb.utils.VoltTrace;
 
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    protected static VoltLogger LOG = new VoltLogger("HOST");
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
@@ -445,7 +450,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         if (shouldTimedOut(latency)) {
 
             String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, true);
-            log.info(msg);
+            LOG.info(msg);
 
             // timing out the long running queries
             return -1 * latency;
@@ -470,7 +475,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             return LONG_OP_THRESHOLD;
         }
         String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, false);
-        log.info(msg);
+        LOG.info(msg);
 
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
         m_lastMsgTime = currentTime;
@@ -830,6 +835,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param spHandle                 The spHandle of the current transaction
      * @param lastCommittedSpHandle    The spHandle of the last committed transaction
      * @param uniqueId                 The uniqueId of the current transaction
+     * @param remoteClusterId          The cluster id of producer cluster
+     * @param remotePartitionId        The partition id of producer cluster
      * @param undoToken                For undo
      * @throws EEException
      */
@@ -839,6 +846,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                         long lastCommittedSpHandle,
                                         long uniqueId,
                                         int remoteClusterId,
+                                        int remotePartitionId,
                                         long undoToken) throws EEException;
 
     /**
@@ -855,6 +863,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException;
 
     public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
+
+    /**
+     * Pause/resume the maintenance of materialized views specified in viewNames.
+     */
+    public abstract void setViewsEnabled(String viewNames, boolean enabled);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -895,6 +908,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int clusterIndex,
             long siteId,
             int partitionId,
+            int sitesPerHost,
             int hostId,
             byte hostname[],
             int drClusterId,
@@ -1119,6 +1133,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                long lastCommittedSpHandle,
                                                long uniqueId,
                                                int remoteClusterId,
+                                               int remotePartitionId,
                                                long undoToken);
 
     /**
@@ -1144,6 +1159,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long mAckOffset,
             long seqNo,
             byte mTableSignature[]);
+
+    protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
 
     /**
      * Get the USO for an export table. This is primarily used for recovery.
@@ -1201,6 +1218,36 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    /*
+     * Execute a large block task synchronously.  Log errors if they occur.
+     * Return true if successful and false otherwise.
+     */
+    protected boolean executeLargeBlockTaskSynchronously(LargeBlockTask task) {
+        LargeBlockManager lbm = LargeBlockManager.getInstance();
+        assert (lbm != null);
+
+        LargeBlockResponse response = null;
+        try {
+            // The call to get() will block until the task completes.
+            response = lbm.submitTask(task).get();
+        }
+        catch (RejectedExecutionException ree) {
+            LOG.error("Could not queue large block task: " + ree.getMessage());
+        }
+        catch (ExecutionException ee) {
+            LOG.error("Could not execute large block task: " + ee.getMessage());
+        }
+        catch (InterruptedException ie) {
+            LOG.error("Large block task was interrupted: " + ie.getMessage());
+        }
+
+        if (response != null && !response.wasSuccessful()) {
+            LOG.error("Large block task failed: " + response.getException().getMessage());
+        }
+
+        return response == null ? false : response.wasSuccessful();
+    }
+
     /**
      * Useful in unit tests.  Allows one to supply a mocked logger
      * to verify that something was logged.
@@ -1209,7 +1256,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     @Deprecated
     public static void setVoltLoggerForTest(VoltLogger vl) {
-        log = vl;
+        LOG = vl;
     }
 
     /**

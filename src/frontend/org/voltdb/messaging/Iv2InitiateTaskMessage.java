@@ -58,7 +58,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     AtomicBoolean m_isDurable;
 
     /** Empty constructor for de-serialization */
-    Iv2InitiateTaskMessage() {
+    public Iv2InitiateTaskMessage() {
         super();
     }
 
@@ -164,6 +164,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_isSinglePartition;
     }
 
+    public short getNPartCount() {
+        return (short)(m_nPartitions != null ? m_nPartitions.length : 0);
+    }
+
     public boolean shouldReturnResultTables() {
         return m_shouldReturnResultTables;
     }
@@ -225,6 +229,20 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             msgsize += 2 + m_nPartitions.length * 4; // 2 for length prefix and 4 each
         }
         msgsize += m_invocation.getSerializedSize();
+        return msgsize;
+    }
+
+    public int getSerializedSizeForHeader()
+    {
+        int msgsize = super.getSerializedSize();
+        msgsize += 8; // m_clientInterfaceHandle
+        msgsize += 8; // m_connectionId
+        msgsize += 1; // is single partition flag
+        msgsize += 1; // should generate a response
+        msgsize += 1; // flags (SP/NP/return tables)
+        if (m_nPartitions != null) {
+            msgsize += 2 + m_nPartitions.length * 4; // 2 for length prefix and 4 each
+        }
         return msgsize;
     }
 
@@ -301,6 +319,9 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             sb.append("  WRITE, ");
         if (m_isSinglePartition)
             sb.append("SINGLE PARTITION, ");
+        else
+        if (getNPartCount() != 0)
+            sb.append("N PARTITION (").append(m_nPartitions).append("), ");
         else
             sb.append("MULTI PARTITION, ");
         if (isForReplay())

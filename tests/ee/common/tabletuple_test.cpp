@@ -23,6 +23,7 @@
 
 #include "harness.h"
 
+#include "common/SynchronizedThreadLock.h"
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
 #include "common/ThreadLocalPool.h"
@@ -40,6 +41,10 @@
 using namespace voltdb;
 
 class TableTupleTest : public Test {
+public:
+    ~TableTupleTest() {
+        voltdb::globalDestroyOncePerProcess();
+    }
 };
 
 TEST_F(TableTupleTest, ComputeNonInlinedMemory)

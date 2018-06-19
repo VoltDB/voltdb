@@ -44,9 +44,6 @@
  */
 
 #include "plannodes/plannodeutil.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/FatalException.hpp"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/deletenode.h"
 #include "plannodes/indexscannode.h"
@@ -59,7 +56,6 @@
 #include "plannodes/mergereceivenode.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/nestloopindexnode.h"
-#include "plannodes/projectionnode.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/receivenode.h"
 #include "plannodes/commontablenode.h"
@@ -70,7 +66,6 @@
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/windowfunctionnode.h"
-#include <sstream>
 
 namespace voltdb {
 namespace plannodeutil {

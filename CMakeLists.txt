@@ -209,7 +209,7 @@ INCLUDE(tools/VoltDB.cmake)
 IF (NOT DEFINED VOLTDB_BUILD_TYPE)
   STRING(TOLOWER ${CMAKE_BUILD_TYPE} VOLTDB_BUILD_TYPE)
 ENDIF()
-IF (NOT (${VOLTDB_BUILD_TYPE} STREQUAL "debug") 
+IF (NOT (${VOLTDB_BUILD_TYPE} STREQUAL "debug")
     AND NOT (${VOLTDB_BUILD_TYPE} STREQUAL "release")
     AND NOT (${VOLTDB_BUILD_TYPE} STREQUAL "memcheck"))
     MESSAGE(FATAL_ERROR "Unknown VoltDB build type ${VOLTDB_BUILD_TYPE}")
@@ -237,6 +237,7 @@ BANNER("Configuring the VoltDB Execution Engine."
        "VOLTDB_BUILD_TYPE:      ${VOLTDB_BUILD_TYPE}"
        "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
        "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
+       "VOLT_POOL_CHECKING:     ${VOLT_POOL_CHECKING}"
    )
 
 ########################################################################
@@ -269,6 +270,8 @@ INCLUDE(tools/VoltDBCompilation.cmake)
 ########################################################################
 OPTION(VOLTDB_USE_COVERAGE "Build for coverage analysis" OFF)
 OPTION(VOLTDB_USE_PROFILING "Build for profiling analysis" OFF)
+
+OPTION(VOLT_POOL_CHECKING "Turn on extra memory pool checking" OFF)
 
 SET (VOLTDB_TARBALLS ${CMAKE_SOURCE_DIR}/third_party/cpp/tarballs)
 SET (VOLTDB_3PTY_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/3pty-install)

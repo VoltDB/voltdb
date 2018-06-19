@@ -43,29 +43,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "common/FatalException.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
-#include "common/debuglog.h"
-#include "common/tabletuple.h"
-#include "common/types.h"
-#include "execution/ExecutorVector.h"
-#include "execution/VoltDBEngine.h"
+#include "common/ExecuteWithMpMemory.h"
 #include "expressions/functionexpression.h"
 #include "insertexecutor.h"
 #include "plannodes/insertnode.h"
 #include "storage/ConstraintFailureException.h"
-#include "storage/persistenttable.h"
-#include "storage/streamedtable.h"
-#include "storage/table.h"
-#include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
 
-#include <vector>
-#include <set>
-
 namespace voltdb {
+int64_t InsertExecutor::s_modifiedTuples;
+
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
                             const ExecutorVector& executorVector)
 {
@@ -121,6 +109,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
+        m_replicatedTableOperation = persistentTarget->isCatalogTableReplicated();
     }
 
     m_multiPartition = m_node->isMultiPartition();
@@ -171,9 +160,9 @@ void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
     }
 }
 
-bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
-                                    AbstractTempTable *newOutputTable,
-                                    TableTuple &temp_tuple) {
+bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
+                                             AbstractTempTable *newOutputTable,
+                                             TableTuple &temp_tuple) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
     assert(inputSchema);
@@ -189,7 +178,10 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
             (m_targetTable == dynamic_cast<StreamedTable*>(m_targetTable)));
 
     m_persistentTable = m_isStreamed ?
-        NULL : static_cast<PersistentTable*>(m_targetTable);
+            NULL : static_cast<PersistentTable*>(m_targetTable);
+    assert((!m_persistentTable && !m_replicatedTableOperation) ||
+            m_replicatedTableOperation == m_persistentTable->isCatalogTableReplicated());
+
     m_upsertTuple = TableTuple(m_targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_node->isInline() ? "INLINE" : m_inputTable->debug().c_str());
@@ -215,7 +207,7 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
         m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(0L));
         // put the tuple into the output table
         m_tmpOutputTable->insertTuple(m_count_tuple);
-        return true;
+        return false;
     }
     m_templateTuple = m_templateTupleStorage.tuple();
 
@@ -224,6 +216,9 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
         m_templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
 
+    VOLT_DEBUG("Initializing insert executor to insert into %s table %s",
+               static_cast<PersistentTable*>(m_targetTable)->isCatalogTableReplicated() ? "replicated" : "partitioned",
+               m_targetTable->name().c_str());
     VOLT_DEBUG("This is a %s insert on partition with id %d",
                m_node->isInline() ? "inline"
                        : (m_node->getChildren()[0]->getPlanNodeType() == PLAN_NODE_TYPE_MATERIALIZE ?
@@ -237,10 +232,25 @@ bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
     m_tempPool = ExecutorContext::getTempStringPool();
     char *storage = static_cast<char *>(m_tempPool->allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
     temp_tuple = TableTuple(storage, inputSchema);
-    return false;
+    return true;
 }
 
-void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
+bool InsertExecutor::p_execute_init(const TupleSchema *inputSchema,
+                                    AbstractTempTable *newOutputTable,
+                                    TableTuple &temp_tuple) {
+    bool rslt = p_execute_init_internal(inputSchema, newOutputTable, temp_tuple);
+    if (m_replicatedTableOperation) {
+        if (SynchronizedThreadLock::countDownGlobalTxnStartCount(m_engine->isLowestSite())) {
+            // Need to set this here for inlined inserts in case there are no inline inserts
+            // and finish is called right after this
+            s_modifiedTuples = 0;
+            SynchronizedThreadLock::signalLowestSiteFinished();
+        }
+    }
+    return rslt;
+}
+
+void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
     const std::vector<int>& fieldMap = m_node->getFieldMap();
     std::size_t mapSize = fieldMap.size();
 
@@ -295,8 +305,7 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
             // tuples to force partitioned data to be generated only
             // where partitioned view rows are maintained.
             if (!m_isStreamed || m_hasStreamView) {
-                throw ConstraintFailureException(
-                                                 m_targetTable, m_templateTuple,
+                throw ConstraintFailureException(m_targetTable, m_templateTuple,
                                                  "Mispartitioned tuple in single-partition insert statement.");
             }
         }
@@ -340,22 +349,51 @@ void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
         m_targetTable = m_persistentTable;
     }
     m_targetTable->insertTuple(m_templateTuple);
-    VOLT_DEBUG("Target table:\n%s\n", m_targetTable->debug().c_str());
+    VOLT_TRACE("Target table:\n%s\n", m_targetTable->debug().c_str());
     // successfully inserted
     ++m_modifiedTuples;
     return;
 }
 
+void InsertExecutor::p_execute_tuple(TableTuple &tuple) {
+    // This should only be called from inlined insert executors because we have to change contexts every time
+    ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+            m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+    if (possiblySynchronizedUseMpMemory.okToExecute()) {
+        p_execute_tuple_internal(tuple);
+        if (m_replicatedTableOperation) {
+            s_modifiedTuples = m_modifiedTuples;
+        }
+    }
+    else {
+        if (s_modifiedTuples == -1) {
+            // An exception was thrown on the lowest site thread and we need to throw here as well so
+            // all threads are in the same state
+            char msg[1024];
+            snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
+                    m_targetTable->name().c_str());
+            VOLT_DEBUG("%s", msg);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+        }
+    }
+}
+
 void InsertExecutor::p_execute_finish() {
+    if (m_replicatedTableOperation) {
+        // Use the static value assigned above to propagate the result to the other engines
+        // that skipped the replicated table work
+        assert(s_modifiedTuples != -1);
+        m_modifiedTuples = s_modifiedTuples;
+    }
     m_count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_modifiedTuples));
     // put the tuple into the output table
     m_tmpOutputTable->insertTuple(m_count_tuple);
 
     // add to the planfragments count of modified tuples
     m_engine->addToTuplesModified(m_modifiedTuples);
-    VOLT_DEBUG("Finished inserting %d tuples", m_modifiedTuples);
-    VOLT_DEBUG("InsertExecutor output table:\n%s\n", m_tmpOutputTable->debug().c_str());
-    VOLT_DEBUG("InsertExecutor target table:\n%s\n", m_targetTable->debug().c_str());
+    VOLT_DEBUG("Finished inserting %" PRId64 " tuples", m_modifiedTuples);
+    VOLT_TRACE("InsertExecutor output table:\n%s\n", m_tmpOutputTable->debug().c_str());
+    VOLT_TRACE("InsertExecutor target table:\n%s\n", m_targetTable->debug().c_str());
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
@@ -367,18 +405,35 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     //
     TableTuple inputTuple;
     const TupleSchema *inputSchema = m_inputTable->schema();
-    if (p_execute_init(inputSchema, m_tmpOutputTable, inputTuple)) {
-        p_execute_finish();
-        return true;
-    }
-
-    //
-    // An insert is quite simple really. We just loop through our m_inputTable
-    // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
-    //
-    TableIterator iterator = m_inputTable->iterator();
-    while (iterator.next(inputTuple)) {
-        p_execute_tuple(inputTuple);
+    {
+        if (p_execute_init_internal(inputSchema, m_tmpOutputTable, inputTuple)) {
+            ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
+                    m_replicatedTableOperation, m_engine->isLowestSite(), &s_modifiedTuples, int64_t(-1));
+            if (possiblySynchronizedUseMpMemory.okToExecute()) {
+                //
+                // An insert is quite simple really. We just loop through our m_inputTable
+                // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
+                //
+                TableIterator iterator = m_inputTable->iterator();
+                while (iterator.next(inputTuple)) {
+                    p_execute_tuple_internal(inputTuple);
+                }
+                if (m_replicatedTableOperation) {
+                    s_modifiedTuples = m_modifiedTuples;
+                }
+            }
+            else {
+                if (s_modifiedTuples == -1) {
+                    // An exception was thrown on the lowest site thread and we need to throw here as well so
+                    // all threads are in the same state
+                    char msg[1024];
+                    snprintf(msg, 1024, "Replicated table insert threw an unknown exception on other thread for table %s",
+                            m_targetTable->name().c_str());
+                    VOLT_DEBUG("%s", msg);
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
+                }
+            }
+        }
     }
 
     p_execute_finish();

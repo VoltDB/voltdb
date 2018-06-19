@@ -27,6 +27,7 @@
 namespace voltdb {
 
 class LargeTempTableBlock;
+class ProgressMonitorProxy;
 
 /**
  * A large temp table class that uses LargeTempTableCache to request
@@ -61,11 +62,7 @@ public:
 
     /** return an iterator that will automatically delete blocks after
         they are scanned. */
-    TableIterator iteratorDeletingAsWeGo() {
-        m_iter.reset(m_blockIds.begin());
-        m_iter.setTempTableDeleteAsGo(true);
-        return m_iter;
-    }
+    TableIterator iteratorDeletingAsWeGo();
 
     /** Delete all the tuples in this table */
     void deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
@@ -91,7 +88,7 @@ public:
      * Sort this table using the given compare function.  Also apply
      * the given limit and offset.
      */
-    void sort(const AbstractExecutor::TupleComparer& comparer, int limit, int offset);
+    void sort(ProgressMonitorProxy *pmp, const AbstractExecutor::TupleComparer& comparer, int limit, int offset);
 
     /** Releases the specified block.  Called by delete-as-you-go
         iterators.  Returns an iterator pointing to the next block
@@ -170,8 +167,6 @@ private:
     void getEmptyBlock();
 
     std::vector<LargeTempTableBlockId> m_blockIds;
-
-    TableIterator m_iter;
 
     LargeTempTableBlock* m_blockForWriting;
 };

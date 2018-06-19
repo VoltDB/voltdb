@@ -48,13 +48,9 @@
 
 #include "abstractexecutor.h"
 
-#include "execution/VoltDBEngine.h"
-#include "execution/ExecutorVector.h"
-#include "expressions/abstractexpression.h"
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
 #include "storage/tablefactory.h"
-#include "storage/TableCatalogDelegate.hpp"
 #include "storage/temptable.h"
 #include "storage/LargeTempTable.h"
 

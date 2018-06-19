@@ -23,7 +23,17 @@
 
 package org.voltdb.iv2;
 
-import com.google_voltpatches.common.collect.Lists;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
+import java.util.List;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -32,10 +42,7 @@ import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-import java.util.List;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import com.google_voltpatches.common.collect.Lists;
 
 public class TestDurabilityListener {
     private SpScheduler m_sched;
@@ -157,7 +164,7 @@ public class TestDurabilityListener {
     {
         SiteTaskerQueue stq = mock(SiteTaskerQueue.class);
         SnapshotCompletionMonitor scm = mock(SnapshotCompletionMonitor.class);
-        SpScheduler sched = spy(new SpScheduler(1, stq, scm));
+        SpScheduler sched = spy(new SpScheduler(1, stq, scm, true));
         sched.setLock(new Object());
 
         TransactionTaskQueue taskQueue = mock(TransactionTaskQueue.class);

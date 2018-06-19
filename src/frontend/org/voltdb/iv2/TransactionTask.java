@@ -24,6 +24,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.TransactionState;
+
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public abstract class TransactionTask extends SiteTasker
@@ -78,6 +79,9 @@ public abstract class TransactionTask extends SiteTasker
 
     // run from the live rejoin task log.
     abstract public void runFromTaskLog(SiteProcedureConnection siteConnection);
+
+    // MP read-write task need to be coordinated.
+    abstract public boolean needCoordination();
 
     public TransactionState getTransactionState()
     {

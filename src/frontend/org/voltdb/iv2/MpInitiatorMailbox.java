@@ -27,7 +27,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -47,6 +46,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     @SuppressWarnings("serial")
     private static class TerminateThreadException extends RuntimeException {};
     private long m_taskThreadId = 0;
+    private final MpRestartSequenceGenerator m_restartSeqGenerator;
     private final Thread m_taskThread = new Thread(null,
                     new Runnable() {
                         @Override
@@ -94,7 +94,8 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             FutureTask<RepairAlgo> ft = new FutureTask<RepairAlgo>(new Callable<RepairAlgo>() {
                 @Override
                 public RepairAlgo call() throws Exception {
-                    RepairAlgo ra = new MpPromoteAlgo( survivors.get(), MpInitiatorMailbox.this, whoami, balanceSPI);
+                    RepairAlgo ra = new MpPromoteAlgo(survivors.get(), MpInitiatorMailbox.this,
+                            m_restartSeqGenerator, whoami, balanceSPI);
                     setRepairAlgoInternal(ra);
                     return ra;
                 }
@@ -106,7 +107,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 Throwables.propagate(e);
             }
         } else {
-            ra = new MpPromoteAlgo( survivors.get(), this, whoami, balanceSPI);
+            ra = new MpPromoteAlgo(survivors.get(), this, m_restartSeqGenerator, whoami, balanceSPI);
             setRepairAlgoInternal(ra);
         }
         return ra;
@@ -201,6 +202,8 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             JoinProducerBase rejoinProducer)
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
+        m_restartSeqGenerator = new MpRestartSequenceGenerator(
+                ((MpScheduler)m_scheduler).getLeaderNodeId(), false);
         m_taskThread.start();
         m_sendThread.start();
     }
@@ -235,16 +238,18 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
 
     @Override
-    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters) {
+    public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, long snapshotSaveTxnId) {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {
-                updateReplicasInternal(replicas, partitionMasters);
+                updateReplicasInternal(replicas, partitionMasters, snapshotSaveTxnId);
             }
         });
+        return new long[0];
     }
 
-    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, boolean balanceSPI) {
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
+            boolean balanceSPI) {
         m_taskQueue.offer(new Runnable() {
             @Override
             public void run() {

@@ -89,6 +89,15 @@ public class TestVoltCompiler extends TestCase {
         tjar.delete();
     }
 
+    public void testDDLCompilerTTL() throws Exception {
+        String ddl = "create table ttl (a integer, b integer, PRIMARY KEY(a)) USING TTL 10 SECOND ON COLUMN a;\n" +
+                     "alter table ttl USING TTL 20 MINUTE ON COLUMN a;\n" +
+                     "alter table ttl drop TTL;\n";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.addLiteralSchema(ddl);
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
+    }
+
     public void testDDLFiltering() throws Exception {
 
         String ddl = "file -inlinebatch END_OF_DROP_BATCH\n" +
@@ -1901,6 +1910,11 @@ public class TestVoltCompiler extends TestCase {
                 "as select num, max(num), min(wage), count(*), sum(wage) from t group by num; \n";
         assertTrue(compileDDL(ddl, compiler));
 
+        // Users can create single table views without including count(*) column.
+        ddl = "create table t (id integer not null, num integer);\n" +
+                "create view my_view1 as select id, sum(num) from t group by id; \n";
+        assertTrue(compileDDL(ddl, compiler));
+
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from (select num from t limit 5) subt group by num; \n";
@@ -1979,18 +1993,30 @@ public class TestVoltCompiler extends TestCase {
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
 
-        // count(*) is needed in ddl
-        errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any)";
-        ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
-                "create view my_view as select id, wage from t group by id, wage;" +
-                "partition table t on column num;";
-        checkDDLErrorMessage(ddl, errorMsg);
-
         // multiple count(*) in ddl
-        errorMsg = "Materialized view \"MY_VIEW\" cannot have count(*) more than once";
         ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
                 "create view my_view as select id, wage, count(*), min(wage), count(*) from t group by id, wage;" +
                 "partition table t on column num;";
+        assertTrue(compileDDL(ddl, compiler));
+
+        // Multiple table view should throw error msg without count(*) columns.
+        errorMsg = "Materialized view \"V\" joins multiple tables, therefore must include COUNT(*) after any GROUP BY columns.";
+        ddl = "CREATE TABLE T1 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                "CREATE TABLE T2 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                "CREATE VIEW V (aint, sumint) AS " +
+                "SELECT T1.a, sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
+        // Check single table view GB without aggregates.
+        ddl = "CREATE TABLE T (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                "CREATE VIEW V AS " +
+                "SELECT A, B FROM T GROUP BY A, B;";
+        assertTrue(compileDDL(ddl, compiler));
+
+        // Check single table view aggregates without GB column.
+        ddl = "CREATE TABLE T (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
+                "CREATE VIEW V AS " +
+                "SELECT SUM(A), MAX(B) FROM T;";
         assertTrue(compileDDL(ddl, compiler));
 
         subTestDDLCompilerMatViewJoin();
@@ -3564,7 +3590,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadDropStream() throws Exception {
         // non-existent stream
-        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: E1.*",
+        badDDLAgainstSimpleSchema(".+object not found: E1.*",
                "DROP STREAM e1;\n"
                 );
 
@@ -3586,7 +3612,7 @@ public class TestVoltCompiler extends TestCase {
                 );
 
         // stream with referencing procedure
-        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: USER_STREAM_2.*",
+        badDDLAgainstSimpleSchema(".+object not found: USER_STREAM_2.*",
                 "CREATE STREAM User_Stream_2 Partition On Column UserId" +
                         " (UserId BIGINT NOT NULL, SessionStart TIMESTAMP);\n" +
                         "CREATE PROCEDURE Enter_User PARTITION ON TABLE User_Stream_2 column UserId" +
@@ -3761,9 +3787,9 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {
-        checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.TITLE\" in statement starting on lineno: 1",
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"object not found: BOOKS.TITLE\" in statement starting on lineno: 1",
                                     "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
-        checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.CASH\" in statement starting on lineno: 1",
+        checkDDLAgainstScalarSubquerySchema("DDL Error: \"object not found: BOOKS.CASH\" in statement starting on lineno: 1",
                                     "create view tview as select cash, count(*), max(( select cash from books as child where books.cash = child.cash )) from books group by cash;\n");
     }
 

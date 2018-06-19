@@ -25,7 +25,12 @@ package org.voltdb.jni;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
@@ -33,6 +38,7 @@ import junit.framework.TestCase;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -43,7 +49,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.ReplicatedTableException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
@@ -53,10 +61,13 @@ import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 public class TestExecutionEngine extends TestCase {
 
     public void testLoadCatalogs() throws Exception {
+        initializeSourceEngine(1);
         sourceEngine.loadCatalog( 0, m_catalog.serialize());
+        terminateSourceEngine();
     }
 
     public void testLoadBadCatalogs() throws Exception {
+        initializeSourceEngine(1);
         /*
          * Tests if the intended EE exception will be thrown when bad catalog is
          * loaded. We are really expecting an ERROR message on the terminal in
@@ -66,13 +77,20 @@ public class TestExecutionEngine extends TestCase {
         try {
             sourceEngine.loadCatalog( 0, badCatalog);
         } catch (final EEException e) {
+            terminateSourceEngine();
             return;
         }
 
         assertFalse(true);
     }
 
-    private void loadTestTables(ExecutionEngine engine, Catalog catalog) throws Exception
+//    public void testMultiSiteInSamePhysicalNodeWithExecutionSite() throws Exception {
+//        initializeSourceEngine(1);
+//        // TODO
+//        terminateSourceEngine();
+//    }
+
+    private void loadTestTables(Catalog catalog) throws Exception
     {
         int WAREHOUSE_TABLEID = warehouseTableId(catalog);
         int STOCK_TABLEID = stockTableId(catalog);
@@ -94,13 +112,12 @@ public class TestExecutionEngine extends TestCase {
 
         System.out.println(warehousedata.toString());
         // Long.MAX_VALUE is a no-op don't track undo token
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
+        sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
 
         //Check that we can detect and handle the dups when loading the data twice
-        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, true, false, Long.MAX_VALUE);
+        byte results[] = sourceEngine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, 0, true, false, Long.MAX_VALUE);
         System.out.println("Printing dups");
         System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
-
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -127,52 +144,169 @@ public class TestExecutionEngine extends TestCase {
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
         // Long.MAX_VALUE is a no-op don't track undo token
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
+        sourceEngine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
     }
 
     public void testLoadTable() throws Exception {
+        initializeSourceEngine(1);
         sourceEngine.loadCatalog( 0, m_catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
 
-        loadTestTables( sourceEngine, m_catalog);
+        loadTestTables(m_catalog);
 
         assertEquals(200, sourceEngine.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         assertEquals(1000, sourceEngine.serializeTable(STOCK_TABLEID).getRowCount());
+        terminateSourceEngine();
     }
 
-    public void testStreamTables() throws Exception {
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+    private Pair<byte[], byte[]> verifyMultiSiteLoadTable(boolean returnUniqueViolations) throws Exception {
+        int ITEM_TABLEID = itemTableId(m_twoSiteCatalog);
+
+        VoltTable itemdata = new VoltTable(
+                new VoltTable.ColumnInfo("I_ID", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("I_IM_ID", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("I_NAME", VoltType.STRING),
+                new VoltTable.ColumnInfo("I_PRICE", VoltType.FLOAT),
+                new VoltTable.ColumnInfo("I_DATA", VoltType.STRING)
+        );
+        for (int i = 0; i < 200; ++i) {
+            itemdata.addRow(i, i, "name" + i, 1.0, "desc");
+        }
+        // make a conflict row
+        itemdata.addRow(5, 5, "failedRow", 1.0, "failedRow");
+
 
         // Each EE needs its own thread for correct initialization.
-        final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
+        final AtomicReference<ExecutionEngine> source2Engine = new AtomicReference<ExecutionEngine>();
         final byte configBytes[] = ElasticHashinator.getConfigureBytes(1);
-        Thread destEEThread = new Thread() {
+        final ExecutorService es = Executors.newSingleThreadExecutor();
+        es.submit(new Runnable() {
             @Override
             public void run() {
-                destinationEngine.set(
+                source2Engine.set(
                         new ExecutionEngineJNI(
                                 CLUSTER_ID,
+                                1,
+                                1,
+                                2,
                                 NODE_ID,
-                                0,
-                                0,
                                 "",
                                 0,
                                 64*1024,
                                 100,
                                 new HashinatorConfig(configBytes, 0, 0), false));
             }
-        };
-        destEEThread.start();
-        destEEThread.join();
+        }).get();
 
-        destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+        es.execute(new Runnable() {
+            @Override
+            public void run() {
+                source2Engine.get().loadCatalog( 0, m_twoSiteCatalog.serialize());
+            }
+        });
+
+        initializeSourceEngine(2);
+
+        sourceEngine.loadCatalog( 0, m_twoSiteCatalog.serialize());
+
+        Future<byte[]> ft = es.submit(new Callable<byte[]>() {
+            @Override
+            public byte[] call() throws Exception {
+                try {
+                    byte[] rslt = source2Engine.get().loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0,
+                            returnUniqueViolations, false, Long.MAX_VALUE);
+                    return rslt;
+                }
+                catch (ReplicatedTableException e) {
+                    return null;
+                }
+                catch (Exception e) {
+                    return new byte[] {(byte)0};
+                }
+            }
+        });
+
+        byte[] srcRslt = null;
+        try {
+            srcRslt = sourceEngine.loadTable(ITEM_TABLEID, itemdata, 0, 0, 0, 0,
+                    returnUniqueViolations, false, Long.MAX_VALUE);
+        }
+        catch (ConstraintFailureException e) {
+            // srcRslt already null
+        }
+        catch (Exception e) {
+            srcRslt = new byte[] {(byte)0};
+        }
+        byte[] src2Rslt = ft.get();
+
+        es.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    source2Engine.get().release();
+                }
+                catch (EEException | InterruptedException e) {
+                }
+            }
+        }).get();
+        terminateSourceEngine();
+        es.shutdown();
+        return Pair.of(srcRslt, src2Rslt);
+    }
+
+    public void testMultiSiteLoadTableWithException() throws Exception {
+        Pair<byte[], byte[]> loadResults = verifyMultiSiteLoadTable(false);
+        assertTrue(loadResults.getFirst() == null && loadResults.getSecond() == null);
+    }
+
+    public void testMultiSiteLoadTableWithoutException() throws Exception {
+        Pair<byte[], byte[]> loadResults = verifyMultiSiteLoadTable(true);
+        assertTrue(loadResults.getFirst() != null && loadResults.getSecond() != null);
+        assertTrue(loadResults.getFirst().length > 4 &&
+                Arrays.equals(loadResults.getFirst(), loadResults.getSecond()));
+
+    }
+
+    public void testStreamTables() throws Exception {
+        // Each EE needs its own thread for correct initialization.
+        final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
+        final byte configBytes[] = ElasticHashinator.getConfigureBytes(1);
+        final ExecutorService es = Executors.newSingleThreadExecutor();
+        es.submit(new Runnable() {
+            @Override
+            public void run() {
+                destinationEngine.set(
+                        new ExecutionEngineJNI(
+                                CLUSTER_ID,
+                                1,
+                                1,
+                                2,
+                                NODE_ID,
+                                "",
+                                0,
+                                64*1024,
+                                100,
+                                new HashinatorConfig(configBytes, 0, 0), false));
+            }
+        }).get();
+
+        es.execute(new Runnable() {
+            @Override
+            public void run() {
+                destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+            }
+        });
+
+        initializeSourceEngine(2);
+
+        sourceEngine.loadCatalog( 0, m_catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
 
-        loadTestTables( sourceEngine, m_catalog);
+        loadTestTables(m_catalog);
 
         sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
                                           new SnapshotPredicates(-1).toBytes());
@@ -198,8 +332,13 @@ public class TestExecutionEngine extends TestCase {
                                                                    output).getSecond()[0];
             assertTrue(serialized > 0);
             container.b().limit(serialized);
-            destinationEngine.get().processRecoveryMessage( container.b(), container.address() );
 
+            es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    destinationEngine.get().processRecoveryMessage( container.b(), container.address() );
+                }
+            }).get();
 
             serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
                                                                TableStreamType.RECOVERY,
@@ -215,8 +354,13 @@ public class TestExecutionEngine extends TestCase {
                                                                output).getSecond()[0];
             assertTrue(serialized > 0);
             container.b().limit(serialized);
-            destinationEngine.get().processRecoveryMessage( container.b(), container.address());
 
+            es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    destinationEngine.get().processRecoveryMessage( container.b(), container.address());
+                }
+            }).get();
 
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
                                                                TableStreamType.RECOVERY,
@@ -228,6 +372,18 @@ public class TestExecutionEngine extends TestCase {
             assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.get().tableHashCode(STOCK_TABLEID));
         } finally {
             container.discard();
+            es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        destinationEngine.get().release();
+                    }
+                    catch (EEException | InterruptedException e) {
+                    }
+                }
+            }).get();
+            terminateSourceEngine();
+            es.shutdown();
         }
     }
 
@@ -239,7 +395,12 @@ public class TestExecutionEngine extends TestCase {
         return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
     }
 
+    private int itemTableId(Catalog catalog) {
+        return catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("ITEM").getRelativeIndex();
+    }
+
     public void testGetStats() throws Exception {
+        initializeSourceEngine(1);
         sourceEngine.loadCatalog( 0, m_catalog.serialize());
 
         final int WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
@@ -255,38 +416,45 @@ public class TestExecutionEngine extends TestCase {
             String tn = resultTable.getString("TABLE_NAME");
             assertTrue(tn.equals("WAREHOUSE") || tn.equals("STOCK"));
         }
+        terminateSourceEngine();
     }
 
     public void testStreamIndex() throws Exception {
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
-
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
         final byte configBytes[] = ElasticHashinator.getConfigureBytes(1);
-        Thread destEEThread = new Thread() {
+        final ExecutorService es = Executors.newSingleThreadExecutor();
+        es.submit(new Runnable() {
             @Override
             public void run() {
                 destinationEngine.set(
                         new ExecutionEngineJNI(
                                 CLUSTER_ID,
+                                1,
+                                1,
+                                2,
                                 NODE_ID,
-                                0,
-                                0,
                                 "",
                                 0,
                                 64*1024,
                                 100,
                                 new HashinatorConfig(configBytes, 0, 0), false));
             }
-        };
-        destEEThread.start();
-        destEEThread.join();
+        }).get();
 
-        destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+        es.execute(new Runnable() {
+            @Override
+            public void run() {
+                destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+            }
+        });
+
+        initializeSourceEngine(2);
+        sourceEngine.loadCatalog( 0, m_catalog.serialize());
 
         int STOCK_TABLEID = stockTableId(m_catalog);
 
-        loadTestTables( sourceEngine, m_catalog);
+        loadTestTables(m_catalog);
 
         SnapshotPredicates predicates = new SnapshotPredicates(-1);
         predicates.addPredicate(new HashRangeExpressionBuilder()
@@ -314,40 +482,59 @@ public class TestExecutionEngine extends TestCase {
         } finally {
             container.discard();
         }
+        es.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    destinationEngine.get().release();
+                }
+                catch (EEException | InterruptedException e) {
+                }
+            }
+        }).get();
+        terminateSourceEngine();
+        es.shutdown();
     }
 
 
     private ExecutionEngine sourceEngine;
     private static final int CLUSTER_ID = 2;
-    private static final long NODE_ID = 1;
+    private static final int NODE_ID = 1;
 
-    TPCCProjectBuilder m_project;
     Catalog m_catalog;
+    Catalog m_twoSiteCatalog;
+
+    private void initializeSourceEngine(int engineCount) throws Exception {
+        sourceEngine =
+                new ExecutionEngineJNI(
+                        CLUSTER_ID,
+                        0,
+                        0,
+                        engineCount,
+                        NODE_ID,
+                        "",
+                        0,
+                        64*1024,
+                        100,
+                        new HashinatorConfig(ElasticHashinator.getConfigureBytes(1), 0, 0), true);
+    }
+
+    private void terminateSourceEngine() throws Exception {
+        sourceEngine.release();
+        sourceEngine = null;
+    }
 
     @Override
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo("Test");
-        sourceEngine =
-                new ExecutionEngineJNI(
-                        CLUSTER_ID,
-                        NODE_ID,
-                        0,
-                        0,
-                        "",
-                        0,
-                        64*1024,
-                        100,
-                        new HashinatorConfig(ElasticHashinator.getConfigureBytes(1), 0, 0), false);
-        m_project = new TPCCProjectBuilder();
-        m_catalog = m_project.createTPCCSchemaCatalog();
+        m_catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
+        m_twoSiteCatalog = TPCCProjectBuilder.getTPCCSchemaCatalogMultiSite(2);
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        sourceEngine.release();
-        sourceEngine = null;
         System.gc();
         System.runFinalization();
     }

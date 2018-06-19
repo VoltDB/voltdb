@@ -48,6 +48,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     // If its is true, the message is created on partition leader and sent to replicas.
     protected boolean m_isForReplica = false;
 
+    public static final long INITIAL_TIMESTAMP = Long.MIN_VALUE;
+
     /** Empty constructor for de-serialization */
     protected TransactionInfoBaseMessage() {
         m_subject = Subject.DEFAULT.getId();

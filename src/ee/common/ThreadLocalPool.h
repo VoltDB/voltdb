@@ -18,10 +18,61 @@
 #ifndef THREADLOCALPOOL_H_
 #define THREADLOCALPOOL_H_
 
+#include "structures/CompactingPool.h"
+
 #include "boost/pool/pool.hpp"
 #include "boost/shared_ptr.hpp"
+#include <boost/unordered_map.hpp>
+#include "common/debuglog.h"
 
 namespace voltdb {
+
+typedef boost::unordered_map<int32_t, boost::shared_ptr<CompactingPool> > CompactingStringStorage;
+
+struct voltdb_pool_allocator_new_delete
+{
+    typedef std::size_t size_type;
+    typedef std::ptrdiff_t difference_type;
+
+    static char * malloc(const size_type bytes);
+    static void free(char * const block);
+};
+
+typedef boost::pool<voltdb_pool_allocator_new_delete> PoolForObjectSize;
+typedef boost::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
+typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
+
+typedef std::pair<int, PoolsByObjectSize* > PoolPairType;
+typedef PoolPairType* PoolPairTypePtr;
+
+struct PoolLocals {
+    PoolLocals();
+    PoolLocals(bool dummyEntry) {
+        poolData = NULL;
+        stringData = NULL;
+        allocated = NULL;
+        enginePartitionId = NULL;
+    }
+    PoolLocals(const PoolLocals& src) {
+        poolData = src.poolData;
+        stringData = src.stringData;
+        allocated = src.allocated;
+        enginePartitionId = src.enginePartitionId;
+    }
+
+    PoolLocals& operator = (PoolLocals const& rhs) {
+        poolData = rhs.poolData;
+        stringData = rhs.stringData;
+        allocated = rhs.allocated;
+        return *this;
+    }
+
+    PoolPairTypePtr poolData;
+    CompactingStringStorage* stringData;
+    std::size_t* allocated;
+    int32_t* enginePartitionId;
+};
+
 
 /**
  * A wrapper around a set of pools that are local to the current thread.
@@ -53,11 +104,15 @@ public:
     // values for use in situations where they are not being stored as column values.
     static const int POOLED_MAX_VALUE_LENGTH = 1024 * 1024;
 
+    static void assignThreadLocals(const PoolLocals& mapping);
+
+    static PoolPairTypePtr getDataPoolPair();
+
     /**
      * Allocate space from a page of objects of the requested size.
      * Each new size of object splinters the allocated memory into a new pool
      * which is a collection of pages of objects of that exact size.
-     * Each pool will allocate additional space that is initally unused.
+     * Each pool will allocate additional space that is initially unused.
      * This is not an issue when the allocated objects will be instances of a
      * class that has many instances to quickly fill up the unused space. So,
      * an optimal use case is a custom operator new for a commonly used class.
@@ -77,6 +132,29 @@ public:
     static void freeExactSizedObject(std::size_t, void* object);
 
     static std::size_t getPoolAllocationSize();
+
+    static void setPartitionIds(int32_t partitionId);
+    /**
+     * Get the partition id of the executing thread.  Most often this
+     * is the same as getEnginePartitionId.  But when a thread is doing
+     * work on behalf of another thread this is the partion id of the
+     * thread actually doing the work.
+     *
+     * @return The partition id of the working thread.
+     */
+    static int32_t getThreadPartitionId();
+    static int32_t getThreadPartitionIdWithNullCheck();
+    /**
+     * Get the partion id of the thread on whose behalf this thread is
+     * working.  Generally this is the same as the value of getThreadPartitionId.
+     * But if some other thread is doing work on our behalf then this is
+     * the partition id of the free rider, on whose behalf the working
+     * thread is working.
+     *
+     * @return The partition id of the free rider thread.
+     */
+    static int32_t getEnginePartitionId();
+    static int32_t getEnginePartitionIdWithNullCheck();
 
     /**
      * Allocate space from a page of objects of approximately the requested
@@ -117,6 +195,27 @@ public:
      * relocating some other allocation.
      */
     static void freeRelocatable(Sized* string);
+
+    static void resetStateForTest();
+    static int32_t* getThreadPartitionIdForTest();
+    static void setThreadPartitionIdForTest(int32_t* partitionId);
+private:
+    #ifdef VOLT_POOL_CHECKING
+        friend class SynchronizedThreadLock;
+        static StackTrace* getStackTraceFor(int32_t engineId, std::size_t sz, void* object);
+
+        int32_t m_allocatingEngine;
+        int32_t m_allocatingThread;
+        static pthread_mutex_t s_sharedMemoryMutex;
+    #ifdef VOLT_TRACE_ALLOCATIONS
+        typedef std::unordered_map<void *, StackTrace*> AllocTraceMap_t;
+    #else
+        typedef std::unordered_set<void *> AllocTraceMap_t;
+    #endif
+        typedef std::unordered_map<std::size_t, AllocTraceMap_t> SizeBucketMap_t;
+        typedef std::unordered_map<int32_t, SizeBucketMap_t> PartitionBucketMap_t;
+        static PartitionBucketMap_t s_allocations;
+    #endif
 };
 }
 

@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component inheritJdk="true">
+	<exclude-output/>
+	<contentEntry url="file://$MODULE_DIR$"/>
+	<lib name="commons-lang3-3.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/commons-lang3-3.0.jar!/"/>
+	</lib>
+	<lib name="jline-2.10.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jline-2.10.jar!/"/>
+	</lib>
+	<lib name="hamcrest-all-1.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/hamcrest-all-1.3.jar!/"/>
+	</lib>
+	<lib name="ant-junit.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant-junit.jar!/"/>
+	</lib>
+	<lib name="ant-testability-explorer.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant-testability-explorer.jar!/"/>
+	</lib>
+	<lib name="ant.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/ant.jar!/"/>
+	</lib>
+	<lib name="japex.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/japex.jar!/"/>
+	</lib>
+	<lib name="jcommon-1.0.16.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jcommon-1.0.16.jar!/"/>
+	</lib>
+	<lib name="jfreechart-1.0.13.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jfreechart-1.0.13.jar!/"/>
+	</lib>
+	<lib name="junit-dep-4.10.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/junit-dep-4.10.jar!/"/>
+	</lib>
+	<lib name="pmd-4.2.5.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/pmd-4.2.5.jar!/"/>
+	</lib>
+	<lib name="testability-explorer.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/testability-explorer.jar!/"/>
+	</lib>
+	<lib name="log4j-1.2.16.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/log4j-1.2.16.jar!/"/>
+	</lib>
+	<lib name="servlet-api-3.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/servlet-api-3.1.jar!/"/>
+	</lib>
+	<lib name="slf4j-api-1.6.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/slf4j-api-1.6.2.jar!/"/>
+	</lib>
+	<lib name="slf4j-nop-1.6.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/slf4j-nop-1.6.2.jar!/"/>
+	</lib>
+	<lib name="jna.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jna.jar!/"/>
+	</lib>
+	<lib name="protobuf-java-3.4.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/protobuf-java-3.4.0.jar!/"/>
+	</lib>
+	<lib name="snappy-java-1.1.1.7.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/snappy-java-1.1.1.7.jar!/"/>
+	</lib>
+	<lib name="super-csv-2.1.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/super-csv-2.1.0.jar!/"/>
+	</lib>
+	<lib name="owner-1.0.9.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/owner-1.0.9.jar!/"/>
+	</lib>
+	<lib name="owner-java8-1.0.9.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/owner-java8-1.0.9.jar!/"/>
+	</lib>
+	<lib name="snmp4j-2.5.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/snmp4j-2.5.2.jar!/"/>
+	</lib>
+	<lib name="mockito-all-1.10.19.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/mockito-all-1.10.19.jar!/"/>
+	</lib>
+	<lib name="powermock-mockito-1.6.3-full.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/powermock-mockito-1.6.3-full.jar!/"/>
+	</lib>
+	<lib name="objenesis-2.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/objenesis-2.1.jar!/"/>
+	</lib>
+	<lib name="make-it-easy-3.1.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/make-it-easy-3.1.0.jar!/"/>
+	</lib>
+	<lib name="javaee-api-7.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/javaee-api-7.0.jar!/"/>
+	</lib>
+	<lib name="kafka-clients-0.10.2.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/kafka-clients-0.10.2.1.jar!/"/>
+	</lib>
+	<lib name="kafka-clients-0.8.2.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/kafka-clients-0.8.2.2.jar!/"/>
+	</lib>
+	<lib name="kafka_2.11-0.8.2.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/kafka_2.11-0.8.2.2.jar!/"/>
+	</lib>
+	<lib name="lz4-1.2.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/lz4-1.2.0.jar!/"/>
+	</lib>
+	<lib name="metrics-core-2.2.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/metrics-core-2.2.0.jar!/"/>
+	</lib>
+	<lib name="scala-library-2.11.5.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-library-2.11.5.jar!/"/>
+	</lib>
+	<lib name="jackson-core-asl-1.9.13.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-core-asl-1.9.13.jar!/"/>
+	</lib>
+	<lib name="jackson-mapper-asl-1.9.13.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-mapper-asl-1.9.13.jar!/"/>
+	</lib>
+	<lib name="felix.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/felix.jar!/"/>
+	</lib>
+	<lib name="httpclient-4.3.6.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpclient-4.3.6.jar!/"/>
+	</lib>
+	<lib name="httpcore-4.3.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpcore-4.3.3.jar!/"/>
+	</lib>
+	<lib name="commons-logging-1.1.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/commons-logging-1.1.3.jar!/"/>
+	</lib>
+	<lib name="tomcat-jdbc.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-jdbc.jar!/"/>
+	</lib>
+	<lib name="amazon-kinesis-client-1.6.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/amazon-kinesis-client-1.6.2.jar!/"/>
+	</lib>
+	<lib name="aws-java-sdk-1.10.72.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/aws-java-sdk-1.10.72.jar!/"/>
+	</lib>
+	<lib name="jackson-dataformat-cbor-2.5.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jackson-dataformat-cbor-2.5.3.jar!/"/>
+	</lib>
+	<lib name="jackson-databind-2.5.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jackson-databind-2.5.3.jar!/"/>
+	</lib>
+	<lib name="jackson-core-2.5.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jackson-core-2.5.3.jar!/"/>
+	</lib>
+	<lib name="jackson-annotations-2.5.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jackson-annotations-2.5.0.jar!/"/>
+	</lib>
+	<lib name="joda-time-2.9.3.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/joda-time-2.9.3.jar!/"/>
+	</lib>
+	<lib name="commons-lang-2.6.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/commons-lang-2.6.jar!/"/>
+	</lib>
+	<lib name="guava-18.0.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/guava-18.0.jar!/"/>
+	</lib>
+	<lib name="tomcat-juli.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-juli.jar!/"/>
+	</lib>
+	<lib name="scala-parser-combinators_2.11-1.0.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-parser-combinators_2.11-1.0.2.jar!/"/>
+	</lib>
+	<lib name="scala-xml_2.11-1.0.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/scala-xml_2.11-1.0.2.jar!/"/>
+	</lib>
+	<lib name="javassist-3.20.0-GA.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/javassist-3.20.0-GA.jar!/"/>
+	</lib>
+	<lib name="zkclient-0.10.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/zkclient-0.10.jar!/"/>
+	</lib>
+	<lib name="zookeeper-3.4.10.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/zookeeper-3.4.10.jar!/"/>
+	</lib>
+	<lib name="commons-io-1.4.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/commons-io-1.4.jar!/"/>
+	</lib>
+	<lib name="httpclient-4.3.4-tests.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/httpclient-4.3.4-tests.jar!/"/>
+	</lib>
+	<lib name="avro-1.7.7.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/avro-1.7.7.jar!/"/>
+	</lib>
+	<lib name="httpasyncclient-4.0.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpasyncclient-4.0.2.jar!/"/>
+	</lib>
+	<lib name="httpcore-nio-4.3.2.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/httpcore-nio-4.3.2.jar!/"/>
+	</lib>
+	<lib name="jetty-continuation-9.3.21.v20170918.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-continuation-9.3.21.v20170918.jar!/"/>
+	</lib>
+	<lib name="jetty-http-9.3.21.v20170918.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-http-9.3.21.v20170918.jar!/"/>
+	</lib>
+	<lib name="jetty-io-9.3.21.v20170918.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-io-9.3.21.v20170918.jar!/"/>
+	</lib>
+	<lib name="jetty-server-9.3.21.v20170918.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-server-9.3.21.v20170918.jar!/"/>
+	</lib>
+	<lib name="jetty-util-9.3.21.v20170918.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-util-9.3.21.v20170918.jar!/"/>
+	</lib>
+	<lib name="jetty-servlet-9.3.21.v20170918.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-servlet-9.3.21.v20170918.jar!/"/>
+	</lib>
+	<lib name="jetty-security-9.3.21.v20170918.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-security-9.3.21.v20170918.jar!/"/>
+	</lib>
+</component>
