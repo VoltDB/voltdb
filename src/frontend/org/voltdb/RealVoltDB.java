@@ -1697,7 +1697,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 handleHostsFailedForMigratePartitionLeader(failedHosts);
-                acceptExportStreamMastership(failedHosts);
+                takeExportStreamMastership();
 
                 // Send KSafety trap - BTW the side effect of
                 // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
@@ -1804,7 +1804,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private void acceptExportStreamMastership(Set<Integer> failedHosts) {
+    private void takeExportStreamMastership() {
         for (Initiator initiator : m_iv2Initiators.values()) {
             if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
                 SpInitiator spInitiator = (SpInitiator)initiator;
@@ -1813,7 +1813,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         exportLog.debug("Export Manager has been notified that local partition " +
                                   spInitiator.getPartitionId() + " to reevaluate export stream master.");
                     }
-                    ExportManager.instance().acceptMastership(spInitiator.getPartitionId());
+                    ExportManager.instance().takeMastership(spInitiator.getPartitionId());
                 }
             }
         }

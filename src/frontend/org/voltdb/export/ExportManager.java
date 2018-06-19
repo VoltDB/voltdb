@@ -91,13 +91,41 @@ public class ExportManager
      */
     private final Set<Integer> m_masterOfPartitions = new HashSet<Integer>();
 
+    /**
+     * Master sends RELEASE_BUFFER to all its replicas to discard buffer.
+     */
     public static final byte RELEASE_BUFFER = 1;
 
-    public static final byte TAKE_MASTERSHIP = 2;
+    /**
+     * Master sends GIVE_MASTERSHIP to one replica to transfer leadership.
+     */
+    public static final byte GIVE_MASTERSHIP = 2;
 
-    public static final byte QUERY_MEMBERSHIP = 3;
+    /**
+     * Master sends GAP_QUERY to all nodes to know: can you cover the next sequence number?
+     *
+     * This is called when master hits gap in the stream.
+     */
+    public static final byte GAP_QUERY = 3;
 
+    /**
+     * Node that receives GAP_QUERY sends back QUERY_RESPONSE with the information that whether
+     * it has data for the next sequence number.
+     */
     public static final byte QUERY_RESPONSE = 4;
+
+    /**
+     * Data sources under new SPI or SPI who receives failed host notification
+     * sends TASK_MASTERSHIP to all nodes to ask master to transfer leadership back.
+     * If master doesn't exist promote itself to be master.
+     */
+    public static final byte TASK_MASTERSHIP = 5;
+
+    /**
+     * Node that receives TASK_MASTERSHIP sends back TASK_MASTERSHIP_RESPONSE to indicate
+     * it's not master.
+     */
+    public static final byte TASK_MASTERSHIP_RESPONSE = 6;
 
     /**
      * Thrown if the initial setup of the loader fails
@@ -185,6 +213,7 @@ public class ExportManager
             rowValues[columnNameToIndex.get(Columns.SITE_ID)] = stat.m_siteId;
             rowValues[columnNameToIndex.get(Columns.PARTITION_ID)] = stat.m_partitionId;
             rowValues[columnNameToIndex.get(Columns.STREAM_NAME)] = stat.m_streamName;
+            rowValues[columnNameToIndex.get(Columns.ROLE)] = stat.m_role;
             rowValues[columnNameToIndex.get(Columns.EXPORT_TARGET)] = stat.m_exportTarget;
             rowValues[columnNameToIndex.get(Columns.TUPLE_COUNT)] = stat.m_tupleCount;
             rowValues[columnNameToIndex.get(Columns.TUPLE_PENDING)] = stat.m_tuplesPending;
@@ -252,17 +281,13 @@ public class ExportManager
      * masters for the given partition id
      * @param partitionId
      */
-    synchronized public void acceptMastership(int partitionId) {
+    synchronized public void takeMastership(int partitionId) {
         m_masterOfPartitions.add(partitionId);
-        /*
-         * Only the first generation will have a processor which
-         * makes it safe to accept mastership.
-         */
         ExportGeneration generation = m_generation.get();
         if (generation == null) {
             return;
         }
-        generation.reassignExportStreamMaster(partitionId);
+        generation.takeMastership(partitionId);
     }
 
     /**
@@ -665,10 +690,11 @@ public class ExportManager
     public static void pushExportBuffer(
             int partitionId,
             String signature,
-            long uso,
+            long startSequenceNumber,
+            long tupleCount,
             long bufferPtr,
             ByteBuffer buffer,
-            boolean sync, long tupleCount) {
+            boolean sync) {
         //For validating that the memory is released
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
@@ -680,21 +706,22 @@ public class ExportManager
                 }
                 return;
             }
-            generation.pushExportBuffer(partitionId, signature, uso, buffer, sync, tupleCount);
+            generation.pushExportBuffer(partitionId, signature, startSequenceNumber,
+                    (int)tupleCount, buffer, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
         }
     }
 
-    public void updateInitialExportStateToTxnId(int partitionId, String signature,
-            boolean isRecover, Long truncationPoint, long sequenceNumber) {
+    public void updateInitialExportStateToSeqNo(int partitionId, String signature,
+                                                boolean isRecover, long sequenceNumber) {
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();
         if (generation != null) {
-            generation.updateInitialExportStateToTxnId(partitionId, signature,
-                    isRecover, truncationPoint, sequenceNumber);
+            generation.updateInitialExportStateToSeqNo(partitionId, signature,
+                                                       isRecover, sequenceNumber);
         }
     }
 

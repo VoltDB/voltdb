@@ -53,13 +53,11 @@ public:
     }
 
     /** Set the total number of bytes used (for rejoin/recover) */
-    void setBytesUsed(size_t count) {
+    void setBytesUsed(int64_t seqNo, size_t count) {
         assert(m_uso == 0);
-        StreamBlock *sb = new StreamBlock(new char[1], 0, 0, count);
-        ExecutorContext::getPhysicalTopend()->pushExportBuffer(
-                                m_partitionId, m_signature, sb, false);
-        delete sb;
         m_uso = count;
+        // this is for start sequence number of stream block
+        m_exportSequenceNumber = seqNo + 1;
         //Extend the buffer chain to replace any existing stream blocks with a new one
         //with the correct USO
         extendBufferChain(0);

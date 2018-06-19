@@ -53,7 +53,7 @@ public class TestStreamBlockQueue {
 
     private StreamBlockQueue m_sbq;
 
-    private static long g_uso = 0;
+    private static long g_seqNo = 0;
     private static ByteBuffer getFilledBuffer(byte fillValue) {
         //8 bytes is magic prefix space
         ByteBuffer buf = ByteBuffer.allocateDirect(1024 * 1024 * 2 + StreamBlock.HEADER_SIZE);
@@ -66,8 +66,8 @@ public class TestStreamBlockQueue {
     }
 
     private static StreamBlock getStreamBlockWithFill(byte fillValue) {
-        g_uso += 1024 * 1024 * 2;
-        return new StreamBlock(DBBPool.wrapBB(getFilledBuffer(fillValue)), g_uso, 1, false);
+        g_seqNo += 100;
+        return new StreamBlock(DBBPool.wrapBB(getFilledBuffer(fillValue)), g_seqNo, 1, false);
     }
 
     @Test
@@ -76,7 +76,7 @@ public class TestStreamBlockQueue {
         StreamBlock sb = getStreamBlockWithFill((byte)1);
         m_sbq.offer(sb);
         StreamBlock fromPeek = m_sbq.peek();
-        assertEquals(sb.uso(), fromPeek.uso());
+        assertEquals(sb.startSequenceNumber(), fromPeek.startSequenceNumber());
         assertEquals(sb.totalSize(), fromPeek.totalSize());
         assertFalse(m_sbq.isEmpty());
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);
@@ -90,7 +90,7 @@ public class TestStreamBlockQueue {
         assertFalse(m_sbq.isEmpty());
         assertEquals(m_sbq.sizeInBytes(), 1024 * 1024 * 2);//USO and length prefix on disk
         assertEquals(sb, m_sbq.poll());
-        assertTrue(sb.uso() == g_uso);
+        assertTrue(sb.startSequenceNumber() == g_seqNo);
         assertEquals(sb.totalSize(), 1024 * 1024 * 2);
         assertTrue(m_sbq.isEmpty());
         assertNull(m_sbq.peek());
@@ -177,13 +177,13 @@ public class TestStreamBlockQueue {
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 4;
+        long seqnum = 200; // first block was discarded
         for (int ii = 1; ii < 32; ii++) {
             assertTrue(iter.hasNext());
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -239,13 +239,13 @@ public class TestStreamBlockQueue {
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 6;
+        long seqnum = 300; // first two block were discarded
         for (int ii = 2; ii < 32; ii++) {
             assertTrue(iter.hasNext());
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -305,13 +305,13 @@ public class TestStreamBlockQueue {
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 6;
+        long seqnum = 300; // first two blocks were discarded
         for (int ii = 2; ii < 32; ii++) {
             assertTrue(iter.hasNext());
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -375,13 +375,13 @@ public class TestStreamBlockQueue {
         System.gc();
         System.runFinalization();
         StreamBlock sb = null;
-        long uso = 1024 * 1024 * 2;
+        long seqnum = 100; // SBQ was reopened.
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
         int ii = 0;
         while (ii < 32 && (sb = m_sbq.pop()) != null) {
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -433,13 +433,13 @@ public class TestStreamBlockQueue {
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 6;
+        long seqnum = 300;
         for (int ii = 2; ii < 32; ii++) {
             assertTrue(iter.hasNext());
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -493,12 +493,12 @@ public class TestStreamBlockQueue {
         Iterator<StreamBlock> iter = m_sbq.iterator();
 
         ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
-        long uso = 1024 * 1024 * 2;
+        long seqnum = 100;
         for (int ii = 0; ii < 32; ii++) {
             StreamBlock sb = iter.next();
             blocks.add(sb);
-            assertEquals(sb.uso(), uso);
-            uso += 1024 * 1024 * 2;
+            assertEquals(sb.startSequenceNumber(), seqnum);
+            seqnum += 100;
             assertEquals(sb.totalSize(), 1024 * 1024 * 2);
             BBContainer cont = sb.unreleasedContainer();
             ByteBuffer buf = cont.b();
@@ -537,7 +537,7 @@ public class TestStreamBlockQueue {
 
     @Before
     public void setUp() throws Exception {
-        g_uso = 0;
+        g_seqNo = 0;
         File testDir = new File(TEST_DIR);
         if (testDir.exists()) {
             for (File f : testDir.listFiles()) {

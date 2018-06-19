@@ -53,7 +53,8 @@ TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpa
       m_committedSpHandle(0), m_committedUso(0),
       m_committedUniqueId(0),
       m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace),
-      m_uncommittedTupleCount(0)
+      m_uncommittedTupleCount(0),
+      m_exportSequenceNumber(1) // sequence number starts from 1
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -308,6 +309,8 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
+
+    m_currBlock->recordStartExportSequenceNumber(m_exportSequenceNumber);
 
     if (openTransaction) {
         handleOpenTransaction(oldBlock);

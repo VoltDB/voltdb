@@ -84,6 +84,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     assert(m_columnNames.size() == tuple.columnCount());
     size_t streamHeaderSz = 0;
     size_t tupleMaxLength = 0;
+    // update sequence number
+    m_exportSequenceNumber = seqNo;
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
@@ -111,6 +113,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
         //If we can not fit the data get a new block with size that includes schemaSize as well.
         extendBufferChain(tupleMaxLength);
     }
+    m_currBlock->recordStartExportSequenceNumber(seqNo);
     bool includeSchema = m_currBlock->needsSchema();
     if (includeSchema) {
         ExportSerializeOutput blkhdr(m_currBlock->headerDataPtr()+EXPORT_BUFFER_HEADER_SIZE,
@@ -125,7 +128,6 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
         writeSchema(blkhdr, tuple);
         m_currBlock->noSchema();
     }
-
 
     // initialize the full row header to 0. This also
     // has the effect of setting each column non-null.
@@ -170,7 +172,9 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     const size_t startingUso = m_uso;
     m_uso += (streamHeaderSz + io.position());
-//    cout << "Appending row " << rowHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+    m_exportSequenceNumber++;
+//    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+//            << " sequence number " << seqNo
 //            << " offset " << m_currBlock->offset() << std::endl;
     //Not new anymore as we have new transaction after UAC
     m_new = false;

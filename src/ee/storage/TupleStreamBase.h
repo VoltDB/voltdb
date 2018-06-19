@@ -117,6 +117,8 @@ public:
      * Note that before the Export Tuples are only committed by the *next* Txn that updates the StreamBLock
      */
     int64_t m_uncommittedTupleCount;
+
+    int64_t m_exportSequenceNumber;
 };
 
 }

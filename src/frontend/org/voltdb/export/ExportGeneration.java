@@ -45,9 +45,9 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
@@ -201,7 +201,6 @@ public class ExportGeneration implements Generation {
 
     // mark a DataSource as dropped if its stream is dropped upon uac
     private void updateDataSources(Database database) {
-
         if (m_dataSourcesByPartition.isEmpty()) {
             return;
         }
@@ -215,9 +214,9 @@ public class ExportGeneration implements Generation {
             for (String signature : sources.keySet()) {
                 ExportDataSource src = sources.get(signature);
                 if (exportSignatures.contains(src)) {
-                    src.setStatus(ExportDataSource.STREAM_STATUS.ACTIVE);
+                    src.setStatus(ExportDataSource.StreamStatus.ACTIVE);
                 } else {
-                    src.setStatus(ExportDataSource.STREAM_STATUS.DROPPED);
+                    src.setStatus(ExportDataSource.StreamStatus.DROPPED);
                 }
             }
         }
@@ -261,7 +260,7 @@ public class ExportGeneration implements Generation {
                     }
 
                     if (msgType == ExportManager.RELEASE_BUFFER) {
-                        final long ackUSO = buf.getLong();
+                        final long seqNo = buf.getLong();
                         int tuplesSent = buf.getInt();
                         if (tuplesSent < 0 ) {
                             exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
@@ -273,50 +272,72 @@ public class ExportGeneration implements Generation {
                         try {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received RELEASE_BUFFER message for " + eds.toString() +
-                                        " with uso: " + ackUSO +
+                                        " with sequence number: " + seqNo +
+                                        " tuples sent " + tuplesSent +
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
-                            eds.ack(ackUSO, tuplesSent);
+                            eds.ack(seqNo, tuplesSent);
                         } catch (RejectedExecutionException ignoreIt) {
                             // ignore it: as it is already shutdown
                         }
-                    } else if (msgType == ExportManager.TAKE_MASTERSHIP) {
-                        final long ackUSO = buf.getLong();
-                        int tuplesSent = buf.getInt();
-                        if (tuplesSent < 0 ) {
-                            exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
-                            tuplesSent = 0;
-                        }
-                        if (m_mbox.getHSId() == message.m_sourceHSId) {
-                            tuplesSent = 0;
-                        }
+                    } else if (msgType == ExportManager.GIVE_MASTERSHIP) {
+                        final long ackSeqNo = buf.getLong();
+                        int tuplesSent = 0;
+//                        if (tuplesSent < 0 ) {
+//                            exportLog.warn("Received an export ack for " + eds.toString());
+//                            tuplesSent = 0;
+//                        }
+//                        if (m_mbox.getHSId() == message.m_sourceHSId) {
+//                            tuplesSent = 0;
+//                        }
                         try {
                             if (exportLog.isDebugEnabled()) {
-                                exportLog.debug("Received TAKE_MASTERSHIP message for " + eds.toString() +
-                                        " with uso:" + ackUSO +
+                                exportLog.debug("Received GIVE_MASTERSHIP message for " + eds.toString() +
+                                        " with sequence number:" + ackSeqNo +
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
-                            eds.ack(ackUSO, tuplesSent);
+                            eds.ack(ackSeqNo, tuplesSent);
                         } catch (RejectedExecutionException ignoreIt) {
                             // ignore it: as it is already shutdown
                         }
                         eds.acceptMastership();
-                    } else if (msgType == ExportManager.QUERY_MEMBERSHIP) {
+                    } else if (msgType == ExportManager.GAP_QUERY) {
+                        final long requestId = buf.getLong();
+                        long gapStart = buf.getLong();
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Received QUERY_MEMBERSHIP message for " + eds.toString() +
+                            exportLog.debug("Received GAP_QUERY message(" + requestId +
+                                    ") for " + eds.toString() +
                                     " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                     " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                         }
-                        eds.handleQueryMessage(message.m_sourceHSId);
+                        eds.handleQueryMessage(message.m_sourceHSId, requestId, gapStart);
                     } else if (msgType == ExportManager.QUERY_RESPONSE) {
+                        final long requestId = buf.getLong();
+                        final boolean canCover = buf.get() == 1 ? true : false;
+                        long lastSeq = Long.MIN_VALUE;
+                        if (canCover) {
+                            lastSeq = buf.getLong();
+                        }
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Received QUERY_RESPONSE message for " + eds.toString() +
+                            exportLog.debug("Received QUERY_RESPONSE message(" + requestId +
+                                    ") for " + eds.toString() +
                                     " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                     " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                         }
-                        eds.handleQueryResponse(message);
+                        eds.handleQueryResponse(message.m_sourceHSId, requestId, canCover, lastSeq);
+                    } else if (msgType == ExportManager.TASK_MASTERSHIP) {
+                        final long requestId = buf.getLong();
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Received TASK_MASTERSHIP message(" + requestId +
+                                    ") for " + eds.toString() +
+                                    " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
+                                    " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
+                        }
+                        eds.handleTakeMastershipMessage(message.m_sourceHSId, requestId);
+                    } else if (msgType == ExportManager.TASK_MASTERSHIP_RESPONSE) {
+
                     } else {
                         exportLog.error("Receive unsupported message type " + message + " in export subsystem");
                     }
@@ -338,9 +359,9 @@ public class ExportGeneration implements Generation {
                 if (replicaHSIds != null) {
                     eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
                 }
-                // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
-                // master stream resend the event when the export mailbox is aware of new streams.
-                if (newHSIds != null) {
+                if (newHSIds != null && !newHSIds.isEmpty()) {
+                    // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
+                    // master stream resends the event when the export mailbox is aware of new streams.
                     eds.forwardAckToNewJoinedReplicas(newHSIds);
                 }
             }
@@ -615,7 +636,7 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void pushExportBuffer(int partitionId, String signature,
-            long uso, ByteBuffer buffer, boolean sync, long tupleCount) {
+            long startSequenceNumber, int tupleCount, ByteBuffer buffer, boolean sync) {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
@@ -637,7 +658,7 @@ public class ExportGeneration implements Generation {
             return;
         }
 
-        source.pushExportBuffer(uso, buffer, sync, (int)tupleCount);
+        source.pushExportBuffer(startSequenceNumber, tupleCount, buffer, sync);
     }
 
     @Override
@@ -682,8 +703,8 @@ public class ExportGeneration implements Generation {
     }
 
     @Override
-    public void updateInitialExportStateToTxnId(int partitionId, String signature,
-            boolean isRecover, Long truncationPoint, long sequenceNumber) {
+    public void updateInitialExportStateToSeqNo(int partitionId, String signature,
+                                                boolean isRecover, long sequenceNumber) {
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
 
@@ -692,7 +713,7 @@ public class ExportGeneration implements Generation {
         if (dataSource != null) {
             ExportDataSource source = dataSource.get(signature);
             if (source != null) {
-                ListenableFuture<?> task = source.truncateExportToTxnId(isRecover, truncationPoint, sequenceNumber);
+                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, sequenceNumber);
                 try {
                     task.get();
                 } catch (Exception e) {
@@ -791,11 +812,11 @@ public class ExportGeneration implements Generation {
     }
 
     /**
-     * Indicate to all associated {@link ExportDataSource}to QUERY
+     * Indicate to all associated {@link ExportDataSource} to QUERY
      * mastership role for the given partition id
      * @param partitionId
      */
-    void reassignExportStreamMaster(int partitionId) {
+    void takeMastership(int partitionId) {
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
@@ -804,7 +825,7 @@ public class ExportGeneration implements Generation {
         }
 
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
-            eds.reassignExportStreamMaster();
+            eds.takeMastership();
         }
     }
 

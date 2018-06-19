@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
+import org.voltdb.export.ExportSequenceNumberTracker;
 
 /**
  * Specialized deque interface for storing binary objects. Objects can be provided as a buffer chain
@@ -94,6 +95,7 @@ public interface BinaryDeque {
 
     public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
 
+    public ExportSequenceNumberTracker scanForGap(BinaryDequeScanner scaner) throws IOException;
     /**
      * Release all resources (open files) held by the back store of the queue. Continuing to use the deque
      * will result in an exception
@@ -177,5 +179,9 @@ public interface BinaryDeque {
          * or a new object can be returned to replace it.
          */
         public TruncatorResponse parse(BBContainer bb);
+    }
+
+    public interface BinaryDequeScanner {
+        public ExportSequenceNumberTracker scan(BBContainer bb);
     }
 }
