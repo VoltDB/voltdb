@@ -2616,15 +2616,21 @@ public abstract class CatalogUtil {
                 continue;
             }
             if (isTableExportOnly(catalog, table)) {
+                // Streamed tables are not considered as "normal" tables here.
                 continue;
             }
             if (table.getMaterializer() != null) {
-                if (! isSnapshottedPersistentTableView(catalog, table)
-                        && ! isSnapshottedStreamedTableView(catalog, table)) {
-                    continue;
+                if (isSnapshottedPersistentTableView(catalog, table)) {
+                    // Some persistent table views are added to the snapshot starting from
+                    // V8.2, they are since then considered as "normal" tables, too.
+                    // But their presence in the snapshot is not compulsory for backward
+                    // compatibility reasons.
+                    if (optionalTableNames != null) {
+                        optionalTableNames.add(table.getTypeName());
+                    }
                 }
-                else if (optionalTableNames != null) {
-                    optionalTableNames.add(table.getTypeName());
+                else if (! isSnapshottedStreamedTableView(catalog, table)) {
+                    continue;
                 }
             }
             tables.add(table);

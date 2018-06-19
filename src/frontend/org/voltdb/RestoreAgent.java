@@ -873,14 +873,14 @@ SnapshotCompletionInterest, Promotable
             // optionally snapshotted views, we have no choice but fail the restore.
             if (! catalogNormalTableNames.isEmpty()) {
                 m_snapshotErrLogStr.append("\nRejected snapshot ")
-                                .append(s.getNonce())
-                                .append(" because this is a partial snapshot.");
+                                   .append(s.getNonce())
+                                   .append(" because this is a partial snapshot.");
                 return null;
             }
         } catch (IOException ioe) {
             m_snapshotErrLogStr.append("\nRejected snapshot ")
-                            .append(s.getNonce())
-                            .append(" because catalog file could not be validated");
+                               .append(s.getNonce())
+                               .append(" because catalog file could not be validated");
             return null;
         }
 

@@ -1610,9 +1610,7 @@ public class TestCatalogUtil extends TestCase {
                         // EXPORT_A is partitioned on C1.
                         "CREATE STREAM EXPORT_A (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n" +
                         // VIEW_E1 contains the partition column of its source streamed table (included in the snapshot).
-                        "CREATE VIEW VIEW_E1 AS SELECT C1, COUNT(*) FROM NORMAL_C GROUP BY C1;\n" +
-                        // VIEW_E1 does not contain the partition column of its source streamed table (not included in the snapshot).
-                        "CREATE VIEW VIEW_E2 AS SELECT C2, COUNT(*) FROM NORMAL_C GROUP BY C2;\n";
+                        "CREATE VIEW VIEW_E1 AS SELECT C1, COUNT(*) FROM EXPORT_A GROUP BY C1;\n";
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         final File file = VoltFile.createTempFile("testGetNormalTableNamesFromInMemoryJar", ".jar", new File(testDir));
 
@@ -1638,7 +1636,6 @@ public class TestCatalogUtil extends TestCase {
         Set<String> definedOptionalTableNames = new HashSet<>();
         definedOptionalTableNames.add("VIEW_A");
         definedOptionalTableNames.add("VIEW_C1");
-        definedOptionalTableNames.add("VIEW_E1");
         Set<String> returnedOptionalTableNames = new HashSet<>();
         Set<String> returnedNormalTableNames = CatalogUtil.getNormalTableNamesFromInMemoryJar(jarfile, returnedOptionalTableNames);
         assertEquals(definedNormalTableNames, returnedNormalTableNames);
