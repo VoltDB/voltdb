@@ -451,7 +451,8 @@ public class ExportGeneration implements Generation {
              */
             return 0;
         }
-        return source.sizeInBytes();
+        long ret=source.sizeInBytes();
+        return ret;
     }
 
     @Override
@@ -536,6 +537,8 @@ public class ExportGeneration implements Generation {
                         exportLog.debug("Creating ExportDataSource for table in catalog " + table.getTypeName() +
                                 " signature " + key + " partition id " + partition);
                     }
+
+
                     dataSourcesForPartition.put(key, exportDataSource);
                 } else {
                     //Since we are loading from catalog any found EDS mark it to be in catalog.
@@ -550,7 +553,7 @@ public class ExportGeneration implements Generation {
     }
 
     @Override
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, long tupleCount) {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
@@ -572,7 +575,7 @@ public class ExportGeneration implements Generation {
             return;
         }
 
-        source.pushExportBuffer(uso, buffer, sync);
+        source.pushExportBuffer(uso, buffer, sync, tupleCount);
     }
 
     @Override

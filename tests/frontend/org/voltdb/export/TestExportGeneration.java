@@ -201,7 +201,8 @@ public class TestExportGeneration {
                     m_tableSignature,
                     uso,
                     foo.duplicate(),
-                    false
+                    false,
+                    1
                     );
             AckingContainer cont = (AckingContainer)m_expDs.poll().get();
 
@@ -228,7 +229,8 @@ public class TestExportGeneration {
                 m_tableSignature,
                 /*uso*/0,
                 foo.duplicate(),
-                false
+                false,
+                1
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {

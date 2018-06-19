@@ -444,7 +444,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             uso,
                             0,
                             length == 0 ? null : getBytes(length),
-                            sync);
+                            sync, 1 /* STAKUTIS...not sure what to do ... tupleCount*/);
                 }
                 else if (status == kErrorCode_getQueuedExportBytes) {
                     ByteBuffer header = ByteBuffer.allocate(8);
@@ -469,7 +469,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     byte signatureBytes[] = new byte[signatureLength];
                     sigbuf.get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
-
                     long retval = ExportManager.getQueuedExportBytes(partitionId, signature);
                     ByteBuffer buf = ByteBuffer.allocate(8);
                     buf.putLong(retval).flip();

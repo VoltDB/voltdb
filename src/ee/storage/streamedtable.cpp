@@ -60,6 +60,7 @@ StreamedTable::StreamedTable(ExportTupleStream *wrapper, int partitionColumn)
 StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::vector<std::string> & columnNames) {
+
     StreamedTable * st = new StreamedTable();
     st->m_wrapper = new ExportTupleStream(ctx->m_partitionId,
                                            ctx->m_siteId, 0, "sign");
@@ -153,7 +154,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       getColumnNames(),
                                       partitionColumn(),
                                       ExportTupleStream::INSERT);
-        m_tupleCount++;
+
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
         if (!uq) {
             // With no active UndoLog, there is no undo support.
@@ -207,7 +208,8 @@ size_t StreamedTable::allocatedBlockCount() const {
 
 int64_t StreamedTable::allocatedTupleMemory() const {
     if (m_wrapper) {
-        return m_wrapper->allocatedByteCount();
+    	int64_t result=m_wrapper->allocatedByteCount();
+    	return result;
     }
     return 0;
 }

@@ -15,6 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 package org.voltdb;
 
 public class DRProducerNodeStats {
