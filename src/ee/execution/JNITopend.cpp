@@ -566,13 +566,6 @@ void JNITopend::pushExportBuffer(
 		int64_t tupleCount) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
 
-    StackTrace* st = new StackTrace();
-    if (st) {
-        printf("STAKUTIS pushExportBuffer stack trace\n");
-        st->printLocalTrace();
-        fflush(stdout);
-    }
-
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {

@@ -77,7 +77,6 @@ namespace voltdb {
         signatures.push(signature);
         blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
-// STAKUTIS Do we need something here for the tupleCount?
         receivedExportBuffer = true;
     }
 
