@@ -180,7 +180,7 @@ public class ParameterConverter {
         }
 
         throw new VoltTypeException(
-                "tryToMakeCompatible: Unable to convert string "
+                "Unable to convert string "
                 + value + " to "  + expectedClz.getName()
                 + " value for target parameter.");
     }
@@ -413,7 +413,7 @@ public class ParameterConverter {
                 } catch (ArithmeticException e) {}
             }
             throw new VoltTypeException(
-                            "tryToMakeCompatible: The provided value: (" + param.toString() +
+                            "The provided value: (" + param.toString() +
                             ") of type: " + inputClz.getName() +
                             " is out of range for the target parameter type: " +
                             expectedClz.getName());
@@ -439,7 +439,7 @@ public class ParameterConverter {
         if (isIntClass(expectedClz) && (numberParam != null)) {
             long val = numberParam.longValue();
             if (val == VoltType.NULL_INTEGER) {
-                throw new VoltTypeException("tryToMakeCompatible: The provided long value: ("
+                throw new VoltTypeException("The provided long value: ("
                         + param.toString() + ") might be interpreted as integer null. " +
                                 "Try explicitly using a int parameter.");
             }
@@ -451,7 +451,7 @@ public class ParameterConverter {
             if ((inputClz == Long.class) || (inputClz == Integer.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_SMALLINT) {
-                    throw new VoltTypeException("tryToMakeCompatible: The provided int or long value: ("
+                    throw new VoltTypeException("The provided int or long value: ("
                             + param.toString() + ") might be interpreted as smallint null. " +
                                     "Try explicitly using a short parameter.");
                 }
@@ -464,7 +464,7 @@ public class ParameterConverter {
             if ((inputClz == Long.class) || (inputClz == Integer.class) || (inputClz == Short.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_TINYINT) {
-                    throw new VoltTypeException("tryToMakeCompatible: The provided short, int or long value: ("
+                    throw new VoltTypeException("The provided short, int or long value: ("
                             + param.toString() + ") might be interpreted as tinyint null. " +
                                     "Try explicitly using a byte parameter.");
                 }
@@ -622,7 +622,7 @@ public class ParameterConverter {
         }
 
         throw new VoltTypeException(
-                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
+                "The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
                 " is not a match or is out of range for the target parameter type: " + expectedClz.getName());
     }
 
