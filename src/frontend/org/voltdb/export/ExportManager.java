@@ -186,6 +186,48 @@ public class ExportManager
     }
 
     /**
+     * Indicate local partition became the SPI Leader
+     * still waiting for old leader (ack) to trigger take over mastership
+     * @param partitionId
+     */
+    synchronized public void prepareAcceptMastership(int partitionId) {
+        // can't acquire mastership twice for the same partition id
+        if (!m_masterOfPartitions.add(partitionId)) {
+            return;
+        }
+
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Export Manager has been notified that local partition " + partitionId + " has became leader.");
+        }
+        ExportGeneration generation = m_generation.get();
+        if (generation == null) {
+            return;
+        }
+        generation.prepareAcceptMastership(partitionId);
+    }
+
+    /**
+     * Indicate to associated {@link ExportGeneration}s to
+     * prepare give up mastership for the given partition id
+     * @param partitionId
+     */
+    synchronized public void prepareUnacceptMastership(int partitionId) {
+        // ignore if mastership for partition id is not on this host
+        if (!m_masterOfPartitions.contains(partitionId)) {
+            return;
+        }
+
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("ExportManager has been notified the sp leader for " + partitionId + " has been migrated away");
+        }
+        ExportGeneration generation = m_generation.get();
+        if (generation == null) {
+            return;
+        }
+        generation.prepareUnacceptMastership(partitionId);
+    }
+
+    /**
      * Get the global instance of the ExportManager.
      * @return The global single instance of the ExportManager.
      */
