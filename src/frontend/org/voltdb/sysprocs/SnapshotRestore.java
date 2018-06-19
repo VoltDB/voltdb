@@ -2060,11 +2060,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Set<Table> tables_to_restore = new HashSet<Table>();
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
-                if (CatalogUtil.isSnapshottedView(table)) {
+                if (CatalogUtil.isSnapshottedPersistentTableView(m_database, table)) {
+                    // If the table is a snapshotted persistent table view, we will try to
+                    // temporarily disable its maintenance job to boost restore performance.
                     commaSeparatedViewNamesToDisable.append(table.getTypeName()).append(",");
                 }
                 tables_to_restore.add(table);
-                // What if the target table is now a stream?
             }
             else if (! CatalogUtil.isTableExportOnly(m_database, table)) {
                 SNAP_LOG.info("Table: " + table.getTypeName() +
