@@ -116,6 +116,9 @@ public interface OpTypes {
         , WINDOWED_PERCENT_RANK = 102 // reserved but not used
         , WINDOWED_CUME_DIST    = 103 // reserved but not used
         // End VoltDB extension
+        // A VoltDB extension of STARTS WITH
+        , STARTS_WITH = 105
+        // End of VoltDB extension
     ;
 
     /**

@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -3065,6 +3066,14 @@ public class ParserDQL extends ParserBase {
 
                 break;
             }
+            case Tokens.STARTS : {
+                read();
+
+                e                = XStartsWithPredicateRightPart(l);
+                e.noOptimisation = isCheckOrTriggerCondition;
+
+                break;
+            }
             case Tokens.BETWEEN : {
                 e = XreadBetweenPredicateRightPart(l);
 
@@ -3363,6 +3372,35 @@ public class ParserDQL extends ParserBase {
 
         return new ExpressionLike(a, b, escape,
                                   this.isCheckOrTriggerCondition);
+    }
+
+    /**
+     *  Scan the right-side string value, return a Startswith Expression for generating XML
+     *
+     * @param a ExpressionColumn
+     */
+    private ExpressionLogical XStartsWithPredicateRightPart(Expression a) {
+
+        readThis(Tokens.WITH);
+
+        if (token.tokenType == Tokens.QUESTION) {    // handle user parameter
+            Expression left = XreadRowValuePredicand();
+            if (a.isParam() && left.isParam()) {
+                throw Error.error(ErrorCode.X_42567);
+            }
+            Expression l = new ExpressionLogical(OpTypes.GREATER_EQUAL, a, left);
+            Expression r = new ExpressionLogical(OpTypes.SMALLER_EQUAL, a,
+                    new ExpressionArithmetic(OpTypes.CONCAT, left, new ExpressionValue("\uffff", Type.SQL_CHAR)));
+            return new ExpressionLogical(OpTypes.AND, l, r);
+        } else {          // handle plain value
+            Expression b      = XreadStringValueExpression();
+            Expression escape = null;
+            if (token.tokenString.equals(Tokens.T_ESCAPE)) {
+                read();
+                escape = XreadStringValueExpression();
+            }
+            return new ExpressionStartsWith(a, b, escape, this.isCheckOrTriggerCondition);
+        }
     }
 
     private ExpressionLogical XreadMatchPredicateRightPart(Expression a) {
