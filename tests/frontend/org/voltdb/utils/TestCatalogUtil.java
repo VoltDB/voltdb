@@ -1599,15 +1599,28 @@ public class TestCatalogUtil extends TestCase {
 
     public void testGetNormalTableNamesFromInMemoryJar() throws Exception {
         String schema = "CREATE TABLE NORMAL_A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL);\n" +
-                "CREATE TABLE NORMAL_B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n" +
-                "CREATE TABLE NORMAL_C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL);\n" +
-                "CREATE VIEW VIEW_A (TOTAL_ROWS) AS SELECT COUNT(*) FROM NORMAL_A;\n" +
-                "CREATE STREAM EXPORT_A (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n";
+                        "CREATE TABLE NORMAL_B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n" +
+                        // NORMAL_C is partitioned on C1.
+                        "CREATE TABLE NORMAL_C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL);\n" +
+                        "CREATE VIEW VIEW_A (TOTAL_ROWS) AS SELECT COUNT(*) FROM NORMAL_A;\n" +
+                        // VIEW_C1 is an explicitly partitioned persistent table view (included in the snapshot).
+                        "CREATE VIEW VIEW_C1 AS SELECT C1, COUNT(*) FROM NORMAL_C GROUP BY C1;\n" +
+                        // VIEW_C2 is an implicitly partitioned persistent table view (not included in the snapshot).
+                        "CREATE VIEW VIEW_C2 AS SELECT C2, COUNT(*) FROM NORMAL_C GROUP BY C2;\n" +
+                        // EXPORT_A is partitioned on C1.
+                        "CREATE STREAM EXPORT_A (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL);\n" +
+                        // VIEW_E1 contains the partition column of its source streamed table (included in the snapshot).
+                        "CREATE VIEW VIEW_E1 AS SELECT C1, COUNT(*) FROM NORMAL_C GROUP BY C1;\n" +
+                        // VIEW_E1 does not contain the partition column of its source streamed table (not included in the snapshot).
+                        "CREATE VIEW VIEW_E2 AS SELECT C2, COUNT(*) FROM NORMAL_C GROUP BY C2;\n";
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         final File file = VoltFile.createTempFile("testGetNormalTableNamesFromInMemoryJar", ".jar", new File(testDir));
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(schema);
+        builder.addPartitionInfo("NORMAL_C", "C1");
+        builder.addPartitionInfo("EXPORT_A", "C1");
+
         builder.compile(file.getPath());
         byte[] bytes = MiscUtils.fileToBytes(file);
         InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(bytes);
@@ -1615,9 +1628,20 @@ public class TestCatalogUtil extends TestCase {
 
         Set<String> definedNormalTableNames = new HashSet<>();
         definedNormalTableNames.add("NORMAL_A");
+        definedNormalTableNames.add("VIEW_A");
         definedNormalTableNames.add("NORMAL_B");
         definedNormalTableNames.add("NORMAL_C");
-        Set<String> returnedNormalTableNames = CatalogUtil.getNormalTableNamesFromInMemoryJar(jarfile);
+        definedNormalTableNames.add("VIEW_C1");
+        definedNormalTableNames.add("VIEW_E1");
+        // The three views below may or may not be in the snapshot for restore - they do not impact
+        // the completeness of the snapshot.
+        Set<String> definedOptionalTableNames = new HashSet<>();
+        definedOptionalTableNames.add("VIEW_A");
+        definedOptionalTableNames.add("VIEW_C1");
+        definedOptionalTableNames.add("VIEW_E1");
+        Set<String> returnedOptionalTableNames = new HashSet<>();
+        Set<String> returnedNormalTableNames = CatalogUtil.getNormalTableNamesFromInMemoryJar(jarfile, returnedOptionalTableNames);
         assertEquals(definedNormalTableNames, returnedNormalTableNames);
+        assertEquals(definedOptionalTableNames, returnedOptionalTableNames);
     }
 }

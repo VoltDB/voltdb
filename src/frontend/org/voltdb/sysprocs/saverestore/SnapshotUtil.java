@@ -77,7 +77,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -1260,39 +1259,19 @@ public class SnapshotUtil {
         return (nonce + ".jar");
     }
 
-    public static final List<Table> getTablesToSave(Database database)
-    {
+    public static final List<Table> getTablesToSave(Database database) {
         CatalogMap<Table> all_tables = database.getTables();
         ArrayList<Table> my_tables = new ArrayList<Table>();
-        for (Table table : all_tables)
-        {
+        for (Table table : all_tables) {
             // Export tables are not included in the snapshot.
             if (CatalogUtil.isTableExportOnly(database, table)) {
                 continue;
             }
-            // Special considerations for materialized views
-            Table viewSource = table.getMaterializer();
-            if (viewSource != null) {
-                if (CatalogUtil.isTableExportOnly(database, viewSource)) {
-                    // Non-partitioned export table are not allowed so it should not get here.
-                    Column sourcePartitionColumn = viewSource.getPartitioncolumn();
-                    if (sourcePartitionColumn == null) {
-                        continue;
-                    }
-
-                    // Make sure the partition column is present in the view.
-                    // Export table views are special, we use column names to match..
-                    Column pc = table.getColumns().get(sourcePartitionColumn.getName());
-                    if (pc == null) {
-                        continue;
-                    }
-                }
-                else {
-                    // Make sure the partition column is present in the view.
-                    if (! CatalogUtil.isSnapshottedView(table)) {
-                        continue;
-                    }
-                }
+            // If the table is a view and it shouldn't be included into the snapshot, skip.
+            if (table.getMaterializer() != null
+                    && ! CatalogUtil.isSnapshottedStreamedTableView(database, table)
+                    && ! CatalogUtil.isSnapshottedPersistentTableView(database, table)) {
+                continue;
             }
             my_tables.add(table);
         }
