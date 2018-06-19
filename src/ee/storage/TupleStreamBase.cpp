@@ -103,16 +103,6 @@ void TupleStreamBase::cleanupManagedBuffers()
 void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t uniqueId,
         bool sync, bool flush)
 {
-	if (0) {
-	printf("STAKUTIS TupleStreamBase.cpp commit() called. Stacktrace:\n");
-    StackTrace* st = new StackTrace();
-    if (st) {
-        printf("STAKUTIS pushExportBuffer stack trace\n");
-        st->printLocalTrace();
-        fflush(stdout);
-    }
-	fflush(stdout);
-	}
 	if (currentSpHandle < m_openSpHandle) {
         throwFatalException(
                 "Active transactions moving backwards: openSpHandle is %jd, while the current spHandle is %jd",
@@ -191,7 +181,6 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
 
 void TupleStreamBase::pushPendingBlocks()
 {
-//	printf("STAKUTIS TupleStreamBase.cpp pushPendingBlocks() called\n");fflush(stdout);
     while (!m_pendingBlocks.empty()) {
         StreamBlock* block = m_pendingBlocks.front();
         //std::cout << "m_committedUso(" << m_committedUso << "), block->uso() + block->offset() == "

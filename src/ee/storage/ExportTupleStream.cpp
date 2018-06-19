@@ -146,8 +146,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
     // write the tuple's data
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
-    // STAKUTIS
-    m_tupleCount++;
+
+    m_tupleCount++;     // STAKUTIS
 
     // row size, generation, partition-index, column count and hasSchema flag (byte)
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);
@@ -262,12 +262,6 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 }
 
 void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
-	printf("STAKUTIS ExportTupleStream.cpp pushStreamBuffer() called with %lld count which will be reset! Stack:\n",m_tupleCount);fflush(stdout);
-    StackTrace* st = new StackTrace();
-    if (st) {
-        st->printLocalTrace();
-        fflush(stdout);
-    }
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
                     m_signature,
