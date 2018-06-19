@@ -508,7 +508,8 @@ public class ExportManager
                 //This is now fine as you could get a stats tick and have no generation if you dropped last table.
                 return 0;
             }
-            return generation.getQueuedExportBytes( partitionId, signature);
+            long ret=generation.getQueuedExportBytes( partitionId, signature);
+            return ret;
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Failed to get export queued bytes.", e);
@@ -550,7 +551,7 @@ public class ExportManager
             long uso,
             long bufferPtr,
             ByteBuffer buffer,
-            boolean sync) {
+            boolean sync, long tupleCount) {
         //For validating that the memory is released
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
@@ -562,7 +563,7 @@ public class ExportManager
                 }
                 return;
             }
-            generation.pushExportBuffer(partitionId, signature, uso, buffer, sync);
+            generation.pushExportBuffer(partitionId, signature, uso, buffer, sync, tupleCount);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);

@@ -18,6 +18,7 @@ package org.voltdb.export;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
+
 import org.voltcore.messaging.HostMessenger;
 
 /**
@@ -32,7 +33,7 @@ public interface Generation {
     public long getQueuedExportBytes(int partitionId, String signature);
     public void onSourceDone(int partitionId, String signature);
 
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync);
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, long tupleCount);
     public void pushEndOfStream(int partitionId, String signature);
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds);
 

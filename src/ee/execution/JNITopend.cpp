@@ -160,12 +160,13 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(ILjava/lang/String;JJLjava/nio/ByteBuffer;Z)V");
+            "(ILjava/lang/String;JJLjava/nio/ByteBuffer;ZJ)V"); //STAKUTIS added last param
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
         throw std::exception();
     }
+
     m_pushExportEOFMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushEndOfStream",
@@ -543,6 +544,7 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_decompressionClass);
 }
 
+
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
     int64_t retval = m_jniEnv->CallStaticLongMethod(
@@ -551,6 +553,8 @@ int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
             partitionId,
             signatureString);
     m_jniEnv->DeleteLocalRef(signatureString);
+    if (retval) {
+    }
     return retval;
 }
 
@@ -558,8 +562,17 @@ void JNITopend::pushExportBuffer(
         int32_t partitionId,
         string signature,
         StreamBlock *block,
-        bool sync) {
+        bool sync,
+		int64_t tupleCount) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
+
+    StackTrace* st = new StackTrace();
+    if (st) {
+        printf("STAKUTIS pushExportBuffer stack trace\n");
+        st->printLocalTrace();
+        fflush(stdout);
+    }
+
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
@@ -575,7 +588,8 @@ void JNITopend::pushExportBuffer(
                 block->uso(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
-                sync ? JNI_TRUE : JNI_FALSE);
+                sync ? JNI_TRUE : JNI_FALSE,
+                		tupleCount); // STAKUTIS
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
 
@@ -587,9 +601,10 @@ void JNITopend::pushExportBuffer(
                         static_cast<int64_t>(0),
                         NULL,
                         NULL,
-                        sync ? JNI_TRUE : JNI_FALSE);
+                        sync ? JNI_TRUE : JNI_FALSE,
+                        		tupleCount); // STAKUTIS
     }
-    m_jniEnv->DeleteLocalRef(signatureString);
+   m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
         throw std::exception();

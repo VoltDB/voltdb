@@ -45,6 +45,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.ExportStats;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -108,6 +109,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnTypes = new ArrayList<>();
     public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
+
+    public ExportStats.ExportStatsRow m_exportStatsRow; // STAKUTIS; added member
 
     /**
      * Create a new data source.
@@ -208,6 +211,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_eos = false;
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
+
+        // STAKUTIS; Create m_exportStatsRow member
+        System.out.println("STAKUITS ExportDateSource.java Creating ExportStat for stream "+tableName);
+        ExportStats m_exportStats=ExportStats.get();
+        ExportStats.ExportStatsRow row=m_exportStats.get(tableName);
+        row.m_tupleCount=0;
+        row.m_partitionId=partitionId;
+        row.m_streamName=tableName;
+        row.m_tuplePending=0;
+        m_exportStatsRow = row;
+
     }
 
     public ExportDataSource(Generation generation, File adFile) throws IOException {
@@ -432,9 +446,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             long uso,
             ByteBuffer buffer,
             boolean sync,
-            boolean poll) throws Exception {
+            boolean poll,
+            long tupleCount /*STAKUTIS added parameter*/) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
-
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
         }
@@ -470,6 +484,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         sb.releaseUso(m_lastReleaseOffset);
                     }
                     m_committedBuffers.offer(sb);
+                    m_exportStatsRow.m_tupleCount += tupleCount;
+                    synchronized (m_exportStatsRow) {
+                    	m_exportStatsRow.m_tuplePending += tupleCount;
+                    }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
                 }
@@ -516,7 +534,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushExportBuffer(
             final long uso,
             final ByteBuffer buffer,
-            final boolean sync) {
+            final boolean sync,
+            final long tupleCount /*STAKUTIS added parameter*/) {
         try {
             m_bufferPushPermits.acquire();
         } catch (InterruptedException e) {
@@ -526,7 +545,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_es.isShutdown()) {
             //If we are shutting down push it to PBD
             try {
-                pushExportBufferImpl(uso, buffer, sync, false);
+                pushExportBufferImpl(uso, buffer, sync, false, tupleCount);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
             } finally {
@@ -540,7 +559,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(uso, buffer, sync, m_readyForPolling);
+                            pushExportBufferImpl(uso, buffer, sync, m_readyForPolling, tupleCount);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);

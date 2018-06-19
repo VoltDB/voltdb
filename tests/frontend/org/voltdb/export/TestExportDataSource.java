@@ -23,9 +23,12 @@
 
 package org.voltdb.export;
 
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.voltdb.export.ExportMatchers.ackPayloadIs;
 
 import java.io.File;
@@ -33,6 +36,7 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +47,7 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -56,13 +61,8 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import java.util.Map;
 
 import junit.framework.TestCase;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.verify;
-import org.voltcore.messaging.HostMessenger;
 
 public class TestExportDataSource extends TestCase {
 
@@ -112,7 +112,7 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
+        public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, long tupleCount) {
         }
 
         @Override
@@ -208,23 +208,23 @@ public class TestExportDataSource extends TestCase {
 
             ByteBuffer foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(23, foo, false);
+            s.pushExportBuffer(23, foo, false, 1);
             assertEquals(s.sizeInBytes(), 20 );
 
             //Push it twice more to check stats calc
             foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(43, foo, false);
+            s.pushExportBuffer(43, foo, false, 1);
             assertEquals(s.sizeInBytes(), 40);
             foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[28]);
-            s.pushExportBuffer(63, foo, false);
+            s.pushExportBuffer(63, foo, false, 1);
 
             assertEquals(s.sizeInBytes(), 60);
 
             //Sync which flattens them all, but then pulls the first two back in memory
             //resulting in no change
-            s.pushExportBuffer(63, null, true);
+            s.pushExportBuffer(63, null, true, 1);
 
             assertEquals( 60, s.sizeInBytes());
 
@@ -317,22 +317,22 @@ public class TestExportDataSource extends TestCase {
         foo.duplicate().put(new byte[20]);
         // we are not purposely starting at 0, because on rejoin
         // we may start at non zero offsets
-        s.pushExportBuffer(23, foo, false);
+        s.pushExportBuffer(23, foo, false, 1);
         assertEquals(s.sizeInBytes(), 20 );
 
         //Push it twice more to check stats calc
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(43, foo, false);
+        s.pushExportBuffer(43, foo, false, 1);
         assertEquals(s.sizeInBytes(), 40 );
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(63, foo, false);
+        s.pushExportBuffer(63, foo, false, 1);
 
         assertEquals(s.sizeInBytes(), 60);
 
         //Sync which flattens them all
-        s.pushExportBuffer(63, null, true);
+        s.pushExportBuffer(63, null, true, 1);
 
         //flattened size
         assertEquals( 60, s.sizeInBytes());
@@ -400,7 +400,7 @@ public class TestExportDataSource extends TestCase {
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[200]);
-            s.pushExportBuffer(203, foo, true);
+            s.pushExportBuffer(203, foo, true, 1);
             long sz = s.sizeInBytes();
             assertEquals(sz, 200);
             listing = getSortedDirectoryListingSegments();
@@ -416,7 +416,7 @@ public class TestExportDataSource extends TestCase {
             //Push again and sync to test files.
             ByteBuffer foo2 = ByteBuffer.allocateDirect(900 + StreamBlock.HEADER_SIZE);
             foo2.duplicate().put(new byte[900]);
-            s.pushExportBuffer(903, foo2, true);
+            s.pushExportBuffer(903, foo2, true, 1);
             sz = s.sizeInBytes();
             assertEquals(sz, 802);
             listing = getSortedDirectoryListingSegments();

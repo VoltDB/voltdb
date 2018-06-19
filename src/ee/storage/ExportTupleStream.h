@@ -48,7 +48,7 @@ public:
         assert(m_uso == 0);
         StreamBlock *sb = new StreamBlock(new char[1], 0, 0, count);
         ExecutorContext::getPhysicalTopend()->pushExportBuffer(
-                                m_partitionId, m_signature, sb, false);
+                                m_partitionId, m_signature, sb, false, 1 /* STAKUTIS tupleCount?*/);
         delete sb;
         m_uso = count;
         //Extend the buffer chain to replace any existing stream blocks with a new one
@@ -64,8 +64,9 @@ public:
     inline size_t getMDColumnNamesSerializedSize() const { return m_mdSchemaSize; }
 
     int64_t allocatedByteCount() const {
-        return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
+    	int64_t result=(m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
                 ExecutorContext::getPhysicalTopend()->getQueuedExportBytes(m_partitionId, m_signature);
+        return result;
     }
 
     void pushStreamBuffer(StreamBlock *block, bool sync);
@@ -100,6 +101,9 @@ private:
     std::string m_signature;
     int64_t m_generation;
     size_t m_schemaSize;
+
+    // STAKUTIS
+    int64_t m_tupleCount;
 
     //Computed size for metadata columns
     static const size_t m_mdSchemaSize;

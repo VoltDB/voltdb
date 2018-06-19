@@ -44,6 +44,7 @@ import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
+import org.voltdb.ExportStats;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
@@ -165,6 +166,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     final TableStats m_tableStats;
     final IndexStats m_indexStats;
     final MemoryStats m_memStats;
+    final ExportStats m_exportStats;
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private SnapshotSiteProcessor m_snapshotter;
@@ -642,6 +644,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_rejoinTaskLog = rejoinTaskLog;
         m_isLowestSiteId = isLowestSiteId;
         m_hashinator = TheHashinator.getCurrentHashinator();
+
+        if (agent != null) {
+	        m_exportStats = new ExportStats(); // STAKUTIS created the m_exportStats member
+	        agent.registerStatsSource(StatsSelector.EXPORT,
+	                m_partitionId, // m_siteId,
+	                m_exportStats);
+        }
+        else m_exportStats = null;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -1784,7 +1794,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 EventType.DR_ELASTIC_REBALANCE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
     }
 
-    public void setDRStreamEnd(long txnId, long spHandle, long uniqueId) {
+    @Override
+	public void setDRStreamEnd(long txnId, long spHandle, long uniqueId) {
         generateDREvent(
                 EventType.DR_STREAM_END, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
     }

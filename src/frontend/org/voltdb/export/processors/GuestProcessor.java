@@ -18,6 +18,7 @@
 package org.voltdb.export.processors;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -33,7 +34,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.ExportStats;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
@@ -45,8 +48,6 @@ import org.voltdb.exportclient.ExportRow;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import java.lang.reflect.Method;
-import org.voltdb.VoltType;
 
 public class GuestProcessor implements ExportDataProcessor {
 
@@ -84,6 +85,8 @@ public class GuestProcessor implements ExportDataProcessor {
             Set<String> tableNames = e.getValue().getSecond();
 
             for (String tableName : tableNames) {
+                ExportStats.get().get(tableName).m_exportTarget = targetName; // STAKUTIS
+                ExportStats.get().get(tableName).m_exportActive = 1; // STAKUTIS
                 tableName = tableName.toLowerCase();
                 assert(!m_targetsByTableName.containsKey(tableName));
                 m_targetsByTableName.put(tableName, targetName);
@@ -126,7 +129,7 @@ public class GuestProcessor implements ExportDataProcessor {
                         continue;
                     }
                     if (groupName == null && source.getClient() != null) {
-                        groupName = ((ExportClientBase )source.getClient()).getTargetName();
+                        groupName = source.getClient().getTargetName();
                         m_targetsByTableName.put(tableName, groupName);
                     }
                     //If we have a new client for the target use it or see if we have an older client which is set before
@@ -311,6 +314,7 @@ public class GuestProcessor implements ExportDataProcessor {
          * For JDBC we want a dedicated thread to block on calls to the remote database
          * so the data source thread can overflow data to disk.
          */
+
         if (fut == null) {
             return;
         }
@@ -318,7 +322,9 @@ public class GuestProcessor implements ExportDataProcessor {
             @Override
             public void run() {
                 try {
+                	System.out.println("STAKUTIS GuestProcessor.java:run(); which is a listener; get()");
                     BBContainer cont = fut.get();
+                	System.out.println("STAKUTIS GuestProcessor.java:run(); which is a listener; RUN");
                     if (cont == null) {
                         return;
                     }
@@ -335,6 +341,7 @@ public class GuestProcessor implements ExportDataProcessor {
                          * Also allow the decoder to request exponential backoff
                          */
                         while (!m_shutdown) {
+                        	System.out.println("STAKUTIS  GuesstProcessor.java LOOPING");
                             try {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
@@ -342,6 +349,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 long generation = -1L;
                                 ExportRow row = null;
                                 while (buf.hasRemaining() && !m_shutdown) {
+                                	System.out.println("STAKUTIS    GuestProcessor.java hasRemaining");
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
@@ -353,6 +361,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                         try {
                                             row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
                                             edb.setPreviousRow(row);
+                                            System.out.println("STAKUTIS      GuestProcessor.java Built a row");
                                         } catch (IOException ioe) {
                                             m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
                                             cont.discard();
@@ -363,12 +372,17 @@ public class GuestProcessor implements ExportDataProcessor {
                                             edb.onBlockStart(row);
                                         }
                                         edb.processRow(row);
+                                        System.out.println("STAKUTIS      GuestProcesso.java Wrote the row");
+                                        synchronized (source.m_exportStatsRow) {
+                                        	source.m_exportStatsRow.m_tuplePending--; // STAKUTIS
+                                        }
                                         if (generation != -1L && row.generation != generation) {
                                             edb.onBlockCompletion(row);
                                             edb.onBlockStart(row);
                                         }
                                         generation = row.generation;
                                     }
+                                	System.out.println("STAKUTIS    GuestProcessor.java Finished Row");
                                 }
                                 if (edb.isLegacy()) {
                                     edb.onBlockCompletion();
@@ -400,7 +414,9 @@ public class GuestProcessor implements ExportDataProcessor {
                                     }
                                 }
                             }
+                        	System.out.println("STAKUTIS  GuesstProcessor.java Finished one loop");
                         }
+                    	System.out.println("STAKUTIS GuesstProcessor.java Finished looping");
                         //Dont discard the block also set the start position to the begining.
                         if (m_shutdown && cont != null) {
                             if (m_logger.isDebugEnabled()) {

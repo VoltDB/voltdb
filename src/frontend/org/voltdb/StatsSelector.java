@@ -60,5 +60,6 @@ public enum StatsSelector {
     GC,             // return GC Stats
 
     COMMANDLOG,     // return number of outstanding bytes and txns on this node
-    IMPORTER
+    IMPORTER,
+    EXPORT // STAKUTIS added
 }

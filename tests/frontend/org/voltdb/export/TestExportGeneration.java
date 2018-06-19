@@ -23,6 +23,10 @@
 
 package org.voltdb.export;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
 
 import java.io.File;
@@ -57,10 +61,6 @@ import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 
 public class TestExportGeneration {
 
@@ -200,7 +200,8 @@ public class TestExportGeneration {
                     m_tableSignature,
                     uso,
                     foo.duplicate(),
-                    false
+                    false,
+                    1
                     );
             AckingContainer cont = (AckingContainer)m_expDs.poll().get();
 
@@ -227,7 +228,8 @@ public class TestExportGeneration {
                 m_tableSignature,
                 /*uso*/0,
                 foo.duplicate(),
-                false
+                false,
+                1
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {

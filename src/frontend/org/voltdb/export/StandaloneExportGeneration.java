@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
@@ -33,7 +34,6 @@ import org.voltdb.utils.VoltFile;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import java.util.Map;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -204,7 +204,7 @@ public class StandaloneExportGeneration implements Generation {
     }
 
     @Override
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync) {
+    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, long tupleCount) {
         //        System.out.println("In partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
         //            System.out.println("Have partition " + i);
@@ -232,7 +232,7 @@ public class StandaloneExportGeneration implements Generation {
             return;
         }
 
-        source.pushExportBuffer(uso, buffer, sync);
+        source.pushExportBuffer(uso, buffer, sync, tupleCount);
     }
 
     public void closeAndDelete() throws IOException {

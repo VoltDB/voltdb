@@ -69,7 +69,7 @@ namespace voltdb {
         return bytes;
     }
 
-    void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync) {
+    void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync, int64_t tupleCount) {
         if (sync) {
             return;
         }
@@ -77,6 +77,7 @@ namespace voltdb {
         signatures.push(signature);
         blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
+// STAKUTIS Do we need something here for the tupleCount?
         receivedExportBuffer = true;
     }
 

@@ -18,10 +18,11 @@
 package org.voltdb.exportclient.decode;
 
 import java.io.IOException;
+import java.util.List;
+
+import org.voltdb.VoltType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import java.util.List;
-import org.voltdb.VoltType;
 
 public class CSVWriterDecoder extends RowDecoder<CSVWriter, IOException> {
 
