@@ -2576,40 +2576,49 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Get all normal table names from a in-memory catalog jar file.
-     * A normal table is one that's NOT a materialized view, nor an export table.
-     * @param InMemoryJarfile a in-memory catalog jar file
-     * @param optionalTableNames  List of table names that is not required to be in the snapshot.
-     * @return A set of normal table names
+     * Get all snapshot-able table names from an in-memory catalog jar file.
+     * A snapshot-able table is one that's neither an export table nor an implicitly partitioned view.
+     * @param jarfile a in-memory catalog jar file
+     * @return A pair of two string sets.</br>
+     *         The first set contains a complete list of names of snapshot-able tables.</br>
+     *         The second set contains a list of names of optional
+     *         <strong>single persistent table views</strong> without which the snapshot
+     *         is still considered as complete (ENG-11578, ENG-14145).
      */
-    public static Set<String> getNormalTableNamesFromInMemoryJar(
-            InMemoryJarfile jarfile, Set<String> optionalTableNames) {
-        Set<String> tableNames = new HashSet<>();
+    public static Pair<Set<String>, Set<String>>
+    getSnapshotableTableNamesFromInMemoryJar(InMemoryJarfile jarfile) {
+        Set<String> fullTableNames = new HashSet<>();
+        Set<String> optionalTableNames = new HashSet<>();
         Catalog catalog = new Catalog();
         catalog.execute(getSerializedCatalogStringFromJar(jarfile));
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        for (Table table : getNormalTables(db, true, optionalTableNames)) {
-            tableNames.add(table.getTypeName());
-        }
-        for (Table table : getNormalTables(db, false, optionalTableNames)) {
-            tableNames.add(table.getTypeName());
-        }
-        return tableNames;
+        Pair<List<Table>, Set<String>> ret;
+
+        ret = getSnapshotableTables(db, true);
+        ret.getFirst().forEach(table -> fullTableNames.add(table.getTypeName()));
+        optionalTableNames.addAll(ret.getSecond());
+
+        ret = getSnapshotableTables(db, false);
+        ret.getFirst().forEach(table -> fullTableNames.add(table.getTypeName()));
+        optionalTableNames.addAll(ret.getSecond());
+
+        return new Pair<Set<String>, Set<String>>(fullTableNames, optionalTableNames);
     }
 
     /**
-     * Get all normal tables from the catalog. A normal table is one that's NOT
-     * an export table and non-snapshotted views.
-     * For the lack of a better name, I call it normal.
+     * Get all snapshot-able tables from the catalog. A snapshot-able table is one
+     * that's neither an export table nor an implicitly partitioned view.
      * @param catalog         Catalog database
      * @param isReplicated    true to return only replicated tables,
      *                        false to return all partitioned tables
-     * @param optionalTableNames  List of table names that is not required to be in the snapshot.
-     * @return A list of tables
+     * @return A pair that contains a complete list of snapshot-able tables and a list
+     *         of names of optional <strong>single persistent table views</strong> without
+     *         which the snapshot is still considered as complete (ENG-11578, ENG-14145).
      */
-    public static List<Table> getNormalTables(Database catalog,
-            boolean isReplicated, Set<String> optionalTableNames) {
+    public static Pair<List<Table>, Set<String>>
+    getSnapshotableTables(Database catalog, boolean isReplicated) {
         List<Table> tables = new ArrayList<>();
+        Set<String> optionalTableNames = new HashSet<>();
         for (Table table : catalog.getTables()) {
             if (table.getIsreplicated() != isReplicated) {
                 // We handle replicated tables and partitioned tables separately.
@@ -2625,9 +2634,7 @@ public abstract class CatalogUtil {
                     // V8.2, they are since then considered as "normal" tables, too.
                     // But their presence in the snapshot is not compulsory for backward
                     // compatibility reasons.
-                    if (optionalTableNames != null) {
-                        optionalTableNames.add(table.getTypeName());
-                    }
+                    optionalTableNames.add(table.getTypeName());
                 }
                 else if (! isSnapshottedStreamedTableView(catalog, table)) {
                     continue;
@@ -2635,7 +2642,7 @@ public abstract class CatalogUtil {
             }
             tables.add(table);
         }
-        return tables;
+        return new Pair<List<Table>, Set<String>>(tables, optionalTableNames);
     }
 
     /**
@@ -2743,8 +2750,8 @@ public abstract class CatalogUtil {
      */
     public static Pair<Long, String> calculateDrTableSignatureAndCrc(Database catalog) {
         SortedSet<Table> tables = Sets.newTreeSet();
-        tables.addAll(getNormalTables(catalog, true, null));
-        tables.addAll(getNormalTables(catalog, false, null));
+        tables.addAll(getSnapshotableTables(catalog, true).getFirst());
+        tables.addAll(getSnapshotableTables(catalog, false).getFirst());
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
         final StringBuilder sb = new StringBuilder();

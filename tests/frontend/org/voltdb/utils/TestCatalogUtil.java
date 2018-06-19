@@ -1624,21 +1624,23 @@ public class TestCatalogUtil extends TestCase {
         InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(bytes);
         file.delete();
 
-        Set<String> definedNormalTableNames = new HashSet<>();
-        definedNormalTableNames.add("NORMAL_A");
-        definedNormalTableNames.add("VIEW_A");
-        definedNormalTableNames.add("NORMAL_B");
-        definedNormalTableNames.add("NORMAL_C");
-        definedNormalTableNames.add("VIEW_C1");
-        definedNormalTableNames.add("VIEW_E1");
-        // The three views below may or may not be in the snapshot for restore - they do not impact
+        Set<String> definedFullTableNames = new HashSet<>();
+        definedFullTableNames.add("NORMAL_A");
+        definedFullTableNames.add("VIEW_A");
+        definedFullTableNames.add("NORMAL_B");
+        definedFullTableNames.add("NORMAL_C");
+        definedFullTableNames.add("VIEW_C1");
+        definedFullTableNames.add("VIEW_E1");
+        // The two views below may or may not be in the snapshot for restore - they do not impact
         // the completeness of the snapshot.
         Set<String> definedOptionalTableNames = new HashSet<>();
         definedOptionalTableNames.add("VIEW_A");
         definedOptionalTableNames.add("VIEW_C1");
-        Set<String> returnedOptionalTableNames = new HashSet<>();
-        Set<String> returnedNormalTableNames = CatalogUtil.getNormalTableNamesFromInMemoryJar(jarfile, returnedOptionalTableNames);
-        assertEquals(definedNormalTableNames, returnedNormalTableNames);
+        Pair<Set<String>, Set<String>> ret =
+                CatalogUtil.getSnapshotableTableNamesFromInMemoryJar(jarfile);
+        Set<String> returnedFullTableNames = ret.getFirst();
+        Set<String> returnedOptionalTableNames = ret.getSecond();
+        assertEquals(definedFullTableNames, returnedFullTableNames);
         assertEquals(definedOptionalTableNames, returnedOptionalTableNames);
     }
 }
