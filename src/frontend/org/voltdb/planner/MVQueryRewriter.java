@@ -83,6 +83,8 @@ final class MVQueryRewriter {
     }
 
     static private boolean rewriteUnionStmt(ParsedUnionStmt stmt) {
+        // indx/updated are captured inside lambda (required to be {\code final}).
+        // The whole parsing/optimization job is done synchronously in a single thread.
         final AtomicInteger indx = new AtomicInteger(0);
         final AtomicBoolean updated = new AtomicBoolean(false);
         stmt.m_children.stream().flatMap(c -> {
@@ -100,7 +102,7 @@ final class MVQueryRewriter {
                 assert(false);
             }
             return null;
-        }).forEach(kv -> {         // update other fields: table list, table alias map, ?orderColumns
+        }).forEach(kv -> {         // update other fields: table list, table alias map
             final int i = kv.getFirst();
             final ParsedSelectStmt sel = kv.getSecond();
             assert (sel.m_tableList.size() == 1);        // For now, only MV from single table gets rewritten
