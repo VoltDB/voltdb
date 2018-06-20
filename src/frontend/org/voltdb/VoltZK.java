@@ -525,7 +525,6 @@ public class VoltZK {
                       null,
                       Ids.OPEN_ACL_UNSAFE,
                       CreateMode.EPHEMERAL);
-            log.info("Register promoting partition " + partitionId);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NODEEXISTS) {
                 VoltDB.crashLocalVoltDB("Unable to register promoting partition " + partitionId, true, e);
@@ -535,20 +534,17 @@ public class VoltZK {
         }
     }
 
-    // remove the partition under /db/promotion when the new leader has accepted promotion
+    // remove the partition under /db/promotingLeaders when the new leader has accepted promotion
     public static void unregisterPromotingPartition(ZooKeeper zk, int partitionId, VoltLogger log) {
         String node = ZKUtil.joinZKPath(promotingLeaders, Integer.toString(partitionId));
         try {
             zk.delete(node, -1);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
-                if (log != null) {
-                    log.error("Failed to remove promoting partition: " + partitionId + "\n" + e.getMessage(), e);
-                }
+                log.error("Failed to remove promoting partition: " + partitionId + "\n" + e.getMessage(), e);
             }
         } catch (InterruptedException e) {
         }
-        log.info("Unregister promoting partition " + partitionId + " successfully.");
     }
 
     // Upon node failures, new partition leaders, including MPI, will be registered right before they
@@ -558,7 +554,8 @@ public class VoltZK {
     public static void checkPartitionLeaderPromotion(ZooKeeper zk) {
         try {
             List<String> partitions = zk.getChildren(VoltZK.promotingLeaders, false);
-            long maxWait = TimeUnit.SECONDS.toNanos(10);
+            // leader promotions could take time with high partition count.
+            long maxWait = TimeUnit.SECONDS.toNanos(120);
             long start = System.nanoTime();
             while(!partitions.isEmpty() && (System.nanoTime() - start < maxWait)) {
                 partitions = zk.getChildren(VoltZK.promotingLeaders, false);
