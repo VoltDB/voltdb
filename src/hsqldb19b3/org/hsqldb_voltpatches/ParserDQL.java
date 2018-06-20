@@ -3394,12 +3394,7 @@ public class ParserDQL extends ParserBase {
             return new ExpressionLogical(OpTypes.AND, l, r);
         } else {          // handle plain value
             Expression b      = XreadStringValueExpression();
-            Expression escape = null;
-            if (token.tokenString.equals(Tokens.T_ESCAPE)) {
-                read();
-                escape = XreadStringValueExpression();
-            }
-            return new ExpressionStartsWith(a, b, escape, this.isCheckOrTriggerCondition);
+            return new ExpressionStartsWith(a, b, this.isCheckOrTriggerCondition);
         }
     }
 

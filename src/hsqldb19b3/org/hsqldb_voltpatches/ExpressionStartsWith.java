@@ -2,7 +2,6 @@ package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.Set;
-import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.Type;
 
 import java.util.Objects;
@@ -14,21 +13,19 @@ import java.util.Objects;
  */
 public final class ExpressionStartsWith extends ExpressionLogical {
 
-    private final static int ESCAPE  = 2;
-    private final static int TERNARY = 3;
+    private final static int BINARY  = 2;
     private StartsWith             startsWithObject;
 
     /**
      * Create a STARTS WITH expression
      */
-    ExpressionStartsWith(Expression left, Expression right, Expression escape, boolean noOptimisation) {
+    ExpressionStartsWith(Expression left, Expression right, boolean noOptimisation) {
 
         super(OpTypes.STARTS_WITH);
 
-        nodes               = new Expression[TERNARY];
+        nodes               = new Expression[BINARY];
         nodes[LEFT]         = left;
         nodes[RIGHT]        = right;
-        nodes[ESCAPE]       = escape;
         startsWithObject          = new StartsWith();
         this.noOptimisation = noOptimisation;
     }
@@ -69,15 +66,11 @@ public final class ExpressionStartsWith extends ExpressionLogical {
 
         Object leftValue   = nodes[LEFT].getValue(session);
         Object rightValue  = nodes[RIGHT].getValue(session);
-        Object escapeValue = (nodes.length < TERNARY || nodes[ESCAPE] == null) ? null
-                                                   : nodes[ESCAPE].getValue(session);
 
         if (startsWithObject.isVariable) {
             synchronized (startsWithObject) {
-               startsWithObject.setPattern(session, rightValue, escapeValue,
-                        (nodes.length == TERNARY) && (nodes[ESCAPE] != null));
-
-                return startsWithObject.compare(session, leftValue);
+               startsWithObject.setPattern(session, rightValue);
+               return startsWithObject.compare(session, leftValue);
             }
         }
 
@@ -93,53 +86,6 @@ public final class ExpressionStartsWith extends ExpressionLogical {
             }
         }
 
-        boolean isEscapeFixedConstant = true;
-
-        if (TERNARY <= nodes.length && nodes[ESCAPE] != null) {
-            if (nodes[ESCAPE].isParam) {
-                throw Error.error(ErrorCode.X_42567);
-            }
-
-            nodes[ESCAPE].resolveTypes(session, this);
-
-            isEscapeFixedConstant = nodes[ESCAPE].opType == OpTypes.VALUE;
-
-            if (isEscapeFixedConstant) {
-                nodes[ESCAPE].setAsConstantValue(session);
-
-                if (nodes[ESCAPE].dataType == null) {
-                    throw Error.error(ErrorCode.X_42567);
-                }
-
-                if (nodes[ESCAPE].valueData != null) {
-                    long length;
-
-                    switch (nodes[ESCAPE].dataType.typeCode) {
-
-                        case Types.SQL_CHAR :
-                        case Types.SQL_VARCHAR :
-                            length =
-                                ((String) nodes[ESCAPE].valueData).length();
-                            break;
-
-                        case Types.SQL_BINARY :
-                        case Types.SQL_VARBINARY :
-                            length =
-                                ((BinaryData) nodes[ESCAPE].valueData).length(
-                                    session);
-                            break;
-
-                        default :
-                            throw Error.error(ErrorCode.X_42565);
-                    }
-
-                    if (length != 1) {
-                        throw Error.error(ErrorCode.X_22019);
-                    }
-                }
-            }
-        }
-
         if (nodes[LEFT].isParam) {
             nodes[LEFT].dataType = nodes[RIGHT].dataType;
         } else if (nodes[RIGHT].isParam) {
@@ -151,17 +97,13 @@ public final class ExpressionStartsWith extends ExpressionLogical {
         }
 
         if (nodes[LEFT].dataType.isCharacterType()
-                && nodes[RIGHT].dataType.isCharacterType()
-                && (nodes.length <= TERNARY || nodes[ESCAPE] == null
-                    || nodes[ESCAPE].dataType.isCharacterType())) {
+                && nodes[RIGHT].dataType.isCharacterType()) {
             boolean ignoreCase =
                 nodes[LEFT].dataType.typeCode == Types.VARCHAR_IGNORECASE
                 || nodes[RIGHT].dataType.typeCode == Types.VARCHAR_IGNORECASE;
             startsWithObject.setIgnoreCase(ignoreCase);
         } else if (nodes[LEFT].dataType.isBinaryType()
-                   && nodes[RIGHT].dataType.isBinaryType()
-                   && (nodes[ESCAPE] == null
-                       || nodes[ESCAPE].dataType.isBinaryType())) {
+                   && nodes[RIGHT].dataType.isBinaryType()) {
             startsWithObject.isBinary = true;
         } else if (false == (nodes[LEFT].dataType.isBooleanType()
                               && nodes[RIGHT].dataType.isBooleanType())
@@ -171,25 +113,13 @@ public final class ExpressionStartsWith extends ExpressionLogical {
             // properly typed.          throw Error.error(ErrorCode.X_42565);
         }
 
-// A VoltDB extension to disable STARTS WITH pattern escape characters
-        /*
-         * Remove the unused escape node
-         */
-        if (TERNARY <= nodes.length && nodes[ESCAPE] == null) {
-            Expression oldNodes[] = nodes;
-            nodes = new Expression[BINARY];
-            nodes[LEFT] = oldNodes[LEFT];
-            nodes[RIGHT] = oldNodes[RIGHT];
-        }
-// End of VoltDB extension
         if (startsWithObject != null) {
             startsWithObject.dataType = nodes[LEFT].dataType;
         }
 
         boolean isRightArgFixedConstant = nodes[RIGHT].opType == OpTypes.VALUE;
 
-        if (isRightArgFixedConstant && isEscapeFixedConstant
-                && nodes[LEFT].opType == OpTypes.VALUE) {
+        if (isRightArgFixedConstant && nodes[LEFT].opType == OpTypes.VALUE) {
             setAsConstantValue(session);
 
             startsWithObject = null;
@@ -197,30 +127,26 @@ public final class ExpressionStartsWith extends ExpressionLogical {
             return;
         }
 
-        if (isRightArgFixedConstant && isEscapeFixedConstant) {
+        if (isRightArgFixedConstant) {
             if (startsWithObject != null) {
                 startsWithObject.isVariable = false;
             }
         } else {
-            if (nodes.length > 2) {
-                throw new RuntimeException("Starts with operation with an escape is not supported in parameterized queries");
-            }
+            return;
         }
 
         // In this case, pattern will always be not null 
         Object pattern = isRightArgFixedConstant
                          ? nodes[RIGHT].getConstantValue(session)
                          : null;
-        boolean constantEscape = isEscapeFixedConstant && (nodes.length > 2);
-        Object escape = constantEscape ? nodes[ESCAPE].getConstantValue(session) : null;
 
-        startsWithObject.setPattern(session, pattern, escape, (nodes.length > 2));
+        startsWithObject.setPattern(session, pattern);
 
         if (noOptimisation) {
             return;
         }
 
-        if (nodes[RIGHT].isParam) {   // Handle the Dynamic Parameter
+        if (nodes[RIGHT].isParam) {   // Shouldn't arrive here
             return;
         }
         else if (startsWithObject.isEquivalentToUnknownPredicate()) {
@@ -269,13 +195,6 @@ public final class ExpressionStartsWith extends ExpressionLogical {
 
         sb.append(left).append(' ').append(Tokens.T_STARTS).append(Tokens.T_WITH).append(' ');
         sb.append(right);
-
-        /** @todo fredt - scripting of non-ascii escapes needs changes to general script logging */
-        if (nodes[ESCAPE] != null) {
-            sb.append(' ').append(Tokens.T_ESCAPE).append(' ');
-            sb.append(nodes[ESCAPE].getSQL());
-            sb.append(' ');
-        }
 
         return sb.toString();
     }

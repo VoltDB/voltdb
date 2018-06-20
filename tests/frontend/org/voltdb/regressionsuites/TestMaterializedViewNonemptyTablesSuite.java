@@ -123,6 +123,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
 
         // Unsafe Boolean Operations
         testUnsafeBoolOperation(client, "bs like 'abc'");
+        testUnsafeBoolOperation(client, "bs starts with 'abc'");
 
         // Safe Boolean Operations
         testSafeBoolOperation(client, "b = b");

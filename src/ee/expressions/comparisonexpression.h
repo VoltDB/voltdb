@@ -199,6 +199,18 @@ public:
     inline static bool isNullRejecting() { return true; }
 };
 
+class CmpSw {
+public:
+    inline static const char* op_name() { return "CmpSw"; }
+    inline static NValue compare(const NValue& l, const NValue& r)
+    {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.startsWith(r);
+    }
+    inline static bool isNullRejecting() { return true; }
+};
+
 class CmpIn {
 public:
     inline static const char* op_name() { return "CmpIn"; }
