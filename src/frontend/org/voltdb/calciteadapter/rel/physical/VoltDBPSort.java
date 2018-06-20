@@ -90,7 +90,7 @@ public class VoltDBPSort extends Sort implements VoltDBPRel {
                 lpn.setLimit(RexLiteral.intValue(fetch));
             }
             if (offset != null) {
-                lpn.setLimit(RexLiteral.intValue(offset));
+                lpn.setOffset(RexLiteral.intValue(offset));
             }
         }
         OrderByPlanNode opn = null;
