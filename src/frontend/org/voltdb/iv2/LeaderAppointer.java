@@ -278,6 +278,7 @@ public class LeaderAppointer implements Promotable
                         partitionId);
             try {
                 m_iv2appointees.put(partitionId, masterHSId);
+                VoltZK.registerPromotingPartition(m_zk, partitionId, tmLog);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
             }
@@ -528,6 +529,7 @@ public class LeaderAppointer implements Promotable
             m_removedPartitionsAtPromotionTime = null;
             // just go ahead and promote our MPI
             m_MPI.acceptPromotion();
+            VoltZK.registerPromotingPartition(m_zk, MpInitiator.MP_INIT_PID, tmLog);
             // set up a watcher on the partitions dir so that new partitions will be picked up
             m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
             blocker.set(null);
