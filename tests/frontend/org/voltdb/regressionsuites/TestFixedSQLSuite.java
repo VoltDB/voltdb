@@ -3130,109 +3130,85 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{gpv}}, vt);
     }
 
-    public void testENG14167() throws Exception {
-        if (isHSQL()) {
-            return;
-        }
+    public void testOrderByAggregateNoGroupBy() throws Exception {
         Client client = getClient();
-        String[] inserts = {
-            "INSERT INTO P3 VALUES (0, -5377, 837, -21764, 18749);",
-            "INSERT INTO P3 VALUES (1, -5377, 837, -21764, 26060);",
-            "INSERT INTO R1 VALUES (100, 'varcharvalue', 120, 1.0);"
-        };
-        for (String insertSQL : inserts) {
-            assertSuccessfulDML(client, insertSQL);
-        }
-        String ticketTester = "SELECT * FROM V_P3 A, (SELECT DISTINCT * FROM R1) B;";
-        VoltTable vt = client.callProcedure("@AdHoc", ticketTester).getResults()[0];
-        assertContentOfTable(new Object[][]{
-            new Object[]{
-                    -5377, 837, 2, -43528, 44809, 100, "varcharvalue" , 120, 1.0
-                    }}, vt);
-    }
-
-    public void testEng13801() throws Exception {
-        if (isHSQL()) {
-            return;
-        }
-
-        Client client = getClient();
-
-        // In this bug, the COUNT(*) in the ORDER BY clause was in the query's
-        // result, even though it's not in the SELECT list.
-        VoltTable vt = client.callProcedure("@AdHoc",
-                "SELECT MIN(VCHAR_INLINE) FROM ENG_13852_R11 AS T1 ORDER BY COUNT(*), T1.BIG;").getResults()[0];
-        assertEquals(1, vt.getColumnCount());
-
-        assertSuccessfulDML(client,
-                "insert into ENG_13852_P5 values ( \n" +
-                        "        0, \n" +
-                        "        1, 10, 100, 1000,\n" +
-                        "        1.0, 2.0,\n" +
-                        "        'foo', 'bar', 'baz', 'boo', 'bugs',\n" +
-                        "        now,\n" +
-                        "        x'ab',\n" +
-                        "        pointfromtext('point(1 0)'), -- point\n" +
-                        "        null, -- polygon\n" +
-                        "        null, null, null, x'ab')");
-        assertSuccessfulDML(client, "insert into ENG_13852_R11 values (\n" +
-                "        0,\n" +
-                "        1, 10, 100, 1000,\n" +
-                "        1.0, 2.0,\n" +
-                "        'foo', 'bar', 'baz', 'boo', 'bugs',\n" +
-                "        now,\n" +
-                "        x'ab',\n" +
-                "        pointfromtext('point(0 0)'), -- point\n" +
-                "        null, -- polygon\n" +
-                "        null, null, null, x'ab')");
-
-        // Original query found by grammar generator:
-        vt = client.callProcedure("@AdHoc",
-                "SELECT 'foo' AS CA2, OUTER_TBL.TINY " +
-                        "FROM ENG_13852_P5 AS OUTER_TBL " +
-                        "WHERE VCHAR_INLINE != (" +
-                        "  SELECT MAX(VCHAR) " +
-                        "  FROM ENG_13852_R11 AS INNER_TBL " +
-                        "  WHERE POINT != OUTER_TBL.POINT " +
-                        "  ORDER BY COUNT(*)) " +
-                        "ORDER BY NUM;").getResults()[0];
-        assertContentOfTable(new Object[][] {{"foo", 1}}, vt);
-    }
-
-    public void testEng13929() throws Exception {
-        if (isHSQL()) {
-            // HSQL gets wrong answers for these.
-            // Our answers match PostgreSQL.
-            return;
-        }
-
-        Client client = getClient();
-        VoltTable vt;
         String sql;
+        VoltTable vt;
+        final String vdbPlannerError = "Aggregate functions in ORDER BY clause are not allowed " +
+                "if they do not also appear in the SELECT list";
+        final String hsqlPlannerError = "invalid ORDER BY expression";
 
-        // In this bug our planner had trouble with
-        // a query where the aggregate function was in a group by clause
+        // In this bug, both HSQL and VoltDB could not handle queries with:
+        // - No GB clause
+        // - Aggregates in the ORDER BY clause that are not in the SELECT list
+        // - Only constants on the SELECT list
+        // Fix is to disallow this where it is problematic.
+        //
+        // Some of these queries are legal (they execute
+        // in PostgreSQL), so maybe we could support them someday.
+        //
+        // Related tickets: ENG-13929, ENG-13801.
+
+        // This query is not valid.  The query does ungrouped aggregation, but has a
+        // raw column reference in the OB clause.  However, because we can optimize away
+        // the ORDER BY clause, we allow this.  (HSQL does not catch the error)
+        sql =  "SELECT MIN(VCHAR_INLINE) FROM ENG_13852_R11 AS T1 ORDER BY COUNT(*), T1.BIG;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][] {{null}}, vt);
+
+        // VoltDB complains about this one.
+        sql = "SELECT TOP 3  -699 AS CA4 " +
+                "FROM ENG_13852_R11, ENG_13852_VR5 " +
+                "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;";
+        verifyStmtFails(client, sql, vdbPlannerError);
+
+        // This query has an agg on OB clause not on the SELECT list
+        // BUT, because the
+        sql = "SELECT 'foo' AS CA2, OUTER_TBL.TINY " +
+                "FROM ENG_13852_P5 AS OUTER_TBL " +
+                "WHERE VCHAR_INLINE != (" +
+                "  SELECT MAX(VCHAR) " +
+                "  FROM ENG_13852_R11 AS INNER_TBL " +
+                "  WHERE POINT != OUTER_TBL.POINT " +
+                "  ORDER BY COUNT(*)) " +
+                "ORDER BY NUM;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][] {}, vt);
+
         sql = "SELECT 'foo' " +
                 "FROM ENG_13852_R11 T1 " +
                 "ORDER BY COUNT(*) DESC;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertContentOfTable(new Object[][] {{"foo"}}, vt);
+        verifyStmtFails(client, sql, vdbPlannerError);
+
+        // Aggregate functions in subexpressions of OB clause should also
+        // be invalid:
+        sql = "SELECT 'foo' " +
+                "FROM ENG_13852_R11 T1 " +
+                "ORDER BY MAX(ID) / COUNT(*) DESC;";
+        verifyStmtFails(client, sql, vdbPlannerError);
+
+        sql = "SELECT 'foo' " +
+                "FROM ENG_13852_R11 T1 " +
+                "ORDER BY ABS(COUNT(*)) DESC;";
+        verifyStmtFails(client, sql, vdbPlannerError);
 
         // Similar query with AVG
         sql = "SELECT 79 AS const_num " +
                 "FROM ENG_13852_R11 T1 " +
                 "ORDER BY AVG(const_num);";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertContentOfTable(new Object[][]{{79}}, vt);
+        verifyStmtFails(client, sql, vdbPlannerError);
 
         // Similar query with GB clause
         sql = "SELECT 'foo' " +
                 "FROM ENG_13852_R11 T1 " +
                 "GROUP BY tiny " +
                 "ORDER BY COUNT(*)";
-        // For some reason, HSQL doesn't like this
-        // (but is OK with aggregates on OB clause when no GB clause)
-        verifyStmtFails(client, sql, "invalid ORDER BY expression");
+        verifyStmtFails(client, sql, hsqlPlannerError);
+
+        sql = "SELECT TOP 3  -699 AS CA4 " +
+                "FROM ENG_13852_R11 , ENG_13852_VR5     " +
+                "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;";
+        verifyStmtFails(client, sql, vdbPlannerError);
     }
 
     //

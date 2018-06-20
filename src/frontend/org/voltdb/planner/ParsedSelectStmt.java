@@ -1125,10 +1125,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         int origNumAggResultCols = m_aggResultColumns.size();
         insertAggExpressionsToAggResultColumns(m_aggregationList, order_col);
         if (m_aggResultColumns.size() > origNumAggResultCols && m_groupByColumns.isEmpty()) {
-            // There are aggregate functions in the order by clause that are not
-            // in the select list, and this is not a GB query.  In this case, the presence
-            // of an aggregate function in the OB clause may make this an aggregate query.
-            m_isComplexOrderBy = true;
+            throw new PlanningErrorException("Aggregate functions in ORDER BY clause are not allowed " +
+                    "if they do not also appear in the SELECT list");
         }
 
         if (m_aggregationList.size() >= 1) {
