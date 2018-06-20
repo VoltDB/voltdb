@@ -73,14 +73,9 @@ CREATE TABLE event_data (
   -- derived from creative_id:
   campaign_id            INTEGER       NOT NULL,
   advertiser_id          INTEGER       NOT NULL,
-  creative_image_url     VARCHAR(2000 BYTES)     NOT NULL,
-  creative_name          VARCHAR(256)  NOT NULL,
-  creative_description   VARCHAR(256)  NOT NULL,
   -- derived from inventory_id:
   site_id                INTEGER       NOT NULL,
   page_id                INTEGER       NOT NULL,
-  site_directory         VARCHAR(256)  NOT NULL,
-  page_url               VARCHAR(2000 BYTES)     NOT NULL,
   -- derived from type_id:
   is_impression          INTEGER       NOT NULL,
   is_clickthrough        INTEGER       NOT NULL,
