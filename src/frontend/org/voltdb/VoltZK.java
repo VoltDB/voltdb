@@ -517,7 +517,7 @@ public class VoltZK {
         return true;
     }
 
-    //add partition id under /db/promotingLeaders when the partition elects a new leader upon node failure
+    // add partition under /db/promotingLeaders when the partition elects a new leader upon node failure
     public static void registerPromotingPartition(ZooKeeper zk, int partitionId, VoltLogger log) {
         String node = ZKUtil.joinZKPath(promotingLeaders, Integer.toString(partitionId));
         try {
@@ -535,7 +535,7 @@ public class VoltZK {
         }
     }
 
-    //remove the partition under /db/promotion when the new leader has accepted promotion
+    // remove the partition under /db/promotion when the new leader has accepted promotion
     public static void unregisterPromotingPartition(ZooKeeper zk, int partitionId, VoltLogger log) {
         String node = ZKUtil.joinZKPath(promotingLeaders, Integer.toString(partitionId));
         try {
@@ -551,11 +551,11 @@ public class VoltZK {
         log.info("Unregister promoting partition " + partitionId + " successfully.");
     }
 
-    //Upon node failures, new partition leaders, including MPI, will be registered right before they
-    //are promoted and unregistered after their promotion are done. Let rejoining nodes wait until
-    //all the partition leader promotions have finished to avoid any
-    //interference in the transaction repair process and score board.
-    public static void checkPromotingPartitions(ZooKeeper zk) {
+    // Upon node failures, new partition leaders, including MPI, will be registered right before they
+    // are promoted and unregistered after their promotions are done. Let rejoining nodes wait until
+    // all the partition leader promotions have finished to avoid any
+    // interference with the transaction repair process and score board.
+    public static void checkPartitionLeaderPromotion(ZooKeeper zk) {
         try {
             List<String> partitions = zk.getChildren(VoltZK.promotingLeaders, false);
             long maxWait = TimeUnit.SECONDS.toNanos(10);
@@ -564,7 +564,7 @@ public class VoltZK {
                 partitions = zk.getChildren(VoltZK.promotingLeaders, false);
             }
         } catch (KeeperException | InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Failed to validate promoting partitions ", true, e);
+            VoltDB.crashLocalVoltDB("Failed to validate partition leader promotions.", true, e);
         }
     }
 

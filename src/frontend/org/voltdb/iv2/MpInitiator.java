@@ -160,7 +160,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
-                    VoltZK.unregisterPromotingPartition(m_messenger.getZK(), MP_INIT_PID, tmLog);
                     TTLManager.instance().scheduleTTLTasks();
                 }
                 else {
