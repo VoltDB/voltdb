@@ -478,8 +478,9 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
     global invalid_statements
     global mismatched_statements
     global keyStats_start_index
-    global total_volt_npes
-    global total_cmp_npes
+    global total_volt_fatal_excep
+    global total_volt_nonfatal_excep
+    global total_cmp_excep
     global total_volt_crashes
     global total_cmp_crashes
     global total_diff_crashes
@@ -496,8 +497,9 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
     total_statements      += int(next_keyStats_column_value())
     mismatched_statements += int(next_keyStats_column_value())
     next_keyStats_column_value()  # ignore Mismatched %
-    total_volt_npes       += int(next_keyStats_column_value())
-    total_cmp_npes        += int(next_keyStats_column_value())
+    total_volt_fatal_excep    += int(next_keyStats_column_value())
+    total_volt_nonfatal_excep += int(next_keyStats_column_value())
+    total_cmp_excep           += int(next_keyStats_column_value())
     total_volt_crashes    += volt_crashes
     total_cmp_crashes     += cmp_crashes
     total_diff_crashes    += diff_crashes
@@ -708,8 +710,9 @@ if __name__ == "__main__":
     invalid_statements = 0
     mismatched_statements = 0
     total_statements = 0
-    total_volt_npes = 0
-    total_cmp_npes = 0
+    total_volt_fatal_excep = 0
+    total_volt_nonfatal_excep = 0
+    total_cmp_excep = 0
     total_volt_crashes = 0
     total_cmp_crashes  = 0
     total_diff_crashes = 0
@@ -864,8 +867,9 @@ if __name__ == "__main__":
                            "\n<td align=right>" + str(total_statements) + "</td>" + \
                            "\n<td align=right>" + str(mismatched_statements) + "</td>" + \
                            "\n<td align=right>" + mismatched_percent + "%</td>" + \
-                           "\n<td align=right>" + str(total_volt_npes) + "</td>" + \
-                           "\n<td align=right>" + str(total_cmp_npes) + "</td>" + \
+                           "\n<td align=right>" + str(total_volt_fatal_excep) + "</td>" + \
+                           "\n<td align=right>" + str(total_volt_nonfatal_excep) + "</td>" + \
+                           "\n<td align=right>" + str(total_cmp_excep) + "</td>" + \
                            "\n<td align=right>" + str(total_volt_crashes) + "</td>" + \
                            "\n<td align=right>" + str(total_cmp_crashes) + "</td>" + \
                            "\n<td align=right>" + str(total_diff_crashes) + "</td>" + \
@@ -893,11 +897,13 @@ if __name__ == "__main__":
     if total_num_unresolved > 0:
         success = False
         print "Total number of invalid statements with unresolved symbols: %d" % total_num_unresolved
-    if total_cmp_npes > 0:
-        print "Total number of " + comparison_database + " NullPointerExceptions (NPEs): %d" % total_cmp_npes
-    if total_volt_npes > 0:
+    if total_cmp_excep > 0:
+        print "Total number of " + comparison_database + " (all) Exceptions: %d" % total_cmp_excep
+    if total_volt_nonfatal_excep > 0:
+        print "Total number of VoltDB Minor Exceptions: %d" % total_volt_nonfatal_excep
+    if total_volt_fatal_excep > 0:
         success = False
-        print "Total number of VoltDB NullPointerExceptions (NPEs): %d" % total_volt_npes
+        print "Total number of VoltDB Fatal Exceptions: %d" % total_volt_fatal_excep
     if mismatched_statements > 0:
         print "Total number of mismatched statements (i.e., test failures): %d" % mismatched_statements
     if total_volt_crashes > 0 or total_cmp_crashes > 0 or total_diff_crashes > 0:

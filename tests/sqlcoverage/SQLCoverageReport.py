@@ -48,7 +48,7 @@ def enum(*sequential, **named):
     return type('Enum', (), enums)
 
 # Options for which SQL statement types to include when generating Steps to
-# Reproduce a failure (or crash, NPE, etc.)
+# Reproduce a failure (or crash, exception, etc.)
 Reproduce = enum('NONE', 'DDL', 'DML', 'CTE', 'ALL')
 
 # Define which SQL statement types are included in each of the above options
@@ -61,6 +61,35 @@ ReproduceStatementTypes[Reproduce.CTE]  = ['WITH']
 ReproduceStatementTypes[Reproduce.CTE].extend(ReproduceStatementTypes[Reproduce.DML])
 ReproduceStatementTypes[Reproduce.ALL]  = ['']    # any statement, including SELECT
 ### print "DEBUG: ReproduceStatementTypes:", str(ReproduceStatementTypes)
+
+# Define which Exceptions (or other error messages) should be flagged as 'fatal'
+# errors (meaning that SqlCoverage should fail); and which as 'non-fatal' errors
+# (meaning that SqlCoverage should NOT fail)
+FatalExceptionTypes = ['NullPointerException',
+                       'IndexOutOfBoundsException',
+                       'AssertionError',
+                       'ClassCastException',
+                       'SAXParseException',
+                       'VoltTypeException',
+                       'ClassCastException',
+                       'VOLTDB ERROR: UNEXPECTED FAILURE',
+                       'unexpected internal error occurred',
+                       'Please contact VoltDB at support@voltdb.com'
+                       ]
+NonfatalExceptionTypes = ['ERROR: IN: NodeSchema',
+                          'is already defined',
+                          'is not defined',
+                          'Could not parse reader',
+                          'unexpected token: EXEC',
+                          'Failed to plan for statement',
+                          'Resource limit exceeded',
+                          "Attribute 'enabled' is not allowed to appear in element 'export'",
+                          'PartitionInfo specifies invalid parameter index for procedure',
+                          'Unexpected error in the SQL parser for statement'
+                          ]
+AllExceptionTypes = []
+AllExceptionTypes.extend(FatalExceptionTypes)
+AllExceptionTypes.extend(NonfatalExceptionTypes)
 
 def highlight(s, flag):
     if not isinstance(s, basestring):
@@ -417,8 +446,9 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     count = 0
     mismatches = []
     crashed = []
-    voltdb_npes = []
-    cmpdb_npes  = []
+    volt_fatal_excep = []
+    volt_nonfatal_excep = []
+    cmpdb_excep  = []
     invalid     = []
     all_results = []
     reproduce_results = []
@@ -469,14 +499,19 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
                 statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
             mismatches.append(statement)
 
-        if ('NullPointerException' in str(jni)):
+        if any(exceptionType in str(jni) for exceptionType in FatalExceptionTypes):
             if reproducer:
                 statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
-            voltdb_npes.append(statement)
-        if ('NullPointerException' in str(cdb)):
+            volt_fatal_excep.append(statement)
+        if any(exceptionType in str(jni) for exceptionType in NonfatalExceptionTypes):
             if reproducer:
                 statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
-            cmpdb_npes.append(statement)
+            volt_nonfatal_excep.append(statement)
+        if any(exceptionType in str(cdb) for exceptionType in AllExceptionTypes):
+            if reproducer:
+                statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
+            cmpdb_excep.append(statement)
+
         if report_all:
             all_results.append(statement)
 
@@ -504,8 +539,8 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
 
     topLines = getTopSummaryLines(cmpdb, False)
     currentTime = datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
-    keyStats = createSummaryInHTML(count, failures, len(mismatches), len(voltdb_npes),
-                                   len(cmpdb_npes), extra_stats, seed, max_mismatches)
+    keyStats = createSummaryInHTML(count, failures, len(mismatches), len(volt_fatal_excep), len(volt_nonfatal_excep),
+                                   len(cmpdb_excep), extra_stats, seed, max_mismatches)
     report = """
 <html>
 <head>
@@ -540,15 +575,20 @@ h2 {text-transform: uppercase}
         report += print_section("Statements Missing Results, due to a Crash<br>(the first one probably caused the crash)",
                                 crashed,     output_dir, cmpdb, modified_sql, reproducer, ddl_file)
 
-    if(len(voltdb_npes) > 0):
-        sorted(voltdb_npes, cmp=cmp, key=key)
-        report += print_section("Statements That Cause a NullPointerException (NPE) in VoltDB",
-                                voltdb_npes, output_dir, cmpdb, modified_sql, reproducer, ddl_file)
+    if(len(volt_fatal_excep) > 0):
+        sorted(volt_fatal_excep, cmp=cmp, key=key)
+        report += print_section("Statements That Cause a 'Fatal' Exception in VoltDB",
+                                volt_fatal_excep,    output_dir, cmpdb, modified_sql, reproducer, ddl_file)
 
-    if(len(cmpdb_npes) > 0):
-        sorted(cmpdb_npes, cmp=cmp, key=key)
-        report += print_section("Statements That Cause a NullPointerException (NPE) in " + cmpdb,
-                                cmpdb_npes,  output_dir, cmpdb, modified_sql, reproducer, ddl_file)
+    if(len(volt_nonfatal_excep) > 0):
+        sorted(volt_nonfatal_excep, cmp=cmp, key=key)
+        report += print_section("Statements That Cause a 'Non-fatal' Exception in VoltDB",
+                                volt_nonfatal_excep, output_dir, cmpdb, modified_sql, reproducer, ddl_file)
+
+    if(len(cmpdb_excep) > 0):
+        sorted(cmpdb_excep, cmp=cmp, key=key)
+        report += print_section("Statements That Cause (any) Exception in " + cmpdb,
+                                cmpdb_excep, output_dir, cmpdb, modified_sql, reproducer, ddl_file)
 
     if report_invalid and (len(invalid) > 0):
         report += print_section("Invalid Statements",
@@ -580,7 +620,7 @@ def getTopSummaryLines(cmpdb, includeAll=True):
     topLines += """
 <td colspan=5 align=center>SQL Statements</td>
 <td colspan=2 align=center>Test Failures</td>
-<td colspan=2 align=center>NPEs</td>
+<td colspan=3 align=center>Exceptions</td>
 <td colspan=3 align=center>Crashes</td>
 <td colspan=5 align=center>SQL Statements per Pattern</td>
 <td colspan=5 align=center>Time (min:sec)</td>
@@ -589,7 +629,7 @@ def getTopSummaryLines(cmpdb, includeAll=True):
 <td>Invalid</td><td>Invalid %%</td>
 <td>Total</td>
 <td>Mismatched</td><td>Mismatched %%</td>
-<td>V</td><td>%s</td>
+<td>VF</td><td>VN</td><td>%s</td>
 <td>V</td><td>%s</td><td>C</td>
 <td>Minimum</td><td>Maximum</td><td># Inserts</td><td># Patterns</td><td># Unresolved</td>
 <td>Generating SQL</td><td>VoltDB</td><td>%s</td>
@@ -599,8 +639,8 @@ def getTopSummaryLines(cmpdb, includeAll=True):
     topLines += "</tr>"
     return topLines
 
-def createSummaryInHTML(count, failures, misses, voltdb_npes, cmpdb_npes,
-                        extra_stats, seed, max_misses=0):
+def createSummaryInHTML(count, failures, misses, volt_fatal_excep, volt_nonfatal_excep,
+                        cmpdb_excep, extra_stats, seed, max_misses=0):
     passed = count - (failures + misses)
     passed_ps = fail_ps = cell4misPct = cell4misCnt = color = None
     count_color = fail_color = ""
@@ -628,29 +668,36 @@ def createSummaryInHTML(count, failures, misses, voltdb_npes, cmpdb_npes,
         cell4misCnt = "<td align=right bgcolor=" + color + ">" + str(misses) + "</td>"
     misRow = cell4misCnt + cell4misPct
 
-    if (voltdb_npes > 0):
+    if (volt_fatal_excep > 0):
         color = "#FF0000" # red
-        voltNpeRow = "<td align=right bgcolor=" + color + ">" + str(voltdb_npes) + "</td>"
+        voltFatalExcepRow = "<td align=right bgcolor=" + color + ">" + str(volt_fatal_excep) + "</td>"
     else:
-        voltNpeRow = "<td align=right>0</td>"
-    if (cmpdb_npes > 0):
+        voltFatalExcepRow = "<td align=right>0</td>"
+    if (volt_nonfatal_excep > 0):
         color = "#FFA500" # orange
-        cmpNpeRow = "<td align=right bgcolor=" + color + ">" + str(cmpdb_npes) + "</td>"
+        voltNonfatalExcepRow = "<td align=right bgcolor=" + color + ">" + str(volt_nonfatal_excep) + "</td>"
     else:
-        cmpNpeRow = "<td align=right>0</td>"
+        voltNonfatalExcepRow = "<td align=right>0</td>"
+    if (cmpdb_excep > 0):
+        color = "#FFA500" # orange
+        cmpExcepRow = "<td align=right bgcolor=" + color + ">" + str(cmpdb_excep) + "</td>"
+    else:
+        cmpExcepRow = "<td align=right>0</td>"
 
     if (passed == count and passed > 0):
         passed_ps = "100.00%"
     else:
         passed_ps = str("{0:.2f}".format((passed/float(max(count, 1))) * 100)) + "%"
+
     stats = """
 <td align=right>%d</td>
 <td align=right>%s</td>
 <td align=right>%d</td>
 <td align=right%s>%s</td>
 <td align=right%s>%d</td>
-%s%s%s%s</tr>
-""" % (passed, passed_ps, failures, fail_color, fail_ps, count_color, count, misRow, voltNpeRow, cmpNpeRow, extra_stats)
+%s%s%s%s%s</tr>
+""" % (passed, passed_ps, failures, fail_color, fail_ps, count_color, count,
+       misRow, voltFatalExcepRow, voltNonfatalExcepRow, cmpExcepRow, extra_stats)
 
     return stats
 
@@ -691,8 +738,9 @@ h2 {text-transform: uppercase}
 <tr><td align=right bgcolor=#FFFF00>Yellow</td><td>table elements indicate a mild warning, for something you might want to improve (e.g. a pattern
                                                    that generated a very large number of SQL queries, or a somewhat slow test suite).</td></tr>
 <tr><td align=right bgcolor=#D3D3D3>Gray</td><td>table elements indicate data that was not computed, due to a crash.</td></tr>
-<tr><td colspan=2>NPEs/V: number of NullPointerExceptions while running against VoltDB.</td></tr>
-<tr><td colspan=2>NPEs/%s: number of NullPointerExceptions while running against %s (likely in VoltDB's %s backend code).</td></tr>
+<tr><td colspan=2>Exceptions/VF: number of 'Fatal' Exceptions (those deemed worth failing the test) while running against VoltDB.</td></tr>
+<tr><td colspan=2>Exceptions/VN: number of 'Non-fatal' Exceptions (those deemed NOT worth failing the test) while running against VoltDB.</td></tr>
+<tr><td colspan=2>Exceptions/%s: number of (any) Exceptions while running against %s (likely in VoltDB's %s backend code).</td></tr>
 <tr><td colspan=2>Crashes/V: number of VoltDB crashes.</td></tr>
 <tr><td colspan=2>Crashes/%s: number of %s crashes.</td></tr>
 <tr><td colspan=2>Crashes/C: number of crashes while comparing VoltDB and %s results.</td></tr>
