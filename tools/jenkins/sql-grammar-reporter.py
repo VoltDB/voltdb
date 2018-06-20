@@ -28,7 +28,7 @@ class Issues(object):
 
     def report_issue(self, build):
         try:
-            jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(JIRA_USER, JIRA_PASS))
+            jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(JIRA_USER, JIRA_PASS), options=dict(verify=False))
         except:
             logging.exception('Could not connect to Jira')
             return
@@ -42,7 +42,7 @@ class Issues(object):
             print 'No new issue created. Build ' + str(build) + 'resulted in: ' + build_result
             return
 
-        summary_url = self.jhost + '/job/' + job + '/' + str(build) + '/artifact/tests/sqlgrammar/summary.out'
+        summary_url = self.jhost + '/job/' + job + '/' + str(build) + '/artifact/summary.out'
         summary_report = self.read_url(summary_url)
 
         pframe_split = summary_report.split('Problematic frame:')
