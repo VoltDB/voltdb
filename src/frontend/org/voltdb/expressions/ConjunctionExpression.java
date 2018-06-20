@@ -20,6 +20,8 @@ package org.voltdb.expressions;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
+import java.util.Comparator;
+
 public class ConjunctionExpression extends AbstractExpression {
     public ConjunctionExpression(ExpressionType type) {
         super(type);
@@ -39,6 +41,22 @@ public class ConjunctionExpression extends AbstractExpression {
     @Override
     public boolean needsRightExpression() {
         return true;
+    }
+
+    @Override
+    public boolean equivalent(AbstractExpression other) {
+        if (getExpressionType().equals(other.getExpressionType())) {
+            switch (getExpressionType()) {
+                case CONJUNCTION_AND:
+                case CONJUNCTION_OR:
+                    return getLeft().equivalent(other.getLeft()) && getRight().equivalent(other.getRight()) ||
+                            getLeft().equivalent(other.getRight()) && getRight().equivalent(other.getLeft());
+                default:
+                    throw new RuntimeException("Unknown conjunction operator " + getExpressionType().toString());
+            }
+        } else {
+            return false;
+        }
     }
 
     @Override

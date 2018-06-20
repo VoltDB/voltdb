@@ -30,6 +30,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
+import org.voltdb.planner.optimizer.ExpressionNormalizer;
 import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
@@ -49,12 +50,12 @@ public abstract class JoinNode implements Cloneable {
     protected AbstractExpression m_whereExpr = null;
 
     // Buckets for children expression classification
-    public final ArrayList<AbstractExpression> m_joinOuterList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_joinInnerList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_joinInnerOuterList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_whereOuterList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_whereInnerList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_whereInnerOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_joinOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_joinInnerList = new ArrayList<>();
+    public final List<AbstractExpression> m_joinInnerOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_whereOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_whereInnerList = new ArrayList<>();
+    public final List<AbstractExpression> m_whereInnerOuterList = new ArrayList<>();
 
     // All possible access paths for this node
     public List<AccessPath> m_accessPaths = new ArrayList<>();
@@ -80,6 +81,30 @@ public abstract class JoinNode implements Cloneable {
 
     public void setId(int id) {
         m_id = id;
+    }
+
+    public void normalizeExpressions() {
+        if (m_joinExpr != null) {
+            m_joinExpr = ExpressionNormalizer.normalize(m_joinExpr);
+        }
+        if (m_whereExpr != null) {
+            m_whereExpr = ExpressionNormalizer.normalize(m_whereExpr);
+        }
+        new ArrayList<List<AbstractExpression>>() {
+            void addAll(List<AbstractExpression>... args) {
+                for (List<AbstractExpression> arg : args) {
+                    add(arg);
+                }
+            }
+            {
+                addAll(m_joinOuterList, m_joinInnerList, m_joinInnerOuterList,
+                        m_whereInnerList, m_whereOuterList, m_whereInnerOuterList);
+            }
+        }.forEach(l -> l.forEach(v -> v = ExpressionNormalizer.normalize(v)));  // TODO: ok to write this way?
+        if (m_currentAccessPath != null) {
+            m_currentAccessPath.normalizeExpressions();
+        }
+        m_accessPaths.forEach(AccessPath::normalizeExpressions);
     }
 
     @SuppressWarnings("static-method")

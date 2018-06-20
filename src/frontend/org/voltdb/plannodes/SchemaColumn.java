@@ -23,6 +23,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.optimizer.ExpressionNormalizer;
 
 /**
  * This class encapsulates the data and operations needed to track columns
@@ -65,6 +66,12 @@ public class SchemaColumn {
         m_tableAlias = tableAlias == null || tableAlias.equals("") ? null : tableAlias;
         m_columnName = columnName == null || columnName.equals("") ? null : columnName;
         m_columnAlias = columnAlias == null || columnAlias.equals("") ? null : columnAlias;
+    }
+
+    public void normalizeExpressions() {
+        if (m_expression != null) {
+            m_expression = ExpressionNormalizer.normalize(m_expression);
+        }
     }
 
     public SchemaColumn(String tableName, String tableAlias,

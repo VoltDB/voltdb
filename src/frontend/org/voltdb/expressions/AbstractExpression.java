@@ -17,10 +17,8 @@
 
 package org.voltdb.expressions;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.IntStream;
 
 import org.hsqldb_voltpatches.FunctionSQL;
 import org.json_voltpatches.JSONArray;
@@ -39,7 +37,7 @@ import org.voltdb.types.SortDirectionType;
  * @param <aeClass>
  *
  */
-public abstract class AbstractExpression implements JSONString, Cloneable {
+public abstract class AbstractExpression implements JSONString, Cloneable, Comparable<AbstractExpression> {
     protected static class Members {
         static final String TYPE = "TYPE";
         static final String LEFT = "LEFT";
@@ -72,6 +70,53 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * aggregate function applied to a floating point expression.
      */
     private String m_contentDeterminismMessage = null;
+    private static final Comparator<List<AbstractExpression>> s_listComparator =
+            (a, b) -> {
+                final int len = a.size();
+                return len != b.size() ? Integer.compare(a.size(), b.size()) :
+                        IntStream.range(0, len).map(index -> a.get(index).compareTo(b.get(index)))
+                                .reduce(0, (acc, cur) -> acc == 0 ? cur : acc);
+            };
+
+    static protected Comparator<List<AbstractExpression>> getArgComparator() {
+        return s_listComparator;
+    }
+
+    @Override
+    public int compareTo(AbstractExpression other) {
+        final Comparator<AbstractExpression> nullComparator = Comparator.nullsFirst(Comparator.naturalOrder());
+        return equivalent(other) ? 0 :
+                Comparator.comparing(AbstractExpression::getExpressionType)
+                        .thenComparing(AbstractExpression::getLeft, nullComparator)
+                        .thenComparing(AbstractExpression::getRight, nullComparator)
+                        .thenComparing(AbstractExpression::getArgs, getArgComparator())
+                        .compare(this, other);
+    }
+
+    /**
+     * Tests whether two expressions are logically equivalent. Default behavior is to check their equality.
+     * @param other
+     * @return
+     */
+    public boolean equivalent(AbstractExpression other) {
+        return equals(other);
+    }
+
+    public void normalizeExpressions() {
+        new ArrayList<AbstractExpression>() {
+            void tryAdd(AbstractExpression... args) {
+                for (AbstractExpression e : args)
+                    if (e != null)
+                        add(e);
+            }
+            {
+                tryAdd(m_left, m_right);
+                if (m_args != null) {
+                    addAll(m_args);
+                }
+            }
+        }.forEach(AbstractExpression::normalizeExpressions);
+    }
 
     /**
      * Note that this expression is inherently non-deterministic. This may be

@@ -32,7 +32,7 @@ public abstract class AbstractValueExpression extends AbstractExpression {
     // This works on the assumption that it is only used to return final "leaf node" bindingLists that
     // are never updated "in place", but just get their contents dumped into a summary List that was created
     // inline and NOT initialized here.
-    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<AbstractExpression>();
+    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<>();
 
     public AbstractValueExpression() {
         // This is needed for serialization
@@ -51,6 +51,7 @@ public abstract class AbstractValueExpression extends AbstractExpression {
     // amounts to an equality test. If the values expressions are identical, the binding is trivially
     // possible, indicated by returning an empty list of binding requirements.
     // Otherwise, there is no binding possible, indicated by a null return.
+    // TODO: incorporate expression normalization
     @Override
     public List<AbstractExpression> bindingToIndexedExpression(AbstractExpression expr) {
         if (equals(expr)) {

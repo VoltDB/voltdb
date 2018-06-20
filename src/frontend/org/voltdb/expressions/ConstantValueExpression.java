@@ -28,6 +28,8 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTypeUtil;
 
+import java.util.Comparator;
+
 /**
  *
  */
@@ -43,6 +45,47 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
     public ConstantValueExpression() {
         super(ExpressionType.VALUE_CONSTANT);
+    }
+    public ConstantValueExpression(String value, VoltType type) {
+        super(ExpressionType.VALUE_CONSTANT);
+        m_value = value;
+        m_valueType = type;
+        m_isNull = false;
+        setValueSize(type.getLengthInBytesForFixedTypes());
+    }
+    public ConstantValueExpression(float val) {
+        this(Float.toString(val), VoltType.FLOAT);
+    }
+    public ConstantValueExpression(double val) {
+        this(Double.toString(val), VoltType.FLOAT);
+    }
+    public ConstantValueExpression(int val) {
+        this(Integer.toString(val), VoltType.INTEGER);
+    }
+
+    @Override
+    public int compareTo(AbstractExpression other) {
+        if (other instanceof ConstantValueExpression) {
+            return Comparator.comparing(ConstantValueExpression::getValue)
+                    .compare(this, (ConstantValueExpression) other);
+        } else if (other instanceof ParameterValueExpression) {
+            final ConstantValueExpression o = ((ParameterValueExpression) other).getOriginalValue();
+            return o == null ? 1 :
+                    Comparator.comparing(ConstantValueExpression::getValue).compare(this, o);
+        } else {
+            return super.compareTo(other);
+        }
+    }
+
+    @Override
+    public boolean equivalent(AbstractExpression other) {
+        if (other instanceof ConstantValueExpression) {
+            return equals(other);
+        } else if (other instanceof ParameterValueExpression) {
+            return equals(((ParameterValueExpression) other).getOriginalValue());
+        } else {
+            return false;
+        }
     }
 
     @Override

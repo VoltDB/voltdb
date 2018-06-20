@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -25,6 +26,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.planner.optimizer.ExpressionNormalizer;
 
 /**
  *
@@ -59,6 +61,44 @@ public class ParameterValueExpression extends AbstractValueExpression {
         setValueSize(expr.getValueSize());
         setInBytes(expr.getInBytes());
         m_correlatedExpr = expr;
+    }
+
+    public ParameterValueExpression(ConstantValueExpression expr) {
+        super(ExpressionType.VALUE_PARAMETER);
+        setOriginalValue(expr);
+    }
+
+    @Override
+    public void normalizeExpressions() {
+        super.normalizeExpressions();
+        if (m_correlatedExpr != null) {
+            m_correlatedExpr = ExpressionNormalizer.normalize(m_correlatedExpr);
+        }
+    }
+
+    @Override
+    public int compareTo(AbstractExpression other) {
+        if (other instanceof ParameterValueExpression) {
+            return Comparator
+                    .comparing(ParameterValueExpression::getOriginalValue, Comparator.nullsFirst(Comparator.naturalOrder()))
+                    .thenComparingInt(ParameterValueExpression::getParameterIndex)
+                    .compare(this, (ParameterValueExpression) other);
+        } else if (other instanceof ConstantValueExpression) {
+            return -other.compareTo(getOriginalValue());
+        } else {
+            return super.compareTo(other);
+        }
+    }
+
+    @Override
+    public boolean equivalent(AbstractExpression other) {
+        if (other instanceof ParameterValueExpression) {
+            return equals(other);
+        } else if (other instanceof ConstantValueExpression) {
+            return getOriginalValue() == null ? false : getOriginalValue().equivalent(other);
+        } else {
+            return false;
+        }
     }
 
     /**

@@ -53,6 +53,26 @@ public class OperatorExpression extends AbstractExpression {
     }
 
     @Override
+    public boolean equivalent(AbstractExpression other) {
+        if (getExpressionType().equals(other.getExpressionType())) {
+            if (needsRightExpression()) {
+                switch (getExpressionType()) {
+                    case OPERATOR_PLUS:
+                    case OPERATOR_MULTIPLY:
+                        return getLeft().equivalent(other.getLeft()) && getRight().equivalent(other.getRight()) ||
+                                getLeft().equivalent(other.getRight()) && getRight().equivalent(other.getLeft());
+                    default:
+                        return getLeft().equivalent(other.getLeft()) && getRight().equivalent(other.getRight());
+                }
+            } else {
+                return getLeft().equivalent(other.getLeft());
+            }
+        } else {
+            return false;
+        }
+    }
+
+    @Override
     public boolean needsRightExpression() {
         ExpressionType type = getExpressionType();
         //XXX Not sure how unary minus (and unary plus?) are handled (possibly via an implicit zero left argument?)
@@ -88,6 +108,7 @@ public class OperatorExpression extends AbstractExpression {
         m_valueType = cast_type;
         m_valueSize = cast_type.getLengthInBytesForFixedTypes();
     }
+
 
     @Override
     public void refineValueType(VoltType neededType, int neededSize)

@@ -19,6 +19,12 @@ package org.voltdb.expressions;
 
 import org.voltdb.types.ExpressionType;
 
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 /**
  * Represents a vector of expression trees.
  * Currently used for SQL IN lists (of values), and (column list) IN (SELECT ...)
@@ -27,6 +33,10 @@ public class VectorValueExpression extends AbstractExpression {
 
     public VectorValueExpression() {
         super(ExpressionType.VALUE_VECTOR);
+    }
+    public VectorValueExpression(List<AbstractExpression> args) {
+        this();
+        setArgs(args);
     }
 
     @Override
@@ -54,6 +64,34 @@ public class VectorValueExpression extends AbstractExpression {
     public void finalizeValueTypes() {
         // just make sure the children have valid types.
         finalizeChildValueTypes();
+    }
+
+    @Override
+    public boolean equivalent(AbstractExpression other) {
+        if (other instanceof VectorValueExpression) {
+            return getArgs() == null || other.getArgs() == null ? getArgs() == other.getArgs() :
+                    // convert all CVE to PVE then compare set equivalence
+                    getArgs().stream().map(e -> {
+                        if (e instanceof ConstantValueExpression) {
+                            return new ParameterValueExpression((ConstantValueExpression) e);
+                        } else {
+                            return e;
+                        }
+                    }).collect(Collectors.toSet()).equals(other.getArgs().stream().map(e -> {
+                        if (e instanceof ConstantValueExpression) {
+                            return new ParameterValueExpression((ConstantValueExpression) e);
+                        } else {
+                            return e;
+                        }
+                    }).collect(Collectors.toSet()));
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public int compareTo(AbstractExpression other) {
+        return equivalent(other) ? 0 : super.compareTo(other);
     }
 
     @Override

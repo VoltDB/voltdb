@@ -23,6 +23,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.planner.optimizer.ExpressionNormalizer;
 
 /**
  * This class represents an instance of a column in a parsed statement.
@@ -114,6 +115,12 @@ public class ParsedColInfo implements Cloneable {
        exp.setDifferentiator(diff);
        m_expression = exp;
        return this;
+    }
+
+    public void normalizeExpressions() {
+        if (m_expression != null) {
+            m_expression = ExpressionNormalizer.normalize(m_expression);
+        }
     }
 
     /** Construct a ParsedColInfo from Volt XML.

@@ -24,6 +24,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.SortDirectionType;
+import org.voltdb.planner.optimizer.ExpressionNormalizer;
 
 /**
  * We may may have several ways to access data in tables.  We
@@ -76,6 +77,24 @@ public class AccessPath {
     // if there is no index in this access path.
     //
     final List<AbstractExpression> m_finalExpressionOrder = new ArrayList<>();
+
+    public void normalizeExpressions() {
+        new ArrayList<List<AbstractExpression>>() {
+            void add(List<AbstractExpression>... args) {
+                for (List<AbstractExpression> arg : args) {
+                    add(arg);
+                }
+            }
+            {
+                add(initialExpr, indexExprs, endExprs, otherExprs, joinExprs, bindings,
+                        eliminatedPostExprs, m_finalExpressionOrder);
+            }
+        }.forEach(l -> {
+            for (int index = 0; index < l.size(); ++index) {
+                l.set(index, ExpressionNormalizer.normalize(l.get(index)));
+            }
+        });
+    }
 
     @Override
     public String toString() {

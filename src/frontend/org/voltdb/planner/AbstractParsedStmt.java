@@ -81,22 +81,22 @@ public abstract class AbstractParsedStmt {
     public String m_sql;
 
     // The initial value is a safety net for the case of parameter-less statements.
-    private TreeMap<Integer, ParameterValueExpression> m_paramsByIndex = new TreeMap<>();
+    private Map<Integer, ParameterValueExpression> m_paramsByIndex = new TreeMap<>();
 
-    protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<>();
+    protected Map<Long, ParameterValueExpression> m_paramsById = new HashMap<>();
 
     // The parameter expression from the correlated expressions. The key is the parameter index.
     // This map acts as intermediate storage for the parameter TVEs found while planning a subquery
     // until they can be distributed to the parent's subquery expression where they originated.
     public Map<Integer, AbstractExpression> m_parameterTveMap = new HashMap<>();
 
-    public ArrayList<Table> m_tableList = new ArrayList<>();
+    public List<Table> m_tableList = new ArrayList<>();
 
     private Table m_DDLIndexedTable = null;
 
-    public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<>();
+    public List<AbstractExpression> m_noTableSelectionList = new ArrayList<>();
 
-    protected ArrayList<AbstractExpression> m_aggregationList = null;
+    protected List<AbstractExpression> m_aggregationList = null;
 
     // Hierarchical join representation
     public JoinNode m_joinTree = null;
@@ -104,11 +104,11 @@ public abstract class AbstractParsedStmt {
     // User specified join order, null if none is specified
     public String m_joinOrder = null;
 
-    protected final HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<>();
+    protected final Map<String, StmtTableScan> m_tableAliasMap = new HashMap<>();
 
     // This list is used to identify the order of the table aliases returned by
     // the parser for possible use as a default join order.
-    protected ArrayList<String> m_tableAliasListAsJoinOrder = new ArrayList<>();
+    protected List<String> m_tableAliasListAsJoinOrder = new ArrayList<>();
 
     protected String[] m_paramValues;
     public final Database m_db;
@@ -120,7 +120,7 @@ public abstract class AbstractParsedStmt {
     // mark whether the statement's parent is UNION clause or not
     private boolean m_isChildOfUnion = false;
 
-    protected static final Collection<String> m_nullUDFNameList = new ArrayList<>();
+    protected static final List<String> m_nullUDFNameList = new ArrayList<>();
 
     private static final String INSERT_NODE_NAME = "insert";
     private static final String UPDATE_NODE_NAME = "update";
@@ -138,6 +138,16 @@ public abstract class AbstractParsedStmt {
         m_parentStmt = parent;
         m_paramValues = paramValues;
         m_db = db;
+    }
+
+    public void normalizeExpressions() {        // TODO
+        m_paramsByIndex.values().forEach(ParameterValueExpression::normalizeExpressions);
+        m_paramsByIndex.values().forEach(ParameterValueExpression::normalizeExpressions);
+        if (m_aggregationList != null) {
+            m_aggregationList.forEach(AbstractExpression::normalizeExpressions);
+        }
+        m_noTableSelectionList.forEach(AbstractExpression::normalizeExpressions);
+        // do not change m_parentStmt
     }
 
     public void setDDLIndexedTable(Table tbl) {
@@ -2399,11 +2409,11 @@ public abstract class AbstractParsedStmt {
         return answer;
     }
 
-    public TreeMap<Integer, ParameterValueExpression> getParamsByIndex() {
+    public Map<Integer, ParameterValueExpression> getParamsByIndex() {
         return m_paramsByIndex;
     }
 
-    public void setParamsByIndex(TreeMap<Integer, ParameterValueExpression> paramsByIndex) {
+    public void setParamsByIndex(Map<Integer, ParameterValueExpression> paramsByIndex) {
         m_paramsByIndex = paramsByIndex;
     }
 

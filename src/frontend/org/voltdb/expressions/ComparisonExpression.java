@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -74,6 +75,21 @@ public class ComparisonExpression extends AbstractExpression {
             return m_quantifier.equals(((ComparisonExpression)obj).m_quantifier);
         }
         return false;
+    }
+
+    @Override
+    public boolean equivalent(AbstractExpression other) {
+        final ExpressionType op1 = getExpressionType(), op2 = other.getExpressionType();
+        if (other instanceof ComparisonExpression) {
+            final ComparisonExpression o = (ComparisonExpression) other;
+            return reverses.containsKey(op1) && reverses.containsKey(op2) &&
+                    getQuantifier().equals(o.getQuantifier()) &&
+                    (op1.equals(op2) && getLeft().equivalent(other.getLeft()) && getRight().equivalent(other.getRight()) ||
+                            (reverses.get(op1).equals(op2) && getLeft().equivalent(other.getRight()) &&
+                                    getRight().equivalent(other.getLeft())));
+        } else {
+            return false;
+        }
     }
 
     @Override

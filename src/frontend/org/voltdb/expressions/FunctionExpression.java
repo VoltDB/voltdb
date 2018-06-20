@@ -25,6 +25,9 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.types.ExpressionType;
 
+import java.util.Comparator;
+import java.util.stream.IntStream;
+
 public class FunctionExpression extends AbstractExpression {
     private enum Members {
         NAME,
@@ -97,6 +100,14 @@ public class FunctionExpression extends AbstractExpression {
         m_name = name;
         m_impliedArgument = impliedArgument;
         m_functionId = id;
+    }
+
+    public boolean equivalent(AbstractExpression other) {
+        return other instanceof FunctionExpression &&
+                0 == Comparator.comparingInt(FunctionExpression::getFunctionId)
+                        .thenComparing(FunctionExpression::getFunctionName)
+                        .thenComparing(AbstractExpression::getArgs, getArgComparator())
+                        .compare(this, (FunctionExpression) other);
     }
 
     public boolean hasFunctionId(int functionId) { return m_functionId == functionId; }
@@ -378,6 +389,9 @@ public class FunctionExpression extends AbstractExpression {
      */
     public boolean isUserDefined() {
         return FunctionForVoltDB.isUserDefinedFunctionId(m_functionId);
+    }
+    public int getFunctionId() {
+        return m_functionId;
     }
 
     /**
