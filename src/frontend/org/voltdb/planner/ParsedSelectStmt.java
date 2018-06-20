@@ -1474,7 +1474,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_having == null &&
                 m_groupByColumns.isEmpty() &&
                 ! hasLimitOrOffsetParameters() &&
-                performsAggregation()) {
+                displaysAgg()) {
             if (m_limitOffset.getOffset() == 0) {
                 return ConstantValueExpression.getTrue();
             }
@@ -2227,7 +2227,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean hasAOneRowResult() {
-        if ( ( ! isGrouped() ) && performsAggregation()) {
+        if ( ( ! isGrouped() ) && displaysAgg()) {
             return true;
         }
         return producesOneRowOutput();
@@ -2242,22 +2242,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
-    private boolean performsAggregation() {
+    private boolean displaysAgg() {
         for (ParsedColInfo displayCol : m_displayColumns) {
             if (displayCol.expression.hasAnySubexpressionOfClass(
                     AggregateExpression.class)) {
                 return true;
             }
         }
-
-        for (ParsedColInfo orderCol : m_orderColumns) {
-            if (orderCol.expression.hasAnySubexpressionOfClass(
-                    AggregateExpression.class)) {
-                return true;
-            }
-        }
-
-
         return false;
     }
 
