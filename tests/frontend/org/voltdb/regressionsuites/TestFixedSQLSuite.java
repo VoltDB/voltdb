@@ -3151,7 +3151,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // This query is not valid.  The query does ungrouped aggregation, but has a
         // raw column reference in the OB clause.  However, because we can optimize away
-        // the ORDER BY clause, we allow this.  (HSQL does not catch the error)
+        // the ORDER BY clause, we allow this.
+        // (HSQL does not catch the error... this is ENG-14177.)
         sql =  "SELECT MIN(VCHAR_INLINE) FROM ENG_13852_R11 AS T1 ORDER BY COUNT(*), T1.BIG;";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][] {{null}}, vt);
