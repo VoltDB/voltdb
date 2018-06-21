@@ -1269,8 +1269,8 @@ public class SnapshotUtil {
             }
             // If the table is a view and it shouldn't be included into the snapshot, skip.
             if (table.getMaterializer() != null
-                    && ! CatalogUtil.isSnapshottedStreamedTableView(database, table)
-                    && ! CatalogUtil.isSnapshottedPersistentTableView(database, table)) {
+                    && ! CatalogUtil.isSnapshotableStreamedTableView(database, table)
+                    && ! CatalogUtil.isSnapshotablePersistentTableView(database, table)) {
                 continue;
             }
             my_tables.add(table);

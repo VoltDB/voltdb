@@ -388,8 +388,8 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     return newVal;
 }
 
-void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTuple,
-        bool fallible) {
+void MaterializedViewTriggerForWrite::processTupleDelete(
+        const TableTuple &oldTuple, bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (failsPredicate(oldTuple)) {
         return;

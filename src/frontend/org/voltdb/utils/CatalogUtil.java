@@ -378,7 +378,7 @@ public abstract class CatalogUtil {
      * @param table The table to test.</br>
      * @return If the table is a persistent table view that should be snapshotted.
      */
-    public static boolean isSnapshottedPersistentTableView(Database db, Table table) {
+    public static boolean isSnapshotablePersistentTableView(Database db, Table table) {
         Table materializer = table.getMaterializer();
         if (materializer == null) {
             // Return false if it is not a materialized view.
@@ -404,7 +404,7 @@ public abstract class CatalogUtil {
      * @param table The table to test.</br>
      * @return If the table is a streamed table view that should be snapshotted.
      */
-    public static boolean isSnapshottedStreamedTableView(Database db, Table table) {
+    public static boolean isSnapshotableStreamedTableView(Database db, Table table) {
         Table materializer = table.getMaterializer();
         if (materializer == null) {
             // Return false if it is not a materialized view.
@@ -2629,14 +2629,14 @@ public abstract class CatalogUtil {
                 continue;
             }
             if (table.getMaterializer() != null) {
-                if (isSnapshottedPersistentTableView(catalog, table)) {
+                if (isSnapshotablePersistentTableView(catalog, table)) {
                     // Some persistent table views are added to the snapshot starting from
                     // V8.2, they are since then considered as "normal" tables, too.
                     // But their presence in the snapshot is not compulsory for backward
                     // compatibility reasons.
                     optionalTableNames.add(table.getTypeName());
                 }
-                else if (! isSnapshottedStreamedTableView(catalog, table)) {
+                else if (! isSnapshotableStreamedTableView(catalog, table)) {
                     continue;
                 }
             }

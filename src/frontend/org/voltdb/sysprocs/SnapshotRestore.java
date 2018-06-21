@@ -2060,7 +2060,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Set<Table> tables_to_restore = new HashSet<Table>();
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
-                if (CatalogUtil.isSnapshottedPersistentTableView(m_database, table)) {
+                if (CatalogUtil.isSnapshotablePersistentTableView(m_database, table)) {
                     // If the table is a snapshotted persistent table view, we will try to
                     // temporarily disable its maintenance job to boost restore performance.
                     commaSeparatedViewNamesToDisable.append(table.getTypeName()).append(",");

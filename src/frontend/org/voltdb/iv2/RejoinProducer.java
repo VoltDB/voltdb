@@ -281,7 +281,7 @@ public class RejoinProducer extends JoinProducerBase {
             StringBuilder commaSeparatedViewNames = new StringBuilder();
             Database db = VoltDB.instance().getCatalogContext().database;
             for (Table table : VoltDB.instance().getCatalogContext().tables) {
-                if (CatalogUtil.isSnapshottedPersistentTableView(db, table)) {
+                if (CatalogUtil.isSnapshotablePersistentTableView(db, table)) {
                     // If the table is a snapshotted persistent table view, we will try to
                     // temporarily disable its maintenance job to boost restore performance.
                     commaSeparatedViewNames.append(table.getTypeName()).append(",");
