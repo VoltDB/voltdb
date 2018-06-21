@@ -12,6 +12,9 @@ Several SQL features in VoltDB are demonstrated in this application, including:
   - VIEW group by expressions
   - [TRUNCATE](http://voltdb.com/docs/UsingVoltDB/sqlfunctruncate.php) Timestamp function
   - [DECODE](http://voltdb.com/docs/UsingVoltDB/sqlfuncdecode.php) function
+  - TTL processing for data expiration
+
+Time to Live (TTL) helps the application operate on a constant stream of incoming events by setting an expiration timestamp to automatically delete old data. Call [@Statistics TABLE](https://docs.voltdb.com/v7docs/UsingVoltDB/sysprocstatistics.php#sysprocstattable) for aggregation statistics to watch the deletion of data on the "event_data" table beginning after the default TTL = 1 minute.
 
 Quickstart
 ---------------------------
@@ -73,12 +76,12 @@ You can control various characteristics of the demo by modifying the parameters 
 
 **Parameters Affecting Simulation:**
 
-    --sites=100                   (number of web sites where ad events may occur)
-    --pagespersite=10             (number of pages per web site)
-    --advertisers=100             (number of advertisers)
+    --sites=200                   (number of web sites where ad events may occur)
+    --pagespersite=20             (number of pages per web site)
+    --advertisers=40              (number of advertisers)
     --campaignsperadvertiser=10   (number of campaigns per advertiser)
-    --creativespercampaign=5      (number of creatives or banners per campaign)
+    --creativespercampaign=10     (number of creatives or banners per campaign)
 
 Customizing this Example
 ---------------------------
-See the "deployment-examples" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
+See the "HOWTOs" directory within the "examples" directory for ways to alter the default single-node, no authorization deployment style of the examples. There are readme files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
