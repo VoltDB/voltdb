@@ -1131,7 +1131,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // This can happen when there is an aggregate function used in an ORDER BY clause
             // that is not also on the SELECT list.  Neither VoltDB nor HSQL is good at handling
             // these kinds of queries, and havoc can result.  See ENG-13929, and ENG-14177.
-            throw new PlanningErrorException("Aggregate functions in ORDER BY clause are not allowed " +
+            throw new PlanningErrorException("Aggregate functions in the ORDER BY clause are not allowed " +
                     "if they do not also appear in the SELECT list");
         }
 
