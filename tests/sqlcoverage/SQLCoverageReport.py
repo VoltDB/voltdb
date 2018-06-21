@@ -68,25 +68,27 @@ ReproduceStatementTypes[Reproduce.ALL]  = ['']    # any statement, including SEL
 FatalExceptionTypes = ['NullPointerException',
                        'IndexOutOfBoundsException',
                        'AssertionError',
-                       'ClassCastException',
-                       'SAXParseException',
-                       'VoltTypeException',
-                       'ClassCastException',
-                       'VOLTDB ERROR: UNEXPECTED FAILURE',
                        'unexpected internal error occurred',
-                       'Please contact VoltDB at support@voltdb.com'
+                       'Please contact VoltDB at support'
                        ]
-NonfatalExceptionTypes = ['ERROR: IN: NodeSchema',
-                          'is already defined',
-                          'is not defined',
-                          'Could not parse reader',
-                          'unexpected token: EXEC',
-                          'Failed to plan for statement',
-                          'Resource limit exceeded',
-                          "Attribute 'enabled' is not allowed to appear in element 'export'",
-                          'PartitionInfo specifies invalid parameter index for procedure',
-                          'Unexpected error in the SQL parser for statement'
+# These are experimental; we have yet to see any of them
+NonfatalExceptionTypes = ['ClassCastException',
+                          'SAXParseException',
+                          'VoltTypeException',
+                          'ERROR: IN: NodeSchema'
                           ]
+# Rejected idea (happens frequently in advanced-scalar-set-subquery):
+#                        'VOLTDB ERROR: UNEXPECTED FAILURE',
+# More rejected ideas (for now):
+#                           'is already defined',
+#                           'is not defined',
+#                           'Could not parse reader',
+#                           'unexpected token: EXEC',
+#                           'Failed to plan for statement',
+#                           'Resource limit exceeded',
+#                           "Attribute 'enabled' is not allowed to appear in element 'export'",
+#                           'PartitionInfo specifies invalid parameter index for procedure',
+#                           'Unexpected error in the SQL parser for statement'
 AllExceptionTypes = []
 AllExceptionTypes.extend(FatalExceptionTypes)
 AllExceptionTypes.extend(NonfatalExceptionTypes)
