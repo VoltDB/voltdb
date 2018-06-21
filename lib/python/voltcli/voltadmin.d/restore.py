@@ -22,6 +22,12 @@ import urllib
     options = (
         # Hidden option to restore the hashinator in addition to the tables.
         VOLT.BooleanOption('-S', '--hashinator', 'hashinator', None, default = False),
+        VOLT.StringListOption(None, '--tables', 'tables',
+                              'tables to include in the snapshot',
+                              default = None),
+        VOLT.StringListOption(None, '--skiptables', 'skip_tables',
+                              'tables to skip in the snapshot',
+                              default = None)
     ),
     arguments = (
         VOLT.PathArgument('directory', 'the snapshot server directory', absolute = True),
