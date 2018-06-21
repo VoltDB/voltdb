@@ -22,6 +22,12 @@ import urllib
     options = (
         # Hidden option to restore the hashinator in addition to the tables.
         VOLT.BooleanOption('-S', '--hashinator', 'hashinator', None, default = False),
+        VOLT.StringListOption(None, '--tables', 'tables',
+                              'tables to include in the snapshot',
+                              default = None),
+        VOLT.StringListOption(None, '--skiptables', 'skip_tables',
+                              'tables to skip in the snapshot',
+                              default = None)
     ),
     arguments = (
         VOLT.PathArgument('directory', 'the snapshot server directory', absolute = True),
@@ -30,11 +36,18 @@ import urllib
 )
 def restore(runner):
     nonce = runner.opts.nonce.replace('"', '\\"')
+    if runner.opts.tables and runner.opts.skip_tables:
+        print 'Cannot specify both --tables and --skiptables.'
+        return
     if runner.opts.hashinator:
         hashinator = 'true'
     else:
         hashinator = 'false'
     json_opts = ['{path:"%s",nonce:"%s",hashinator:"%s"}' % (runner.opts.directory, nonce, hashinator)]
+    if runner.opts.tables:
+        raw_json_opts.append('tables:%s' % (runner.opts.tables))
+    if runner.opts.skip_tables:
+        raw_json_opts.append('skiptables:%s' % (runner.opts.skip_tables))
     runner.verbose_info('@SnapshotRestore "%s"' % json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
     print 'voltadmin: Snapshot restore has been started. Check the server logs for ongoing status of the restore operation.'

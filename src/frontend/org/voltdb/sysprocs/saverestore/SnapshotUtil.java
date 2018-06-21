@@ -107,6 +107,8 @@ public class SnapshotUtil {
     public static final String JSON_SERVICE = "service";
     public static final String JSON_PARTITION_COUNT = "partitionCount";
     public static final String JSON_NEW_PARTITION_COUNT = "newPartitionCount";
+    public static final String JSON_TABLES = "tables";
+    public static final String JSON_SKIPTABLES = "skiptables";
     /**
      * milestone used to mark a shutdown save snapshot
      */

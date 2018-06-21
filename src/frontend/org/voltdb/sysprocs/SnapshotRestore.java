@@ -1126,6 +1126,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         JSONObject jsObj = new JSONObject(json);
         String path = jsObj.getString(SnapshotUtil.JSON_PATH);
         String pathType = jsObj.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.toString());
+        String tablesStr = jsObj.optString(SnapshotUtil.JSON_TABLES);
+        String skiptablesStr = jsObj.optString(SnapshotUtil.JSON_SKIPTABLES);
         final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
         final String dupsPath = jsObj.optString(SnapshotUtil.JSON_DUPLICATES_PATH, null);
         final boolean useHashinatorData = jsObj.optBoolean(SnapshotUtil.JSON_HASHINATOR);
@@ -1374,7 +1376,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             }
         }
 
-        results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot(), isRecover);
+        results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot(), isRecover, tablesStr, skiptablesStr);
 
         final long endTime = System.currentTimeMillis();
         final double duration = (endTime - startTime) / 1000.0;
@@ -2056,8 +2058,28 @@ public class SnapshotRestore extends VoltSystemProcedure {
     }
 
     private Set<Table> getTablesToRestore(Set<String> savedTableNames,
-                                          StringBuilder commaSeparatedViewNamesToDisable) {
+                                          StringBuilder commaSeparatedViewNamesToDisable,
+                                          String include,
+                                          String exclude,
+                                          int filter) {
         Set<Table> tables_to_restore = new HashSet<Table>();
+
+        if(filter == 1) {
+            List<String> toInclude = Arrays.asList(include.split(","));
+            Set<String> newSet = new HashSet<>();
+            for(String s : toInclude) {
+                newSet.add(s);
+            }
+            savedTableNames = newSet;
+        } else if(filter == -1) {
+            List<String> toExclude = Arrays.asList(exclude.split(","));
+            for (String s : toExclude) {
+                if(savedTableNames.contains(s)) {
+                    savedTableNames.remove(s);
+                }
+            }
+        }
+
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
                 if (CatalogUtil.isSnapshotablePersistentTableView(m_database, table)) {
@@ -2125,12 +2147,23 @@ public class SnapshotRestore extends VoltSystemProcedure {
     private VoltTable[] performTableRestoreWork(
             final ClusterSaveFileState savefileState,
             final SiteTracker st,
-            final boolean isRecover) throws Exception
+            final boolean isRecover,
+            String include,
+            String exclude) throws Exception
     {
         /*
          * Create a mailbox to use to send fragment work to execution sites
          */
         final Mailbox m = VoltDB.instance().getHostMessenger().createMailbox();
+        //1 for "tables", -1 for "skiptables", 0 for no filter.
+        int filterType;
+        if (!include.equals("")) {
+            filterType = 1;
+        } else if (!exclude.equals("")) {
+            filterType = -1;
+        } else {
+            filterType = 0;
+        }
 
         /*
          * Create a separate thread to do the work of coordinating the restore
@@ -2198,7 +2231,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  */
                 StringBuilder commaSeparatedViewNamesToDisable = new StringBuilder();
                 Set<Table> tables_to_restore =
-                        getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable);
+                        getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable, include, exclude, filterType);
                 VoltTable[] restore_results = new VoltTable[1];
                 restore_results[0] = constructResultsTable();
                 ArrayList<SynthesizedPlanFragment[]> restorePlans =
