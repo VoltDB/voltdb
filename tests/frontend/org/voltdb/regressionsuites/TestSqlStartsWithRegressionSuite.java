@@ -33,9 +33,71 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.aggregates.Insert;
 
-import junit.framework.TestCase;
+/**
+ * System tests for basic STARTS WITH functionality
+ */
+public class TestSqlStartsWithRegressionSuite extends RegressionSuite {
 
-final class TestStartsWithQueries extends TestCase {
+    /** Procedures used by this suite */
+    static final Class<?>[] PROCEDURES = { Insert.class };
+
+    static final int ROWS = 10;
+
+    public void testStartsWith() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        StartsWithSuite tests = new StartsWithSuite(client);
+//        TestStartsWithQueries.StartsWithSuite tests = new TestStartsWithQueries.StartsWithSuite(client);
+        tests.doTests(client, true);
+        tests.doTests(client, false);
+    }
+
+    //
+    // JUnit / RegressionSuite boilerplate
+    //
+    public TestSqlStartsWithRegressionSuite(String name) {
+        super(name);
+    }
+
+    static public junit.framework.Test suite() {
+
+        VoltServerConfig config = null;
+        MultiConfigSuiteBuilder builder =
+            new MultiConfigSuiteBuilder(TestSqlStartsWithRegressionSuite.class);
+
+        VoltProjectBuilder project = new VoltProjectBuilder();
+
+        final String schema =
+                "create table STRINGS (" +
+                "ID int default 0 not null, " +
+                "VAL varchar(32) default null," +
+                "PAT varchar(32) default null," +
+                "PRIMARY KEY(ID));";
+
+        try {
+            project.addLiteralSchema(schema);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        project.addPartitionInfo("STRINGS", "ID");
+        project.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);");
+        project.addStmtProcedure("SelectStartsWith", "select * from strings where val starts with ?;");
+        project.addStmtProcedure("NotStartsWith", "select * from strings where val not starts with ?;");
+
+        config = new LocalCluster("sqllike-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
+
+        config = new LocalCluster("sqllike-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
+
+        config = new LocalCluster("sqllike-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
+
+        return builder;
+    }
 
     static class StartsWithTest
     {
@@ -84,13 +146,6 @@ final class TestStartsWithQueries extends TestCase {
             this.pat = pat;
         }
     }
-
-    public static final String schema =
-            "create table STRINGS (" +
-            "ID int default 0 not null, " +
-            "VAL varchar(32) default null," +
-            "PAT varchar(32) default null," +
-            "PRIMARY KEY(ID));";
 
     static final StartsWithTestData[] rowData = {
             new StartsWithTestData("aaaaaaa", "aaa"),
@@ -211,64 +266,5 @@ final class TestStartsWithQueries extends TestCase {
                 System.out.println("(This failure was expected)");
             }
         }
-    }
-
-}
-
-/**
- * System tests for basic STARTS WITH functionality
- */
-public class TestSqlStartsWithRegressionSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
-
-    static final int ROWS = 10;
-
-    public void testStartsWith() throws IOException, ProcCallException
-    {
-        Client client = getClient();
-        TestStartsWithQueries.StartsWithSuite tests = new TestStartsWithQueries.StartsWithSuite(client);
-        tests.doTests(client, true);
-        tests.doTests(client, false);
-    }
-
-    //
-    // JUnit / RegressionSuite boilerplate
-    //
-    public TestSqlStartsWithRegressionSuite(String name) {
-        super(name);
-    }
-
-    static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSqlStartsWithRegressionSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        try {
-            project.addLiteralSchema(TestStartsWithQueries.schema);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        project.addPartitionInfo("STRINGS", "ID");
-        project.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);");
-        project.addStmtProcedure("SelectStartsWith", "select * from strings where val starts with ?;");
-        project.addStmtProcedure("NotStartsWith", "select * from strings where val not starts with ?;");
-
-        config = new LocalCluster("sqllike-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqllike-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqllike-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
-
-        return builder;
     }
 }
