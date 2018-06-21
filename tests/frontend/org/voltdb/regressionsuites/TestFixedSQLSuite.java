@@ -3134,7 +3134,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         Client client = getClient();
         String sql;
         VoltTable vt;
-        final String vdbPlannerError = "Aggregate functions in ORDER BY clause are not allowed " +
+        final String vdbPlannerError = "Aggregate functions in the ORDER BY clause are not allowed " +
                 "if they do not also appear in the SELECT list";
         final String hsqlPlannerError = "invalid ORDER BY expression";
 
