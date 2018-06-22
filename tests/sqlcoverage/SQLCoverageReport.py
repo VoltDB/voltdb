@@ -71,7 +71,7 @@ FatalExceptionTypes = ['NullPointerException',
                        'unexpected internal error occurred',
                        'Please contact VoltDB at support'
                        ]
-# These are experimental; we have yet to see any of them
+# These are experimental; we have yet to see any of them:
 NonfatalExceptionTypes = ['ClassCastException',
                           'SAXParseException',
                           'VoltTypeException',
@@ -450,10 +450,13 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     crashed = []
     volt_fatal_excep = []
     volt_nonfatal_excep = []
-    cmpdb_excep  = []
+    cmpdb_excep = []
     invalid     = []
     all_results = []
     reproduce_results = []
+    volt_fatal_excep_types    = set([])
+    volt_nonfatal_excep_types = set([])
+    cmpdb_excep_types         = set([])
 
     while True:
         try:
@@ -505,14 +508,17 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
             if reproducer:
                 statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
             volt_fatal_excep.append(statement)
+            [volt_fatal_excep_types.add(et) if et in str(jni) else None for et in FatalExceptionTypes]
         if any(exceptionType in str(jni) for exceptionType in NonfatalExceptionTypes):
             if reproducer:
                 statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
             volt_nonfatal_excep.append(statement)
+            [volt_nonfatal_excep_types.add(et) if et in str(jni) else None for et in NonfatalExceptionTypes]
         if any(exceptionType in str(cdb) for exceptionType in AllExceptionTypes):
             if reproducer:
                 statement["reproducer"] = get_reproducer(reproduce_results, statement["SQL"])
             cmpdb_excep.append(statement)
+            [cmpdb_excep_types.add(et) if et in str(cdb) else None for et in AllExceptionTypes]
 
         if report_all:
             all_results.append(statement)
@@ -520,6 +526,17 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     statements_file.close()
     cmpdb_file.close()
     jni_file.close()
+
+    # Print the Exception/Error types that were found, if any
+    if cmpdb_excep_types:
+        print "All Exception/Error types found in %s, for test suite '%s':" % (cmpdb, suite)
+        print '\n'.join(['    %s' % et for et in cmpdb_excep_types])
+    if volt_nonfatal_excep_types:
+        print "'Non-fatal' Exception/Error types found in VoltDB, for test suite '%s':" % suite
+        print '\n'.join(['    %s' % et for et in volt_nonfatal_excep_types])
+    if volt_fatal_excep_types:
+        print "'Fatal' Exception/Error types found in VoltDB, for test suite '%s':" % suite
+        print '\n'.join(['    %s' % et for et in volt_fatal_excep_types])
 
     if modified_sql_file:
         try:
