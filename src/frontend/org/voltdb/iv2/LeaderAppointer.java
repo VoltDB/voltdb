@@ -260,11 +260,14 @@ public class LeaderAppointer implements Promotable
                     masterHostId = -1;
                 }
             } else {
-                //node down
+                // promote new partition leader when nodes are down
                 masterHostId = newLeaderHostId;
                 tmLog.debug("[assignLeader]moving leader of partition " + m_partitionId + " to host " + newLeaderHostId + " ["
                         + CoreUtils.hsIdCollectionToString(children) + "]");
                 newLeaderHostId = -1;
+
+                // register this partition so rejoining has to wait before the new leader is fully promoted.
+                VoltZK.registerPromotingPartition(m_zk, partitionId, tmLog);
             }
 
             long masterHSId = children.get(0);
@@ -527,7 +530,9 @@ public class LeaderAppointer implements Promotable
             }
             m_removedPartitionsAtPromotionTime = null;
             // just go ahead and promote our MPI
+            VoltZK.registerPromotingPartition(m_zk, MpInitiator.MP_INIT_PID, tmLog);
             m_MPI.acceptPromotion();
+            VoltZK.unregisterPromotingPartition(m_zk, MpInitiator.MP_INIT_PID, tmLog);
             // set up a watcher on the partitions dir so that new partitions will be picked up
             m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
             blocker.set(null);
