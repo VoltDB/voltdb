@@ -2325,7 +2325,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             @Override
             public void clientCallback(ClientResponse resp) throws Exception {
                 if (resp.getStatus() != ClientResponse.SUCCESS) {
-                    hostLog.warn(String.format("Fail to execute TTL on table:%s, column:%s, status:%",
+                    hostLog.warn(String.format("Fail to execute TTL on table:%s, column:%s, status:s%",
                             tableName, columnName, resp.getStatusString()));
                 }
                 VoltTable t = resp.getResults()[0];
