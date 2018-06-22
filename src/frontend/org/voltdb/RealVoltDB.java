@@ -1153,6 +1153,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
+            if (m_rejoining) {
+                // check if any partition leader promotions are in progress upon node failures.
+                // avoid rejoining while partition leader promotions and transaction repairs are not done
+                VoltZK.checkPartitionLeaderPromotion(m_messenger.getZK());
+            }
+
             /*
              * Construct all the mailboxes for things that need to be globally addressable so they can be published
              * in one atomic shot.
