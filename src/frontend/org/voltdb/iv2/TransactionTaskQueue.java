@@ -31,7 +31,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.CompleteTransactionResponseMessage;
 
 public class TransactionTaskQueue
 {
@@ -46,7 +45,6 @@ public class TransactionTaskQueue
     private static class RelativeSiteOffset {
         private SiteTaskerQueue[] m_stashedMpQueues;
         private Scoreboard[] m_stashedMpScoreboards;
-        private TransactionTaskQueue[] m_txnTaskQueues;
         private int m_lowestSiteId = Integer.MIN_VALUE;
         private int m_siteCount = 0;
         private Mailbox[] m_mailBoxes;
@@ -55,22 +53,19 @@ public class TransactionTaskQueue
             m_stashedMpScoreboards = null;
             m_lowestSiteId = firstSiteId;
             m_siteCount = siteCount;
-            m_txnTaskQueues = null;
         }
 
-        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox, TransactionTaskQueue taskQueue) {
+        void initializeScoreboard(int siteId, SiteTaskerQueue queue, Scoreboard scoreboard, Mailbox mailBox) {
             assert(m_lowestSiteId != Integer.MIN_VALUE);
             assert(siteId >= m_lowestSiteId && siteId-m_lowestSiteId < m_siteCount);
             if (m_stashedMpQueues == null) {
                 m_stashedMpQueues = new SiteTaskerQueue[m_siteCount];
                 m_stashedMpScoreboards = new Scoreboard[m_siteCount];
                 m_mailBoxes = new Mailbox[m_siteCount];
-                m_txnTaskQueues = new TransactionTaskQueue[m_siteCount];
             }
             m_stashedMpQueues[siteId-m_lowestSiteId] = queue;
             m_stashedMpScoreboards[siteId-m_lowestSiteId] = scoreboard;
             m_mailBoxes[siteId-m_lowestSiteId] = mailBox;
-            m_txnTaskQueues[siteId-m_lowestSiteId] = taskQueue;
         }
 
         // All sites receives FragmentTask messages, time to fire the task.
@@ -94,9 +89,8 @@ public class TransactionTaskQueue
         // If there are enough completeTransactionTask messages to fire another round of release, return false, otherwise true.
         boolean releaseStashedCompleteTxns(boolean missingTxn, long txnId)
         {
-            boolean missingTask = missingTxn ? true : hasMissingTxn(txnId);
             if (hostLog.isDebugEnabled()) {
-                if (missingTask) {
+                if (missingTxn) {
                     hostLog.debug("skipped incomplete rollback transaction message:" + TxnEgo.txnIdToString(txnId));
                 } else {
                     hostLog.debug("release stashed complete transaction message:" + TxnEgo.txnIdToString(txnId));
@@ -105,30 +99,16 @@ public class TransactionTaskQueue
             int tasksAtTail = 0;
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
                 // only release completions at head of queue
-                CompleteTransactionTask completion = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst().getFirst();
-                if (missingTask) {
-                    //flush the backlog to avoid no task is pushed to site queue
-                    if (completion.isAbortDuringRepair()) {
-                        if (hostLog.isDebugEnabled()) {
-                            hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(txnId));
-                        }
-                        // Mark the transaction state as DONE
-                        // Transaction state could be null when a CompleteTransactionTask is added to scorecboard.
-                        if (completion.m_txnState != null) {
-                            completion.m_txnState.setDone();
-                        }
-                        // Flush us out of the head of the TransactionTaskQueue.
-                        m_txnTaskQueues[ii].flush(txnId);
+                Pair<CompleteTransactionTask, Boolean> task = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst();
+                CompleteTransactionTask completion = task.getFirst();
+                if (missingTxn) {
+                    completion.setFragmentNotExecuted();
+                    if (!task.getSecond()) {
+                        completion.setRepairCompletionMatched();
                     }
-                    //Some sites may have processed CompleteTransactionResponseMessage, re-deliver this message to all sites and clear
-                    //up the site outstanding transaction queue and duplicate counter
-                    final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(completion.getCompleteMessage());
-                    resp.m_sourceHSId = m_mailBoxes[ii].getHSId();
-                    m_mailBoxes[ii].deliver(resp);
-                } else {
-                    Iv2Trace.logSiteTaskerQueueOffer(completion);
-                    m_stashedMpQueues[ii].offer(completion);
                 }
+                Iv2Trace.logSiteTaskerQueueOffer(completion);
+                m_stashedMpQueues[ii].offer(completion);
                 Pair<CompleteTransactionTask, Boolean> tail = m_stashedMpScoreboards[ii].getCompletionTasks().pollLast();
                 if (tail != null) {
                     m_stashedMpScoreboards[ii].getCompletionTasks().addFirst(tail);
@@ -151,15 +131,6 @@ public class TransactionTaskQueue
             for (int ii = 0; ii < m_siteCount; ii++) {
                 builder.append("\nQueue " + m_stashedMpQueues[ii].getPartitionId() + ":" + m_stashedMpScoreboards[ii]);
             }
-        }
-
-        boolean hasMissingTxn(long txnId) {
-            for (int ii = m_siteCount-1; ii >= 0; ii--) {
-                if (m_stashedMpScoreboards[ii].isTransactionMissing(txnId)) {
-                    return true;
-                }
-            }
-            return false;
         }
     }
 
@@ -192,7 +163,7 @@ public class TransactionTaskQueue
 
 
     // We start joining nodes with scoreboard disabled
-    // After all sites has been fully initilized and ready for snapshot, we should enable the scoreboard.
+    // After all sites has been fully initialized and ready for snapshot, we should enable the scoreboard.
     boolean enableScoreboard() {
         assert (s_barrier != null);
         try {
@@ -223,7 +194,7 @@ public class TransactionTaskQueue
     void initializeScoreboard(int siteId, Mailbox mailBox) {
         synchronized (s_lock) {
             if (m_taskQueue.getPartitionId() != MpInitiator.MP_INIT_PID) {
-                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox, this);
+                s_stashedMpWrites.initializeScoreboard(siteId, m_taskQueue, m_scoreboard, mailBox);
             }
         }
     }
@@ -367,11 +338,14 @@ public class TransactionTaskQueue
 
             while (!done) {
                 int completionScore = 0;
+                boolean missingTxn = false;
                 for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
                     if (!sb.getCompletionTasks().isEmpty()) {
                         if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
                             break;
-                        }                    // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
+                        }
+                        missingTxn |= sb.getCompletionTasks().peekFirst().getSecond();
+                        // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                         // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                         // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
                         completionScore++;
@@ -385,7 +359,7 @@ public class TransactionTaskQueue
                     hostLog.debug(sb.toString());
                 }
                 if (completionScore == s_stashedMpWrites.getSiteCount()) {
-                    done = s_stashedMpWrites.releaseStashedCompleteTxns(true, missingTxnCompletion.getMsgTxnId());
+                    done = s_stashedMpWrites.releaseStashedCompleteTxns(missingTxn, missingTxnCompletion.getMsgTxnId());
                 } else {
                     done = true;
                 }

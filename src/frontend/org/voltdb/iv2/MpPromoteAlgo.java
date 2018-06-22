@@ -376,7 +376,7 @@ public class MpPromoteAlgo implements RepairAlgo
                             0,
                             true,       // Force rollback as our repair operation.
                             false,      // no acks in iv2.
-                            restart,    // Indicate rollback for repair as appropriate
+                            false,      // Indicate because this will not be restarted, the txn should be cleaned up
                             ftm.isForReplay(),
                             ftm.isNPartTxn(),
                             true);

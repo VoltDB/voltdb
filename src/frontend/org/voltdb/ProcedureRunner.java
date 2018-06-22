@@ -1544,7 +1544,7 @@ public class ProcedureRunner {
         }
 
         // instruct the dtxn what's needed to resume the proc
-        m_txnState.setupProcedureResume(finalTask, state.m_depsToResume);
+        m_txnState.setupProcedureResume(state.m_depsToResume);
 
         // create all the local work for the transaction
         for (int i = 0; i < state.m_depsForLocalTask.length; i++) {

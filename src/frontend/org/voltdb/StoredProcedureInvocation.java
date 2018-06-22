@@ -209,6 +209,17 @@ public class StoredProcedureInvocation implements JSONString {
      */
     public int getSerializedSize()
     {
+        // compute the size
+        int size = getSerializedSizeWithoutParams() +
+            getSerializedParamSize(); // parameters
+        assert(size > 0); // sanity
+
+        // MAKE SURE YOU SEE COMMENT ON TOP OF METHOD!!!
+        return size;
+    }
+
+    public int getSerializedSizeWithoutParams()
+    {
         // get extension sizes - if not present, size is 0 for each
         // 6 is one byte for ext type, one for size, and 4 for integer value
         int batchExtensionSize = m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
@@ -217,15 +228,11 @@ public class StoredProcedureInvocation implements JSONString {
 
         // compute the size
         int size =
-            1 + // type
-            4 + getProcNameBytes().length + // procname
-            8 + // client handle
-            1 + // extension count
-            batchExtensionSize + allPartitionExtensionSize + // extensions
-            getSerializedParamSize(); // parameters
-        assert(size > 0); // sanity
-
-        // MAKE SURE YOU SEE COMMENT ON TOP OF METHOD!!!
+                1 + // type
+                        4 + getProcNameBytes().length + // procname
+                        8 + // client handle
+                        1 + // extension count
+                        batchExtensionSize + allPartitionExtensionSize;
         return size;
     }
 

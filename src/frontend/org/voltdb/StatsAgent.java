@@ -78,6 +78,9 @@ public class StatsAgent extends OpsAgent
         case DRROLE:
             request.aggregateTables = aggregateDRRoleStats(request.aggregateTables);
             break;
+        case TTL:
+            request.aggregateTables = aggregateTTLStats(request.aggregateTables);
+            break;
         default:
         }
     }
@@ -569,6 +572,9 @@ public class StatsAgent extends OpsAgent
         case EXPORT:
             stats = collectStats(StatsSelector.EXPORT, interval);
         	break;
+        case TTL:
+            stats = collectStats(StatsSelector.TTL, interval);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -614,6 +620,9 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
+    private VoltTable[] aggregateTTLStats(VoltTable[] stats) {
+        return stats;
+    }
     // This is just a roll-up of MEMORY, TABLE, INDEX, PROCEDURE, INITIATOR, IO, and
     // STARVATION
     private VoltTable[] collectManagementStats(boolean interval)

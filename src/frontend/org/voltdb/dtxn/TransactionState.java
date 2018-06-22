@@ -173,7 +173,7 @@ public abstract class TransactionState extends OrderableTransaction  {
         throw new UnsupportedOperationException(msg);
     }
 
-    public void setupProcedureResume(boolean isFinal, int[] dependencies) {
+    public void setupProcedureResume(int[] dependencies) {
         String msg = "The current transaction context of type " + this.getClass().getName();
         msg += " doesn't support receiving dependencies.";
         throw new UnsupportedOperationException(msg);

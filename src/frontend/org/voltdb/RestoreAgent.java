@@ -854,20 +854,30 @@ SnapshotCompletionInterest, Promotable
                                 .append(" because catalog CRC did not match digest.");
                 return null;
             }
-            // Make sure this is not a partial snapshot.
-            // Compare digestTableNames with all normal table names in catalog file.
-            // A normal table is one that's NOT a materialized view, nor an export table.
-            Set<String> catalogNormalTableNames = CatalogUtil.getNormalTableNamesFromInMemoryJar(jarfile);
-            if (!catalogNormalTableNames.equals(digestTableNames)) {
+            // Make sure that the snapshot we are using is not a partial snapshot.
+            // All the "normal" tables in the current catalog must be present in the snapshot digest.
+            // Since V8.2, we allow some materialized views to be snapshotted.
+            // However, if you recover the cluster using V8.2 or later from a pre-8.2 snapshot,
+            // you will not be able to find those snapshotted views in the snapshot.
+            // Here, we will make an exception for those "optional tables" which are the view tables
+            // that can be snapshotted in V8.2 or later. If they are not in the snapshot it's OK.
+            Pair<Set<String>, Set<String>> ret = CatalogUtil.getSnapshotableTableNamesFromInMemoryJar(jarfile);
+            Set<String> fullTableNames = ret.getFirst();
+            Set<String> optionalTableNames = ret.getSecond();
+            digestTableNames.forEach(tableName -> fullTableNames.remove(tableName));
+            optionalTableNames.forEach(tableName -> fullTableNames.remove(tableName));
+            // If there are still "normal" tables apart from the snapshotted tables and
+            // optionally snapshotted views, we have no choice but fail the restore.
+            if (! fullTableNames.isEmpty()) {
                 m_snapshotErrLogStr.append("\nRejected snapshot ")
-                                .append(s.getNonce())
-                                .append(" because this is a partial snapshot.");
+                                   .append(s.getNonce())
+                                   .append(" because this is a partial snapshot.");
                 return null;
             }
         } catch (IOException ioe) {
             m_snapshotErrLogStr.append("\nRejected snapshot ")
-                            .append(s.getNonce())
-                            .append(" because catalog file could not be validated");
+                               .append(s.getNonce())
+                               .append(" because catalog file could not be validated");
             return null;
         }
 

@@ -132,7 +132,7 @@ public class TestLoadingSuite extends RegressionSuite {
         assertEquals(4, r.getResults()[0].asScalarLong());
         assertEquals(4, countReplicatedRows(client));
 
-        // test successful load to partitioned table from MP txn
+        // test failure to load partitioned table from MP txn
         table = m_template.clone(100);
         table.addRow(1, 1, 1, "1", 1.0);
         table.addRow(2, 1, 2, "2", 2.0);
@@ -143,6 +143,7 @@ public class TestLoadingSuite extends RegressionSuite {
             fail();
         }
         catch (ProcCallException e) {
+            assertTrue(e.getMessage().contains("no longer supports loading partitioned tables"));
         }
 
         // test rollback to a replicated table (constraint)
@@ -154,7 +155,29 @@ public class TestLoadingSuite extends RegressionSuite {
             fail(); // prev stmt should throw exception
         }
         catch (ProcCallException e) {
+            // Unfortunately the IPC path for loadTable will always throw EEException
+            // if the return error_code is not success.
+            // It didn't deserilize from exception buffer like JNI path,
+            // so the error type and message was not preserved.
+            if (!isValgrind()) {
+                assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
+            }
         }
+
+        // test rollback to a replicated table (sql exception)
+        table = m_template.clone(100);
+        table.addRow(6, 1, 5, "6", 5.0);
+        table.addRow(7, 1, 5, "777", 5.0);
+        try {
+            r = client.callProcedure("@LoadMultipartitionTable", "REPLICATED", upsertMode, table);
+            fail(); // prev stmt should throw exception
+        }
+        catch (ProcCallException e) {
+            if (!isValgrind()) {
+                assertTrue(e.getMessage().contains("SQL ERROR"));
+            }
+        }
+
         // 4 rows in the db from the previous test
         assertEquals(4, countReplicatedRows(client));
     }
@@ -180,7 +203,7 @@ public class TestLoadingSuite extends RegressionSuite {
                         "  ival INTEGER DEFAULT '0' NOT NULL,\n" +
                         "  pval INTEGER DEFAULT '0' NOT NULL,\n" +
                         "  bval TINYINT DEFAULT '0' NOT NULL,\n" +
-                        "  sval VARCHAR(60) DEFAULT '0' NOT NULL,\n" +
+                        "  sval VARCHAR(2) DEFAULT '0' NOT NULL,\n" +
                         "  dval FLOAT DEFAULT '0' NOT NULL,\n" +
                         "  PRIMARY KEY (ival)\n" +
                         ");\n" +

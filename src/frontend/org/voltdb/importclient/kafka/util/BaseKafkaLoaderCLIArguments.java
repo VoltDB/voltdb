@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Properties;
 
 import org.voltdb.CLIConfig;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 
 /**
@@ -75,6 +76,9 @@ public abstract class BaseKafkaLoaderCLIArguments extends CLIConfig {
 
     @Option(desc = "Password for connecting to VoltDB servers.")
     public String password = "";
+
+    @Option(desc = "Credentials that contains username and password information")
+    public String credentials = "";
 
     @Option(shortOpt = "z", desc = "Kafka Zookeeper to connect to in the format (host:port).")
     public String zookeeper = ""; //No default here as default will clash with local voltdb cluster

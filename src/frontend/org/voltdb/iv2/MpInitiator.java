@@ -33,6 +33,7 @@ import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
+import org.voltdb.TTLManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
@@ -159,6 +160,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+                    TTLManager.instance().scheduleTTLTasks();
                 }
                 else {
                     // The only known reason to fail is a failed replica during

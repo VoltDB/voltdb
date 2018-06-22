@@ -27,7 +27,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.UnknownHostException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -42,12 +48,20 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.types.TimestampType;
+import org.voltdb.utils.CSVLoader;
+import org.voltdb.utils.JDBCLoader;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
@@ -60,7 +74,14 @@ public class TestJDBCSecurityEnabled {
     static ServerThread server;
     static Connection conn;
     static Connection myconn;
-    static VoltProjectBuilder pb;
+    private static Client client;
+    private static VoltProjectBuilder pb;
+    private static String sysUsername = System.getProperty("user.name");
+    private static String tmpCSVFileDir = String.format("/tmp/%s_csv", sysUsername);
+    private static String path_csv_user = String.format("%s/%s", tmpCSVFileDir, "userCredentials.csv");
+    private static String path_csv_data = String.format("%s/%s", tmpCSVFileDir, "userData.csv");
+    private static String driver_class = "org.voltdb.jdbc.Driver";
+    private static String jdbc_url = "jdbc:voltdb://localhost";
 
     public static final RoleInfo GROUPS[] = new RoleInfo[] {
         new RoleInfo("GroupWithSQLPerm", true, false, false, false, false, false),
@@ -77,6 +98,7 @@ public class TestJDBCSecurityEnabled {
         new UserInfo("userWithSQLPerm", "password", new String[] {"GroupWithSQLPerm"}),
         new UserInfo("userWithSQLReadPerm", "password", new String[] {"GroupWithSQLReadPerm"}),
         new UserInfo("userWithAdminPerm", "password", new String[] {"GroupWithAdminPerm"}),
+        new UserInfo("userWithAdminPerm2", "password!!!", new String[] {"GroupWithAdminPerm"}),
         new UserInfo("userWithDefaultProcPerm", "password", new String[] {"GroupWithDefaultProcPerm"}),
         new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"GroupWithDefaultProcReadPerm"}),
         new UserInfo("userWithAllProcPerm", "password", new String[] {"GroupWithAllProcPerm"}),
@@ -115,9 +137,17 @@ public class TestJDBCSecurityEnabled {
                 + "A1 INTEGER NOT NULL, "
                 + "A2 DECIMAL, "
                 + "A3 DECIMAL DEFAULT 0, "
-                + "PRIMARY KEY(A1));";
+                + "PRIMARY KEY(A1)"
+                + ");\n"
+                + "CREATE TABLE TC("
+                + "A1 INTEGER NOT NULL, "
+                + "A2 DECIMAL, "
+                + "A3 DECIMAL DEFAULT 0, "
+                + "PRIMARY KEY(A1)"
+                + ");";
         pb.addLiteralSchema(ddl);
         pb.addPartitionInfo("T", "A1");
+        pb.addPartitionInfo("TC", "A1");
 
         pb.addRoles(GROUPS);
         pb.addUsers(USERS);
@@ -142,7 +172,7 @@ public class TestJDBCSecurityEnabled {
     }
 
     private static void startServer() throws ClassNotFoundException,
-    SQLException {
+    SQLException, UnknownHostException, IOException {
         server = new ServerThread(testjar, pb.getPathToDeployment(),
                 BackendTarget.NATIVE_EE_JNI);
         server.start();
@@ -158,9 +188,15 @@ public class TestJDBCSecurityEnabled {
             conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212", "defaultadmin", "admin");
         }
         myconn = null;
+        ClientConfig cfg = new ClientConfig("userWithAdminPerm", "password");
+        client = ClientFactory.createClient(cfg);
+        client.createConnection("localhost");
     }
 
-    private static void stopServer() throws SQLException {
+    private static void stopServer() throws SQLException, InterruptedException {
+        if (client != null) client.close();
+        client = null;
+
         if (conn != null) {
             conn.close();
             conn = null;
@@ -228,6 +264,142 @@ public class TestJDBCSecurityEnabled {
             e.printStackTrace();
             fail("Connection creation shouldn't fail: " + e.getMessage());
         }
+    }
+
+    @Test
+    public void testJDBCLoaderWithCredentialsFile() throws NoConnectionsException, IOException, ProcCallException, InterruptedException{
+
+        // write username / password to csv
+        String[] authData = {"username: userWithAdminPerm", "password: password"};
+        try {
+            BufferedWriter output_csv = new BufferedWriter( new FileWriter( path_csv_user ) );
+            for (String line: authData) {
+                output_csv.write(line + "\n");
+            }
+            output_csv.flush();
+            output_csv.close();
+        } catch (Exception e) {
+            System.err.print( e.getMessage() );
+        }
+
+        // write data to csv
+        String []myData = { "1 ,2000.00,1.11" };
+        try {
+            BufferedWriter output_csv = new BufferedWriter( new FileWriter( path_csv_data ) );
+            for (String line: myData) {
+                output_csv.write(line + "\n");
+            }
+            output_csv.flush();
+            output_csv.close();
+        } catch (Exception e) {
+            System.err.print( e.getMessage() );
+        }
+
+        // read data to db using csvloader
+        String[] csvOptions = {
+                "-f" + path_csv_data,
+                "--reportdir=" + tmpCSVFileDir,
+                "--maxerrors=50",
+                "--credentials=" + path_csv_user,
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "TC"
+        };
+        CSVLoader.testMode = true;
+        CSVLoader.main(csvOptions);
+
+        String[] jdbcOptions = {
+                "--jdbcdriver=" + driver_class,
+                "--jdbcurl=" + jdbc_url,
+                "--jdbctable=" + "TC",
+                "--reportdir=" + tmpCSVFileDir,
+                "--maxerrors=50",
+                "--jdbcuser=userWithAdminPerm",
+                "--jdbcpassword=password",
+                "--credentials="+ path_csv_user,
+                "--port=",
+                "T"
+        };
+
+        //Reload using JDBC
+        JDBCLoader.testMode = true;
+        JDBCLoader.main(jdbcOptions);
+
+        VoltTable modCount;
+        modCount = client.callProcedure("@AdHoc", "SELECT * FROM T;").getResults()[0];
+        System.out.println("data inserted to table T:\n" + modCount);
+        int rowct = modCount.getRowCount();
+        assertEquals(rowct, 1);
+    }
+
+    @Test
+    public void testUsingCrendentialFileIncludingSpecialCharactersInPassword() throws NoConnectionsException, IOException, ProcCallException, InterruptedException{
+
+        // write username / password to csv
+        String[] authData = {"username: userWithAdminPerm2", "password: password!!!"};
+        try {
+            BufferedWriter output_csv = new BufferedWriter( new FileWriter( path_csv_user ) );
+            for (String line: authData) {
+                output_csv.write(line + "\n");
+            }
+            output_csv.flush();
+            output_csv.close();
+        } catch (Exception e) {
+            System.err.print( e.getMessage() );
+        }
+
+        // write data to csv
+        String []myData = { "1 ,2000.00,1.11" };
+        try {
+            BufferedWriter output_csv = new BufferedWriter( new FileWriter( path_csv_data ) );
+            for (String line: myData) {
+                output_csv.write(line + "\n");
+            }
+            output_csv.flush();
+            output_csv.close();
+        } catch (Exception e) {
+            System.err.print( e.getMessage() );
+        }
+
+        // read data to db using csvloader
+        String[] csvOptions = {
+                "-f" + path_csv_data,
+                "--reportdir=" + tmpCSVFileDir,
+                "--maxerrors=50",
+                "--credentials=" + path_csv_user,
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "TC"
+        };
+        CSVLoader.testMode = true;
+        CSVLoader.main(csvOptions);
+
+        String[] jdbcOptions = {
+                "--jdbcdriver=" + driver_class,
+                "--jdbcurl=" + jdbc_url,
+                "--jdbctable=" + "TC",
+                "--reportdir=" + tmpCSVFileDir,
+                "--maxerrors=50",
+                "--credentials=" + path_csv_user,
+                "--port=",
+                "T"
+        };
+
+        //Reload using JDBC
+        JDBCLoader.testMode = true;
+        JDBCLoader.main(jdbcOptions);
+
+        VoltTable modCount;
+        modCount = client.callProcedure("@AdHoc", "SELECT * FROM T;").getResults()[0];
+        System.out.println("data inserted to table T:\n" + modCount);
+        int rowct = modCount.getRowCount();
+        assertEquals(rowct, 1);
     }
 
     @Test

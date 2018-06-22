@@ -159,9 +159,17 @@ public class Benchmark {
 
         @Option(desc = "Allow disabling different threads for testing specific functionality. ")
         String disabledthreads = "none";
-        //threads: "clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses"
+        //threads: "clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt"
         // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
         ArrayList<String> disabledThreads = null;
+
+        @Option(desc = "Allow enabling specific threads. ")
+        String enabledthreads = "all";
+        //threads: "clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt"
+        // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
+        ArrayList<String> enabledThreads = null;
+
+        ArrayList<String> allThreads = new ArrayList<String>(Arrays.asList("clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt".split(",")));
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
@@ -196,7 +204,17 @@ public class Benchmark {
 
             // parse servers
             parsedServers = servers.split(",");
-            disabledThreads = new ArrayList<String>(Arrays.asList(disabledthreads.split(",")));
+            if (enabledthreads != "all") {
+                disabledThreads = allThreads;
+                enabledThreads = new ArrayList<String>(Arrays.asList(enabledthreads.split(",")));
+                for (String tn : enabledThreads) {
+                    disabledThreads.remove(tn);
+                }
+            }
+            else {
+                disabledThreads = new ArrayList<String>(Arrays.asList(disabledthreads.split(",")));
+            }
+            log.info("Disabled threads: " + disabledthreads.join(","));
         }
     }
 
@@ -541,7 +559,8 @@ public class Benchmark {
     DdlThread ddlt = null;
     List<ClientThread> clientThreads = null;
     UpdateClassesThread updcls = null;
-
+    NibbleDeleteLoader partNDlt = null;
+    NibbleDeleteLoader replNDlt = null;
 
     /**
      * Core benchmark code.
@@ -619,6 +638,7 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
 
         // Big Partitioned Loader
+        partBiglt = null;
         if (!(config.disabledThreads.contains("partBiglt") || config.disabledThreads.contains("Biglt"))) {
             partBiglt = new BigTableLoader(client, "bigp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
@@ -631,6 +651,7 @@ public class Benchmark {
             replBiglt.start();
         }
 
+
         // wait for the filler tables to load up
         //partBiglt.join();
         //replBiglt.join();
@@ -639,9 +660,25 @@ public class Benchmark {
         log.info("Starting Benchmark");
         log.info(HORIZONTAL_RULE);
 
+        // Nibble delete Loader
+        partNDlt = null;
+        if (!(config.disabledThreads.contains("partNDlt") || config.disabledThreads.contains("NDlt"))) {
+            partNDlt = new NibbleDeleteLoader(client, "nibdp",
+                    100000, 1024, 50, permits, partitionCount);
+            partNDlt.start();
+        }
+
+        replNDlt = null;
+        if (config.mpratio > 0.0 && !(config.disabledThreads.contains("replNDlt") || config.disabledThreads.contains("NDlt"))) {
+            replNDlt = new NibbleDeleteLoader(client, "nibdr",
+                    100000, 1024, 3, permits, partitionCount);
+            replNDlt.start();
+        }
+
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         scheduleRunTimer();
+
         // reset progress tracker
         lastProgressTimestamp = System.currentTimeMillis();
         schedulePeriodicStats();

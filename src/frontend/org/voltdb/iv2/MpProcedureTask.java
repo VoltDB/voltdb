@@ -161,7 +161,7 @@ public class MpProcedureTask extends ProcedureTask
                     0,
                     true,
                     false,  // really don't want to have ack the ack.
-                    !m_txnState.isReadOnly(),
+                    true,   // Don't clear/flush the txn because we are restarting it
                     m_msg.isForReplay(),
                     txn.isNPartTxn(),
                     false);
