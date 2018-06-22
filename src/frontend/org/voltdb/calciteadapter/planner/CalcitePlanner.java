@@ -25,6 +25,7 @@ import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -141,11 +142,11 @@ public class CalcitePlanner {
             JaninoRelMetadataProvider relMetadataProvider = JaninoRelMetadataProvider.of(
                     VoltDBDefaultRelMetadataProvider.INSTANCE);
             RelMetadataQuery.THREAD_PROVIDERS.set(relMetadataProvider);
-            // @TODO Do I need it? Do I need it to do for each phase / root rel?
-            // @TODO Setting the seems to be enough. Ask Hanu
-//            convertedRel.accept(new VoltDBDefaultRelMetadataProvider.MetaDataProviderModifier(relMetadataProvider));
 
             // Transform the relational expression
+
+            // Modify RelMetaProvider for every RelNode in the SQL operator Rel tree.
+            convertedRel.accept(new VoltDBDefaultRelMetadataProvider.MetaDataProviderModifier(relMetadataProvider));
 
             // Apply Rule set 0 - standard Calcite transformations and convert to the VOLTDB Logical convention
             traitSet = prepareOutputTraitSet(volcanoPlanner, VoltDBLRel.VOLTDB_LOGICAL, convertedRel);
@@ -153,11 +154,20 @@ public class CalcitePlanner {
 
             // Apply Rule Set 1 - VoltDB transformations
             // Add traits that the transformed relNode must have
+            // @TODO Need to add single distribution trait????
             traitSet = prepareOutputTraitSet(volcanoPlanner, VoltDBPRel.VOLTDB_PHYSICAL, phaseOneRel);
+
+            // Modify RelMetaProvider for every RelNode in the SQL operator Rel tree.
+            phaseOneRel.accept(new VoltDBDefaultRelMetadataProvider.MetaDataProviderModifier(relMetadataProvider));
+ 
             phaseTwoRel = volcanoPlanner.transform(1, traitSet, phaseOneRel);
 
             // Apply Rule Set 2 - VoltDB inlining
             hepPlanner = getHepPlanner();
+
+            // Modify RelMetaProvider for every RelNode in the SQL operator Rel tree.
+            phaseTwoRel.accept(new VoltDBDefaultRelMetadataProvider.MetaDataProviderModifier(relMetadataProvider));
+
             hepPlanner.setRoot(phaseTwoRel);
             phaseThreeRel = hepPlanner.findBestExp();
 

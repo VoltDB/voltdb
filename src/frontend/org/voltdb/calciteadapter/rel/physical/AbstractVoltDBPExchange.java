@@ -18,8 +18,11 @@
 package org.voltdb.calciteadapter.rel.physical;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -42,6 +45,7 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
             RelNode input,
             RelDistribution distribution,
             int childSplitCount) {
+        // All Exchange rels must have SINGLETON distribution trait
         super(cluster, traitSet, input, distribution);
         m_childSplitCount = childSplitCount;
     }
@@ -89,6 +93,16 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
         double rowCount = super.estimateRowCount(mq);
         // The total count is multiplied by the child's split count
         return rowCount * m_childSplitCount;
+    }
+
+    @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
+            RelMetadataQuery mq) {
+        // The higher up exchange should have less cost
+        double dRows = estimateRowCount(mq) / m_level;
+        double dCpu = dRows + 1; // ensure non-zero cost
+        double dIo = 0;
+        RelOptCost cost = planner.getCostFactory().makeCost(dRows, dCpu, dIo);
+        return cost;
     }
 
     @Override
