@@ -119,6 +119,9 @@ public:
     int64_t m_committedUniqueId;
 
     size_t m_headerSpace;
+
+    int64_t m_tupleCount;     // STAKUTIS
+    int64_t m_tupleCount_uncommitted;     // STAKUTIS
 };
 
 }

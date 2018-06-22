@@ -35,6 +35,9 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
+import org.voltdb.ExportStats;
+import org.voltdb.RealVoltDB; // STAKUTIS
+import org.voltdb.StatsSelector; // STAKUTIS
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -117,6 +120,7 @@ public class ExportManager
 
     /** Obtain the global ExportManager via its instance() method */
     private static ExportManager m_self;
+    private static ExportStats m_exportStats;
     private final int m_hostId;
 
     // this used to be flexible, but no longer - now m_loaderClass is just null or default value
@@ -150,6 +154,13 @@ public class ExportManager
             em.clearOverflowData();
         }
         em.initialize(catalogContext, partitions, isRejoin);
+
+        m_exportStats = new ExportStats(); // STAKUTIS created the m_exportStats member
+        RealVoltDB db=(RealVoltDB)VoltDB.instance();
+        db.getStatsAgent().registerStatsSource(StatsSelector.EXPORT,
+                myHostId, // m_siteId,
+                m_exportStats);
+
         m_self = em;
     }
 
