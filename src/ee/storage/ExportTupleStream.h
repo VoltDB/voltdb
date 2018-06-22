@@ -102,8 +102,6 @@ private:
     int64_t m_generation;
     size_t m_schemaSize;
 
-    int64_t m_tupleCount;     // STAKUTIS
-
     //Computed size for metadata columns
     static const size_t m_mdSchemaSize;
     // meta-data column count

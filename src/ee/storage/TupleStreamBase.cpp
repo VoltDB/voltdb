@@ -113,6 +113,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
                 "Received a new transaction, but with the same spHandle (%jd): old uniqueId is %jd, new uniqueId is %jd",
                 (intmax_t)m_openSpHandle, (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
     }
+	printf("STAKUTIS TupleStreamBase.cpp: commit()\n");fflush(stdout);
 
     // more data for an ongoing transaction with no new committed data
     if ((currentSpHandle == m_openSpHandle) &&
@@ -177,6 +178,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     if (sync) {
         pushStreamBuffer(NULL, true);
     }
+	printf("STAKUTIS TupleStreamBase.cpp: commit() DONE\n");fflush(stdout);
 }
 
 void TupleStreamBase::pushPendingBlocks()
@@ -217,6 +219,9 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t)
 
     // back up the universal stream counter
     m_uso = mark;
+    printf("STAKUTIS: TupleStreamBase:rollbackTo %zu\n",mark);fflush(stdout);
+    // STAKUTIS...maybe here is where we want to undo our m_tupleCount??
+    m_tupleCount_uncommitted=0;
 
     // working from newest to oldest block, throw
     // away blocks that are fully after mark; truncate

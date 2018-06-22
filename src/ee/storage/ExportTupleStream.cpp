@@ -79,6 +79,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
         int partitionColumn,
         ExportTupleStream::Type type)
 {
+    printf("\nSTAKUTIS ExportTupleStream.cpp appendTuple() started.\n"); fflush(stdout);
     assert(columnNames.size() == tuple.columnCount());
     size_t streamHeaderSz = 0;
     size_t tupleMaxLength = 0;
@@ -96,7 +97,9 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     //Most of the transaction id info and unique id info supplied to commit
     //is nonsense since it isn't currently supplied with a transaction id
     //but it is fine since export isn't currently using the info
+    printf("STAKUTIS ExportTupleStream.cpp appendTuple() Calling commit\n"); fflush(stdout);
     commit(lastCommittedSpHandle, spHandle, uniqueId, false, false);
+    printf("STAKUTIS ExportTupleStream.cpp appendTuple() Calling commit DONE\n"); fflush(stdout);
 
     // get schema related size
     size_t schemaSize = computeSchemaSize(tableName, columnNames);
@@ -147,7 +150,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // write the tuple's data
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
 
-    m_tupleCount++;     // STAKUTIS
+    printf("STAKUTIS ExportTupleStream.cpp appendTuple() poured data into buffer, inc'd uncommitted\n"); fflush(stdout);
+    m_tupleCount_uncommitted++;     // STAKUTIS
 
     // row size, generation, partition-index, column count and hasSchema flag (byte)
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);
@@ -169,6 +173,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 //            << " offset " << m_currBlock->offset() << std::endl;
     //Not new anymore as we have new transaction after UAC
     m_new = false;
+    printf("STAKUTIS ExportTupleStream.cpp appendTuple() started. DONE\n\n"); fflush(stdout);
     return startingUso;
 }
 
@@ -262,17 +267,22 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 }
 
 void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
+	printf("STAKUTIS ExportTupleStream.cpp:pushStreamBuffer() tupleCount:%lld and clearing\n",m_tupleCount);fflush(stdout);
+	m_tupleCount = m_tupleCount_uncommitted;  // STAKUTIS
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
                     m_signature,
                     block,
                     sync,
 					m_tupleCount /* STAKUTIS */);
-    m_tupleCount=0;
+	printf("STAKUTIS ExportTupleStream.cpp:pushStreamBuffer() DONE clearing tupleCount\n");fflush(stdout);
+    m_tupleCount=0; m_tupleCount_uncommitted=0;// STAKUTIS
 }
 
 void ExportTupleStream::pushEndOfStream() {
+	printf("STAKUTIS ExportTupleStream.cpp:pushEndOfStream()\n");fflush(stdout);
     ExecutorContext::getPhysicalTopend()->pushEndOfStream(
                     m_partitionId,
                     m_signature);
+	printf("STAKUTIS ExportTupleStream.cpp:pushEndOfStream() DONE\n");fflush(stdout);
 }

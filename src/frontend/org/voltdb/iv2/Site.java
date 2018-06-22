@@ -44,7 +44,6 @@ import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExportStats;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
@@ -166,7 +165,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     final TableStats m_tableStats;
     final IndexStats m_indexStats;
     final MemoryStats m_memStats;
-    final ExportStats m_exportStats;
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private SnapshotSiteProcessor m_snapshotter;
@@ -645,6 +643,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_isLowestSiteId = isLowestSiteId;
         m_hashinator = TheHashinator.getCurrentHashinator();
 
+        /*** STAKUTIS hacked-out; Should this be moved to ExportManager
         if (agent != null) {
 	        m_exportStats = new ExportStats(); // STAKUTIS created the m_exportStats member
 	        agent.registerStatsSource(StatsSelector.EXPORT,
@@ -652,6 +651,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 	                m_exportStats);
         }
         else m_exportStats = null;
+        ***/
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
