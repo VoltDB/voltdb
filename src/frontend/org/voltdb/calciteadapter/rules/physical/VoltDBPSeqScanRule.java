@@ -50,6 +50,7 @@ public class VoltDBPSeqScanRule extends RelOptRule {
         RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
         VoltDBTable voltTable = tableScan.getVoltDBTable();
         if (voltTable.getCatTable().getIsreplicated()) {
+            // Here also needed distribution trait
             int scanSplitCount = 1;
             call.transformTo(new VoltDBPTableSeqScan(
                                 tableScan.getCluster(),
