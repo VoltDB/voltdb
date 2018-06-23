@@ -20,12 +20,14 @@ package org.voltdb.calciteadapter.rel;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.aeonbits.owner.util.Collections;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptTable.ToRelContext;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelReferentialConstraint;
 import org.apache.calcite.rel.type.RelDataType;
@@ -110,7 +112,15 @@ public class VoltDBTable implements TranslatableTable {
 
             @Override
             public RelDistribution getDistribution() {
-                return null;
+                assert (m_catTable != null);
+                if (m_catTable.getIsreplicated()) {
+                    return RelDistributions.SINGLETON;
+                } else {
+                    Column partitionColumn = m_catTable.getPartitioncolumn();
+                    List<Integer> partitionColumnIds = Collections.list(partitionColumn.getIndex());
+                    RelDistribution hashDist = RelDistributions.hash(partitionColumnIds);
+                    return hashDist;
+                }
             }
 
             @Override
@@ -126,8 +136,9 @@ public class VoltDBTable implements TranslatableTable {
     public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
         RelOptCluster cluster = context.getCluster();
         // Start conservatively with a Logical Scan
+        RelDistribution distribution = relOptTable.getDistribution();
         RelNode node = new VoltDBLTableScan(cluster,
-                cluster.traitSet(),
+                cluster.traitSet(); // .plus(distribution),
                 relOptTable,
                 this);
         return node;

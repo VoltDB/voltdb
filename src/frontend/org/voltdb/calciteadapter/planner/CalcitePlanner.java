@@ -158,7 +158,7 @@ public class CalcitePlanner {
 
             // Modify RelMetaProvider for every RelNode in the SQL operator Rel tree.
             phaseOneRel.accept(new VoltDBDefaultRelMetadataProvider.MetaDataProviderModifier(relMetadataProvider));
- 
+
             phaseTwoRel = volcanoPlanner.transform(1, traitSet, phaseOneRel);
 
             // Apply Rule Set 2 - VoltDB inlining

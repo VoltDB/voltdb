@@ -59,25 +59,26 @@ public class VoltDBPSeqScanRule extends RelOptRule {
                                 scanSplitCount));
         } else {
             // Table is partitioned. Add UnionExchange rel on top
-            // @TODO Must be number of hosts * number of sites per host
             int scanSplitCount = DISTRIBUTED_SPLIT_COUNT;
+            RelDistribution hashDist = tableScan.getTable().getDistribution();
+
             VoltDBPTableSeqScan scanRel = new VoltDBPTableSeqScan(
                     tableScan.getCluster(),
-                    convertedTraits,
+                    // Adding Distribution trait
+                    convertedTraits,//.plus(hashDist),
                     tableScan.getTable(),
                     tableScan.getVoltDBTable(),
                     scanSplitCount);
-            // VoltDB uses HASH partitioning only
-            Column partitionColumn = voltTable.getCatTable().getPartitioncolumn();
-            List<Integer> partitionColumnIds = Collections.list(partitionColumn.getIndex());
-            RelDistribution hashDist = RelDistributions.hash(partitionColumnIds);
 
             VoltDBPUnionExchange exchangeRel = new VoltDBPUnionExchange(
                     tableScan.getCluster(),
-                    convertedTraits,
+                    // Exchange's  RelDistribution trait must match the one used to construct it
+                    convertedTraits, //.plus(hashDist),
                     scanRel,
                     hashDist,
                     scanSplitCount);
+// trying to add the RelDistribution trait def to the planner.
+//            call.getPlanner().addRelTraitDef(hashDist.getTraitDef());
             call.transformTo(exchangeRel);
         }
     }
