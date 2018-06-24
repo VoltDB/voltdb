@@ -39,7 +39,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     static final int ISRESTART = 2;
     static final int ISNPARTTXN = 3;
     static final int ISABORTDURINGREPAIR = 4;
-
+    static final int ISABORTDURINGRESTART = 5;
     private void setBit(int position, boolean value)
     {
         if (value) {
@@ -78,6 +78,16 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
                                       boolean isRestart, boolean isForReplay,
                                       boolean isNPartTxn, boolean isAbortDuringRepair)
     {
+        this(initiatorHSId, coordinatorHSId,txnId, isReadOnly, hash, isRollback,
+                requiresAck, isRestart, isForReplay, isNPartTxn, isAbortDuringRepair, false);
+    }
+
+    public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId,
+            long txnId, boolean isReadOnly, int hash,
+            boolean isRollback, boolean requiresAck,
+            boolean isRestart, boolean isForReplay,
+            boolean isNPartTxn, boolean isAbortDuringRepair, boolean isAbortDuringRestart)
+    {
         super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, isForReplay);
         m_hash = hash;
         setBit(ISROLLBACK, isRollback);
@@ -85,8 +95,8 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(ISRESTART, isRestart);
         setBit(ISNPARTTXN, isNPartTxn);
         setBit(ISABORTDURINGREPAIR, isAbortDuringRepair);
+        setBit(ISABORTDURINGRESTART, isAbortDuringRestart);
     }
-
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId, CompleteTransactionMessage msg)
     {
         super(initiatorHSId, coordinatorHSId, msg);
@@ -116,6 +126,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 
     public boolean isAbortDuringRepair() {
         return getBit(ISABORTDURINGREPAIR);
+    }
+
+    public boolean isAbortDuringRestart() {
+        return getBit(ISABORTDURINGRESTART);
     }
 
     public int getHash() {
@@ -205,6 +219,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 
         if(isAbortDuringRepair()) {
             sb.append("\n  THIS IS NOT RESTARTABLE (ABORT) REPAIR");
+        }
+
+        if(isAbortDuringRestart()) {
+            sb.append("\n  THIS IS NOT RESTARTABLE (ABORT) RESTART");
         }
         return sb.toString();
     }

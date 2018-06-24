@@ -67,7 +67,7 @@ public class CompleteTransactionTask extends TransactionTask
     }
     private void doUnexecutedFragmentCleanup()
     {
-        if (m_completeMsg.isAbortDuringRepair() || m_repairCompletionMatched) {
+        if (m_completeMsg.isAbortDuringRepair() || m_repairCompletionMatched || m_completeMsg.isAbortDuringRestart()) {
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(getTxnId()));
             }
@@ -86,7 +86,7 @@ public class CompleteTransactionTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        if (m_fragmentNotExecuted) {
+        if (m_fragmentNotExecuted || m_completeMsg.isAbortDuringRestart()) {
             hostLog.debug("SKIPPING (Never Executed): " + this);
             doUnexecutedFragmentCleanup();
         }
