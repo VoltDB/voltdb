@@ -200,7 +200,10 @@ public class RepairLog
 
             // We can't repair read only MP transactions. Just don't log them to the repair log.
             // Restart transaction do not need to be repaired here, don't log them as well.
-            if (ctm.isReadOnly() || ctm.isRestart()) {
+
+            // CompleteTransactionMessage (AbortDuringRepair) is manually created during repair process from non-restartable FragmentTaskMessage
+            // Keep these messages out of repair queue.
+            if (ctm.isReadOnly() || ctm.isRestart() || ctm.isAbortDuringRepair()) {
                 return;
             }
 
