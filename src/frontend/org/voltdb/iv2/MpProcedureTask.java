@@ -144,7 +144,7 @@ public class MpProcedureTask extends ProcedureTask
             m_queue.flush(getTxnId());
 
             //send message to all the partition leaders to flush their
-            //transaction queues and process next one.
+            //transaction queues, clean duplicate counter, and move onto next one.
             sendCompleteTransactionMessage(true);
 
             m_initiator.deliver(errorResp);
