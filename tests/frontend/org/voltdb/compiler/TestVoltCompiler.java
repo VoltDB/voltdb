@@ -1910,11 +1910,6 @@ public class TestVoltCompiler extends TestCase {
                 "as select num, max(num), min(wage), count(*), sum(wage) from t group by num; \n";
         assertTrue(compileDDL(ddl, compiler));
 
-        // Users can create single table views without including count(*) column.
-        ddl = "create table t (id integer not null, num integer);\n" +
-                "create view my_view1 as select id, sum(num) from t group by id; \n";
-        assertTrue(compileDDL(ddl, compiler));
-
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
                 "create view my_view1 (num, total) " +
                 "as select num, count(*) from (select num from t limit 5) subt group by num; \n";
@@ -1993,6 +1988,13 @@ public class TestVoltCompiler extends TestCase {
                 "partition table t on column num;";
         checkDDLErrorMessage(ddl, errorMsg);
 
+        // count(*) is needed in ddl. If snapshots issue solved remove this test case
+        errorMsg = "Materialized view \"MY_VIEW\" must have count(*) after the GROUP BY columns (if any)";
+        ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
+                    "create view my_view as select id, wage from t group by id, wage;" +
+                       "partition table t on column num;";
+        checkDDLErrorMessage(ddl, errorMsg);
+
         // multiple count(*) in ddl
         ddl = "create table t(id integer not null, num integer not null, wage integer);\n" +
                 "create view my_view as select id, wage, count(*), min(wage), count(*) from t group by id, wage;" +
@@ -2000,24 +2002,12 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(compileDDL(ddl, compiler));
 
         // Multiple table view should throw error msg without count(*) columns.
-        errorMsg = "Materialized view \"V\" joins multiple tables, therefore must include COUNT(*) after any GROUP BY columns.";
+        errorMsg = "Materialized view \"V\" must have count(*) after the GROUP BY columns (if any)";
         ddl = "CREATE TABLE T1 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                 "CREATE TABLE T2 (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                 "CREATE VIEW V (aint, sumint) AS " +
                 "SELECT T1.a, sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
         checkDDLErrorMessage(ddl, errorMsg);
-
-        // Check single table view GB without aggregates.
-        ddl = "CREATE TABLE T (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
-                "CREATE VIEW V AS " +
-                "SELECT A, B FROM T GROUP BY A, B;";
-        assertTrue(compileDDL(ddl, compiler));
-
-        // Check single table view aggregates without GB column.
-        ddl = "CREATE TABLE T (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
-                "CREATE VIEW V AS " +
-                "SELECT SUM(A), MAX(B) FROM T;";
-        assertTrue(compileDDL(ddl, compiler));
 
         subTestDDLCompilerMatViewJoin();
     }
