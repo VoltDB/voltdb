@@ -561,8 +561,11 @@ public class MaterializedViewProcessor {
 
         // Users can create SINGLE TABLE VIEWS without declaring count(*) in the stmt.
         // Multiple table views still need this restriction.
-        if (stmt.m_tableList.size() > 1 && countStarFound == false) {
-            msg.append("joins multiple tables, therefore must include COUNT(*) after any GROUP BY columns.");
+        // ENG-10892-guardback: add the restriction again
+        if (countStarFound == false) {
+            msg.append("must have count(*) after the GROUP BY columns (if any)");
+//        if (stmt.m_tableList.size() > 1 && countStarFound == false) {
+//            msg.append("joins multiple tables, therefore must include COUNT(*) after any GROUP BY columns.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
@@ -621,9 +624,11 @@ public class MaterializedViewProcessor {
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
+        // ENG-10892-guardback, add the restriction again
+        if (displayColCount <= groupColCount) {
         // ENG-10892, since count(*) can be removed from SV table
-        if ((stmt.m_tableList.size() > 1 && displayColCount <= groupColCount) ||
-                displayColCount < groupColCount) {
+//        if ((stmt.m_tableList.size() > 1 && displayColCount <= groupColCount) ||
+//                displayColCount < groupColCount) {
             msg.append("has too few columns.");
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
