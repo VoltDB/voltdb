@@ -378,18 +378,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         VoltTable vt = resp.getResults()[0];
         vt.advanceToRow(0);
         assertEquals(vt.get(2, VoltType.INTEGER), 2);
-
-        // create single table view without count(*)
-        assertTrue(findTableInSystemCatalogResults("VT1B"));
-        assertEquals(getTableType("VT1B"), "VIEW");
-
-
-        m_client.callProcedure("T24.insert", 2, 3);
-        m_client.callProcedure("T24.insert", 2, 4);
-        resp = m_client.callProcedure("@AdHoc", "select * from VT1B");
-        vt = resp.getResults()[0];
-        vt.advanceToRow(0);
-        assertEquals(vt.get(1, VoltType.INTEGER), 4);
     }
 
     @Test
