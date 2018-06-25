@@ -1421,9 +1421,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
         builder.append("\n  " + m_pendingTasks.toString());
         if (m_duplicateCounters.size() > 0) {
-            builder.append("\n  duplicate counters: ");
+            builder.append("\n  DUPLICATE COUNTERS:\n ");
             for (Entry<DuplicateCounterKey, DuplicateCounter> e : m_duplicateCounters.entrySet()) {
-                builder.append("  " + who + ": " + e.getKey().toString() + ": " + e.getValue().toString());
+                builder.append("  " + e.getKey().toString() + ": " + e.getValue().toString());
             }
         }
         builder.append("END of STATE DUMP FOR SITE: " + who);

@@ -142,11 +142,6 @@ public class MpProcedureTask extends ProcedureTask
             errorResp.m_sourceHSId = m_initiator.getHSId();
             m_txnState.setDone();
             m_queue.flush(getTxnId());
-
-            //send message to all the partition leaders to flush their
-            //transaction queues, clean duplicate counter, and move onto next one.
-            sendCompleteTransactionMessage(true);
-
             m_initiator.deliver(errorResp);
 
             if (hostLog.isDebugEnabled()) {
@@ -259,41 +254,34 @@ public class MpProcedureTask extends ProcedureTask
                                                  "commit", Boolean.toString(!m_txnState.needsRollback()),
                                                  "dest", CoreUtils.hsIdCollectionToString(m_initiatorHSIds)));
         }
-
         MpTransactionState txnState = (MpTransactionState)m_txnState;
         // Only send completions for MP transactions that have processed at least one fragment
         if (txnState.isReadOnly() || txnState.haveSentFragment()) {
-            sendCompleteTransactionMessage(false);
+            CompleteTransactionMessage complete = new CompleteTransactionMessage(
+                    m_initiator.getHSId(), // who is the "initiator" now??
+                    m_initiator.getHSId(),
+                    m_txnState.txnId,
+                    m_txnState.isReadOnly(),
+                    m_txnState.getHash(),
+                    m_txnState.needsRollback(),
+                    false,  // really don't want to have ack the ack.
+                    false,
+                    m_msg.isForReplay(),
+                    txnState.isNPartTxn(),
+                    false);
+            complete.setTruncationHandle(m_msg.getTruncationHandle());
+
+            //If there are misrouted fragments, send message to current masters.
+            final List<Long> initiatorHSIds = new ArrayList<Long>();
+            if (txnState.isFragmentRestarted()) {
+                initiatorHSIds.addAll(txnState.getMasterHSIDs());
+            } else {
+                initiatorHSIds.addAll(m_initiatorHSIds);
+            }
+            m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
         }
         m_txnState.setDone();
         m_queue.flush(getTxnId());
-    }
-
-    private void sendCompleteTransactionMessage(boolean abortDuringRestart) {
-        MpTransactionState txnState = (MpTransactionState)m_txnState;
-        CompleteTransactionMessage complete = new CompleteTransactionMessage(
-                m_initiator.getHSId(), // who is the "initiator" now??
-                m_initiator.getHSId(),
-                m_txnState.txnId,
-                m_txnState.isReadOnly(),
-                m_txnState.getHash(),
-                m_txnState.needsRollback(),
-                false,  // really don't want to have ack the ack.
-                false,
-                m_msg.isForReplay(),
-                txnState.isNPartTxn(),
-                false,
-                abortDuringRestart);
-        complete.setTruncationHandle(m_msg.getTruncationHandle());
-
-        //If there are misrouted fragments, send message to current masters.
-        final List<Long> initiatorHSIds = new ArrayList<Long>();
-        if (txnState.isFragmentRestarted()) {
-            initiatorHSIds.addAll(txnState.getMasterHSIDs());
-        } else {
-            initiatorHSIds.addAll(m_initiatorHSIds);
-        }
-        m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIds), complete);
     }
 
     private void restartTransaction()
