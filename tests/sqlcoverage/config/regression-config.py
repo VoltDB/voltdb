@@ -22,6 +22,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+# Note: this config file is old and deprecated; however, for now, it is
+# still used by the 'test-nextrelease-sqlcoverage-multiconfig' job, in the
+# CORE-team-extended area of Jenkins, and is still the default config file
+# to run (when running via ANT).
+
 # HACK:
 # This SQL coverage configuration set represents hopefully the largest
 # set of statements that should always pass.  Some of the template files
