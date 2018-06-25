@@ -3130,6 +3130,27 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{gpv}}, vt);
     }
 
+    public void testENG14167() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+        Client client = getClient();
+        String[] inserts = {
+            "INSERT INTO P3 VALUES (0, -5377, 837, -21764, 18749);",
+            "INSERT INTO P3 VALUES (1, -5377, 837, -21764, 26060);",
+            "INSERT INTO R1 VALUES (100, 'varcharvalue', 120, 1.0);"
+        };
+        for (String insertSQL : inserts) {
+            assertSuccessfulDML(client, insertSQL);
+        }
+        String ticketTester = "SELECT * FROM V_P3 A, (SELECT DISTINCT * FROM R1) B;";
+        VoltTable vt = client.callProcedure("@AdHoc", ticketTester).getResults()[0];
+        assertContentOfTable(new Object[][]{
+            new Object[]{
+                    -5377, 837, 2, -43528, 44809, 100, "varcharvalue" , 120, 1.0
+                    }}, vt);
+    }
+
     public void testEng13801() throws Exception {
         if (isHSQL()) {
             return;
