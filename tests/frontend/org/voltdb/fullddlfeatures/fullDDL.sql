@@ -378,18 +378,6 @@ AS
           ,  C2
 ;
 
---CREATE VIEW VT1b
---(
---    C1
---,   TOTAL
---)
---AS
---    SELECT C1
---        ,  SUM(C2)
---    FROM T24
---    GROUP BY C1
---;
-
 CREATE VIEW VT2
 (
     C1
