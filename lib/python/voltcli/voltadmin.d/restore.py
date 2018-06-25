@@ -45,9 +45,9 @@ def restore(runner):
         hashinator = 'false'
     json_opts = ['{path:"%s",nonce:"%s",hashinator:"%s"}' % (runner.opts.directory, nonce, hashinator)]
     if runner.opts.tables:
-        raw_json_opts.append('tables:%s' % (runner.opts.tables))
-    if runner.opts.skip_tables:
-        raw_json_opts.append('skiptables:%s' % (runner.opts.skip_tables))
+        json_opts = ['{path:"%s",nonce:"%s",hashinator:"%s",tables:"%s"}' % (runner.opts.directory, nonce, hashinator, runner.opts.tables)]
+    elif runner.opts.skip_tables:
+        json_opts = ['{path:"%s",nonce:"%s",hashinator:"%s",skiptables:"%s"}' % (runner.opts.directory, nonce, hashinator, runner.opts.skip_tables)]
     runner.verbose_info('@SnapshotRestore "%s"' % json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
     print 'voltadmin: Snapshot restore has been started. Check the server logs for ongoing status of the restore operation.'

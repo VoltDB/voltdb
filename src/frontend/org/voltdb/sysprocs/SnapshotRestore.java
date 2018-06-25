@@ -554,7 +554,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  * if path type is not SNAP_PATH use local path specified by type
                  */
                 m_duplicateRowHandler = null;
-                String dupPath = (String )params.toArray()[3];
+                String dupPath = (String)params.toArray()[3];
                 if (dupPath != null) {
                     dupPath = (SnapshotPathType.valueOf(m_filePathType) == SnapshotPathType.SNAP_PATH ?
                             dupPath : m_filePath);
@@ -1142,6 +1142,23 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
         savefile_data = performRestoreScanWork(path, pathType, nonce, dupsPath);
+        
+        tablesStr = tablesStr.equals("") ? "" : tablesStr.substring(1, tablesStr.length() - 1);
+        skiptablesStr = skiptablesStr.equals("") ? "" : skiptablesStr.substring(1, skiptablesStr.length() - 1);
+        List<String> includeList = tableOptParser(tablesStr);
+        List<String> excludeList = tableOptParser(skiptablesStr);
+        
+        //Test
+        System.out.println("Print out includeList.Size:"+includeList.size());
+        for(String s : includeList) {
+            System.out.println(s);
+        }
+        
+        System.out.println("Print out excludeList.Size:"+excludeList.size());
+        for(String s : excludeList) {
+            System.out.println(s);
+        }
+
 
         while (savefile_data[0].advanceRow()) {
             long originalHostId = savefile_data[0].getLong("ORIGINAL_HOST_ID");
@@ -1230,6 +1247,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
             for (JSONObject obj : digests) {
                 JSONArray tables = obj.getJSONArray("tables");
                 for (int ii = 0; ii < tables.length(); ii++) {
+                    if((excludeList.size() > 0 && excludeList.contains(tables.getString(ii))) 
+                            || (includeList.size() > 0 && !includeList.contains(tables.getString(ii)))) {
+                        continue;
+                    }
                     relevantTableNames.add(tables.getString(ii));
                 }
             }
@@ -1376,7 +1397,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             }
         }
 
-        results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot(), isRecover, tablesStr, skiptablesStr);
+        results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot(), isRecover, includeList, excludeList);
 
         final long endTime = System.currentTimeMillis();
         final double duration = (endTime - startTime) / 1000.0;
@@ -2059,26 +2080,32 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private Set<Table> getTablesToRestore(Set<String> savedTableNames,
                                           StringBuilder commaSeparatedViewNamesToDisable,
-                                          String include,
-                                          String exclude,
+                                          List<String> include,
+                                          List<String> exclude,
                                           int filter) {
         Set<Table> tables_to_restore = new HashSet<Table>();
+        
 
         if(filter == 1) {
-            List<String> toInclude = Arrays.asList(include.split(","));
             Set<String> newSet = new HashSet<>();
-            for(String s : toInclude) {
+            for(String s : include) {
                 newSet.add(s);
+                System.out.println("added:"+s);
             }
             savedTableNames = newSet;
         } else if(filter == -1) {
-            List<String> toExclude = Arrays.asList(exclude.split(","));
-            for (String s : toExclude) {
+            for (String s : exclude) {
                 if(savedTableNames.contains(s)) {
                     savedTableNames.remove(s);
+                    System.out.println("removed:"+s);
                 }
             }
         }
+        
+        for(String s : savedTableNames) {
+            System.out.println("s:"+s);
+        }
+        System.out.println("In getTablesToRestore, filter:" + filter);
 
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
@@ -2099,6 +2126,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
         // XXX consider logging the list of tables that were saved but not
         // in the current catalog
+        System.out.println("There are " + tables_to_restore.size() + " tables to restore");
         return tables_to_restore;
     }
 
@@ -2148,8 +2176,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
             final ClusterSaveFileState savefileState,
             final SiteTracker st,
             final boolean isRecover,
-            String include,
-            String exclude) throws Exception
+            List<String> include,
+            List<String> exclude) throws Exception
     {
         /*
          * Create a mailbox to use to send fragment work to execution sites
@@ -2157,9 +2185,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
         final Mailbox m = VoltDB.instance().getHostMessenger().createMailbox();
         //1 for "tables", -1 for "skiptables", 0 for no filter.
         int filterType;
-        if (!include.equals("")) {
+        if (include.size() > 0) {
             filterType = 1;
-        } else if (!exclude.equals("")) {
+        } else if (exclude.size() > 0) {
             filterType = -1;
         } else {
             filterType = 0;
@@ -2271,6 +2299,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     for (int ii = 0; ii < restore_plan.length - 1; ii++) {
                         restore_plan[ii].siteId = actualToGenerated.get(restore_plan[ii].siteId);
                     }
+                    System.out.println("Performing restore for table: " + table.getTypeName());
                     SNAP_LOG.info("Performing restore for table: " + table.getTypeName());
 
                     /*
@@ -3000,6 +3029,26 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         pfs[pfs.length - 1].fragmentId,
                         pfs[pfs.length - 1].parameters).getTableDependency();
         return results;
+    }
+    
+    private List<String> tableOptParser(String s) {
+        List<String> ret = new ArrayList<>();
+        if(s.equals("")) return ret;
+        
+        String[] raw = s.split(", ");
+
+        for(String ss : raw) {
+            StringBuilder sb = new StringBuilder();
+            for(int i = 1 ; i < ss.length() - 1 ; i++) {
+                char c = ss.charAt(i);
+                if(ss.charAt(i) >= 'a' && ss.charAt(i) <= 'z') {
+                    c = (char) (c + 'A' - 'a');
+                }
+                sb.append("" + c);
+            }
+            ret.add(sb.toString());
+        }
+        return ret;
     }
 
     /*
