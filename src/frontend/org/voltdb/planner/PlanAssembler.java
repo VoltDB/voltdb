@@ -2287,7 +2287,10 @@ public class PlanAssembler {
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
 
         HashAggregatePlanNode reAggNodeForReplace = null;
-        if (m_parsedSelect.getScanCount() > 1 && !edgeCaseOuterJoin) {
+        // For cases that joining an implicitly partitioned view
+        // (source table partition key not in the group by keys) and a derived table,
+        // we need to push down the re-agg node.
+        if (sendNodeChild instanceof AbstractJoinPlanNode && ! edgeCaseOuterJoin) {
             reAggNodeForReplace = reAggNode;
         }
         boolean find = mvFixInfo.processScanNodeWithReAggNode(sendNode, reAggNodeForReplace);
@@ -2295,10 +2298,9 @@ public class PlanAssembler {
 
         // If it is a normal joined query, replace the node under the
         // receive node with materialized view scan node.
-        if (m_parsedSelect.getScanCount() > 1 && !edgeCaseOuterJoin) {
+        if (sendNodeChild instanceof AbstractJoinPlanNode && ! edgeCaseOuterJoin) {
             AbstractPlanNode joinNode = sendNodeChild;
             // No agg, limit pushed down at this point.
-            assert(joinNode instanceof AbstractJoinPlanNode);
 
             // Fix the node after Re-aggregation node.
             joinNode.clearParents();
