@@ -200,7 +200,7 @@ public class RepairLog
 
             // We can't repair read only MP transactions. Just don't log them to the repair log.
             // Restart transaction do not need to be repaired here, don't log them as well.
-            if (ctm.isReadOnly() || ctm.isRestart()) {
+            if (ctm.isReadOnly() || ctm.isRestart() || ctm.isAbortDuringRepair()) {
                 return;
             }
 
