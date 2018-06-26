@@ -585,6 +585,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             for (ParsedColInfo orderCol : m_orderColumns) {
                 AbstractExpression expr = orderCol.expression;
                 expr = expr.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
+                // We cannot handle aggregate expressions in the ORDER BY clause.  We need to
+                // have aggregate functions computed and stored in a temp table, and
+                // referenced via a TVE for sorting.
+                assert (! expr.hasAnySubexpressionOfClass(AggregateExpression.class));
                 orderCol.expression = expr;
             }
         }
@@ -1121,10 +1125,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
 
+        int origNumAggResultCols = m_aggResultColumns.size();
         insertAggExpressionsToAggResultColumns(m_aggregationList, order_col);
+        if (m_aggResultColumns.size() > origNumAggResultCols && m_groupByColumns.isEmpty()) {
+            // This can happen when there is an aggregate function used in an ORDER BY clause
+            // that is not also on the SELECT list.  Neither VoltDB nor HSQL is good at handling
+            // these kinds of queries, and havoc can result.  See ENG-13929, and ENG-14177.
+            throw new PlanningErrorException(
+                    "Aggregate functions are not allowed in the ORDER BY clause " +
+                            "if they do not also appear in the SELECT list.");
+        }
+
         if (m_aggregationList.size() >= 1) {
             m_hasAggregateExpression = true;
         }
+
         // Add TVEs in ORDER BY statement if we have,
         // stop recursive finding when we have it in AggResultColumns
         List<TupleValueExpression> tveList = new ArrayList<>();
@@ -1849,8 +1864,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private void detectComplexOrderby() {
         m_isComplexOrderBy = false;
-
-        if (! hasOrderByColumns() || ! isGrouped()) {
+        if (! hasOrderByColumns() || (! m_hasAggregateExpression && !isGrouped())) {
             return;
         }
 
