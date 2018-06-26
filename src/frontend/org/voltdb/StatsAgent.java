@@ -689,15 +689,6 @@ public class StatsAgent extends OpsAgent
         statsSources.add(source);
     }
 
-    /*
-    public StatsSource getStatsSource(StatsSelector selector, long siteId) {// UNACTIVE Stakutis;  added for ExportStats support
-        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
-                m_registeredStatsSources.get(selector);
-        NonBlockingHashSet nbhs=siteIdToStatsSources.get(siteId);
-        return null;
-    }
-    */
-
     public void deregisterStatsSource(StatsSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;

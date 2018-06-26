@@ -22,7 +22,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -47,8 +46,6 @@ import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Throwables;
-
-
 
 /**
  * Wrapper for native Execution Engine library.

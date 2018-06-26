@@ -129,7 +129,7 @@ public class GuestProcessor implements ExportDataProcessor {
                         continue;
                     }
                     if (groupName == null && source.getClient() != null) {
-                        groupName = source.getClient().getTargetName();
+                    	groupName = source.getClient().getTargetName();
                         m_targetsByTableName.put(tableName, groupName);
                     }
                     //If we have a new client for the target use it or see if we have an older client which is set before
@@ -322,9 +322,7 @@ public class GuestProcessor implements ExportDataProcessor {
             @Override
             public void run() {
                 try {
-                	System.out.println("STAKUTIS GuestProcessor.java:run(); which is a listener; get()");
                     BBContainer cont = fut.get();
-                	System.out.println("STAKUTIS GuestProcessor.java:run(); which is a listener; RUN");
                     if (cont == null) {
                         return;
                     }
@@ -342,7 +340,6 @@ public class GuestProcessor implements ExportDataProcessor {
                          */
                         while (!m_shutdown) {
                         	long startTime=0;
-                        	System.out.println("STAKUTIS  GuesstProcessor.java LOOPING");
                             try {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
@@ -350,10 +347,8 @@ public class GuestProcessor implements ExportDataProcessor {
                                 long generation = -1L;
                                 ExportRow row = null;
                                 while (buf.hasRemaining() && !m_shutdown) {
-                                	System.out.println("STAKUTIS    GuestProcessor.java hasRemaining, startPostion:"+startPosition);
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
-                                    System.out.println("STAKUTIS read-int for byte-len:"+length);;
                                     buf.get(rowdata, 0, length);
                                     if (edb.isLegacy()) {
                                         edb.onBlockStart();
@@ -363,9 +358,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                         try {
                                             row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
                                             startTime=(long)row.values[1]; // STAKUTIS
-                                            System.out.println("Start time of this row:"+startTime);
                                             edb.setPreviousRow(row);
-                                            System.out.println("STAKUTIS      GuestProcessor.java Built a row  TimeStamp:"+row.values[1]);
                                         } catch (IOException ioe) {
                                             m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
                                             cont.discard();
@@ -375,10 +368,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                         if (generation == -1L) {
                                             edb.onBlockStart(row);
                                         }
-                                        System.out.println("STAKUTIS      GuestProcesso.java ABOUT to write"
-                                        		+ " the row");
                                         edb.processRow(row);
-                                        System.out.println("STAKUTIS      GuestProcesso.java Wrote the row");
                                         synchronized (source.m_exportStatsRow) {
                                         	source.m_exportStatsRow.m_tuplePending--; // STAKUTIS
                                         }
@@ -388,7 +378,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                         }
                                         generation = row.generation;
                                     }
-                                	System.out.println("STAKUTIS    GuestProcessor.java Finished Row");
                                 }
                                 if (edb.isLegacy()) {
                                     edb.onBlockCompletion();
@@ -404,7 +393,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                                 //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
                                 if (cont != null) {
-                                    cont.discard(); // STAKUTIS
+                                    cont.discard();
                                     cont = null;
                                 }
                                 break;
@@ -426,9 +415,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                     }
                                 }
                             }
-                        	System.out.println("STAKUTIS  GuesstProcessor.java Finished one loop");
                         }
-                    	System.out.println("STAKUTIS GuesstProcessor.java Finished looping");
                         //Dont discard the block also set the start position to the begining.
                         if (m_shutdown && cont != null) {
                             if (m_logger.isDebugEnabled()) {

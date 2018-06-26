@@ -120,8 +120,8 @@ public:
 
     size_t m_headerSpace;
 
-    int64_t m_tupleCount;     // STAKUTIS
-    int64_t m_tupleCount_uncommitted;     // STAKUTIS
+    int64_t m_tupleCount;
+    int64_t m_tupleCount_uncommitted;
 };
 
 }

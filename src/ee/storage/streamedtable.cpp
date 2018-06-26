@@ -208,8 +208,7 @@ size_t StreamedTable::allocatedBlockCount() const {
 
 int64_t StreamedTable::allocatedTupleMemory() const {
     if (m_wrapper) {
-    	int64_t result=m_wrapper->allocatedByteCount();
-    	return result;
+    	return m_wrapper->allocatedByteCount();
     }
     return 0;
 }

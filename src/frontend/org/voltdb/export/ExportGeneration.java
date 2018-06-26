@@ -378,8 +378,7 @@ public class ExportGeneration implements Generation {
              */
             return 0;
         }
-        long ret=source.sizeInBytes();
-        return ret;
+        return source.sizeInBytes();
     }
 
     @Override
