@@ -341,6 +341,7 @@ public class GuestProcessor implements ExportDataProcessor {
                          * Also allow the decoder to request exponential backoff
                          */
                         while (!m_shutdown) {
+                        	long startTime=0;
                         	System.out.println("STAKUTIS  GuesstProcessor.java LOOPING");
                             try {
                                 final ByteBuffer buf = cont.b();
@@ -349,9 +350,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                 long generation = -1L;
                                 ExportRow row = null;
                                 while (buf.hasRemaining() && !m_shutdown) {
-                                	System.out.println("STAKUTIS    GuestProcessor.java hasRemaining");
+                                	System.out.println("STAKUTIS    GuestProcessor.java hasRemaining, startPostion:"+startPosition);
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
+                                    System.out.println("STAKUTIS read-int for byte-len:"+length);;
                                     buf.get(rowdata, 0, length);
                                     if (edb.isLegacy()) {
                                         edb.onBlockStart();
@@ -360,8 +362,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                         //New style connector.
                                         try {
                                             row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
+                                            startTime=(long)row.values[1]; // STAKUTIS
+                                            System.out.println("Start time of this row:"+startTime);
                                             edb.setPreviousRow(row);
-                                            System.out.println("STAKUTIS      GuestProcessor.java Built a row");
+                                            System.out.println("STAKUTIS      GuestProcessor.java Built a row  TimeStamp:"+row.values[1]);
                                         } catch (IOException ioe) {
                                             m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
                                             cont.discard();
@@ -371,6 +375,8 @@ public class GuestProcessor implements ExportDataProcessor {
                                         if (generation == -1L) {
                                             edb.onBlockStart(row);
                                         }
+                                        System.out.println("STAKUTIS      GuestProcesso.java ABOUT to write"
+                                        		+ " the row");
                                         edb.processRow(row);
                                         System.out.println("STAKUTIS      GuestProcesso.java Wrote the row");
                                         synchronized (source.m_exportStatsRow) {
@@ -389,10 +395,16 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                                 if (row != null) {
                                     edb.onBlockCompletion(row);
+                                    long elapsedMS = System.currentTimeMillis() - startTime;
+                                    source.m_exportStatsRow.m_tuplesSentSinceClear += 1;
+                                    source.m_exportStatsRow.m_totalMSSentSinceClear += elapsedMS;
+                                    source.m_exportStatsRow.m_averageLatency = source.m_exportStatsRow.m_totalMSSentSinceClear / source.m_exportStatsRow.m_tuplesSentSinceClear;
+                                    if (source.m_exportStatsRow.m_averageLatency > source.m_exportStatsRow.m_maxLatency)
+                                    	source.m_exportStatsRow.m_maxLatency = source.m_exportStatsRow.m_averageLatency;
                                 }
                                 //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
                                 if (cont != null) {
-                                    cont.discard();
+                                    cont.discard(); // STAKUTIS
                                     cont = null;
                                 }
                                 break;
