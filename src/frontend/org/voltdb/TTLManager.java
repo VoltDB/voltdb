@@ -119,13 +119,24 @@ public class TTLManager extends StatsSource{
             if (VoltType.get((byte)ttl.getTtlcolumn().getType()) != VoltType.TIMESTAMP) {
                 return ttl.getTtlvalue();
             }
-            TimeUnit timeUnit = TimeUnit.SECONDS;
-            if ("MINUTE".equalsIgnoreCase(ttl.getTtlunit())) {
-                timeUnit = TimeUnit.MINUTES;
-            } else if ("HOUR".equalsIgnoreCase(ttl.getTtlunit())) {
-                timeUnit = TimeUnit.HOURS;
-            }else if ("DAY".equalsIgnoreCase(ttl.getTtlunit())) {
-                timeUnit = TimeUnit.DAYS;
+            TimeUnit timeUnit;
+            if(ttl.getTtlunit().isEmpty()) {
+                timeUnit = TimeUnit.SECONDS;
+            } else {
+                final char frequencyUnit = ttl.getTtlunit().toLowerCase().charAt(0);
+                switch (frequencyUnit) {
+                case 'm':
+                    timeUnit = TimeUnit.MINUTES;
+                    break;
+                case 'h':
+                    timeUnit = TimeUnit.HOURS;
+                    break;
+                case 'd':
+                    timeUnit = TimeUnit.DAYS;
+                    break;
+                default:
+                    timeUnit = TimeUnit.SECONDS;
+                }
             }
             return ((System.currentTimeMillis() - timeUnit.toMillis(ttl.getTtlvalue())) * 1000);
         }

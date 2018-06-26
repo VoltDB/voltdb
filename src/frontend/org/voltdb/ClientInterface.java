@@ -2325,19 +2325,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             @Override
             public void clientCallback(ClientResponse resp) throws Exception {
                 if (resp.getStatus() != ClientResponse.SUCCESS) {
-                    hostLog.warn(String.format("Fail to execute TTL on table:%s, column:%s, status:s%",
+                    hostLog.warn(String.format("Fail to execute TTL on table: %s, column: %s, status: s%",
                             task.tableName, columnName, resp.getStatusString()));
                 }
                 VoltTable t = resp.getResults()[0];
                 t.advanceRow();
                 String error = t.getString("MESSAGE");
                 if (!error.isEmpty()) {
-                    hostLog.warn("Errors occured when running TTL on table " + task.tableName + ":" +  error);
+                    String drLimitError = "";
                     if (error.indexOf(TTLManager.DR_LIMIT_MSG) > -1) {
-                        //over DR limit
-                        hostLog.warn("TTL is disabled for table " + task.tableName);
+                        // The buffer limit for a DR transaction is 50M. If over the limit,
+                        // the transaction will be aborted. The same is true for nibble delete transaction.
+                        // If hit this error, no more data can be deleted in this TTL table.
+                        drLimitError = "TTL is disabled for this table.";
                         task.cancel();
                     }
+                    hostLog.warn("Errors occured on TTL table " + task.tableName + ": " +  error + " " + drLimitError);
                 } else {
                     task.stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"), t.getLong("LAST_DELETE_TIMESTAMP"));
                 }
