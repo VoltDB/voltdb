@@ -87,11 +87,15 @@ public class CompleteTransactionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         if (m_fragmentNotExecuted) {
-            hostLog.debug("SKIPPING (Never Executed): " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("SKIPPING (Never Executed): " + this);
+            }
             doUnexecutedFragmentCleanup();
         }
         else {
-            hostLog.debug("STARTING: " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("STARTING: " + this);
+            }
             final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
             if (traceLog != null) {
                 traceLog.add(() -> VoltTrace.beginDuration("execcompletetxn",
@@ -114,7 +118,9 @@ public class CompleteTransactionTask extends TransactionTask
 
                 // Log invocation to DR
                 logToDR(siteConnection.getDRGateway());
-                hostLog.debug("COMPLETE: " + this);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("COMPLETE: " + this);
+                }
             }
             else
             {
@@ -123,7 +129,9 @@ public class CompleteTransactionTask extends TransactionTask
                 // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
                 // for the restarted fragments.
                 m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
-                hostLog.debug("RESTART: " + this);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("RESTART: " + this);
+                }
             }
 
             if (traceLog != null) {
