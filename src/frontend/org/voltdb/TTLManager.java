@@ -88,11 +88,17 @@ public class TTLManager extends StatsSource{
         }
         @Override
         public void run() {
-            ClientInterface cl = VoltDB.instance().getClientInterface();
+
+            //do not run TTL when paused.
+            final VoltDBInterface voltdb = VoltDB.instance();
+            if (voltdb.getMode() == OperationMode.PAUSED) {
+                return;
+            }
+            ClientInterface cl = voltdb.getClientInterface();
             if (!canceled.get() && cl != null && cl.isAcceptingConnections()) {
                 TimeToLive ttl = ttlRef.get();
-                cl.runTimeToLive(tableName, ttl.getTtlcolumn().getName(),
-                        transformValue(ttl), CHUNK_SIZE, TIMEOUT, stats, this);
+                cl.runTimeToLive(ttl.getTtlcolumn().getName(),
+                        transformValue(ttl), CHUNK_SIZE, TIMEOUT, this);
             }
         }
 

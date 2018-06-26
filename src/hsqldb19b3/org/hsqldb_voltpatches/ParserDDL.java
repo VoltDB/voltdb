@@ -1009,7 +1009,7 @@ public class ParserDDL extends ParserRoutine {
             return null;
         }
         int timeLiveValue = 0;
-        String ttlUnit = "SECOND";
+        String ttlUnit = "SECONDS";
         String ttlColumn = "";
         int tokenCount = 0;
         while (tokenCount <= 5) {
@@ -1028,10 +1028,10 @@ public class ParserDDL extends ParserRoutine {
                 tokenCount++;
                 timeLiveValue = (Integer)(token.tokenValue);
                 break;
-            case Tokens.SECOND:
-            case Tokens.MINUTE:
-            case Tokens.HOUR:
-            case Tokens.DAY:
+            case Tokens.SECONDS:
+            case Tokens.MINUTES:
+            case Tokens.HOURS:
+            case Tokens.DAYS:
                 if (tokenCount != 2) {
                     throw unexpectedToken();
                 }
