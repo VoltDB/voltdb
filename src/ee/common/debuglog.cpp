@@ -99,6 +99,7 @@ void outputLogHeader(const char *file, int line, const char *func, int level) {
 }
 
 StackTrace::StackTrace() {
+
     if (backtraceIsSupported()) {
         /**
          * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
@@ -108,6 +109,7 @@ StackTrace::StackTrace() {
         for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
         const int numTraces = backtrace( traces, 128);
         m_traceSymbols = backtrace_symbols( traces, numTraces);
+
         for (int ii = 0; ii < numTraces; ii++) {
             std::size_t sz = 200;
             // Note: must use malloc vs. new so __cxa_demangle can use realloc.
