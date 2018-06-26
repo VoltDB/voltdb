@@ -406,10 +406,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     protected String verifyAndWriteCatalogJar(CatalogChangeResult ccr)
     {
         String procedureName = "@VerifyCatalogAndWriteJar";
-        String diffCommands = CompressionService.decodeBase64AndDecompress(ccr.encodedDiffCommands);
 
         CompletableFuture<Map<Integer,ClientResponse>> cf =
-                callNTProcedureOnAllHosts(procedureName, ccr.catalogBytes, diffCommands,
+                callNTProcedureOnAllHosts(procedureName, ccr.catalogBytes, ccr.encodedDiffCommands,
                         ccr.catalogHash, ccr.deploymentBytes);
 
         Map<Integer, ClientResponse> resultMapByHost = null;
