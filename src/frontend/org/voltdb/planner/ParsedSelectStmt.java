@@ -1863,7 +1863,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void detectComplexOrderby() {
-        if (! hasOrderByColumns() || (! m_hasAggregateExpression && m_groupByColumns.isEmpty())) {
+        m_isComplexOrderBy = false;
+        if (! hasOrderByColumns() || (! m_hasAggregateExpression && !isGrouped())) {
             return;
         }
 
