@@ -549,6 +549,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void pushEndOfStream() {
         exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
+        ExportStats.get().remove(getTableName()); // STAKUTIS
         m_eos = true;
     }
 
@@ -838,7 +839,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             exportLog.trace("AckingContainer.discard with uso: " + m_uso);
                         }
                         try {
-                            m_backingCont.discard();
+                             m_backingCont.discard();
                             try {
                                 if (!m_es.isShutdown()) {
                                     ackImpl(m_uso);
