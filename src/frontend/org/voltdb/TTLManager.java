@@ -89,7 +89,7 @@ public class TTLManager extends StatsSource{
         @Override
         public void run() {
 
-            //do not run TTL when paused.
+            //do not run TTL when cluster is paused to allow proper draini of stream and dr buffer
             final VoltDBInterface voltdb = VoltDB.instance();
             if (voltdb.getMode() == OperationMode.PAUSED) {
                 return;
@@ -119,10 +119,8 @@ public class TTLManager extends StatsSource{
             if (VoltType.get((byte)ttl.getTtlcolumn().getType()) != VoltType.TIMESTAMP) {
                 return ttl.getTtlvalue();
             }
-            TimeUnit timeUnit;
-            if(ttl.getTtlunit().isEmpty()) {
-                timeUnit = TimeUnit.SECONDS;
-            } else {
+            TimeUnit timeUnit = TimeUnit.SECONDS;
+            if(!ttl.getTtlunit().isEmpty()) {
                 final char frequencyUnit = ttl.getTtlunit().toLowerCase().charAt(0);
                 switch (frequencyUnit) {
                 case 'm':

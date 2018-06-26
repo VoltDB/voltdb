@@ -819,7 +819,7 @@ public class Tokens {
     static final String        T_DATEDIFF         = "DATEDIFF";
     public static final String T_SECONDS_MIDNIGHT = "SECONDS_SINCE_MIDNIGHT";
 
-    //VOLTDB EXENSION
+    //VoltDB extension for TTL
     public static final String T_MINUTES          = "MINUTES";
     public static final String T_SECONDS          = "SECONDS";
     public static final String T_HOURS            = "HOURS";
@@ -1619,7 +1619,7 @@ public class Tokens {
     static final int HOURS         = 1006;
     static final int DAYS          = 1007;
     // End of VoltDB extension
-    //
+
     public static final int X_UNKNOWN_TOKEN = -1;
     private static final IntValueHashMap reservedKeys =
         new IntValueHashMap(351);
