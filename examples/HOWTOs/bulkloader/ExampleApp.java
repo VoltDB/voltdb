@@ -10,22 +10,35 @@ public class ExampleApp {
     public static Random rand = new Random();
 
     public static AtomicLong errors = new AtomicLong(0);
+    public static AtomicLong commits = new AtomicLong(0);
     public static int testSize = 1000000;
 
     public static void handleResponse(ClientResponse cr) {
-            if (cr.getStatus() != ClientResponse.SUCCESS) {
-                errors.incrementAndGet();
-                System.err.println(cr.getStatusString());
-            }
+        if (cr.getStatus() == ClientResponse.SUCCESS) {
+            commits.incrementAndGet();
+        } else {
+            errors.incrementAndGet();
+            System.err.println(cr.getStatusString());
+        }
     }
 
-    // Implement the BulkLoaderFailureCallBack for BulkLoader
+    // Implement a BulkLoaderFailureCallback for your BulkLoader
     public static class SessionBulkloaderFailureCallback implements BulkLoaderFailureCallBack {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse cr) {
             handleResponse(cr);
         }
     }
+
+    // Implement a BulkLoaderSuccessCallback for your BulkLoader
+    public static class SessionBulkloaderSuccessCallback implements BulkLoaderSuccessCallback {
+        @Override
+        public void success(Object rowHandle, ClientResponse cr) {
+            handleResponse(cr);
+        }
+    }
+
+
 
     // Implement ProcedureCallback for asynchronous procedure calls
     public static class DefaultCallback implements ProcedureCallback {
@@ -58,7 +71,10 @@ public class ExampleApp {
         double elapsedSeconds = (System.nanoTime() - startNanos)/1000000000.0;
         int tps = (int)(testSize/elapsedSeconds);
         System.out.println("Loaded "+testSize+" records in "+elapsedSeconds+" seconds ("+tps+" rows/sec)");
-
+        System.out.println("  commits: " + commits.get());
+        System.out.println("  errors: " + errors.get());
+        commits.set(0);
+        errors.set(0);
     }
 
 
@@ -68,7 +84,12 @@ public class ExampleApp {
 
         // Get a BulkLoader for the table we want to load, with a given batch size and one callback handles failures for any failed batches
         int batchSize = 1000;
-        VoltBulkLoader bulkLoader = client.getNewBulkLoader("app_session",batchSize, new SessionBulkloaderFailureCallback());
+        boolean upsertMode = false;
+        VoltBulkLoader bulkLoader = client.getNewBulkLoader("app_session",
+                                                            batchSize,
+                                                            upsertMode,
+                                                            new SessionBulkloaderFailureCallback(),
+                                                            new SessionBulkloaderSuccessCallback());
 
         long startNanos = System.nanoTime();
         for (int i=0; i<testSize; i++) {
@@ -87,6 +108,10 @@ public class ExampleApp {
         double elapsedSeconds = (System.nanoTime() - startNanos)/1000000000.0;
         int tps = (int)(testSize/elapsedSeconds);
         System.out.println("Loaded "+testSize+" records in "+elapsedSeconds+" seconds ("+tps+" rows/sec)");
+        System.out.println("  commits: " + commits.get());
+        System.out.println("  errors: " + errors.get());
+        commits.set(0);
+        errors.set(0);
 
         bulkLoader.close();
     }
