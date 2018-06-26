@@ -279,6 +279,7 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
                                                          tuple.getNValue(i),
                                                          m_tempPool);
     }
+
     VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
                m_templateTuple.debug(m_targetTable->name()).c_str(), m_targetTable->name().c_str(),
                m_targetTable->schema()->debug().c_str());

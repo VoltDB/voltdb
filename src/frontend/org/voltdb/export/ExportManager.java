@@ -552,8 +552,7 @@ public class ExportManager
                 //This is now fine as you could get a stats tick and have no generation if you dropped last table.
                 return 0;
             }
-            long ret=generation.getQueuedExportBytes( partitionId, signature);
-            return ret;
+            return generation.getQueuedExportBytes( partitionId, signature);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Failed to get export queued bytes.", e);

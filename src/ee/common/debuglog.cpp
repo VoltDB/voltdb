@@ -99,7 +99,7 @@ void outputLogHeader(const char *file, int line, const char *func, int level) {
 }
 
 StackTrace::StackTrace() {
-    if (backtraceIsSupported() || true) { // STAKUTIS added TRUE
+    if (backtraceIsSupported()) {
         /**
          * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
          */

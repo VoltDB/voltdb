@@ -643,16 +643,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_isLowestSiteId = isLowestSiteId;
         m_hashinator = TheHashinator.getCurrentHashinator();
 
-        /*** STAKUTIS hacked-out; Should this be moved to ExportManager
-        if (agent != null) {
-	        m_exportStats = new ExportStats(); // STAKUTIS created the m_exportStats member
-	        agent.registerStatsSource(StatsSelector.EXPORT,
-	                m_partitionId, // m_siteId,
-	                m_exportStats);
-        }
-        else m_exportStats = null;
-        ***/
-
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
             agent.registerStatsSource(StatsSelector.TABLE,

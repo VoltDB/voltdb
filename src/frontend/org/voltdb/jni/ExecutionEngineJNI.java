@@ -47,8 +47,6 @@ import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Throwables;
 
-
-
 /**
  * Wrapper for native Execution Engine library.
  * All native methods are private to make it simple

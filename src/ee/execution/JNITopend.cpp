@@ -161,7 +161,8 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             m_exportManagerClass,
             "pushExportBuffer",
             "(ILjava/lang/String;JJLjava/nio/ByteBuffer;ZJ)V");
-        m_jniEnv->ExceptionDescribe();
+    if (m_pushExportBufferMID == NULL) {
+    	m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
         throw std::exception();
     }
@@ -552,8 +553,6 @@ int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
             partitionId,
             signatureString);
     m_jniEnv->DeleteLocalRef(signatureString);
-    if (retval) {
-    }
     return retval;
 }
 
@@ -596,7 +595,7 @@ void JNITopend::pushExportBuffer(
                         sync ? JNI_TRUE : JNI_FALSE,
                         		tupleCount);
     }
-   m_jniEnv->DeleteLocalRef(signatureString);
+    m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
         throw std::exception();
