@@ -166,7 +166,6 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         assert(m_pushExportBufferMID != NULL);
         throw std::exception();
     }
-
     m_pushExportEOFMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushEndOfStream",
