@@ -160,8 +160,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(ILjava/lang/String;JJLjava/nio/ByteBuffer;ZJ)V"); //STAKUTIS added last param
-    if (m_pushExportBufferMID == NULL) {
+            "(ILjava/lang/String;JJLjava/nio/ByteBuffer;ZJ)V");
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
         throw std::exception();
@@ -582,7 +581,7 @@ void JNITopend::pushExportBuffer(
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
                 sync ? JNI_TRUE : JNI_FALSE,
-                		tupleCount); // STAKUTIS
+                		tupleCount);
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
 
@@ -595,7 +594,7 @@ void JNITopend::pushExportBuffer(
                         NULL,
                         NULL,
                         sync ? JNI_TRUE : JNI_FALSE,
-                        		tupleCount); // STAKUTIS
+                        		tupleCount);
     }
    m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {
