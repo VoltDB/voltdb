@@ -72,7 +72,10 @@ public class ExportStats extends StatsSource {
     }
 
     static public ExportStats get() {
-    	assert(singleton != null);
+    	if (singleton == null) {
+    		// This happens during a restart and there are already stream tables
+    		singleton = new ExportStats();
+    	}
     	return singleton;  // STAKUTIS hack for now
     }
 
