@@ -1619,7 +1619,7 @@ void VoltDBIPC::pushExportBuffer(
         std::string signature,
         voltdb::StreamBlock *block,
         bool sync,
-		int64_t tupleCount) {
+        int64_t tupleCount) {
     int32_t index = 0;
     m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
     *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);

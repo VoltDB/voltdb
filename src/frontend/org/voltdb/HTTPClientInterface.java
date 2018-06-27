@@ -370,7 +370,7 @@ public class HTTPClientInterface {
     }
 
     public boolean callProcedure(String hostname, final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
-    	InternalConnectionHandler internal=m_invocationHandler.get();
+        InternalConnectionHandler internal=m_invocationHandler.get();
         return internal.callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, args);
     }
 

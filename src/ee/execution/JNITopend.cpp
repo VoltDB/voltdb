@@ -162,7 +162,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             "pushExportBuffer",
             "(ILjava/lang/String;JJLjava/nio/ByteBuffer;ZJ)V");
     if (m_pushExportBufferMID == NULL) {
-    	m_jniEnv->ExceptionDescribe();
+        m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
         throw std::exception();
     }
@@ -560,7 +560,7 @@ void JNITopend::pushExportBuffer(
         string signature,
         StreamBlock *block,
         bool sync,
-		int64_t tupleCount) {
+        int64_t tupleCount) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
 
     if (block != NULL) {
@@ -579,7 +579,7 @@ void JNITopend::pushExportBuffer(
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
                 sync ? JNI_TRUE : JNI_FALSE,
-                		tupleCount);
+                        tupleCount);
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
 
@@ -592,7 +592,7 @@ void JNITopend::pushExportBuffer(
                         NULL,
                         NULL,
                         sync ? JNI_TRUE : JNI_FALSE,
-                        		tupleCount);
+                                tupleCount);
     }
     m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {

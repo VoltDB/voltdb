@@ -262,13 +262,13 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 }
 
 void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
-	m_tupleCount = m_tupleCount_uncommitted;
+    m_tupleCount = m_tupleCount_uncommitted;
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
                     m_signature,
                     block,
                     sync,
-					m_tupleCount);
+                    m_tupleCount);
     m_tupleCount=0; m_tupleCount_uncommitted=0;
 }
 

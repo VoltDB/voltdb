@@ -571,7 +571,7 @@ public class StatsAgent extends OpsAgent
             break;
         case EXPORT:
             stats = collectStats(StatsSelector.EXPORT, interval);
-        	break;
+            break;
         case TTL:
             stats = collectStats(StatsSelector.TTL, interval);
             break;

@@ -221,7 +221,6 @@ public class TestExportBase extends RegressionSuite {
 
     public TestExportBase(String s) {
         super(s);
-    	System.out.println("Stakutis says hi");
     }
 
 }
