@@ -89,9 +89,9 @@ public class TTLManager extends StatsSource{
         @Override
         public void run() {
 
-            //do not run TTL when cluster is paused to allow proper draini of stream and dr buffer
+            //do not run TTL when cluster is paused to allow proper draining of stream and dr buffer
             final VoltDBInterface voltdb = VoltDB.instance();
-            if (voltdb.getMode() == OperationMode.PAUSED) {
+            if (voltdb.getMode() != OperationMode.RUNNING) {
                 return;
             }
             ClientInterface cl = voltdb.getClientInterface();
