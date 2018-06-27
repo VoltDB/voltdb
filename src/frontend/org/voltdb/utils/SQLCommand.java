@@ -429,14 +429,12 @@ public class SQLCommand
             // Check if table exists
             String tableName = "";
             String type = "";
-            //String remarks = "";
             VoltTable tableData = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
             while (tableData.advanceRow()) {
                 String t = tableData.getString(2);
                 if (t.equalsIgnoreCase(describeArgs)) {
                     tableName = t;
                     type = tableData.getString(3);
-                    //remarks = tableData.getString(4);
                     break;
                 }
             }
