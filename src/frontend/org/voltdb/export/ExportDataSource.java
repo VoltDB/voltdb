@@ -505,7 +505,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_committedBuffers.offer(sb);
                     m_exportStatsRow.m_tupleCount += tupleCount;
                     synchronized (m_exportStatsRow) {
-                    	m_exportStatsRow.m_tuplePending += tupleCount;
+                        m_exportStatsRow.m_tuplePending += tupleCount;
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);

@@ -129,7 +129,7 @@ public class GuestProcessor implements ExportDataProcessor {
                         continue;
                     }
                     if (groupName == null && source.getClient() != null) {
-                    	groupName = source.getClient().getTargetName();
+                        groupName = source.getClient().getTargetName();
                         m_targetsByTableName.put(tableName, groupName);
                     }
                     //If we have a new client for the target use it or see if we have an older client which is set before
@@ -338,7 +338,7 @@ public class GuestProcessor implements ExportDataProcessor {
                          * Also allow the decoder to request exponential backoff
                          */
                         while (!m_shutdown) {
-                        	long startTime=0;
+                            long startTime=0;
                             try {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
@@ -369,7 +369,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                         }
                                         edb.processRow(row);
                                         synchronized (source.m_exportStatsRow) {
-                                        	source.m_exportStatsRow.m_tuplePending--; // STAKUTIS
+                                            source.m_exportStatsRow.m_tuplePending--; // STAKUTIS
                                         }
                                         if (generation != -1L && row.generation != generation) {
                                             edb.onBlockCompletion(row);
@@ -388,7 +388,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                     source.m_exportStatsRow.m_totalMSSentSinceClear += elapsedMS;
                                     source.m_exportStatsRow.m_averageLatency = source.m_exportStatsRow.m_totalMSSentSinceClear / source.m_exportStatsRow.m_tuplesSentSinceClear;
                                     if (source.m_exportStatsRow.m_averageLatency > source.m_exportStatsRow.m_maxLatency)
-                                    	source.m_exportStatsRow.m_maxLatency = source.m_exportStatsRow.m_averageLatency;
+                                        source.m_exportStatsRow.m_maxLatency = source.m_exportStatsRow.m_averageLatency;
                                 }
                                 //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
                                 if (cont != null) {

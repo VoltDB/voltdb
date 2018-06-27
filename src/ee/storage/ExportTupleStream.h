@@ -64,7 +64,7 @@ public:
     inline size_t getMDColumnNamesSerializedSize() const { return m_mdSchemaSize; }
 
     int64_t allocatedByteCount() const {
-    	return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
+        return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
                 ExecutorContext::getPhysicalTopend()->getQueuedExportBytes(m_partitionId, m_signature);
     }
 

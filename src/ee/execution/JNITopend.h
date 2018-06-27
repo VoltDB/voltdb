@@ -51,7 +51,7 @@ public:
             std::string signature,
             StreamBlock *block,
             bool sync,
-			int64_t tupleCount);
+            int64_t tupleCount);
     void pushEndOfStream(
             int32_t partitionId,
             std::string signature);

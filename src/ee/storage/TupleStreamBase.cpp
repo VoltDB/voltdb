@@ -53,8 +53,8 @@ TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpa
       m_committedSpHandle(0), m_committedUso(0),
       m_committedUniqueId(0),
       m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace),
-	  m_tupleCount(0),
-	  m_tupleCount_uncommitted(0)
+      m_tupleCount(0),
+      m_tupleCount_uncommitted(0)
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -105,7 +105,7 @@ void TupleStreamBase::cleanupManagedBuffers()
 void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t uniqueId,
         bool sync, bool flush)
 {
-	if (currentSpHandle < m_openSpHandle) {
+    if (currentSpHandle < m_openSpHandle) {
         throwFatalException(
                 "Active transactions moving backwards: openSpHandle is %jd, while the current spHandle is %jd",
                 (intmax_t)m_openSpHandle, (intmax_t)currentSpHandle
