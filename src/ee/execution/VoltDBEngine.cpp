@@ -1532,7 +1532,9 @@ void
 VoltDBEngine::markAllExportingStreamsNew() {
     //Mark all streams new so that schema is sent on next tuple.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingStreams) {
-        entry.second->setNew();
+        if (entry.second != NULL) {
+            entry.second->setNew();
+        }
     }
 }
 
