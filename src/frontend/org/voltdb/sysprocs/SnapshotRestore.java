@@ -1142,23 +1142,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
         savefile_data = performRestoreScanWork(path, pathType, nonce, dupsPath);
-        
         tablesStr = tablesStr.equals("") ? "" : tablesStr.substring(1, tablesStr.length() - 1);
         skiptablesStr = skiptablesStr.equals("") ? "" : skiptablesStr.substring(1, skiptablesStr.length() - 1);
         List<String> includeList = tableOptParser(tablesStr);
         List<String> excludeList = tableOptParser(skiptablesStr);
-        
-        //Test
-        System.out.println("Print out includeList.Size:"+includeList.size());
-        for(String s : includeList) {
-            System.out.println(s);
-        }
-        
-        System.out.println("Print out excludeList.Size:"+excludeList.size());
-        for(String s : excludeList) {
-            System.out.println(s);
-        }
-
 
         while (savefile_data[0].advanceRow()) {
             long originalHostId = savefile_data[0].getLong("ORIGINAL_HOST_ID");
@@ -1247,10 +1234,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
             for (JSONObject obj : digests) {
                 JSONArray tables = obj.getJSONArray("tables");
                 for (int ii = 0; ii < tables.length(); ii++) {
-                    if((excludeList.size() > 0 && excludeList.contains(tables.getString(ii))) 
-                            || (includeList.size() > 0 && !includeList.contains(tables.getString(ii)))) {
-                        continue;
-                    }
                     relevantTableNames.add(tables.getString(ii));
                 }
             }
@@ -2084,28 +2067,20 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                           List<String> exclude,
                                           int filter) {
         Set<Table> tables_to_restore = new HashSet<Table>();
-        
 
         if(filter == 1) {
             Set<String> newSet = new HashSet<>();
             for(String s : include) {
                 newSet.add(s);
-                System.out.println("added:"+s);
             }
             savedTableNames = newSet;
         } else if(filter == -1) {
             for (String s : exclude) {
                 if(savedTableNames.contains(s)) {
                     savedTableNames.remove(s);
-                    System.out.println("removed:"+s);
                 }
             }
         }
-        
-        for(String s : savedTableNames) {
-            System.out.println("s:"+s);
-        }
-        System.out.println("In getTablesToRestore, filter:" + filter);
 
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
@@ -2116,7 +2091,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
                 tables_to_restore.add(table);
             }
-            else if (! CatalogUtil.isTableExportOnly(m_database, table)) {
+            else if (!CatalogUtil.isTableExportOnly(m_database, table)) {
                 SNAP_LOG.info("Table: " + table.getTypeName() +
                               " does not have any savefile data and so will not be loaded from disk.");
             }
@@ -2126,7 +2101,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
         // XXX consider logging the list of tables that were saved but not
         // in the current catalog
-        System.out.println("There are " + tables_to_restore.size() + " tables to restore");
         return tables_to_restore;
     }
 
@@ -3030,11 +3004,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         pfs[pfs.length - 1].parameters).getTableDependency();
         return results;
     }
-    
+
     private List<String> tableOptParser(String s) {
         List<String> ret = new ArrayList<>();
         if(s.equals("")) return ret;
-        
+
         String[] raw = s.split(", ");
 
         for(String ss : raw) {

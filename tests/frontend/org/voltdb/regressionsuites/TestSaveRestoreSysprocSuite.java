@@ -1937,6 +1937,88 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    public void testSaveAndPartialRestoreSkiptables() throws Exception {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testSaveAndPartialRestoreSkiptables");
+        int num_replicated_items_per_chunk = 100;
+        int num_replicated_chunks = 10;
+        int num_partitioned_items_per_chunk = 120;
+        int num_partitioned_chunks = 10;
+
+        Client client = getClient();
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                num_replicated_items_per_chunk,
+                num_replicated_chunks);
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                num_partitioned_items_per_chunk,
+                num_partitioned_chunks);
+        //TODO:Implement junit test or partial Snapshot.
+        client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte)0);
+        m_config.shutDown();
+        m_config.startUp();
+
+        client = getClient();
+        JSONObject jsObj = new JSONObject();
+        try {
+            jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
+            jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
+            jsObj.put(SnapshotUtil.JSON_SKIPTABLES, "['REPLICATED_TESTER']");
+        } catch (JSONException e) {
+            fail("JSON exception" + e.getMessage());
+        }
+        VoltTable[] results;
+        results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
+
+        while(results[0].advanceRow()) {
+            if (results[0].getString("RESULT").equals("FAILURE")) {
+                fail(results[0].getString("ERR_MSG"));
+            }
+            assert(!results[0].getString("TABLE").equals("REPLICATED_TESTER"));
+        }
+    }
+
+    public void testSaveAndPartialRestoreTables() throws Exception {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testPartialSnapshotRestoreTables");
+        int num_replicated_items_per_chunk = 100;
+        int num_replicated_chunks = 10;
+        int num_partitioned_items_per_chunk = 120;
+        int num_partitioned_chunks = 10;
+
+        Client client = getClient();
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                num_replicated_items_per_chunk,
+                num_replicated_chunks);
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                num_partitioned_items_per_chunk,
+                num_partitioned_chunks);
+        //TODO:Implement junit test or partial Snapshot.
+        client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte)0);
+        m_config.shutDown();
+        m_config.startUp();
+
+        client = getClient();
+        JSONObject jsObj = new JSONObject();
+        try {
+            jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
+            jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
+            jsObj.put(SnapshotUtil.JSON_TABLES, "['REPLICATED_TESTER']");
+        } catch (JSONException e) {
+            fail("JSON exception" + e.getMessage());
+        }
+        VoltTable[] results;
+        results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
+
+        while(results[0].advanceRow()) {
+            if (results[0].getString("RESULT").equals("FAILURE")) {
+                fail(results[0].getString("ERR_MSG"));
+            }
+            assert(results[0].getString("TABLE").equals("REPLICATED_TESTER"));
+        }
+    }
+
     public void testIdleOnlineSnapshot() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
