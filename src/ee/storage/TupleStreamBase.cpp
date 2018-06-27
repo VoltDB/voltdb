@@ -52,7 +52,9 @@ TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpa
       m_openTransactionUso(0),
       m_committedSpHandle(0), m_committedUso(0),
       m_committedUniqueId(0),
-      m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace)
+      m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace),
+	  m_tupleCount(0),
+	  m_tupleCount_uncommitted(0)
 {
     extendBufferChain(m_defaultCapacity);
 }

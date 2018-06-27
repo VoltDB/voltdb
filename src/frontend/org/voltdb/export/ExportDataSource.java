@@ -216,10 +216,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         System.out.println("STAKUITS ExportDateSource.java Creating ExportStat for stream "+tableName);
         ExportStats m_exportStats=ExportStats.get();
         ExportStats.ExportStatsRow row=m_exportStats.get(tableName);
-        row.m_tupleCount=0;
         row.m_partitionId=partitionId;
         row.m_streamName=tableName;
-        row.m_tuplePending=0;
         m_exportStatsRow = row;
 
     }

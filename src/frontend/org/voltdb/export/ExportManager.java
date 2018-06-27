@@ -147,7 +147,7 @@ public class ExportManager
         }
         em.initialize(catalogContext, partitions, isRejoin);
 
-        m_exportStats = new ExportStats(); // STAKUTIS created the m_exportStats member
+        m_exportStats = ExportStats.get(); // STAKUTIS created the m_exportStats member
         RealVoltDB db=(RealVoltDB)VoltDB.instance();
         db.getStatsAgent().registerStatsSource(StatsSelector.EXPORT,
                 myHostId, // m_siteId,
