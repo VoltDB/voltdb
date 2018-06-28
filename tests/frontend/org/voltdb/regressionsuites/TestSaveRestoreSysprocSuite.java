@@ -1866,7 +1866,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 num_replicated_chunks);
         loadLargePartitionedTable(client, "PARTITION_TESTER",
                 num_partitioned_items_per_chunk,
-                num_partitioned_chunks);
+                 num_partitioned_chunks);
 
         // Test saving a non-existing table
         VoltTable[] results = saveTables(client, TMPDIR, TESTNONCE + "NonExistingTable", new String[]{"DUMMYTABLE"},
@@ -1941,20 +1941,16 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         System.out.println("Starting testSaveAndPartialRestoreSkiptables");
-        int num_replicated_items_per_chunk = 100;
-        int num_replicated_chunks = 10;
-        int num_partitioned_items_per_chunk = 120;
-        int num_partitioned_chunks = 10;
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+        VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
 
         Client client = getClient();
-        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
-                num_replicated_items_per_chunk,
-                num_replicated_chunks);
-        loadLargePartitionedTable(client, "PARTITION_TESTER",
-                num_partitioned_items_per_chunk,
-                num_partitioned_chunks);
-        //TODO:Implement junit test or partial Snapshot.
-        client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte)0);
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
+        saveTablesWithDefaultOptions(client, TESTNONCE);
+        validateSnapshot(true, TESTNONCE);
         m_config.shutDown();
         m_config.startUp();
 
@@ -1967,6 +1963,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         } catch (JSONException e) {
             fail("JSON exception" + e.getMessage());
         }
+        Thread.sleep(2000);
         VoltTable[] results;
         results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
 
@@ -1982,20 +1979,16 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         System.out.println("Starting testPartialSnapshotRestoreTables");
-        int num_replicated_items_per_chunk = 100;
-        int num_replicated_chunks = 10;
-        int num_partitioned_items_per_chunk = 120;
-        int num_partitioned_chunks = 10;
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+        VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
 
         Client client = getClient();
-        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
-                num_replicated_items_per_chunk,
-                num_replicated_chunks);
-        loadLargePartitionedTable(client, "PARTITION_TESTER",
-                num_partitioned_items_per_chunk,
-                num_partitioned_chunks);
-        //TODO:Implement junit test or partial Snapshot.
-        client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte)0);
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
+        saveTablesWithDefaultOptions(client, TESTNONCE);
+        validateSnapshot(true, TESTNONCE);
         m_config.shutDown();
         m_config.startUp();
 
@@ -2008,6 +2001,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         } catch (JSONException e) {
             fail("JSON exception" + e.getMessage());
         }
+        
+        Thread.sleep(2000);
         VoltTable[] results;
         results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
 
