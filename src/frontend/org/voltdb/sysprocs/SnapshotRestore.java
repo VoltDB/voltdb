@@ -2071,7 +2071,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
         if(filter == 1) {
             Set<String> newSet = new HashSet<>();
             for(String s : include) {
-                newSet.add(s);
+                if(savedTableNames.contains(s)) {
+                    newSet.add(s);
+                } else {
+                    SNAP_LOG.error("Table: " + s + " is not in the snapshot, skip this table.");
+                    System.err.println("ERROR: Table " + s + " is not in the snapshot, skip this table.");
+                }
             }
             savedTableNames = newSet;
         } else if(filter == -1) {

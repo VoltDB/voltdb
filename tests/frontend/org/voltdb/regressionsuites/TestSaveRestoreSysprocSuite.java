@@ -2012,6 +2012,44 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
+    public void testSaveAndPartialRestoreWithNonExistingTables() throws Exception {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testSaveAndPartialRestoreWithNonExistingTables");
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+        VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+
+        Client client = getClient();
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
+        saveTablesWithDefaultOptions(client, TESTNONCE);
+        validateSnapshot(true, TESTNONCE);
+        m_config.shutDown();
+        m_config.startUp();
+
+        client = getClient();
+        JSONObject jsObj = new JSONObject();
+        try {
+            jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
+            jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
+            jsObj.put(SnapshotUtil.JSON_TABLES, "['REPLICATED_TESTER', 'DUMMYTABLE']");
+        } catch (JSONException e) {
+            fail("JSON exception" + e.getMessage());
+        }
+
+        VoltTable[] results;
+        results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
+
+        while(results[0].advanceRow()) {
+            if (results[0].getString("RESULT").equals("FAILURE")) {
+                fail(results[0].getString("ERR_MSG"));
+            }
+            assert(!results[0].getString("TABLE").equals("DUMMYTABLE"));
+        }
+    }
+
     public void testIdleOnlineSnapshot() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
