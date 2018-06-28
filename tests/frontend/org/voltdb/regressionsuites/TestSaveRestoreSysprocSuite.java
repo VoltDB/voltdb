@@ -1866,7 +1866,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 num_replicated_chunks);
         loadLargePartitionedTable(client, "PARTITION_TESTER",
                 num_partitioned_items_per_chunk,
-                 num_partitioned_chunks);
+                num_partitioned_chunks);
 
         // Test saving a non-existing table
         VoltTable[] results = saveTables(client, TMPDIR, TESTNONCE + "NonExistingTable", new String[]{"DUMMYTABLE"},
@@ -1963,7 +1963,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         } catch (JSONException e) {
             fail("JSON exception" + e.getMessage());
         }
-        Thread.sleep(2000);
         VoltTable[] results;
         results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
 
@@ -2001,8 +2000,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         } catch (JSONException e) {
             fail("JSON exception" + e.getMessage());
         }
-        
-        Thread.sleep(2000);
+
         VoltTable[] results;
         results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
 
