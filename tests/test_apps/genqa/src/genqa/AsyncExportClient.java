@@ -551,7 +551,7 @@ public class AsyncExportClient
                 + "increase --timeout arg for slower tests" );
             }
             try {
-                stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+                stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             } catch (Exception ex) {
             }
             if (stats == null) {
@@ -561,16 +561,13 @@ public class AsyncExportClient
             boolean passedThisTime = true;
             while (stats.advanceRow()) {
                 if ( Instant.now().isAfter(maxTime) ) {
-                    throw new Exception("Test Timeout expecting non-zero TUPLE_ALLOCATED_MEMORY Statistic, "
+                    throw new Exception("Test Timeout expecting non-zero TUPLE_PENDING Statistic, "
                     + "increase --timeout arg for slower clients" );
                 }
-                String ttype = stats.getString("TABLE_TYPE");
-                if (ttype.equals("StreamedTable")) {
-                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
-                        passedThisTime = false;
-                        System.out.println("Partition Not Zero.");
-                        break;
-                    }
+                if (0 != stats.getLong("TUPLE_PENDING")) {
+                    passedThisTime = false;
+                    System.out.println("Partition Not Zero.");
+                    break;
                 }
             }
             if (passedThisTime) {

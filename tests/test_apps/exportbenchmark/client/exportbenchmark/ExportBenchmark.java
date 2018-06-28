@@ -244,7 +244,7 @@ public class ExportBenchmark {
         //Wait 10 mins only
         long end = st + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -258,18 +258,15 @@ public class ExportBenchmark {
             }
             long ts = 0;
             while (stats.advanceRow()) {
-                String ttype = stats.getString("TABLE_TYPE");
                 Long tts = stats.getLong("TIMESTAMP");
                 //Get highest timestamp and watch it change
                 if (tts > ts) {
                     ts = tts;
                 }
-                if ("StreamedTable".equals(ttype)) {
-                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
-                        passedThisTime = false;
-                        System.out.println("Partition Not Zero.");
-                        break;
-                    }
+                if (0 != stats.getLong("TUPLE_PENDING")) {
+                    passedThisTime = false;
+                    System.out.println("Partition Not Zero.");
+                    break;
                 }
             }
             if (passedThisTime) {
