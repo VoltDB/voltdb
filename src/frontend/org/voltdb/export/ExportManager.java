@@ -85,6 +85,10 @@ public class ExportManager
      */
     private final Set<Integer> m_masterOfPartitions = new HashSet<Integer>();
 
+    public static final byte RELEASE_BUFFER = 1;
+
+    public static final byte MIGRATE_MASTER = 2;
+
     /**
      * Thrown if the initial setup of the loader fails
      */
