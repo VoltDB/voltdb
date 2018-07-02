@@ -195,9 +195,12 @@ EXECUTE_PROCESS(
 )
 #
 # The previous command left the test names in
-# This file.
+# This file.  Each line is a single file name.  We
+# need to do some CMake magic to convert this to a
+# CMake list.
 #
 FILE(READ ${CMAKE_SOURCE_DIR}/tests/ee/ee_auto_generated_unit_tests/generated_tests.txt VOLTDB_GENERATED_TEST_PROGRAMS)
+STRING(REPLACE "\n" ";" VOLTDB_GENERATED_TEST_PROGRAMS ${VOLTDB_GENERATED_TEST_PROGRAMS})
 
 STRING(STRIP "${VOLTDB_GENERATED_TEST_PROGRAMS}" VOLTDB_GENERATED_TEST_PROGRAMS)
 # MESSAGE( "VOLTDB_GENERATED_TEST_PROGRAMS is ${VOLTDB_GENERATED_TEST_PROGRAMS}" )
