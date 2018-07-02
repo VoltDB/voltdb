@@ -88,11 +88,17 @@ public class TTLManager extends StatsSource{
         }
         @Override
         public void run() {
-            ClientInterface cl = VoltDB.instance().getClientInterface();
+
+            //do not run TTL when cluster is paused to allow proper draining of stream and dr buffer
+            final VoltDBInterface voltdb = VoltDB.instance();
+            if (voltdb.getMode() != OperationMode.RUNNING) {
+                return;
+            }
+            ClientInterface cl = voltdb.getClientInterface();
             if (!canceled.get() && cl != null && cl.isAcceptingConnections()) {
                 TimeToLive ttl = ttlRef.get();
-                cl.runTimeToLive(tableName, ttl.getTtlcolumn().getName(),
-                        transformValue(ttl), CHUNK_SIZE, TIMEOUT, stats, this);
+                cl.runTimeToLive(ttl.getTtlcolumn().getName(),
+                        transformValue(ttl), CHUNK_SIZE, TIMEOUT, this);
             }
         }
 
@@ -114,12 +120,21 @@ public class TTLManager extends StatsSource{
                 return ttl.getTtlvalue();
             }
             TimeUnit timeUnit = TimeUnit.SECONDS;
-            if ("MINUTE".equalsIgnoreCase(ttl.getTtlunit())) {
-                timeUnit = TimeUnit.MINUTES;
-            } else if ("HOUR".equalsIgnoreCase(ttl.getTtlunit())) {
-                timeUnit = TimeUnit.HOURS;
-            }else if ("DAY".equalsIgnoreCase(ttl.getTtlunit())) {
-                timeUnit = TimeUnit.DAYS;
+            if(!ttl.getTtlunit().isEmpty()) {
+                final char frequencyUnit = ttl.getTtlunit().toLowerCase().charAt(0);
+                switch (frequencyUnit) {
+                case 'm':
+                    timeUnit = TimeUnit.MINUTES;
+                    break;
+                case 'h':
+                    timeUnit = TimeUnit.HOURS;
+                    break;
+                case 'd':
+                    timeUnit = TimeUnit.DAYS;
+                    break;
+                default:
+                    timeUnit = TimeUnit.SECONDS;
+                }
             }
             return ((System.currentTimeMillis() - timeUnit.toMillis(ttl.getTtlvalue())) * 1000);
         }

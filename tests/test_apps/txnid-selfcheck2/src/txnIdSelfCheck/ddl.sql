@@ -138,7 +138,7 @@ CREATE TABLE nibdr
 , ts         timestamp          DEFAULT NOW NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_nr PRIMARY KEY (p,id)
-) USING TTL 30 Second on column ts ;
+) USING TTL 30 Seconds on column ts ;
 CREATE INDEX NIBR_TSINDEX ON nibdr (ts);
 
 -- nibble delete partitioned table
@@ -149,7 +149,7 @@ CREATE TABLE nibdp
 , ts         timestamp          DEFAULT NOW NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_np PRIMARY KEY (p,id)
-) USING TTL 30 Second on column ts ;
+) USING TTL 30 Seconds on column ts ;
 PARTITION TABLE nibdp ON COLUMN p;
 CREATE INDEX NIBP_TSINDEX ON nibdp (ts);
 
