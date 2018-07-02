@@ -174,11 +174,17 @@ public class Cartographer extends StatsSource
                         if (isHostIdLocal(hostId)) {
                             // this is a host contain newly promoted partition
                             // inform the export manager to prepare mastership promotion
-                            ExportManager.instance().prepareAcceptMastership(partitionId);
+                            // Cartographer is initialized before ExportManager, ignore callbacks
+                            // before export is initialized
+                            if (ExportManager.instance() != null) {
+                                ExportManager.instance().prepareAcceptMastership(partitionId);
+                            }
                         } else {
                             // this host *could* contain old master
                             // inform the export manager to preapre mastership migration (drain existing PBD and notify new leader)
-                            ExportManager.instance().prepareUnacceptMastership(partitionId);
+                            if (ExportManager.instance() != null) {
+                                ExportManager.instance().prepareUnacceptMastership(partitionId);
+                            }
                         }
                     }
                 }

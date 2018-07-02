@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 
@@ -85,6 +86,8 @@ public class ExportGeneration implements Generation {
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
         return m_dataSourcesByPartition;
     }
+
+    private ImmutableList<Long> m_replicasHSIds = null;
 
     private Mailbox m_mbox = null;
 
@@ -181,36 +184,67 @@ public class ExportGeneration implements Generation {
                 if (message instanceof BinaryPayloadMessage) {
                     BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
                     ByteBuffer buf = ByteBuffer.wrap(bpm.m_payload);
+                    final byte msgType = buf.get();
                     final int partition = buf.getInt();
-                    final int length = buf.getInt();
-                    byte stringBytes[] = new byte[length];
-                    buf.get(stringBytes);
-                    String signature = new String(stringBytes, Constants.UTF8ENCODING);
-                    final long ackUSO = buf.getLong();
-                    final boolean runEveryWhere = (buf.getShort() == (short )1);
-
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
-                    if (partitionSources == null) {
-                        exportLog.error("Received an export ack for partition " + partition +
-                                " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
-                        return;
-                    }
 
-                    final ExportDataSource eds = partitionSources.get(signature);
-                    if (eds == null) {
-                        exportLog.warn("Received an export ack for partition " + partition +
-                                " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
-                        return;
-                    }
-
-                    try {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Received an export ack for partition " + partition +
-                                    " source signature " + signature + " with uso: " + ackUSO);
+                    if (msgType == ExportManager.RELEASE_BUFFER) {
+                        final int length = buf.getInt();
+                        byte stringBytes[] = new byte[length];
+                        buf.get(stringBytes);
+                        String signature = new String(stringBytes, Constants.UTF8ENCODING);
+                        if (partitionSources == null) {
+                            exportLog.error("Received an export ack for partition " + partition +
+                                    " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
+                            return;
                         }
-                        eds.ack(ackUSO, runEveryWhere);
-                    } catch (RejectedExecutionException ignoreIt) {
-                        // ignore it: as it is already shutdown
+                        final ExportDataSource eds = partitionSources.get(signature);
+                        if (eds == null) {
+                            exportLog.warn("Received an export ack for partition " + partition +
+                                    " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
+                            return;
+                        }
+                        final long ackUSO = buf.getLong();
+
+                        try {
+                            if (exportLog.isDebugEnabled()) {
+                                exportLog.debug("Received RELEASE_BUFFER message for partition " + partition +
+                                        " source signature " + signature + " with uso: " + ackUSO);
+                            }
+                            eds.ack(ackUSO);
+                        } catch (RejectedExecutionException ignoreIt) {
+                            // ignore it: as it is already shutdown
+                        }
+                    } else if (msgType == ExportManager.MIGRATE_MASTER) {
+                        final int edsSize = buf.getInt();
+                        Map<String, Long> perDataSourceUso = new HashMap<String, Long>();
+                        for (int i = 0; i < edsSize; i++) {
+                            final int length = buf.getInt();
+                            byte stringBytes[] = new byte[length];
+                            buf.get(stringBytes);
+                            String signature = new String(stringBytes, Constants.UTF8ENCODING);
+                            final long uso = buf.getLong();
+                            perDataSourceUso.put(signature, uso);
+                        }
+                        for (Entry<String, ExportDataSource> e : partitionSources.entrySet()) {
+                            if (e.getValue().readyForMastership()) {
+                                e.getValue().acceptMastership();
+                            } else {
+                                Long uso = perDataSourceUso.get(e.getKey());
+                                if (uso == null) {
+                                    exportLog.error("Received an export master migrate request for partition " + partition +
+                                            " table " + e.getValue().getTableName() +
+                                            " which does not exist on this node, source = " + partitionSources);
+                                    return;
+                                }
+                                // migrate export mastership
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Received MIGRATE_MASTER message for partition " + partition +
+                                            " table " + e.getValue().getTableName() + " with uso(" + uso + ")");
+                                }
+                                e.getValue().markStreamHasNoMaster(uso);
+                            }
+                        }
                     }
                 } else {
                     exportLog.error("Receive unexpected message " + message + " in export subsystem");
@@ -265,6 +299,7 @@ public class ExportGeneration implements Generation {
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
+                    m_replicasHSIds = mailboxHsids;
                     synchronized (m_dataSourcesByPartition) {
                         for( ExportDataSource eds:
                             m_dataSourcesByPartition.get( partition).values()) {
@@ -343,6 +378,7 @@ public class ExportGeneration implements Generation {
                                 mailboxes.add(Long.valueOf(child));
                             }
                             ImmutableList<Long> mailboxHsids = mailboxes.build();
+                            m_replicasHSIds = mailboxHsids;
                             synchronized (m_dataSourcesByPartition) {
                                 for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
                                     eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
@@ -706,5 +742,54 @@ public class ExportGeneration implements Generation {
     @Override
     public String toString() {
         return "Export Generation";
+    }
+
+    private void sendMigrateMastershipEvent(int partitionId, Map<String, ExportDataSource> partitionDataSourceMap) {
+        if (m_mbox != null && m_replicasHSIds.size() > 0) {
+            // msg type(1) + partition:int(4) + array length:int(4)
+            // { length:int(4) + signaturesBytes.length + usoToDrain:long(8) } repeat X times
+            int msgLen = 1 + 4 + 4;
+            for (ExportDataSource eds : partitionDataSourceMap.values()) {
+                msgLen += 4 + eds.getTableSignature().length + 8;
+            }
+
+            ByteBuffer buf = ByteBuffer.allocate(msgLen);
+            buf.put(ExportManager.MIGRATE_MASTER);
+            buf.putInt(partitionId);
+            buf.putInt(partitionDataSourceMap.size());
+
+            for (ExportDataSource eds : partitionDataSourceMap.values()) {
+                buf.putInt(eds.getTableSignature().length);
+                buf.put(eds.getTableSignature());
+                buf.putLong(eds.getLastReleaseUso());
+            }
+
+
+            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
+
+            for( Long siteId: m_replicasHSIds) {
+                m_mbox.send(siteId, bpm);
+            }
+
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Partition " + partitionId + " mailbox hsid (" +
+                        CoreUtils.hsIdToString(m_mbox.getHSId()) + ") send MIGRATE_MASTER message to " +
+                        CoreUtils.hsIdCollectionToString(m_replicasHSIds));
+            }
+        }
+    }
+
+    public void migrateDataSource(ExportDataSource source) {
+        Map<String, ExportDataSource> partitionDataSourceMap =
+                m_dataSourcesByPartition.get(source.getPartitionId());
+        // this case happens when there are no export tables
+        if (partitionDataSourceMap == null) {
+            return;
+        }
+
+        int drainedTables = (int)partitionDataSourceMap.values().stream().filter(eds -> eds.streamHasNoMaster()).count();
+        if (partitionDataSourceMap.values().size() == drainedTables) {
+            sendMigrateMastershipEvent(source.getPartitionId(), partitionDataSourceMap);
+        }
     }
 }

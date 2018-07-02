@@ -18,6 +18,7 @@ package org.voltdb.export;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
+
 import org.voltcore.messaging.HostMessenger;
 
 /**
@@ -37,4 +38,6 @@ public interface Generation {
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
+
+    public void migrateDataSource(ExportDataSource source);
 }

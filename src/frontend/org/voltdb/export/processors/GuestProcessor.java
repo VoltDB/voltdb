@@ -18,6 +18,7 @@
 package org.voltdb.export.processors;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
@@ -45,8 +47,6 @@ import org.voltdb.exportclient.ExportRow;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import java.lang.reflect.Method;
-import org.voltdb.VoltType;
 
 public class GuestProcessor implements ExportDataProcessor {
 
@@ -219,8 +219,7 @@ public class GuestProcessor implements ExportDataProcessor {
             detectDecoder(m_client, edb);
             Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
             m_decoders.add(pair);
-            final ListenableFuture<BBContainer> fut = m_source.poll();
-            addBlockListener(m_source, fut, edb);
+            addBlockListener(m_source, m_source.poll(), edb);
         }
 
         private void runDataSource() {

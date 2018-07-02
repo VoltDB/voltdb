@@ -79,7 +79,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final byte [] m_signatureBytes;
     private final int m_partitionId;
     private final ExportFormat m_format;
+
     private long m_firstUnpolledUso = 0;
+    private long m_lastReleaseUso = 0;
+    // End uso of most recently pushed export buffer
+    private long m_lastPushedUso = 0L;
+    // Relinquishes export master after this uso
+    private long m_usoToDrain = -1L;
+    // EDS that will be demoted soon
+    private boolean m_retiredMaster = false;
+    // EDS that will be promoted as export master soon
+    private boolean m_wannabeMaster = false;
+    // This flag indicates there is no export master for the stream
+    private boolean m_anarchy = false;
+    //This is released when all mailboxes are set.
+    private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
+    // This EDS is export master when the flag set to true
+    private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
+
+    private volatile boolean m_closed = false;
     private final StreamBlockQueue m_committedBuffers;
     private Runnable m_onMastership;
     private SettableFuture<BBContainer> m_pollFuture;
@@ -87,16 +105,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
-    private long m_lastReleaseOffset = 0;
-    //Set if connector "replicated" property is set to true
+    // Set if connector "replicated" property is set to true
+    // Like replicated table, every replicated export stream is its own master.
     private boolean m_runEveryWhere = false;
-    private boolean m_replicaRunning = false;
-    //This is released when all mailboxes are set.
-    private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
-    private volatile boolean m_closed = false;
-    private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
-    // indicate has assumed sp leadership, ready to be promoted as export master
-    private volatile AtomicBoolean m_waitToAssumeMastership = new AtomicBoolean(false);
     private volatile ListeningExecutorService m_es;
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
     private volatile boolean m_isInCatalog;
@@ -285,29 +296,29 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_client;
     }
 
-    private synchronized void releaseExportBytes(long releaseOffset) throws IOException {
+    private synchronized void releaseExportBytes(long releaseUso) throws IOException {
         // if released offset is in an already-released past, just return success
-        if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso()) {
+        if (!m_committedBuffers.isEmpty() && releaseUso < m_committedBuffers.peek().uso()) {
             return;
         }
 
         long lastUso = m_firstUnpolledUso;
-        while (!m_committedBuffers.isEmpty() && releaseOffset >= m_committedBuffers.peek().uso()) {
+        while (!m_committedBuffers.isEmpty() && releaseUso >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
-            if (releaseOffset >= sb.uso() + sb.totalSize()-1) {
+            if (releaseUso >= sb.uso() + sb.totalSize()-1) {
                 m_committedBuffers.pop();
                 try {
                     lastUso = sb.uso() + sb.totalSize()-1;
                 } finally {
                     sb.discard();
                 }
-            } else if (releaseOffset >= sb.uso()) {
-                sb.releaseUso(releaseOffset);
-                lastUso = releaseOffset;
+            } else if (releaseUso >= sb.uso()) {
+                sb.releaseUso(releaseUso);
+                lastUso = releaseUso;
                 break;
             }
         }
-        m_lastReleaseOffset = releaseOffset;
+        m_lastReleaseUso = releaseUso;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso+1);
     }
 
@@ -435,8 +446,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             ByteBuffer buffer,
             boolean sync,
             boolean poll) throws Exception {
-        final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
-
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
         }
@@ -444,33 +453,32 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
             if (buffer.capacity() > 8) {
+                // Drop already acked buffer
                 final BBContainer cont = DBBPool.wrapBB(buffer);
-                if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8) - 1)) {
-                    //What ack from future is known?
+                long bufferSize = (buffer.capacity() - 8) - 1;
+                if (m_lastReleaseUso > 0 && m_lastReleaseUso >= (uso + bufferSize)) {
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Dropping already acked USO: " + m_lastReleaseOffset
+                        exportLog.debug("Dropping already acked USO: " + m_lastReleaseUso
                                 + " Buffer info: " + uso + " Size: " + buffer.capacity());
                     }
                     cont.discard();
                     return;
                 }
-                try {
-                    StreamBlock sb = new StreamBlock(
-                            new BBContainer(buffer) {
-                                @Override
-                                public void discard() {
-                                    checkDoubleFree();
-                                    cont.discard();
-                                    deleted.set(true);
-                                }
-                            }, uso, false);
-                    if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= sb.uso()) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Setting releaseUso as " + m_lastReleaseOffset +
-                                    " for sb with uso " + sb.uso() + " for partition " + m_partitionId);
-                        }
-                        sb.releaseUso(m_lastReleaseOffset);
+
+                StreamBlock sb = new StreamBlock(cont, uso, false);
+
+                // Mark release uso to partially acked buffer.
+                if (m_lastReleaseUso > 0 && m_lastReleaseUso >= sb.uso()) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Setting releaseUso as " + m_lastReleaseUso +
+                                " for sb with uso " + sb.uso() + " for partition " + m_partitionId);
                     }
+                    sb.releaseUso(m_lastReleaseUso);
+                }
+
+                m_lastPushedUso = uso + bufferSize;
+
+                try {
                     m_committedBuffers.offer(sb);
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
@@ -807,23 +815,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void forwardAckToOtherReplicas(long uso) {
-        if (m_runEveryWhere && m_replicaRunning) {
-           //we dont forward if we are running as replica in replicated export
-           return;
-        }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
-            // partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8) + 2 bytes for runEverywhere or not + 8 bytes for generation ID.
-            final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 2;
+            // msg type(1) + partition:int(4) + length:int(4) +
+            // signaturesBytes.length + ackUSO:long(8).
+            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
+            buf.put(ExportManager.RELEASE_BUFFER);
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(uso);
-            buf.putShort((m_runEveryWhere ? (short )1 : (short )0));
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -833,7 +837,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void ack(final long uso, boolean runEveryWhere) {
+    public void ack(final long uso) {
         // TODO ENG-1375
         // assume mastership if m_waitToAssumeMastership has been set
 
@@ -878,8 +882,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                 return;
             }
+            // Current master sends migrate event to all export replicas
+            if (m_retiredMaster && uso >= m_usoToDrain) {
+                unacceptMastership();
+                m_generation.migrateDataSource(this);
+            }
+            // Receiving a ACK means new master is promoted, clear the anarchy state
+            if (m_anarchy && uso >= m_usoToDrain) {
+                m_anarchy = false;
+                m_usoToDrain = -1L;
+            }
         }
     }
+
 
     //Is this a run everywhere source
     public boolean isRunEveryWhere() {
@@ -891,20 +906,36 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * prepare to give up the mastership,
      * has to drain existing PBD and then notify new leaders (through ack)
      */
-    synchronized void prepareUnacceptMastership() {
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export table " + getTableName() + " mastership prepare to be promoted for partition " + getPartitionId());
-        }
-        // TODO
-        // ENG-13952
-        // ENG-13765
+    void prepareUnacceptMastership() {
+        m_es.submit(new Runnable() {
+            public void run() {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Export table " + getTableName() + " mastership prepare to be demoted for partition " + getPartitionId());
+                }
+                m_retiredMaster = true;
+                // memorize end USO of the most recently pushed buffer from EE
+                m_usoToDrain = m_lastPushedUso;
+                // if no new buffer to be drained, send the migrate event right away
+                if (m_usoToDrain == m_lastReleaseUso) {
+                    unacceptMastership();
+                    m_generation.migrateDataSource(ExportDataSource.this);
+                }
+            }
+        });
     }
 
     public synchronized void unacceptMastership() {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Export table " + getTableName() + " for partition " + getPartitionId() + " mailbox hsid (" +
+                    CoreUtils.hsIdToString(m_ackMailboxRefs.get().getFirst().getHSId()) + ") gave up export mastership");
+        }
         m_onMastership = null;
         m_mastershipAccepted.set(false);
         m_isInCatalog = false;
         m_eos = false;
+        m_usoToDrain = -1L;
+        m_anarchy = true;
+        m_retiredMaster = false;
         // For case where the previous export processor had only row of the first block to process
         // and it completed processing it, poll future is not set to null still. Set it to null to
         // prepare for the new processor polling
@@ -919,10 +950,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * still has to wait for the old leader to give up mastership (through ack)
      */
     synchronized void prepareAcceptMastership() {
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export table " + getTableName() + " mastership prepare to be promoted for partition " + getPartitionId());
-        }
-        m_waitToAssumeMastership.compareAndSet(false, true);
+        m_es.submit(new Runnable() {
+            public void run() {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Export table " + getTableName() + " mastership prepare to be promoted for partition " + getPartitionId());
+                }
+                m_wannabeMaster = true;
+                // If in anarchy state, promote master right away
+                if (m_anarchy) {
+                    acceptMastership();
+                }
+            }
+        });
     }
 
     /**
@@ -941,9 +980,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.debug("Export table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
             }
             return;
-        }
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Accepting mastership for export table " + getTableName() + " partition " + getPartitionId());
         }
         m_es.execute(new Runnable() {
             @Override
@@ -1005,6 +1041,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         // TODO
         // Query all other node for current mastership
+    }
+
+    public boolean readyForMastership() {
+        return m_wannabeMaster;
+    }
+
+    public boolean streamHasNoMaster() {
+        return m_anarchy;
+    }
+
+    public byte[] getTableSignature() {
+        return m_signatureBytes;
+    }
+    public long getLastReleaseUso() {
+        return m_lastReleaseUso;
+    }
+    // Anarchy state will be cleared when replicas receive ACK message equals or greater than m_usoToDrain
+    public void markStreamHasNoMaster(long uso) {
+        m_anarchy = true;
+        m_usoToDrain = uso;
     }
 
     @Override
