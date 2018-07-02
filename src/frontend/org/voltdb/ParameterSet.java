@@ -82,14 +82,24 @@ public class ParameterSet implements JSONString {
 
         for (int ii = 0; ii < params.length; ii++) {
             Object obj = params[ii];
+
             if ((obj == null) || (obj == JSONObject.NULL)) {
                 size++;
                 continue;
             }
             size += 1;//everything has a type even arrays and null
             Class<?> cls = obj.getClass();
-            if (cls.isArray()) {
 
+            if (ByteBuffer.class.isAssignableFrom(cls)) {
+                ByteBuffer bb = (ByteBuffer)obj;
+                bb.clear();
+                final byte[] b = new byte[bb.capacity()];
+                bb.get(b);
+                size += 4 + b.length;
+                continue;
+            }
+
+            if (cls.isArray()) {
                 if (obj instanceof byte[]) {
                     final byte[] b = (byte[]) obj;
                     size += 4 + b.length;
@@ -690,8 +700,19 @@ public class ParameterSet implements JSONString {
                 buf.put(type.getValue());
                 continue;
             }
-
             Class<?> cls = obj.getClass();
+
+            if (ByteBuffer.class.isAssignableFrom(cls)) {
+                ByteBuffer bb = (ByteBuffer)obj;
+                bb.clear();
+                buf.put(VoltType.VARBINARY.getValue());
+                buf.putInt(bb.capacity());
+                final byte[] b = new byte[bb.capacity()];
+                bb.get(b);
+                buf.put(b);
+                continue;
+            }
+
             if (cls.isArray()) {
 
                 // Since arrays of bytes could be varbinary or strings,
@@ -894,6 +915,13 @@ public class ParameterSet implements JSONString {
                     buf.putInt(gv.getLengthInBytes());
                     gv.flattenToBuffer(buf);
                     break;
+//                case VARBINARY:
+//                    buf.put(VoltType.VARBINARY.getValue());
+//                    final ByteBuffer bb = (ByteBuffer)obj;
+//                    bb.clear();
+//                    buf.putInt(bb.capacity());
+//                    buf.put(bb);
+//                    break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);
             }

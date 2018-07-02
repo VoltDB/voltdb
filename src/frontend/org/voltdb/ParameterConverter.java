@@ -24,6 +24,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.regex.Pattern;
+import java.nio.ByteBuffer;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.voltdb.common.Constants;
@@ -273,7 +274,7 @@ public class ParameterConverter {
                 param == null ? "NULL" : param.getClass().getName(),
                 expectedClz.getName());
         System.err.flush();
-        // */
+         */
 
         // Get blatant null out of the way fast, as it avoids some inline checks
         // There are some subtle null values that aren't java null coming up, but wait until
@@ -362,6 +363,8 @@ public class ParameterConverter {
                 String value = new String((byte[]) param, Constants.UTF8ENCODING);
                 if (value.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
                 else return value;
+            } else if (ByteBuffer.class.isAssignableFrom(expectedClz)) {
+                return ByteBuffer.wrap((byte[])param);
             }
         }
         // null sigils. (ning - if we're not checking if the sigil matches the expected type,
