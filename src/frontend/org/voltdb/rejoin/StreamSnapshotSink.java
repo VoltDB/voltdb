@@ -81,7 +81,9 @@ public class StreamSnapshotSink {
 
         @Override
         public void restore(SiteProcedureConnection connection) {
-            rejoinLog.debug("Updating the hashinator to version " + version);
+            if (rejoinLog.isDebugEnabled()) {
+                rejoinLog.debug("Updating the hashinator to version " + version);
+            }
 
             // Update the Java hashinator
             Pair<? extends UndoAction, TheHashinator> hashinatorPair =
@@ -274,9 +276,11 @@ public class StreamSnapshotSink {
                 }
             }
             else if (msg.m_msgType == StreamSnapshotMessageType.SCHEMA) {
-                rejoinLog.trace("Got SCHEMA message " + msg.m_blockIndex + " from " +
-                        CoreUtils.hsIdToString(msg.m_srcHSId) +
-                        " (TargetId " + msg.m_dataTargetId + ")");
+                if (rejoinLog.isTraceEnabled()) {
+                    rejoinLog.trace("Got SCHEMA message " + msg.m_blockIndex + " from " +
+                            CoreUtils.hsIdToString(msg.m_srcHSId) +
+                            " (TargetId " + msg.m_dataTargetId + ")");
+                }
                 ByteBuffer block = msg.m_container.b();
                 block.position(StreamSnapshotDataTarget.contentOffset);
                 byte[] schemaBytes = new byte[block.remaining()];
@@ -294,9 +298,11 @@ public class StreamSnapshotSink {
             }
             else {
                 // It's normal snapshot data afterwards
-                rejoinLog.trace("Got DATA message " + msg.m_blockIndex + " from " +
-                        CoreUtils.hsIdToString(msg.m_srcHSId) +
-                        " (TargetId " + msg.m_dataTargetId + ")");
+                if (rejoinLog.isTraceEnabled()) {
+                    rejoinLog.trace("Got DATA message " + msg.m_blockIndex + " from " +
+                            CoreUtils.hsIdToString(msg.m_srcHSId) +
+                            " (TargetId " + msg.m_dataTargetId + ")");
+                }
 
                 ByteBuffer block = msg.m_container.b();
 

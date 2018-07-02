@@ -267,6 +267,9 @@ public class SnapshotSaveAPI
                         }
                     }
                     else {
+                        if (SNAP_LOG.isDebugEnabled()) {
+                            SNAP_LOG.debug("initiateSnapshots " + taskList);
+                        }
                         context.getSiteSnapshotConnection().initiateSnapshots(
                                 format,
                                 taskList,

@@ -17,13 +17,7 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -220,16 +214,31 @@ public abstract class SnapshotWritePlan
         }
     }
 
-    protected void placeReplicatedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids)
+    protected void placeReplicatedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids, boolean roundRobin)
     {
-        SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));
-        int siteIndex = 0;
-        // Round-robin the placement of replicated table tasks across the provided HSIds
-        for (SnapshotTableTask task : tasks) {
-            ArrayList<Long> robin = new ArrayList<Long>();
-            robin.add(hsids.get(siteIndex));
-            placeTask(task, robin);
-            siteIndex = (siteIndex + 1) % hsids.size();
+        if (SNAP_LOG.isDebugEnabled()) {
+            if (roundRobin) {
+                SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));
+            } else {
+                SNAP_LOG.debug("Placing replicated tasks at lowest site: " + CoreUtils.hsIdToString(Collections.min(hsids)));
+            }
+        }
+
+        if (roundRobin) {
+            int siteIndex = 0;
+            // Round-robin the placement of replicated table tasks across the provided HSIds
+            for (SnapshotTableTask task : tasks) {
+                ArrayList<Long> robin = new ArrayList<Long>();
+                robin.add(hsids.get(siteIndex));
+                placeTask(task, robin);
+                siteIndex = (siteIndex + 1) % hsids.size();
+            }
+        } else {
+            List<Long> lowestHsid = new ArrayList<>();
+            lowestHsid.add(Collections.min(hsids));
+            for (SnapshotTableTask task : tasks) {
+                placeTask(task, lowestHsid);
+            }
         }
     }
 }

@@ -155,7 +155,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         // but since we've pre-filtered the replicated task list to only contain entries on
         // one node, we can go ahead and distribute them across all of the sites on that node.
         placePartitionedTasks(partitionedSnapshotTasks, sitesToInclude);
-        placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
+        placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()), true);
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, pathType, file_nonce, config.tables, txnId, partitionTransactionIds,

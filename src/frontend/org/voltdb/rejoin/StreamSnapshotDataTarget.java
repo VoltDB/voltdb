@@ -124,9 +124,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_ackReceiver = ackReceiver;
         m_ackReceiver.setCallback(m_targetId, this, m_replicatedTableTarget ? allDestHostHSIds.size() : 1);
 
-        rejoinLog.debug(String.format("Initializing snapshot stream processor " +
-                "for source site id: %s, and with processorid: %d%s" ,
-                CoreUtils.hsIdToString(HSId), m_targetId, (lowestDestSite?" [Lowest Site]":"")));
+        if (rejoinLog.isDebugEnabled()) {
+            rejoinLog.debug(String.format("Initializing snapshot stream processor " +
+                            "for source site id: %s, and with processorid: %d%s",
+                    CoreUtils.hsIdToString(HSId), m_targetId, (lowestDestSite ? " [Lowest Site]" : "")));
+        }
 
         // start a periodic task to look for timed out connections
         VoltDB.instance().scheduleWork(new Watchdog(0, writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
@@ -269,9 +271,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     m_ackCounter = new AtomicInteger(1);
                     sentBytes = send(mb, msgFactory, m_message);
                 }
-                rejoinLog.trace("Sent " + m_type.name() + " from " + m_targetId +
-                        " expected ackCounter " + m_ackCounter +
-                        " otherDestHSIds " + m_otherDestHSIds);
+                if (rejoinLog.isTraceEnabled()) {
+                    rejoinLog.trace("Sent " + m_type.name() + " from " + m_targetId +
+                            " expected ackCounter " + m_ackCounter +
+                            " otherDestHSIds " + m_otherDestHSIds);
+                }
                 return sentBytes;
             } finally {
                 // Buffers are only discarded after they are acked. Discarding them here would cause the sender to
@@ -395,15 +399,19 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             return;
         }
         if (work.receiveAck()) {
-            rejoinLog.trace("Received ack for targetId " + m_targetId +
-                    " removes block for index " + String.valueOf(blockIndex));
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Received ack for targetId " + m_targetId +
+                        " removes block for index " + String.valueOf(blockIndex));
+            }
             m_outstandingWorkCount.decrementAndGet();
             m_outstandingWork.remove(blockIndex);
             work.discard();
         }
         else {
-            rejoinLog.trace("Received ack for targetId " + m_targetId +
-                    " decrements counter for block index " + String.valueOf(blockIndex));
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Received ack for targetId " + m_targetId +
+                        " decrements counter for block index " + String.valueOf(blockIndex));
+            }
         }
     }
 
@@ -538,7 +546,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     // remove the schema once sent
                     byte[] schema = tableInfo.getSecond();
                     m_schemas.put(tableId, Pair.of(tableInfo.getFirst(), null));
-                    rejoinLog.debug("Sending schema for table " + tableId);
+                    if (rejoinLog.isDebugEnabled()) {
+                        rejoinLog.debug("Sending schema for table " + tableId);
+                    }
 
                     rejoinLog.trace("Writing schema as part of this write");
                     send(StreamSnapshotMessageType.SCHEMA, tableId, schema, tableInfo.getFirst());
@@ -581,9 +591,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
      */
     synchronized ListenableFuture<Boolean> send(StreamSnapshotMessageType type, int blockIndex, BBContainer chunk, boolean replicatedTable) {
         SettableFuture<Boolean> sendFuture = SettableFuture.create();
-        rejoinLog.trace("Sending block " + blockIndex + " of type " + (replicatedTable?"REPLICATED ":"PARTITIONED ") + type.name() +
-                " from targetId " + m_targetId + " to " + CoreUtils.hsIdToString(m_destHSId) +
-                (replicatedTable?", " + CoreUtils.hsIdCollectionToString(m_otherDestHostHSIds):""));
+        if (rejoinLog.isTraceEnabled()) {
+            rejoinLog.trace("Sending block " + blockIndex + " of type " + (replicatedTable ? "REPLICATED " : "PARTITIONED ") + type.name() +
+                    " from targetId " + m_targetId + " to " + CoreUtils.hsIdToString(m_destHSId) +
+                    (replicatedTable ? ", " + CoreUtils.hsIdCollectionToString(m_otherDestHostHSIds) : ""));
+        }
         SendWork sendWork = new SendWork(type, m_targetId, m_destHSId,
                 replicatedTable?m_otherDestHostHSIds:null, chunk, sendFuture);
         m_outstandingWork.put(blockIndex, sendWork);
@@ -611,7 +623,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
          * target
          */
         if (!m_closed.get()) {
-            rejoinLog.trace("Closing stream snapshot target " + m_targetId);
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Closing stream snapshot target " + m_targetId);
+            }
 
             // block until all acks have arrived
             waitForOutstandingWork();
@@ -629,8 +643,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
                 assert(m_outstandingWork.size() == 0);
             }
-
-            rejoinLog.trace("Closed stream snapshot target " + m_targetId);
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Closed stream snapshot target " + m_targetId);
+            }
         }
 
         Runnable closeHandle = m_onCloseHandler.get();

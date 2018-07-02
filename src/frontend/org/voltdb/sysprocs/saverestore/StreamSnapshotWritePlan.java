@@ -18,17 +18,8 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -108,7 +99,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
          * them.
          *
          */
-        final int newPartitionCount = partitionsToAdd.isEmpty() ? context.getNumberOfPartitions() : Collections.max(partitionsToAdd) + 1;
+        final boolean forJoin = !partitionsToAdd.isEmpty();
+        final int newPartitionCount = forJoin ? Collections.max(partitionsToAdd) + 1 : context.getNumberOfPartitions();
         Callable<Boolean> deferredSetup = null;
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
@@ -118,12 +110,13 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                            tracker,
                                            hashinatorData,
                                            timestamp,
-                                           newPartitionCount);
+                                           newPartitionCount,
+                                           forJoin);
         }
 
         // Create post snapshot update hashinator work
         List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
-        if (!partitionsToAdd.isEmpty()) {
+        if (forJoin) {
             createUpdatePartitionCountTasksForSites(localPartitions, newPartitionCount);
         }
 
@@ -162,7 +155,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         // reset siteId to 0 for placing replicated Task from site 0
         m_siteIndex = 0;
         for (final Table table : config.tables) {
-            createTasksForTable(table, sdts, numTables, m_snapshotRecord, tracker.getSitesForHost(context.getHostId()));
+            createTasksForTable(table, sdts, numTables, m_snapshotRecord, tracker.getSitesForHost(context.getHostId()), forJoin);
             result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getTypeName(), "SUCCESS", "");
         }
 
@@ -262,12 +255,13 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                              SiteTracker tracker,
                                                              HashinatorSnapshotData hashinatorData,
                                                              long timestamp,
-                                                             int newPartitionCount)
+                                                             int newPartitionCount,
+                                                             boolean forJoin)
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
                 plan.createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds, null, context,
-                        result, extraSnapshotData, tracker, hashinatorData, timestamp, newPartitionCount);
+                        result, extraSnapshotData, tracker, hashinatorData, timestamp, newPartitionCount, forJoin);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
 
         return new Callable<Boolean>() {
@@ -355,7 +349,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                      List<DataTargetInfo> dataTargets,
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord,
-                                     List<Long> hsids)
+                                     List<Long> hsids,
+                                     boolean forJoin)
     {
         // srcHSId -> tasks
         Multimap<Long, SnapshotTableTask> tasks = ArrayListMultimap.create();
@@ -368,20 +363,22 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             }
             final SnapshotTableTask task = createSingleTableTask(table, targetInfo, numTables, snapshotRecord);
 
-            SNAP_LOG.debug("ADDING TASK for streamSnapshot: " + task);
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("ADDING TASK for streamSnapshot: " + task);
+            }
             tasks.put(targetInfo.srcHSId, task);
         }
 
-        placeTasksForTable(table, tasks, hsids);
+        placeTasksForTable(table, tasks, hsids, forJoin);
     }
 
-    private void placeTasksForTable(Table table, Multimap<Long, SnapshotTableTask> tasks, List<Long> hsids)
+    private void placeTasksForTable(Table table, Multimap<Long, SnapshotTableTask> tasks, List<Long> hsids, boolean forJoin)
     {
         for (Entry<Long, Collection<SnapshotTableTask>> tasksEntry : tasks.asMap().entrySet()) {
             // Stream snapshots need to write all partitioned tables to all selected partitions
             // and all replicated tables to across all the sites on every host
             if (table.getIsreplicated()) {
-                placeReplicatedTasks(tasksEntry.getValue(), hsids);
+                placeReplicatedTasks(tasksEntry.getValue(), hsids, !forJoin);
             } else {
                 placePartitionedTasks(tasksEntry.getValue(), Arrays.asList(tasksEntry.getKey()));
             }
@@ -465,15 +462,30 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     }
 
     @Override
-    protected void placeReplicatedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids)
+    protected void placeReplicatedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids, boolean roundRobin)
     {
-        SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));
-        // Round-robin the placement of replicated table tasks across the provided HSIds
-        for (SnapshotTableTask task : tasks) {
-            ArrayList<Long> robin = new ArrayList<Long>();
-            robin.add(hsids.get(m_siteIndex));
-            placeTask(task, robin);
-            m_siteIndex = (m_siteIndex +1) % hsids.size();
+        if (SNAP_LOG.isDebugEnabled()) {
+            if (roundRobin) {
+                SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));
+            } else {
+                SNAP_LOG.debug("Placing replicated tasks at lowest site: " + CoreUtils.hsIdToString(Collections.min(hsids)));
+            }
+        }
+
+        if (roundRobin) {
+            // Round-robin the placement of replicated table tasks across the provided HSIds
+            for (SnapshotTableTask task : tasks) {
+                ArrayList<Long> robin = new ArrayList<Long>();
+                robin.add(hsids.get(m_siteIndex));
+                placeTask(task, robin);
+                m_siteIndex = (m_siteIndex +1) % hsids.size();
+            }
+        } else {
+            List<Long> lowestHsid = new ArrayList<>();
+            lowestHsid.add(Collections.min(hsids));
+            for (SnapshotTableTask task : tasks) {
+                placeTask(task, lowestHsid);
+            }
         }
     }
 }

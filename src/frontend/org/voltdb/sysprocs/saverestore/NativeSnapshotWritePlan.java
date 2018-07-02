@@ -74,7 +74,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
     {
         return createSetupInternal(file_path, pathType, file_nonce, txnId, partitionTransactionIds,
                 jsData, context, result, extraSnapshotData, tracker, hashinatorData,
-                timestamp, context.getNumberOfPartitions());
+                timestamp, context.getNumberOfPartitions(), false);
     }
 
     Callable<Boolean> createSetupInternal(String file_path, String pathType,
@@ -88,7 +88,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                     SiteTracker tracker,
                                                     HashinatorSnapshotData hashinatorData,
                                                     long timestamp,
-                                                    int newPartitionCount)
+                                                    int newPartitionCount,
+                                                    boolean forJoin)
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
@@ -125,7 +126,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                             null,
                             false);
 
-            SNAP_LOG.debug("ADDING TASK for nativeSnapshot: " + task);
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("ADDING TASK for nativeSnapshot: " + task);
+            }
 
             if (table.getIsreplicated()) {
                 replicatedSnapshotTasks.add(task);
@@ -147,7 +150,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         // Native snapshots place the partitioned tasks on every site and round-robin the
         // replicated tasks across all the sites on every host
         placePartitionedTasks(partitionedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
-        placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
+        placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()), !forJoin);
 
         boolean isTruncationSnapshot = true;
         if (jsData != null) {
