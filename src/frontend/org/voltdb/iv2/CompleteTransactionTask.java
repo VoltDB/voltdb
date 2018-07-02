@@ -67,7 +67,9 @@ public class CompleteTransactionTask extends TransactionTask
     }
     private void doUnexecutedFragmentCleanup()
     {
-        if (m_completeMsg.isAbortDuringRepair() || m_repairCompletionMatched) {
+        // If the task is for restart, FragmentTasks could be at head of the TransactionTaskQueue.
+        // The transaction should not be flushed at this moment.
+        if (m_completeMsg.isAbortDuringRepair() || (m_repairCompletionMatched && !m_completeMsg.isRestart())) {
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(getTxnId()));
             }
