@@ -59,8 +59,6 @@ public interface ConsumerDRGateway extends Promotable {
 
     void restart(final boolean blocking) throws InterruptedException, ExecutionException;
 
-    void shutdownPartitions(final int consumerPartitionId) throws InterruptedException, ExecutionException;
-
     DRConsumerMpCoordinator getDRConsumerMpCoordinator();
 
     void clusterUnrecoverable(byte clusterId, Throwable t);

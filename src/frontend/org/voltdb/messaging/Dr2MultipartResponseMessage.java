@@ -94,7 +94,7 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
         buf.put(m_producerClusterId);
         buf.putInt(m_producerPID);
 
-        if (!m_drain) {
+        if (!m_drain && !m_reneg) {
             m_response.flattenToBuffer(buf);
         }
 
@@ -109,7 +109,7 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
                    + 1  // reneg or not
                    + 1  // producer cluster ID
                    + 4; // producer partition ID
-        if (!m_drain) {
+        if (!m_drain && !m_reneg) {
             size += m_response.getSerializedSize();
         }
         return size;

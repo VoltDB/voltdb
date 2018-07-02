@@ -2264,7 +2264,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltZK.createMigratePartitionLeaderInfo(m_zk, spiInfo);
 
             notifyPartitionMigrationStatus(partitionId, targetHSId, false);
-            
+
             synchronized (m_executeTaskAdpater) {
                 createTransaction(m_executeTaskAdpater.connectionId(),
                         spi,
@@ -2324,7 +2324,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         () -> {VoltZK.removeActionBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
                         5, 0, TimeUnit.SECONDS);
             }
-            
+
             if (!migrationComplete) {
                 notifyPartitionMigrationStatus(partitionId,
                         m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
@@ -2332,7 +2332,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
     }
-    
+
     private void notifyPartitionMigrationStatus(int partitionId, long targetHSId, boolean failed) {
         for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
             try {
