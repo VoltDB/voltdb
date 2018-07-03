@@ -627,6 +627,23 @@ public class ExportGeneration implements Generation {
         }
 
     }
+
+    /**
+     * Indicate to all associated {@link ExportDataSource}to PREPARE give up
+     * mastership role for the given partition id
+     * @param partitionId
+     */
+    public void prepareUnacceptMastership(int partitionId) {
+        Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
+
+        // this case happens when there are no export tables
+        if (partitionDataSourceMap == null) {
+            return;
+        }
+        for (ExportDataSource eds : partitionDataSourceMap.values()) {
+            eds.prepareUnacceptMastership();
+        }
+    }
     /**
      * Indicate to all associated {@link ExportDataSource}to assume
      * mastership role for the given partition id
@@ -647,6 +664,24 @@ public class ExportGeneration implements Generation {
             } catch (Exception e) {
                 exportLog.error("Unable to start exporting", e);
             }
+        }
+    }
+
+    /**
+     * Indicate to all associated {@link ExportDataSource}to PREPARE assume
+     * mastership role for the given partition id
+     * @param partitionId
+     */
+    public void prepareAcceptMastership(int partitionId) {
+        Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
+
+        // this case happens when there are no export tables
+        if (partitionDataSourceMap == null) {
+            return;
+        }
+
+        for( ExportDataSource eds: partitionDataSourceMap.values()) {
+            eds.prepareAcceptMastership();
         }
     }
 

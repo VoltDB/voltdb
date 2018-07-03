@@ -95,6 +95,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
     private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
+    // indicate has assumed sp leadership, ready to be promoted as export master
+    private volatile AtomicBoolean m_waitToAssumeMastership = new AtomicBoolean(false);
     private volatile ListeningExecutorService m_es;
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
     private volatile boolean m_isInCatalog;
@@ -832,6 +834,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso, boolean runEveryWhere) {
+        // TODO ENG-1375
+        // assume mastership if m_waitToAssumeMastership has been set
 
         //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
@@ -882,6 +886,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_runEveryWhere;
     }
 
+    /**
+     * indicate the partition leader has been migrated away
+     * prepare to give up the mastership,
+     * has to drain existing PBD and then notify new leaders (through ack)
+     */
+    synchronized void prepareUnacceptMastership() {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Export table " + getTableName() + " mastership prepare to be promoted for partition " + getPartitionId());
+        }
+        // TODO
+        // ENG-13952
+        // ENG-13765
+    }
+
     public synchronized void unacceptMastership() {
         m_onMastership = null;
         m_mastershipAccepted.set(false);
@@ -893,6 +911,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
             m_pollFuture = null;
         }
+    }
+
+    /**
+     * indicate the partition leader has been promoted
+     * prepare to assume the mastership,
+     * still has to wait for the old leader to give up mastership (through ack)
+     */
+    synchronized void prepareAcceptMastership() {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Export table " + getTableName() + " mastership prepare to be promoted for partition " + getPartitionId());
+        }
+        m_waitToAssumeMastership.compareAndSet(false, true);
     }
 
     /**
