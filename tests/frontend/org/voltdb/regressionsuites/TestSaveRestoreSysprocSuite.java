@@ -143,13 +143,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         raf.close();
     }
 
-    private VoltTable createReplicatedTable(int numberOfItems,
+    static VoltTable createReplicatedTable(int numberOfItems,
             int indexBase,
             Set<String> expectedText) {
         return createReplicatedTable(numberOfItems, indexBase, expectedText, false);
     }
 
-    private VoltTable createReplicatedTable(int numberOfItems,
+    static VoltTable createReplicatedTable(int numberOfItems,
                                             int indexBase,
                                             Set<String> expectedText,
                                             boolean generateCSV)
@@ -230,7 +230,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return repl_table;
     }
 
-    private VoltTable createPartitionedTable(int numberOfItems,
+    static VoltTable createPartitionedTable(int numberOfItems,
                                              int indexBase)
     {
         VoltTable partition_table =
@@ -255,7 +255,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return partition_table;
     }
 
-    private VoltTable[] loadTable(Client client, String tableName, boolean replicated,
+    static VoltTable[] loadTable(Client client, String tableName, boolean replicated,
                                   VoltTable table)
     {
         VoltTable[] results = null;
@@ -316,7 +316,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-    private VoltTable[] saveTablesWithDefaultOptions(Client client, String nonce)
+    static VoltTable[] saveTablesWithDefaultOptions(Client client, String nonce)
     {
         return saveTables(client, TMPDIR, nonce, null, null, true, false);
     }
@@ -337,7 +337,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return results;
     }
 
-    private VoltTable[] saveTables(Client client, String dir, String nonce, String[] tables, String[] skiptables,
+    public static VoltTable[] saveTables(Client client, String dir, String nonce, String[] tables, String[] skiptables,
             boolean block, boolean csv)
     {
         VoltTable[] results = null;
@@ -418,11 +418,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-    private void validateSnapshot(boolean expectSuccess, String nonce) {
+    static void validateSnapshot(boolean expectSuccess, String nonce) {
         validateSnapshot(expectSuccess, false, nonce);
     }
 
-    private boolean validateSnapshot(boolean expectSuccess,
+    static boolean validateSnapshot(boolean expectSuccess,
             boolean onlyReportSuccess,String nonce) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
@@ -1934,119 +1934,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 num_partitioned_chunks);
         if (!checkTableNameAppears(client, new String[]{"PARTITION_TESTER", "REPLICATED_TESTER"})) {
             fail("Missing replicated or partitioned table name in snapshot result");
-        }
-    }
-
-    public void testSaveAndPartialRestoreSkiptables() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
-        System.out.println("Starting testSaveAndPartialRestoreSkiptables");
-        int num_replicated_items = 1000;
-        int num_partitioned_items = 126;
-        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
-        VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
-
-        Client client = getClient();
-        loadTable(client, "REPLICATED_TESTER", true, repl_table);
-        loadTable(client, "PARTITION_TESTER", false, partition_table);
-        saveTablesWithDefaultOptions(client, TESTNONCE);
-        validateSnapshot(true, TESTNONCE);
-        m_config.shutDown();
-        m_config.startUp();
-
-        client = getClient();
-        JSONObject jsObj = new JSONObject();
-        try {
-            jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
-            jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
-            jsObj.put(SnapshotUtil.JSON_SKIPTABLES, "['REPLICATED_TESTER']");
-        } catch (JSONException e) {
-            fail("JSON exception" + e.getMessage());
-        }
-        VoltTable[] results;
-        results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
-
-        while(results[0].advanceRow()) {
-            if (results[0].getString("RESULT").equals("FAILURE")) {
-                fail(results[0].getString("ERR_MSG"));
-            }
-            assert(!results[0].getString("TABLE").equals("REPLICATED_TESTER"));
-        }
-    }
-
-    public void testSaveAndPartialRestoreTables() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
-        System.out.println("Starting testPartialSnapshotRestoreTables");
-        int num_replicated_items = 1000;
-        int num_partitioned_items = 126;
-        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
-        VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
-
-        Client client = getClient();
-        loadTable(client, "REPLICATED_TESTER", true, repl_table);
-        loadTable(client, "PARTITION_TESTER", false, partition_table);
-        saveTablesWithDefaultOptions(client, TESTNONCE);
-        validateSnapshot(true, TESTNONCE);
-        m_config.shutDown();
-        m_config.startUp();
-
-        client = getClient();
-        JSONObject jsObj = new JSONObject();
-        try {
-            jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
-            jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
-            jsObj.put(SnapshotUtil.JSON_TABLES, "['REPLICATED_TESTER']");
-        } catch (JSONException e) {
-            fail("JSON exception" + e.getMessage());
-        }
-
-        VoltTable[] results;
-        results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
-
-        while(results[0].advanceRow()) {
-            if (results[0].getString("RESULT").equals("FAILURE")) {
-                fail(results[0].getString("ERR_MSG"));
-            }
-            assert(results[0].getString("TABLE").equals("REPLICATED_TESTER"));
-        }
-    }
-
-    public void testSaveAndPartialRestoreWithNonExistingTables() throws Exception {
-        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
-
-        System.out.println("Starting testSaveAndPartialRestoreWithNonExistingTables");
-        int num_replicated_items = 1000;
-        int num_partitioned_items = 126;
-        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
-        VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
-
-        Client client = getClient();
-        loadTable(client, "REPLICATED_TESTER", true, repl_table);
-        loadTable(client, "PARTITION_TESTER", false, partition_table);
-        saveTablesWithDefaultOptions(client, TESTNONCE);
-        validateSnapshot(true, TESTNONCE);
-        m_config.shutDown();
-        m_config.startUp();
-
-        client = getClient();
-        JSONObject jsObj = new JSONObject();
-        try {
-            jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
-            jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
-            jsObj.put(SnapshotUtil.JSON_TABLES, "['REPLICATED_TESTER', 'DUMMYTABLE']");
-        } catch (JSONException e) {
-            fail("JSON exception" + e.getMessage());
-        }
-
-        VoltTable[] results;
-        results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
-
-        while(results[0].advanceRow()) {
-            if (results[0].getString("RESULT").equals("FAILURE")) {
-                fail(results[0].getString("ERR_MSG"));
-            }
-            assert(!results[0].getString("TABLE").equals("DUMMYTABLE"));
         }
     }
 

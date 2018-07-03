@@ -200,7 +200,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private final static String HASHINATOR_ALL_BAD = "All hashinator snapshots are bad (%s).";
     // These keep track of count per table that are reported restored by the snapshotrestore process.
-    static final Map<String, AtomicLong> m_reportStats = new HashMap<String, AtomicLong>();
+    public static final Map<String, AtomicLong> m_reportStats = new HashMap<String, AtomicLong>();
     static final Map<String, Integer> m_selectedReportPartition = new HashMap<String, Integer>();
     static long m_nextReportTime = 0;
     //Report every minute.
@@ -1128,6 +1128,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         String pathType = jsObj.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.toString());
         String tablesStr = jsObj.optString(SnapshotUtil.JSON_TABLES);
         String skiptablesStr = jsObj.optString(SnapshotUtil.JSON_SKIPTABLES);
+        tablesStr = tablesStr.equals("") ? "" : tablesStr.substring(1, tablesStr.length() - 1);
+        skiptablesStr = skiptablesStr.equals("") ? "" : skiptablesStr.substring(1, skiptablesStr.length() - 1);
         final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
         final String dupsPath = jsObj.optString(SnapshotUtil.JSON_DUPLICATES_PATH, null);
         final boolean useHashinatorData = jsObj.optBoolean(SnapshotUtil.JSON_HASHINATOR);
@@ -1142,8 +1144,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
         savefile_data = performRestoreScanWork(path, pathType, nonce, dupsPath);
-        tablesStr = tablesStr.equals("") ? "" : tablesStr.substring(1, tablesStr.length() - 1);
-        skiptablesStr = skiptablesStr.equals("") ? "" : skiptablesStr.substring(1, skiptablesStr.length() - 1);
         List<String> includeList = tableOptParser(tablesStr);
         List<String> excludeList = tableOptParser(skiptablesStr);
 
@@ -2064,25 +2064,26 @@ public class SnapshotRestore extends VoltSystemProcedure {
     private Set<Table> getTablesToRestore(Set<String> savedTableNames,
                                           StringBuilder commaSeparatedViewNamesToDisable,
                                           List<String> include,
-                                          List<String> exclude,
-                                          int filter) {
+                                          List<String> exclude) {
         Set<Table> tables_to_restore = new HashSet<Table>();
 
-        if(filter == 1) {
+        if(include.size() > 0) {
             Set<String> newSet = new HashSet<>();
             for(String s : include) {
                 if(savedTableNames.contains(s)) {
                     newSet.add(s);
                 } else {
-                    SNAP_LOG.error("Table: " + s + " is not in the snapshot, skip this table.");
-                    System.err.println("ERROR: Table " + s + " is not in the snapshot, skip this table.");
+                    SNAP_LOG.error("Table: " + s + " does not match any savefile data.");
+                    throw new VoltAbortException("Invalid table specification, abort.");
                 }
             }
             savedTableNames = newSet;
-        } else if(filter == -1) {
+        } else if(exclude.size() > 0) {
             for (String s : exclude) {
                 if(savedTableNames.contains(s)) {
                     savedTableNames.remove(s);
+                } else {
+                    SNAP_LOG.info("Table: " + s + " does not match any savefile data");
                 }
             }
         }
@@ -2162,15 +2163,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
          * Create a mailbox to use to send fragment work to execution sites
          */
         final Mailbox m = VoltDB.instance().getHostMessenger().createMailbox();
-        //1 for "tables", -1 for "skiptables", 0 for no filter.
-        int filterType;
-        if (include.size() > 0) {
-            filterType = 1;
-        } else if (exclude.size() > 0) {
-            filterType = -1;
-        } else {
-            filterType = 0;
-        }
 
         /*
          * Create a separate thread to do the work of coordinating the restore
@@ -2238,7 +2230,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  */
                 StringBuilder commaSeparatedViewNamesToDisable = new StringBuilder();
                 Set<Table> tables_to_restore =
-                        getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable, include, exclude, filterType);
+                        getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable, include, exclude);
                 VoltTable[] restore_results = new VoltTable[1];
                 restore_results[0] = constructResultsTable();
                 ArrayList<SynthesizedPlanFragment[]> restorePlans =
@@ -2278,7 +2270,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     for (int ii = 0; ii < restore_plan.length - 1; ii++) {
                         restore_plan[ii].siteId = actualToGenerated.get(restore_plan[ii].siteId);
                     }
-                    System.out.println("Performing restore for table: " + table.getTypeName());
                     SNAP_LOG.info("Performing restore for table: " + table.getTypeName());
 
                     /*
@@ -3010,13 +3001,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return results;
     }
 
-    private List<String> tableOptParser(String s) {
+    private List<String> tableOptParser(String raw) {
         List<String> ret = new ArrayList<>();
-        if(s.equals("")) return ret;
+        if(raw == null || raw.length() == 0) return ret;
+        String[] rawstrs = raw.split(", ");
 
-        String[] raw = s.split(", ");
-
-        for(String ss : raw) {
+        for(String ss : rawstrs) {
             StringBuilder sb = new StringBuilder();
             for(int i = 1 ; i < ss.length() - 1 ; i++) {
                 char c = ss.charAt(i);
