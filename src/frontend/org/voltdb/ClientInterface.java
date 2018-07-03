@@ -2328,21 +2328,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                    hostLog.warn(String.format("Fail to execute TTL on table: %s, column: %s, status: %s",
                            task.tableName, columnName, resp.getStatusString()));
                }
-               VoltTable t = resp.getResults()[0];
-               t.advanceRow();
-               String error = t.getString("MESSAGE");
-               if (!error.isEmpty()) {
-                   String drLimitError = "";
-                   if (error.indexOf(TTLManager.DR_LIMIT_MSG) > -1) {
-                       // The buffer limit for a DR transaction is 50M. If over the limit,
-                       // the transaction will be aborted. The same is true for nibble delete transaction.
-                       // If hit this error, no more data can be deleted in this TTL table.
-                       drLimitError = "TTL is disabled for this table.";
-                       task.cancel();
+               if (resp.getResults() != null && resp.getResults().length > 0) {
+                   VoltTable t = resp.getResults()[0];
+                   t.advanceRow();
+                   String error = t.getString("MESSAGE");
+                   if (!error.isEmpty()) {
+                       String drLimitError = "";
+                       if (error.indexOf(TTLManager.DR_LIMIT_MSG) > -1) {
+                           // The buffer limit for a DR transaction is 50M. If over the limit,
+                           // the transaction will be aborted. The same is true for nibble delete transaction.
+                           // If hit this error, no more data can be deleted in this TTL table.
+                           drLimitError = "TTL is disabled for this table.";
+                           task.cancel();
+                       }
+                       hostLog.warn("Errors occured on TTL table " + task.tableName + ": " +  error + " " + drLimitError);
+                   } else {
+                       task.stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"), t.getLong("LAST_DELETE_TIMESTAMP"));
                    }
-                   hostLog.warn("Errors occured on TTL table " + task.tableName + ": " +  error + " " + drLimitError);
-               } else {
-                   task.stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"), t.getLong("LAST_DELETE_TIMESTAMP"));
                }
                latch.countDown();
            }
