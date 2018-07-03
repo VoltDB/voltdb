@@ -2158,8 +2158,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (message.startMigratingPartitionLeaders()) {
             if (m_migratePartitionLeaderExecutor == null) {
                 m_migratePartitionLeaderExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("MigratePartitionLeader"));
-                final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "10"));
-                final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "30"));
+                final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
+                final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
                 m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
                         () -> {startMigratePartitionLeader();},
                         delay, interval, TimeUnit.SECONDS);
