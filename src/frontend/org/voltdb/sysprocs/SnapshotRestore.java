@@ -2239,7 +2239,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 StringBuilder commaSeparatedViewNamesToDisable = new StringBuilder();
                 Set<Table> tables_to_restore = new HashSet<Table>();
                 tables_to_restore = getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable, include, exclude);
-              
+
                 VoltTable[] restore_results = new VoltTable[1];
                 restore_results[0] = constructResultsTable();
                 ArrayList<SynthesizedPlanFragment[]> restorePlans =
@@ -3028,7 +3028,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
         return ret;
     }
-    
+
     private void testValidIncludeTables(final ClusterSaveFileState savefileState, List<String> include) {
         if(include == null || include.size() == 0) return;
         Set<String> savedTableNames = savefileState.getSavedTableNames();
