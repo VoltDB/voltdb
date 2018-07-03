@@ -2265,6 +2265,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             notifyPartitionMigrationStatus(partitionId, targetHSId, false);
 
+            Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "30"));
+            if (Boolean.getBoolean("TEST_MIGRATION_FAILURE")) {
+                Thread.sleep(100);
+                throw new IOException("failure simulation");
+            }
             synchronized (m_executeTaskAdpater) {
                 createTransaction(m_executeTaskAdpater.connectionId(),
                         spi,

@@ -2273,7 +2273,7 @@ public class LocalCluster extends VoltServerConfig {
                                                   DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
                                                   String callingMethodName) throws IOException {
         return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort, remoteReplicationPort,
-                           pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, callingMethodName, false);
+                           pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, callingMethodName, false, null);
     }
 
     // temporary method until we always enable SPI migration
@@ -2281,7 +2281,8 @@ public class LocalCluster extends VoltServerConfig {
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
                                                   String callingMethodName,
-                                                  boolean enableSPIMigration) throws IOException {
+                                                  boolean enableSPIMigration,
+                                                  Map<String, String> javaProps) throws IOException {
         if (builder == null) builder = new VoltProjectBuilder();
         LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
                 replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, callingMethodName);
@@ -2295,6 +2296,10 @@ public class LocalCluster extends VoltServerConfig {
             lc.setJavaProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1");
             lc.setJavaProperty("MIGRATE_PARTITION_LEADER_DELAY", "1");
             lc.setJavaProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false");
+        }
+        if (javaProps != null)
+        for (Map.Entry<String, String> prop : javaProps.entrySet()) {
+            lc.setJavaProperty(prop.getKey(), prop.getValue());
         }
         if (!lc.isNewCli()) {
             lc.setDeploymentAndVoltDBRoot(builder.getPathToDeployment(), pathToVoltDBRoot);
