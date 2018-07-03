@@ -1380,6 +1380,19 @@ public class SnapshotRestore extends VoltSystemProcedure {
             }
         }
 
+        try {
+            testValidIncludeTables(savefile_state, includeList);
+        } catch (VoltAbortException e) {
+            ColumnInfo[] result_columns = new ColumnInfo[2];
+            int ii = 0;
+            result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+            results = new VoltTable[] { new VoltTable(result_columns) };
+            results[0].addRow("FAILURE", e.toString());
+            System.out.println(e.toString());
+            return results;
+        }
+
         results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot(), isRecover, includeList, excludeList);
 
         final long endTime = System.currentTimeMillis();
@@ -2070,12 +2083,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         if(include.size() > 0) {
             Set<String> newSet = new HashSet<>();
             for(String s : include) {
-                if(savedTableNames.contains(s)) {
-                    newSet.add(s);
-                } else {
-                    SNAP_LOG.error("Table: " + s + " does not match any savefile data.");
-                    throw new VoltAbortException("Invalid table specification, abort.");
-                }
+                newSet.add(s);
             }
             savedTableNames = newSet;
         } else if(exclude.size() > 0) {
@@ -2229,8 +2237,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  * site
                  */
                 StringBuilder commaSeparatedViewNamesToDisable = new StringBuilder();
-                Set<Table> tables_to_restore =
-                        getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable, include, exclude);
+                Set<Table> tables_to_restore = new HashSet<Table>();
+                tables_to_restore = getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable, include, exclude);
+              
                 VoltTable[] restore_results = new VoltTable[1];
                 restore_results[0] = constructResultsTable();
                 ArrayList<SynthesizedPlanFragment[]> restorePlans =
@@ -3018,6 +3027,17 @@ public class SnapshotRestore extends VoltSystemProcedure {
             ret.add(sb.toString());
         }
         return ret;
+    }
+    
+    private void testValidIncludeTables(final ClusterSaveFileState savefileState, List<String> include) {
+        if(include == null || include.size() == 0) return;
+        Set<String> savedTableNames = savefileState.getSavedTableNames();
+        for(String s : include) {
+            if(!savedTableNames.contains(s)) {
+                SNAP_LOG.error("ERROR : Table " + s + " is not in the savefile data.");
+                throw new VoltAbortException("Table " + s + " is not in the savefile data.");
+            }
+        }
     }
 
     /*

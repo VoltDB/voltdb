@@ -15,7 +15,7 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
         super(name);
     }
 
-    public void SaveAndPartialRestoreExcludetables() throws Exception {
+    public void testSaveAndPartialRestoreExcludetables() throws Exception {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         System.out.println("Starting testSaveAndPartialRestoreExcludetables");
@@ -57,7 +57,7 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
         assert(rowCount == 126);
     }
 
-    public void SaveAndPartialRestoreIncludeTables() throws Exception {
+    public void testSaveAndPartialRestoreIncludeTables() throws Exception {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         System.out.println("Starting testSaveAndPartialRestoreIncludeTables");
@@ -126,12 +126,14 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
         } catch (JSONException e) {
             fail("JSON exception" + e.getMessage());
         }
-        assert(true);
-        client.callProcedure("@SnapshotRestore", jsObj.toString());
-        assert(false);
+        VoltTable[] results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
+        while(results[0].advanceRow()) {
+            assert(results[0].getString("RESULT").equals("FAILURE"));
+            assert(results[0].getString("ERR_MSG").equals("org.voltdb.VoltProcedure$VoltAbortException: Table DUMMYTABLE is not in the savefile data."));
+        }
     }
 
-    public void SaveAndPartialRestoreWithNonExistingExcludeTables() throws Exception {
+    public void testSaveAndPartialRestoreWithNonExistingExcludeTables() throws Exception {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
 
         System.out.println("Starting testSaveAndPartialRestoreWithNonExistingExcludeTables");
