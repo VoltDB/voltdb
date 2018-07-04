@@ -54,6 +54,7 @@ public class PlannerTool {
     private Database m_database;
     private byte[] m_catalogHash;
     private AdHocCompilerCache m_cache;
+    private long m_adHocLargeFallbackCount = 0;
 
     private final HSQLInterface m_hsql;
 
@@ -114,6 +115,10 @@ public class PlannerTool {
         return m_hsql;
     }
 
+    public long getAdHocLargeFallbackCount() {
+        return m_adHocLargeFallbackCount;
+    }
+
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
         return planSql(sqlIn, infer, false, null, false, false);
@@ -153,7 +158,10 @@ public class PlannerTool {
                 logException(e, "Error compiling query");
                 loggedMsg = " (Stack trace has been written to the log.)";
             }
-            throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg, e);
+            if (e.getMessage() != null) {
+                throw new RuntimeException("SQL error while compiling query: " + e.getMessage() + loggedMsg, e);
+            }
+            throw new RuntimeException("SQL error while compiling query: " + e.toString() + loggedMsg, e);
         }
 
         if (plan == null) {
@@ -297,6 +305,9 @@ public class PlannerTool {
                 if (plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
+                if (plan.getIsLargeQuery() != isLargeQuery) {
+                    ++m_adHocLargeFallbackCount;
+                }
 
                 planHasExceptionsWhenParameterized = planner.wasBadPameterized();
             }
@@ -310,8 +321,10 @@ public class PlannerTool {
                     logException(e, "Error compiling query");
                     loggedMsg = " (Stack trace has been written to the log.)";
                 }
-                throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
-                                           e);
+                if (e.getMessage() != null) {
+                    throw new RuntimeException("SQL error while compiling query: " + e.getMessage() + loggedMsg, e);
+                }
+                throw new RuntimeException("SQL error while compiling query: " + e.toString() + loggedMsg, e);
             }
 
             //////////////////////

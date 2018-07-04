@@ -1546,7 +1546,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 "PRIMARY KEY (F_PKEY) ); " +
 
                 "CREATE VIEW V2 (V_D1_PKEY, V_D2_PKEY, V_D3_PKEY, V_F_PKEY, CNT, SUM_V1, SUM_V2, SUM_V3) " +
-                "AS SELECT F_D1, F_D2, F_D3, F_PKEY, MIN(F_VAL1), SUM(F_VAL1), SUM(F_VAL2), SUM(F_VAL3) " +
+                "AS SELECT F_D1, F_D2, F_D3, F_PKEY, COUNT(*), SUM(F_VAL1), SUM(F_VAL2), SUM(F_VAL3) " +
                 "FROM F  GROUP BY F_D1, F_D2, F_D3, F_PKEY;"
                 ;
         try {
@@ -1557,12 +1557,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project2);
-        assertFalse(success);
-        captured = capturer.toString("UTF-8");
-        lines = captured.split("\n");
-
-        assertTrue(foundLineMatching(lines,
-                ".*V2.*must have count(.*) after the GROUP BY columns \\(if any\\)*"));
+        assertTrue(success);
 
         // Real config for tests
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -1724,8 +1719,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 // This R4 mv tests bigint math result type
                 "CREATE VIEW V2_R4 (V2_R4_G1, V2_R4_G2, V2_R4_CNT, V2_R4_sum_wage) " +
                 "AS SELECT dept*dept, dept+dept, count(*), SUM(wage) " +
-                "FROM R4 GROUP BY dept*dept, dept+dept;" +
-                "";
+                "FROM R4 GROUP BY dept*dept, dept+dept;";
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {

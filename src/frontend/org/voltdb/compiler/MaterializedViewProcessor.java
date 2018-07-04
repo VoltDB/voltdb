@@ -559,6 +559,7 @@ public class MaterializedViewProcessor {
             assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
         }
 
+        // Users cannot create SINGLE TABLE VIEWS without declaring count(*) in the stmt.
         if (countStarFound == false) {
             msg.append("must have count(*) after the GROUP BY columns (if any)");
             throw m_compiler.new VoltCompilerException(msg.toString());

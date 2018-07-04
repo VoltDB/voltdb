@@ -50,7 +50,7 @@ public class SpTerm implements Term
     protected BabySitter m_babySitter;
     private ImmutableList<Long> m_replicas = ImmutableList.of();
     private boolean m_replicasUpdatedRequired = false;
-    private boolean m_initJoin = StartAction.JOIN.equals(VoltDB.instance().getConfig().m_startAction);
+    private boolean m_initJoin = VoltDB.instance().isJoining();
     private final int m_kFactor = VoltDB.instance().getKFactor();
 
     // runs on the babysitter thread when a replica changes.
@@ -81,14 +81,14 @@ public class SpTerm implements Term
             // for joining nodes that hasn't been fully initialized
             // still update replicas for allowing all replicas receive fragment tasks
             if (m_initJoin) {
-                if (replicas.size() == m_kFactor) {
+                if (replicas.size() == m_kFactor + 1) {
                     m_initJoin = false;
                 }
                 m_mailbox.updateReplicas(replicas, null);
                 m_replicasUpdatedRequired = false;
             }
             if (m_replicas.isEmpty() || replicas.size() <= m_replicas.size()) {
-                //The cases for startup or host failure/
+                //The cases for startup or host failure
                 m_mailbox.updateReplicas(replicas, null);
                 m_replicasUpdatedRequired = false;
             } else {

@@ -274,12 +274,10 @@ public class TestDecimalRoundingSuite extends RegressionSuite {
             // Try it with unrepresentable numbers.
             //
             String positiveTest = "insert into decimaltable values 99999999999999999999999999.9999999999995;";
-            String positiveTestMsg = "Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: " +
-                                     "Error compiling query: java.lang.RuntimeException: " +
+            String positiveTestMsg = "SQL error while compiling query: " +
                                      "Decimal 100000000000000000000000000.000000000000 has more than 38 digits of precision.";
             String negativeTest = "insert into decimaltable values -99999999999999999999999999.9999999999995;";
-            String negativeTestMsg = "Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: " +
-                                     "Error compiling query: java.lang.RuntimeException: " +
+            String negativeTestMsg = "SQL error while compiling query: " +
                                      "Decimal -100000000000000000000000000.000000000000 has more than 38 digits of precision.";
             switch (mode) {
             case HALF_DOWN:

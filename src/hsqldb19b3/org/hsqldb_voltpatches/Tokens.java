@@ -768,6 +768,9 @@ public class Tokens {
     static final String        T_WEEKDAY             = "WEEKDAY";    // for compliant with MySQL
     // End of VoltDB extension
 
+    // A VoltDB extension TTL
+    static final String        T_TTL = "TTL";
+    // End of VoltDB extension
     //
     static final String        T_ACOS             = "ACOS";
     static final String        T_ASIN             = "ASIN";
@@ -816,6 +819,11 @@ public class Tokens {
     static final String        T_DATEDIFF         = "DATEDIFF";
     public static final String T_SECONDS_MIDNIGHT = "SECONDS_SINCE_MIDNIGHT";
 
+    //VoltDB extension for TTL
+    public static final String T_MINUTES          = "MINUTES";
+    public static final String T_SECONDS          = "SECONDS";
+    public static final String T_HOURS            = "HOURS";
+    public static final String T_DAYS             = "DAYS";
     //
     //
     //SQL 200n Standard reserved keywords - full set
@@ -1603,6 +1611,13 @@ public class Tokens {
     public static final int WEEKDAY                    = 741; // for compliant with MySQL
     // End of VoltDB extension
 
+    // A VoltDB extension to support TTL
+    static final int TTL           = 1003;
+    static final int SECONDS       = 1004;
+    static final int MINUTES       = 1005;
+    static final int HOURS         = 1006;
+    static final int DAYS          = 1007;
+    // End of VoltDB extension
     //
     public static final int X_UNKNOWN_TOKEN = -1;
     private static final IntValueHashMap reservedKeys =
@@ -1954,6 +1969,10 @@ public class Tokens {
         // A VoltDB extension to support WEEKOFYEAR and WEEKDAY function
         reservedKeys.put(Tokens.T_WEEKOFYEAR, WEEKOFYEAR);    // For compliant with MySQL
         reservedKeys.put(Tokens.T_WEEKDAY, WEEKDAY);          // For compliant with MySQL
+        reservedKeys.put(Tokens.T_SECONDS, SECONDS);
+        reservedKeys.put(Tokens.T_MINUTES, MINUTES);
+        reservedKeys.put(Tokens.T_HOURS, HOURS);
+        reservedKeys.put(Tokens.T_DAYS, DAYS);
         // End of VoltDB extension
     }
 
@@ -2220,6 +2239,10 @@ public class Tokens {
         commandSet.put(T_QUESTION, Tokens.QUESTION);
         commandSet.put(T_OPENBRACKET, OPENBRACKET);
         commandSet.put(T_CLOSEBRACKET, CLOSEBRACKET);
+
+        // A VoltDB extension to TTL
+        commandSet.put(T_TTL, TTL);
+        //end of VoltDB extension
     }
 
     static int get(String token) {

@@ -47,13 +47,10 @@
 
 #include "ExecutorVector.h"
 
-#include "catalog/catalog.h"
-#include "catalog/catalogmap.h"
 #include "catalog/cluster.h"
 #include "catalog/column.h"
 #include "catalog/columnref.h"
 #include "catalog/connector.h"
-#include "catalog/database.h"
 #include "catalog/function.h"
 #include "catalog/functionparameter.h"
 #include "catalog/index.h"
@@ -65,15 +62,10 @@
 
 #include "common/ElasticHashinator.h"
 #include "common/ExecuteWithMpMemory.h"
-#include "common/executorcontext.hpp"
-#include "common/FailureInjection.h"
-#include "common/FatalException.hpp"
 #include "common/InterruptException.h"
 #include "common/RecoveryProtoMessage.h"
-#include "common/SerializableEEException.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
-#include "common/types.h"
 
 #include "common/SynchronizedThreadLock.h"
 #include "executors/abstractexecutor.h"
@@ -81,17 +73,12 @@
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 
-#include "plannodes/abstractplannode.h"
-#include "plannodes/plannodefragment.h"
-
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
 #include "storage/ExecuteTaskUndoGenerateDREventAction.h"
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
-#include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
-#include "storage/ExportTupleStream.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
@@ -99,9 +86,6 @@
 
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
-#include "boost/foreach.hpp"
-#include "boost/scoped_ptr.hpp"
-#include "boost/shared_ptr.hpp"
 // The next #define limits the number of features pulled into the build
 // We don't use those features.
 #define BOOST_MULTI_INDEX_DISABLE_SERIALIZATION
@@ -111,11 +95,7 @@
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 
-#include <sstream>
-#include <locale>
-#include <typeinfo>
 #include <chrono> // For measuring the execution time of each fragment.
-#include <pthread.h>
 #if __cplusplus >= 201103L
 #include <atomic>
 #else
@@ -723,7 +703,17 @@ void VoltDBEngine::serializeException(const SerializableEEException& e) {
 // -------------------------------------------------
 void VoltDBEngine::send(Table* dependency) {
     VOLT_DEBUG("Sending Dependency from C++");
-    m_resultOutput.writeInt(-1); // legacy placeholder for old output id
+    // legacy placeholder for old output id
+    // repurpose the placeholder to store bytes of Buffer allocated for DR
+
+    size_t drBufferChange = size_t(0);
+    if (m_drStream) {
+        drBufferChange = m_drStream->m_uso - m_drStream->m_committedUso;
+        if (m_drReplicatedStream) {
+            drBufferChange += m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
+        }
+    }
+    m_resultOutput.writeInt(static_cast<int>(drBufferChange));
     dependency->serializeTo(m_resultOutput);
     m_numResultDependencies++;
 }
@@ -1542,7 +1532,9 @@ void
 VoltDBEngine::markAllExportingStreamsNew() {
     //Mark all streams new so that schema is sent on next tuple.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingStreams) {
-        entry.second->setNew();
+        if (entry.second != NULL) {
+            entry.second->setNew();
+        }
     }
 }
 
@@ -1585,14 +1577,23 @@ VoltDBEngine::loadTable(int32_t tableId,
         return false;
     }
 
+    // If this is a paused non-empty single table view, load data into the delta table
+    // instead of the main table.
+    if (table->deltaTable() && table->materializedViewTrigger()) {
+        table = table->deltaTable();
+    }
+
     // When loading a replicated table, behavior should be:
-    //   ConstraintFailureExceptions may be thrown on the lowest site thread.
-    //   If throwUniqueViolations is true:
+    //   ConstraintFailureException may be thrown on the lowest site thread.
+    //   If returnConflictRows is false:
     //       Lowest site thread: throw the exception.
     //       Other site threads: throw replicated table exceptions.
-    //   else (throwUniqueViolations is false)
+    //   else (returnConflictRows is true)
     //       Lowest site thread: serialize the offending rows, return 1.
-    //       Other site thread: return 1.
+    //       Other site thread: copy the serialized buffer from lowest site, return 1.
+    //
+    //   SQLException may also be thrown on the loweset site thread (e.g. from the TableTuple.deserializeFrom())
+    //   will always re/throw from every sites
     //
     //   For all other kinds of exceptions, throw a FatalException.  This is legacy behavior.
     //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
@@ -1621,9 +1622,13 @@ VoltDBEngine::loadTable(int32_t tableId,
                 return false;
             }
         }
+        catch (const SQLException &sqe) {
+            s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
+            throw;
+        }
         catch (const SerializableEEException& serializableExc) {
-            // Exceptions that are not constraint failures are treated as fatal.   This is legacy
-            // behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
+            // Exceptions that are not constraint failures or sql exeception are treated as fatal.
+            // This is legacy behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
             // other kind of exception?
             s_loadTableException = serializableExc.getType();
             throwFatalException("%s", serializableExc.message().c_str());
@@ -1649,14 +1654,21 @@ VoltDBEngine::loadTable(int32_t tableId,
         if (!returnConflictRows) {
             std::ostringstream oss;
             oss << "Replicated load table failed (constraint violation) on other thread for table \""
-                << table->name() << "\".";
+                << table->name() << "\".\n";
             VOLT_DEBUG("%s", oss.str().c_str());
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
         }
-        else {
-            // Offending rows will be serialized on lowest site thread.
-            return false;
-        }
+        // Offending rows will be serialized on lowest site thread.
+        return false;
+    }
+    else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_SQL) {
+        // An sql exception was thrown on the lowest site thread and
+        // handle it on the other threads too.
+        std::ostringstream oss;
+        oss << "Replicated load table failed (sql exception) on other thread for table \""
+            << table->name() << "\".\n";
+        VOLT_DEBUG("%s", oss.str().c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
     }
     else if (s_loadTableException != VOLT_EE_EXCEPTION_TYPE_NONE) { // some other kind of exception occurred on lowest site thread
         // This is fatal.
@@ -2723,6 +2735,73 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     if (tbl != NULL) {
         tbl->deleteAllTempTuples();
     }
+}
+
+/* (Ethan): During snapshot restore, all replicated persistent table views and explicitly partitioned
+ * persistent table views will be put into paused mode, meaning that we are not going to
+ * maintain the data in them while table data is being imported from the snapshot.
+
+ * What is an implicitly partitioned view?
+ * * If any of the source tables of a view is partitioned, the view is partitioned.
+ * * If the partition column of any view source tables is present in the view group-by columns,
+ *   the view will use the first-found such column as the partition column.
+ *   In this case, the view is **explicitly partitioned**.
+ * * If none of the partition column of any view source tables is included in the view group-by columns,
+ *   the view is still partitioned, but the partition column is set to null.
+ *   We call it **implicitly partitioned** because given any row in the view table, we have no way to
+ *   infer which partition it should go to using the hashinator.
+
+ * Why do we need to know the viewNames?
+ * In the node rejoin case, all the tables in the database will be streamed to the rejoining node.
+ * Knowing the name of the views we are pausing/resuming is not necessary.
+ * However, because we allow partial snapshots for normal snapshots, and the database catalog may have
+ * changed before a @SnapshotRestore, we need to precisely control which views to pause/resume and which
+ * views to keep untouched.
+ */
+void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
+    // We need to update the statuses of replicated views and partitioned views separately to consolidate
+    // the use of the count-down latch which is required when updating replicated views.
+    VOLT_TRACE("[Partition %d] VoltDBEngine::setViewsEnabled(%s, %s)\n", m_partitionId, viewNames.c_str(), value?"true":"false");
+    bool updateReplicated = false;
+    // The loop below is executed exactly twice. The first iteration has updateReplicated = false, where we
+    // update the partitioned views. The updateReplicated flag is flipped to true at the end of the iteration,
+    // which allows the loop to execute for a second round to update replicated views.
+    do {
+        VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
+        // Update all the partitioned table views first, then update all the replicated table views.
+        int64_t dummyExceptionTracker = 0;
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, &dummyExceptionTracker, int64_t(-1));
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            // This loop just split the viewNames by commas and process each view individually.
+            for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
+                std::string viewName = viewNames.substr(pstart+(pstart!=0), (pend=viewNames.find(',',pstart+1))-pstart-(pstart!=0));
+                Table *table = getTableByName(viewName);
+                PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
+                if (! persistentTable) {
+                    // We do not look at export tables.
+                    // We should have prevented this in the Java layer.
+                    continue;
+                }
+                if (persistentTable->isCatalogTableReplicated() != updateReplicated) {
+                    VOLT_TRACE("[Partition %d] skip %s\n", m_partitionId, persistentTable->name().c_str());
+                    continue;
+                }
+                if (persistentTable->materializedViewTrigger()) {
+                    VOLT_TRACE("[Partition %d] %s->materializedViewTrigger()->setEnabled(%s)\n",
+                               m_partitionId, persistentTable->name().c_str(), value?"true":"false");
+                    // Single table view
+                    persistentTable->materializedViewTrigger()->setEnabled(value);
+                }
+                else if (persistentTable->materializedViewHandler()) {
+                    VOLT_TRACE("[Partition %d] %s->materializedViewHandler()->setEnabled(%s)\n",
+                               m_partitionId, persistentTable->name().c_str(), value?"true":"false");
+                    // Joined view.
+                    persistentTable->materializedViewHandler()->setEnabled(value);
+                }
+            }
+        }
+        updateReplicated = ! updateReplicated;
+    } while (updateReplicated);
 }
 
 } // namespace voltdb

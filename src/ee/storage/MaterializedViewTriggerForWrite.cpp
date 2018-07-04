@@ -388,8 +388,8 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     return newVal;
 }
 
-void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTuple,
-        bool fallible) {
+void MaterializedViewTriggerForWrite::processTupleDelete(
+        const TableTuple &oldTuple, bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (failsPredicate(oldTuple)) {
         return;
@@ -408,7 +408,13 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
     memset(m_updatedTuple.address(), 0, destTbl->getTupleLength());
 
     // obtain the current count of the number of tuples in the group
-    NValue count = m_existingTuple.getNValue((int) m_countStarColumnIndex).op_decrement();
+    NValue count;
+    if ((int) m_countStarColumnIndex == -1) {
+        assert(destTbl->schema()->hiddenColumnCount() == 1);
+        count = m_existingTuple.getHiddenNValue(0).op_decrement();
+    } else {
+        count = m_existingTuple.getNValue((int) m_countStarColumnIndex).op_decrement();
+    }
 
     // check if we should remove the tuple
     if (count.isZero()) {
@@ -504,7 +510,10 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         VOLT_TRACE("updating matview tuple column %d\n", (int)(aggOffset+aggIndex));
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
-
+    if (numCountStar == 0) {
+        assert(destTbl->schema()->hiddenColumnCount() == 1);
+        m_updatedTuple.setHiddenNValue(0, m_existingTuple.getHiddenNValue(0).op_decrement());
+    }
     // update the row
     // Shouldn't need to update group-key-only indexes such as the primary key
     // since their keys shouldn't ever change, but do update other indexes.

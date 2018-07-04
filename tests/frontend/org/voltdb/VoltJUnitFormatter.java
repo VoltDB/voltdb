@@ -159,7 +159,9 @@ public class VoltJUnitFormatter implements JUnitResultFormatter {
     @Override
     public void addFailure(Test arg0, AssertionFailedError arg1) {
         String testName = arg0.toString();
-        testName = testName.substring(0, testName.indexOf('('));
+        if (testName.indexOf('(') != -1) {
+            testName = testName.substring(0, testName.indexOf('('));
+        }
 
         out.println("    " + testName + " failed an assertion.");
         StackTraceElement[] st = arg1.getStackTrace();

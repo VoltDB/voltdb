@@ -41,7 +41,7 @@ JUNIT = os.environ.get('junit', None)
 # Jira credentials and info
 JIRA_USER = os.environ.get('jirauser', None)
 JIRA_PASS = os.environ.get('jirapass', None)
-JIRA_PROJECT = os.environ.get('jiraproject', None)
+JIRA_PROJECT = os.environ.get('jiraproject', 'ENG')
 
 # Queries
 
@@ -581,12 +581,10 @@ table {
     width: 100%;
     font-family: verdana,arial,sans-serif;
 }
-
 th, td {
     padding: 8px;
     border-bottom: 1px solid #ddd;
 }
-
 tr:hover{
     background-color:#f5f5f5
 }
@@ -738,7 +736,7 @@ tr:hover{
             self.response_html()
 
     def create_bug_issue(self, channel, summary, description, component, version, labels,
-                         user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT):
+                         user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT, DRY_RUN=False):
         """
         Creates a bug issue on Jira
         :param channel: The channel to notify
@@ -753,7 +751,7 @@ tr:hover{
         """
         if user and passwd and project:
             try:
-                jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(user, passwd))
+                jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(user, passwd), options=dict(verify=False))
             except:
                 self.logger.exception('Could not connect to Jira')
                 return
@@ -761,11 +759,12 @@ tr:hover{
             self.logger.error('Did not provide either a Jira user, a Jira password or a Jira project')
             return
 
-        # Check for existing bug with same summary
-        existing = jira.search_issues('summary ~ \'%s\'' % summary)
+        # Check for existing bugs for the same test case, if there are any, suppress filing another
+        test_case = summary.split(' ')[0]
+        existing = jira.search_issues('summary ~ \'%s\' and labels = automatic and status != Closed' % test_case)
         if len(existing) > 0:
             # Already reported
-            self.logger.info('OLD: Already reported issue with summary "' + summary + '"')
+            self.logger.info('Found open issue(s) for "' + test_case + '" ' + ' '.join([k.key for k in existing]))
             return
 
         issue_dict = {
@@ -812,11 +811,17 @@ tr:hover{
         issue_dict['fixVersions'] = [{'name':'Backlog'}]
         issue_dict['priority'] = {'name': 'Blocker'}
 
-        new_issue = jira.create_issue(fields=issue_dict)
-        self.logger.info('NEW: Reported issue with summary "' + summary + '"')
+        self.logger.info("Filing ticket: %s" % summary)
+        if not DRY_RUN:
+            new_issue = jira.create_issue(fields=issue_dict)
+            #self.logger.info('NEW: Reported issue with summary "' + summary + '"')
+            if self.connect_to_slack():
+                self.post_message(channel, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
+        else:
+            new_issue = None
 
-        if self.connect_to_slack():
-            self.post_message(channel, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
+        return new_issue
+
 
 if __name__ == '__main__':
     jenkinsbot = JenkinsBot()

@@ -130,6 +130,29 @@ CREATE TABLE bigp
 );
 PARTITION TABLE bigp ON COLUMN p;
 
+--  nibble delete replicated table
+CREATE TABLE nibdr
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_nr PRIMARY KEY (p,id)
+) USING TTL 30 Seconds on column ts ;
+CREATE INDEX NIBR_TSINDEX ON nibdr (ts);
+
+-- nibble delete partitioned table
+CREATE TABLE nibdp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, ts         timestamp          DEFAULT NOW NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_np PRIMARY KEY (p,id)
+) USING TTL 30 Seconds on column ts ;
+PARTITION TABLE nibdp ON COLUMN p;
+CREATE INDEX NIBP_TSINDEX ON nibdp (ts);
+
 CREATE TABLE forDroppedProcedure
 (
   p          integer             NOT NULL
@@ -465,9 +488,15 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertP;
 PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
 PARTITION PROCEDURE ImportInsertP ON TABLE importbp COLUMN cid PARAMETER 3;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertR;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.exceptionUDF;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.NIBDPTableInsert;
+PARTITION PROCEDURE NIBDPTableInsert ON TABLE nibdp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.NIBDRTableInsert;
+
+-- functions
 CREATE FUNCTION add2Bigint    FROM METHOD txnIdSelfCheck.procedures.udfs.add2Bigint;
 CREATE FUNCTION identityVarbin    FROM METHOD txnIdSelfCheck.procedures.udfs.identityVarbin;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.exceptionUDF;
 CREATE FUNCTION excUDF    FROM METHOD txnIdSelfCheck.procedures.udfs.badUDF;
+
 
 END_OF_BATCH

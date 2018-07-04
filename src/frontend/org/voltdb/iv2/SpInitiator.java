@@ -235,7 +235,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
-
+                    VoltZK.unregisterPromotingPartition(m_messenger.getZK(), getPartitionId(), tmLog);
                     m_initiatorMailbox.setMigratePartitionLeaderStatus(migratePartitionLeader);
                 }
                 else {

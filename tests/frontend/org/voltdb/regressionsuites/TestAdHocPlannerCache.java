@@ -411,10 +411,6 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         verifyAdHocFails(client, errorMsg, sql, 1.8);
         checkPlannerCache(client, CACHE_MISS2);
 
-        // verify the error message is from "tryToMakeCompatible"
-        verifyAdHocFails(client, "tryToMakeCompatible", sql, 1.8);
-        checkPlannerCache(client, CACHE_HIT2);
-
         vt = client.callProcedure("@AdHoc", sql, 2).getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{3});
         checkPlannerCache(client, CACHE_HIT2);

@@ -1324,6 +1324,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Don't mark txn done for restarts
             txnDone = false;
         }
+        if (msg.isAborted() && counter != null) {
+            // The last completion was an abort due to a repair/abort or restart/abort so we need to remove duplicate counters
+            // for stale versions of the restarted Txn that never made it past the scoreboard
+            final DuplicateCounterKey lowestPossible = new DuplicateCounterKey(msg.getTxnId(), 0);
+            DuplicateCounterKey staleMatch = m_duplicateCounters.ceilingKey(lowestPossible);
+            while (staleMatch != null && staleMatch.compareTo(duplicateCounterKey) == -1) {
+                m_duplicateCounters.remove(staleMatch);
+                staleMatch = m_duplicateCounters.ceilingKey(lowestPossible);
+            };
+        }
 
         if (counter != null) {
             txnDone = counter.offer(msg) == DuplicateCounter.DONE;
@@ -1397,24 +1407,27 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void handleDumpMessage()
     {
         String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
-        hostLog.warn("State dump for site: " + who);
-        hostLog.warn(who + ": partition: " + m_partitionId + ", isLeader: " + m_isLeader);
+        StringBuilder builder = new StringBuilder();
+        builder.append("START OF STATE DUMP FOR SITE: " + who);
+        builder.append("\n  partition: " + m_partitionId + ", isLeader: " + m_isLeader);
         if (m_isLeader) {
-            hostLog.warn(who + ": replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
+            builder.append("  replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, new DumpMessage());
             }
         }
-        hostLog.warn(who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
-        hostLog.warn(who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
+        builder.append("\n  most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
+        builder.append("  outstanding txns: " + m_outstandingTxns.keySet() + " " +
                 TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
-        hostLog.warn(who + ": " + m_pendingTasks.toString());
+        builder.append("\n  " + m_pendingTasks.toString());
         if (m_duplicateCounters.size() > 0) {
-            hostLog.warn(who + ": duplicate counters: ");
+            builder.append("\n  DUPLICATE COUNTERS:\n ");
             for (Entry<DuplicateCounterKey, DuplicateCounter> e : m_duplicateCounters.entrySet()) {
-                hostLog.warn("\t" + who + ": " + e.getKey().toString() + ": " + e.getValue().toString());
+                builder.append("  " + e.getKey().toString() + ": " + e.getValue().toString());
             }
         }
+        builder.append("END of STATE DUMP FOR SITE: " + who);
+        hostLog.warn(builder.toString());
     }
 
     private void handleDummyTransactionTaskMessage(DummyTransactionTaskMessage message)

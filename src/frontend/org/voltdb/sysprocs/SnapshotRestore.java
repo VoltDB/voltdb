@@ -191,6 +191,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
     private static final int DEP_restoreAsyncRunLoopResults = (int)
             SysProcFragmentId.PF_restoreAsyncRunLoopResults;
 
+    private static final int DEP_setViewEnabled = (int)SysProcFragmentId.PF_setViewEnabled;
+
     private static HashSet<String>  m_initializedTableSaveFileNames = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
 
@@ -720,9 +722,12 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                     null,
                                     VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)),
                                     ftm.getParameterSetForFragment(0));
-                    FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
-                    frm.addDependency(dp);
-                    m.send(ftm.getCoordinatorHSId(), frm);
+                    if (dp != null) {
+                        // Like SysProcFragmentId.PF_setViewEnabled, the execution returns null.
+                        FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
+                        frm.addDependency(dp);
+                        m.send(ftm.getCoordinatorHSId(), frm);
+                    }
                 } else if (vm instanceof BinaryPayloadMessage) {
                     if (context.isLowestSiteId() && m_duplicateRowHandler != null) {
                         try {
@@ -1070,7 +1075,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
             VoltTable result = performDistributeReplicatedTable(table_name, context, -1, true, isRecover);
             assert(result != null);
             return new DependencyPair.TableDependencyPair(dependency_id, result);
-
+        }
+        else if (fragmentId == SysProcFragmentId.PF_setViewEnabled) {
+            Object[] paramArray = params.toArray();
+            assert(paramArray[0] != null && paramArray[1] != null);
+            boolean enabled = (int)paramArray[0] > 0 ? true : false;
+            String commaSeparatedViewNames = (String)paramArray[1];
+            m_runner.getExecutionEngine().setViewsEnabled(commaSeparatedViewNames, enabled);
+            // Can an error from here stop the snapshot? I don't think so.
+            // So I intentionally let this fragment return nothing.
+            return null;
         }
 
         assert (false);
@@ -2041,43 +2055,71 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return executeSysProcPlanFragments(pfs, DEP_restoreDistributeHashinatorResults);
     }
 
-    private Set<Table> getTablesToRestore(Set<String> savedTableNames)
-    {
+    private Set<Table> getTablesToRestore(Set<String> savedTableNames,
+                                          StringBuilder commaSeparatedViewNamesToDisable) {
         Set<Table> tables_to_restore = new HashSet<Table>();
-        for (Table table : m_database.getTables())
-        {
-            if (savedTableNames.contains(table.getTypeName()))
-            {
-                if (table.getMaterializer() == null)
-                {
-                    tables_to_restore.add(table);
+        for (Table table : m_database.getTables()) {
+            if (savedTableNames.contains(table.getTypeName())) {
+                if (CatalogUtil.isSnapshotablePersistentTableView(m_database, table)) {
+                    // If the table is a snapshotted persistent table view, we will try to
+                    // temporarily disable its maintenance job to boost restore performance.
+                    commaSeparatedViewNamesToDisable.append(table.getTypeName()).append(",");
                 }
-                else
-                {
-                    if (CatalogUtil.isTableExportOnly(m_database, table.getMaterializer()))
-                    {
-                        tables_to_restore.add(table);
-                        continue;
-                    }
-                    // LOG_TRIAGE reconsider info level here?
-                    SNAP_LOG.info("Table: " + table.getTypeName() + " was saved " +
-                            "but is now a materialized table and will " +
-                            "not be loaded from disk");
-                }
+                tables_to_restore.add(table);
             }
-            else
-            {
-                if (table.getMaterializer() == null && !CatalogUtil.isTableExportOnly(m_database, table))
-                {
-                    SNAP_LOG.info("Table: " + table.getTypeName() + " does not have " +
-                            "any savefile data and so will not be loaded " +
-                            "from disk");
-                }
+            else if (! CatalogUtil.isTableExportOnly(m_database, table)) {
+                SNAP_LOG.info("Table: " + table.getTypeName() +
+                              " does not have any savefile data and so will not be loaded from disk.");
             }
+        }
+        if (commaSeparatedViewNamesToDisable.length() > 0) {
+            commaSeparatedViewNamesToDisable.setLength(commaSeparatedViewNamesToDisable.length() - 1);
         }
         // XXX consider logging the list of tables that were saved but not
         // in the current catalog
         return tables_to_restore;
+    }
+
+    /**
+     * Generate a FragmentTaskMessage to instruct the SP sites the pause/resume
+     * the view maintenance on specified view tables.
+     * @param commaSeparatedViewNames The names of the views that we want to set the flag, concatenated by commas.
+     * @param enabled True if want the views enabled, false otherwise.
+     * @return The generated FragmentTaskMessage
+     */
+    private FragmentTaskMessage generateSetViewEnabledMessage(long coordinatorHSId,
+                                                              String commaSeparatedViewNames,
+                                                              boolean enabled) {
+        int enabledAsInt = enabled ? 1 : 0;
+        /*
+         * The only real data is the fragment id and parameters.
+         * Transactions ids, output dep id, readonly-ness, and finality-ness are unused.
+         */
+        return FragmentTaskMessage.createWithOneFragment(
+                        0,            // initiatorHSId
+                        coordinatorHSId,
+                        0,            // txnId
+                        0,            // uniqueId
+                        false,        // isReadOnly
+                        fragIdToHash(SysProcFragmentId.PF_setViewEnabled), //planHash
+                        DEP_setViewEnabled,
+                        ParameterSet.fromArrayNoCopy(enabledAsInt, commaSeparatedViewNames),
+                        false,        // isFinal
+                        m_runner.getTxnState().isForReplay(),
+                        false,        // isNPartTxn
+                        m_runner.getTxnState().getTimetamp());
+    }
+
+    private void verifyRestoreWorkResult(VoltTable[] results, VoltTable[] restore_results) {
+        while (results[0].advanceRow()) {
+            // this will actually add the active row of results[0]
+            restore_results[0].add(results[0]);
+
+            // if any table at any site fails... then the whole proc fails
+            if (results[0].getString("RESULT").equalsIgnoreCase("FAILURE")) {
+                noteOperationalFailure(RESTORE_FAILED);
+            }
+        }
     }
 
     private VoltTable[] performTableRestoreWork(
@@ -2154,12 +2196,17 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  * Do the usual restore planning to generate the plan fragments for execution at each
                  * site
                  */
+                StringBuilder commaSeparatedViewNamesToDisable = new StringBuilder();
                 Set<Table> tables_to_restore =
-                        getTablesToRestore(savefileState.getSavedTableNames());
+                        getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable);
                 VoltTable[] restore_results = new VoltTable[1];
                 restore_results[0] = constructResultsTable();
                 ArrayList<SynthesizedPlanFragment[]> restorePlans =
                         new ArrayList<SynthesizedPlanFragment[]>();
+
+                // Disable the views before the table restore work starts.
+                m.send(Longs.toArray(actualToGenerated.values()),
+                       generateSetViewEnabledMessage(m.getHSId(), commaSeparatedViewNamesToDisable.toString(), false));
 
                 for (Table t : tables_to_restore) {
                     TableSaveFileState table_state =
@@ -2180,10 +2227,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  * Now distribute the plan fragments for restoring each table.
                  */
                 Iterator<Table> tableIterator = tables_to_restore.iterator();
+                VoltTable[] results = null;
                 for (SynthesizedPlanFragment[] restore_plan : restorePlans)
                 {
                     Table table = tableIterator.next();
-                    if(TRACE_LOG.isTraceEnabled()){
+                    if (TRACE_LOG.isTraceEnabled()){
                         TRACE_LOG.trace("Performing restore for table: " + table.getTypeName());
                         TRACE_LOG.trace("Plan has fragments: " + restore_plan.length);
                     }
@@ -2196,19 +2244,13 @@ public class SnapshotRestore extends VoltSystemProcedure {
                      * This isn't ye olden executeSysProcPlanFragments. It uses the provided mailbox
                      * and has it's own tiny run loop to process incoming fragments.
                      */
-                    VoltTable[] results =
-                            executeSysProcPlanFragments(restore_plan, m);
-                    while (results[0].advanceRow())
-                    {
-                        // this will actually add the active row of results[0]
-                        restore_results[0].add(results[0]);
-
-                        // if any table at any site fails... then the whole proc fails
-                        if (results[0].getString("RESULT").equalsIgnoreCase("FAILURE")) {
-                            noteOperationalFailure(RESTORE_FAILED);
-                        }
-                    }
+                    results = executeSysProcPlanFragments(restore_plan, m);
+                    verifyRestoreWorkResult(results, restore_results);
                 }
+
+                // Re-enable the views after the table restore work completes.
+                m.send(Longs.toArray(actualToGenerated.values()),
+                       generateSetViewEnabledMessage(m.getHSId(), commaSeparatedViewNamesToDisable.toString(), true));
 
                 /*
                  * Send a termination message. This will cause the async mailbox plan fragment to stop
@@ -2642,7 +2684,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
     }
 
     private HashMap<Integer, byte[]> createPartitionedTables(String tableName, VoltTable loadedTable,
-            int number_of_partitions, TreeMap<Integer, VoltTable> partitioned_table_cache) throws Exception
+                int number_of_partitions, TreeMap<Integer, VoltTable> partitioned_table_cache) throws Exception
     {
         Table catalog_table = m_database.getTables().getIgnoreCase(tableName);
         assert(!catalog_table.getIsreplicated());
@@ -2650,22 +2692,22 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // find the index and type of the partitioning attribute
         int partition_col;
         VoltType partition_type;
-        if (catalog_table.getMaterializer() != null && CatalogUtil.isTableExportOnly(m_database, catalog_table.getMaterializer())) {
-            String pname = catalog_table.getMaterializer().getPartitioncolumn().getName();
+        Table viewSource = catalog_table.getMaterializer();
+        if (viewSource != null && CatalogUtil.isTableExportOnly(m_database, viewSource)) {
+            String pname = viewSource.getPartitioncolumn().getName();
             //Get partition column name and find index and type in view table
             Column c = catalog_table.getColumns().get(pname);
             if (c != null) {
                 partition_col = c.getIndex();
                 partition_type = VoltType.get((byte) c.getType());
             } else {
-                //Bad table in snapshot it should not be present.
+                // Bad table in snapshot it should not be present.
                 SNAP_LOG.error("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
                 throw new RuntimeException("Bad table in snapshot, export view without partitioning column in group by should not be in snapshot.");
             }
         } else {
             partition_col = catalog_table.getPartitioncolumn().getIndex();
-            partition_type =
-                    VoltType.get((byte) catalog_table.getPartitioncolumn().getType());
+            partition_type = VoltType.get((byte) catalog_table.getPartitioncolumn().getType());
         }
         final VoltType partitionParamType = VoltType.get(partition_type.getValue());
 

@@ -25,6 +25,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.NTProcedureService;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.utils.CompressionService;
 
 /**
  *
@@ -81,12 +82,14 @@ public class VerifyCatalogAndWriteJar extends UpdateApplicationBase {
     public final static long TIMEOUT = getTimeoutValue();
 
 
-    public CompletableFuture<ClientResponse> run(byte[] catalogBytes, String diffCommands,
+    public CompletableFuture<ClientResponse> run(byte[] catalogBytes, String encodedDiffCommands,
             byte[] catalogHash, byte[] deploymentBytes)
     {
-        log.info("Verify user procedure classes and write catalog jar");
-
         // This should only be called once on each host
+        String diffCommands = CompressionService.decodeBase64AndDecompress(encodedDiffCommands);
+        log.info("Verify user procedure classes and write catalog jar (compressed size = " + encodedDiffCommands.length() +
+                ", uncompressed size = " + diffCommands.length() +")");
+
         String err = VoltDB.instance().verifyJarAndPrepareProcRunners(
                 catalogBytes, diffCommands, catalogHash, deploymentBytes);
         if (err != null) {

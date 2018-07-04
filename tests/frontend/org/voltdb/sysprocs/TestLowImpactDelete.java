@@ -63,7 +63,15 @@ public class TestLowImpactDelete extends TestCase {
               + "    PRIMARY KEY (id) \n"
               + " ); \n"
               + "PARTITION TABLE part ON COLUMN id;"
-              + "CREATE INDEX partindex ON part (ts);"
+              + "CREATE INDEX partindex ON part (ts);\n"
+
+              + "CREATE TABLE ttl (\n"
+              + "    id BIGINT not null, \n"
+              + "    ts TIMESTAMP not null, "
+              + "    PRIMARY KEY (id) \n"
+              + " ) USING TTL 10 SECONDS ON COLUMN TS; \n"
+              + "PARTITION TABLE ttl ON COLUMN id;"
+              + "CREATE INDEX ttlindex ON ttl (ts);"
 
               + "CREATE TABLE rep (\n"
               + "    id BIGINT not null, \n"
@@ -78,6 +86,7 @@ public class TestLowImpactDelete extends TestCase {
         builder.addPartitionInfo("part", "id");
         builder.addStmtProcedure("partcount", "select count(*) from part;");
         builder.addStmtProcedure("repcount", "select count(*) from rep;");
+        builder.addStmtProcedure("ttlcount", "select count(*) from ttl;");
         builder.setUseDDLSchema(true);
         m_cluster = new LocalCluster("foo.jar", SPH, HOSTCOUNT, KFACTOR, BackendTarget.NATIVE_EE_JNI);
         m_cluster.setHasLocalServer(true);
@@ -230,14 +239,14 @@ public class TestLowImpactDelete extends TestCase {
         VoltTable result = response.getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
-        long deleted = result.getLong("rowsdeleted");
+        long deleted = result.getLong("ROWS_DELETED");
         assertTrue (deleted == 9000);
 
         response = m_client.callProcedure("@LowImpactDelete", "rep", "ts", "9000", "<", 500, 1000 * 1000);
         result = response.getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
-        deleted = result.getLong("rowsdeleted");
+        deleted = result.getLong("ROWS_DELETED");
         assertTrue (deleted == 9000);
     }
 
@@ -286,8 +295,7 @@ public class TestLowImpactDelete extends TestCase {
                 VoltTable result = response.getResults()[0];
                 assertEquals(1, result.getRowCount());
                 result.advanceRow();
-                long deleted = result.getLong("rowsdeleted");
-                long rowsLeft = result.getLong("rowsLeft");
+                long rowsLeft = result.getLong("ROWS_LEFT");
                 assertTrue (rowsLeft == 0);
                 try {
                     Thread.sleep(1000);
@@ -311,4 +319,38 @@ public class TestLowImpactDelete extends TestCase {
         }
     }
 
+    @Test
+    public void testTimeToLive() throws InterruptedException {
+        //load 500 rows
+        for (int i = 0; i < 500; i++) {
+            try {
+                m_client.callProcedure("@AdHoc", "INSERT INTO TTL VALUES(" + i + ",CURRENT_TIMESTAMP())");
+            } catch (IOException | ProcCallException e) {
+                fail("fail to insert data for TTL testing.");
+            }
+        }
+        //allow TTL to work, the inserted rows should be deleted after 10 seconds
+        try {
+            Thread.sleep(60*1000);
+            VoltTable vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
+            System.out.println(vt.toFormattedString());
+            vt = m_client.callProcedure("@AdHoc", "select count(*) from TTL").getResults()[0];
+            assertEquals(0, vt.asScalarLong());
+
+            for (int i = 500; i < 1000; i++) {
+                try {
+                    m_client.callProcedure("@AdHoc", "INSERT INTO TTL VALUES(" + i + ",CURRENT_TIMESTAMP())");
+                } catch (IOException | ProcCallException e) {
+                    fail("fail to insert data for TTL testing.");
+                }
+            }
+            Thread.sleep(60*1000);
+            vt = m_client.callProcedure("@Statistics", "TTL").getResults()[0];
+            System.out.println(vt.toFormattedString());
+            vt = m_client.callProcedure("@AdHoc", "select count(*) from TTL").getResults()[0];
+            assertEquals(0, vt.asScalarLong());
+        } catch (Exception e) {
+            fail("Failed to get row count from Table ttl:" + e.getMessage());
+        }
+    }
 }

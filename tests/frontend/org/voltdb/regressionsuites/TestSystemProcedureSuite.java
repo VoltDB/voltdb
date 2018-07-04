@@ -966,7 +966,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "@SwapTables SWAP_THIS SWAP_THAT");
             fail("Unexpected @AdHoc success.");
         } catch (ProcCallException ex) {
-            assertTrue(ex.getMessage().contains("Error in \"@SwapTables SWAP_THIS SWAP_THAT\" unknown token"));
+            assertTrue(ex.getMessage().contains("Error in \"@SwapTables SWAP_THIS SWAP_THAT\" - unknown token"));
         }
     }
 

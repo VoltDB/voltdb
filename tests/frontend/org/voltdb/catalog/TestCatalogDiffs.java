@@ -754,6 +754,28 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated, false, null, true, false, true);
     }
 
+    public void testAlterTableTTL() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        // start with a table
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1)) USING TTL 10 SECONDS ON COLUMN C2;");
+        builder.addPartitionInfo("A", "C1");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL1.jar"));
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "testAlterTableTTL1.jar");
+
+        // alter TTL
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL2.jar"));
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "testAlterTableTTL2.jar");
+        verifyDiff(catOriginal, catUpdated, false, null, true, false, true);
+
+        builder.addLiteralSchema("\nALTER TABLE A DROP TTL;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));
+        Catalog catTTlDropped = catalogForJar(testDir + File.separator + "testAlterTableTTL3.jar");
+        verifyDiff(catUpdated, catTTlDropped, false, null, true, false, true);
+    }
+
     public void testAddUniqueNonCoveringTableIndexRejectedIfNotEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 

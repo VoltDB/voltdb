@@ -22,6 +22,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -897,5 +898,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         clearPsetAndEnsureCapacity(8 + requiredCapacity);
         m_psetBuffer.position(8);
         return m_psetBuffer;
+    }
+
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        if (viewNames.equals("")) {
+            return;
+        }
+        if (enabled) {
+            LOG.info("The maintenance of the following views is restarting: " + viewNames);
+        }
+        else {
+            LOG.info("The maintenance of the following views will be paused to accelerate the restoration: " + viewNames);
+        }
+        nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
     }
 }

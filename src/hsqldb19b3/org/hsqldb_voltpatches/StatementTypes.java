@@ -79,6 +79,11 @@ public interface StatementTypes {
     int DROP_CAST                        = 78;
     int DROP_ORDERING                    = 115;
     int DROP_VIEW                        = 36;
+
+    //VoltDB extension to support TTL
+    int DROP_TTL                         = 200;
+    int ALTER_TTL                        = 201;
+    //end of VoltDB extension
     int DYNAMIC_CLOSE                    = 37;
     int DYNAMIC_DELETE_CURSOR            = 38;
     int DYNAMIC_FETCH                    = 39;

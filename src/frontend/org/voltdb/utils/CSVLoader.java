@@ -21,9 +21,11 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -69,7 +71,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      * log file name
      */
     static String pathLogfile = "csvloaderLog.log";
-    private static final VoltLogger m_log = new VoltLogger("CSVLOADER");
     private static CSVConfig config = null;
     private static long start = 0;
     private static boolean standin = false;
@@ -153,18 +154,12 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                     }
                     out_invaliderowfile.write(currItem.errorInfo[0] + "\n");
                     String message = "Invalid input on line " + currItem.lineNumber + ". " + currItem.errorInfo[1];
-                    m_log.error(message);
                     out_logfile.write(message + "\n  Content: " + currItem.errorInfo[0] + "\n");
-
                     m_errorCount++;
 
-                } catch (FileNotFoundException e) {
-                    m_log.error("CSV report directory '" + config.reportdir
-                            + "' does not exist.");
                 } catch (Exception x) {
-                    m_log.error(x.getMessage());
+                    System.err.println(x.getMessage());
                 }
-
             }
         }
     }
@@ -287,6 +282,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         @Option(desc = "password to use when connecting to servers")
         String password = "";
+
+        @Option(desc = "credentials that contains username and password information")
+        String credentials = "";
 
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
@@ -415,6 +413,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         start = System.currentTimeMillis();
         long insertTimeStart = start;
         long insertTimeEnd;
+        FileReader fr = null;
+        BufferedReader br = null;
         final CSVConfig cfg = new CSVConfig();
         cfg.parse(CSVLoader.class.getName(), args);
         config = cfg;
@@ -443,14 +443,21 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                           config.skip,
                           config.header);
 
-                   listReader = new CsvListReader(tokenizer, csvPreference);
+                listReader = new CsvListReader(tokenizer, csvPreference);
             }
         } catch (FileNotFoundException e) {
-            m_log.error("CSV file '" + config.file + "' could not be found.");
+            System.err.println("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
         }
         // Split server list
         final String[] serverlist = config.servers.split(",");
+
+        // read username and password from txt file
+        if (config.credentials != null && !config.credentials.trim().isEmpty()) {
+            Properties props = MiscUtils.readPropertiesFromCredentials(config.credentials);
+            config.user = props.getProperty("username");
+            config.password = props.getProperty("password");
+        }
 
         // If we need to prompt the user for a password, do so.
         config.password = CLIConfig.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
@@ -477,7 +484,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         try {
             csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
         } catch (Exception e) {
-            m_log.error("Error connecting to the servers: "
+            System.err.println("Error connecting to the servers: "
                     + config.servers);
             System.exit(-1);
         }
@@ -529,20 +536,15 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             try {
                listReader.close();
             } catch (Exception ex) {
-                m_log.error("Error closing reader: " + ex);
-            } finally {
-                m_log.debug("Rows Queued by Reader: " + rowsQueued);
+                //Do nothing here.
             }
 
             if (errHandler.hasReachedErrorLimit()) {
-                m_log.warn("The number of failed rows exceeds the configured maximum failed rows: "
-                           + config.maxerrors);
+               System.out.println("The number of failed rows exceeds the configured maximum failed rows: "
+                                  + config.maxerrors);
             }
-
-            m_log.debug("Parsing CSV file took " + readerTime + " milliseconds.");
-            m_log.debug("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
-            m_log.info("Read " + insertCount + " rows from file and successfully inserted "
-                       + ackCount + " rows (final)");
+            System.out.println("Read " + insertCount + " rows from file and successfully inserted "
+                               + ackCount + " rows (final)");
             errHandler.produceFiles(ackCount, insertCount);
             close_cleanup();
             //In test junit mode we let it continue for reuse
@@ -550,7 +552,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 System.exit(errHandler.m_errorInfo.isEmpty() ? 0 : -1);
             }
         } catch (Exception ex) {
-            m_log.error("Exception Happened while loading CSV data: " + ex);
+            System.err.println("Exception Happened while loading CSV data: " + ex);
             System.exit(1);
         }
     }
@@ -575,7 +577,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 dir.mkdirs();
             }
         } catch (Exception x) {
-            m_log.error(x.getMessage(), x);
+            System.err.println(x.getMessage());
             System.exit(-1);
         }
 
@@ -593,7 +595,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             out_logfile = new BufferedWriter(new FileWriter(pathLogfile));
             out_reportfile = new BufferedWriter(new FileWriter(pathReportfile));
         } catch (IOException e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
             System.exit(-1);
         }
     }
@@ -629,9 +631,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
     private void produceFiles(long ackCount, long insertCount) {
         long latency = System.currentTimeMillis() - start;
-        m_log.info("Elapsed time: " + latency / 1000F
-                + " seconds");
-
+        System.out.println("Elapsed time: " + latency / 1000F
+                           + " seconds");
         try {
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
@@ -672,18 +673,15 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             out_reportfile.write("CSVLoader rate: " + insertCount
                     / elapsedTimeSec + " row/s\n");
 
-            m_log.info("Invalid row file: " + pathInvalidrowfile);
-            m_log.info("Log file: " + pathLogfile);
-            m_log.info("Report file: " + pathReportfile);
+            System.out.println("Invalid row file: " + pathInvalidrowfile);
+            System.out.println("Log file: " + pathLogfile);
+            System.out.println("Report file: " + pathReportfile);
 
             out_invaliderowfile.flush();
             out_logfile.flush();
             out_reportfile.flush();
-        } catch (FileNotFoundException e) {
-            m_log.error("CSV report directory '" + config.reportdir
-                    + "' does not exist.");
         } catch (Exception x) {
-            m_log.error(x.getMessage());
+            System.err.println(x.getMessage());
         }
     }
 

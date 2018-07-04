@@ -233,6 +233,7 @@ public interface SiteProcedureConnection {
 
     public TheHashinator getCurrentHashinator();
     public void updateHashinator(TheHashinator hashinator);
+    public void setViewsEnabled(String viewNames, boolean enabled);
     public long[] validatePartitioning(long tableIds[], byte hashinatorConfig[]);
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, int remotePartitionId, byte logData[]);
     public void setDRProtocolVersion(int drVersion);

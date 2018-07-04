@@ -60,6 +60,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
+import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExtensibleSnapshotDigestData;
@@ -70,15 +71,12 @@ import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.CatalogContext.CatalogJarWriteMode;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -1261,31 +1259,18 @@ public class SnapshotUtil {
         return (nonce + ".jar");
     }
 
-    public static final List<Table> getTablesToSave(Database database)
-    {
+    public static final List<Table> getTablesToSave(Database database) {
         CatalogMap<Table> all_tables = database.getTables();
         ArrayList<Table> my_tables = new ArrayList<Table>();
-        for (Table table : all_tables)
-        {
-            //If table has view and table is export table snapshot view table.
-            if ((table.getMaterializer() != null) &&
-                    (CatalogUtil.isTableExportOnly(database, table.getMaterializer())))
-            {
-                //Non partitioned export table are not allowed so it should not get here.
-                Column bpc = table.getMaterializer().getPartitioncolumn();
-                if (bpc == null) continue;
-
-                String bPartName = bpc.getName();
-                Column pc = table.getColumns().get(bPartName);
-                if (pc != null) {
-                    my_tables.add(table);
-                }
+        for (Table table : all_tables) {
+            // Export tables are not included in the snapshot.
+            if (CatalogUtil.isTableExportOnly(database, table)) {
                 continue;
             }
-            // Make a list of all non-materialized, non-export only tables
-            if ((table.getMaterializer() != null) ||
-                    (CatalogUtil.isTableExportOnly(database, table)))
-            {
+            // If the table is a view and it shouldn't be included into the snapshot, skip.
+            if (table.getMaterializer() != null
+                    && ! CatalogUtil.isSnapshotableStreamedTableView(database, table)
+                    && ! CatalogUtil.isSnapshotablePersistentTableView(database, table)) {
                 continue;
             }
             my_tables.add(table);

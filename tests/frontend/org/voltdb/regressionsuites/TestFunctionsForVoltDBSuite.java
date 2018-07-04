@@ -911,7 +911,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("SQL error while compiling query"));
             assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
         }
 
@@ -1051,7 +1051,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             //* enable for debug */ System.out.println(cr.getResults()[0]);
             fail("Expected to detect missing SELECT columns");
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("SQL error while compiling query"));
             assertTrue(ex.getMessage().contains("unexpected token: FROM"));
             return;
         }
@@ -1082,7 +1082,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select to_timestamp(second, '1372640523') from P2 limit 1");
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("SQL error while compiling query"));
             assertTrue(ex.getMessage().contains("incompatible data type"));
         }
 
@@ -1191,7 +1191,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             ex = e;
         } finally {
             assertNotNull(ex);
-            assertTrue((ex.getMessage().contains("PlanningErrorException")));
+            assertTrue((ex.getMessage().contains("SQL error while compiling query")));
             assertTrue((ex.getMessage().contains("TRUNCATE")));
         }
 
@@ -2961,7 +2961,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "SELECT DATEADD(NULL, 1, TM) FROM P2 WHERE ID = 20005;");
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
+            assertTrue(e.getClientResponse().getStatusString().contains("SQL error while compiling query"));
             throwed = true;
         }
         assertTrue(throwed);
@@ -2971,7 +2971,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "SELECT DATEADD(WEEK, 1, TM) FROM P2 WHERE ID = 20005;");
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
+            assertTrue(e.getClientResponse().getStatusString().contains("SQL error while compiling query"));
             throwed = true;
         }
         assertTrue(throwed);
