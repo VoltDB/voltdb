@@ -166,6 +166,13 @@ public class SysprocFragmentTask extends FragmentTaskBase
             VoltDB.crashLocalVoltDB("@UpdateCore is not supported during a rejoin. " +
                     "The rejoining node's VoltDB process will now exit.", false, null);
         }
+        //If this is a snapshot creation we have the nonce of the snapshot
+        //Provide it to the site so it can decide to enable recording in the task log
+        //if it is our rejoin snapshot start
+        if (SysProcFragmentId.isFirstSnapshotFragment(m_fragmentMsg.getPlanHash(0))) {
+            siteConnection.notifyOfSnapshotNonce((String)m_fragmentMsg.getParameterSetForFragment(0).toArray()[1],
+                    m_fragmentMsg.getSpHandle());
+        }
 
         // special case for @PingPartitions for re-enabling scoreboard
         if (SysProcFragmentId.isEnableScoreboardFragment(m_fragmentMsg.getPlanHash(0)) &&
