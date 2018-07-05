@@ -1723,6 +1723,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
+        m_initiatorMailbox.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
+    }
+
+    @Override
     public long applyBinaryLog(long txnId, long spHandle,
                                long uniqueId, int remoteClusterId, int remotePartitionId,
                                byte log[]) throws EEException {
