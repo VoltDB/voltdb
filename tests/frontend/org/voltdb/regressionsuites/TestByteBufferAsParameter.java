@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.nio.ByteBuffer;
+import org.voltdb.client.*;
 
 import org.junit.Test;
 import org.voltdb.BackendTarget;
@@ -44,9 +45,8 @@ public class TestByteBufferAsParameter extends RegressionSuite {
         client.callProcedure("ENG10375.insert", 5, new byte[] {(byte)0x2F});
         client.callProcedure("ENG10375.insert", 6, new byte[] {(byte)0x00, (byte)0x13, (byte)0x00, (byte)0xBA});
 
-        byte[] by = {0x2F};
-        ByteBuffer bb = ByteBuffer.allocate(1);
-        bb = ByteBuffer.wrap(by);
+        byte[] by = {(byte)0x2F};
+        ByteBuffer bb = ByteBuffer.wrap(by);
 
         VoltTable vt = client.callProcedure("ByteBufferAsParam", bb).getResults()[0];
         assertTrue(vt.getRowCount() == 2);
@@ -75,8 +75,7 @@ public class TestByteBufferAsParameter extends RegressionSuite {
                 + ");\n"
                 ;
 
-//        literalSchema += "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.regressionsuites.basecase.ByteBufferAsParam;";
-          literalSchema += "CREATE PROCEDURE ByteBufferAsParam AS SELECT * FROM ENG10375 WHERE A = ?;";
+        literalSchema += "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.regressionsuites.basecase.ByteBufferAsParam;";
         try {
             project.addLiteralSchema(literalSchema);
         }

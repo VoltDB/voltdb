@@ -106,6 +106,9 @@ public class ParameterConverter {
         }
         else if (value != null) {
             Class<?> clz = value.getClass();
+            if (ByteBuffer.class.isAssignableFrom(clz) && ByteBuffer.class.isAssignableFrom(expectedClz)) {
+                return true;
+            }
             if (clz != expectedClz) {
                 // skip this without linking to it (used for sysprocs)
                 return expectedClz.getSimpleName().equals("SystemProcedureExecutionContext") &&
