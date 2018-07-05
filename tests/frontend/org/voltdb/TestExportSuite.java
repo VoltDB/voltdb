@@ -82,7 +82,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
 
     // Test Export of an ADDED table.
     //
-    public void testExportAndAddedTable() throws Exception {
+    public void xtestExportAndAddedTable() throws Exception {
         System.out.println("testExportAndAddedTable");
         final Client client = getClient();
         System.out.println("Seen Verifiers: " + m_verifier.m_seen_verifiers);
@@ -125,18 +125,23 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             client.callProcedure("Insert", paramsGrp);
         }
         waitForStreamedAllocatedMemoryZero(client);
+        System.out.println("STAKUTIS test 1/2 and now dropping the no-nulls table ***************************************");
 
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
         final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
         final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
                 new File(deploymentURL));
+        System.out.println("STAKUTIS did we getStatus():"+callProcedure.getStatus());
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         client = getClient();
 
+        System.out.println("STAKUTIS calling queisceandverify");
         // must still be able to verify the export data.
         quiesceAndVerify(client, m_verifier);
+
+        System.out.println("STAKUTIS test seemed to pass...");;
     }
 
     // Test that a table w/o Export enabled does not produce Export content
@@ -257,7 +262,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     //
     // Verify that snapshot can be enabled with a streamed table present
     //
-    public void xtestExportPlusSnapshot() throws Exception {
+    public void testExportPlusSnapshot() throws Exception {
         System.out.println("testExportPlusSnapshot");
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
@@ -311,7 +316,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         quiesceAndVerify(client, m_verifier);
     }
 
-    public void xtestSwapTables() throws Exception {
+    public void testSwapTables() throws Exception {
         System.out.println("testExportSwapTables");
         final Client client = getClient();
         verifyProcFails(client, "Illegal to swap a stream", "@SwapTables", "ALLOW_NULLS", "LOOPBACK_ALLOW_NULLS");
