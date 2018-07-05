@@ -22,7 +22,7 @@ def findattribute(xml,attribute, depth):
             if attribute in atts.keys():
                 foundattribute = atts[attribute].value
         if foundattribute:
-           print foundattribute + "," + quote(smash(innertext(child) ))
+            print foundattribute + "," + quote(smash(innertext(child) ))
         else:
             findattribute(child,attribute,depth+1)
 
@@ -38,7 +38,7 @@ def innertext(node):
 def smash(text):
     # First compress it
     text = ' '.join(text.split())
-    return text
+    return text.encode('ascii','ignore')
 def quote(text):
     text = text.replace("\\","\\\\")
     text = text.replace("\"","\\\"")

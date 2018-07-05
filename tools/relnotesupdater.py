@@ -43,7 +43,7 @@ jira_url = 'https://issues.voltdb.com/'
 
 
 try:
-    jira = JIRA(jira_url, basic_auth=(username, password))
+    jira = JIRA(jira_url, basic_auth=(username, password),options=dict(verify=False))
 except:
     sys.exit('FATAL: Unable to log in ' + username)
 
@@ -108,7 +108,7 @@ with open (args.file) as csvfile:
                     else:
                         infostr += '-- dry run, no updates done'
                         results.append(('INFO', jid, text, infostr))
-               
+
                 #if (cleanstring(existing_relnote) == cleanstring(text)):
                     #Okay - it exists and it matches what is there. Nothing to do
                     #pass
