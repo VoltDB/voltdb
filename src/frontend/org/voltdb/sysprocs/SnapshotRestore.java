@@ -1379,7 +1379,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
 
         try {
-            ValidIncludeTables(savefile_state, includeList);
+            validateIncludeTables(savefile_state, includeList);
         } catch (VoltAbortException e) {
             ColumnInfo[] result_columns = new ColumnInfo[2];
             int ii = 0;
@@ -3013,19 +3013,19 @@ public class SnapshotRestore extends VoltSystemProcedure {
             return ret;
         }
         for(int i = 0 ; i < raw.length() ; i++) {
-            String s = "";
             try {
-                s = raw.getString(i).trim().toUpperCase();
+                String s = raw.getString(i).trim().toUpperCase();
+                if(s.length() > 0) {
+                    ret.add(s.toString());
+                }
             } catch (JSONException e) {
-                e.printStackTrace();
+                throw new RuntimeException(e.getMessage());
             }
-            if(s.length() > 0)
-                ret.add(s.toString());
         }
         return ret;
     }
 
-    private void ValidIncludeTables(final ClusterSaveFileState savefileState, List<String> include) {
+    private void validateIncludeTables(final ClusterSaveFileState savefileState, List<String> include) {
         if(include == null || include.size() == 0) return;
         Set<String> savedTableNames = savefileState.getSavedTableNames();
         for(String s : include) {
