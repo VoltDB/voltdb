@@ -2276,7 +2276,6 @@ public class LocalCluster extends VoltServerConfig {
                            pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, callingMethodName, false, null);
     }
 
-    // temporary method until we always enable SPI migration
     public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
@@ -2292,9 +2291,8 @@ public class LocalCluster extends VoltServerConfig {
         lc.overrideAnyRequestForValgrind();
         lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
         lc.setJavaProperty("DR_RECV_TIMEOUT", "5000");
+        // temporary, until we always enable SPI migration
         if (enableSPIMigration) {
-            lc.setJavaProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1");
-            lc.setJavaProperty("MIGRATE_PARTITION_LEADER_DELAY", "1");
             lc.setJavaProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false");
         }
         if (javaProps != null)
