@@ -56,6 +56,7 @@ public class TestTaskLog {
     public void setUp() throws IOException {
         m_tempDir = getTempDir();
         m_log = new TaskLogImpl(0, m_tempDir);
+        m_log.enableRecording(Long.MIN_VALUE);
     }
 
     @After
@@ -310,5 +311,61 @@ public class TestTaskLog {
             setUp();
             Thread.sleep(10);
         }
+    }
+
+    @Test
+    public void testSetSnapshotTxnIdAfter() throws IOException {
+        // push 200 single-partition task messages to the queue, won't fill a buffer in the task log,
+        // set the snapshot spHandle when we have pushed 100 SPs in there, the first 100 SPs should
+        // be dropped when we poll.
+        TxnEgo spego = TxnEgo.makeZero(0);
+        long snapshotSpHandle = 0;
+        for (int i = 0; i < 200; i++) {
+            final long uniqueId = m_uniqueIdGenerator.getNextUniqueId();
+            StoredProcedureInvocation invocation = new StoredProcedureInvocation();
+            invocation.setProcName("hah");
+            invocation.setParams(1l, "haha", 3.3);
+
+            Iv2InitiateTaskMessage task =
+                    new Iv2InitiateTaskMessage(1, 2, Long.MIN_VALUE, spego.getTxnId(), uniqueId,
+                            false, true, invocation, 4, 5, false);
+            task.setSpHandle(spego.getTxnId());
+            spego = spego.makeNext();
+            m_log.logTask(task);
+
+            if (i == 99) {
+                // The snapshot fragment comes in the middle
+                snapshotSpHandle = spego.getTxnId();
+                m_log.enableRecording(snapshotSpHandle);
+                spego = spego.makeNext();
+            }
+        }
+
+        // pull all task messages in the queue and verify if they are the same
+        int count = 0;
+        spego = new TxnEgo(snapshotSpHandle).makeNext();
+        while (!m_log.isEmpty()) {
+            Iv2InitiateTaskMessage nextMessage = (Iv2InitiateTaskMessage) m_log.getNextMessage();
+            if (nextMessage == null) {
+                nextMessage = (Iv2InitiateTaskMessage) m_log.getNextMessage();
+            }
+            if (!m_log.isEmpty()) {
+                if (nextMessage == null) {
+                    continue;
+                }
+            }
+            assertEquals(1, nextMessage.getInitiatorHSId());
+            assertEquals(2, nextMessage.getCoordinatorHSId());
+
+            assertEquals(spego.getTxnId(), nextMessage.getTxnId());
+            assertEquals(spego.getTxnId(), nextMessage.getSpHandle());
+            spego = spego.makeNext();
+
+            StoredProcedureInvocation nextInvocation = nextMessage.getStoredProcedureInvocation();
+            assertEquals("hah", nextInvocation.getProcName());
+            count++;
+            if (m_log.isEmpty()) break;
+        }
+        assertEquals(100, count);
     }
 }
