@@ -51,4 +51,21 @@ public interface TaskLog {
      * @throws IOException
      */
     public void close() throws IOException;
+
+    /**
+     * Default policy at startup is to drop invocations until recording is necessary
+     * When used for live rejoin the first SnapshotSave plan fragment triggers the start
+     * of recording of transactions for the live rejoin.
+     *
+     * @param snapshotSpHandle    Note that it is possible that this may be called
+     *                            multiple times with different snapshotSpHandles during
+     *                            live rejoin. There may be multiple snapshot fragments
+     *                            with the same snapshot nonce due to snapshot collisions.
+     *                            At the time this is called, we don't know if the
+     *                            snapshot will succeed or not. If it collides with an
+     *                            snapshot in progress, it will be retried later. The task
+     *                            log implementation should update the snapshotSpHandle
+     *                            with the latest one.
+     */
+    public void enableRecording(long snapshotSpHandle);
 }
