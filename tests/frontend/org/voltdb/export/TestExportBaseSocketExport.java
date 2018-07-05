@@ -364,8 +364,11 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     }
 
     public void quiesceAndVerify(final Client client, ExportTestExpectedData tester) throws Exception {
+        System.out.println("STAKUTIS PRE DRAIN...");
         client.drain();
+        System.out.println("STAKUTIS PRE wait...");
         waitForStreamedAllocatedMemoryZero(client);
+        System.out.println("STAKUTIS PRE verify...");
         tester.verifyRows();
         System.out.println("Passed!");
     }
