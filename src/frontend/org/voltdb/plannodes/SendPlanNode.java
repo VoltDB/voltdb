@@ -64,7 +64,7 @@ public class SendPlanNode extends AbstractPlanNode {
         assert(estimates != null);
         // Recursively compute and collect stats from the child node,
         // but don't add any costs for this Send node.
-        // Let the parent "RecievePlanNode" account for any (theoretical)
+        // Let the parent "ReceivePlanNode" account for any (theoretical)
         // cost differences due to how much data
         // different plans must distribute as intermediate results.
         // Don't bother accounting for how much data is sent as the FINAL

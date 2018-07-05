@@ -455,7 +455,7 @@ public class SQLLexer extends SQLPatternFactory
         // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
         // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
         int iCur = 0;
-        // A string builder for the current statment
+        // A string builder for the current statement
         StringBuilder currentStmt = new StringBuilder();
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement

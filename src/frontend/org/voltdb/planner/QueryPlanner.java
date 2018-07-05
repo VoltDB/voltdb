@@ -142,7 +142,7 @@ public class QueryPlanner implements AutoCloseable {
         m_isLargeQuery = isLargeQuery;
         m_planSelector = new PlanSelector(m_estimates, m_stmtName,
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
-                suppressDebugOutput);
+                suppressDebugOutput, m_isLargeQuery);
         m_isUpsert = false;
     }
 
@@ -382,7 +382,13 @@ public class QueryPlanner implements AutoCloseable {
     private CompiledPlan compileFromXML(VoltXMLElement xmlSQL, String[] paramValues) {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null, m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null,
+                                                                 m_sql,
+                                                                 xmlSQL,
+                                                                 paramValues,
+                                                                 m_db,
+                                                                 m_joinOrder,
+                                                                 m_isLargeQuery);
         if (parsedStmt == null) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();
             return null;

@@ -120,6 +120,11 @@ public abstract class AbstractParsedStmt {
     // mark whether the statement's parent is UNION clause or not
     private boolean m_isChildOfUnion = false;
 
+    // This is true iff this is a query with large temp tables.
+    private boolean m_isLargeQuery;
+
+    // We often need a null name list for UDFs.  This
+    // lets us have one without making a lot of copies.
     protected static final Collection<String> m_nullUDFNameList = new ArrayList<>();
 
     private static final String INSERT_NODE_NAME = "insert";
@@ -134,10 +139,11 @@ public abstract class AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    protected AbstractParsedStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
+    protected AbstractParsedStmt(AbstractParsedStmt parent, String[] paramValues, Database db, boolean isLargeQuery) {
         m_parentStmt = parent;
         m_paramValues = paramValues;
         m_db = db;
+        m_isLargeQuery = isLargeQuery;
     }
 
     public void setDDLIndexedTable(Table tbl) {
@@ -157,7 +163,8 @@ public abstract class AbstractParsedStmt {
             AbstractParsedStmt parent,
             VoltXMLElement stmtTypeElement,
             String[] paramValues,
-            Database db) {
+            Database db,
+            boolean isLargeQuery) {
         AbstractParsedStmt retval = null;
 
         if (stmtTypeElement == null) {
@@ -167,25 +174,25 @@ public abstract class AbstractParsedStmt {
 
         // create non-abstract instances
         if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
-            retval = new ParsedInsertStmt(parent, paramValues, db);
+            retval = new ParsedInsertStmt(parent, paramValues, db, isLargeQuery);
             if (stmtTypeElement.attributes.containsKey(QueryPlanner.UPSERT_TAG)) {
                 retval.m_isUpsert = true;
             }
         }
         else if (stmtTypeElement.name.equals(UPDATE_NODE_NAME)) {
-            retval = new ParsedUpdateStmt(parent, paramValues, db);
+            retval = new ParsedUpdateStmt(parent, paramValues, db, isLargeQuery);
         }
         else if (stmtTypeElement.name.equals(DELETE_NODE_NAME)) {
-            retval = new ParsedDeleteStmt(parent, paramValues, db);
+            retval = new ParsedDeleteStmt(parent, paramValues, db, isLargeQuery);
         }
         else if (stmtTypeElement.name.equals(SELECT_NODE_NAME)) {
-            retval = new ParsedSelectStmt(parent, paramValues, db);
+            retval = new ParsedSelectStmt(parent, paramValues, db, isLargeQuery);
         }
         else if (stmtTypeElement.name.equals(UNION_NODE_NAME)) {
-            retval = new ParsedUnionStmt(parent, paramValues, db);
+            retval = new ParsedUnionStmt(parent, paramValues, db, isLargeQuery);
         }
         else if (stmtTypeElement.name.equals(SWAP_NODE_NAME)) {
-            retval = new ParsedSwapStmt(parent, paramValues, db);
+            retval = new ParsedSwapStmt(parent, paramValues, db, isLargeQuery);
         }
         else {
             throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
@@ -221,12 +228,17 @@ public abstract class AbstractParsedStmt {
      * @param db
      * @param joinOrder
      */
-    public static AbstractParsedStmt parse(AbstractParsedStmt parent, String sql, VoltXMLElement stmtTypeElement, String[] paramValues,
-            Database db, String joinOrder) {
+    public static AbstractParsedStmt parse(AbstractParsedStmt parent,
+                                           String sql,
+                                           VoltXMLElement stmtTypeElement,
+                                           String[] paramValues,
+                                           Database db,
+                                           String joinOrder,
+                                           boolean isLargeQuery) {
 
         // reset the statement counters
         NEXT_STMT_ID = 0;
-        AbstractParsedStmt retval = getParsedStmt(parent, stmtTypeElement, paramValues, db);
+        AbstractParsedStmt retval = getParsedStmt(parent, stmtTypeElement, paramValues, db, isLargeQuery);
 
         parse(retval, sql, stmtTypeElement, joinOrder);
         return retval;
@@ -1719,7 +1731,7 @@ public abstract class AbstractParsedStmt {
     }
 
     protected AbstractParsedStmt parseFromSubQuery(VoltXMLElement queryNode) {
-        AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
+        AbstractParsedStmt subquery = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db, m_isLargeQuery);
         // Propagate parameters from the parent to the child
         subquery.m_paramsById.putAll(m_paramsById);
         subquery.setParamsByIndex(m_paramsByIndex);
@@ -1729,7 +1741,7 @@ public abstract class AbstractParsedStmt {
     }
 
     protected AbstractParsedStmt parseSubquery(VoltXMLElement suqueryElmt) {
-        AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(this, suqueryElmt, m_paramValues, m_db);
+        AbstractParsedStmt subQuery = AbstractParsedStmt.getParsedStmt(this, suqueryElmt, m_paramValues, m_db, m_isLargeQuery);
         // Propagate parameters from the parent to the child
         subQuery.m_paramsById.putAll(m_paramsById);
 
@@ -2413,5 +2425,9 @@ public abstract class AbstractParsedStmt {
 
     public void setStmtId(int id) {
         m_stmtId = id;
+    }
+
+    public boolean isLargeQuery() {
+        return m_isLargeQuery;
     }
 }

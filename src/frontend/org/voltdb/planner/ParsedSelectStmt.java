@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -146,6 +147,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean m_distinct = false;
     private boolean m_hasComplexAgg = false;
+    // A complex group by is one which has non-column
+    // group by expressions.  For example,
+    //   select count(aa + bb) from alpha group by (aa + bb);
     private boolean m_hasComplexGroupby = false;
     private boolean m_hasAggregateExpression = false;
     private boolean m_hasAverage = false;
@@ -168,8 +172,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param paramValues
      * @param db
      */
-    public ParsedSelectStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
-        super(parent, paramValues, db);
+    public ParsedSelectStmt(AbstractParsedStmt parent, String[] paramValues, Database db, boolean isLargeQuery) {
+        super(parent, paramValues, db, isLargeQuery);
     }
 
     @Override
@@ -1057,6 +1061,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (ParsedColInfo col : m_displayColumns) {
             if (! col.expression.equals(groupbyCol.expression)) {
                 continue;
+            }
+            // If we don't have a natural name for this group by column,
+            // and the expression is equal to a display column, then
+            // set the column name and alias to the display list column.
+            if (groupbyCol.columnName == null || groupbyCol.columnName.isEmpty()) {
+                groupbyCol.columnName = col.columnName;
             }
             groupbyCol.alias = col.alias;
             groupbyCol.groupByInDisplay = true;
@@ -2280,6 +2290,39 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return true;
     }
 
+    private boolean m_groupByIsOrderedByOrderByWasTested = false;
+    private boolean m_groupByIsOrderedByOrderByResult = true;
+
+    /**
+     * Return true iff all the order by expressions appear in
+     * the group by expression list.  If this is true, then the
+     * order induced by the order by expression list can be
+     * used for serial aggregation.
+     *
+     * @return true if all order by expressions appear in the
+     *         group by expression list.
+     */
+    boolean groupByIsOrderedByOrderBy() {
+        if (m_groupByIsOrderedByOrderByWasTested) {
+            return m_groupByIsOrderedByOrderByResult;
+        }
+        m_groupByIsOrderedByOrderByWasTested = true;
+        HashSet<AbstractExpression> groupSet = new HashSet<>();
+        if ( ! m_orderColumns.isEmpty()) {
+            for (ParsedColInfo gbCol : m_groupByColumns) {
+                groupSet.add(gbCol.expression);
+            }
+            for (ParsedColInfo orderCol : m_orderColumns) {
+                AbstractExpression orderExp = orderCol.expression;
+                if (!groupSet.contains(orderExp)) {
+                    m_groupAndOrderByPermutationResult = false;
+                    break;
+                }
+            }
+        }
+        return m_groupAndOrderByPermutationResult;
+    }
+
     boolean groupByIsAnOrderByPermutation() {
         if (m_groupAndOrderByPermutationWasTested) {
             return m_groupAndOrderByPermutationResult;
@@ -2610,7 +2653,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     protected AbstractParsedStmt parseCommonTableStatement(VoltXMLElement queryNode, boolean isBaseCase) {
-        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
+        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this,
+                                                                              queryNode,
+                                                                              m_paramValues,
+                                                                              m_db,
+                                                                              isLargeQuery());
         // Propagate parameters from the parent to the child
         commonTableStmt.m_paramsById.putAll(m_paramsById);
         commonTableStmt.setParamsByIndex(getParamsByIndex());
@@ -2678,5 +2725,79 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             SchemaColumn schemaColumn = new SchemaColumn(tableName, tableName, columnName, columnName, tve, idx);
             tableScan.addOutputColumn(schemaColumn);
         }
+    }
+
+    /**
+     * If there is a permutation of the group by columns, say {g1, ..., gk} such that
+     * the order by columns are {g1, ..., gj}, for j <= k, then sorting by
+     * the group by columns will necessarily provide the ordering for the
+     * order by columns.  If we do this we can avoid an order by node.
+     *
+     * Note that this is only relevant for large temp tables.  For
+     * normal sized temp tables we just do hash aggregation or else
+     * we scan an index, so we don't need a sort at all.
+     *
+     * @return A permutation of the group by columns which has
+     *         the order by columns are an initial sequence.  If
+     *         this is not possible, because there is an order by column
+     *         which does not appear in the group by list, then
+     *         we return null.  Note that the order by column
+     *         values must be functionally dependent on the group
+     *         by expressions, but they don't have to be exactly
+     *         the same.  For example, in "group by a order by a * a"
+     *         the order by expression is not a group by expression,
+     *         but is functionally dependent on the group by expression.
+     */
+    Pair<List<ParsedColInfo>, List<Integer>> getSortColumnsForSerialGroupBy() {
+        if (m_orderColumns.isEmpty()) {
+            // No order columns, so the order by
+            // index, if any, can't help us.
+            return null;
+        }
+        int numGroupByColumns = m_groupByColumns.size();
+        List<Integer> gbOrigIndexes       = new ArrayList<>();
+        List<Integer> answerPermutation   = new ArrayList<>();
+        List<ParsedColInfo> answerColumns = new ArrayList<>(numGroupByColumns);
+        // Remember which columns we have used, but setting
+        // the index here to -1 when we use them.
+        for (int idx = 0; idx < numGroupByColumns; idx += 1) {
+            gbOrigIndexes.add(idx);
+        }
+        for (ParsedColInfo oColInfo : m_orderColumns) {
+            AbstractExpression oExpr = oColInfo.expression;
+            boolean foundIt = false;
+            // Hope there are not too many group by columns.
+            for (int idx = 0; idx < numGroupByColumns; idx += 1) {
+                if (0 <= gbOrigIndexes.get(idx)) {
+                    ParsedColInfo gColInfo = m_groupByColumns.get(idx);
+                    AbstractExpression gExpr = gColInfo.expression;
+                    if (gExpr.equals(oExpr)) {
+                        answerColumns.add(oColInfo);
+                        answerPermutation.add(gbOrigIndexes.get(idx));
+                        gbOrigIndexes.set(idx, -1);
+                        foundIt = true;
+                        break;
+                    }
+                }
+            }
+            // If we didn't find the order by column
+            // we must quit now and return null.
+            if (! foundIt) {
+                return null;
+            }
+        }
+        // Add all the group by expressions we did
+        // not use yet.  We need to order by these
+        // for serial aggregation, but not for
+        // order by sorting.
+        if (answerColumns != null) {
+            for (int idx = 0; idx < numGroupByColumns; idx += 1) {
+                if (0 <= gbOrigIndexes.get(idx)) {
+                    answerColumns.add(m_groupByColumns.get(idx));
+                    answerPermutation.add(gbOrigIndexes.get(idx));
+                }
+            }
+        }
+        return Pair.of(answerColumns, answerPermutation);
     }
 }

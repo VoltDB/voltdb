@@ -28,6 +28,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -132,7 +133,12 @@ public class PlanAssembler {
     /** plan selector */
     private final PlanSelector m_planSelector;
 
-    private final boolean m_isLargeQuery;
+    /**
+     * True iff this is a large query.  This duplicates the ones
+     * in the abstract parsed statements above.  But it's more
+     * convenient to have our own.
+     */
+    private boolean m_isLargeQuery = false;
 
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
@@ -1966,12 +1972,24 @@ public class PlanAssembler {
      * @param root          The subtree which may need its output tuples ordered
      * @return true if the plan needs an OrderByPlanNode, false otherwise
      */
-    private static boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
-        // Only sort when the statement has an ORDER BY.
-        if ( ! parsedStmt.hasOrderByColumns()) {
+    private boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+        // Sort when the statement has an ORDER BY.
+        // We also need to sort if we need to do serial
+        // aggregation for large queries.  But that is
+        // handled elsewhere.
+        if ( ! parsedStmt.hasOrderByColumns() ) {
             return false;
         }
 
+        // If we have already sorted by group by
+        // expressions to implement serial aggregation,
+        // and the order by expressions are an initial
+        // sub sequence, possibly improper, of the group
+        // by expressions, then we don't need to sort
+        // again.
+        if ( m_serialAggregationSortIsOrderBySort ) {
+            return false;
+        }
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
@@ -2111,7 +2129,7 @@ public class PlanAssembler {
      * @param root        The root of the plan needing ordering
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    private static AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+    private AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
         assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt ||
                 parsedStmt instanceof ParsedDeleteStmt);
 
@@ -2326,22 +2344,64 @@ public class PlanAssembler {
         return root;
     }
 
-    private static class IndexGroupByInfo {
+    private static class GroupByOrderInfo {
         boolean m_multiPartition = false;
 
         List<Integer> m_coveredGroupByColumns;
         boolean m_canBeFullySerialized = false;
 
-        AbstractPlanNode m_indexAccess = null;
+        /*
+         * This holds the plan node whose output is sorted.
+         * If this is an index scan, then it is sorted by the
+         * index.  If it is an order by node, then, of course,
+         * it sorts itself.  If it's null we can't or don't
+         * want to do aggregation by sorting.
+         */
+        AbstractPlanNode m_sortedNode = null;
 
+        /**
+         * See if we have determined whether this set of group by
+         * expressions can be serialized by the index we are scanning.
+         * If so, we will use serial aggregation and not hash aggregation.
+         *
+         * We have already checked this.  We just want to look it up.
+         * @return true iff the scan can serialize the group bys.
+         */
         boolean isChangedToSerialAggregate() {
-            return m_canBeFullySerialized && m_indexAccess != null;
+            return m_canBeFullySerialized && m_sortedNode != null;
         }
 
         boolean isChangedToPartialAggregate() {
-            return !m_canBeFullySerialized && m_indexAccess != null;
+            return !m_canBeFullySerialized && m_sortedNode != null;
         }
 
+        /**
+         * A hash aggregation is needed if all of these are true.
+         * <ol>
+         *   <li>There are group by columns.</li>
+         *   <li>There is no useful index, or there is a useful index,
+         *    but this is a multi partition query.</li>
+         *   <li>This is not a large temp table query.</li>
+         *   <li>The order by expressions, which require an order by
+         *    node, cannot supply a useful order for group bys.  For
+         *    example, if the group by expressions are "a, b" and the
+         *    order by expressions are "b, a", then we can sort by
+         *    "b, a" and get the same groups as "a, b".  Whatever
+         *    mechanism, index or order by node, satisfies the order
+         *    by expressions also satisfies the group by expressions.
+         *    But if the mechanism for satisfying the order by expressions
+         *    is not compatible with group bys, then we either need
+         *    an order by or hash aggregation.</li>
+         * </ol>
+         * Note that we could just insert an order by node in this case,
+         * but sorting is slower than hashing.  We expect sorting to be
+         * O(n lg(n)), and hashing to be about O(n).  Hashing requires
+         * more memory.
+         *
+         * @param root
+         * @param parsedSelect
+         * @return
+         */
         boolean needHashAggregator(AbstractPlanNode root, ParsedSelectStmt parsedSelect) {
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
@@ -2353,10 +2413,12 @@ public class PlanAssembler {
                 return false;
             }
 
-            if (isChangedToSerialAggregate() && ! m_multiPartition) {
+            if (isChangedToSerialAggregate() && (parsedSelect.isLargeQuery() || ! m_multiPartition) ) {
                 return false;
             }
 
+            // isChangedToSerialAggregate
+            assert( ! parsedSelect.isLargeQuery());
             boolean predeterminedOrdering = false;
             if (root instanceof IndexScanPlanNode) {
                 if (((IndexScanPlanNode)root).getSortDirection() !=
@@ -2379,10 +2441,8 @@ public class PlanAssembler {
                     return false;
                 }
             }
-
             return true;
         }
-
     }
 
     private static AbstractPlanNode findSeqScanCandidateForGroupBy(
@@ -2408,21 +2468,56 @@ public class PlanAssembler {
     }
 
     /**
-     * For a seqscan feeding a GROUP BY, consider substituting an IndexScan
-     * that pre-sorts by the GROUP BY keys.
-     * If a candidate is already an indexscan,
-     * simply calculate GROUP BY column coverage
+     * It's sometimes useful or necessary to take advantage of a well
+     * defined sort order to implement grouping. For example, if we are
+     * already scanning an index which can calculate a suitable sort order
+     * for a group by then we don't need an order by node.  Also, we cannot
+     * do hash aggregation for a large temp table query, since the hash tables
+     * all need to be in memory at the same time.  If an existing scan does
+     * not provide a useful order for GROUP BY expressions, we need to add
+     * and ORDER BY node.
+     *
+     * There are three cases.
+     * <ol>
+     *     <li>
+     *         For a sequential scan node feeding a GROUP BY, consider substituting an IndexScan
+     *         that provides an order for the GROUP BY keys.
+     *     </li>
+     *     <li>
+     *         For an index scan node feeding a GROUP BY, if the index expressions
+     *         are compatible with the GROUP BY expressions we just use the index
+     *         scan.  By "compatible" we mean there is some permutation of the
+     *         GROUP BY expressions which form a possibly improper initial subsequence
+     *         of the index expressions.
+     *     </li>
+     *     <li>
+     *         For a large temp table query, which is not one of the previous two
+     *         cases we need to add an order by node.
+     *         <ol>
+     *             <li>
+     *                 We prefer to put this node
+     *                 in the the distributed fragment, since it can then be done in
+     *                 parallel.  This can only happen if one of the GROUP BY expressions
+     *                 is a partition column.  In this case we will modify the candidate.
+     *             </li>
+     *             <li>
+     *                 If we cannot distribute the order by node then we need to add an
+     *                 order by node at the top of the existing plan.  This will make
+     *                 it impossible to push aggregate calculations down, but it was
+     *                 already impossible, so this is not a regression.
+     *             </li>
+     *     </li>
+     * </ol>
      *
      * @param candidate
      * @param gbInfo
-     * @return true when planner can switch to index scan
-     *         from a sequential scan, and when the index scan
-     *         has no parent plan node or the candidate is already
-     *         an indexscan and covers all or some GROUP BY columns
+     * @return true when planner has placed a new node at the top of the candidate.
      */
-    private boolean switchToIndexScanForGroupBy(AbstractPlanNode candidate,
-            IndexGroupByInfo gbInfo) {
-        if (! m_parsedSelect.isGrouped()) {
+    private boolean switchToOrderedScanForGroupBy(AbstractPlanNode candidate,
+                                                  GroupByOrderInfo gbInfo) {
+        // This is only a useful analysis and transformation when
+        // we have group by keys, or if we have aggregate functions.
+        if (! m_parsedSelect.hasAggregateOrGroupby()) {
             return false;
         }
 
@@ -2432,7 +2527,7 @@ public class PlanAssembler {
                     !gbInfo.m_coveredGroupByColumns.isEmpty()) {
                 // The candidate index does cover all or some
                 // of the GROUP BY columns and can be serialized
-                gbInfo.m_indexAccess = candidate;
+                gbInfo.m_sortedNode = candidate;
                 return true;
             }
             return false;
@@ -2448,26 +2543,30 @@ public class PlanAssembler {
         if (sourceSeqScan.getParentCount() > 0) {
             parent = sourceSeqScan.getParent(0);
         }
-        AbstractPlanNode indexAccess = indexAccessForGroupByExprs(
+        AbstractPlanNode sortedAccessNode = indexAccessForGroupByExprs(
                 (SeqScanPlanNode)sourceSeqScan, gbInfo);
 
-        if (indexAccess.getPlanNodeType() != PlanNodeType.INDEXSCAN) {
-            // does not find proper index to replace sequential scan
-            return false;
+        switch (sortedAccessNode.getPlanNodeType()) {
+            case INDEXSCAN:
+            case ORDERBY:
+                // found way to sort for sequential scan
+                gbInfo.m_sortedNode = sortedAccessNode;
+                break;
+            default:
+                return false;
         }
 
-        gbInfo.m_indexAccess = indexAccess;
         if (parent != null) {
             // have a parent and would like to replace
             // the sequential scan with an index scan
-            indexAccess.clearParents();
+            sortedAccessNode.clearParents();
             // For two children join node, index 0 is its outer side
-            parent.replaceChild(0, indexAccess);
+            parent.replaceChild(0, sortedAccessNode);
 
             return false;
         }
 
-        // parent is null and switched to index scan from sequential scan
+        // parent is null and switched to sorted scan from sequential scan
         return true;
     }
 
@@ -2590,35 +2689,98 @@ public class PlanAssembler {
         return null;
     }
 
+    /**
+     * Change the root plan to account for aggregate functions and
+     * group by expressions.  We may have queries with aggregate
+     * functions but no group by expressions, queries with group by expressions
+     * with no aggregate functions or queries with both.  For example,
+     * a query may have the form:
+     *    select sum(col) from t;
+     * or
+     *    select col from t group by col;
+     * or
+     *    select sum(col) from t group by othercol, col;
+     * This function computes plans for all three forms.
+     *
+     * @param root The plan so far.  Note that the top nodes in root may
+     *             be a RECEIVE/SEND pair, for multipart queries, or a
+     *             join tree.  A scan node is a kind of trivial join tree here.
+     *             Note also that multipart queries may have a scan tree at the
+     *             root, if the query is an OUTER join of a replicated table and a
+     *             partitioned table, as in "select id from R1 left join P1 on R1.id = P1.id".
+     *             The root node would then be a join node, but the RECEIVE/SEND
+     *             pair would be a descendant.
+     * @return A plan altered to compute aggregate functions and group by expressions.
+     *         This may have a new node pasted onto the top, or a new node added
+     *         to the existing plan.
+     */
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
-        /* Check if any aggregate expressions are present */
-
         /*
-         * "Select A from T group by A" is grouped but has no aggregate operator
-         * expressions. Catch that case by checking the grouped flag
+         * The query "select A from R group by A" has no aggregate
+         * functions.  So, we want to look at more than just "hasAggregate".
+         *
+         * If this is a large query, and there are aggregates
+         * then we may need to add an order by to get serial
+         * aggregation working.
          */
+
         if (m_parsedSelect.hasAggregateOrGroupby()) {
+            // Consider this query: select count(a) from P group by a;
+            //                      where P is partitioned on a column not a;
+            // If we aggregate by a and count rows on the partitions,
+            // we just have to sum up the counts on the coordinator
+            // fragment.  The counting computations are done in parallel
+            // on the partitions.  The aggNode is the computation that
+            // goes to the partitions and the topAggNode is the
+            // coordinator fragment computation.  There will be a
+            // receive/send pair placed between them.  We may not
+            // need the topAggNode if all the calculation can be completed
+            // on the partitions, or of none of the calculation can
+            // be done on the partitions.
+            //
             AggregatePlanNode aggNode = null;
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
-            IndexGroupByInfo gbInfo = new IndexGroupByInfo();
+            GroupByOrderInfo gbInfo = new GroupByOrderInfo();
 
             if (root instanceof AbstractReceivePlanNode) {
-                // do not apply index scan for serial/partial aggregation
-                // for distinct that does not group by partition column
-                if ( ! m_parsedSelect.hasAggregateDistinct() ||
+                // This is a multi partition plan, with no coordinator
+                // join nodes.
+                //
+                // Only try to switch to serial aggregation via index scan
+                // if this is a large temp table query, or there is no
+                // distinct aggregate or one of the group by expressions
+                // is a partition column.
+                if ( m_isLargeQuery ||
+                        ! m_parsedSelect.hasAggregateDistinct() ||
                         m_parsedSelect.hasPartitionColumnInGroupby()) {
                     AbstractPlanNode candidate = root.getChild(0).getChild(0);
                     gbInfo.m_multiPartition = true;
-                    switchToIndexScanForGroupBy(candidate, gbInfo);
+                    boolean didSwitch = switchToOrderedScanForGroupBy(candidate, gbInfo);
+                    // If this is a large query then we had better have
+                    // switched to an ordered scan.
+                    assert ( !m_isLargeQuery || didSwitch );
                 }
             }
-            else if (switchToIndexScanForGroupBy(root, gbInfo)) {
-                root = gbInfo.m_indexAccess;
+            else if (switchToOrderedScanForGroupBy(root, gbInfo)) {
+                // This is either a multi partition plan or else
+                // a plan with outer joins with a replicated table.
+                //
+                // Since the switch was correct, we cached the new
+                // root of the tree in m_sortedNode.  Some day we will
+                // have to figure out how to make this more obscure, but
+                // I don't see exactly how right now. -- BW
+                root = gbInfo.m_sortedNode;
             }
+            // See the definition of needHashAggregator for the
+            // conditions which hash aggregation requires.
             boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
 
-            // Construct the aggregate nodes
+            // Construct the aggregate nodes.
+            // The variable needHashAgg should really be
+            // something like needHashAggIfNotLTT, but how
+            // do you pronounce THAT?
             if (needHashAgg) {
+                assert( ! m_isLargeQuery );
                 if ( m_parsedSelect.m_mvFixInfo.needed() ) {
                     // TODO: may optimize this edge case in future
                     aggNode = new HashAggregatePlanNode();
@@ -2639,8 +2801,17 @@ public class PlanAssembler {
                 }
             }
             else {
+                // If a hash aggregation is not needed, either
+                // because there is a natural index to provide
+                // order for serial aggregation, or because it is a
+                // large temp table query and we have group by expressions.
+                // If this is a large temp table query and there are
+                // aggregates but there are no group by expressions
+                // we don't need any sorting at all.
                 aggNode = new AggregatePlanNode();
 
+                // If m_isLargeQuery is true, then the MV fix cannot be needed.
+                assert ( ! m_isLargeQuery || ! m_parsedSelect.m_mvFixInfo.needed() );
                 if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
                     topAggNode = new AggregatePlanNode();
                 }
@@ -2709,10 +2880,36 @@ public class PlanAssembler {
                          * the same as the output schema of the push-down
                          * aggregate node.
                          *
-                         * If DISTINCT is specified, don't do push-down for
-                         * count() and sum() when not group by partition column.
-                         * An exception is the aggregation arguments are the
-                         * partition column (ENG-4980).
+                         * If DISTINCT is specified and the aggregation
+                         * arguments are *not* the partition column (ENG-4980) and
+                         * we are not grouping by the partition column,
+                         * then don't do push-down for count() and sum().
+                         *
+                         *
+                         * create table alpha (
+                         *       id        bigint not null,
+                         *       aa        bigint
+                         * );
+                         * partition table alpha on column id;
+                         * select distinct count(aa) from alpha group by aa;
+                         * -- In this case we *cannot* do the push down,
+                         *    because the groups may have non-empty
+                         *    intersection on the sites.  Some rows
+                         *    with aa == 100, say, may be on different
+                         *    sites.  So the sites cannot count all
+                         *    rows by themselves.
+                         * select distinct count(aa) from alpha group by aa, id;
+                         * -- In this case we cannot do the push down.
+                         *    The groups will be disjoint on each site.
+                         *    But rows with aa = 100, say, may be on
+                         *    different sites, and so the individual
+                         *    sites cannot count them all.
+                         * select distinct sum(id) from alpha group by aa, id;
+                         * -- In this case, we *can* do the push down,
+                         *    because the groups will be a disjoint union
+                         *    of groups on the site, and all rows
+                         *    on which a sum will act will be on a
+                         *    single site.
                          */
                         if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
                             agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
@@ -2820,9 +3017,9 @@ public class PlanAssembler {
         return handleDistinctWithGroupby(root);
     }
 
-    // Sets IndexGroupByInfo for an IndexScan
+    // Sets GroupByOrderInfo for an IndexScan
     private void calculateIndexGroupByInfo(IndexScanPlanNode root,
-            IndexGroupByInfo gbInfo) {
+            GroupByOrderInfo gbInfo) {
         String fromTableAlias = root.getTargetTableAlias();
         assert(fromTableAlias != null);
 
@@ -2839,11 +3036,62 @@ public class PlanAssembler {
                 m_parsedSelect.groupByColumns().size());
     }
 
+    /**
+     * Add an order by node for serial aggregation for Large
+     * Temp Tables. We can't do hash aggregation, so we have
+     * to do do serial aggregation.  The sort keys are the group
+     * by columns, but we can choose any order for the group
+     * by columns.  We know at this point we don't have an
+     * index to help us with ordering.
+     *
+     * If there are order by expressions, and the order by
+     * expressions and group by expressions are compatible,
+     * then we can do a single order by.  Otherwise we will
+     * do another order by later.
+     *
+     * @param root The tree onto which we tack the new order by node.
+     * @return The new node.  We also set m_serialAggregationSortIsOrderBySort
+     *         to true, so we will not create an extra order by node.
+     */
+    private AbstractPlanNode addOrderByForSerialAggregation(AbstractPlanNode root, GroupByOrderInfo gbInfo) {
+        Pair<List<ParsedColInfo>, List<Integer>> sortColumns
+                = m_parsedSelect.getSortColumnsForSerialGroupBy();
+        List<ParsedColInfo> groupBySortColumns = null;
+        List<Integer> groupBySortColumnPermutation = null;
+        if (sortColumns == null) {
+            groupBySortColumns = m_parsedSelect.groupByColumns();
+            // Make the permutation the identity.
+            groupBySortColumnPermutation = new ArrayList<>(groupBySortColumns.size());
+            for (int idx = 0; idx < groupBySortColumns.size(); idx += 1) {
+                groupBySortColumnPermutation.add(idx);
+            }
+            m_serialAggregationSortIsOrderBySort = false;
+            gbInfo.m_coveredGroupByColumns = groupBySortColumnPermutation;
+            gbInfo.m_canBeFullySerialized = true;
+        } else {
+            groupBySortColumns = sortColumns.getFirst();
+            gbInfo.m_coveredGroupByColumns = sortColumns.getSecond();
+            m_serialAggregationSortIsOrderBySort = true;
+            gbInfo.m_canBeFullySerialized = true;
+        }
+        OrderByPlanNode orderByNode
+                = buildOrderByPlanNode(groupBySortColumns);
+        orderByNode.addAndLinkChild(root);
+        return orderByNode;
+    }
+
+
     // Turn sequential scan to index scan for group by if possible
+    // This will only be called if root is a Sequential scan node,
+    // as the type shows.  We rummage around to find an index.  If
+    // one of them is useful we are done.  If none are useful and
+    // this is a large temp table query we must add an order by node
+    // on the type of root and return that.
     private AbstractPlanNode indexAccessForGroupByExprs(SeqScanPlanNode root,
-            IndexGroupByInfo gbInfo) {
+            GroupByOrderInfo gbInfo) {
         if (! root.isPersistentTableScan()) {
-            // subquery and common tables are not handled
+            // subquery and common tables are not handled.
+            // No indexes there.
             return root;
         }
 
@@ -2886,6 +3134,10 @@ public class PlanAssembler {
             }
         }
         if (pickedUpIndex == null) {
+            // Add an order by if necessary for forced serial aggregation.
+            if (m_parsedSelect != null && m_isLargeQuery) {
+                return addOrderByForSerialAggregation(root, gbInfo);
+            }
             return root;
         }
 
@@ -3020,7 +3272,7 @@ public class PlanAssembler {
     }
 
     /**
-     * Push the given aggregate if the plan is distributed, then add the
+     * Push down the given aggregate if the plan is distributed, then add the
      * coordinator node on top of the send/receive pair. If the plan
      * is not distributed, or coordNode is not provided, the distNode
      * is added at the top of the plan.
@@ -3042,9 +3294,9 @@ public class PlanAssembler {
      * @return The new root node.
      */
     private static AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
-                                       AggregatePlanNode distNode,
-                                       AggregatePlanNode coordNode,
-                                       ParsedSelectStmt selectStmt) {
+                                                      AggregatePlanNode distNode,
+                                                      AggregatePlanNode coordNode,
+                                                      ParsedSelectStmt selectStmt) {
         AggregatePlanNode rootAggNode;
 
         // remember that coordinating aggregation has a pushed-down
@@ -3062,8 +3314,13 @@ public class PlanAssembler {
          */
         if (coordNode != null && root instanceof ReceivePlanNode) {
             AbstractPlanNode accessPlanTemp = root;
+            // Pop off the receive and send plan nodes.
             root = accessPlanTemp.getChild(0).getChild(0);
+            // Clear the parents of the result.  This will be
+            // the subplan, or close to it.
             root.clearParents();
+            // Clear the children of the send plan.  We will
+            // be using it again below.
             accessPlanTemp.getChild(0).clearChildren();
             distNode.addAndLinkChild(root);
 
@@ -3112,6 +3369,13 @@ public class PlanAssembler {
         return root;
     }
 
+    /**
+     * This is a breadcrumb we leave for ourselves to remember
+     * that we have chosen a column order for the group by
+     * columns, and that order is compatible with the order
+     * by order.
+     */
+    private boolean m_serialAggregationSortIsOrderBySort = false;
     private static AbstractPlanNode processComplexAggProjectionNode(
             ParsedSelectStmt selectStmt, AbstractPlanNode root) {
         if ( ! selectStmt.hasComplexAgg()) {
@@ -3270,7 +3534,7 @@ public class PlanAssembler {
 
         assert(m_parsedSelect.isGrouped());
 
-        // DISTINCT is redundant with GROUP BY IFF
+        // DISTINCT is redundant with GROUP BY IF
         // all of the grouping columns are present in the display columns.
         if (m_parsedSelect.displayColumnsContainAllGroupByColumns()) {
             return root;
@@ -3279,7 +3543,21 @@ public class PlanAssembler {
         // Now non complex aggregation cases are handled already
         assert(m_parsedSelect.hasComplexAgg());
 
-        AggregatePlanNode distinctAggNode = new HashAggregatePlanNode();
+        AggregatePlanNode distinctAggNode = null;
+        OrderByPlanNode orderByForSerialAggregation = null;
+        if (m_isLargeQuery) {
+            distinctAggNode = new AggregatePlanNode();
+            orderByForSerialAggregation = new OrderByPlanNode();
+            final List<AbstractExpression> displayExprs = new ArrayList<>();
+            m_parsedSelect.m_displayColumns.forEach((ParsedColInfo col) -> {
+                displayExprs.add(col.expression);
+            });
+            // Sort descending.  We don't really care about
+            // the order, but we want it to be fixed.
+            orderByForSerialAggregation.addSortExpressions(displayExprs, null);
+        } else {
+            distinctAggNode = new HashAggregatePlanNode();
+        }
         distinctAggNode.setOutputSchema(m_parsedSelect.getDistinctProjectionSchema());
 
         for (ParsedColInfo col : m_parsedSelect.distinctGroupByColumns()) {
@@ -3312,7 +3590,10 @@ public class PlanAssembler {
                 pushedDown = true;
             }
         }*/
-
+        if (orderByForSerialAggregation != null) {
+            orderByForSerialAggregation.addAndLinkChild(root);
+            root = orderByForSerialAggregation;
+        }
         distinctAggNode.addAndLinkChild(root);
         root = distinctAggNode;
 

@@ -106,7 +106,7 @@ public class MaterializedViewProcessor {
             // parse the xml like any other sql statement
             ParsedSelectStmt stmt = null;
             try {
-                stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(null, query, xmlquery, null, db, null);
+                stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(null, query, xmlquery, null, db, null, false);
             }
             catch (Exception e) {
                 throw m_compiler.new VoltCompilerException(e.getMessage());
