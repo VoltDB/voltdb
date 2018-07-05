@@ -112,7 +112,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     //  Then drops the table and verifies that Export can successfully
     //  drain the dropped table. IE, drop table doesn't lose Export data.
     //
-    public void testExportAndDroppedTable() throws Exception {
+    public void xtestExportAndDroppedTable() throws Exception {
         System.out.println("testExportAndDroppedTable");
         Client client = getClient();
         for (int i = 0; i < 10; i++) {
@@ -140,7 +140,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     }
 
     // Test that a table w/o Export enabled does not produce Export content
-    public void testThatTablesOptIn() throws Exception {
+    public void xtestThatTablesOptIn() throws Exception {
         System.out.println("testThatTablesOptIn");
         final Client client = getClient();
 
@@ -165,7 +165,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
 
     // Verify that planner rejects updates to append-only tables
     //
-    public void testExportUpdateAppendOnly() throws IOException {
+    public void xtestExportUpdateAppendOnly() throws IOException {
         System.out.println("testExportUpdateAppendOnly");
         final Client client = getClient();
         boolean threw = false;
@@ -184,7 +184,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     //
     // Verify that planner rejects reads of append-only tables.
     //
-    public void testExportSelectAppendOnly() throws IOException {
+    public void xtestExportSelectAppendOnly() throws IOException {
         System.out.println("testExportSelectAppendOnly");
         final Client client = getClient();
         boolean passed = false;
@@ -202,7 +202,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     //
     //  Verify that planner rejects deletes of append-only tables
     //
-    public void testExportDeleteAppendOnly() throws IOException {
+    public void xtestExportDeleteAppendOnly() throws IOException {
         System.out.println("testExportDeleteAppendOnly");
         final Client client = getClient();
         boolean passed = false;
@@ -220,7 +220,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     //
     // Multi-table test
     //
-    public void testExportMultiTable() throws Exception
+    public void xtestExportMultiTable() throws Exception
     {
         System.out.println("testExportMultiTable");
         final Client client = getClient();
@@ -257,7 +257,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     //
     // Verify that snapshot can be enabled with a streamed table present
     //
-    public void testExportPlusSnapshot() throws Exception {
+    public void xtestExportPlusSnapshot() throws Exception {
         System.out.println("testExportPlusSnapshot");
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
@@ -311,7 +311,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         quiesceAndVerify(client, m_verifier);
     }
 
-    public void testSwapTables() throws Exception {
+    public void xtestSwapTables() throws Exception {
         System.out.println("testExportSwapTables");
         final Client client = getClient();
         verifyProcFails(client, "Illegal to swap a stream", "@SwapTables", "ALLOW_NULLS", "LOOPBACK_ALLOW_NULLS");

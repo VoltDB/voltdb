@@ -82,7 +82,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
      * @param tuple2 Expected tuple count on partition 1
      * @throws Exception if an assumption is violated or the test times out
      */
-    private void checkForExpectedStats(Client client, String tableName, int mem1, int tuple1, int mem2, int tuple2) throws Exception {
+    private void checkForExpectedStats(Client client, String tableName, int mem1, int tuple1, int mem2, int tuple2, boolean isPersistent) throws Exception {
         boolean passed = false;
         boolean zpassed, opassed;
         zpassed = opassed = false;
@@ -92,7 +92,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         //Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            stats = client.callProcedure("@Statistics", isPersistent ? "table" : "export", 0).getResults()[0];  // STAKUTIS
             boolean passedThisTime = false;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -105,17 +105,20 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
                 st = System.currentTimeMillis();
             }
             while (stats.advanceRow()) {
-                if (stats.getString("TABLE_NAME").equalsIgnoreCase(tableName)) {
+                String memoryColumnName = isPersistent ? "TUPLE_ALLOCATED_MEMORY" : "TUPLE_PENDING"; // STAKUTIS
+                String tableColumnName = isPersistent ? "TABLE_NAME": "STREAM_NAME"; // STAKUTIS
+                if (stats.getString(tableColumnName).equalsIgnoreCase(tableName)) {
                     if (stats.getLong("PARTITION_ID") == 0 && !zpassed) {
                         if (tuple1 == stats.getLong("TUPLE_COUNT")
-                                && ((mem1 == SKIP_MEMORY_CHECK) || (mem1 == stats.getLong("TUPLE_ALLOCATED_MEMORY")))) {
+                                && ((mem1 == SKIP_MEMORY_CHECK) || (mem1 == stats.getLong(memoryColumnName)))) { // STAKUTIS
                             zpassed = true;
                             System.out.println("Partition Zero passed.");
                         }
+                        System.out.println("tuple1:"+tuple1+" TUPLE_COUNT:"+stats.getLong("TUPLE_COUNT")+" mem1:"+mem1+" "+memoryColumnName+":"+stats.getLong(memoryColumnName));
                     }
                     if (stats.getLong("PARTITION_ID") == 1 && !opassed) {
                         if (tuple2 == stats.getLong("TUPLE_COUNT")
-                                && ((mem2 == SKIP_MEMORY_CHECK) || (mem2 == stats.getLong("TUPLE_ALLOCATED_MEMORY")))) {
+                                && ((mem2 == SKIP_MEMORY_CHECK) || (mem2 == stats.getLong(memoryColumnName)))) { // STAKUTIS
                             opassed = true;
                             System.out.println("Partition One passed.");
                         }
@@ -169,8 +172,8 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         waitForStreamedAllocatedMemoryZero(client);
 
         // Verify that table stats show both insertions.
-        checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1);
-        checkForExpectedStats(client, "tuple_count_export", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1);
+        checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, true);  // STAKUTIS
+        checkForExpectedStats(client, "tuple_count_export", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, false);
 
         // Memory statistics need to show the persistent table but not the export.
         // We can assume no other tables have tuples since any catalog update clears the stats.
@@ -216,14 +219,16 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
+//        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false); STAKUTIS no longer byte-count units
+        checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
         System.out.println("Quiesce client....");
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
+        //checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false); STAKUTIS no longer byte-count units
+        checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         //Resume will put flg on onserver export to start consuming.
         startListener();
@@ -263,7 +268,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
 
         //Allocated memory should go to 0
         //If this is failing watch out for ENG-5708
-        checkForExpectedStats(client, "NO_NULLS", 0, 24, 0, 16);
+        checkForExpectedStats(client, "NO_NULLS", 0, 24, 0, 16, false);
     }
 
     public TestExportStatsSuite(final String name) {

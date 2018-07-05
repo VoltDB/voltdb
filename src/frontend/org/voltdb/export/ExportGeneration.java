@@ -188,7 +188,7 @@ public class ExportGeneration implements Generation {
                     String signature = new String(stringBytes, Constants.UTF8ENCODING);
                     final long ackUSO = buf.getLong();
                     final boolean runEveryWhere = (buf.getShort() == (short )1);
-
+                    long tuplesSent = buf.getLong();  // STAKUTIS
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
                         exportLog.error("Received an export ack for partition " + partition +
@@ -202,13 +202,26 @@ public class ExportGeneration implements Generation {
                                 " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
                         return;
                     }
-
+                    System.out.println("STAKUTIS ExportGeneration.java: mailbox deliver() got ackUSO:"+ackUSO+
+                            " "+eds.getTableName()+eds.getPartitionId()+
+                            " pend:"+eds.m_exportStatsRow.m_tuplePending+
+                            " me:"+m_mbox.getHSId()+
+                            " from:"+message.m_sourceHSId + "tuplesCompleted:"+tuplesSent);
+                    if (tuplesSent < 0 ) {
+                        exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
+                        tuplesSent = 0;
+                    }
+                    if (m_mbox.getHSId() == message.m_sourceHSId) {
+                        System.out.println("STAKUTIS ExportGeneration.java: SKIPPING from myself! SHould we set to zero?");
+                        tuplesSent = 0;
+                    }
                     try {
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Received an export ack for partition " + partition +
                                     " source signature " + signature + " with uso: " + ackUSO);
                         }
-                        eds.ack(ackUSO, runEveryWhere);
+                        System.out.println("STAKUTIS calling eds.ack:");
+                        eds.ack(ackUSO, runEveryWhere, tuplesSent);
                     } catch (RejectedExecutionException ignoreIt) {
                         // ignore it: as it is already shutdown
                     }

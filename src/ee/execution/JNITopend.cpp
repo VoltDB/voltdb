@@ -545,6 +545,9 @@ JNITopend::~JNITopend() {
 
 
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
+    //printf("STAKUTIS JNITopend returning bogus value\n"); fflush(stdout);
+    return 1024L*99999999;  // Stakutis
+    /*
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
     int64_t retval = m_jniEnv->CallStaticLongMethod(
             m_exportManagerClass,
@@ -553,6 +556,7 @@ int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
             signatureString);
     m_jniEnv->DeleteLocalRef(signatureString);
     return retval;
+    **/
 }
 
 void JNITopend::pushExportBuffer(

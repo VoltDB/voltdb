@@ -171,7 +171,7 @@ public class TestExportBase extends RegressionSuite {
         //Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0]; // STAKUTIS
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -185,14 +185,14 @@ public class TestExportBase extends RegressionSuite {
             }
             long ts = 0;
             while (stats.advanceRow()) {
-                String ttype = stats.getString("TABLE_TYPE");
+                //String ttype = stats.getString("TABLE_TYPE"); STAKUTIS
                 Long tts = stats.getLong("TIMESTAMP");
                 //Get highest timestamp and watch is change
                 if (tts > ts) {
                     ts = tts;
                 }
-                if (ttype.equals("StreamedTable")) {
-                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                if (true) { // ttype.equals("StreamedTable")) { STAKUTIS
+                    if (0 != stats.getLong("TUPLE_PENDING")) {
                         passedThisTime = false;
                         System.out.println("Partition Not Zero.");
                         break;

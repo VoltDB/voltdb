@@ -17,29 +17,32 @@
 
 package org.voltdb.export.processors;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataSource;
+import org.voltdb.export.StandaloneExportDataProcessor;
+import org.voltdb.export.StandaloneExportGeneration;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
+import org.voltdb.exportclient.ExportRow;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import java.io.IOException;
-import org.voltdb.VoltType;
-import org.voltdb.export.StandaloneExportDataProcessor;
-import org.voltdb.export.StandaloneExportGeneration;
-import org.voltdb.exportclient.ExportRow;
 
 public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
 
