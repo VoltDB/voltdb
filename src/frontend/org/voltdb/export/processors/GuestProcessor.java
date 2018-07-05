@@ -34,7 +34,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.ExportStats;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
@@ -85,11 +84,10 @@ public class GuestProcessor implements ExportDataProcessor {
             Set<String> tableNames = e.getValue().getSecond();
 
             for (String tableName : tableNames) {
-                ExportStats.get().get(tableName).m_exportTarget = targetName; // STAKUTIS
-                ExportStats.get().get(tableName).m_exportActive = 1; // STAKUTIS
                 tableName = tableName.toLowerCase();
                 assert(!m_targetsByTableName.containsKey(tableName));
                 m_targetsByTableName.put(tableName, targetName);
+                // STAKUTIS this would be a good place to set the ExportRow 'target'
             }
 
             String exportClientClass = properties.getProperty(EXPORT_TO_TYPE);
@@ -320,6 +318,7 @@ public class GuestProcessor implements ExportDataProcessor {
         fut.addListener(new Runnable() {
             @Override
             public void run() {
+                long tuplesSent=0;
                 try {
                     BBContainer cont = fut.get();
                     if (cont == null) {
@@ -339,6 +338,7 @@ public class GuestProcessor implements ExportDataProcessor {
                          */
                         while (!m_shutdown) {
                             long startTime=0;
+                            tuplesSent=0;
                             try {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
@@ -368,9 +368,13 @@ public class GuestProcessor implements ExportDataProcessor {
                                             edb.onBlockStart(row);
                                         }
                                         edb.processRow(row);
+                                        tuplesSent++;
+                                        /* Now done in releaseExportBytes()
                                         synchronized (source.m_exportStatsRow) {
+                                            System.out.println("STAKUTIS GuestProcessor downticking "+source.getTableName()+source.getPartitionId());
                                             source.m_exportStatsRow.m_tuplePending--; // STAKUTIS
                                         }
+                                        */
                                         if (generation != -1L && row.generation != generation) {
                                             edb.onBlockCompletion(row);
                                             edb.onBlockStart(row);
@@ -382,6 +386,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                     edb.onBlockCompletion();
                                 }
                                 if (row != null) {
+                                    System.out.println("STAKUTIS GuestProcessor calling blockCompletion "+source.getTableName()+source.getPartitionId());
                                     edb.onBlockCompletion(row);
                                     long elapsedMS = System.currentTimeMillis() - startTime;
                                     source.m_exportStatsRow.m_tuplesSentSinceClear += 1;
@@ -392,6 +397,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                                 //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
                                 if (cont != null) {
+                                    System.out.println("STAKUTIS GuestProcessor calling cont.discard() "+source.getTableName()+source.getPartitionId());
                                     cont.discard();
                                     cont = null;
                                 }
@@ -434,8 +440,9 @@ public class GuestProcessor implements ExportDataProcessor {
                     m_logger.error("Error processing export block", e);
                 }
                 if (!m_shutdown) {
-                    addBlockListener(source, source.poll(), edb);
+                    addBlockListener(source, source.poll(tuplesSent), edb);
                 }
+                System.out.println("STAKUTIS GuestProcessor finished run() "+source.getTableName()+source.getPartitionId()+" tuplesSent:"+tuplesSent);
             }
         }, edb.getExecutor());
     }

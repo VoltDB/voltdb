@@ -223,6 +223,15 @@ public class ExportGeneration implements Generation {
 
                     if (msgType == ExportManager.RELEASE_BUFFER) {
                         final long ackUSO = buf.getLong();
+                        long tuplesSent = buf.getLong();  // STAKUTIS
+                        if (tuplesSent < 0 ) {
+                            exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
+                            tuplesSent = 0;
+                        }
+                        if (m_mbox.getHSId() == message.m_sourceHSId) {
+                            System.out.println("STAKUTIS ExportGeneration.java: SKIPPING from myself! SHould we set to zero?");
+                            tuplesSent = 0;
+                        }
                         try {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received RELEASE_BUFFER message for " + eds.toString() +
@@ -230,12 +239,21 @@ public class ExportGeneration implements Generation {
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
-                            eds.ack(ackUSO);
+                            eds.ack(ackUSO, tuplesSent);
                         } catch (RejectedExecutionException ignoreIt) {
                             // ignore it: as it is already shutdown
                         }
                     } else if (msgType == ExportManager.TAKE_MASTERSHIP) {
                         final long ackUSO = buf.getLong();
+                        long tuplesSent = buf.getLong();  // STAKUTIS
+                        if (tuplesSent < 0 ) {
+                            exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
+                            tuplesSent = 0;
+                        }
+                        if (m_mbox.getHSId() == message.m_sourceHSId) {
+                            System.out.println("STAKUTIS ExportGeneration.java: SKIPPING from myself! SHould we set to zero?");
+                            tuplesSent = 0;
+                        }
                         try {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received TAKE_MASTERSHIP message for " + eds.toString() +
@@ -243,7 +261,7 @@ public class ExportGeneration implements Generation {
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
-                            eds.ack(ackUSO);
+                            eds.ack(ackUSO, tuplesSent);
                         } catch (RejectedExecutionException ignoreIt) {
                             // ignore it: as it is already shutdown
                         }
