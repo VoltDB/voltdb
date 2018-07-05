@@ -200,7 +200,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private final static String HASHINATOR_ALL_BAD = "All hashinator snapshots are bad (%s).";
     // These keep track of count per table that are reported restored by the snapshotrestore process.
-    public static final Map<String, AtomicLong> m_reportStats = new HashMap<String, AtomicLong>();
+    static final Map<String, AtomicLong> m_reportStats = new HashMap<String, AtomicLong>();
     static final Map<String, Integer> m_selectedReportPartition = new HashMap<String, Integer>();
     static long m_nextReportTime = 0;
     //Report every minute.
