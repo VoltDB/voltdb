@@ -1379,7 +1379,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
 
         try {
-            testValidIncludeTables(savefile_state, includeList);
+            ValidIncludeTables(savefile_state, includeList);
         } catch (VoltAbortException e) {
             ColumnInfo[] result_columns = new ColumnInfo[2];
             int ii = 0;
@@ -2088,7 +2088,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 if(savedTableNames.contains(s)) {
                     savedTableNames.remove(s);
                 } else {
-                    SNAP_LOG.info("Table: " + s + " does not match any savefile data");
+                    SNAP_LOG.info("Table: " + s + " does not exist in the saved snapshot.");
                 }
             }
         }
@@ -3025,7 +3025,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return ret;
     }
 
-    private void testValidIncludeTables(final ClusterSaveFileState savefileState, List<String> include) {
+    private void ValidIncludeTables(final ClusterSaveFileState savefileState, List<String> include) {
         if(include == null || include.size() == 0) return;
         Set<String> savedTableNames = savefileState.getSavedTableNames();
         for(String s : include) {
