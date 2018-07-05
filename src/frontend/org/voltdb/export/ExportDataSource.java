@@ -327,7 +327,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_lastReleaseOffset = releaseOffset;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso+1);
         m_exportStatsRow.m_tuplePending -= tuplesSent;  // STAKUTIS: SYNCHRONIZE HERE???
-        System.out.println("STAKUTIS ExportDataSource: relaseExportBytes() uso:"+releaseOffset+" tuplesSent decrement by:"+tuplesSent+ " now is:"+m_exportStatsRow.m_tuplePending);
+        System.out.println("STAKUTIS thread:"+Thread.currentThread());
+        System.out.println("STAKUTIS ExportDataSource: relaseExportBytes() "+this.m_tableName+this.m_partitionId+" uso:"+releaseOffset+" tuplesSent decrement by:"+tuplesSent+ " now is:"+m_exportStatsRow.m_tuplePending);
         return;
     }
 
@@ -466,6 +467,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (buffer.capacity() > 8) {
                 final BBContainer cont = DBBPool.wrapBB(buffer);
                 if (m_lastReleaseOffset > 0 && m_lastReleaseOffset >= (uso + (buffer.capacity() - 8) - 1)) {
+                    System.out.println("STAKUTIS ExportDataSource commited a tuple from the FUTURE! "+m_tableName+m_partitionId+ " count:"+tuplesSent);
+                    synchronized (m_exportStatsRow) {
+                        m_exportStatsRow.m_tupleCount += tuplesSent;
+                        m_exportStatsRow.m_tuplePending += tuplesSent;
+                        System.out.println("STAKUTIS ExportDataSource count now FUTURE: "+m_exportStatsRow.m_tupleCount+" pending now"+m_exportStatsRow.m_tuplePending);
+                    }
                     //What ack from future is known?
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Dropping already acked USO: " + m_lastReleaseOffset
@@ -495,6 +502,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     synchronized (m_exportStatsRow) {
                         m_exportStatsRow.m_tupleCount += tuplesSent;
                         m_exportStatsRow.m_tuplePending += tuplesSent;
+                        System.out.println("STAKUTIS thread:"+Thread.currentThread());
+                        System.out.println("STAKUTIS ExportDataSource count now: "+m_exportStatsRow.m_tupleCount+" pending now"+m_exportStatsRow.m_tuplePending);
                     }
                     m_committedBuffers.offer(sb);
                 } catch (IOException e) {
@@ -858,8 +867,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putLong(uso);
             buf.putShort((m_runEveryWhere ? (short )1 : (short )0));
             buf.putLong(tuplesSent); // STAKUTIS
-            if (tuplesSent <= 0)
-                VoltDB.crashLocalVoltDB("Error acking export buffer", true, new Exception("STAKUTIS TUPLES"));
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
