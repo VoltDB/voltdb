@@ -2256,17 +2256,9 @@ public class LocalCluster extends VoltServerConfig {
     // Use this for optionally enabling localServer in one of the DR clusters (usually for debugging)
     public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
-                                                  boolean isReplica) throws IOException {
-        return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort, remoteReplicationPort,
-                pathToVoltDBRoot, jar, isReplica ? DrRoleType.REPLICA : DrRoleType.MASTER, false);
-    }
-
-    public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
-                                                  int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer) throws IOException {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
         return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort, remoteReplicationPort,
-                pathToVoltDBRoot, jar, drRole, hasLocalServer, builder);
+                pathToVoltDBRoot, jar, drRole, hasLocalServer, null, null);
     }
 
     public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
@@ -2278,16 +2270,19 @@ public class LocalCluster extends VoltServerConfig {
 
     public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
-                                                  DrRoleType drRole, boolean hasLocalServer, String callingMethodName) throws IOException {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
+                                                  DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
+                                                  String callingMethodName) throws IOException {
         return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort, remoteReplicationPort,
-                pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, callingMethodName);
+                           pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, callingMethodName, false, null);
     }
 
     public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
-                                                  String callingMethodName) throws IOException {
+                                                  String callingMethodName,
+                                                  boolean enableSPIMigration,
+                                                  Map<String, String> javaProps) throws IOException {
+        if (builder == null) builder = new VoltProjectBuilder();
         LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
                 replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, callingMethodName);
 
@@ -2296,6 +2291,14 @@ public class LocalCluster extends VoltServerConfig {
         lc.overrideAnyRequestForValgrind();
         lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
         lc.setJavaProperty("DR_RECV_TIMEOUT", "5000");
+        // temporary, until we always enable SPI migration
+        if (enableSPIMigration) {
+            lc.setJavaProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false");
+        }
+        if (javaProps != null)
+        for (Map.Entry<String, String> prop : javaProps.entrySet()) {
+            lc.setJavaProperty(prop.getKey(), prop.getValue());
+        }
         if (!lc.isNewCli()) {
             lc.setDeploymentAndVoltDBRoot(builder.getPathToDeployment(), pathToVoltDBRoot);
             lc.startUp(false);

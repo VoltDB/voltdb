@@ -2193,7 +2193,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
-    public boolean isClusterCompelte() {
+    public boolean isClusterComplete() {
         return (m_config.m_hostCount == m_messenger.getLiveHostIds().size());
     }
 
@@ -2205,7 +2205,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         //MigratePartitionLeader service will be started up only after the last rejoining has finished
-        if(!isClusterCompelte() || m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0) {
+        if(!isClusterComplete() || m_config.m_hostCount == 1 || m_configuredReplicationFactor == 0) {
             return;
         }
 
@@ -2221,6 +2221,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             int hostId = it.next();
             final int currentMasters = m_cartographer.getMasterCount(hostId);
             if (currentMasters > minimalNumberOfLeaders) {
+                hostLog.debug("Host " + hostId + " has more than " + minimalNumberOfLeaders + ". Sending migrate partition message");
                 m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
                         HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
             }

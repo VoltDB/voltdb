@@ -2201,7 +2201,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         int partitionKey = -1;
 
         //MigratePartitionLeader is completed or there are hosts down. Stop MigratePartitionLeader service on this host
-        if (targetHostId == -1 || !voltDB.isClusterCompelte()) {
+        if (targetHostId == -1 || !voltDB.isClusterComplete()) {
             voltDB.scheduleWork(
                     () -> {m_mailbox.deliver(new MigratePartitionLeaderMessage());},
                     0, 0, TimeUnit.SECONDS);
@@ -2255,13 +2255,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 spi = MiscUtils.roundTripForCL(spi);
             }
 
+            long targetHSId = m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId);
             //Info saved for the node failure handling
             MigratePartitionLeaderInfo spiInfo = new MigratePartitionLeaderInfo(
                     m_cartographer.getHSIDForPartitionHost(hostId, partitionId),
-                    m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
+                    targetHSId,
                     partitionId);
             VoltZK.createMigratePartitionLeaderInfo(m_zk, spiInfo);
 
+            notifyPartitionMigrationStatus(partitionId, targetHSId, false);
+
+            if (Boolean.getBoolean("TEST_MIGRATION_FAILURE")) {
+                Thread.sleep(100);
+                throw new IOException("failure simulation");
+            }
             synchronized (m_executeTaskAdpater) {
                 createTransaction(m_executeTaskAdpater.connectionId(),
                         spi,
@@ -2282,15 +2289,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 //not necessary a failure.
                 tmLog.warn(String.format("Fail to move the leader of partition %d to host %d. %s",
                         partitionId, targetHostId, resp.getStatusString()));
+                notifyPartitionMigrationStatus(partitionId, targetHSId, true);
             }
         } catch (IOException | InterruptedException e) {
             tmLog.warn(String.format("errors in leader change for partition %d: %s", partitionId, e.getMessage()));
+            notifyPartitionMigrationStatus(partitionId,
+                    m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
+                    true);
         } finally {
             //wait for the Cartographer to see the new partition leader. The leader promotion process should happen instantly.
             //If the new leader does not show up in 5 min, the cluster may have experienced host-down events.
             long remainingWaitTime = TimeUnit.MINUTES.toMillis(5);
             final long waitingInterval = TimeUnit.SECONDS.toMillis(1);
             boolean anyFailedHosts = false;
+            boolean migrationComplete = false;
             while (remainingWaitTime > 0) {
                 try {
                     Thread.sleep(waitingInterval);
@@ -2298,13 +2310,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
                 remainingWaitTime -= waitingInterval;
                 if (CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(partitionId)) == targetHostId) {
+                    migrationComplete = true;
                     break;
                 }
 
                 //some hosts may be down.
-                if (!voltDB.isClusterCompelte()) {
+                if (!voltDB.isClusterComplete()) {
                     anyFailedHosts = true;
-                    break;
+                    // If the target host is still alive, migration is still going on.
+                    if (!voltDB.getHostMessenger().getLiveHostIds().contains(targetHostId)) break;
                 }
             }
 
@@ -2313,6 +2327,40 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 voltDB.scheduleWork(
                         () -> {VoltZK.removeActionBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
                         5, 0, TimeUnit.SECONDS);
+            }
+
+            if (!migrationComplete) {
+                notifyPartitionMigrationStatus(partitionId,
+                        m_cartographer.getHSIDForPartitionHost(targetHostId, partitionId),
+                        true);
+            }
+        }
+    }
+
+    private void notifyPartitionMigrationStatus(int partitionId, long targetHSId, boolean failed) {
+        for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
+            try {
+                cihm.connection.queueTask(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (cihm.repairCallback != null) {
+                            if (failed) {
+                                cihm.repairCallback.leaderMigrationFailed(partitionId, targetHSId);
+                            } else {
+                                cihm.repairCallback.leaderMigrationStarted(partitionId, targetHSId);
+                            }
+                        }
+                    }
+                });
+            } catch (UnsupportedOperationException ignore) {
+                // In case some internal connections don't implement queueTask()
+                if (cihm.repairCallback != null) {
+                    if (failed) {
+                        cihm.repairCallback.leaderMigrationFailed(partitionId, targetHSId);
+                    } else {
+                        cihm.repairCallback.leaderMigrationStarted(partitionId, targetHSId);
+                    }
+                }
             }
         }
     }
