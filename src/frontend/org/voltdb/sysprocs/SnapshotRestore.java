@@ -71,6 +71,8 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
+import org.voltdb.ExportStats;
+import org.voltdb.ExportStats.ExportStatsRow;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
@@ -1560,6 +1562,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
             }
             long uso = pair.getFirst();
             long sequenceNumber = pair.getSecond();
+
+            // STAKUTIS  .. let the export stats know!
+            ExportStatsRow row = ExportStats.get().addRow(name, "SNAP", myPartitionId);
+            row.m_tupleCount = sequenceNumber;
 
             //Forward the sequence number to the EE
             context.getSiteProcedureConnection().exportAction(

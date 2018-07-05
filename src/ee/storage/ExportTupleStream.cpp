@@ -82,6 +82,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     assert(columnNames.size() == tuple.columnCount());
     size_t streamHeaderSz = 0;
     size_t tupleMaxLength = 0;
+    //printf("STAKUTIS ExportTupleStream.cpp appendTuple()\n"); fflush(stdout);
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
@@ -97,6 +98,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     //is nonsense since it isn't currently supplied with a transaction id
     //but it is fine since export isn't currently using the info
     commit(lastCommittedSpHandle, spHandle, uniqueId, false, false);
+    //printf("STAKUTIS ExportTupleStream.cpp appendTuple() CONTINUING\n"); fflush(stdout);
 
     // get schema related size
     size_t schemaSize = computeSchemaSize(tableName, columnNames);
@@ -142,6 +144,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     io.writeLong(seqNo);
     io.writeLong(m_partitionId);
     io.writeLong(m_siteId);
+    //printf("STAKUTIS ExportTupleStream.cpp appendTuple(): m_siteId:%lld %llx\n",m_siteId,m_siteId); fflush(stdout);
     // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
     io.writeByte(static_cast<int8_t>((type == INSERT) ? 1L : 0L));
     // write the tuple's data
@@ -263,6 +266,7 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 
 void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
     m_tupleCount = m_tupleCount_uncommitted;
+    //printf("STAKUTIS ExportTuleStream.cpp pushStreamBuffer  sync:%d CALLING TOPEND!\n",sync);fflush(stdout);
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
                     m_signature,

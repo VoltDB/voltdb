@@ -25,32 +25,42 @@ import java.util.Set;
 
 import org.voltdb.VoltTable.ColumnInfo;
 
-
 public class ExportStats extends StatsSource {
-  private HashMap<String, ExportStatsRow> m_stats=new HashMap<String, ExportStatsRow>();
-  private boolean m_intervalCollection = false;
-  static ExportStats singleton;  // STAKUTIS HACK for now
+    private HashMap<String, ExportStatsRow> m_stats = new HashMap<String, ExportStatsRow>();
+    private boolean m_intervalCollection = false;
+    static ExportStats singleton; // STAKUTIS HACK for now
 
-  public class ExportStatsRow {
-    public long m_partitionId=0;
-   public String m_streamName="";
-   public String m_exportTarget="";
-   public long m_exportActive=0;
-   public long m_tupleCount=0;
-   public long m_tuplePending=0;
-   public long m_averageLatency=0; // for current counting-session
-   public long m_maxLatency=0; // for current counting-session
+    static String keyName(String streamName, int partitionId) {
+        return streamName + "-" + partitionId;
+    }
 
-   public long m_tuplesSentSinceClear=0;
-   public long m_totalMSSentSinceClear=0;
-   private long m_overallTuplesSent = 0;
-   private long m_overallMSSent = 0;
-   private long m_overallMaxLatency = 0;
+    public class ExportStatsRow {
+        private long m_partitionId = 0;
+        private String m_streamName = "";
+        private String m_exportTarget = "";
+        private String m_keyName="";
+        public long m_exportActive = 1;
+        public long m_tupleCount = 0;
+        public long m_tuplePending = 0;
+        public long m_averageLatency = 0; // for current counting-session
+        public long m_maxLatency = 0; // for current counting-session
 
-   ExportStatsRow() {
-   }
-  }
+        public long m_tuplesSentSinceClear = 0;
+        public long m_totalMSSentSinceClear = 0;
+        private long m_overallTuplesSent = 0;
+        private long m_overallMSSent = 0;
+        private long m_overallMaxLatency = 0;
 
+
+        ExportStatsRow(String streamName, String exportTarget, int partitionId) {
+            String key = keyName(streamName, partitionId);
+            singleton.m_stats.put(key, this);
+            this.m_keyName = key;
+            this.m_streamName = streamName;
+            this.m_exportTarget = exportTarget;
+            this.m_partitionId = partitionId;
+        }
+    }
 
     public static interface Columns {
         // column for both tables
@@ -64,32 +74,34 @@ public class ExportStats extends StatsSource {
         public static final String MAX_LATENCY = "MAX_LATENCY";
     }
 
-    /* Constructor*/
+    /* Constructor */
     public ExportStats() {
         super(false);
-     assert(singleton == null);
-        singleton = this;  // STAKUTIS hack for now
+        assert (singleton == null);
+        singleton = this; // STAKUTIS hack for now
     }
 
     static public ExportStats get() {
-     if (singleton == null) {
-      // This happens during a restart and there are already stream tables
-      singleton = new ExportStats();
-     }
-     return singleton;  // STAKUTIS hack for now
+        if (singleton == null) {
+            // This happens during a restart and there are already stream tables
+            singleton = new ExportStats();
+        }
+        return singleton; // STAKUTIS hack for now
     }
 
-    public ExportStatsRow get(String streamName) {
-     // Will create a new row if necessary
-     ExportStatsRow row=m_stats.get(streamName);
-     if (row == null) m_stats.put(streamName,  row=new ExportStatsRow());
-     row.m_streamName = streamName;
-     return row;
+
+    public ExportStatsRow addRow(String streamName, String exportTarget, int partitionId) {
+       ExportStatsRow row;
+       row = singleton.m_stats.get(keyName(streamName, partitionId));
+       if (row == null)
+           row = new ExportStatsRow(streamName, exportTarget, partitionId);
+       return row;
     }
 
-    public void remove(String streamName) {
-     m_stats.remove(streamName);
-     return;
+
+    public void remove(ExportStatsRow row) {
+        m_stats.remove(row.m_keyName);
+        return;
     }
 
     @Override
@@ -105,11 +117,10 @@ public class ExportStats extends StatsSource {
         columns.add(new ColumnInfo(Columns.MAX_LATENCY, VoltType.BIGINT));
     }
 
-
     @Override
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
         super.updateStatsRow(rowKey, rowValues);
-        Map.Entry<String, ExportStatsRow> mentry=(Map.Entry)rowKey;
+        Map.Entry<String, ExportStatsRow> mentry = (Map.Entry) rowKey;
         ExportStatsRow stat = mentry.getValue();
         rowValues[columnNameToIndex.get(Columns.PARTITION_ID)] = stat.m_partitionId;
         rowValues[columnNameToIndex.get(Columns.STREAM_NAME)] = stat.m_streamName;
@@ -118,35 +129,34 @@ public class ExportStats extends StatsSource {
         rowValues[columnNameToIndex.get(Columns.TUPLE_COUNT)] = stat.m_tupleCount;
         rowValues[columnNameToIndex.get(Columns.TUPLE_PENDING)] = stat.m_tuplePending;
 
-  if (stat.m_maxLatency > stat.m_overallMaxLatency)
-   stat.m_overallMaxLatency = stat.m_maxLatency;
+        if (stat.m_maxLatency > stat.m_overallMaxLatency)
+            stat.m_overallMaxLatency = stat.m_maxLatency;
 
-  if (m_intervalCollection) {
+        if (m_intervalCollection) {
             rowValues[columnNameToIndex.get(Columns.AVERAGE_LATENCY)] = stat.m_averageLatency;
             rowValues[columnNameToIndex.get(Columns.MAX_LATENCY)] = stat.m_maxLatency;
-   stat.m_overallTuplesSent += stat.m_tuplesSentSinceClear;
-   stat.m_overallMSSent += stat.m_totalMSSentSinceClear;
-   stat.m_tuplesSentSinceClear = 0;
-   stat.m_totalMSSentSinceClear = 0;
-         stat.m_maxLatency = 0;
-         stat.m_averageLatency = 0;
+            stat.m_overallTuplesSent += stat.m_tuplesSentSinceClear;
+            stat.m_overallMSSent += stat.m_totalMSSentSinceClear;
+            stat.m_tuplesSentSinceClear = 0;
+            stat.m_totalMSSentSinceClear = 0;
+            stat.m_maxLatency = 0;
+            stat.m_averageLatency = 0;
         } else {
-         if (stat.m_tuplesSentSinceClear + stat.m_overallTuplesSent > 0)
-          rowValues[columnNameToIndex.get(Columns.AVERAGE_LATENCY)] =
-           (stat.m_totalMSSentSinceClear + stat.m_overallMSSent) /
-           (stat.m_tuplesSentSinceClear + stat.m_overallTuplesSent);
-         rowValues[columnNameToIndex.get(Columns.MAX_LATENCY)] = stat.m_overallMaxLatency;
+            if (stat.m_tuplesSentSinceClear + stat.m_overallTuplesSent > 0)
+                rowValues[columnNameToIndex
+                        .get(Columns.AVERAGE_LATENCY)] = (stat.m_totalMSSentSinceClear + stat.m_overallMSSent)
+                                / (stat.m_tuplesSentSinceClear + stat.m_overallTuplesSent);
+            rowValues[columnNameToIndex.get(Columns.MAX_LATENCY)] = stat.m_overallMaxLatency;
         }
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(final boolean interval) {
         m_intervalCollection = interval;
-     Set set = m_stats.entrySet();
-     Iterator iterator=set.iterator();
-     return iterator;
+        Set set = m_stats.entrySet();
+        Iterator iterator = set.iterator();
+        return iterator;
 
     }
-
 
 }

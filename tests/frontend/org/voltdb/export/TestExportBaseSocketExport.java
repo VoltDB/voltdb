@@ -155,7 +155,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             @Override
             public void run() {
                 Thread.currentThread().setName("Client handler:" + m_clientSocket);
-                System.out.println("Starting Client handler");
+                System.out.println("STAKUTIS TestExportBaseSocket: run() starting, me:"+Thread.currentThread());
                 try {
                     while (true) {
                         BufferedReader in = new BufferedReader(new InputStreamReader(m_clientSocket.getInputStream()));
@@ -168,6 +168,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                             }
                             if (line == null)
                                 continue;
+                            System.out.println("STAKUTIS TestExportBaseSocket: GOT A LINE! "+Thread.currentThread());
                             String parts[] = m_parser.parseLine(line);
                             if (parts == null) {
                                 System.out.println("Failed to parse exported data.");
@@ -307,7 +308,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         // Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0]; // STAKUTIS
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -321,8 +322,10 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             }
             long ts = 0;
             while (stats.advanceRow()) {
-                String ttype = stats.getString("TABLE_TYPE");
-                String ttable = stats.getString("TABLE_NAME");
+                String debugStr=stats.toJSONString();
+
+               // String ttype = stats.getString("TABLE_TYPE"); STAKUTIS
+                String ttable = stats.getString("STREAM_NAME"); // STAKUTIS
                 Long tts = stats.getLong("TIMESTAMP");
                 Long host = stats.getLong("HOST_ID");
                 Long pid = stats.getLong("PARTITION_ID");
@@ -330,11 +333,13 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 if (tts > ts) {
                     ts = tts;
                 }
-                if (ttype.equals("StreamedTable")) {
-                    long m = stats.getLong("TUPLE_ALLOCATED_MEMORY");
+                if (true) { //ttype.equals("StreamedTable")) { // STAKUTIS
+                    long m = stats.getLong("TUPLE_PENDING"); // STAKUTIS
                     if (0 != m) {
                         passedThisTime = false;
                         System.out.println("Partition Not Zero: " + ttable + ":" + m  + ":" + host + ":" + pid);
+                        System.out.println("Partition Not Zero: " + ttable + " pend:" + m  + " host:" + host + " partid:" + pid);
+                        System.out.println("row:"+debugStr);
                         break;
                     }
                 }
