@@ -1126,10 +1126,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         JSONObject jsObj = new JSONObject(json);
         String path = jsObj.getString(SnapshotUtil.JSON_PATH);
         String pathType = jsObj.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.toString());
-        String tablesStr = jsObj.optString(SnapshotUtil.JSON_TABLES);
-        String skiptablesStr = jsObj.optString(SnapshotUtil.JSON_SKIPTABLES);
-        tablesStr = tablesStr.equals("") ? "" : tablesStr.substring(1, tablesStr.length() - 1);
-        skiptablesStr = skiptablesStr.equals("") ? "" : skiptablesStr.substring(1, skiptablesStr.length() - 1);
+        JSONArray tableNames = jsObj.optJSONArray(SnapshotUtil.JSON_TABLES);
+        JSONArray skiptableNames = jsObj.optJSONArray(SnapshotUtil.JSON_SKIPTABLES);
         final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
         final String dupsPath = jsObj.optString(SnapshotUtil.JSON_DUPLICATES_PATH, null);
         final boolean useHashinatorData = jsObj.optBoolean(SnapshotUtil.JSON_HASHINATOR);
@@ -1144,8 +1142,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
         savefile_data = performRestoreScanWork(path, pathType, nonce, dupsPath);
-        List<String> includeList = tableOptParser(tablesStr);
-        List<String> excludeList = tableOptParser(skiptablesStr);
+        List<String> includeList = tableOptParser(tableNames);
+        List<String> excludeList = tableOptParser(skiptableNames);
 
         while (savefile_data[0].advanceRow()) {
             long originalHostId = savefile_data[0].getLong("ORIGINAL_HOST_ID");
@@ -1389,7 +1387,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
             result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
             results = new VoltTable[] { new VoltTable(result_columns) };
             results[0].addRow("FAILURE", e.toString());
-            System.out.println(e.toString());
             return results;
         }
 
@@ -3010,21 +3007,20 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return results;
     }
 
-    private List<String> tableOptParser(String raw) {
+    private List<String> tableOptParser(JSONArray raw) {
         List<String> ret = new ArrayList<>();
-        if(raw == null || raw.length() == 0) return ret;
-        String[] rawstrs = raw.split(", ");
-
-        for(String ss : rawstrs) {
-            StringBuilder sb = new StringBuilder();
-            for(int i = 1 ; i < ss.length() - 1 ; i++) {
-                char c = ss.charAt(i);
-                if(ss.charAt(i) >= 'a' && ss.charAt(i) <= 'z') {
-                    c = (char) (c + 'A' - 'a');
-                }
-                sb.append("" + c);
+        if(raw == null || raw.length() == 0) {
+            return ret;
+        }
+        for(int i = 0 ; i < raw.length() ; i++) {
+            String s = "";
+            try {
+                s = raw.getString(i).trim().toUpperCase();
+            } catch (JSONException e) {
+                e.printStackTrace();
             }
-            ret.add(sb.toString());
+            if(s.length() > 0)
+                ret.add(s.toString());
         }
         return ret;
     }
