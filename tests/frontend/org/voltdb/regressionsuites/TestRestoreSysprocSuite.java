@@ -60,7 +60,7 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
         try {
             jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
             jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
-            jsObj.put(SnapshotUtil.JSON_SKIPTABLES, "['REPLICATED_TESTER']");
+            jsObj.put(SnapshotUtil.JSON_SKIPTABLES, new String[] {"REPLICATED_TESTER"});
         } catch (JSONException e) {
             fail("JSON exception" + e.getMessage());
         }
@@ -102,7 +102,7 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
         try {
             jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
             jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
-            jsObj.put(SnapshotUtil.JSON_TABLES, "['REPLICATED_TESTER']");
+            jsObj.put(SnapshotUtil.JSON_TABLES, new String[] {"REPLICATED_TESTER"});
         } catch (JSONException e) {
             fail("JSON exception" + e.getMessage());
         }
@@ -145,7 +145,7 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
         try {
             jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
             jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
-            jsObj.put(SnapshotUtil.JSON_TABLES, "['REPLICATED_TESTER', 'DUMMYTABLE']");
+            jsObj.put(SnapshotUtil.JSON_TABLES, new String[] {"REPLICATED_TESTER", "DUMMYTABLE"});
         } catch (JSONException e) {
             fail("JSON exception" + e.getMessage());
         }
@@ -178,7 +178,7 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
         try {
             jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
             jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
-            jsObj.put(SnapshotUtil.JSON_SKIPTABLES, "['REPLICATED_TESTER', 'DUMMYTABLE']");
+            jsObj.put(SnapshotUtil.JSON_SKIPTABLES, new String[] {"REPLICATED_TESTER", "DUMMYTABLE"});
         } catch (JSONException e) {
             fail("JSON exception" + e.getMessage());
         }
