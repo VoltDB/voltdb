@@ -927,7 +927,7 @@ public class EEPlanGenerator extends PlannerTestCase {
         } catch (IOException ex) {
             oldContents = "";
         }
-        if (oldContents.isEmpty() || !oldContents.equals(contents)) {
+        if (!oldContents.equals(contents)) {
             try {
                 out = new PrintWriter(path);
                 out.print(contents);
@@ -985,9 +985,9 @@ public class EEPlanGenerator extends PlannerTestCase {
         if ( ! outFileName.exists() ) {
             append = false;
         }
-        PrintStream ps = new PrintStream(new BufferedOutputStream(new FileOutputStream(outFileName, append)));
-        ps.print(name);
-        ps.close();
+        try (PrintStream ps = new PrintStream(new BufferedOutputStream(new FileOutputStream(outFileName, append)))) {
+            ps.print(name);
+        }
     }
 
     private void writeTestFile(String testFolder, String testClassName, Map<String, String> params) throws Exception {
@@ -998,6 +998,9 @@ public class EEPlanGenerator extends PlannerTestCase {
             String pattern = "@" + entry.getKey() + "@";
             String value   = params.get(entry.getKey());
             template = template.replace(pattern, value);
+        }
+        if (template.isEmpty()) {
+            throw new PlanningErrorException("Cannot create C++ Unit Test source from template.  This is a bug.");
         }
         File outputDir = new File(String.format("%s/%s", m_testGenPath, testFolder));
         if (! outputDir.exists() && !outputDir.mkdirs()) {
