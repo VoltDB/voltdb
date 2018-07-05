@@ -32,18 +32,8 @@ import org.voltdb.client.ClientResponse;
 
 /**
  *
- * @author akhanzode
-=======
-import org.eclipse.jetty.server.Request;
-
-import org.voltdb.VoltDB;
-import org.voltdb.client.ClientResponse;
-
-/**
- *
  * The servlet that handles all API request for HTTP-JSON interface.
  * This servlet calls procedures system or otherwise.
->>>>>>> c82dfdb69a... Eng 13223 vmc server 9321 (#4986)
  */
 public class ApiRequestServlet extends VoltBaseServlet {
 
