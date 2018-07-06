@@ -25,6 +25,7 @@ import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -39,6 +40,7 @@ import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.calciteadapter.rules.VoltDBRules;
+import org.voltdb.calciteadapter.util.VoltDBRelUtil;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.CompiledPlan;
@@ -83,10 +85,11 @@ public class CalcitePlanner {
         RexConverter.resetParameterIndex();
 
         AbstractPlanNode root = rel.toPlanNode();
-        SendPlanNode sendNode = new SendPlanNode();
-        sendNode.addAndLinkChild(root);
-        root = sendNode;
-
+        if (! (root instanceof SendPlanNode)) {
+            SendPlanNode sendNode = new SendPlanNode();
+            sendNode.addAndLinkChild(root);
+            root = sendNode;
+        }
         compiledPlan.rootPlanGraph = root;
 
         PostBuildVisitor postPlannerVisitor = new PostBuildVisitor();
@@ -125,7 +128,13 @@ public class CalcitePlanner {
         RelNode phaseOneRel = null;
         RelNode phaseTwoRel = null;
         RelNode phaseThreeRel = null;
+        RelTrait collationTrait = null;
         String errMsg = null;
+
+        // Set VoltDB Metadata Provider
+        JaninoRelMetadataProvider relMetadataProvider = JaninoRelMetadataProvider.of(
+                VoltDBDefaultRelMetadataProvider.INSTANCE);
+        RelMetadataQuery.THREAD_PROVIDERS.set(relMetadataProvider);
 
         try {
             // Parse the input sql
@@ -136,35 +145,44 @@ public class CalcitePlanner {
 
             // Convert the input sql to a relational expression
             convertedRel = volcanoPlanner.rel(validatedSql).project();
-
-            // VoltDB Metadata Provider
-            JaninoRelMetadataProvider relMetadataProvider = JaninoRelMetadataProvider.of(
-                    VoltDBDefaultRelMetadataProvider.INSTANCE);
-            RelMetadataQuery.THREAD_PROVIDERS.set(relMetadataProvider);
+            // Get a possible collation trait if any
+            collationTrait = convertedRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
 
             // Transform the relational expression
 
-            // Modify RelMetaProvider for every RelNode in the SQL operator Rel tree.
+            // Set the RelMetaProvider for every RelNode in the SQL operator Rel tree.
             convertedRel.accept(new VoltDBDefaultRelMetadataProvider.MetaDataProviderModifier(relMetadataProvider));
-
+            // Prepare the set of RelTraits required of the root node at the termination of the planning phase
+            traitSet = prepareOutputTraitSet(volcanoPlanner, VoltDBLRel.VOLTDB_LOGICAL, collationTrait);
             // Apply Rule set 0 - standard Calcite transformations and convert to the VOLTDB Logical convention
-            traitSet = prepareOutputTraitSet(volcanoPlanner, VoltDBLRel.VOLTDB_LOGICAL, convertedRel);
             phaseOneRel = volcanoPlanner.transform(0, traitSet, convertedRel);
 
             // Apply Rule Set 1 - VoltDB transformations
-            // Add traits that the transformed relNode must have
-            // @TODO Need to add single distribution trait????
-            traitSet = prepareOutputTraitSet(volcanoPlanner, VoltDBPRel.VOLTDB_PHYSICAL, phaseOneRel);
 
-            // Modify RelMetaProvider for every RelNode in the SQL operator Rel tree.
+            // Set the RelMetaProvider for every RelNode in the Rel tree.
             phaseOneRel.accept(new VoltDBDefaultRelMetadataProvider.MetaDataProviderModifier(relMetadataProvider));
 
+            // Starting from this phase (VoltDB Physical) we are going to require Calcite to produce a plan
+            // that must have a root with a RelDistribution.SINGLELTON trait set.
+
+            // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
+            phaseOneRel.getCluster().getPlanner().addRelTraitDef(RelDistributions.SINGLETON.getTraitDef());
+
+            // Prepare the set of RelTraits required of the root node at the termination of the planning phase
+            traitSet = prepareOutputTraitSet(volcanoPlanner, VoltDBPRel.VOLTDB_PHYSICAL,
+                    collationTrait, RelDistributions.SINGLETON);
+
+            // Add RelDistributions.ANY trait to the rel tree. It will be replaced with a real trait
+            // during the transformation
+            phaseOneRel = VoltDBRelUtil.addTraitRecurcively(phaseOneRel, RelDistributions.ANY);
+
+            // Transform the rel
             phaseTwoRel = volcanoPlanner.transform(1, traitSet, phaseOneRel);
 
             // Apply Rule Set 2 - VoltDB inlining
             hepPlanner = getHepPlanner();
 
-            // Modify RelMetaProvider for every RelNode in the SQL operator Rel tree.
+            // Set the RelMetaProvider for every RelNode in the Rel tree.
             phaseTwoRel.accept(new VoltDBDefaultRelMetadataProvider.MetaDataProviderModifier(relMetadataProvider));
 
             hepPlanner.setRoot(phaseTwoRel);
@@ -211,9 +229,9 @@ public class CalcitePlanner {
     private static RelTraitSet prepareOutputTraitSet(
             Planner planner,
             Convention outConvention,
-            RelNode rel) {
+            RelTrait collationTrait,
+            RelTrait...otherTraits) {
         RelTraitSet traitSet = planner.getEmptyTraitSet().replace(outConvention);
-        RelTrait collationTrait = rel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
         // If a RelNode does not have a real RelCollation trait Calcite returns
         // an empty collation (RelCompositeTrait$EmptyCompositeTrait<T>)
         // which is not an instance of the RelCollation class (RelCollations.EMPTY) as
@@ -222,6 +240,12 @@ public class CalcitePlanner {
         if (collationTrait instanceof RelCollation) {
             traitSet = traitSet.plus(collationTrait);
         }
+
+        // Add other traits
+        if (otherTraits != null && otherTraits.length > 0) {
+            traitSet = traitSet.plusAll(otherTraits);
+        }
+
         return traitSet;
     }
 

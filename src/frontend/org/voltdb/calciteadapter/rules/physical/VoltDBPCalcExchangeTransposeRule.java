@@ -40,15 +40,16 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
         VoltDBPCalc calc = call.rel(0);
         AbstractVoltDBPExchange exchange = call.rel(1);
 
-        Calc newCalc = calc.copy(calc.getTraitSet(),
+        Calc newCalc = calc.copy(
+                // Update Calc distribution's trait
+                calc.getTraitSet().plus(exchange.getChildDistribution()),
                 exchange.getInput(),
                 calc.getProgram(),
                 exchange.getChildSplitCount());
         AbstractVoltDBPExchange newExchange = exchange.copy(
                 exchange.getTraitSet(),
                 newCalc,
-                exchange.getDistribution(),
-                exchange.getLevel() + 1);
+                exchange.getChildDistribution());
 
         call.transformTo(newExchange);
         // Remove the original rel from the search space

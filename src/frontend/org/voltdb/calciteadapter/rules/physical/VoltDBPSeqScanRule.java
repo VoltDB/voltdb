@@ -17,26 +17,22 @@
 
 package org.voltdb.calciteadapter.rules.physical;
 
-import java.util.List;
-
-import org.aeonbits.owner.util.Collections;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistribution.Type;
 import org.apache.calcite.rel.RelDistributions;
-import org.voltdb.calciteadapter.rel.VoltDBTable;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
+import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPSingeltonExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPTableSeqScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPUnionExchange;
-import org.voltdb.catalog.Column;
 
 
 public class VoltDBPSeqScanRule extends RelOptRule {
-
-    private static final int DISTRIBUTED_SPLIT_COUNT = 30;
 
     public static final VoltDBPSeqScanRule INSTANCE = new VoltDBPSeqScanRule();
 
@@ -48,39 +44,33 @@ public class VoltDBPSeqScanRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         VoltDBLTableScan tableScan = (VoltDBLTableScan) call.rel(0);
         RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
-        VoltDBTable voltTable = tableScan.getVoltDBTable();
-        if (voltTable.getCatTable().getIsreplicated()) {
-            // Here also needed distribution trait
-            int scanSplitCount = 1;
-            call.transformTo(new VoltDBPTableSeqScan(
-                                tableScan.getCluster(),
-                                convertedTraits,
-                                tableScan.getTable(),
-                                tableScan.getVoltDBTable(),
-                                scanSplitCount));
-        } else {
-            // Table is partitioned. Add UnionExchange rel on top
-            int scanSplitCount = DISTRIBUTED_SPLIT_COUNT;
-            RelDistribution hashDist = tableScan.getTable().getDistribution();
 
-            VoltDBPTableSeqScan scanRel = new VoltDBPTableSeqScan(
+        // Table distribution
+        RelDistribution tableDist = tableScan.getTable().getDistribution();
+        int scanSplitCount = (Type.SINGLETON == tableDist.getType()) ?
+                1 : AbstractVoltDBPExchange.DISTRIBUTED_SPLIT_COUNT;
+        VoltDBPTableSeqScan scanRel = new VoltDBPTableSeqScan(
+                tableScan.getCluster(),
+                convertedTraits.plus(tableDist),
+                tableScan.getTable(),
+                tableScan.getVoltDBTable(),
+                scanSplitCount);
+
+        AbstractVoltDBPExchange exchangeRel = null;
+        if (Type.SINGLETON == tableDist.getType()) {
+            exchangeRel = new VoltDBPSingeltonExchange(
                     tableScan.getCluster(),
-                    // Adding Distribution trait
-                    convertedTraits,//.plus(hashDist),
-                    tableScan.getTable(),
-                    tableScan.getVoltDBTable(),
-                    scanSplitCount);
-
-            VoltDBPUnionExchange exchangeRel = new VoltDBPUnionExchange(
+                    convertedTraits.plus(RelDistributions.SINGLETON),
+                    scanRel);
+        } else {
+            exchangeRel = new VoltDBPUnionExchange(
                     tableScan.getCluster(),
                     // Exchange's  RelDistribution trait must match the one used to construct it
-                    convertedTraits, //.plus(hashDist),
+                    convertedTraits.plus(RelDistributions.SINGLETON),
                     scanRel,
-                    hashDist,
+                    tableDist,
                     scanSplitCount);
-// trying to add the RelDistribution trait def to the planner.
-//            call.getPlanner().addRelTraitDef(hashDist.getTraitDef());
-            call.transformTo(exchangeRel);
         }
+        call.transformTo(exchangeRel);
     }
   }

@@ -18,8 +18,6 @@
 package org.voltdb.calciteadapter.rel.physical;
 
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
@@ -33,21 +31,25 @@ import org.voltdb.plannodes.SendPlanNode;
 
 public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDBPRel {
 
+    public static final int DISTRIBUTED_SPLIT_COUNT = 30;
+
     // Exchange's split count is always one
     protected final int m_splitCount = 1;
     // This is a split count of the exchange's input
     protected final int m_childSplitCount;
-
-    private int m_level = 1;
+    // Exchange's input distribution type
+    protected final RelDistribution m_childDistribution;
 
     protected AbstractVoltDBPExchange(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
-            RelDistribution distribution,
+            RelDistribution childDistribution,
             int childSplitCount) {
-        // All Exchange rels must have SINGLETON distribution trait
-        super(cluster, traitSet, input, distribution);
+        // Exchange own distribution type must be a SINGLETON - VoltDB supports only
+        // "many inputs, one output" exchange type
+        super(cluster, traitSet, input, RelDistributions.SINGLETON);
         m_childSplitCount = childSplitCount;
+        m_childDistribution = childDistribution;
     }
 
     protected AbstractPlanNode toPlanNode(AbstractPlanNode epn) {
@@ -67,7 +69,6 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
     @Override
     protected String computeDigest() {
         String digest = super.computeDigest();
-        digest += "_level_" + m_level;
         return digest;
     }
 
@@ -80,12 +81,8 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
         return m_childSplitCount;
     }
 
-    public void setLevel(int level) {
-        m_level = level;
-    }
-
-    public int getLevel() {
-        return m_level;
+    public RelDistribution getChildDistribution() {
+        return m_childDistribution;
     }
 
     @Override
@@ -95,30 +92,18 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
         return rowCount * m_childSplitCount;
     }
 
-    @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
-            RelMetadataQuery mq) {
-        // The higher up exchange should have less cost
-        double dRows = estimateRowCount(mq) / m_level;
-        double dCpu = dRows + 1; // ensure non-zero cost
-        double dIo = 0;
-        RelOptCost cost = planner.getCostFactory().makeCost(dRows, dCpu, dIo);
-        return cost;
-    }
-
     @Override
     public AbstractVoltDBPExchange copy(RelTraitSet traitSet, RelNode newInput,
             RelDistribution newDistribution) {
-        return copy(
+        return copyInternal(
                 traitSet,
                 newInput,
-                newDistribution,
-                getLevel());
+                getChildDistribution());
     }
 
-    public abstract AbstractVoltDBPExchange copy(
+    protected abstract AbstractVoltDBPExchange copyInternal(
             RelTraitSet traitSet,
             RelNode newInput,
-            RelDistribution newDistribution,
-            int level);
+            RelDistribution childDistribution);
 
 }

@@ -29,29 +29,27 @@ public class VoltDBPUnionExchange extends AbstractVoltDBPExchange implements Vol
     public VoltDBPUnionExchange(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
-            RelDistribution distribution,
+            RelDistribution childDistribution,
             int childSplitCount) {
-        super(cluster, traitSet, input, distribution, childSplitCount);
+        super(cluster, traitSet, input, childDistribution, childSplitCount);
     }
 
     @Override
-    public VoltDBPUnionExchange copy(RelTraitSet traitSet,
+    protected VoltDBPUnionExchange copyInternal(RelTraitSet traitSet,
             RelNode newInput,
-            RelDistribution newDistribution,
-            int level) {
+            RelDistribution childDistribution) {
         VoltDBPUnionExchange exchange = new VoltDBPUnionExchange(
                 getCluster(),
                 traitSet,
                 newInput,
-                newDistribution,
+                getChildDistribution(),
                 m_childSplitCount);
-        exchange.setLevel(level);
         return exchange;
     }
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        ReceivePlanNode rpn = new ReceivePlanNode();
+        AbstractPlanNode rpn = new ReceivePlanNode();
         return super.toPlanNode(rpn);
     }
 

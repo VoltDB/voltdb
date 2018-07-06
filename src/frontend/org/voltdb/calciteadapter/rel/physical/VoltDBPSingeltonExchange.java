@@ -20,37 +20,37 @@ package org.voltdb.calciteadapter.rel.physical;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.MergeReceivePlanNode;
+import org.voltdb.plannodes.SendPlanNode;
 
-public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements VoltDBPRel {
+public class VoltDBPSingeltonExchange extends AbstractVoltDBPExchange implements VoltDBPRel {
 
-    public VoltDBPMergeExchange(RelOptCluster cluster,
+    public VoltDBPSingeltonExchange(RelOptCluster cluster,
             RelTraitSet traitSet,
-            RelNode input,
-            RelDistribution childDistribution,
-            int childSplitCount) {
-        super(cluster, traitSet, input, childDistribution, childSplitCount);
+            RelNode input) {
+        super(cluster, traitSet, input, RelDistributions.SINGLETON, 1);
     }
 
     @Override
-    protected VoltDBPMergeExchange copyInternal(RelTraitSet traitSet,
+    protected VoltDBPSingeltonExchange copyInternal(RelTraitSet traitSet,
             RelNode newInput,
             RelDistribution childDistribution) {
-        VoltDBPMergeExchange exchange = new VoltDBPMergeExchange(
+        VoltDBPSingeltonExchange exchange = new VoltDBPSingeltonExchange(
                 getCluster(),
                 traitSet,
-                newInput,
-                getChildDistribution(),
-                m_childSplitCount);
+                newInput);
         return exchange;
     }
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        AbstractPlanNode rpn = new MergeReceivePlanNode();
-        return super.toPlanNode(rpn);
+        SendPlanNode spn = new SendPlanNode();
+
+        AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
+        spn.addAndLinkChild(child);
+        return spn;
     }
 
 }

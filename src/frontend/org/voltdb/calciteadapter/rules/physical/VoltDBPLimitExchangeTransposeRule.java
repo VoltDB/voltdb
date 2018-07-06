@@ -21,50 +21,39 @@ import java.math.BigDecimal;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelOptRuleOperandChildPolicy;
+import org.apache.calcite.plan.RelOptRuleOperandChildren;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPLimit;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPSingeltonExchange;
 
-import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableList;
 
 /**
- * Transform Limit / Exchange rels into Limit / Exchange / Limit
- * It is only possible if the original Limit rel has a LIMIT set -
- * can not push down an OFFSET only
+ * Transform Limit / Exchange rels into
+ *  a) Singleton Exchange / Coordinator Limit / Exchange / Fragment Limit
+ *      if the original Exchange relation is a Union or Merge Exchanges
+ *  b) Singleton Exchange / Limit if the original Exchange relation is a Singleton
  */
 public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
 
     public static final VoltDBPLimitExchangeTransposeRule INSTANCE= new VoltDBPLimitExchangeTransposeRule();
 
-    // Predicate to eliminate this rule from firing on already pushed down LIMIT rel
-    // LIMIT/EXCHANGE -> LIMIT/EXCHANGE/LIMIT -> LIMIT/EXCHANGE/LIMIT/LIMIT -> ....
-    private static Predicate<RelNode> checkPredicate() {
-        return new Predicate<RelNode> () {
-            @Override
-            public boolean apply(RelNode exchangeRel) {
-                return !(exchangeRel instanceof VoltDBPLimit);
-            }
-        };
-    }
-
     private VoltDBPLimitExchangeTransposeRule() {
-        super(operand(VoltDBPLimit.class,
-                operand(AbstractVoltDBPExchange.class,
-                        unordered(operand(RelNode.class, null, checkPredicate(), any())))));
-    }
-
-    @Override
-    public boolean matches(RelOptRuleCall call) {
-        boolean matches = super.matches(call);
-        if (matches) {
-            VoltDBPLimit limit = call.rel(0);
-            // Must have limit. Can not push down the limit rel if it only has an offset
-            matches = limit.getLimit() != null;
-        }
-        return matches;
+        super(
+                operand(
+                        VoltDBPLimit.class,
+                        RelDistributions.ANY,
+                        new RelOptRuleOperandChildren(
+                                RelOptRuleOperandChildPolicy.ANY,
+                                ImmutableList.of(
+                                        operand(AbstractVoltDBPExchange.class, any()))))
+                );
     }
 
     @Override
@@ -73,38 +62,78 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
         assert(limitRel != null);
         AbstractVoltDBPExchange exchangeRel = call.rel(1);
 
-        // The fragment limit always has 0 offset and its limit =
-        // sum of the coordinator's limit and offset
-        int fragmentLimit = RexLiteral.intValue(limitRel.getLimit());
-        if (limitRel.getOffset() != null) {
-            fragmentLimit += RexLiteral.intValue(limitRel.getOffset());
+        RelNode result;
+        if (exchangeRel instanceof VoltDBPSingeltonExchange) {
+            result = transposeSingletonExchange((VoltDBPSingeltonExchange) exchangeRel, limitRel);
+        } else {
+            result = transposeDistributedExchange(exchangeRel, limitRel);
         }
-        RexBuilder rexBuilder = limitRel.getCluster().getRexBuilder();
-        RexNode fragmentLimitRex = rexBuilder.makeBigintLiteral(new BigDecimal(fragmentLimit));
-        VoltDBPLimit fragmentLimitRel = limitRel.copy(
-                limitRel.getTraitSet(),
-                exchangeRel.getInput(),
-                null,
-                fragmentLimitRex,
-                exchangeRel.getChildSplitCount());
 
-        AbstractVoltDBPExchange newExchange = exchangeRel.copy(
-                exchangeRel.getTraitSet(),
-                fragmentLimitRel,
-                exchangeRel.getDistribution(),
-                exchangeRel.getLevel() + 1);
-
-        // Coordinator's limit
-        VoltDBPLimit coordinatorLimitRel = limitRel.copy(
-                limitRel.getTraitSet(),
-                newExchange,
-                limitRel.getOffset(),
-                limitRel.getLimit(),
-                limitRel.getSplitCount());
-
-        call.transformTo(coordinatorLimitRel);
+        call.transformTo(result);
 //        // Remove the original rel from the search space
         call.getPlanner().setImportance(limitRel, 0);
 
     }
+
+    private RelNode transposeSingletonExchange(VoltDBPSingeltonExchange exchangeRel, VoltDBPLimit limitRel) {
+        // Simply push the limit through the exchange
+        VoltDBPLimit newLimitRel = limitRel.copy(
+                // Update Limit distribution's trait
+                limitRel.getTraitSet().plus(exchangeRel.getChildDistribution()),
+                exchangeRel.getInput(),
+                limitRel.getOffset(),
+                limitRel.getLimit(),
+                exchangeRel.getChildSplitCount());
+
+        AbstractVoltDBPExchange newExchange = exchangeRel.copy(
+                exchangeRel.getTraitSet(),
+                newLimitRel,
+                exchangeRel.getChildDistribution());
+
+        return newExchange;
+    }
+
+    private RelNode transposeDistributedExchange(AbstractVoltDBPExchange exchangeRel, VoltDBPLimit limitRel) {
+        // We can not push just an OFFSET through a distributed exchange
+        AbstractVoltDBPExchange newExchangeRel;
+        if (limitRel.getLimit() == null) {
+            newExchangeRel = exchangeRel;
+        } else {
+            // The fragment limit always has 0 offset and its limit =
+            // sum of the coordinator's limit and offset
+            int fragmentLimit = RexLiteral.intValue(limitRel.getLimit());
+            if (limitRel.getOffset() != null) {
+                fragmentLimit += RexLiteral.intValue(limitRel.getOffset());
+            }
+            RexBuilder rexBuilder = limitRel.getCluster().getRexBuilder();
+            RexNode fragmentLimitRex = rexBuilder.makeBigintLiteral(new BigDecimal(fragmentLimit));
+            RelNode fragmentLimitRel = limitRel.copy(
+                    // Update Limit distribution's trait
+                    limitRel.getTraitSet().plus(exchangeRel.getChildDistribution()),
+                    exchangeRel.getInput(),
+                    null,
+                    fragmentLimitRex,
+                    exchangeRel.getChildSplitCount());
+            newExchangeRel = exchangeRel.copy(
+                    exchangeRel.getTraitSet(),
+                    fragmentLimitRel,
+                    exchangeRel.getChildDistribution());
+        }
+
+        // Coordinator's limit
+        VoltDBPLimit coordinatorLimitRel = limitRel.copy(
+            limitRel.getTraitSet().replace(RelDistributions.SINGLETON),
+            newExchangeRel,
+            limitRel.getOffset(),
+            limitRel.getLimit(),
+            limitRel.getSplitCount());
+        // Add a SingletonExchange on top of it
+        RelNode result = new VoltDBPSingeltonExchange(
+                    exchangeRel.getCluster(),
+                    exchangeRel.getTraitSet(),
+                    coordinatorLimitRel);
+
+        return result;
+    }
+
 }
