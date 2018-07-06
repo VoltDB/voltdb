@@ -915,13 +915,6 @@ public class ParameterSet implements JSONString {
                     buf.putInt(gv.getLengthInBytes());
                     gv.flattenToBuffer(buf);
                     break;
-//                case VARBINARY:
-//                    buf.put(VoltType.VARBINARY.getValue());
-//                    final ByteBuffer bb = (ByteBuffer)obj;
-//                    bb.clear();
-//                    buf.putInt(bb.capacity());
-//                    buf.put(bb);
-//                    break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);
             }
