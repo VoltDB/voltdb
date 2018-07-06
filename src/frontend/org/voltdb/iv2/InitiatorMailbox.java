@@ -606,6 +606,11 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
+        if (m_joinProducer == null) return;
+        m_joinProducer.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
+    }
+
     //The new partition leader is notified by previous partition leader
     //that previous partition leader has drained its txns
     private void setMigratePartitionLeaderStatus(MigratePartitionLeaderMessage message) {

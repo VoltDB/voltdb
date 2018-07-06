@@ -723,4 +723,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
         return m_sysprocContext;
     }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
+        // TODO Auto-generated method stub
+    }
 }
