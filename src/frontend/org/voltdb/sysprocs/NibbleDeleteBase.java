@@ -204,6 +204,9 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
         VoltTable result = null;
         result = executePrecompiledSQL(countStmt, params, replicated);
         long rowCount = result.asScalarLong();
+        if (rowCount == 0) {
+            throw new VoltAbortException("No rows to delete. Aborting txn");
+        }
         // If number of rows meet the criteria is more than chunk size, pick the column value
         // which offset equals to chunk size as new predicate.
         // Please be noted that it means rows be deleted can be more than chunk size, normally
