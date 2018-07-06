@@ -1088,7 +1088,6 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::
 template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vector<NValue>& arguments){
     assert (arguments.size() == 2);
 
-
     const NValue& time_stamp = arguments[0];
     if (time_stamp.isNull()) {
         return getNullValue(VALUE_TYPE_TIMESTAMP);
@@ -1106,7 +1105,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vec
     if(time_offset.getValueType()!=VALUE_TYPE_VARCHAR){
         throwCastSQLException(time_offset.getValueType(), VALUE_TYPE_VARCHAR);
     }
-    /////
+
     int32_t length;
     const char* time_offset_buffer = time_offset.getObject_withoutNull(&length);
     std::string time_offset_str(time_offset_buffer, length);
@@ -1131,14 +1130,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vec
     struct std::tm * time_info = std::gmtime (&t);
     char time_buffer [60];
     std::strftime (time_buffer,60,"%F %T.",time_info);
-    sprintf(time_buffer+strlen(time_buffer), "%06lli", micro_seconds_tail);
+    snprintf(time_buffer+strlen(time_buffer), 10, "%06lli", micro_seconds_tail);
 
     return getTempStringValue(time_buffer, strlen(time_buffer));
-
-//    boost::posix_time::ptime ptime;
-//    micros_to_ptime(time_stamp.getTimestamp(), ptime);
-//    std::string time_str;
-//    time_str = boost::posix_time::to_simple_string(ptime);
 }
 
 const int64_t MIN_VALID_TIMESTAMP_VALUE = GREGORIAN_EPOCH;
