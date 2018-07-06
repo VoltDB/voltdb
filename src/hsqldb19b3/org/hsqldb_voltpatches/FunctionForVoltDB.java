@@ -195,6 +195,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?
         static final int FUNC_VOLT_MAKE_VALID_POLYGON           = 21024;    // Make an invalid polygon valid by reversing rings.
                                                                             // Note: This will only correct orientation errors.
+        static final int FUNC_VOLT_FORMAT_TIMESTAMP             = 21025;
 
         /*
          * All VoltDB user-defined functions must have IDs in this range.
@@ -416,7 +417,11 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             new FunctionDescriptor("makevalidpolygon", Type.VOLT_GEOGRAPHY, FUNC_VOLT_MAKE_VALID_POLYGON, -1,
             		new Type[] { Type.VOLT_GEOGRAPHY },
-            		singleParamList)
+            		singleParamList),
+
+            new FunctionDescriptor("format_timestamp", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_TIMESTAMP, -1,
+                    new Type[] { Type.SQL_TIMESTAMP, Type.SQL_VARCHAR },
+                    doubleParamList)
 
         };
 
