@@ -369,12 +369,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                         }
                                         edb.processRow(row);
                                         tuplesSent++;
-                                        /* Now done in releaseExportBytes()
-                                        synchronized (source.m_exportStatsRow) {
-                                            System.out.println("STAKUTIS GuestProcessor downticking "+source.getTableName()+source.getPartitionId());
-                                            source.m_exportStatsRow.m_tuplePending--; // STAKUTIS
-                                        }
-                                        */
                                         if (generation != -1L && row.generation != generation) {
                                             edb.onBlockCompletion(row);
                                             edb.onBlockStart(row);

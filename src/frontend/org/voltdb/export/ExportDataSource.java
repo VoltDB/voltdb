@@ -347,8 +347,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         m_lastReleasedUso = releaseUso;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso+1);
-        m_exportStatsRow.m_tuplePending -= tuplesSent;  // STAKUTIS: SYNCHRONIZE HERE???
-        System.out.println("STAKUTIS thread:"+Thread.currentThread());
+        m_exportStatsRow.m_tuplePending -= tuplesSent;
+
         System.out.println("STAKUTIS ExportDataSource: relaseExportBytes() "+this.m_tableName+this.m_partitionId+" uso:"+releaseUso+" tuplesSent decrement by:"+tuplesSent+ " now is:"+m_exportStatsRow.m_tuplePending);
         return;
     }
@@ -523,12 +523,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_committedBuffers.offer(sb);
                     m_exportStatsRow.m_tupleCount += tuplesSent;
                     System.out.println("STAKUTIS ExportDataSource commited a tuple! "+m_tableName+m_partitionId+ " count:"+tuplesSent);
-                    synchronized (m_exportStatsRow) {
-                        m_exportStatsRow.m_tupleCount += tuplesSent;
-                        m_exportStatsRow.m_tuplePending += tuplesSent;
-                        System.out.println("STAKUTIS thread:"+Thread.currentThread());
-                        System.out.println("STAKUTIS ExportDataSource count now: "+m_exportStatsRow.m_tupleCount+" pending now"+m_exportStatsRow.m_tuplePending);
-                    }
+                    m_exportStatsRow.m_tupleCount += tuplesSent;
+                    m_exportStatsRow.m_tuplePending += tuplesSent;
+                    System.out.println("STAKUTIS ExportDataSource count now: "+m_exportStatsRow.m_tupleCount+" pending now"+m_exportStatsRow.m_tuplePending);
                     m_committedBuffers.offer(sb);
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
