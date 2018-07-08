@@ -51,7 +51,6 @@ public class ExportStats extends StatsSource {
         private long m_overallMSSent = 0;
         private long m_overallMaxLatency = 0;
 
-
         ExportStatsRow(String streamName, String exportTarget, int partitionId) {
             String key = keyName(streamName, partitionId);
             singleton.m_stats.put(key, this);
