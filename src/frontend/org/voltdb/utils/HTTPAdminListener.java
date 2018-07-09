@@ -32,6 +32,9 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.entity.ContentType;
 import org.eclipse.jetty.http.HttpVersion;
+import org.eclipse.jetty.security.ConstraintMapping;
+import org.eclipse.jetty.security.ConstraintSecurityHandler;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
@@ -40,6 +43,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.util.security.Constraint;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.voltcore.logging.VoltLogger;
@@ -275,6 +279,7 @@ public class HTTPAdminListener {
 
             compressResourcesHandler.setServer(m_server);
             m_server.setHandler(compressResourcesHandler);
+            m_server.setHandler(wrapWithSecurityHandler(handlers));
 
             //Following are the servelets jetty is configured with see URL pattern for what they handle.
             servlets.addServletWithMapping(DBMonitorServlet.class, "/").setAsyncSupported(true);
@@ -370,5 +375,28 @@ public class HTTPAdminListener {
                 doStop();
             }
         }
+    }
+
+    private Handler wrapWithSecurityHandler(Handler h){
+        Constraint disableTraceConstraint = new Constraint();
+        disableTraceConstraint.setName("Disable TRACE");
+        disableTraceConstraint.setAuthenticate(true);
+
+        ConstraintMapping mapping = new ConstraintMapping();
+        mapping.setConstraint(disableTraceConstraint);
+        mapping.setMethod("TRACE");
+        mapping.setPathSpec("/");
+
+        Constraint omissionConstraint = new Constraint();
+        ConstraintMapping omissionMapping = new ConstraintMapping();
+        omissionMapping.setConstraint(omissionConstraint);
+        omissionMapping.setMethod("*");
+        omissionMapping.setPathSpec("/");
+
+        ConstraintSecurityHandler handler = new ConstraintSecurityHandler();
+        handler.addConstraintMapping(mapping);
+        handler.addConstraintMapping(omissionMapping);
+        handler.setHandler(h);
+        return handler;
     }
 }
