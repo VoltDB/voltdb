@@ -545,8 +545,7 @@ JNITopend::~JNITopend() {
 
 
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
-    //printf("STAKUTIS JNITopend returning bogus value\n"); fflush(stdout);
-    return 1024L*99999999;  // Stakutis
+    return 1024L*99999999;  // STAKUTIS; NOTE: Wont-be-seen because it is patched/hacked on the other end with a psuedo-new value
     /*
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
     int64_t retval = m_jniEnv->CallStaticLongMethod(

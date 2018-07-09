@@ -202,17 +202,12 @@ public class ExportGeneration implements Generation {
                                 " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
                         return;
                     }
-                    System.out.println("STAKUTIS ExportGeneration.java: mailbox deliver() got ackUSO:"+ackUSO+
-                            " "+eds.getTableName()+eds.getPartitionId()+
-                            " pend:"+eds.m_exportStatsRow.m_tuplePending+
-                            " me:"+m_mbox.getHSId()+
-                            " from:"+message.m_sourceHSId + "tuplesCompleted:"+tuplesSent);
                     if (tuplesSent < 0 ) {
                         exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
                         tuplesSent = 0;
                     }
                     if (m_mbox.getHSId() == message.m_sourceHSId) {
-                        System.out.println("STAKUTIS ExportGeneration.java: SKIPPING from myself! SHould we set to zero?");
+                        //System.out.println("STAKUTIS ExportGeneration.java: SKIPPING from myself! SHould we set to zero? Do we care this is happening?");
                         tuplesSent = 0;
                     }
                     try {
@@ -220,7 +215,6 @@ public class ExportGeneration implements Generation {
                             exportLog.debug("Received an export ack for partition " + partition +
                                     " source signature " + signature + " with uso: " + ackUSO);
                         }
-                        System.out.println("STAKUTIS calling eds.ack:");
                         eds.ack(ackUSO, runEveryWhere, tuplesSent);
                     } catch (RejectedExecutionException ignoreIt) {
                         // ignore it: as it is already shutdown

@@ -194,7 +194,7 @@ public class TestExportBase extends RegressionSuite {
                 if (true) { // ttype.equals("StreamedTable")) { STAKUTIS
                     if (0 != stats.getLong("TUPLE_PENDING")) {
                         passedThisTime = false;
-                        System.out.println("Partition Not Zero.");
+                        System.out.println("Partition Not Zero. STAKUTIS:"+stats.getLong("TUPLE_PENDING"));
                         break;
                     }
                 }
