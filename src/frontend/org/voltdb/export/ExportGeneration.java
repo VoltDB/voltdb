@@ -229,7 +229,6 @@ public class ExportGeneration implements Generation {
                             tuplesSent = 0;
                         }
                         if (m_mbox.getHSId() == message.m_sourceHSId) {
-                            System.out.println("STAKUTIS ExportGeneration.java: SKIPPING from myself! SHould we set to zero?");
                             tuplesSent = 0;
                         }
                         try {
@@ -251,7 +250,6 @@ public class ExportGeneration implements Generation {
                             tuplesSent = 0;
                         }
                         if (m_mbox.getHSId() == message.m_sourceHSId) {
-                            System.out.println("STAKUTIS ExportGeneration.java: SKIPPING from myself! SHould we set to zero?");
                             tuplesSent = 0;
                         }
                         try {

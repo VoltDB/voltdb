@@ -105,7 +105,6 @@ void TupleStreamBase::cleanupManagedBuffers()
 void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHandle, int64_t uniqueId,
         bool sync, bool flush)
 {
-    //printf("STAKUTIS TupleStreamBase.cpp: commit() sync:%d flush:%d\n",sync,flush);fflush(stdout);
     if (currentSpHandle < m_openSpHandle) {
         throwFatalException(
                 "Active transactions moving backwards: openSpHandle is %jd, while the current spHandle is %jd",
@@ -148,7 +147,6 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         }
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") < currentSpHandle("
         //<< currentSpHandle << ")" << std::endl;
-       // printf("STAKUTIS TupleStreamBase.cpp: setting commitedUse CASE 1:%lld\n",m_uso);fflush(stdout);
         m_committedUso = m_uso;
         m_committedUniqueId = m_openUniqueId;
         // Advance the tip to the new transaction.
@@ -167,7 +165,6 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     if (m_openSpHandle <= lastCommittedSpHandle) {
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") <= lastCommittedSpHandle(" <<
         //lastCommittedSpHandle << ")" << std::endl;
-        //printf("STAKUTIS TupleStreamBase.cpp: setting commitedUse CASE 2:%lld\n",m_uso);fflush(stdout);
         m_committedUso = m_uso;
         m_committedSpHandle = m_openSpHandle;
         m_committedUniqueId = m_openUniqueId;
@@ -180,15 +177,12 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     pushPendingBlocks();
 
     if (sync) {
-        //printf("STAKUTIS: TupleStreamBase.cpp commit() Call pushStreamBuffer() to send to TOP END because of 'sync'\n");fflush(stdout);
         pushStreamBuffer(NULL, true);
     }
-    //printf("STAKUTIS: TupleStreamBase.cpp commit() DONE\n");fflush(stdout);
 }
 
 void TupleStreamBase::pushPendingBlocks()
 {
-    //printf("STAKUTIS TupleStreamBase.cpp: pushPendingBlocks()\n");fflush(stdout);
     while (!m_pendingBlocks.empty()) {
         StreamBlock* block = m_pendingBlocks.front();
         //std::cout << "m_committedUso(" << m_committedUso << "), block->uso() + block->offset() == "
@@ -330,12 +324,10 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
                                int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush
-    //printf("\nSTAKUTIS TupleStreamBase.cpop periodicFlush() timeInMillis:%lld...\n",timeInMillis);fflush(stdout);
     if (timeInMillis < 0 || (m_flushInterval > 0 && timeInMillis - m_lastFlush > m_flushInterval)) {
         int64_t maxSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);
         if (timeInMillis > 0) {
             m_lastFlush = timeInMillis;
-            //printf("STAKUTIS setting last flush\n");
         }
 
         /*
@@ -345,8 +337,6 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
          * in calls to this procedure may be called right after
          * these.
          */
-        //printf("\nSTAKUTIS TupleStreamBase.cpop periodicFlush() callign commit...\n");fflush(stdout);
         commit(lastCommittedSpHandle, maxSpHandle, std::numeric_limits<int64_t>::min(), timeInMillis < 0 ? true : false, true);
-        //printf("STAKUTIS TupleStreamBase.cpop periodicFlush() callign commit DONE...\n\n");fflush(stdout);
     }
 }

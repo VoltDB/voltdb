@@ -28,7 +28,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 public class ExportStats extends StatsSource {
     private HashMap<String, ExportStatsRow> m_stats = new HashMap<String, ExportStatsRow>();
     private boolean m_intervalCollection = false;
-    static ExportStats singleton; // STAKUTIS HACK for now
+    static ExportStats singleton;
 
     static String keyName(String streamName, int partitionId) {
         return streamName + "-" + partitionId;
@@ -77,7 +77,7 @@ public class ExportStats extends StatsSource {
     public ExportStats() {
         super(false);
         assert (singleton == null);
-        singleton = this; // STAKUTIS hack for now
+        singleton = this;
     }
 
     static public ExportStats get() {
@@ -85,9 +85,8 @@ public class ExportStats extends StatsSource {
             // This happens during a restart and there are already stream tables
             singleton = new ExportStats();
         }
-        return singleton; // STAKUTIS hack for now
+        return singleton;
     }
-
 
     public ExportStatsRow addRow(String streamName, String exportTarget, int partitionId) {
        ExportStatsRow row;
@@ -95,6 +94,11 @@ public class ExportStats extends StatsSource {
        if (row == null)
            row = new ExportStatsRow(streamName, exportTarget, partitionId);
        return row;
+    }
+
+    static public ExportStatsRow getRow(String streamName, int partitionId) {
+        if (singleton == null) return null;
+        return singleton.m_stats.get(keyName(streamName, partitionId));
     }
 
 

@@ -387,6 +387,11 @@ public abstract class VoltTableRow {
         return getLong(colIndex);
     }
 
+    // STAKUTIS HOORAY
+    public final void setLong(String columnName, long val) {
+        final int colIndex = getColumnIndex(columnName);
+        m_buffer.putLong(getOffset(colIndex), val);
+    }
     /**
      * Returns whether last retrieved value was <tt>null</tt>.
      * Some special values that are NOT Java's NULL represents <tt>null</tt> the SQL notion of <tt>null</tt>
