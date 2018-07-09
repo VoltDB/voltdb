@@ -31,6 +31,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.PartitionDRGateway;
+import org.voltdb.PartitionDRGateway.DRRecordType;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -60,6 +62,8 @@ public class MpTransactionState extends TransactionState
     private static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
     private static final String dr_max_consumer_partitionCount_str = "DR_MAX_CONSUMER_PARTITIONCOUNT";
     private static final String volt_output_buffer_overflow = "V0001";
+    private static final int DR_BEGINTXN_MSG_LEN = PartitionDRGateway.getMessageTypeLength(DRRecordType.BEGIN_TXN);
+    private static final int DR_ENDTXN_MSG_LEN = PartitionDRGateway.getMessageTypeLength(DRRecordType.END_TXN);
 
     /**
      *  This is thrown by the TransactionState instance when something
@@ -134,10 +138,10 @@ public class MpTransactionState extends TransactionState
         // user can also override this via system property
         int remotePartitionCount = Integer.getInteger(dr_max_consumer_partitionCount_str, m_localPartitionCount);
 
-        // assume still has replicated stream for upper bound estimation
-        // avoid check the dr system for performance concern
+        // assume still has replicated stream for upper bound estimation avoid check the dr system for
+        // performance concern. The streamCount could be m_localPartitionCount if DR ProtocolVersion is 8 or more.
         int streamCount = m_localPartitionCount + 1;
-        int concatLogSize = m_drBufferChangedAgg + 13 * streamCount; // adding END_Transaction Size
+        int concatLogSize = m_drBufferChangedAgg + DR_ENDTXN_MSG_LEN * streamCount; // adding END_Transaction Size
 
         // estimate of ParametersSet Size of @ApplyBinaryLogMP on the consumer side
         int serializedParamSize = getSerializedParamSizeForApplyBinaryLog(streamCount, remotePartitionCount, concatLogSize);
@@ -576,6 +580,11 @@ public class MpTransactionState extends TransactionState
     {
         // push into threadsafe queue
         m_newDeps.offer(message);
+    }
+
+    public boolean drTxnDataCanBeRolledBack() {
+        // Note this will not work for DR Protocol Version 8 which folds Replicated Table data into Partition 0's beginTxn
+        return m_drBufferChangedAgg <= (m_localPartitionCount + 1) * DR_BEGINTXN_MSG_LEN;
     }
 
     /**

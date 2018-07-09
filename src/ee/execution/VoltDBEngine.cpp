@@ -672,18 +672,28 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
 }
 
-void VoltDBEngine::releaseUndoToken(int64_t undoToken) {
+void VoltDBEngine::releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn) {
     if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
         m_currentUndoQuantum = NULL;
         m_executorContext->setupForPlanFragments(NULL);
     }
     m_undoLog.release(undoToken);
 
-    if (m_executorContext->drStream()) {
-        m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
+    if (isEmptyDRTxn) {
+        if (m_executorContext->drStream()) {
+            m_executorContext->drStream()->rollbackTo(INVALID_DR_MARK, SIZE_MAX);
+        }
+        if (m_executorContext->drReplicatedStream()) {
+            m_executorContext->drReplicatedStream()->rollbackTo(INVALID_DR_MARK, SIZE_MAX);
+        }
     }
-    if (m_executorContext->drReplicatedStream()) {
-        m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
+    else {
+        if (m_executorContext->drStream()) {
+            m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
+        }
+        if (m_executorContext->drReplicatedStream()) {
+            m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
+        }
     }
 }
 

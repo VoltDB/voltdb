@@ -379,7 +379,8 @@ public class MpPromoteAlgo implements RepairAlgo
                             false,      // Indicate because this will not be restarted, the txn should be cleaned up
                             ftm.isForReplay(),
                             ftm.isNPartTxn(),
-                            true);
+                            true,
+                            false);
                     rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
                 }
             }

@@ -154,7 +154,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
+    public boolean releaseUndoToken(final long undoToken, boolean isEmptyDRTxn) {
         return false;
     }
 

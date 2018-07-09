@@ -111,6 +111,7 @@ public class CompleteTransactionTask extends TransactionTask
                 // ownership yet. But truncateUndoLog is written assuming the right
                 // eventual encapsulation.
                 siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
+                        m_completeMsg.isEmptyDRTxn(),
                         m_txnState.getBeginUndoToken(),
                         m_txnState.m_spHandle,
                         m_txnState.getUndoLog());
@@ -220,6 +221,7 @@ public class CompleteTransactionTask extends TransactionTask
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
+                    m_completeMsg.isEmptyDRTxn(),
                     m_txnState.getBeginUndoToken(),
                     m_txnState.m_spHandle,
                     m_txnState.getUndoLog());

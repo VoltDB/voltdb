@@ -780,7 +780,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Release all undo actions up to and including the specified undo token
      * @param undoToken The undo token.
      */
-    public abstract boolean releaseUndoToken(long undoToken);
+    public abstract boolean releaseUndoToken(long undoToken, boolean isEmptyDRTxn);
 
     /**
      * Undo all undo actions back to and including the specified undo token
@@ -1074,7 +1074,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token to release
      * @return true for success false for failure
      */
-    protected native boolean nativeReleaseUndoToken(long pointer, long undoToken);
+    protected native boolean nativeReleaseUndoToken(long pointer, long undoToken, boolean isEmptyDRTxn);
 
     /**
      * @param undoToken The undo token to undo
