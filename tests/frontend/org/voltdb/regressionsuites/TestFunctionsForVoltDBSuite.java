@@ -3387,10 +3387,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             }
         }
 
-        String[] offsets = {"UTC", "SADT", "EST", "CST", "CCT", "+02:30", "-10:00"};
+        String[] offsets = {"UTC", "SADT", "EST", "CST", "CCT", "+02:30", "-10:00", "  +02:30", " -10:00 "};
         String[] results = {"2013-07-18 02:00:00.123457", "2013-07-18 12:30:00.123457", "2013-07-17 21:00:00.123457",
                 "2013-07-17 20:00:00.123457", "2013-07-18 10:00:00.123457", "2013-07-18 04:30:00.123457",
-                "2013-07-17 16:00:00.123457"};
+                "2013-07-17 16:00:00.123457", "2013-07-18 04:30:00.123457", "2013-07-17 16:00:00.123457"};
 
         for (int i = 0; i < offsets.length; i++) {
             cr = client.callProcedure("FORMAT_TIMESTAMP", offsets[i], 1);

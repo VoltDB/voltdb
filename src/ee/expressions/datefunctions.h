@@ -20,7 +20,7 @@
 
 #include <ctime>
 #include <unordered_map>
-#include <regex>
+#include <boost/algorithm/string.hpp>
 
 #include "common/SQLException.h"
 #include "common/executorcontext.hpp"
@@ -50,8 +50,6 @@ static const std::unordered_map<std::string, std::string> TIMEZONE_OFFSET_FROM_U
         {"CST", "-06:00"}, {"MDT", "-06:00"}, {"MST", "-07:00"}, {"PDT", "-07:00"}, {"AKDT", "-08:00"},
         {"PST", "-08:00"}, {"YDT", "-08:00"}, {"AKST", "-09:00"}, {"HDT", "-09:00"}, {"YST", "-09:00"},
         {"AHST", "-10:00"}, {"HST", "-10:00"}, {"CAT", "-10:00"}, {"NT", "-11:00"}, {"IDLW", "-12:00"}};
-
-static const std::regex offset_re{"[\\+\\-][0-1][0-9]:[0-5][0-9]"};
 
 static const int64_t PTIME_MAX_YEARS = 10000;
 static const int64_t PTIME_MIN_YEARS = boost::gregorian::date(boost::gregorian::min_date_time).year();
@@ -1109,12 +1107,19 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vec
     int32_t length;
     const char* time_offset_buffer = time_offset.getObject_withoutNull(&length);
     std::string time_offset_str(time_offset_buffer, length);
+    boost::trim(time_offset_str);
+
     auto search = TIMEZONE_OFFSET_FROM_UTC.find(time_offset_str);
     if(search!=TIMEZONE_OFFSET_FROM_UTC.end()){
         time_offset_str = search->second;
     }
-    if(!std::regex_match(time_offset_str, offset_re)){
-        throw SQLException(SQLException::data_exception_invalid_parameter, "time offset must use valid timezone name or meet the [+-]HH:MM format");
+    // equivalent to [\+\-][0-1][0-9]:[0-5][0-9], since <regex> is not support by our c++ compiler
+    if (!(time_offset_str.length() == 6 && (time_offset_str.at(0) == '-' || time_offset_str.at(0) == '+') &&
+          (time_offset_str.at(1) == '0' || time_offset_str.at(1) == '1') && isdigit(time_offset_str.at(2)) &&
+          time_offset_str.at(3) == ':' && isdigit(time_offset_str.at(4)) && stoi(time_offset_str.substr(4, 1)) < 6 &&
+          isdigit(time_offset_str.at(5)))) {
+        throw SQLException(SQLException::data_exception_invalid_parameter,
+                           "time offset must use valid timezone name or meet the [+-]HH:MM format");
     }
 
     int64_t micro_seconds_offset = 1000000 * (stoll(time_offset_str.substr(1, 2)) * 3600 +
