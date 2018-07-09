@@ -1130,7 +1130,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vec
     struct std::tm * time_info = std::gmtime (&t);
     char time_buffer [60];
     std::strftime (time_buffer,60,"%F %T.",time_info);
-    snprintf(time_buffer+strlen(time_buffer), 10, "%06lli", micro_seconds_tail);
+    snprintf(time_buffer+strlen(time_buffer), 10, "%06ld", long(micro_seconds_tail));
 
     return getTempStringValue(time_buffer, strlen(time_buffer));
 }
