@@ -20,16 +20,11 @@
 	<classpathentry kind="lib" path="third_party/java/jars/pmd-4.2.5.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/testability-explorer.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.16.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-http-9.3.6.v20151106.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-server-9.3.6.v20151106.jar"/>
 	<classpathentry kind="lib" path="lib/servlet-api-3.1.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-util-9.3.6.v20151106.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-continuation-9.3.6.v20151106.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-io-9.3.6.v20151106.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-nop-1.6.2.jar"/>
 	<classpathentry kind="lib" path="lib/jna.jar"/>
-	<classpathentry kind="lib" path="lib/protobuf-java-3.1.0.jar"/>
+	<classpathentry kind="lib" path="lib/protobuf-java-3.4.0.jar"/>
 	<classpathentry kind="lib" path="lib/snappy-java-1.1.1.7.jar"/>
 	<classpathentry kind="lib" path="lib/super-csv-2.1.0.jar"/>
 	<classpathentry kind="lib" path="lib/owner-1.0.9.jar"/>
@@ -40,12 +35,6 @@
 	<classpathentry kind="lib" path="third_party/java/jars/objenesis-2.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
-	<!--
-	** export system still uses producer based on Kafka 8 API. If need to debug export
-	** in IDE based on kafka 8 apis, enable line below. IDE will have errors for kafka
-	** loader 10 and that can be ignored for export
-	-->
-    <!--classpathentry kind="lib" path="third_party/java/jars/lib/kafka-clients-0.8.2.2.jar" /-->
 	<classpathentry kind="lib" path="third_party/java/jars/kafka-clients-0.10.2.1.jar"/>
 	<classpathentry kind="lib" path="lib/kafka_2.11-0.8.2.2.jar"/>
 	<classpathentry kind="lib" path="lib/lz4-1.2.0.jar"/>
@@ -67,7 +56,6 @@
 	<classpathentry kind="lib" path="third_party/java/jars/joda-time-2.9.3.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/commons-lang-2.6.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/guava-18.0.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/protobuf-java-2.6.1.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
 		<attributes>
 			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/voltdb"/>
@@ -77,5 +65,15 @@
 	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/scala-xml_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javassist-3.20.0-GA.jar"/>
+	<classpathentry kind="lib" path="lib/avro-1.7.7.jar"/>
+	<classpathentry kind="lib" path="lib/httpasyncclient-4.0.1.jar"/>
+	<classpathentry kind="lib" path="lib/httpcore-nio-4.3.2.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-continuation-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-http-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-io-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-server-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-util-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-servlet-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-security-9.3.21.v20170918.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>

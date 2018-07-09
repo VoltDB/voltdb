@@ -3419,6 +3419,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     return m_catalogContext;
                 }
 
+                //Security credentials may be part of the new catalog update.
+                //Notify HTTPClientInterface not to store AuthenticationResult in sessions
+                //before CatalogContext swap.
+                if (m_adminListener != null) {
+                    m_adminListener.dontStoreAuthenticationResultInHttpSession();
+                }
+
                 byte[] newCatalogBytes = null;
                 byte[] catalogBytesHash = null;
                 byte[] deploymentBytes = null;
@@ -4627,5 +4634,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     public void logMessageToFLC(long timestampMilis, String user, String ip) {
         m_flc.logMessage(timestampMilis, user, ip);
+    }
+
+    public HTTPAdminListener getHttpAdminListener() {
+        return m_adminListener;
     }
 }
