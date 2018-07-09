@@ -21,8 +21,10 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
+import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
+import org.voltdb.plannodes.NodeSchema;
 
 public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements VoltDBPRel {
 
@@ -53,8 +55,23 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
 
     @Override
     public AbstractPlanNode toPlanNode() {
-        AbstractPlanNode rpn = new MergeReceivePlanNode();
-        return super.toPlanNode(rpn);
+        MergeReceivePlanNode rpn = new MergeReceivePlanNode();
+
+        NodeSchema childOutputSchema = generatePreAggregateSchema();
+        rpn.setPreAggregateOutputSchema(childOutputSchema);
+
+        AbstractPlanNode result = super.toPlanNode(rpn);
+        // Must set it after its own schema is generated
+        result.setHaveSignificantOutputSchema(true);
+        return result;
+    }
+
+    private NodeSchema generatePreAggregateSchema() {
+        // @TODO Set Pre aggregate output schema. for now no aggregate - from input
+        RelNode child = getInput();
+        assert(child != null);
+        NodeSchema childOutputSchema = RexConverter.convertToVoltDBNodeSchema(input.getRowType());
+        return childOutputSchema;
     }
 
 }

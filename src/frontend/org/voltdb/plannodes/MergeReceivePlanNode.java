@@ -119,4 +119,9 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
         return true;
     }
 
+    // Calcite's Addition
+    public void setPreAggregateOutputSchema(NodeSchema outputSchemaPreInlineAgg) {
+        assert(outputSchemaPreInlineAgg != null);
+        m_outputSchemaPreInlineAgg = outputSchemaPreInlineAgg;
+    }
 }

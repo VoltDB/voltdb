@@ -69,6 +69,21 @@ public class VoltDBPSort extends Sort implements VoltDBPRel {
             RelCollation collation,
             RexNode offset,
             RexNode limit) {
+        return copy(
+                traitSet,
+                input,
+                collation,
+                offset,
+                limit,
+                m_splitCount);
+    }
+
+    public VoltDBPSort copy(RelTraitSet traitSet,
+            RelNode input,
+            RelCollation collation,
+            RexNode offset,
+            RexNode limit,
+            int splitCount) {
         return new VoltDBPSort(
                 getCluster(),
                 traitSet,
@@ -76,7 +91,7 @@ public class VoltDBPSort extends Sort implements VoltDBPRel {
                 collation,
                 offset,
                 limit,
-                m_splitCount);
+                splitCount);
     }
 
     @Override

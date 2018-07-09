@@ -64,7 +64,8 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
                 exchangeRel.getInput(),
                 sortRel.getCollation(),
                 sortRel.offset,
-                sortRel.fetch);
+                sortRel.fetch,
+                exchangeRel.getChildSplitCount());
 
         RelNode result = transposeExchange(exchangeRel, newSortRel);
 
