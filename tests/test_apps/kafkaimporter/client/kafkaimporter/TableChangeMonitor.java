@@ -72,6 +72,7 @@ public class TableChangeMonitor {
             }
             long ts = 0;
             while (stats.advanceRow()) {
+                String ttable = stats.getString("TABLE_NAME");
                 Long tts = stats.getLong("TIMESTAMP");
                 //Get highest timestamp and watch it change
                 if (tts > ts) {
