@@ -58,7 +58,7 @@ public class TableChangeMonitor {
         //Wait 10 mins only
         long end = st + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -73,19 +73,17 @@ public class TableChangeMonitor {
             long ts = 0;
             while (stats.advanceRow()) {
                 String ttable = stats.getString("TABLE_NAME");
-                String ttype = stats.getString("TABLE_TYPE");
                 Long tts = stats.getLong("TIMESTAMP");
                 //Get highest timestamp and watch it change
                 if (tts > ts) {
                     ts = tts;
                 }
-                if (type.equals(ttype) && table.equals(ttable)) {
-                    if (stats.getLong("TUPLE_ALLOCATED_MEMORY") != 0) {
-                        passedThisTime = false;
-                        log.info(ttable + ": Partition Not Zero.");
-                        break;
-                    }
+                if (stats.getLong("TUPLE_PENDING") != 0) {
+                    passedThisTime = false;
+                    log.info(ttable + ": Partition Not Zero.");
+                    break;
                 }
+
             }
             if (passedThisTime) {
                 if (ftime == 0) {
