@@ -886,25 +886,25 @@ if __name__ == "__main__":
     generate_summary(output_dir, statistics, comparison_database)
 
     # output statistics for SQLCoverage auto filer
-    hack = open(os.path.join(output_dir, "stats.txt"), "w")
-    stats = \
-        {
-        'valid_statements' : valid_statements,
-        'valid_percent' : valid_percent,
-        'invalid_statements' : invalid_statements,
-        'invalid_percent' : invalid_percent,
-        'total_statements' : total_statements,
-        'mismatched_statements' : mismatched_statements,
-        'mismatched_percent' : mismatched_percent,
-        'total_volt_fatal_excep' : total_volt_fatal_excep,
-        'total_volt_nonfatal_excep' : total_volt_nonfatal_excep,
-        'total_cmp_excep' : total_cmp_excep,
-        'total_volt_crashes' : total_volt_crashes,
-        'total_cmp_crashes' : total_cmp_crashes,
-        'total_diff_crashes' : total_diff_crashes
-        }
-    hack.write(str(stats))
-    hack.close()
+    with open(os.path.join(output_dir, "stats.txt"), "w") as hack:
+        stats = \
+            {
+            'valid_statements' : valid_statements,
+            'valid_percent' : valid_percent,
+            'invalid_statements' : invalid_statements,
+            'invalid_percent' : invalid_percent,
+            'total_statements' : total_statements,
+            'mismatched_statements' : mismatched_statements,
+            'mismatched_percent' : mismatched_percent,
+            'total_volt_fatal_excep' : total_volt_fatal_excep,
+            'total_volt_nonfatal_excep' : total_volt_nonfatal_excep,
+            'total_cmp_excep' : total_cmp_excep,
+            'total_volt_crashes' : total_volt_crashes,
+            'total_cmp_crashes' : total_cmp_crashes,
+            'total_diff_crashes' : total_diff_crashes
+            }
+        hack.write(str(stats))
+        hack.close()
 
     # Print the total time, for each type of activity
     sys.stdout.flush()
