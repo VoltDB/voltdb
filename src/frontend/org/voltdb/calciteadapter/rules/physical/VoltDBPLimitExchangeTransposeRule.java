@@ -88,8 +88,8 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
         AbstractVoltDBPExchange newExchange = exchangeRel.copy(
                 exchangeRel.getTraitSet(),
                 newLimitRel,
-                exchangeRel.getChildDistribution());
-
+                exchangeRel.getChildDistribution(),
+                exchangeRel.getLevel() + 1);
         return newExchange;
     }
 
@@ -117,7 +117,8 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
             newExchangeRel = exchangeRel.copy(
                     exchangeRel.getTraitSet(),
                     fragmentLimitRel,
-                    exchangeRel.getChildDistribution());
+                    exchangeRel.getChildDistribution(),
+                    exchangeRel.getLevel() + 1);
         }
 
         // Coordinator's limit
@@ -131,7 +132,8 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
         RelNode result = new VoltDBPSingeltonExchange(
                     exchangeRel.getCluster(),
                     exchangeRel.getTraitSet(),
-                    coordinatorLimitRel);
+                    coordinatorLimitRel,
+                    newExchangeRel.getLevel() + 1);
 
         return result;
     }

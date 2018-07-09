@@ -46,6 +46,7 @@ import org.voltdb.calciteadapter.rules.physical.VoltDBPLimitRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPSeqScanRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPSortCalcTransposeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPSortConvertRule;
+import org.voltdb.calciteadapter.rules.physical.VoltDBPSortExchangeTransposeRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPSortIndexScanRemoveRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPSortRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPSortScanToIndexRule;
@@ -72,6 +73,7 @@ public class VoltDBRules {
     public static RelOptRule[] VOLCANO_RULES_1 = {
             // Calcite's Rules
             AbstractConverter.ExpandConversionRule.INSTANCE
+            , CalcMergeRule.INSTANCE
 
             // VoltDB Logical Rules
 
@@ -95,6 +97,7 @@ public class VoltDBRules {
             // Exchage Rules
             , VoltDBPCalcExchangeTransposeRule.INSTANCE
             , VoltDBPLimitExchangeTransposeRule.INSTANCE
+            , VoltDBPSortExchangeTransposeRule.INSTANCE
     };
 
     public static RelOptRule[] INLINING_RULES = {

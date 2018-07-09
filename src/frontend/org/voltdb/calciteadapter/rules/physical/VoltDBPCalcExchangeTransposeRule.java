@@ -49,7 +49,8 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
         AbstractVoltDBPExchange newExchange = exchange.copy(
                 exchange.getTraitSet(),
                 newCalc,
-                exchange.getChildDistribution());
+                exchange.getChildDistribution(),
+                exchange.getLevel() + 1);
 
         call.transformTo(newExchange);
         // Remove the original rel from the search space

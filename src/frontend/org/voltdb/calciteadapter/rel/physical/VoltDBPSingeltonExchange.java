@@ -29,18 +29,22 @@ public class VoltDBPSingeltonExchange extends AbstractVoltDBPExchange implements
 
     public VoltDBPSingeltonExchange(RelOptCluster cluster,
             RelTraitSet traitSet,
-            RelNode input) {
-        super(cluster, traitSet, input, RelDistributions.SINGLETON, 1);
+            RelNode input,
+            int level) {
+        super(cluster, traitSet, input, RelDistributions.SINGLETON, 1, level);
     }
 
     @Override
-    protected VoltDBPSingeltonExchange copyInternal(RelTraitSet traitSet,
+    protected VoltDBPSingeltonExchange copyInternal(
+            RelTraitSet traitSet,
             RelNode newInput,
-            RelDistribution childDistribution) {
+            RelDistribution childDistribution,
+            int level) {
         VoltDBPSingeltonExchange exchange = new VoltDBPSingeltonExchange(
                 getCluster(),
                 traitSet,
-                newInput);
+                newInput,
+                level);
         return exchange;
     }
 

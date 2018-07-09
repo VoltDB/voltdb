@@ -30,20 +30,24 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
             RelTraitSet traitSet,
             RelNode input,
             RelDistribution childDistribution,
-            int childSplitCount) {
-        super(cluster, traitSet, input, childDistribution, childSplitCount);
+            int childSplitCount,
+            int level) {
+        super(cluster, traitSet, input, childDistribution, childSplitCount, level);
     }
 
     @Override
-    protected VoltDBPMergeExchange copyInternal(RelTraitSet traitSet,
+    protected VoltDBPMergeExchange copyInternal(
+            RelTraitSet traitSet,
             RelNode newInput,
-            RelDistribution childDistribution) {
+            RelDistribution childDistribution,
+            int level) {
         VoltDBPMergeExchange exchange = new VoltDBPMergeExchange(
                 getCluster(),
                 traitSet,
                 newInput,
                 getChildDistribution(),
-                m_childSplitCount);
+                m_childSplitCount,
+                level);
         return exchange;
     }
 
