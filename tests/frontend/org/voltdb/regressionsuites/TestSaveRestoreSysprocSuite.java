@@ -143,13 +143,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         raf.close();
     }
 
-    private VoltTable createReplicatedTable(int numberOfItems,
+    static VoltTable createReplicatedTable(int numberOfItems,
             int indexBase,
             Set<String> expectedText) {
         return createReplicatedTable(numberOfItems, indexBase, expectedText, false);
     }
 
-    private VoltTable createReplicatedTable(int numberOfItems,
+    static VoltTable createReplicatedTable(int numberOfItems,
                                             int indexBase,
                                             Set<String> expectedText,
                                             boolean generateCSV)
@@ -230,7 +230,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return repl_table;
     }
 
-    private VoltTable createPartitionedTable(int numberOfItems,
+    static VoltTable createPartitionedTable(int numberOfItems,
                                              int indexBase)
     {
         VoltTable partition_table =
@@ -255,7 +255,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return partition_table;
     }
 
-    private VoltTable[] loadTable(Client client, String tableName, boolean replicated,
+    static VoltTable[] loadTable(Client client, String tableName, boolean replicated,
                                   VoltTable table)
     {
         VoltTable[] results = null;
@@ -316,7 +316,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-    private VoltTable[] saveTablesWithDefaultOptions(Client client, String nonce)
+    static VoltTable[] saveTablesWithDefaultOptions(Client client, String nonce)
     {
         return saveTables(client, TMPDIR, nonce, null, null, true, false);
     }
@@ -337,7 +337,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return results;
     }
 
-    private VoltTable[] saveTables(Client client, String dir, String nonce, String[] tables, String[] skiptables,
+    public static VoltTable[] saveTables(Client client, String dir, String nonce, String[] tables, String[] skiptables,
             boolean block, boolean csv)
     {
         VoltTable[] results = null;
@@ -418,11 +418,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-    private void validateSnapshot(boolean expectSuccess, String nonce) {
+    static void validateSnapshot(boolean expectSuccess, String nonce) {
         validateSnapshot(expectSuccess, false, nonce);
     }
 
-    private boolean validateSnapshot(boolean expectSuccess,
+    static boolean validateSnapshot(boolean expectSuccess,
             boolean onlyReportSuccess,String nonce) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);

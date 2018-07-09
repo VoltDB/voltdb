@@ -554,7 +554,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  * if path type is not SNAP_PATH use local path specified by type
                  */
                 m_duplicateRowHandler = null;
-                String dupPath = (String )params.toArray()[3];
+                String dupPath = (String)params.toArray()[3];
                 if (dupPath != null) {
                     dupPath = (SnapshotPathType.valueOf(m_filePathType) == SnapshotPathType.SNAP_PATH ?
                             dupPath : m_filePath);
@@ -1126,6 +1126,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         JSONObject jsObj = new JSONObject(json);
         String path = jsObj.getString(SnapshotUtil.JSON_PATH);
         String pathType = jsObj.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.toString());
+        JSONArray tableNames = jsObj.optJSONArray(SnapshotUtil.JSON_TABLES);
+        JSONArray skiptableNames = jsObj.optJSONArray(SnapshotUtil.JSON_SKIPTABLES);
         final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
         final String dupsPath = jsObj.optString(SnapshotUtil.JSON_DUPLICATES_PATH, null);
         final boolean useHashinatorData = jsObj.optBoolean(SnapshotUtil.JSON_HASHINATOR);
@@ -1140,6 +1142,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
         savefile_data = performRestoreScanWork(path, pathType, nonce, dupsPath);
+        List<String> includeList = tableOptParser(tableNames);
+        List<String> excludeList = tableOptParser(skiptableNames);
 
         while (savefile_data[0].advanceRow()) {
             long originalHostId = savefile_data[0].getLong("ORIGINAL_HOST_ID");
@@ -1374,7 +1378,19 @@ public class SnapshotRestore extends VoltSystemProcedure {
             }
         }
 
-        results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot(), isRecover);
+        try {
+            validateIncludeTables(savefile_state, includeList);
+        } catch (VoltAbortException e) {
+            ColumnInfo[] result_columns = new ColumnInfo[2];
+            int ii = 0;
+            result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
+            result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+            results = new VoltTable[] { new VoltTable(result_columns) };
+            results[0].addRow("FAILURE", e.toString());
+            return results;
+        }
+
+        results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot(), isRecover, includeList, excludeList);
 
         final long endTime = System.currentTimeMillis();
         final double duration = (endTime - startTime) / 1000.0;
@@ -2056,8 +2072,27 @@ public class SnapshotRestore extends VoltSystemProcedure {
     }
 
     private Set<Table> getTablesToRestore(Set<String> savedTableNames,
-                                          StringBuilder commaSeparatedViewNamesToDisable) {
+                                          StringBuilder commaSeparatedViewNamesToDisable,
+                                          List<String> include,
+                                          List<String> exclude) {
         Set<Table> tables_to_restore = new HashSet<Table>();
+
+        if(include.size() > 0) {
+            Set<String> newSet = new HashSet<>();
+            for(String s : include) {
+                newSet.add(s);
+            }
+            savedTableNames = newSet;
+        } else if(exclude.size() > 0) {
+            for (String s : exclude) {
+                if(savedTableNames.contains(s)) {
+                    savedTableNames.remove(s);
+                } else {
+                    SNAP_LOG.info("Table: " + s + " does not exist in the saved snapshot.");
+                }
+            }
+        }
+
         for (Table table : m_database.getTables()) {
             if (savedTableNames.contains(table.getTypeName())) {
                 if (CatalogUtil.isSnapshotablePersistentTableView(m_database, table)) {
@@ -2067,7 +2102,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 }
                 tables_to_restore.add(table);
             }
-            else if (! CatalogUtil.isTableExportOnly(m_database, table)) {
+            else if (!CatalogUtil.isTableExportOnly(m_database, table)) {
                 SNAP_LOG.info("Table: " + table.getTypeName() +
                               " does not have any savefile data and so will not be loaded from disk.");
             }
@@ -2125,7 +2160,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
     private VoltTable[] performTableRestoreWork(
             final ClusterSaveFileState savefileState,
             final SiteTracker st,
-            final boolean isRecover) throws Exception
+            final boolean isRecover,
+            List<String> include,
+            List<String> exclude) throws Exception
     {
         /*
          * Create a mailbox to use to send fragment work to execution sites
@@ -2197,8 +2234,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                  * site
                  */
                 StringBuilder commaSeparatedViewNamesToDisable = new StringBuilder();
-                Set<Table> tables_to_restore =
-                        getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable);
+                Set<Table> tables_to_restore = new HashSet<Table>();
+                tables_to_restore = getTablesToRestore(savefileState.getSavedTableNames(), commaSeparatedViewNamesToDisable, include, exclude);
+
                 VoltTable[] restore_results = new VoltTable[1];
                 restore_results[0] = constructResultsTable();
                 ArrayList<SynthesizedPlanFragment[]> restorePlans =
@@ -2967,6 +3005,35 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         pfs[pfs.length - 1].fragmentId,
                         pfs[pfs.length - 1].parameters).getTableDependency();
         return results;
+    }
+
+    private List<String> tableOptParser(JSONArray raw) {
+        List<String> ret = new ArrayList<>();
+        if(raw == null || raw.length() == 0) {
+            return ret;
+        }
+        for(int i = 0 ; i < raw.length() ; i++) {
+            try {
+                String s = raw.getString(i).trim().toUpperCase();
+                if(s.length() > 0) {
+                    ret.add(s.toString());
+                }
+            } catch (JSONException e) {
+                throw new RuntimeException(e.getMessage());
+            }
+        }
+        return ret;
+    }
+
+    private void validateIncludeTables(final ClusterSaveFileState savefileState, List<String> include) {
+        if(include == null || include.size() == 0) return;
+        Set<String> savedTableNames = savefileState.getSavedTableNames();
+        for(String s : include) {
+            if(!savedTableNames.contains(s)) {
+                SNAP_LOG.error("ERROR : Table " + s + " is not in the savefile data.");
+                throw new VoltAbortException("Table " + s + " is not in the savefile data.");
+            }
+        }
     }
 
     /*

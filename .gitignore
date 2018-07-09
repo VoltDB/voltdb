@@ -76,6 +76,7 @@ build.gradle
 /lib/python/vdm/tests/geb_vdm/.nb-gradle/
 tools/meshmonitor/build/
 tools/meshmonitor/dist/
+tools/ee/ee_auto_generated_unit_tests
 
 # IntelliJ excluded files.
 .idea/workspace.xml

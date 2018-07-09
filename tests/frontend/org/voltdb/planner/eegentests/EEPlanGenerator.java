@@ -82,11 +82,7 @@
  * the License.
  */package org.voltdb.planner.eegentests;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -210,10 +206,20 @@ public class EEPlanGenerator extends PlannerTestCase {
         "}\n";
 
     //
-    // Guess that we are started in the root.
+    // This holds the full path name of the directory into which we will
+    // put generated EE unit tests.
     //
-    private String m_VoltDBRootDirName = Paths.get(".").toAbsolutePath().normalize().toString();
-    private String m_testGenDir = "ee_auto_generated_unit_tests";
+    private String m_testGenPath;
+    //
+    // This is the last path component of the previous.
+    //
+    private String m_testGenDir;
+    //
+    // This holds the full path name of the file which contains names
+    // of generated tests.  The names are listed one test name per line.
+    // Each test name is the full path name to the test file.
+    //
+    private String m_testNamesFile;
 
     protected String getPlanString(String sqlStmt, int fragmentNumber) throws JSONException {
         boolean planForSinglePartition = (fragmentNumber == 0);
@@ -861,7 +867,6 @@ public class EEPlanGenerator extends PlannerTestCase {
      * @throws Exception
      */
     protected void generateTests(String testFolder, String testClassName, DBConfig db) throws Exception {
-        System.out.printf("%s/%s/%s;", m_testGenDir, testFolder, testClassName);
         Map<String, String> params = new HashMap<>();
         params.put("SOURCE_PACKAGE_NAME",   db.getClassPackageName());
         params.put("SOURCE_CLASS_NAME",     db.getClassName());
@@ -879,6 +884,7 @@ public class EEPlanGenerator extends PlannerTestCase {
         params.put("ALL_TESTS",             db.getAllTests(params));
         params.put("DATABASE_CONFIG_BODY",  db.getDatabaseConfigBody(params));
         writeTestFile(testFolder, testClassName, params);
+        writeTestFileName(String.format("%s/%s/%s\n", m_testGenDir, testFolder, testClassName), true);
     }
 
     public static boolean typeMatch(Object elem, VoltType type, int size) {
@@ -940,22 +946,63 @@ public class EEPlanGenerator extends PlannerTestCase {
     protected void processArgs(String args[]) throws PlanningErrorException {
         for (int idx = 0; idx < args.length; idx += 1) {
             String arg = args[idx];
-            if (arg.startsWith("--test-source-dir=")) {
-                m_VoltDBRootDirName = arg.substring("--test-source-dir=".length());
-            } else if (arg.startsWith("--generated-source-dir=")) {
-                m_testGenDir = arg.substring("--generated-source-dir".length());
+            if (arg.startsWith("--generated-source-dir=")) {
+                m_testGenPath = arg.substring("--generated-source-dir=".length());
+                // Pull out the last component.  We
+                // need this later on, to put the source in the
+                // right directory.
+                String[] paths = m_testGenPath.split("/");
+                if (paths.length == 0) {
+                    throw new PlanningErrorException(
+                            String.format("--generated-source-dir argument \"%s\" is malformed.",
+                                          arg));
+                }
+                m_testGenDir = paths[paths.length - 1];
+            } else if (arg.startsWith("--test-names-file=")) {
+                m_testNamesFile = arg.substring("--test-names-file=".length());
+            } else {
+                throw new PlanningErrorException("Unknown generated sources argument: " + arg);
             }
+        }
+        if (m_testGenPath == null) {
+            throw new PlanningErrorException("--generated-source-dir argument is missing in call to EEPlanGenerator.java");
+        }
+        if (m_testNamesFile == null) {
+            throw new PlanningErrorException("--test-names-file argument is missing in call to EEPlanGenerator.java");
+        }
+    }
+
+    /**
+     * Write the named string to the output file.
+     *
+     * @param name The string to write.
+     * @param append If true, then append to the file.  Otherwise truncate the file first.
+     * @throws FileNotFoundException
+     */
+    protected void writeTestFileName(String name,
+                                     boolean append) throws FileNotFoundException {
+        File outFileName = new File(m_testNamesFile);
+        if ( ! outFileName.exists() ) {
+            append = false;
+        }
+        try (PrintStream ps = new PrintStream(new BufferedOutputStream(new FileOutputStream(outFileName, append)))) {
+            ps.print(name);
         }
     }
 
     private void writeTestFile(String testFolder, String testClassName, Map<String, String> params) throws Exception {
         String template = TESTFILE_TEMPLATE;
+        // This could be made much faster by looking for all the strings
+        // with a regular expression, rather than one at a time.
         for (Map.Entry<String, String> entry : params.entrySet()) {
             String pattern = "@" + entry.getKey() + "@";
             String value   = params.get(entry.getKey());
             template = template.replace(pattern, value);
         }
-        File outputDir = new File(String.format("%s/%s/%s", m_VoltDBRootDirName, m_testGenDir, testFolder));
+        if (template.isEmpty()) {
+            throw new PlanningErrorException("Cannot create C++ Unit Test source from template.  This is a bug.");
+        }
+        File outputDir = new File(String.format("%s/%s", m_testGenPath, testFolder));
         if (! outputDir.exists() && !outputDir.mkdirs()) {
             throw new IOException("Cannot make test source folder \"" + outputDir + "\"");
         }

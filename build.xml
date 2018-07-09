@@ -2474,6 +2474,8 @@ UTILITIES
         description="Remove other generated source files.">
     <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
     <delete file="${src.ee.dir}/org_voltcore_utils_DBBPool.h" />
+    <!-- Delete the generated ee unit tests, but not if they don't exist. -->
+    <delete dir="${src.ee.test.dir}/ee_auto_generated_unit_tests" failonerror="false"/>
 </target>
 
 <!--
