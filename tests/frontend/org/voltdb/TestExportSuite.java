@@ -125,23 +125,18 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             client.callProcedure("Insert", paramsGrp);
         }
         waitForStreamedAllocatedMemoryZero(client);
-        System.out.println("STAKUTIS test 1/2 and now dropping the no-nulls table ***************************************");
 
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
         final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
         final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
                 new File(deploymentURL));
-        System.out.println("STAKUTIS did we getStatus():"+callProcedure.getStatus());
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         client = getClient();
 
-        System.out.println("STAKUTIS calling queisceandverify");
         // must still be able to verify the export data.
         quiesceAndVerify(client, m_verifier);
-
-        System.out.println("STAKUTIS test seemed to pass...");;
     }
 
     // Test that a table w/o Export enabled does not produce Export content

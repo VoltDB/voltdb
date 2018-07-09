@@ -44,6 +44,8 @@ import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
+import org.voltdb.ExportStats;
+import org.voltdb.ExportStats.ExportStatsRow;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
@@ -1312,6 +1314,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     boolean trackMemory = (!isReplicated) || m_isLowestSiteId;
                     if ("PersistentTable".equals(stats.getString(6)) && trackMemory){
                         tupleCount += stats.getLong(7);
+                    }
+                    else {
+                        // STAKUTIS Fake it out!
+                        ExportStatsRow row = ExportStats.getRow(stats.getString(5),(int)stats.getLong(4));
+                        if (row != null) {
+                            stats.setLong("TUPLE_ALLOCATED_MEMORY",row.m_tuplePending * 1024);
+                        }
                     }
                     assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     if (trackMemory) {

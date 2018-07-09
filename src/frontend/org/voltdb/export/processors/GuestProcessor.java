@@ -381,7 +381,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                     edb.onBlockCompletion();
                                 }
                                 if (row != null) {
-                                    System.out.println("STAKUTIS GuestProcessor calling blockCompletion "+source.getTableName()+source.getPartitionId());
                                     edb.onBlockCompletion(row);
                                     long elapsedMS = System.currentTimeMillis() - startTime;
                                     source.m_exportStatsRow.m_tuplesSentSinceClear += 1;
@@ -392,7 +391,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                                 //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
                                 if (cont != null) {
-                                    System.out.println("STAKUTIS GuestProcessor calling cont.discard() "+source.getTableName()+source.getPartitionId());
                                     cont.discard();
                                     cont = null;
                                 }
@@ -437,7 +435,6 @@ public class GuestProcessor implements ExportDataProcessor {
                 if (!m_shutdown) {
                     addBlockListener(source, source.poll(tuplesSent), edb);
                 }
-                System.out.println("STAKUTIS GuestProcessor finished run() "+source.getTableName()+source.getPartitionId()+" tuplesSent:"+tuplesSent);
             }
         }, edb.getExecutor());
     }

@@ -155,7 +155,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             @Override
             public void run() {
                 Thread.currentThread().setName("Client handler:" + m_clientSocket);
-                System.out.println("STAKUTIS TestExportBaseSocket: run() starting, me:"+Thread.currentThread());
                 try {
                     while (true) {
                         BufferedReader in = new BufferedReader(new InputStreamReader(m_clientSocket.getInputStream()));
@@ -168,7 +167,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                             }
                             if (line == null)
                                 continue;
-                            System.out.println("STAKUTIS TestExportBaseSocket: GOT A LINE! "+Thread.currentThread());
                             String parts[] = m_parser.parseLine(line);
                             if (parts == null) {
                                 System.out.println("Failed to parse exported data.");
@@ -364,11 +362,8 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     }
 
     public void quiesceAndVerify(final Client client, ExportTestExpectedData tester) throws Exception {
-        System.out.println("STAKUTIS PRE DRAIN...");
         client.drain();
-        System.out.println("STAKUTIS PRE wait...");
         waitForStreamedAllocatedMemoryZero(client);
-        System.out.println("STAKUTIS PRE verify...");
         tester.verifyRows();
         System.out.println("Passed!");
     }
