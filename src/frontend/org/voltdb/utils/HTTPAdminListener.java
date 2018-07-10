@@ -278,8 +278,7 @@ public class HTTPAdminListener {
                     "image/gif", "image/png", "image/jpeg", HTML_CONTENT_TYPE);
 
             compressResourcesHandler.setServer(m_server);
-            m_server.setHandler(compressResourcesHandler);
-            m_server.setHandler(wrapWithSecurityHandler(handlers));
+            m_server.setHandler(wrapWithSecurityHandler(compressResourcesHandler));
 
             //Following are the servelets jetty is configured with see URL pattern for what they handle.
             servlets.addServletWithMapping(DBMonitorServlet.class, "/").setAsyncSupported(true);
