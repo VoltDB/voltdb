@@ -2221,7 +2221,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             int hostId = it.next();
             final int currentMasters = m_cartographer.getMasterCount(hostId);
             if (currentMasters > minimalNumberOfLeaders) {
-                hostLog.debug("Host " + hostId + " has more than " + minimalNumberOfLeaders + ". Sending migrate partition message");
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Host " + hostId + " has more than " + minimalNumberOfLeaders +
+                            ". Sending migrate partition message");
+                }
                 m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
                         HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
             }
