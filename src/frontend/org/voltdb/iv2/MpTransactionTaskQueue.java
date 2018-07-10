@@ -84,12 +84,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * TransactionTaskQueue.
      */
     @Override
-    synchronized boolean offer(TransactionTask task)
+    synchronized void offer(TransactionTask task)
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
         m_backlog.addLast(task);
         taskQueueOffer();
-        return true;
     }
 
     // repair is used by MPI repair to inject a repair task into the
