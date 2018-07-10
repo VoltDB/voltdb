@@ -3362,18 +3362,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // null timestamp will return null
         cr = client.callProcedure("FORMAT_TIMESTAMP", "UTC", 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertNull(result.getString(0));
+        assertContentOfTable(new Object[][]{{null}}, cr.getResults()[0]);
 
         // null offset means offset == 0
         cr = client.callProcedure("FORMAT_TIMESTAMP", null, 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(result.getString(0), "2013-07-18 02:00:00.123457");
+        assertContentOfTable(new Object[][]{{"2013-07-18 02:00:00.123457"}}, cr.getResults()[0]);
 
         String[] invalid_offsets = {"I_AM_INVALID", "10:00", "-1:00", "+20:00"};
         String expectedError = "VOLTDB ERROR: SQL ERROR\\s*" +
