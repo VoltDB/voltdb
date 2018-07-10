@@ -1086,31 +1086,31 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::
 template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vector<NValue>& arguments){
     assert (arguments.size() == 2);
 
-    const NValue& time_stamp = arguments[0];
+    const NValue &time_stamp = arguments[0];
     if (time_stamp.isNull()) {
         return getNullValue(VALUE_TYPE_TIMESTAMP);
     }
 
-    if(time_stamp.getValueType()!=VALUE_TYPE_TIMESTAMP){
+    if (time_stamp.getValueType() != VALUE_TYPE_TIMESTAMP) {
         throwCastSQLException(time_stamp.getValueType(), VALUE_TYPE_TIMESTAMP);
     }
 
-    const NValue& time_offset = arguments[1];
+    const NValue &time_offset = arguments[1];
     if (time_offset.isNull()) {
         return time_stamp;
     }
 
-    if(time_offset.getValueType()!=VALUE_TYPE_VARCHAR){
+    if (time_offset.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException(time_offset.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
     int32_t length;
-    const char* time_offset_buffer = time_offset.getObject_withoutNull(&length);
+    const char *time_offset_buffer = time_offset.getObject_withoutNull(&length);
     std::string time_offset_str(time_offset_buffer, length);
     boost::trim(time_offset_str);
 
     auto search = TIMEZONE_OFFSET_FROM_UTC.find(time_offset_str);
-    if(search!=TIMEZONE_OFFSET_FROM_UTC.end()){
+    if (search != TIMEZONE_OFFSET_FROM_UTC.end()) {
         time_offset_str = search->second;
     }
     // equivalent to [\+\-][0-1][0-9]:[0-5][0-9], since <regex> is not support by our c++ compiler
@@ -1123,7 +1123,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vec
     }
 
     int64_t micro_seconds_offset = 1000000 * (stoll(time_offset_str.substr(1, 2)) * 3600 +
-            stoll(time_offset_str.substr(4, 2)) * 60);
+                                              stoll(time_offset_str.substr(4, 2)) * 60);
 
     micro_seconds_offset = (time_offset_str.at(0) == '-') ? -micro_seconds_offset : micro_seconds_offset;
 
@@ -1132,10 +1132,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vec
     int64_t micro_seconds_tail = total_micro_seconds % 1000000;
 
     std::time_t t = total_seconds;
-    struct std::tm * time_info = std::gmtime (&t);
-    char time_buffer [60];
-    std::strftime (time_buffer,60,"%F %T.",time_info);
-    snprintf(time_buffer+strlen(time_buffer), 10, "%06ld", long(micro_seconds_tail));
+    struct std::tm *time_info = std::gmtime(&t);
+    char time_buffer[60];
+    std::strftime(time_buffer, 60, "%F %T.", time_info);
+    snprintf(time_buffer + strlen(time_buffer), 10, "%06ld", long(micro_seconds_tail));
 
     return getTempStringValue(time_buffer, strlen(time_buffer));
 }
