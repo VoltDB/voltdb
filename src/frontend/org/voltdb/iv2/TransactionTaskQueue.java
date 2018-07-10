@@ -221,27 +221,25 @@ public class TransactionTaskQueue
                 m_backlog.addLast(task);
                 return;
             }
-            TransactionTask headTask = m_backlog.getFirst();
 
             //It is possible a RO MP read with higher TxnId could be executed before a RO MP reader with lower TxnId
             //so do not offer them to the site task queue in the same time, place it in the backlog instead.
-            if ((txnState.isReadOnly()) && headTask.getTransactionState().isReadOnly() && TxnEgo.getSequence(task.getTxnId()) != TxnEgo.getSequence(headTask.getTxnId())
-            || (TxnEgo.getSequence(task.getTxnId()) > TxnEgo.getSequence(headTask.getTxnId()))) {
+            TransactionTask headTask = m_backlog.getFirst();
+            if ((txnState.isReadOnly()) && headTask.getTransactionState().isReadOnly() &&
+                    TxnEgo.getSequence(task.getTxnId()) != TxnEgo.getSequence(headTask.getTxnId())
+                       || (TxnEgo.getSequence(task.getTxnId()) > TxnEgo.getSequence(headTask.getTxnId()))) {
                 m_backlog.addLast(task);
-            }
-            /*
-             * This branch coordinates FragmentTask or CompletedTransactionTask,
-             * holds the tasks until all the sites on the node receive the task.
-             * Task with newer spHandle will
-             */
-            else if (task.needCoordination() && m_scoreboardEnabled) {
+            } else if (task.needCoordination() && m_scoreboardEnabled) {
+                /*
+                 * This branch coordinates FragmentTask or CompletedTransactionTask,
+                 * holds the tasks until all the sites on the node receive the task.
+                 * Task with newer spHandle will
+                 */
                 coordinatedTaskQueueOffer(task);
-            }
-            else {
+            } else {
                 taskQueueOffer(task);
             }
-        }
-        else {
+        } else {
             /*
              * Base case nothing queued nothing in progress
              * If the task is a multipart then put an entry in the backlog which
