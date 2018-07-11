@@ -31,14 +31,13 @@ import javax.servlet.http.HttpServletResponse;
 
 import junit.framework.TestCase;
 
-public class TestTraceDisabled extends TestCase{
+public class TestHttpTraceDisabled extends TestCase{
     public static final String URL = "http://127.0.0.1:8080/";
 
     public void testCanAccessRootPath() throws IOException {
         URL url = new URL(URL);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         int code = conn.getResponseCode();
-        System.out.println(code);
         assertEquals(HttpServletResponse.SC_OK, code);
     }
 
@@ -47,7 +46,30 @@ public class TestTraceDisabled extends TestCase{
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("TRACE");
         int code = conn.getResponseCode();
-        System.out.println(code);
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, code);
+    }
+
+    public void testCannotAccessCSSPathByTrace() throws IOException {
+        URL url = new URL(URL + "css");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("TRACE");
+        int code = conn.getResponseCode();
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, code);
+    }
+
+    public void testCannotAccessImagePathByTrace() throws IOException {
+        URL url = new URL(URL + "images");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("TRACE");
+        int code = conn.getResponseCode();
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, code);
+    }
+
+    public void testCannotAccessJsPathByTrace() throws IOException {
+        URL url = new URL(URL + "js");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("TRACE");
+        int code = conn.getResponseCode();
         assertEquals(HttpServletResponse.SC_FORBIDDEN, code);
     }
 }

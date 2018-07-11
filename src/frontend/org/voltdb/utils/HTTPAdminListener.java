@@ -35,9 +35,11 @@ import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
 import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.HttpChannel;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -132,6 +134,22 @@ public class HTTPAdminListener {
         }
 
     }
+//
+//    public class MyServer extends Server {
+//
+//        @Override
+//        public void handle(HttpChannel<?> connection) throws IOException, ServletException {
+//            Request request=connection.getRequest();
+//            Response response=connection.getResponse();
+//
+//            if ("TRACE".equals(request.getMethod())){
+//                request.setHandled(true);
+//                response.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+//            } else {
+//                super.handle(connection);
+//            }
+//        }
+//    }
 
     /**
      * Load a template for the admin page, fill it out and return the value.
@@ -254,6 +272,7 @@ public class HTTPAdminListener {
             ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
             cssResource.setDirectoriesListed(false);
             cssResourceHandler.setHandler(cssResource);
+
             ContextHandler imageResourceHandler = new ContextHandler("/images");
             ResourceHandler imagesResource = new CacheStaticResourceHandler(IMAGES_TARGET, cacheMaxAge);
             imagesResource.setDirectoriesListed(false);
@@ -266,10 +285,10 @@ public class HTTPAdminListener {
 
             //Add all to a collection which will be wrapped by GzipHandler we set GzipHandler to the server.
             ContextHandlerCollection handlers = new ContextHandlerCollection();
-            handlers.addHandler(rootContext);
-            handlers.addHandler(cssResourceHandler);
-            handlers.addHandler(imageResourceHandler);
-            handlers.addHandler(jsResourceHandler);
+            handlers.addHandler(disableTraceMethodForHandler(rootContext));
+            handlers.addHandler(disableTraceMethodForHandler(cssResourceHandler));
+            handlers.addHandler(disableTraceMethodForHandler(imageResourceHandler));
+            handlers.addHandler(disableTraceMethodForHandler(jsResourceHandler));
 
             GzipHandler compressResourcesHandler = new GzipHandler();
             compressResourcesHandler.setHandler(handlers);
@@ -278,7 +297,7 @@ public class HTTPAdminListener {
                     "image/gif", "image/png", "image/jpeg", HTML_CONTENT_TYPE);
 
             compressResourcesHandler.setServer(m_server);
-            m_server.setHandler(wrapWithSecurityHandler(compressResourcesHandler));
+            m_server.setHandler(compressResourcesHandler);
 
             //Following are the servelets jetty is configured with see URL pattern for what they handle.
             servlets.addServletWithMapping(DBMonitorServlet.class, "/").setAsyncSupported(true);
@@ -376,7 +395,8 @@ public class HTTPAdminListener {
         }
     }
 
-    private Handler wrapWithSecurityHandler(Handler h){
+    private Handler disableTraceMethodForHandler(Handler h){
+
         Constraint disableTraceConstraint = new Constraint();
         disableTraceConstraint.setName("Disable TRACE");
         disableTraceConstraint.setAuthenticate(true);
@@ -386,11 +406,16 @@ public class HTTPAdminListener {
         mapping.setMethod("TRACE");
         mapping.setPathSpec("/");
 
+        // omissionConstraint is to fix the warning log ""null has uncovered http methods for path: /
+        // No impact to disable TRACE if you do not add this constraint
+        // But if you're using the monitoring tool like Geneos, and your component requires keep production monitoring all green,
+        // You can try to add this omissionConstraint to fix the warning Jetty prints.
         Constraint omissionConstraint = new Constraint();
         ConstraintMapping omissionMapping = new ConstraintMapping();
         omissionMapping.setConstraint(omissionConstraint);
         omissionMapping.setMethod("*");
         omissionMapping.setPathSpec("/");
+
 
         ConstraintSecurityHandler handler = new ConstraintSecurityHandler();
         handler.addConstraintMapping(mapping);
