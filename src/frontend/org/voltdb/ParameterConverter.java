@@ -362,11 +362,15 @@ public class ParameterConverter {
             if (expectedClz == byte[].class) return param;
             if (expectedClz == Byte[].class) return ArrayUtils.toObject((byte[]) param);
             // allow byte arrays to be passed into string parameters
-            else if (expectedClz == String.class) {
+            if (expectedClz == String.class) {
                 String value = new String((byte[]) param, Constants.UTF8ENCODING);
-                if (value.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
-                else return value;
-            } else if (ByteBuffer.class.isAssignableFrom(expectedClz)) {
+                if (value.equals(Constants.CSV_NULL)) {
+                    return nullValueForType(expectedClz);
+                } else {
+                    return value;
+                }
+            }
+            if (ByteBuffer.class.isAssignableFrom(expectedClz)) {
                 return ByteBuffer.wrap((byte[])param);
             }
         }

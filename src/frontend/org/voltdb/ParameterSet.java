@@ -93,9 +93,7 @@ public class ParameterSet implements JSONString {
             if (ByteBuffer.class.isAssignableFrom(cls)) {
                 ByteBuffer bb = (ByteBuffer)obj;
                 bb.clear();
-                final byte[] b = new byte[bb.capacity()];
-                bb.get(b);
-                size += 4 + b.length;
+                size += 4 + bb.capacity();
                 continue;
             }
 
@@ -707,8 +705,7 @@ public class ParameterSet implements JSONString {
                 bb.clear();
                 buf.put(VoltType.VARBINARY.getValue());
                 buf.putInt(bb.capacity());
-                final byte[] b = new byte[bb.capacity()];
-                bb.get(b);
+                final byte[] b = bb.array();
                 buf.put(b);
                 continue;
             }
