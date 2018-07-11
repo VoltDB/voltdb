@@ -21,7 +21,6 @@
 #include <ctime>
 #include <unordered_map>
 #include <boost/algorithm/string.hpp>
-#include <chrono>
 
 #include "common/SQLException.h"
 #include "common/executorcontext.hpp"
@@ -1086,13 +1085,6 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::
 
 template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vector<NValue>& arguments){
     assert (arguments.size() == 2);
-    // testing if our c++ compiler support <chrono>
-    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now - std::chrono::hours(24));
-    if(!now_c){
-        return getNullValue(VALUE_TYPE_TIMESTAMP);
-    }
-    // end testing
 
     const NValue &time_stamp = arguments[0];
     if (time_stamp.isNull()) {
