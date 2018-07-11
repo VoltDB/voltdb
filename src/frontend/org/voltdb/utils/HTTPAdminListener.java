@@ -134,22 +134,6 @@ public class HTTPAdminListener {
         }
 
     }
-//
-//    public class MyServer extends Server {
-//
-//        @Override
-//        public void handle(HttpChannel<?> connection) throws IOException, ServletException {
-//            Request request=connection.getRequest();
-//            Response response=connection.getResponse();
-//
-//            if ("TRACE".equals(request.getMethod())){
-//                request.setHandled(true);
-//                response.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
-//            } else {
-//                super.handle(connection);
-//            }
-//        }
-//    }
 
     /**
      * Load a template for the admin page, fill it out and return the value.
@@ -406,10 +390,6 @@ public class HTTPAdminListener {
         mapping.setMethod("TRACE");
         mapping.setPathSpec("/");
 
-        // omissionConstraint is to fix the warning log ""null has uncovered http methods for path: /
-        // No impact to disable TRACE if you do not add this constraint
-        // But if you're using the monitoring tool like Geneos, and your component requires keep production monitoring all green,
-        // You can try to add this omissionConstraint to fix the warning Jetty prints.
         Constraint omissionConstraint = new Constraint();
         ConstraintMapping omissionMapping = new ConstraintMapping();
         omissionMapping.setConstraint(omissionConstraint);
