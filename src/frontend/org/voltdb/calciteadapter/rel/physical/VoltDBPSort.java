@@ -17,9 +17,6 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
@@ -28,14 +25,10 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.util.Pair;
-import org.voltdb.calciteadapter.converter.RelConverter;
-import org.voltdb.calciteadapter.converter.RexConverter;
-import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.types.SortDirectionType;
 
 public class VoltDBPSort extends Sort implements VoltDBPRel {
 
@@ -111,21 +104,7 @@ public class VoltDBPSort extends Sort implements VoltDBPRel {
         OrderByPlanNode opn = null;
         RelCollation collation = getCollation();
         if (collation != null) {
-            opn = new OrderByPlanNode();
-
-            // Convert ORDER BY Calcite expressions to VoltDB
-            List<AbstractExpression> voltExprList = new ArrayList<>();
-            for (RexNode expr : fieldExps) {
-                AbstractExpression voltExpr = RexConverter.convert(expr);
-                voltExprList.add(voltExpr);
-            }
-            List<Pair<Integer, SortDirectionType>> collFields = RelConverter.convertCollation(collation);
-            assert(voltExprList.size() == collFields.size());
-            int index = 0;
-            for (Pair<Integer, SortDirectionType> collField : collFields) {
-                opn.getSortExpressions().add(voltExprList.get(index++));
-                opn.getSortDirections().add(collField.right);
-            }
+            opn = VoltDBRexUtil.collationToOrderByNode(collation, fieldExps);
         }
         AbstractPlanNode result = null;
         if (opn != null) {

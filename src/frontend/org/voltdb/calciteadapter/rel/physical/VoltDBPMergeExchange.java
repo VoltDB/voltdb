@@ -17,24 +17,47 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexNode;
 import org.voltdb.calciteadapter.converter.RexConverter;
+import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.OrderByPlanNode;
+
+import com.google.common.collect.ImmutableList;
 
 public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements VoltDBPRel {
+
+    // Inline Offset
+    private RexNode m_offset;
+    // Inline Limit
+    private RexNode m_limit;
+
+    // Collation fields expressions
+    ImmutableList<RexNode> m_collationFieldExprs;
 
     public VoltDBPMergeExchange(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
             RelDistribution childDistribution,
             int childSplitCount,
-            int level) {
+            int level,
+            List<RexNode> collationFieldExprs) {
         super(cluster, traitSet, input, childDistribution, childSplitCount, level);
+        assert(traitSet.getTrait(RelCollations.EMPTY.getTraitDef()) instanceof RelCollation);
+        m_collationFieldExprs = ImmutableList.copyOf(collationFieldExprs);
     }
 
     @Override
@@ -49,7 +72,8 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
                 newInput,
                 getChildDistribution(),
                 m_childSplitCount,
-                level);
+                level,
+                m_collationFieldExprs);
         return exchange;
     }
 
@@ -60,10 +84,39 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
         NodeSchema childOutputSchema = generatePreAggregateSchema();
         rpn.setPreAggregateOutputSchema(childOutputSchema);
 
+        // Collation must be converted to the inline OrderByPlanNode
+        RelTrait collationTrait = getTraitSet().getTrait(RelCollations.EMPTY.getTraitDef());
+        OrderByPlanNode inlineOrderByPlanNode =
+                VoltDBRexUtil.collationToOrderByNode((RelCollation) collationTrait, this.m_collationFieldExprs);
+        rpn.addInlinePlanNode(inlineOrderByPlanNode);
+
+        // Inline Limit and / or Offset
+        if (m_limit != null || m_offset != null) {
+            LimitPlanNode inlineLimitPlanNode = new LimitPlanNode();
+            if (m_limit != null) {
+                inlineLimitPlanNode.setLimit(RexLiteral.intValue(m_limit));
+            }
+            if (m_offset != null) {
+                inlineLimitPlanNode.setOffset(RexLiteral.intValue(m_offset));
+            }
+            rpn.addInlinePlanNode(inlineLimitPlanNode);
+        }
         AbstractPlanNode result = super.toPlanNode(rpn);
-        // Must set it after its own schema is generated
+        // Must set HaveSignificantOutputSchema after its own schema is generated
         result.setHaveSignificantOutputSchema(true);
         return result;
+    }
+
+    @Override
+    protected String computeDigest() {
+        String digest = super.computeDigest();
+        if (m_offset != null) {
+            digest += "_offset_" + m_offset.toString();
+        }
+        if (m_limit != null) {
+            digest += "_limit_" + m_limit.toString();
+        }
+        return digest;
     }
 
     private NodeSchema generatePreAggregateSchema() {
@@ -72,6 +125,22 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
         assert(child != null);
         NodeSchema childOutputSchema = RexConverter.convertToVoltDBNodeSchema(input.getRowType());
         return childOutputSchema;
+    }
+
+    public void setOffset(RexNode offset) {
+        m_offset = offset;
+    }
+
+    public RexNode getOffset() {
+        return m_offset;
+    }
+
+    public void setLimit(RexNode limit) {
+        m_limit = limit;
+    }
+
+    public RexNode getLimit() {
+        return m_limit;
     }
 
 }

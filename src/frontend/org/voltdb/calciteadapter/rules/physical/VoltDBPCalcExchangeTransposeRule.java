@@ -19,9 +19,14 @@ package org.voltdb.calciteadapter.rules.physical;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelOptRuleOperandChildPolicy;
+import org.apache.calcite.plan.RelOptRuleOperandChildren;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.core.Calc;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * Transform Calc / Exchange rel to Exchange / Calc
@@ -32,7 +37,11 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
 
     private VoltDBPCalcExchangeTransposeRule() {
         super(operand(VoltDBPCalc.class,
-                operand(AbstractVoltDBPExchange.class, any())));
+                RelDistributions.ANY,
+                new RelOptRuleOperandChildren(
+                        RelOptRuleOperandChildPolicy.ANY,
+                        ImmutableList.of(
+                                operand(AbstractVoltDBPExchange.class, any())))));
     }
 
     @Override

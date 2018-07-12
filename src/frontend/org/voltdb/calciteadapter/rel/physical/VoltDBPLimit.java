@@ -31,6 +31,7 @@ import org.voltdb.plannodes.LimitPlanNode;
 
 public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
 
+    // @TODO limit / offset as expressions or parameters
     private RexNode m_offset;
     private RexNode m_limit;
 

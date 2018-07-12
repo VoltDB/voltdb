@@ -128,7 +128,11 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
             limitRel.getOffset(),
             limitRel.getLimit(),
             limitRel.getSplitCount());
-        // Add a SingletonExchange on top of it
+
+        // Add a SingletonExchange on top of it to be propagated all the way to the root
+        // The relations that will be transposed with the Singleton Exchange represent
+        // the coordinator's nodes in the final VoltDB plan 
+        // and can not / should not be pushed beyond the VoltDBPMergeExchange exchange
         RelNode result = new VoltDBPSingeltonExchange(
                     exchangeRel.getCluster(),
                     exchangeRel.getTraitSet(),

@@ -33,8 +33,13 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.util.Pair;
+import org.voltdb.calciteadapter.converter.RelConverter;
+import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
 
@@ -221,6 +226,33 @@ public class VoltDBRexUtil {
                 (Direction.ASCENDING == collationDirection1 || Direction.STRICTLY_ASCENDING == collationDirection1) ?
                 SortDirectionType.ASC : SortDirectionType.DESC;
         return sortDirection;
+    }
+
+    /**
+     * Convert a collation into an OrderByPlanNode
+     *
+     * @param collation
+     * @param collationFieldExps
+     * @return
+     */
+    public static OrderByPlanNode collationToOrderByNode(RelCollation collation, List<RexNode> collationFieldExps) {
+        assert(collation != null);
+        OrderByPlanNode opn = new OrderByPlanNode();
+
+        // Convert ORDER BY Calcite expressions to VoltDB
+        List<AbstractExpression> voltExprList = new ArrayList<>();
+        for (RexNode expr : collationFieldExps) {
+            AbstractExpression voltExpr = RexConverter.convert(expr);
+            voltExprList.add(voltExpr);
+        }
+        List<Pair<Integer, SortDirectionType>> collFields = RelConverter.convertCollation(collation);
+        assert(voltExprList.size() == collFields.size());
+        int index = 0;
+        for (Pair<Integer, SortDirectionType> collField : collFields) {
+            opn.getSortExpressions().add(voltExprList.get(index++));
+            opn.getSortDirections().add(collField.right);
+        }
+        return opn;
     }
 
     /**

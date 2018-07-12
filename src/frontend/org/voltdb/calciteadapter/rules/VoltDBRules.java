@@ -31,6 +31,7 @@ import org.apache.calcite.tools.Programs;
 import org.voltdb.calciteadapter.rules.inlining.VoltDBPAggregateScanMergeRule;
 import org.voltdb.calciteadapter.rules.inlining.VoltDBPCalcAggregateMergeRule;
 import org.voltdb.calciteadapter.rules.inlining.VoltDBPCalcScanMergeRule;
+import org.voltdb.calciteadapter.rules.inlining.VoltDBPLimitMergeExchangeMergeRule;
 import org.voltdb.calciteadapter.rules.inlining.VoltDBPLimitScanMergeRule;
 import org.voltdb.calciteadapter.rules.inlining.VoltDBPLimitSortMergeRule;
 import org.voltdb.calciteadapter.rules.logical.VoltDBLAggregateRule;
@@ -104,12 +105,15 @@ public class VoltDBRules {
             // VoltDB Inline Rules. The rules order declaration
             // has to match the order of rels from a real plan produced by the previous stage.
 
-            VoltDBPCalcAggregateMergeRule.INSTANCE
+            VoltDBPLimitMergeExchangeMergeRule.INSTANCE_1
+            , VoltDBPLimitMergeExchangeMergeRule.INSTANCE_2
+            , VoltDBPCalcAggregateMergeRule.INSTANCE
             , VoltDBPCalcScanMergeRule.INSTANCE
             , VoltDBPLimitSortMergeRule.INSTANCE
             , VoltDBPAggregateScanMergeRule.INSTANCE
             , VoltDBPLimitScanMergeRule.INSTANCE_1
             , VoltDBPLimitScanMergeRule.INSTANCE_2
+
 
     };
 
