@@ -21,11 +21,13 @@
 #include <ctime>
 #include <unordered_map>
 #include <boost/algorithm/string.hpp>
+#include <iostream>
 
 #include "common/SQLException.h"
 #include "common/executorcontext.hpp"
 #include "common/NValue.hpp"
 #include "expressions/dateconstants.h"
+#include "date/tz.h"
 
 static const int8_t QUARTER_START_MONTH_BY_MONTH[] = {
         /*[0] not used*/-1,  1, 1, 1,  4, 4, 4,  7, 7, 7,  10, 10, 10 };
@@ -1113,6 +1115,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vec
     if (search != TIMEZONE_OFFSET_FROM_UTC.end()) {
         time_offset_str = search->second;
     }
+    using namespace date;
+    using namespace std::chrono;
+    auto zone = locate_zone("Europe/Berlin");
+    auto t2 = make_zoned(zone, system_clock::now());
+    std::cout << t2 << '\n';
     // equivalent to [\+\-][0-1][0-9]:[0-5][0-9], since <regex> is not support by our c++ compiler
     if (!(time_offset_str.length() == 6 && (time_offset_str.at(0) == '-' || time_offset_str.at(0) == '+') &&
           (time_offset_str.at(1) == '0' || time_offset_str.at(1) == '1') && isdigit(time_offset_str.at(2)) &&
