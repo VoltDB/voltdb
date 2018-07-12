@@ -40,15 +40,18 @@ public class VoltDBPLimitRule extends RelOptRule {
         VoltDBLLimit limitOffset = call.rel(0);
         RelNode input = limitOffset.getInput();
         RelTraitSet convertedTraits = limitOffset.getTraitSet()
-                .replace(VoltDBPRel.VOLTDB_PHYSICAL);
+                .replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
         RelNode convertedInput = convert(input,
-                input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
+                input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
+        int splitCount = (convertedInput instanceof VoltDBPRel) ?
+                ((VoltDBPRel)convertedInput).getSplitCount() : 1;
+
         call.transformTo(new VoltDBPLimit(
                 limitOffset.getCluster(),
                 convertedTraits,
                 convertedInput,
                 limitOffset.getOffset(),
                 limitOffset.getLimit(),
-                1));
+                splitCount));
     }
 }
