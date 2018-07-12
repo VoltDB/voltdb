@@ -109,7 +109,8 @@ public class VoltDBRules {
             , VoltDBPLimitMergeExchangeMergeRule.INSTANCE_2
             , VoltDBPCalcAggregateMergeRule.INSTANCE
             , VoltDBPCalcScanMergeRule.INSTANCE
-            , VoltDBPLimitSortMergeRule.INSTANCE
+            , VoltDBPLimitSortMergeRule.INSTANCE_1
+            , VoltDBPLimitSortMergeRule.INSTANCE_2
             , VoltDBPAggregateScanMergeRule.INSTANCE
             , VoltDBPLimitScanMergeRule.INSTANCE_1
             , VoltDBPLimitScanMergeRule.INSTANCE_2

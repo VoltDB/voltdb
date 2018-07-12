@@ -19,24 +19,41 @@ package org.voltdb.calciteadapter.rules.inlining;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelNode;
-
+import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPLimit;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPSort;
 
 public class VoltDBPLimitSortMergeRule extends RelOptRule {
 
-    public static final VoltDBPLimitSortMergeRule INSTANCE = new VoltDBPLimitSortMergeRule();
+    public static final VoltDBPLimitSortMergeRule INSTANCE_1 =
+            new VoltDBPLimitSortMergeRule(
+                    operand(VoltDBPLimit.class,
+                            operand(VoltDBPSort.class, any()))
+                    );
 
-    private VoltDBPLimitSortMergeRule() {
-        super(operand(VoltDBPLimit.class,
-                operand(VoltDBPSort.class, any())));
+    public static final VoltDBPLimitSortMergeRule INSTANCE_2 =
+            new VoltDBPLimitSortMergeRule(
+                    operand(VoltDBPLimit.class,
+                            operand(VoltDBPCalc.class,
+                                    operand(VoltDBPSort.class, any())))
+                    );
+
+    /**
+     * Transform  VoltDBPLimit / VoltDBPSort to VoltDBPSort with Limit
+     * Transform  VoltDBPLimit / VoltDBCalc / VoltDBPSort to
+     *            VoltDBCalc / VoltDBPSort with Limit
+     */
+    private VoltDBPLimitSortMergeRule(RelOptRuleOperand operand) {
+        super(operand);
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltDBPLimit limitOffset = call.rel(0);
-        VoltDBPSort sort = call.rel(1);
+        int sortIdx = call.rels.length - 1;
+        VoltDBPSort sort = call.rel(sortIdx);
 
         RelNode newSort = sort.copy(
                 sort.getTraitSet(),
@@ -44,7 +61,15 @@ public class VoltDBPLimitSortMergeRule extends RelOptRule {
                 sort.getCollation(),
                 limitOffset.getOffset(),
                 limitOffset.getLimit());
-        call.transformTo(newSort);
+        RelNode newRel;
+        if (call.rels.length == 3) {
+            VoltDBPCalc calc = call.rel(1);
+            newRel = calc.copy(calc.getTraitSet(), newSort, calc.getProgram());
+        } else {
+            newRel = newSort;
+        }
+
+        call.transformTo(newRel);
     }
 
 }
