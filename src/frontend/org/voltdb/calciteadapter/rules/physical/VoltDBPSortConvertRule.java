@@ -20,6 +20,7 @@ package org.voltdb.calciteadapter.rules.physical;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.Sort;
@@ -44,7 +45,12 @@ public class VoltDBPSortConvertRule extends ConverterRule {
 
         @Override public RelNode convert(RelNode rel) {
             Sort sort = (Sort) rel;
-            RelTraitSet traits = sort.getInput().getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+            RelTraitSet traits = sort.getInput().getTraitSet()
+                    .replace(VoltDBPRel.VOLTDB_PHYSICAL)
+                    // This is important. Since the new sort is recreated by Calcite from a collation trait
+                    // it must have the RelDistributions.ANY distribution trait to be properly
+                    // exchanged / transposed with an Exchange relation
+                    .replace(RelDistributions.ANY);
             RelNode input = sort.getInput();
             RelNode convertedInput = convert(input,
                     input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());

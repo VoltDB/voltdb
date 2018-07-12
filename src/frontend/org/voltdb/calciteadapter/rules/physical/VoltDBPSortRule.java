@@ -25,6 +25,11 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLSort;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 
+/**
+ * Convert LogicalSort to a collation that would be propagated by Calcite and recreated back
+ * a VoltDBPSort at the later stage
+ *
+ */
 public class VoltDBPSortRule extends RelOptRule {
 
         public static final VoltDBPSortRule INSTANCE = new VoltDBPSortRule();
