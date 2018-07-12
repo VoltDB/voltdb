@@ -29,25 +29,56 @@ import java.net.URL;
 
 import javax.servlet.http.HttpServletResponse;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.HTTPAdminListener;
+
 import junit.framework.TestCase;
 
 public class TestHttpTraceDisabled extends TestCase{
-    public static final String URL = "http://127.0.0.1:8080/";
+    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     public void testCanAccessRootPath() throws IOException {
-        URL url = new URL(URL);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        int code = conn.getResponseCode();
-        assertEquals(HttpServletResponse.SC_OK, code);
+        try {
+            LocalCluster cluster = new LocalCluster("testCanAccessRootPath.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            cluster.setNewCli(true);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            cluster.compile(builder);
+            cluster.startUp();
+            int hostId = VoltDB.instance().getHostMessenger().getHostId();
+            int port = cluster.httpPort(hostId);
+            final String URL = "http://127.0.0.1:" + port + "/";
+            URL url = new URL(URL);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            int code = conn.getResponseCode();
+            assertEquals(HttpServletResponse.SC_OK, code);
+            cluster.shutDown();
+        } catch (InterruptedException e) {
+            networkLog.error(e.getMessage());
+        }
     }
 
     public void testCannotAccessPathsByTrace() throws IOException {
-        URL[] handlers = new URL[] {new URL(URL), new URL(URL + "css"), new URL(URL + "images"), new URL(URL + "js")};
-        for(URL url : handlers) {
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("TRACE");
-            int code = conn.getResponseCode();
-            assertEquals(HttpServletResponse.SC_FORBIDDEN, code);
+        try {
+            LocalCluster cluster = new LocalCluster("testCannotAccessRootPathsByTrace.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            cluster.setNewCli(true);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            cluster.compile(builder);
+            cluster.startUp();
+            int hostId = VoltDB.instance().getHostMessenger().getHostId();
+            int port = cluster.httpPort(hostId);
+            final String URL = "http://127.0.0.1:" + port + "/";
+            URL[] handlers = new URL[] {new URL(URL), new URL(URL + "css"), new URL(URL + "images"), new URL(URL + "js")};
+            for(URL u : handlers) {
+                HttpURLConnection conn = (HttpURLConnection) u.openConnection();
+                conn.setRequestMethod("TRACE");
+                int code = conn.getResponseCode();
+                assertEquals(HttpServletResponse.SC_FORBIDDEN, code);
+            }
+            cluster.shutDown();
+        } catch (InterruptedException e) {
+            networkLog.error(e.getMessage());
         }
     }
 }
