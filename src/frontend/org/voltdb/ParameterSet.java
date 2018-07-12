@@ -82,14 +82,21 @@ public class ParameterSet implements JSONString {
 
         for (int ii = 0; ii < params.length; ii++) {
             Object obj = params[ii];
+
             if ((obj == null) || (obj == JSONObject.NULL)) {
                 size++;
                 continue;
             }
             size += 1;//everything has a type even arrays and null
             Class<?> cls = obj.getClass();
-            if (cls.isArray()) {
 
+            if (ByteBuffer.class.isAssignableFrom(cls)) {
+                ByteBuffer bb = (ByteBuffer)obj;
+                size += 4 + bb.capacity();
+                continue;
+            }
+
+            if (cls.isArray()) {
                 if (obj instanceof byte[]) {
                     final byte[] b = (byte[]) obj;
                     size += 4 + b.length;
@@ -690,8 +697,17 @@ public class ParameterSet implements JSONString {
                 buf.put(type.getValue());
                 continue;
             }
-
             Class<?> cls = obj.getClass();
+
+            if (ByteBuffer.class.isAssignableFrom(cls)) {
+                ByteBuffer bb = (ByteBuffer)obj;
+                buf.put(VoltType.VARBINARY.getValue());
+                buf.putInt(bb.capacity());
+                final byte[] b = bb.array();
+                buf.put(b);
+                continue;
+            }
+
             if (cls.isArray()) {
 
                 // Since arrays of bytes could be varbinary or strings,

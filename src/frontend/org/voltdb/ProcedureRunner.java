@@ -382,6 +382,7 @@ public class ProcedureRunner {
                     }
                     try {
                         Object rawResult = m_procMethod.invoke(m_procedure, paramList);
+
                         results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
                     } catch (IllegalAccessException e) {
                         // If reflection fails, invoke the same error handling that other exceptions do
