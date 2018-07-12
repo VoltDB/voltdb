@@ -95,7 +95,7 @@ public class TestExportDataSource extends TestCase {
     class TestGeneration implements Generation {
 
         @Override
-        public void acceptMastershipTask(int partitionId) {
+        public void acceptMastership(int partitionId) {
         }
 
         @Override
