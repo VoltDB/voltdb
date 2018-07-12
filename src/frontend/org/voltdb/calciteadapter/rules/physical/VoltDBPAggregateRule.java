@@ -47,13 +47,13 @@ public class VoltDBPAggregateRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltDBLAggregate aggregate = call.rel(0);
-        RelTraitSet convertedAggrTraits = aggregate.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet convertedAggrTraits = aggregate.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
 
         RelNode input = aggregate.getInput();
-        RelTraitSet convertedInputTraits = input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet convertedInputTraits = input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
         RelNode convertedInput = convert(input, convertedInputTraits);
 
-        if (this.needHashAggregator(aggregate)) {
+        if (needHashAggregator(aggregate)) {
             // Transform to a physical Hash Aggregate
             VoltDBPHashAggregate hashAggr = new VoltDBPHashAggregate(
                     aggregate.getCluster(),

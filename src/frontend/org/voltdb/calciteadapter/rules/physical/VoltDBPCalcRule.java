@@ -39,12 +39,15 @@ public class VoltDBPCalcRule extends RelOptRule {
             VoltDBLCalc calc = (VoltDBLCalc) call.rel(0);
             RelNode input = calc.getInput();
             RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
-            RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL));
+            RelNode convertedInput = convert(input,
+                    input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
+            int splitCount = (convertedInput instanceof VoltDBPRel) ?
+                    ((VoltDBPRel)convertedInput).getSplitCount() : 1;
             call.transformTo(new VoltDBPCalc(
                     calc.getCluster(),
                     convertedTraits,
                     convertedInput,
                     calc.getProgram(),
-                    1));
+                    splitCount));
         }
 }

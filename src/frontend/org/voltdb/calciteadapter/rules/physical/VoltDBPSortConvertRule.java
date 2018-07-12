@@ -45,12 +45,18 @@ public class VoltDBPSortConvertRule extends ConverterRule {
         @Override public RelNode convert(RelNode rel) {
             Sort sort = (Sort) rel;
             RelTraitSet traits = sort.getInput().getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+            RelNode input = sort.getInput();
+            RelNode convertedInput = convert(input,
+                    input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
+            int splitCount = (convertedInput instanceof VoltDBPRel) ?
+                    ((VoltDBPRel)convertedInput).getSplitCount() : 1;
+
             RelNode newRel = new VoltDBPSort(
                                 sort.getCluster(),
                                 traits.plus(sort.getCollation()),
                                 convert(sort.getInput(), traits.simplify()),
                                 sort.getCollation(),
-                                1);
+                                splitCount);
 
             return newRel;
           }
