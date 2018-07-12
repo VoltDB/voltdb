@@ -7,7 +7,7 @@ include( GNUInstallDirs )
 find_package( Threads REQUIRED )
 
 # Override by setting on CMake command line.
-set( CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard whose features are requested.")
+set( CMAKE_CXX_STANDARD 11 CACHE STRING "The C++ standard whose features are requested.")
 
 option( USE_SYSTEM_TZ_DB "Use the operating system's timezone database" ON )
 option( USE_TZ_DB_IN_DOT "Save the timezone database in the current folder" OFF )
