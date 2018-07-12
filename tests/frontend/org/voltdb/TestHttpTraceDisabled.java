@@ -33,7 +33,7 @@ import junit.framework.TestCase;
 
 public class TestHttpTraceDisabled extends TestCase{
     public static final String URL = "http://127.0.0.1:8080/";
-    
+
     public void testCanAccessRootPath() throws IOException {
         URL url = new URL(URL);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
