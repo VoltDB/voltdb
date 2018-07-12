@@ -146,7 +146,8 @@ class EnginePlanSet : public PlanSet { };
 VoltEEExceptionType VoltDBEngine::s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
 
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
-    : m_currentIndexInBatch(-1),
+    :
+      m_currentIndexInBatch(-1),
       m_currentUndoQuantum(NULL),
       m_siteId(-1),
       m_isLowestSite(false),
@@ -162,7 +163,6 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
       m_executorContext(NULL),
       m_drPartitionedConflictStreamedTable(NULL),
       m_drReplicatedConflictStreamedTable(NULL),
-      m_drStream(NULL),
       m_drReplicatedStream(NULL),
       m_currExecutorVec(NULL)
 {
@@ -179,7 +179,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t defaultDrBufferSize,
                          int64_t tempTableMemoryLimit,
                          bool isLowestSiteId,
-                         int32_t compactionThreshold)
+                         int32_t compactionThreshold,
+                         int32_t maxBufferAge)
 {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
@@ -187,6 +188,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
+    m_maxBufferAge = maxBufferAge;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -1532,9 +1534,7 @@ void
 VoltDBEngine::markAllExportingStreamsNew() {
     //Mark all streams new so that schema is sent on next tuple.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingStreams) {
-        if (entry.second != NULL) {
-            entry.second->setNew();
-        }
+        entry.second->setNew();
     }
 }
 

@@ -469,7 +469,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     byte signatureBytes[] = new byte[signatureLength];
                     sigbuf.get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
-
                     long retval = ExportManager.getQueuedExportBytes(partitionId, signature);
                     ByteBuffer buf = ByteBuffer.allocate(8);
                     buf.putLong(retval).flip();
@@ -836,7 +835,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorConfig hashinatorConfig,
-            final boolean isLowestSiteId) {
+            final boolean isLowestSiteId,
+            final long maxBufferAge) { // STAKUTIS2
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -866,7 +866,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 defaultDrBufferSize,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
-                isLowestSiteId);
+                isLowestSiteId,
+                maxBufferAge);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -921,7 +922,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int defaultDrBufferSize,
             final long tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream)
+            final boolean createDrReplicatedStream,
+            final long maxBufferAge)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
