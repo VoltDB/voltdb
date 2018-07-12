@@ -1004,97 +1004,112 @@ public class ParserDDL extends ParserRoutine {
 
     private Statement readTimeToLive(Table table, boolean alter) {
 
-        //syntax: USING TTL 10 SECOND ON COLUMN a
+        //syntax: USING TTL 10 SECONDS ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 1000 CANCELABLE
         if (!alter && token.tokenType != Tokens.USING) {
             return null;
         }
         int timeLiveValue = 0;
         String ttlUnit = "SECONDS";
         String ttlColumn = "";
-        int tokenCount = 0;
-        while (tokenCount <= 5) {
-            read();
-            switch(token.tokenType) {
-            case Tokens.TTL:
-                if (tokenCount != 0) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                break;
-            case Tokens.X_VALUE:
-                if (tokenCount != 1) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                timeLiveValue = (Integer)(token.tokenValue);
-                break;
-            case Tokens.SECONDS:
-            case Tokens.MINUTES:
-            case Tokens.HOURS:
-            case Tokens.DAYS:
-                if (tokenCount != 2) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                ttlUnit = token.tokenString;
-                break;
-            case Tokens.ON:
-                if (tokenCount == 2) {
-                    tokenCount++;
-                }
-                if (tokenCount != 3) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                break;
-            case Tokens.COLUMN:
-                if (tokenCount != 4) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                break;
-            case Tokens.X_IDENTIFIER:
-                if (tokenCount != 5) {
-                    throw unexpectedToken();
-                }
-                ttlColumn = token.tokenString;
+        int batchSize = 1000;
+        int maxFrequency = 10;
+        boolean cancelable = false;
 
-                int index = table.findColumn(ttlColumn);
-                if (index < 0) {
-                    throw unexpectedToken();
-                }
-                ColumnSchema col = table.getColumn(index);
-                //TIMESTAMP, INTEGER, BIGINT
-                int colType = col.getDataType().typeCode;
-                if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
-                    throw unexpectedToken();
-                }
-                if (!alter) {
-                    table.addTTL(timeLiveValue, ttlUnit, ttlColumn);
-                }
-                tokenCount++;
-                read();
-                break;
-            default:
+        read();
+        if (token.tokenType != Tokens.TTL) {
+            throw unexpectedToken();
+        }
+
+        read();
+        if (token.tokenType != Tokens.X_VALUE) {
+            throw unexpectedToken();
+        }
+        timeLiveValue = (Integer)(token.tokenValue);
+
+        read();
+        if (token.tokenType == Tokens.SECONDS || token.tokenType == Tokens.MINUTES ||
+             token.tokenType == Tokens.HOURS || token.tokenType == Tokens.DAYS) {
+            ttlUnit = token.tokenString;
+            read();
+        }
+
+        if (token.tokenType == Tokens.ON) {
+            read();
+            if (token.tokenType != Tokens.COLUMN) {
                 throw unexpectedToken();
             }
-        }
-        //missing parameters
-        if (tokenCount != 6) {
+            read();
+            if (token.tokenType != Tokens.X_IDENTIFIER) {
+                throw unexpectedToken();
+            }
+            ttlColumn = token.tokenString;
+            int index = table.findColumn(ttlColumn);
+            if (index < 0) {
+                throw unexpectedToken();
+            }
+            ColumnSchema col = table.getColumn(index);
+            //TIMESTAMP, INTEGER, BIGINT
+            int colType = col.getDataType().typeCode;
+            if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
+                throw unexpectedToken();
+            }
+        } else {
             throw unexpectedToken();
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
+        }
+        if (token.tokenType == Tokens.BATCH_SIZE) {
+            read();
+            if (token.tokenType != Tokens.X_VALUE) {
+                throw unexpectedToken();
+            }
+            batchSize = (Integer)(token.tokenValue);
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
+        }
+        if (token.tokenType == Tokens.MAX_FREQUENCY) {
+            read();
+            if (token.tokenType != Tokens.X_VALUE) {
+                throw unexpectedToken();
+            }
+            maxFrequency = (Integer)(token.tokenValue);
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
+        } else if (token.tokenType != Tokens.CANCELABLE) {
+            throw unexpectedToken();
+        }
+        cancelable = true;
+        return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
+    }
+
+    private Statement createTimeToLive(Table table, boolean alter,int value, String unit, String column,
+            int batchSize, int maxFrequency, boolean cancelable) {
+        if (!alter) {
+            table.addTTL(value, unit, column, batchSize, maxFrequency, cancelable);
         }
 
         Object[] args = new Object[] {
                 table.getName(),
-                timeLiveValue,
-                ttlUnit,
-                ttlColumn,
+                value,
+                unit,
+                column,
+                batchSize,
+                maxFrequency,
+                cancelable,
                 Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
                 Boolean.valueOf(false)
             };
         return new StatementSchema(null, StatementTypes.ALTER_TTL, args,
                                        null, table.getName());
-
     }
     //End of VoltDB extension
 

@@ -1342,6 +1342,11 @@ public class DDLCompiler {
             int ttlValue = Integer.parseInt(ttlNode.attributes.get("value"));
             ttl.setTtlunit(ttlNode.attributes.get("unit"));
             ttl.setTtlvalue(ttlValue);
+            ttlValue = Integer.parseInt(ttlNode.attributes.get("batchSize"));
+            ttl.setBatchsize(ttlValue);
+            ttlValue = Integer.parseInt(ttlNode.attributes.get("maxFrequency"));
+            ttl.setMaxfrequency(ttlValue);
+            ttl.setCancelable(ttlNode.attributes.containsKey("cancelable"));
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {
                     ttl.setTtlcolumn(col);
