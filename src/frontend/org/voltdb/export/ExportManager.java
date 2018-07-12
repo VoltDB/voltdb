@@ -328,12 +328,13 @@ public class ExportManager
         processor.startPolling();
     }
 
-    private ExportGeneration initializePersistedGenerations() throws IOException {
+    private ExportGeneration initializePersistedGenerations(Set<Integer> allPartitions) throws IOException {
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
         ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
         File files[] = exportOverflowDirectory.listFiles();
         if (files != null) {
-            generation.initializeGenerationFromDisk(m_messenger);
+            List<Integer> partitionsFromDisk = generation.initializeGenerationFromDisk(m_messenger);
+            allPartitions.addAll(partitionsFromDisk);
         }
         return generation;
     }
@@ -407,9 +408,13 @@ public class ExportManager
             ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(m_processorConfig);
             m_processor.set(newProcessor);
 
-            ExportGeneration generation = initializePersistedGenerations();
+            File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
+            ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
+            File files[] = exportOverflowDirectory.listFiles();
+            // Export overflow directory must exists
+            Preconditions.checkNotNull(files);
+            generation.initialize(m_messenger, m_hostId, catalogContext, connectors, partitions);
 
-            generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
             m_generation.set(generation);
             newProcessor.setExportGeneration(generation);
             newProcessor.readyForData();
@@ -423,7 +428,8 @@ public class ExportManager
         }
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration, List<Integer> partitions)
+    public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
+            boolean requiresNewExportGeneration, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -470,6 +476,9 @@ public class ExportManager
             }
             try {
                 generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
+                for (int partition : partitions) {
+                    generation.updateAckMailboxes(partition);
+                }
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Creating connector " + m_loaderClass);
                 }
@@ -530,6 +539,10 @@ public class ExportManager
             }
             //Load any missing tables.
             generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
+            for (int partition : partitions) {
+                generation.updateAckMailboxes(partition);
+            }
+
             //We create processor even if we dont have any streams.
             try {
                 ExportDataProcessor newProcessor = getNewProcessorWithProcessConfigSet(config);

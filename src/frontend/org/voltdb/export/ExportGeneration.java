@@ -56,6 +56,7 @@ import org.voltdb.messaging.LocalMailbox;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -87,7 +88,8 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    private ImmutableList<Long> m_replicasHSIds = null;
+    // Export generation mailboxes under the same partition id, excludes the local one.
+    private Map<Integer, ImmutableList<Long>> m_replicasHSIds = new HashMap<>();
 
     private Mailbox m_mbox = null;
 
@@ -114,8 +116,23 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    void initializeGenerationFromDisk(HostMessenger messenger) {
-        Set<Integer> partitions = new HashSet<Integer>();
+    void initialize(HostMessenger messenger,
+            int hostId,
+            CatalogContext catalogContext,
+            final CatalogMap<Connector> connectors,
+            List<Integer> partitions)
+    {
+        List<Integer> partitionsFromDisk = initializeGenerationFromDisk(messenger);
+        initializeGenerationFromCatalog(catalogContext, connectors, hostId, messenger, partitions);
+        Set<Integer> allPartitions = new HashSet<Integer>(partitionsFromDisk);
+        allPartitions.addAll(partitions);
+        // One export mailbox per node, since we only keep one generation
+        createAckMailboxes(messenger, allPartitions);
+        updateReplicaList(messenger, allPartitions);
+    }
+
+    List<Integer> initializeGenerationFromDisk(HostMessenger messenger) {
+        List<Integer> partitions = new ArrayList<Integer>();
 
         /*
          * Find all the data files. Once one is found, extract the nonce
@@ -146,7 +163,7 @@ public class ExportGeneration implements Generation {
                 }
             }
         }
-        createAndRegisterAckMailboxes(partitions, messenger);
+        return partitions;
     }
 
     void initializeGenerationFromCatalog(CatalogContext catalogContext,
@@ -155,26 +172,18 @@ public class ExportGeneration implements Generation {
             HostMessenger messenger,
             List<Integer> partitions)
     {
-        //Only populate partitions in use if export is actually happening
-        Set<Integer> partitionsInUse = new HashSet<Integer>();
-        final long genId = catalogContext.m_genId;
-        /*
-         * Now create datasources based on the catalog
-         */
+        // Now create datasources based on the catalog
         for (Connector conn : connectors) {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
-                    addDataSources(genId, table, hostId, partitions);
-                    partitionsInUse.addAll(partitions);
+                    addDataSources(table, hostId, partitions);
                 }
             }
         }
-
-        createAndRegisterAckMailboxes(partitionsInUse, messenger);
     }
 
-    private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
+    private void createAckMailboxes(HostMessenger messenger, final Set<Integer> localPartitions) {
 
         m_mailboxesZKPath = VoltZK.exportGenerations + "/" + "mailboxes";
 
@@ -209,7 +218,9 @@ public class ExportGeneration implements Generation {
                         try {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received RELEASE_BUFFER message for partition " + partition +
-                                        " source signature " + signature + " with uso: " + ackUSO);
+                                        " source signature " + signature + " with uso: " + ackUSO +
+                                        " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
+                                        " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
                             eds.ack(ackUSO);
                         } catch (RejectedExecutionException ignoreIt) {
@@ -252,7 +263,18 @@ public class ExportGeneration implements Generation {
             }
         };
         messenger.createMailbox(null, m_mbox);
+    }
 
+    // Access by multiple threads
+    public void updateAckMailboxes(int partition) {
+        synchronized (m_dataSourcesByPartition) {
+            for( ExportDataSource eds: m_dataSourcesByPartition.get(partition).values()) {
+                eds.updateAckMailboxes(Pair.of(m_mbox, m_replicasHSIds.get(partition)));
+            }
+        }
+    }
+
+    private void updateReplicaList(HostMessenger messenger, Set<Integer> localPartitions) {
         //If we have new partitions create mailbox paths.
         for (Integer partition : localPartitions) {
             final String partitionDN =  m_mailboxesZKPath + "/" + partition;
@@ -299,13 +321,8 @@ public class ExportGeneration implements Generation {
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
-                    m_replicasHSIds = mailboxHsids;
-                    synchronized (m_dataSourcesByPartition) {
-                        for( ExportDataSource eds:
-                            m_dataSourcesByPartition.get( partition).values()) {
-                            eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
-                        }
-                    }
+                    m_replicasHSIds.put(partition, mailboxHsids);
+                    updateAckMailboxes(partition);
                 }
             }
         });
@@ -315,7 +332,6 @@ public class ExportGeneration implements Generation {
         } catch (Throwable t) {
             Throwables.propagate(t);
         }
-
     }
 
     private Watcher constructMailboxChildWatcher(final HostMessenger messenger) {
@@ -369,7 +385,6 @@ public class ExportGeneration implements Generation {
                             } else if (code != KeeperException.Code.OK) {
                                 throw KeeperException.create(code);
                             }
-
                             final String split[] = path.split("/");
                             final int partition = Integer.valueOf(split[split.length - 1]);
                             ImmutableList.Builder<Long> mailboxes = ImmutableList.builder();
@@ -378,7 +393,15 @@ public class ExportGeneration implements Generation {
                                 mailboxes.add(Long.valueOf(child));
                             }
                             ImmutableList<Long> mailboxHsids = mailboxes.build();
-                            m_replicasHSIds = mailboxHsids;
+                            if (exportLog.isDebugEnabled()) {
+                                Set<Long> newHSIds = Sets.difference(new HashSet<Long>(mailboxHsids),
+                                        new HashSet<Long>(m_replicasHSIds.get(partition)));
+                                Set<Long> removedHSIds = Sets.difference(new HashSet<Long>(m_replicasHSIds.get(partition)),
+                                        new HashSet<Long>(mailboxHsids));
+                                exportLog.debug("Current export generation added mailbox: " + CoreUtils.hsIdCollectionToString(newHSIds) +
+                                        ", removed mailbox: " + CoreUtils.hsIdCollectionToString(removedHSIds));
+                            }
+                            m_replicasHSIds.put(partition, mailboxHsids);
                             synchronized (m_dataSourcesByPartition) {
                                 for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
                                     eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
@@ -449,7 +472,7 @@ public class ExportGeneration implements Generation {
     /*
      * Create a datasource based on an ad file
      */
-    private void addDataSource(File adFile, Set<Integer> partitions) throws IOException {
+    private void addDataSource(File adFile, List<Integer> partitions) throws IOException {
         ExportDataSource source = new ExportDataSource(this, adFile);
         partitions.add(source.getPartitionId());
         if (exportLog.isDebugEnabled()) {
@@ -471,7 +494,7 @@ public class ExportGeneration implements Generation {
     }
 
     // silly helper to add datasources for a table catalog object
-    private void addDataSources(final long genId, Table table, int hostId, List<Integer> partitions)
+    private void addDataSources(Table table, int hostId, List<Integer> partitions)
     {
         for (Integer partition : partitions) {
 
@@ -767,14 +790,14 @@ public class ExportGeneration implements Generation {
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
-            for( Long siteId: m_replicasHSIds) {
+            for( Long siteId: m_replicasHSIds.get(partitionId)) {
                 m_mbox.send(siteId, bpm);
             }
 
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Partition " + partitionId + " mailbox hsid (" +
                         CoreUtils.hsIdToString(m_mbox.getHSId()) + ") send MIGRATE_MASTER message to " +
-                        CoreUtils.hsIdCollectionToString(m_replicasHSIds));
+                        CoreUtils.hsIdCollectionToString(m_replicasHSIds.get(partitionId)));
             }
         }
     }

@@ -284,6 +284,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Mailbox " + CoreUtils.hsIdToString(ackMailboxes.getFirst().getHSId()) + " is registered for " + this.toString() +
+                    " : replicas " + CoreUtils.hsIdCollectionToString(ackMailboxes.getSecond()) );
+        }
         m_ackMailboxRefs.set( ackMailboxes);
     }
 
@@ -833,6 +837,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
             for( Long siteId: p.getSecond()) {
                 mbx.send(siteId, bpm);
+            }
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Send RELEASE_BUFFER for partition " + m_partitionId + "source signature " + m_tableName + " with uso " + uso
+                        + " from " + CoreUtils.hsIdToString(mbx.getHSId())
+                        + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
             }
         }
     }
