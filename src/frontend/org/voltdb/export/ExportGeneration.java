@@ -402,11 +402,7 @@ public class ExportGeneration implements Generation {
                                         ", removed mailbox: " + CoreUtils.hsIdCollectionToString(removedHSIds));
                             }
                             m_replicasHSIds.put(partition, mailboxHsids);
-                            synchronized (m_dataSourcesByPartition) {
-                                for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
-                                    eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
-                                }
-                            }
+                            updateAckMailboxes(partition);
                         } catch (Throwable t) {
                             VoltDB.crashLocalVoltDB("Error in export ack handling", true, t);
                         }
