@@ -3352,7 +3352,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         Client client = getClient();
         ClientResponse cr;
-        VoltTable result;
 
         cr = client.callProcedure("P2.insert", 1, "2013-07-18 02:00:00.123457");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -3369,15 +3368,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertContentOfTable(new Object[][]{{"2013-07-18 02:00:00.123457"}}, cr.getResults()[0]);
 
-        String[] invalid_offsets = {"I_AM_INVALID", "10:00", "-1:00", "+20:00"};
+        String[] invalid_offsets = {"I_AM_INVALID", "HOME/TRASH", "10:00", "-1:00"};
         String expectedError = "VOLTDB ERROR: SQL ERROR\\s*" +
-                "time offset must use valid timezone name or meet the \\[\\+\\-\\]HH:MM format\\s*";
+                "invalid timezone string\\s*";
         for (String invalid_offset : invalid_offsets) {
             verifyProcFails(client, expectedError, "FORMAT_TIMESTAMP", invalid_offset, 1);
         }
 
-        String[] offsets = {"UTC", "SADT", "EST", "CST", "CCT", "+02:30", "-10:00", "  +02:30", " -10:00 "};
-        String[] results = {"2013-07-18 02:00:00.123457", "2013-07-18 12:30:00.123457", "2013-07-17 21:00:00.123457",
+        String[] offsets = {"UTC", "Australia/Adelaide", "America/Atikokan", "America/Belize", "Asia/Shanghai",
+                "+02:30", "-10:00", "  +02:30", " -10:00 "};
+        String[] results = {"2013-07-18 02:00:00.123457", "2013-07-18 11:30:00.123457", "2013-07-17 21:00:00.123457",
                 "2013-07-17 20:00:00.123457", "2013-07-18 10:00:00.123457", "2013-07-18 04:30:00.123457",
                 "2013-07-17 16:00:00.123457", "2013-07-18 04:30:00.123457", "2013-07-17 16:00:00.123457"};
 

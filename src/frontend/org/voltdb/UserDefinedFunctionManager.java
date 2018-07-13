@@ -99,7 +99,12 @@ public class UserDefinedFunctionManager {
             assert(funcInstance != null);
             builder.put(catalogFunction.getFunctionid(), new UserDefinedFunctionRunner(catalogFunction, funcInstance));
         }
-        ///
+
+        loadBuildinJavaFunctions(builder);
+        m_udfs = builder.build();
+    }
+
+    private void loadBuildinJavaFunctions(ImmutableMap.Builder<Integer,UserDefinedFunctionRunner> builder) {
         // define the function object
         Function func = new Function();
         func.setFunctionname("FORMAT_TIMESTAMP");
@@ -107,8 +112,7 @@ public class UserDefinedFunctionManager {
         func.setClassname("org.voltdb.utils.JavaBuildinFunctions");
         func.setMethodname("format_timestamp");
         func.setReturntype(Types.VARCHAR);
-        CatalogMap<FunctionParameter> params = new CatalogMap<FunctionParameter>(null, null, "params", FunctionParameter.class, 1);
-//        CatalogMap<FunctionParameter> params = func.getParameters();
+        CatalogMap<FunctionParameter> params = new CatalogMap<>(null, null, "params", FunctionParameter.class, 1);
         FunctionParameter param = params.add("0");
         param.setParametertype(Types.TIMESTAMP);
         param = params.add("1");
@@ -118,7 +122,6 @@ public class UserDefinedFunctionManager {
         func.setFunctionid(21025);
 
         builder.put(21025, new UserDefinedFunctionRunner(func, new JavaBuildinFunctions()));
-        m_udfs = builder.build();
     }
 
 
@@ -341,5 +344,6 @@ public class UserDefinedFunctionManager {
         public String getFunctionName() {
             return m_functionName;
         }
+
     }
 }
