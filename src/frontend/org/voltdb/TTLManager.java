@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -34,8 +35,11 @@ import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.CatalogUtil;
 
 //schedule and process time-to-live feature via @LowImpactDelete. The host with smallest host id
@@ -78,14 +82,22 @@ public class TTLManager extends StatsSource{
     public class TTLTask implements Runnable {
 
         final String tableName;
-        AtomicReference<TimeToLive> ttlRef;
+        final String columnName;
         final TTLStats stats;
+        int batchSize;
+        int maxFrequency;
+        long value;
         AtomicBoolean canceled = new AtomicBoolean(false);
+        Object lock = new Object();
         public TTLTask(String table, TimeToLive timeToLive, TTLStats ttlStats) {
             tableName = table;
-            ttlRef = new AtomicReference<>(timeToLive);
             stats = ttlStats;
+            batchSize = timeToLive.getBatchsize();
+            maxFrequency = timeToLive.getMaxfrequency();
+            value =  transformValue(timeToLive);
+            columnName = timeToLive.getTtlcolumn().getName();
         }
+
         @Override
         public void run() {
 
@@ -96,9 +108,11 @@ public class TTLManager extends StatsSource{
             }
             ClientInterface cl = voltdb.getClientInterface();
             if (!canceled.get() && cl != null && cl.isAcceptingConnections()) {
-                TimeToLive ttl = ttlRef.get();
-                cl.runTimeToLive(ttl.getTtlcolumn().getName(),
-                        transformValue(ttl), CHUNK_SIZE, TIMEOUT, this);
+                long ttlValue;
+                synchronized(lock){
+                    ttlValue = value;
+                }
+                performDelete(cl, columnName, ttlValue, TIMEOUT, this);
             }
         }
 
@@ -112,7 +126,11 @@ public class TTLManager extends StatsSource{
         }
 
         public void updateTask(TimeToLive updatedTTL) {
-            ttlRef.compareAndSet(ttlRef.get(), updatedTTL);
+            synchronized(lock){
+                batchSize = updatedTTL.getBatchsize();
+                maxFrequency = updatedTTL.getMaxfrequency();
+                value =  transformValue(updatedTTL);
+            }
         }
 
         private long transformValue(TimeToLive ttl) {
@@ -239,7 +257,8 @@ public class TTLManager extends StatsSource{
                 }
                 task = new TTLTask(t.getTypeName(), ttl, stats);
                 m_tasks.put(t.getTypeName(), task);
-                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY + random.nextInt(INTERVAL), INTERVAL, TimeUnit.MILLISECONDS));
+                long interval = 1;
+                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY + random.nextInt((int)interval), interval, TimeUnit.MILLISECONDS));
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));
             } else {
                 task.updateTask(ttl);
@@ -293,5 +312,61 @@ public class TTLManager extends StatsSource{
             rowValues[columnNameToIndex.get("ROWS_REMAINING")] = stats.rowsLeft;
             rowValues[columnNameToIndex.get("LAST_DELETE_TIMESTAMP")] = stats.ts;
         }
+    }
+
+    protected void performDelete(ClientInterface cl, String columnName, long ttlValue, int timeout, TTLTask task) {
+        CountDownLatch latch = new CountDownLatch(1);
+        final ProcedureCallback cb = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse resp) throws Exception {
+                if (resp.getStatus() != ClientResponse.SUCCESS) {
+                    hostLog.warn(String.format("Fail to execute TTL on table: %s, column: %s, status: %s",
+                            task.tableName, columnName, resp.getStatusString()));
+                }
+                if (resp.getResults() != null && resp.getResults().length > 0) {
+                    VoltTable t = resp.getResults()[0];
+                    t.advanceRow();
+                    String error = t.getString("MESSAGE");
+                    if (!error.isEmpty()) {
+                        String drLimitError = "";
+                        if (error.indexOf(TTLManager.DR_LIMIT_MSG) > -1) {
+                            // The buffer limit for a DR transaction is 50M. If over the limit,
+                            // the transaction will be aborted. The same is true for nibble delete transaction.
+                            // If hit this error, no more data can be deleted in this TTL table.
+                            drLimitError = "TTL is disabled for this table.";
+                            task.cancel();
+                            ScheduledFuture<?> fut = m_futures.get(task.tableName);
+                            if (fut != null) {
+                                fut.cancel(false);
+                                m_futures.remove(task.tableName);
+                            }
+                        }
+                        hostLog.warn("Errors occured on TTL table " + task.tableName + ": " +  error + " " + drLimitError);
+                    } else {
+                        task.stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"), t.getLong("LAST_DELETE_TIMESTAMP"));
+                        adjustDeleteFrequency(task);
+                    }
+                }
+                latch.countDown();
+            }
+        };
+        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, 1000 * 120, cb,
+                "@LowImpactDelete", new Object[] {task.tableName, columnName, ttlValue, "<", task.batchSize, timeout});
+        try {
+            latch.await(1, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+        }
+    }
+
+    private void adjustDeleteFrequency(TTLTask task) {
+        ScheduledFuture<?> fut = m_futures.get(task.tableName);
+        if (fut != null) {
+            fut.cancel(false);
+            m_futures.remove(task.tableName);
+        }
+
+        //TODO: determine a new interval based on latest stats.
+        long interval = TimeUnit.SECONDS.toMillis(1)/task.maxFrequency;
+        m_futures.put(task.tableName, m_timeToLiveExecutor.scheduleAtFixedRate(task, 0, interval, TimeUnit.MILLISECONDS));
     }
 }

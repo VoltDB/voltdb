@@ -770,7 +770,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAlterTableTTL2.jar");
         verifyDiff(catOriginal, catUpdated, false, null, true, false, true);
 
-        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 CANCELABLE;");
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 MAX_FREQUENCY 1;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL21.jar"));
         Catalog catUpdated1 = catalogForJar(testDir + File.separator + "testAlterTableTTL21.jar");
         verifyDiff(catUpdated, catUpdated1, false, null, true, false, true);

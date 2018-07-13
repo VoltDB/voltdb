@@ -96,7 +96,7 @@ public class TestVoltCompiler extends TestCase {
                      "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
                      "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
                      "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
-                     "alter table ttl USING TTL 20 ON COLUMN a BATCH_SIZE 10 CANCELABLE;\n" +
+                     "alter table ttl USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
                      "alter table ttl drop TTL;\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);

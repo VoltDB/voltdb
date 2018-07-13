@@ -2734,9 +2734,6 @@ public class Table extends TableBase implements SchemaObject {
             ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
             ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
             ttl.attributes.put("maxFrequency", Integer.toString(timeToLive.maxFrequency));
-            if (timeToLive.cancelable) {
-                ttl.attributes.put("cancelable", "true");
-            }
             table.children.add(ttl);
         }
         assert(indexConstraintMap.isEmpty());
@@ -2768,17 +2765,17 @@ public class Table extends TableBase implements SchemaObject {
     // End of VoltDB extension
 
     // A VoltDB extension to support TTL
-    public void addTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency, boolean cancelable) {
+    public void addTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency) {
         dropTTL();
-        timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)), batchSize, maxFrequency, cancelable);
+        timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)), batchSize, maxFrequency);
     }
 
     public TimeToLiveVoltDB getTTL() {
         return timeToLive;
     }
 
-    public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency, boolean cancelable) {
-        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
+    public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency) {
+        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
     }
 
     public void dropTTL() {

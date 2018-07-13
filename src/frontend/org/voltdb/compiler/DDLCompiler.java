@@ -1346,7 +1346,6 @@ public class DDLCompiler {
             ttl.setBatchsize(ttlValue);
             ttlValue = Integer.parseInt(ttlNode.attributes.get("maxFrequency"));
             ttl.setMaxfrequency(ttlValue);
-            ttl.setCancelable(ttlNode.attributes.containsKey("cancelable"));
             for (Column col : table.getColumns()) {
                 if (column.equalsIgnoreCase(col.getName())) {
                     ttl.setTtlcolumn(col);

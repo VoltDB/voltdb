@@ -1004,7 +1004,7 @@ public class ParserDDL extends ParserRoutine {
 
     private Statement readTimeToLive(Table table, boolean alter) {
 
-        //syntax: USING TTL 10 SECONDS ON COLUMN a MAX_FREQUENCY 3 BATCH_SIZE 1000 CANCELABLE
+        //syntax: USING TTL 10 SECONDS ON COLUMN a MAX_FREQUENCY 1 BATCH_SIZE 1000 CANCELABLE
         if (!alter && token.tokenType != Tokens.USING) {
             return null;
         }
@@ -1012,8 +1012,7 @@ public class ParserDDL extends ParserRoutine {
         String ttlUnit = "SECONDS";
         String ttlColumn = "";
         int batchSize = 1000;
-        int maxFrequency = 10;
-        boolean cancelable = false;
+        int maxFrequency = 1;
 
         read();
         if (token.tokenType != Tokens.TTL) {
@@ -1059,7 +1058,7 @@ public class ParserDDL extends ParserRoutine {
 
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
         }
         if (token.tokenType == Tokens.BATCH_SIZE) {
             read();
@@ -1071,7 +1070,7 @@ public class ParserDDL extends ParserRoutine {
 
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
         }
         if (token.tokenType == Tokens.MAX_FREQUENCY) {
             read();
@@ -1083,18 +1082,16 @@ public class ParserDDL extends ParserRoutine {
 
         read();
         if (token.tokenType == Tokens.SEMICOLON) {
-            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
-        } else if (token.tokenType != Tokens.CANCELABLE) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        } else {
             throw unexpectedToken();
         }
-        cancelable = true;
-        return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
     }
 
     private Statement createTimeToLive(Table table, boolean alter,int value, String unit, String column,
-            int batchSize, int maxFrequency, boolean cancelable) {
+            int batchSize, int maxFrequency) {
         if (!alter) {
-            table.addTTL(value, unit, column, batchSize, maxFrequency, cancelable);
+            table.addTTL(value, unit, column, batchSize, maxFrequency);
         }
 
         Object[] args = new Object[] {
@@ -1104,7 +1101,6 @@ public class ParserDDL extends ParserRoutine {
                 column,
                 batchSize,
                 maxFrequency,
-                cancelable,
                 Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
                 Boolean.valueOf(false)
             };

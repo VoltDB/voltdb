@@ -445,8 +445,7 @@ public class StatementSchema extends Statement {
                     String ttlColumn = (String)arguments[3];
                     int batchSize = (Integer) arguments[4];
                     int maxFrequency = (Integer) arguments[5];
-                    boolean cancelable = (Boolean) arguments[6];
-                    table.alterTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency, cancelable);
+                    table.alterTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
                     break;
                 } catch (HsqlException e) {
                     return Result.newErrorResult(e, sql);
