@@ -627,6 +627,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_DWITHIN_POLYGON_POINT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_DWITHIN_POLYGON_POINT>(*arguments);
             break;
+        case FUNC_VOLT_FORMAT_TIMESTAMP:
+            ret = new UserDefinedFunctionExpression(functionId, *arguments);
+            break;
         default:
             return NULL;
         }

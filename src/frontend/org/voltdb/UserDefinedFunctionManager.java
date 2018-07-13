@@ -22,17 +22,20 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.sql.Types;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Function;
+import org.voltdb.catalog.FunctionParameter;
 import org.voltdb.common.Constants;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.SerializationHelper;
+import org.voltdb.utils.JavaBuildinFunctions;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -96,6 +99,25 @@ public class UserDefinedFunctionManager {
             assert(funcInstance != null);
             builder.put(catalogFunction.getFunctionid(), new UserDefinedFunctionRunner(catalogFunction, funcInstance));
         }
+        ///
+        // define the function object
+        Function func = new Function();
+        func.setFunctionname("FORMAT_TIMESTAMP");
+
+        func.setClassname("org.voltdb.utils.JavaBuildinFunctions");
+        func.setMethodname("format_timestamp");
+        func.setReturntype(Types.VARCHAR);
+        CatalogMap<FunctionParameter> params = new CatalogMap<FunctionParameter>(null, null, "params", FunctionParameter.class, 1);
+//        CatalogMap<FunctionParameter> params = func.getParameters();
+        FunctionParameter param = params.add("0");
+        param.setParametertype(Types.TIMESTAMP);
+        param = params.add("1");
+        param.setParametertype(Types.VARCHAR);
+        func.setParameters(params);
+        // org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor is private, I can't access FUNC_VOLT_FORMAT_TIMESTAMP, so I just use the function id directly.
+        func.setFunctionid(21025);
+
+        builder.put(21025, new UserDefinedFunctionRunner(func, new JavaBuildinFunctions()));
         m_udfs = builder.build();
     }
 
