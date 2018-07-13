@@ -8,6 +8,7 @@ Development:
  * [Using Eclipse to develop, unit test, and debug VoltDB stored procedures and java clients](EclipseUnitTestDebug.md)
  * [Configure Logging](ConfigureLogging.md)
  * [Use the BulkLoader API from a java client to load a table](bulkloader/README.md)
+ * [Start and Maintain an xdcr Cluster](xdcr_tutorial.md)
 
 Administration:
 ---------------
