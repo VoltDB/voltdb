@@ -113,7 +113,8 @@ public class TestAddDropUDF extends RegressionSuite {
         StringBuffer success = new StringBuffer();
         Set<String> dfns = FunctionForVoltDB.getAllUserDefinedFunctionNamesForDebugging();
         VoltTable vt = client.callProcedure("@SystemCatalog", "functions").getResults()[0];
-        if (dfns.size() != vt.getRowCount()) {
+        // FORMAT_TIMESTAMP is a build-in function, not UDF
+        if (!(dfns.size() - 1 == vt.getRowCount() && dfns.contains("FORMAT_TIMESTAMP"))) {
             success.append(String.format("Compiler set has %d elements, catalog has %d functions\n",
                                          dfns.size(), vt.getRowCount()));
         } else {
