@@ -9,7 +9,6 @@ import sys
 from jenkinsbot import JenkinsBot
 from jira import JIRA
 from sql_grammar_reporter import Issues # using symlink alias to reference file
-from urllib2 import HTTPError, URLError, urlopen
 
 JIRA_USER = os.environ.get('jirauser', None)
 JIRA_PASS = os.environ.get('jirapass', None)
@@ -57,8 +56,9 @@ class Reporter(Issues):
             logging.info('No new issue created. Build ' + str(build) + ' resulted in: ' + build_result)
             return
 
+        current_version = str(urlopen('https://raw.githubusercontent.com/VoltDB/voltdb/master/version.txt').read())
         description = 'SQLCoverage failure(s) on ' + job + ', build ' + str(build) + '\n\n'
-        summary = job + ':' + build + ' sqlcov-internal-err'
+        summary = job + ' : ' + build + ' : sqlcov-internal-err'
         runs = build_report.get('runs')
         for run in runs:
             config_url = run.get('url')
@@ -72,12 +72,6 @@ class Reporter(Issues):
             config_data_url = config_url + 'artifact/obj/release/sqlcoverage'
             config_stats = eval(self.read_url(config_data_url + '/stats.txt'))
             description += self.build_description(config_name, config_data_url, config_stats)
-
-        current_version = str(urlopen('https://raw.githubusercontent.com/VoltDB/voltdb/master/version.txt').read())
-        existing = jira.search_issues('summary ~ \'%s\'' % summary.replace('()','\\\\(\\\\)',10))
-        if len(existing) > 0:
-            logging.info('No new Jira issue created. Build ' + str(build) + ' has already been reported.')
-            return
 
         jenkinsbot = JenkinsBot()
         jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version, ['sqlcoverage-failure', 'automatic'],
