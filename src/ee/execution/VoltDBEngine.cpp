@@ -188,7 +188,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
-    m_maxBufferAge = maxBufferAge;
+    s_maxBufferAge = maxBufferAge;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());

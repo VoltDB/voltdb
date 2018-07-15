@@ -270,7 +270,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
     jint compactionThreshold,
-    jint maxBufferAge) // STAKUTIS2
+    jint maxBufferAge)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -298,7 +298,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                            defaultDrBufferSize,
                            tempTableMemory,
                            createDrReplicatedStream,
-                           static_cast<int32_t>(compactionThreshold), maxBufferAge); // STAKUTIS
+                           static_cast<int32_t>(compactionThreshold), maxBufferAge);
         VOLT_DEBUG("initialize succeeded");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     }

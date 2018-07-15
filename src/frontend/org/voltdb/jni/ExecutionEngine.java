@@ -916,7 +916,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long tempTableMemory,
             boolean createDrReplicatedStream,
             int compactionThreshold,
-            int maxBufferAge); // STAKUTIS
+            int maxBufferAge);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.

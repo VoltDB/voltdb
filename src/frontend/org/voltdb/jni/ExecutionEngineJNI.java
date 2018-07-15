@@ -151,7 +151,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
             final boolean isLowestSiteId,
-            final int maxBufferAge) // STAKUTIS2
+            final int maxBufferAge)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -182,7 +182,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     tempTableMemory * 1024 * 1024,
                     isLowestSiteId,
                     EE_COMPACTION_THRESHOLD,
-                    maxBufferAge); //STAKUTIS2
+                    maxBufferAge);
         checkErrorCode(errorCode);
 
         setupPsetBuffer(smallBufferSize);

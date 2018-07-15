@@ -836,7 +836,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int port,
             final HashinatorConfig hashinatorConfig,
             final boolean isLowestSiteId,
-            final long maxBufferAge) { // STAKUTIS2
+            final long maxBufferAge) {
         super(siteId, partitionId);
 
         // m_counter = 0;

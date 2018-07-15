@@ -121,7 +121,7 @@ typedef std::unique_ptr<AbstractTempTable, TempTableTupleDeleter> UniqueTempTabl
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
-static  int32_t m_maxBufferAge=4*1005; /** maxBufferAge in ms for export stream flushing STAKUTIS**/
+static  int32_t s_maxBufferAge=4*1000;
 
 
 /**
