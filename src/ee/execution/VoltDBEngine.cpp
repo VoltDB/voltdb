@@ -139,6 +139,8 @@ typedef boost::multi_index::multi_index_container<
     >
 > PlanSet;
 
+  int32_t s_maxBufferAge=4000;  // export/tuple flush interval ms setting
+
 
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
