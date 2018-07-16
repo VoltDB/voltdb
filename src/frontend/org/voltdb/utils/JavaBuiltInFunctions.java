@@ -29,7 +29,7 @@ import java.time.ZoneId;
  * This is the Java class that manages Java build-in function. It is the Java version of SQL functions,
  * but using the UDF mechanism.
  */
-public class JavaBuildInFunctions {
+public class JavaBuiltInFunctions {
     public String format_timestamp(TimestampType ts, String tz) throws VoltAbortException {
         if (ts == null) {
             return null;

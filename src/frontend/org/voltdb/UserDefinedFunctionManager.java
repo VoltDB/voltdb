@@ -22,20 +22,18 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.sql.Types;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Function;
-import org.voltdb.catalog.FunctionParameter;
 import org.voltdb.common.Constants;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.SerializationHelper;
-import org.voltdb.utils.JavaBuildInFunctions;
+import org.voltdb.utils.JavaBuiltInFunctions;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -108,7 +106,7 @@ public class UserDefinedFunctionManager {
         // define the function object
 
         // org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor is private, I can't access FUNC_VOLT_FORMAT_TIMESTAMP, so I just use the function id directly.
-        builder.put(21025, new UserDefinedFunctionRunner("FORMAT_TIMESTAMP", 21025, "format_timestamp", new JavaBuildInFunctions()));
+        builder.put(21025, new UserDefinedFunctionRunner("FORMAT_TIMESTAMP", 21025, "format_timestamp", new JavaBuiltInFunctions()));
     }
 
 
@@ -199,6 +197,7 @@ public class UserDefinedFunctionManager {
                     m_functionMethod = m;
                     break;
                 }
+
             }
             if (m_functionMethod == null) {
                 throw new RuntimeException(
