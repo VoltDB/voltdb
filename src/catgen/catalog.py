@@ -179,7 +179,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
             fname = field.name
             realtype = field.type[:-1]
             methname = fname.capitalize()
-            if field.type[-1] == '*' and not (clsname == 'Function' and fname == 'parameters'):
+            if field.type[-1] == '*':
                 continue
             if field.has_comment():
                 write('    /** SETTER:', field.comment, '*/')

@@ -3360,12 +3360,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // null timestamp will return null
         cr = client.callProcedure("FORMAT_TIMESTAMP", "UTC", 2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertContentOfTable(new Object[][]{{null}}, cr.getResults()[0]);
 
         // null offset means offset == 0
         cr = client.callProcedure("FORMAT_TIMESTAMP", null, 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertContentOfTable(new Object[][]{{"2013-07-18 02:00:00.123457"}}, cr.getResults()[0]);
 
         String[] invalid_offsets = {"I_AM_INVALID", "HOME/TRASH", "10:00", "-1:00"};
@@ -3383,7 +3381,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         for (int i = 0; i < offsets.length; i++) {
             cr = client.callProcedure("FORMAT_TIMESTAMP", offsets[i], 1);
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             assertContentOfTable(new Object[][]{{results[i]}}, cr.getResults()[0]);
         }
     }

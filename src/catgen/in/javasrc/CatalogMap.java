@@ -46,7 +46,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     boolean m_hasComputedOrder = false;
     int m_depth;
 
-    public CatalogMap(Catalog catalog, CatalogType parent, String name, Class<T> cls, int depth) {
+    CatalogMap(Catalog catalog, CatalogType parent, String name, Class<T> cls, int depth) {
         m_catalog = catalog;
         m_parent = parent;
         m_name = name;

@@ -586,7 +586,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         bool checkTempTableCleanup(ExecutorVector* execsForFrag);
 
-        void initJavaBuildinSQLFunctionInfo();
+        void initJavaBuildInSQLFunctionInfo();
 
         // -------------------------------------------------
         // Data Members

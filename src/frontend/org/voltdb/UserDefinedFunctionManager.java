@@ -35,7 +35,7 @@ import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.SerializationHelper;
-import org.voltdb.utils.JavaBuildinFunctions;
+import org.voltdb.utils.JavaBuildInFunctions;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -100,28 +100,15 @@ public class UserDefinedFunctionManager {
             builder.put(catalogFunction.getFunctionid(), new UserDefinedFunctionRunner(catalogFunction, funcInstance));
         }
 
-        loadBuildinJavaFunctions(builder);
+        loadBuildInJavaFunctions(builder);
         m_udfs = builder.build();
     }
 
-    private void loadBuildinJavaFunctions(ImmutableMap.Builder<Integer,UserDefinedFunctionRunner> builder) {
+    private void loadBuildInJavaFunctions(ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder) {
         // define the function object
-        Function func = new Function();
-        func.setFunctionname("FORMAT_TIMESTAMP");
 
-        func.setClassname("org.voltdb.utils.JavaBuildinFunctions");
-        func.setMethodname("format_timestamp");
-        func.setReturntype(Types.VARCHAR);
-        CatalogMap<FunctionParameter> params = new CatalogMap<>(null, null, "params", FunctionParameter.class, 1);
-        FunctionParameter param = params.add("0");
-        param.setParametertype(Types.TIMESTAMP);
-        param = params.add("1");
-        param.setParametertype(Types.VARCHAR);
-        func.setParameters(params);
         // org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor is private, I can't access FUNC_VOLT_FORMAT_TIMESTAMP, so I just use the function id directly.
-        func.setFunctionid(21025);
-
-        builder.put(21025, new UserDefinedFunctionRunner(func, new JavaBuildinFunctions()));
+        builder.put(21025, new UserDefinedFunctionRunner("FORMAT_TIMESTAMP", 21025, "format_timestamp", new JavaBuildInFunctions()));
     }
 
 
@@ -146,27 +133,8 @@ public class UserDefinedFunctionManager {
             m_functionId = catalogFunction.getFunctionid();
             m_functionInstance = funcInstance;
             m_functionMethod = null;
-            String methodName = catalogFunction.getMethodname();
-            for (final Method m : m_functionInstance.getClass().getDeclaredMethods()) {
-                if (m.getName().equals(methodName)) {
-                    if (! Modifier.isPublic(m.getModifiers())) {
-                        continue;
-                    }
-                    if (Modifier.isStatic(m.getModifiers())) {
-                        continue;
-                    }
-                    if (m.getReturnType().equals(Void.TYPE)) {
-                        continue;
-                    }
-                    m_functionMethod = m;
-                    break;
-                }
-            }
-            if (m_functionMethod == null) {
-                throw new RuntimeException(
-                        String.format("Error loading function %s: cannot find the %s() method.",
-                                m_functionName, methodName));
-            }
+
+            initFunctionMethod(catalogFunction.getMethodname());
 
             Class<?>[] paramTypeClasses = m_functionMethod.getParameterTypes();
             m_paramCount = paramTypeClasses.length;
@@ -188,6 +156,55 @@ public class UserDefinedFunctionManager {
                                                   m_functionId,
                                                   m_returnType,
                                                   m_paramTypes);
+        }
+
+        public UserDefinedFunctionRunner(String functionName, int functionId, String methodName, Object funcInstance) {
+            m_functionName = functionName;
+            m_functionId = functionId;
+            m_functionInstance = funcInstance;
+            m_functionMethod = null;
+
+            initFunctionMethod(methodName);
+            Class<?>[] paramTypeClasses = m_functionMethod.getParameterTypes();
+            m_paramCount = paramTypeClasses.length;
+            m_paramTypes = new VoltType[m_paramCount];
+            m_boxUpByteArray = new boolean[m_paramCount];
+            for (int i = 0; i < m_paramCount; i++) {
+                m_paramTypes[i] = VoltType.typeFromClass(paramTypeClasses[i]);
+                m_boxUpByteArray[i] = paramTypeClasses[i] == Byte[].class;
+            }
+            m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
+
+            m_logger.debug(String.format("The user-defined function manager is defining function %s (ID = %s)",
+                    m_functionName, m_functionId));
+
+            // We register the token again when initializing the user-defined function manager because
+            // in a cluster setting the token may only be registered on the node where the CREATE FUNCTION DDL
+            // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
+            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes);
+        }
+
+        private void initFunctionMethod(String methodName) {
+            for (final Method m : m_functionInstance.getClass().getDeclaredMethods()) {
+                if (m.getName().equals(methodName)) {
+                    if (!Modifier.isPublic(m.getModifiers())) {
+                        continue;
+                    }
+                    if (Modifier.isStatic(m.getModifiers())) {
+                        continue;
+                    }
+                    if (m.getReturnType().equals(Void.TYPE)) {
+                        continue;
+                    }
+                    m_functionMethod = m;
+                    break;
+                }
+            }
+            if (m_functionMethod == null) {
+                throw new RuntimeException(
+                        String.format("Error loading function %s: cannot find the %s() method.",
+                                m_functionName, methodName));
+            }
         }
 
         // We should refactor those functions into SerializationHelper

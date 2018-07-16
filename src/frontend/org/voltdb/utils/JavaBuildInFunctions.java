@@ -29,7 +29,7 @@ import java.time.ZoneId;
  * This is the Java class that manages Java build-in function. It is the Java version of SQL functions,
  * but using the UDF mechanism.
  */
-public class JavaBuildinFunctions {
+public class JavaBuildInFunctions {
     public String format_timestamp(TimestampType ts, String tz) throws VoltAbortException {
         if (ts == null) {
             return null;
@@ -43,13 +43,9 @@ public class JavaBuildinFunctions {
         Instant fromEpochMilli = Instant.ofEpochMilli(millis);
         ZoneOffset offset;
         try {
-            offset = ZoneOffset.of(tz);
+            offset = ZonedDateTime.ofInstant(fromEpochMilli, ZoneId.of(tz)).getOffset();
         } catch (DateTimeException offsetEx) {
-            try {
-                offset = ZonedDateTime.ofInstant(fromEpochMilli, ZoneId.of(tz)).getOffset();
-            } catch (DateTimeException tzEx) {
-                throw new VoltAbortException("VOLTDB ERROR: SQL ERROR\n" + "    invalid timezone string.");
-            }
+            throw new VoltAbortException("VOLTDB ERROR: SQL ERROR\n" + "    invalid timezone string.");
         }
 
         long offsetInSeconds = offset.getTotalSeconds();
