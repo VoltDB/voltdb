@@ -128,7 +128,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), true, 4*1009)); // STAKUTIS2
+                                new HashinatorConfig(configBytes, 0, 0), true, 4*1000));
             }
         }).get();
 
@@ -148,7 +148,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false, 4*1009));
+                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
             }
         }).get();
 
