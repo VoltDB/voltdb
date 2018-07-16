@@ -98,11 +98,11 @@ public class UserDefinedFunctionManager {
             builder.put(catalogFunction.getFunctionid(), new UserDefinedFunctionRunner(catalogFunction, funcInstance));
         }
 
-        loadBuildInJavaFunctions(builder);
+        loadBuiltInJavaFunctions(builder);
         m_udfs = builder.build();
     }
 
-    private void loadBuildInJavaFunctions(ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder) {
+    private void loadBuiltInJavaFunctions(ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder) {
         // define the function object
 
         // org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor is private, I can't access FUNC_VOLT_FORMAT_TIMESTAMP, so I just use the function id directly.

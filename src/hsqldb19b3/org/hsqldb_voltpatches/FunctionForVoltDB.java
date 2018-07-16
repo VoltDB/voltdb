@@ -1011,7 +1011,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             assert((functionId < 0) || (functionId == retFunctionId));
         } else {
             // if the function was not already defined, then
-            //   if functionId is a valid UDF id, then use it
+            //   if functionId is a valid UDF id or pre-defined SQL function id, then use it
             //   otherwise, we want a new number.
             //
             if (functionId > 0) {
@@ -1021,6 +1021,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             FunctionDescriptor fd = makeFunctionDescriptorFromParts(functionName, retFunctionId,
                                                             hsqlReturnType, hsqlParameterTypes);
+            // if the function id is belong to UDF, put it into the defined_function map
             if (isUserDefinedFunctionId(retFunctionId)) {
                 FunctionDescriptor.addDefinedFunction(functionName, fd);
             }
