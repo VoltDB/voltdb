@@ -360,7 +360,7 @@ class Stats(object):
                     }
 
                     add_target = ('INSERT INTO `junit-build-targets` '
-                                  '(name, build, target, duration, empty, failcount, passcount, skipcount) '
+                                  '(name, build, target, duration, `empty`, failcount, passcount, skipcount) '
                                   'VALUES (%(name)s, %(build)s, %(target)s, SEC_TO_TIME(%(duration)s), %(empty)s, %(failcount)s, %(passcount)s, %(skipcount)s)')
 
                     logging.debug(add_target % target_data)
