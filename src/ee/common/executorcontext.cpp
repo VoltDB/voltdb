@@ -106,7 +106,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 CatalogId hostId,
                 AbstractDRTupleStream *drStream,
                 AbstractDRTupleStream *drReplicatedStream,
-                CatalogId drClusterId):
+                CatalogId drClusterId) :
     m_topend(topend),
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),

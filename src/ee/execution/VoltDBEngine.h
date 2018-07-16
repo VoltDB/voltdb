@@ -146,7 +146,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int64_t tempTableMemoryLimit,
                         bool createDrReplicatedStream,
                         int32_t compactionThreshold = 95,
-                        int32_t maxBufferAge = 4*1002);
+                        int32_t maxBufferAge = 4*1000);
         virtual ~VoltDBEngine();
 
         // ------------------------------------------------------------------

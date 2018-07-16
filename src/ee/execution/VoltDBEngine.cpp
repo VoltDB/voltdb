@@ -148,8 +148,7 @@ class EnginePlanSet : public PlanSet { };
 VoltEEExceptionType VoltDBEngine::s_loadTableException = VOLT_EE_EXCEPTION_TYPE_NONE;
 
 VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
-    :
-      m_currentIndexInBatch(-1),
+    : m_currentIndexInBatch(-1),
       m_currentUndoQuantum(NULL),
       m_siteId(-1),
       m_isLowestSite(false),
