@@ -33,7 +33,6 @@ package org.hsqldb_voltpatches;
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -1015,14 +1014,16 @@ public class FunctionForVoltDB extends FunctionSQL {
             //   if functionId is a valid UDF id, then use it
             //   otherwise, we want a new number.
             //
-            if (isUserDefinedFunctionId(functionId)) {
+            if (functionId > 0) {
                 retFunctionId = functionId;
             } else {
                 retFunctionId = getNextFunctionId();
             }
             FunctionDescriptor fd = makeFunctionDescriptorFromParts(functionName, retFunctionId,
                                                             hsqlReturnType, hsqlParameterTypes);
-            FunctionDescriptor.addDefinedFunction(functionName, fd);
+            if (isUserDefinedFunctionId(retFunctionId)) {
+                FunctionDescriptor.addDefinedFunction(functionName, fd);
+            }
             m_logger.debug(String.format("Added UDF \"%s\"(%d) with %d parameters",
                                         functionName, retFunctionId, voltParameterTypes.length));
         }
