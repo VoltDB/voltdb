@@ -193,7 +193,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
-
+    // Git is fun -- STAKUTIS
     // create the template single long (int) table
     assert (m_templateSingleLongTable == NULL);
     m_templateSingleLongTable = new char[m_templateSingleLongTableSize];
