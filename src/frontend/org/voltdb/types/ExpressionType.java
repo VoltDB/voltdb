@@ -89,7 +89,7 @@ public enum ExpressionType {
         // greater than equal operator between left and right
     COMPARE_LIKE                 (ComparisonExpression.class, 16, "LIKE", true),
         // LIKE operator (left LIKE right). both children must be string.
-    COMPARE_STARTSWITH           (ComparisonExpression.class, 76, "STARTS WITH", true),
+    COMPARE_STARTSWITH           (ComparisonExpression.class, 150, "STARTS WITH", true),
     COMPARE_IN                   (InComparisonExpression.class, 17, "IN", true),
         // IN operator. left IN right. right must be VectorValue
     // value 18 is assigned to OPERATOR_EXISTS

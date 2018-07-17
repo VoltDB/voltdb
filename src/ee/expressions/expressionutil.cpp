@@ -216,7 +216,7 @@ getGeneral(ExpressionType c,
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new ComparisonExpression<CmpLike>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_STARTSWITH):
-        return new ComparisonExpression<CmpSw>(c, l, r);
+        return new ComparisonExpression<CmpStartsWith>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new ComparisonExpression<CmpIn>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
@@ -253,7 +253,7 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new InlinedComparisonExpression<CmpLike, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_STARTSWITH):
-        return new InlinedComparisonExpression<CmpSw, L, R>(c, l, r);
+        return new InlinedComparisonExpression<CmpStartsWith, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new InlinedComparisonExpression<CmpIn, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):

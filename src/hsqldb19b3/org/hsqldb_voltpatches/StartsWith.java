@@ -1,10 +1,30 @@
-
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2018 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.hsqldb_voltpatches.types.Type;
-import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 
@@ -17,9 +37,8 @@ class StartsWith {
 
     private final static BinaryData maxByteValue =
         new BinaryData(new byte[]{ -128 }, false);
-    private char[]   cLike;
+    private char[]   cStartsWith;
     private int      iLen;
-    private boolean  isIgnoreCase;
     private boolean  isNull;
     boolean          hasCollation;
     boolean          isVariable      = true;
@@ -30,10 +49,6 @@ class StartsWith {
 
     void setParams(boolean collation) {
         hasCollation = collation;
-    }
-
-    void setIgnoreCase(boolean flag) {
-        isIgnoreCase = flag;
     }
 
     private Object getStartsWith() {
@@ -56,9 +71,9 @@ class StartsWith {
 
         for (; i < iLen; i++) {
             if (isBinary) {
-                os.writeByte(cLike[i]);
+                os.writeByte(cStartsWith[i]);
             } else {
-                sb.append(cLike[i]);
+                sb.append(cStartsWith[i]);
             }
         }
 
@@ -78,10 +93,6 @@ class StartsWith {
 
         if (isNull) {
             return null;
-        }
-
-        if (isIgnoreCase) {
-            o = ((CharacterType) dataType).upper(session, o);
         }
 
         return compareAt(o, 0, 0, getLength(session, o, "")) ? Boolean.TRUE
@@ -117,7 +128,7 @@ class StartsWith {
     private boolean compareAt(Object o, int i, int j, int jLen) {
 
         for (; i < iLen; i++) {
-            if ((j >= jLen) || (cLike[i] != getChar(o, j++))) {
+            if ((j >= jLen) || (cStartsWith[i] != getChar(o, j++))) {
                 return false;
             }
         }
@@ -137,19 +148,15 @@ class StartsWith {
             return;
         }
 
-        if (isIgnoreCase) {
-            pattern = (String) ((CharacterType) dataType).upper(null, pattern);
-        }
-
         iLen           = 0;
 
         int l = getLength(session, pattern, "");
 
-        cLike        = new char[l];
+        cStartsWith        = new char[l];
 
         for (int i = 0; i < l; i++) {
             char c = getChar(pattern, i);
-            cLike[iLen++] = c;
+            cStartsWith[iLen++] = c;
         }
     }
 
@@ -166,11 +173,9 @@ class StartsWith {
         return true;
     }
 
-    // An VoltDB extension for STARTS WITH operator
     boolean isEquivalentToCharPredicate() {
         return !isVariable;
     }
-    // End of VoltDB extension
 
     Object getRangeLow() {
         return getStartsWith();
@@ -198,10 +203,9 @@ class StartsWith {
         sb.append(super.toString()).append("[\n");
         sb.append("isNull=").append(isNull).append('\n');
 
-        sb.append("isIgnoreCase=").append(isIgnoreCase).append('\n');
         sb.append("iLen=").append(iLen).append('\n');
-        sb.append("cLike=");
-        sb.append(StringUtil.arrayToString(cLike));
+        sb.append("cStartsWith=");
+        sb.append(StringUtil.arrayToString(cStartsWith));
         sb.append(']');
 
         return sb.toString();

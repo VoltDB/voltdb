@@ -1423,7 +1423,7 @@ public class Tokens {
     static final int        SHUTDOWN              = 586;
     // A VoltDB extension to support fast match with some ranges starting with some patterns
     static final int        STARTS                = 1011;
-    // Eng of VoltDB extension
+    // End of VoltDB extension
     static final int        TEMP                  = 587;
     static final int        TEXT                  = 588;
     static final int        TO_CHAR               = 589;

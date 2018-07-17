@@ -1,7 +1,29 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2018 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.lib.HsqlList;
-import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.types.Type;
 
 import java.util.Objects;
@@ -11,9 +33,8 @@ import java.util.Objects;
  *
  * @author Xin Jin
  */
-public final class ExpressionStartsWith extends ExpressionLogical {
+public class ExpressionStartsWith extends ExpressionLogical {
 
-    private final static int BINARY  = 2;
     private StartsWith             startsWithObject;
 
     /**
@@ -26,7 +47,7 @@ public final class ExpressionStartsWith extends ExpressionLogical {
         nodes               = new Expression[BINARY];
         nodes[LEFT]         = left;
         nodes[RIGHT]        = right;
-        startsWithObject          = new StartsWith();
+        startsWithObject    = new StartsWith();
         this.noOptimisation = noOptimisation;
     }
 
@@ -36,11 +57,6 @@ public final class ExpressionStartsWith extends ExpressionLogical {
 
         this.nodes      = other.nodes;
         this.startsWithObject = other.startsWithObject;
-    }
-
-    @Override
-    void collectObjectNames(Set set) {
-        super.collectObjectNames(set);
     }
 
     @Override
@@ -68,10 +84,8 @@ public final class ExpressionStartsWith extends ExpressionLogical {
         Object rightValue  = nodes[RIGHT].getValue(session);
 
         if (startsWithObject.isVariable) {
-            synchronized (startsWithObject) {
-               startsWithObject.setPattern(session, rightValue);
-               return startsWithObject.compare(session, leftValue);
-            }
+            startsWithObject.setPattern(session, rightValue);
+            return startsWithObject.compare(session, leftValue);
         }
 
         return startsWithObject.compare(session, leftValue);
@@ -96,13 +110,7 @@ public final class ExpressionStartsWith extends ExpressionLogical {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        if (nodes[LEFT].dataType.isCharacterType()
-                && nodes[RIGHT].dataType.isCharacterType()) {
-            boolean ignoreCase =
-                nodes[LEFT].dataType.typeCode == Types.VARCHAR_IGNORECASE
-                || nodes[RIGHT].dataType.typeCode == Types.VARCHAR_IGNORECASE;
-            startsWithObject.setIgnoreCase(ignoreCase);
-        } else if (nodes[LEFT].dataType.isBinaryType()
+        if (nodes[LEFT].dataType.isBinaryType()
                    && nodes[RIGHT].dataType.isBinaryType()) {
             startsWithObject.isBinary = true;
         } else if (false == (nodes[LEFT].dataType.isBooleanType()
@@ -110,7 +118,10 @@ public final class ExpressionStartsWith extends ExpressionLogical {
                               && dataType.isBooleanType()) {
             // If both argument nodes are boolean we have resolved
             // this before.  So, this is ok.  Otherwise, this is not
-            // properly typed.          throw Error.error(ErrorCode.X_42565);
+            // properly typed.
+            if (!(nodes[LEFT].dataType.isCharacterType() && nodes[RIGHT].dataType.isCharacterType())) {
+                throw Error.error(ErrorCode.X_42565);
+            }
         }
 
         if (startsWithObject != null) {
@@ -121,9 +132,6 @@ public final class ExpressionStartsWith extends ExpressionLogical {
 
         if (isRightArgFixedConstant && nodes[LEFT].opType == OpTypes.VALUE) {
             setAsConstantValue(session);
-
-            startsWithObject = null;
-
             return;
         }
 
@@ -146,10 +154,10 @@ public final class ExpressionStartsWith extends ExpressionLogical {
             return;
         }
 
-        if (nodes[RIGHT].isParam) {   // Shouldn't arrive here
-            return;
-        }
-        else if (startsWithObject.isEquivalentToUnknownPredicate()) {
+        // User parameters should not arrive here.
+        assert(!nodes[RIGHT].isParam);
+
+        if (startsWithObject.isEquivalentToUnknownPredicate()) {
             this.setAsConstantValue(null);
             startsWithObject = null;
         } else if (startsWithObject.isEquivalentToCharPredicate()) {    // handling plain prefix
@@ -193,7 +201,7 @@ public final class ExpressionStartsWith extends ExpressionLogical {
         String       right = getContextSQL(nodes[RIGHT]);
         StringBuffer sb    = new StringBuffer();
 
-        sb.append(left).append(' ').append(Tokens.T_STARTS).append(Tokens.T_WITH).append(' ');
+        sb.append(left).append(' ').append(Tokens.T_STARTS).append(' ').append(Tokens.T_WITH).append(' ');
         sb.append(right);
 
         return sb.toString();

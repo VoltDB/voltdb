@@ -3379,22 +3379,22 @@ public class ParserDQL extends ParserBase {
      *
      * @param a ExpressionColumn
      */
-    private ExpressionLogical XStartsWithPredicateRightPart(Expression a) {
+    private ExpressionLogical XStartsWithPredicateRightPart(Expression left) {
 
         readThis(Tokens.WITH);
 
-        if (token.tokenType == Tokens.QUESTION) {    // handle user parameter
-            Expression left = XreadRowValuePredicand();
-            if (a.isParam() && left.isParam()) {
+        if (token.tokenType == Tokens.QUESTION) {    // handle user parameter case
+            Expression right = XreadRowValuePredicand();
+            if (left.isParam() && right.isParam()) {  // again make sure the left side is valid
                 throw Error.error(ErrorCode.X_42567);
             }
-            Expression l = new ExpressionLogical(OpTypes.GREATER_EQUAL, a, left);
-            Expression r = new ExpressionLogical(OpTypes.SMALLER_EQUAL, a,
-                    new ExpressionArithmetic(OpTypes.CONCAT, left, new ExpressionValue("\uffff", Type.SQL_CHAR)));
+            Expression l = new ExpressionLogical(OpTypes.GREATER_EQUAL, left, right);
+            Expression r = new ExpressionLogical(OpTypes.SMALLER_EQUAL, left,
+                    new ExpressionArithmetic(OpTypes.CONCAT, right, new ExpressionValue("\uffff", Type.SQL_CHAR)));
             return new ExpressionLogical(OpTypes.AND, l, r);
-        } else {          // handle plain value
-            Expression b      = XreadStringValueExpression();
-            return new ExpressionStartsWith(a, b, this.isCheckOrTriggerCondition);
+        } else {          // handle plain string value
+            Expression right      = XreadStringValueExpression();
+            return new ExpressionStartsWith(left, right, this.isCheckOrTriggerCondition);
         }
     }
 

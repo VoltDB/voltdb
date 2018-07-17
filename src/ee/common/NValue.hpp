@@ -4015,7 +4015,8 @@ inline NValue NValue::like(const NValue& rhs) const {
 
 /*
  * The LHS (this) should always be the string being compared
- * and the RHS should always be a plain string.
+ * and the RHS should always be a plain string used as pattern.
+ * The funtion returns NValue: true if rhs is a prefix of lhs, o/w NValue: false.
  *
  * Null check should have been handled in comparisonexpression.h already.
  */
@@ -4044,6 +4045,10 @@ inline NValue NValue::startsWith(const NValue& rhs) const {
     int32_t patternUTF8Length;
     const char* patternChars = rhs.getObject_withoutNull(&patternUTF8Length);
 
+    /*
+     * The case if pattern is an empty string.
+     * Return true only if the left string is also an empty string.
+     */
     if (0 == patternUTF8Length) {
         if (0 == valueUTF8Length) {
             return getTrue();
@@ -4052,22 +4057,23 @@ inline NValue NValue::startsWith(const NValue& rhs) const {
         }
     }
 
-    assert(valueChars);
-    assert(patternChars);
-
     UTF8Iterator m_value(valueChars, valueChars + valueUTF8Length);
     UTF8Iterator m_pattern(patternChars, patternChars + patternUTF8Length);
 
+    /*
+     * Go through the pattern per single code point to see if pattern is the prefix
+     */
     while (! m_pattern.atEnd()) {
         const uint32_t nextPatternCodePoint = m_pattern.extractCodePoint();
-        if (m_value.atEnd()) {
+        if (m_value.atEnd()) { // if left string is longer than pattern string
             return getFalse();
         }
-        const int nextValueCodePoint = m_value.extractCodePoint();
-        if (nextPatternCodePoint != nextValueCodePoint) {
+        const uint32_t nextValueCodePoint = m_value.extractCodePoint();
+        if (nextPatternCodePoint != nextValueCodePoint) { // if the current char is not the same
             return getFalse();
         }
     }
+    // Have checked the pattern is the prefix of left string, return true
     return getTrue();
 }
 
