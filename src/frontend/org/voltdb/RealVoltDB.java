@@ -192,7 +192,6 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -1741,7 +1740,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         VoltZK.removeActionBlocker(m_messenger.getZK(), VoltZK.migratePartitionLeaderBlocker, hostLog);
         MigratePartitionLeaderInfo migratePartitionLeaderInfo = VoltZK.getMigratePartitionLeaderInfo(m_messenger.getZK());
-        if (migratePartitionLeaderInfo == null){
+        if (migratePartitionLeaderInfo == null) {
             return;
         }
 
@@ -1758,22 +1757,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         //Then reset the MigratePartitionLeader status on the new leader to allow it process transactions as leader
         if (failedHosts.contains(oldHostId) && newHostId == m_messenger.getHostId()) {
             Initiator initiator = m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
-            String msg = "The host which initiates @MigratePartitionLeader is down. Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId());
+            hostLog.info("The host that initiated @MigratePartitionLeader possibly went down before migration completed. Reset MigratePartitionLeader status on "
+                          + CoreUtils.hsIdToString(initiator.getInitiatorHSId()));
             ((SpInitiator)initiator).setMigratePartitionLeaderStatus(oldHostId);
-            hostLog.warn(msg);
-            return;
-        }
-
-        //The new leader is down, on old leader host:
-        if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) {
+            VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
+        } else if (failedHosts.contains(newHostId) && oldHostId == m_messenger.getHostId()) { //The new leader is down, on old leader host:
             int currentLeaderHostId = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(migratePartitionLeaderInfo.getPartitionId()));
             SpInitiator initiator = (SpInitiator)m_iv2Initiators.get(migratePartitionLeaderInfo.getPartitionId());
             //The partition leader is still on old host but marked as none leader. Reinstall the old leader.
             if (oldHostId == currentLeaderHostId && !initiator.isLeader()) {
                 String msg = "The host with new partition leader is down. Reset MigratePartitionLeader status on "+ CoreUtils.hsIdToString(initiator.getInitiatorHSId());
-                hostLog.warn(msg);
+                hostLog.info(msg);
                 initiator.resetMigratePartitionLeaderStatus(newHostId);
             }
+            VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
         }
     }
 
@@ -1973,7 +1970,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 JSONObject jsObj = new JSONObject(stringer.toString());
                 jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
             } catch (JSONException e) {
-                Throwables.propagate(e);
+                throw new RuntimeException(e);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -2221,7 +2218,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             int hostId = it.next();
             final int currentMasters = m_cartographer.getMasterCount(hostId);
             if (currentMasters > minimalNumberOfLeaders) {
-                hostLog.debug("Host " + hostId + " has more than " + minimalNumberOfLeaders + ". Sending migrate partition message");
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Host " + hostId + " has more than " + minimalNumberOfLeaders +
+                            ". Sending migrate partition message");
+                }
                 m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
                         HostMessenger.CLIENT_INTERFACE_SITE_ID), msg);
             }
@@ -4810,7 +4810,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             try (BufferedReader rdr = new BufferedReader(new FileReader(markerFH))){
                 nonce = rdr.readLine();
             } catch (IOException e) {
-                Throwables.propagate(e); // highly unlikely
+                throw new RuntimeException(e); // highly unlikely
             }
             // make sure that there is a snapshot associated with the terminus nonce
             HashMap<String, Snapshot> snapshots = new HashMap<>();
