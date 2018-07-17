@@ -207,6 +207,27 @@ public class ExportManager
     }
 
     /**
+     * Indicate local partition has saw node failure
+     * Could be leader failover or replica fail
+     * Need to query the replica for verify ExportMastership
+     * @param partitionId
+     */
+    synchronized public void handlePartitionFailure(int partitionId) {
+        // ? if is already export master, don't need query
+        if (m_masterOfPartitions.contains(partitionId)) {
+            return;
+        }
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Export Manager has been notified that local partition " + partitionId + "  has encountered node failure.");
+        }
+        ExportGeneration generation = m_generation.get();
+        if (generation == null) {
+            return;
+        }
+        generation.handlePartitionFailure(partitionId);
+    }
+
+    /**
      * Indicate to associated {@link ExportGeneration}s to
      * prepare give up mastership for the given partition id
      * @param partitionId
