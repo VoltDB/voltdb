@@ -80,11 +80,6 @@ public class ExportManager
 
     private final HostMessenger m_messenger;
 
-    /**
-     * Set of partition ids for which this export manager instance is master of
-     */
-    private final Set<Integer> m_masterOfPartitions = new HashSet<Integer>();
-
     public static final byte RELEASE_BUFFER = 1;
 
     public static final byte MIGRATE_MASTER = 2;
@@ -170,11 +165,6 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        // can't acquire mastership twice for the same partition id
-        if (! m_masterOfPartitions.add(partitionId)) {
-            return;
-        }
-
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Export Manager has been notified that local partition " + partitionId + " to accept export mastership.");
         }
@@ -196,11 +186,6 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void prepareAcceptMastership(int partitionId) {
-        // can't acquire mastership twice for the same partition id
-        if (!m_masterOfPartitions.add(partitionId)) {
-            return;
-        }
-
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Export Manager has been notified that local partition " + partitionId + " has became leader.");
         }
@@ -218,10 +203,6 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void handlePartitionFailure(int partitionId) {
-        // ? if is already export master, don't need query
-        if (m_masterOfPartitions.contains(partitionId)) {
-            return;
-        }
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Export Manager has been notified that local partition " + partitionId + "  has encountered node failure.");
         }
@@ -238,11 +219,6 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void prepareUnacceptMastership(int partitionId) {
-        // ignore if mastership for partition id is not on this host
-        if (!m_masterOfPartitions.contains(partitionId)) {
-            return;
-        }
-
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("ExportManager has been notified the sp leader for " + partitionId + " has been migrated away");
         }
@@ -487,9 +463,7 @@ public class ExportManager
                  * We stashed away all the ones we have mastership of
                  * in m_masterOfPartitions
                  */
-                for (Integer partitionId: m_masterOfPartitions) {
-                    generation.acceptMastershipTask(partitionId);
-                }
+                generation.acceptMastershipTaskForAll();
             }
             catch (final ClassNotFoundException e) {
                 exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
@@ -543,9 +517,7 @@ public class ExportManager
             catch (Exception crash) {
                 VoltDB.crashLocalVoltDB("Error creating next export processor", true, crash);
             }
-            for ( Integer partitionId: m_masterOfPartitions) {
-                generation.acceptMastershipTask(partitionId);
-            }
+            generation.acceptMastershipTaskForAll();
     }
 
     private  ExportDataProcessor getNewProcessorWithProcessConfigSet(Map<String, Pair<Properties, Set<String>>> config) throws ClassNotFoundException, InstantiationException, IllegalAccessException {

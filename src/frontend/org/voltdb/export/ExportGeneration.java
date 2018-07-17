@@ -83,13 +83,14 @@ public class ExportGeneration implements Generation {
      */
     private final Map<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition
             =        new HashMap<Integer, Map<String, ExportDataSource>>();
-    @Override
-    public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
-        return m_dataSourcesByPartition;
-    }
 
     // Export generation mailboxes under the same partition id, excludes the local one.
     private Map<Integer, ImmutableList<Long>> m_replicasHSIds = new HashMap<>();
+
+    /**
+     * Set of partition ids for which this export manager instance is master of
+     */
+    private final Set<Integer> m_masterOfPartitions = new HashSet<Integer>();
 
     private Mailbox m_mbox = null;
 
@@ -697,6 +698,10 @@ public class ExportGeneration implements Generation {
      * @param partitionId
      */
     public void prepareUnacceptMastership(int partitionId) {
+        // ignore if mastership for partition id is not on this host
+        if (!m_masterOfPartitions.contains(partitionId)) {
+            return;
+        }
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
@@ -707,13 +712,19 @@ public class ExportGeneration implements Generation {
             eds.prepareUnacceptMastership();
         }
     }
+
     /**
-     * Indicate to all associated {@link ExportDataSource}to assume
+     * Indicate to all associated {@link ExportDataSource} to assume
      * mastership role for the given partition id
      * @param partitionId
      */
     @Override
     public void acceptMastershipTask( int partitionId) {
+        // can't acquire mastership twice for the same partition id
+        if (! m_masterOfPartitions.add(partitionId)) {
+            return;
+        }
+
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
@@ -731,11 +742,26 @@ public class ExportGeneration implements Generation {
     }
 
     /**
+     * Indicate to all associated {@link ExportDataSource} to assume
+     * mastership role for the all master partitions on this host
+     */
+    public void acceptMastershipTaskForAll() {
+        for (int partitionId : m_masterOfPartitions) {
+            acceptMastershipTask(partitionId);
+        }
+    }
+
+    /**
      * Indicate to all associated {@link ExportDataSource}to PREPARE assume
      * mastership role for the given partition id
      * @param partitionId
      */
     void prepareAcceptMastership(int partitionId) {
+        // can't acquire mastership twice for the same partition id
+        if (!m_masterOfPartitions.add(partitionId)) {
+            return;
+        }
+
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
@@ -754,6 +780,10 @@ public class ExportGeneration implements Generation {
      * @param partitionId
      */
     void handlePartitionFailure(int partitionId) {
+        // ? if is already export master, don't need query
+        if (m_masterOfPartitions.contains(partitionId)) {
+            return;
+        }
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
@@ -764,6 +794,11 @@ public class ExportGeneration implements Generation {
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             eds.handlePartitionFailure();
         }
+    }
+
+    @Override
+    public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+        return m_dataSourcesByPartition;
     }
 
     @Override
@@ -816,12 +851,8 @@ public class ExportGeneration implements Generation {
 
         int drainedTables = (int)partitionDataSourceMap.values().stream().filter(eds -> eds.streamHasNoMaster()).count();
         if (partitionDataSourceMap.values().size() == drainedTables) {
-            try {
-                Thread.sleep(4000);
-            } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
+            // This host is no longer the export master of given partition.
+            m_masterOfPartitions.remove(source.getPartitionId());
             sendMigrateMastershipEvent(source.getPartitionId(), partitionDataSourceMap);
         }
     }
