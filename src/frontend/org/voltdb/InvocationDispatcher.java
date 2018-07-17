@@ -69,6 +69,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.Base64;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
@@ -445,8 +446,9 @@ public final class InvocationDispatcher {
                 if (retval != null) {
                     return retval;
                 }
-                if (m_isInitialRestore.compareAndSet(true, false) && isSchemaEmpty()) {
+                if (m_isInitialRestore.compareAndSet(true, false) && toLoadSchemaFromSnapshot()) {
                     m_NTProcedureService.isRestoring = true;
+                    System.out.println("Loading data from Snapshot.");
                     return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
                 }
             }
@@ -519,8 +521,17 @@ public final class InvocationDispatcher {
         return null;
     }
 
-    private final boolean isSchemaEmpty() {
-        return m_catalogContext.get().database.getTables().size() == 0;
+    private final boolean toLoadSchemaFromSnapshot() {
+        CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
+        if(tables.size() == 0) return true;
+        boolean ret = true;
+        for(Table t : tables) {
+            System.out.println(t.getSignature());
+            if(!t.getSignature().startsWith("VOLTDB_AUTOGEN_")) {
+                ret = false;
+            }
+        }
+        return ret;
     }
 
     public final static Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
@@ -1062,7 +1073,6 @@ public final class InvocationDispatcher {
         try {
             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
             final File catalogFH = getSnapshotCatalogFile(jsObj);
-
             final byte[] catalog;
             try {
                 catalog = MiscUtils.fileToBytes(catalogFH);
