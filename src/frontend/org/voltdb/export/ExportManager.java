@@ -176,8 +176,9 @@ public class ExportManager
         }
 
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("ExportManager accepting mastership for partition " + partitionId);
+            exportLog.debug("Export Manager has been notified that local partition " + partitionId + " to accept export mastership.");
         }
+
         /*
          * Only the first generation will have a processor which
          * makes it safe to accept mastership.
@@ -328,17 +329,6 @@ public class ExportManager
         processor.startPolling();
     }
 
-    private ExportGeneration initializePersistedGenerations(Set<Integer> allPartitions) throws IOException {
-        File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-        ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
-        File files[] = exportOverflowDirectory.listFiles();
-        if (files != null) {
-            List<Integer> partitionsFromDisk = generation.initializeGenerationFromDisk(m_messenger);
-            allPartitions.addAll(partitionsFromDisk);
-        }
-        return generation;
-    }
-
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
         Map<String, Pair<Properties, Set<String>>> config = new HashMap<>();
 
@@ -410,10 +400,7 @@ public class ExportManager
 
             File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
             ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
-            File files[] = exportOverflowDirectory.listFiles();
-            // Export overflow directory must exists
-            Preconditions.checkNotNull(files);
-            generation.initialize(m_messenger, m_hostId, catalogContext, connectors, partitions);
+            generation.initialize(m_messenger, m_hostId, catalogContext, connectors, partitions, exportOverflowDirectory);
 
             m_generation.set(generation);
             newProcessor.setExportGeneration(generation);

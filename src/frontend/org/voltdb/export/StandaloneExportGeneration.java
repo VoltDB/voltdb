@@ -285,7 +285,6 @@ public class StandaloneExportGeneration implements Generation {
             return;
         }
 
-        exportLog.info("Export accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
                 eds.acceptMastership();

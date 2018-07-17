@@ -120,11 +120,15 @@ public class ExportGeneration implements Generation {
             int hostId,
             CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
-            List<Integer> partitions)
+            List<Integer> partitions,
+            File exportOverflowDirectory)
     {
-        List<Integer> partitionsFromDisk = initializeGenerationFromDisk(messenger);
+        Set<Integer> allPartitions = new HashSet<>();
+        File files[] = exportOverflowDirectory.listFiles();
+        if (files != null) {
+            allPartitions.addAll(initializeGenerationFromDisk(messenger));
+        }
         initializeGenerationFromCatalog(catalogContext, connectors, hostId, messenger, partitions);
-        Set<Integer> allPartitions = new HashSet<Integer>(partitionsFromDisk);
         allPartitions.addAll(partitions);
         // One export mailbox per node, since we only keep one generation
         createAckMailboxes(messenger, allPartitions);
@@ -239,6 +243,10 @@ public class ExportGeneration implements Generation {
                         }
                         for (Entry<String, ExportDataSource> e : partitionSources.entrySet()) {
                             if (e.getValue().readyForMastership()) {
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Received MIGRATE_MASTER message for partition " + partition +
+                                            " table " + e.getValue().getTableName() + ", this stream is ready to be master.");
+                                }
                                 e.getValue().acceptMastership();
                             } else {
                                 Long uso = perDataSourceUso.get(e.getKey());
@@ -808,6 +816,12 @@ public class ExportGeneration implements Generation {
 
         int drainedTables = (int)partitionDataSourceMap.values().stream().filter(eds -> eds.streamHasNoMaster()).count();
         if (partitionDataSourceMap.values().size() == drainedTables) {
+            try {
+                Thread.sleep(4000);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
             sendMigrateMastershipEvent(source.getPartitionId(), partitionDataSourceMap);
         }
     }
