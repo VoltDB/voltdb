@@ -31,11 +31,12 @@ class Reporter(Issues):
             + ' : Mismatched=' + str(stats['mismatched_statements']) + ' (' + stats['mismatched_percent'] + '%)\n' \
             + 'Exceptions:\n' \
             + ' : Volt Fatal=' + str(stats['total_volt_fatal_excep']) \
-            + ' : Volt Nonfatal=' + str(stats['total_volt_nonfatal_excep']) + '\n' \
+            + ' : Volt Nonfatal=' + str(stats['total_volt_nonfatal_excep']) \
+            + ' : ' + str(stats['comparison_database']) + ' Total=' + str(stats['total_cmp_excep']) + '\n' \
             + 'Crashes:\n' \
             + ' : Volt=' + str(stats['total_volt_crashes']) \
-            + ' : Diff=' + str(stats['total_diff_crashes']) \
-            + ' : Comparison=' + str(stats['total_cmp_crashes'])
+            + ' : ' + str(stats['comparison_database']) + '=' + str(stats['total_cmp_crashes']) \
+            + ' : Diff=' + str(stats['total_diff_crashes'])
 
         url += '/index.html'
         description += '\nSee [OVERVIEW|' + url + '] for more information.\n\n'
@@ -56,7 +57,7 @@ class Reporter(Issues):
             logging.info('No new issue created. Build ' + str(build) + ' resulted in: ' + build_result)
             return
 
-        current_version = str(urlopen('https://raw.githubusercontent.com/VoltDB/voltdb/master/version.txt').read())
+        current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/master/version.txt'))
         description = 'SQLCoverage failure(s) on ' + job + ', build ' + str(build) + '\n\n'
         summary = job + ' : ' + build + ' : sqlcov-internal-err'
         runs = build_report.get('runs')

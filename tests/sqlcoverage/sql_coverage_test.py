@@ -901,7 +901,8 @@ if __name__ == "__main__":
             'total_cmp_excep' : total_cmp_excep,
             'total_volt_crashes' : total_volt_crashes,
             'total_cmp_crashes' : total_cmp_crashes,
-            'total_diff_crashes' : total_diff_crashes
+            'total_diff_crashes' : total_diff_crashes,
+            'comparison_database' : comparison_database
             }
         hack.write(str(stats))
         hack.close()
