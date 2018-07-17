@@ -127,33 +127,8 @@ public class UserDefinedFunctionManager {
         static final int VAR_LEN_SIZE = Integer.SIZE/8;
 
         public UserDefinedFunctionRunner(Function catalogFunction, Object funcInstance) {
-            m_functionName = catalogFunction.getFunctionname();
-            m_functionId = catalogFunction.getFunctionid();
-            m_functionInstance = funcInstance;
-            m_functionMethod = null;
-
-            initFunctionMethod(catalogFunction.getMethodname());
-
-            Class<?>[] paramTypeClasses = m_functionMethod.getParameterTypes();
-            m_paramCount = paramTypeClasses.length;
-            m_paramTypes = new VoltType[m_paramCount];
-            m_boxUpByteArray = new boolean[m_paramCount];
-            for (int i = 0; i < m_paramCount; i++) {
-                m_paramTypes[i] = VoltType.typeFromClass(paramTypeClasses[i]);
-                m_boxUpByteArray[i] = paramTypeClasses[i] == Byte[].class;
-            }
-            m_returnType = VoltType.typeFromClass(m_functionMethod.getReturnType());
-
-            m_logger.debug(String.format("The user-defined function manager is defining function %s (ID = %s)",
-                    m_functionName, m_functionId));
-
-            // We register the token again when initializing the user-defined function manager because
-            // in a cluster setting the token may only be registered on the node where the CREATE FUNCTION DDL
-            // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
-            FunctionForVoltDB.registerTokenForUDF(m_functionName,
-                                                  m_functionId,
-                                                  m_returnType,
-                                                  m_paramTypes);
+            this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
+                    catalogFunction.getMethodname(), funcInstance);
         }
 
         public UserDefinedFunctionRunner(String functionName, int functionId, String methodName, Object funcInstance) {
