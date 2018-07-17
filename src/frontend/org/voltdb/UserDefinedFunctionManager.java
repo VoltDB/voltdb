@@ -104,9 +104,8 @@ public class UserDefinedFunctionManager {
 
     private void loadBuiltInJavaFunctions(ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder) {
         // define the function object
-
-        // org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor is private, I can't access FUNC_VOLT_FORMAT_TIMESTAMP, so I just use the function id directly.
-        builder.put(21025, new UserDefinedFunctionRunner("FORMAT_TIMESTAMP", 21025, "format_timestamp", new JavaBuiltInFunctions()));
+        builder.put(FunctionForVoltDB.getFunctionID("format_timestamp"), new UserDefinedFunctionRunner("FORMAT_TIMESTAMP",
+                FunctionForVoltDB.getFunctionID("format_timestamp"), "format_timestamp", new JavaBuiltInFunctions()));
     }
 
 

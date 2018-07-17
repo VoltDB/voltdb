@@ -514,6 +514,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         return function;
     }
 
+    public static int getFunctionID(String token) {
+        return FunctionDescriptor.fn_by_name(token).getId();
+    }
+
     public FunctionForVoltDB(FunctionDescriptor fn) {
         super();
         m_def     = fn;
@@ -1021,7 +1025,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             FunctionDescriptor fd = makeFunctionDescriptorFromParts(functionName, retFunctionId,
                                                             hsqlReturnType, hsqlParameterTypes);
-            // if the function id is belong to UDF, put it into the defined_function map
+            // if the function id belongs to UDF, put it into the defined_function map
             if (isUserDefinedFunctionId(retFunctionId)) {
                 FunctionDescriptor.addDefinedFunction(functionName, fd);
             }

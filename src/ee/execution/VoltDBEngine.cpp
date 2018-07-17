@@ -167,7 +167,7 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
       m_drReplicatedStream(NULL),
       m_currExecutorVec(NULL)
 {
-    initJavaBuiltInSQLFunctionInfo();
+    loadBuiltInJavaFunctions();
 }
 
 void
@@ -2806,8 +2806,8 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
     } while (updateReplicated);
 }
 
-void VoltDBEngine::initJavaBuiltInSQLFunctionInfo(){
-    // Hard code the info of format_stamp function
+void VoltDBEngine::loadBuiltInJavaFunctions(){
+    // Hard code the info of format_timestamp function
     UserDefinedFunctionInfo *info = new UserDefinedFunctionInfo();
     info->returnType = VALUE_TYPE_VARCHAR;
     info->paramTypes.resize(2);
