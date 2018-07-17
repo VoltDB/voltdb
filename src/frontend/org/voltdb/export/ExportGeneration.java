@@ -672,7 +672,7 @@ public class ExportGeneration implements Generation {
      * mastership role for the given partition id
      * @param partitionId
      */
-    public void prepareAcceptMastership(int partitionId) {
+    void prepareAcceptMastership(int partitionId) {
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
@@ -682,6 +682,24 @@ public class ExportGeneration implements Generation {
 
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             eds.prepareAcceptMastership();
+        }
+    }
+
+    /**
+     * Indicate to all associated {@link ExportDataSource}to QUERY
+     * mastership role for the given partition id
+     * @param partitionId
+     */
+    void handlePartitionFailure(int partitionId) {
+        Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
+
+        // this case happens when there are no export tables
+        if (partitionDataSourceMap == null) {
+            return;
+        }
+
+        for( ExportDataSource eds: partitionDataSourceMap.values()) {
+            eds.handlePartitionFailure();
         }
     }
 
