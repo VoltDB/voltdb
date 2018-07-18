@@ -524,7 +524,7 @@ public final class InvocationDispatcher {
         if(tables.size() == 0) return true;
         boolean ret = true;
         for(Table t : tables) {
-            if(!t.getSignature().startsWith("VOLTDB_AUTOGEN_")) {
+            if(!t.getSignature().startsWith("VOLTDB_AUTOGEN_XDCR")) {
                 ret = false;
             }
         }
