@@ -20,6 +20,10 @@ import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
  * A class which can match an abstract plan node.
+ *
+ * PlanNodeType implements this, so plan nodes of
+ * a given type can be matched.
+ *
  * @author bwhite
  *
  */
