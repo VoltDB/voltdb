@@ -74,7 +74,7 @@ public class HTTPClientInterface {
     public static final String PARAM_ADMIN = "admin";
     public static final String AUTH_USER_SESSION_KEY = "authuser";
     //Hidden property for session inactive timeout.
-    public static final int MAX_SESSION_INACTIVITY_SECONDS = Integer.getInteger("HTTP_SESSION_TIMEOUT_SECONDS", 10);
+    public static final int MAX_SESSION_INACTIVITY_SECONDS = Integer.getInteger("HTTP_SESSION_TIMEOUT_SECONDS", 30);
     //Hidden property for disable session management and use always auth mode.
     public static final boolean HTTP_DONT_USE_SESSION = Boolean.getBoolean("HTTP_DONT_USE_SESSION");
 
