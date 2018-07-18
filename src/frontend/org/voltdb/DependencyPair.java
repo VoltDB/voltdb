@@ -30,16 +30,18 @@ import java.nio.ByteBuffer;
 public abstract class DependencyPair {
 
     public final int depId;
+    private final int drBufferChange;
 
-    public DependencyPair(int depId) {
+    public DependencyPair(int depId, int drBufferSize) {
         this.depId = depId;
+        this.drBufferChange = drBufferSize;
     }
 
     public abstract ByteBuffer getBufferDependency();
 
     public abstract VoltTable getTableDependency();
 
-    public int getDRBufferChange() {return 0;}
+    public int getDRBufferChange() {return drBufferChange;}
 
     /*
      * Concrete class for a DependencyPair that is created from a VoltTable but may
@@ -49,7 +51,11 @@ public abstract class DependencyPair {
         private final VoltTable dependencyTable;
 
         public TableDependencyPair(int depId, VoltTable dependency) {
-            super(depId);
+            this(depId, dependency, 0);
+        }
+
+        public TableDependencyPair(int depId, VoltTable dependency, int drBufferSize) {
+            super(depId, drBufferSize);
             assert(dependency != null);
 
             this.dependencyTable = dependency;
@@ -75,7 +81,6 @@ public abstract class DependencyPair {
         private final byte[] dependencyByteArray;
         private final int startPosition;
         private final int totalLen;
-        private final int drBufferChange;
         private VoltTable dependencyTable = null;
 
         public BufferDependencyPair(int depId, byte[] dependency, int startPosition, int totalLen) {
@@ -83,13 +88,12 @@ public abstract class DependencyPair {
         }
 
         public BufferDependencyPair(int depId, byte[] dependency, int startPosition, int totalLen, int drBufferSize) {
-            super(depId);
-            assert(dependency != null);
-            assert(dependency.length >= 4);
+            super(depId, drBufferSize);
+            assert (dependency != null);
+            assert (dependency.length >= 4);
             this.dependencyByteArray = dependency;
             this.startPosition = startPosition;
             this.totalLen = totalLen;
-            this.drBufferChange = drBufferSize;
         }
 
         public ByteBuffer getBufferDependency() {
@@ -101,11 +105,6 @@ public abstract class DependencyPair {
                 dependencyTable = PrivateVoltTableFactory.createVoltTableFromByteArray(dependencyByteArray, startPosition, totalLen);
             }
             return dependencyTable;
-        }
-
-        @Override
-        public int getDRBufferChange() {
-            return drBufferChange;
         }
     }
 }

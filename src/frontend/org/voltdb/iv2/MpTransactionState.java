@@ -141,7 +141,7 @@ public class MpTransactionState extends TransactionState
         // assume still has replicated stream for upper bound estimation avoid check the dr system for
         // performance concern. The streamCount could be m_localPartitionCount if DR ProtocolVersion is 8 or more.
         int streamCount = m_localPartitionCount + 1;
-        int concatLogSize = m_drBufferChangedAgg + DR_ENDTXN_MSG_LEN * streamCount; // adding END_Transaction Size
+        int concatLogSize = m_drBufferChangedAgg + (DR_BEGINTXN_MSG_LEN + DR_ENDTXN_MSG_LEN) * streamCount; // adding BEGIN_Transaction and END_Transaction Size
 
         // estimate of ParametersSet Size of @ApplyBinaryLogMP on the consumer side
         int serializedParamSize = getSerializedParamSizeForApplyBinaryLog(streamCount, remotePartitionCount, concatLogSize);
@@ -583,8 +583,7 @@ public class MpTransactionState extends TransactionState
     }
 
     public boolean drTxnDataCanBeRolledBack() {
-        // Note this will not work for DR Protocol Version 8 which folds Replicated Table data into Partition 0's beginTxn
-        return m_drBufferChangedAgg <= (m_localPartitionCount + 1) * DR_BEGINTXN_MSG_LEN;
+        return m_drBufferChangedAgg == 0;
     }
 
     /**

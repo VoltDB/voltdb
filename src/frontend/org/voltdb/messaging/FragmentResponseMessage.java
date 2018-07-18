@@ -210,6 +210,9 @@ public class FragmentResponseMessage extends VoltMessage {
         // one int per dependency ID and table length (0 = null)
         msgsize += 8 * m_dependencyCount;
 
+        // one int per dependency ID for dr Buffer change
+        msgsize += 4 * m_dependencyCount;
+
         // Add the actual result lengths
         for (DependencyPair depPair : m_dependencies)
         {
@@ -246,6 +249,8 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.putLong(m_restartTimestamp);
         for (DependencyPair depPair : m_dependencies) {
             buf.putInt(depPair.depId);
+            // also has to serialize drBuffer change size
+            buf.putInt(depPair.getDRBufferChange());
 
             ByteBuffer dep = depPair.getBufferDependency();
             if (dep == null) {
@@ -281,13 +286,16 @@ public class FragmentResponseMessage extends VoltMessage {
         m_restartTimestamp = buf.getLong();
         for (int i = 0; i < m_dependencyCount; i++) {
             int depId = buf.getInt();
+            int drBufferSize = buf.getInt();
             int depLen = buf.getInt(buf.position());
             boolean isNull = depLen == 0 ? true : false;
+
             if (isNull) {
                 m_dependencies.add(new DependencyPair.TableDependencyPair(depId, null));
             } else {
+
                 m_dependencies.add(new DependencyPair.TableDependencyPair(depId,
-                        PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf)));
+                        PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf), drBufferSize));
             }
         }
         m_exception = SerializableException.deserializeFromBuffer(buf);

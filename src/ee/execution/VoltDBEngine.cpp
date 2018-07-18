@@ -83,6 +83,7 @@
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
 #include "storage/ConstraintFailureException.h"
+#include "storage/DRTupleStream.h"
 
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
@@ -712,18 +713,28 @@ void VoltDBEngine::serializeException(const SerializableEEException& e) {
 // RESULT FUNCTIONS
 // -------------------------------------------------
 void VoltDBEngine::send(Table* dependency) {
-    VOLT_DEBUG("Sending Dependency from C++");
     // legacy placeholder for old output id
     // repurpose the placeholder to store bytes of Buffer allocated for DR
 
     size_t drBufferChange = size_t(0);
     if (m_drStream) {
         drBufferChange = m_drStream->m_uso - m_drStream->m_committedUso;
+        if (drBufferChange > 0) {
+            assert(drBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
+            drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
+        }
         if (m_drReplicatedStream) {
-            drBufferChange += m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
+            size_t drReplicatedStreamBufferChange = size_t(0);
+            drReplicatedStreamBufferChange = m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
+            if (drReplicatedStreamBufferChange > 0) {
+                assert(drReplicatedStreamBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
+                drReplicatedStreamBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
+            }
+            drBufferChange += drReplicatedStreamBufferChange;
         }
     }
     m_resultOutput.writeInt(static_cast<int>(drBufferChange));
+    VOLT_DEBUG("Sending Dependency from C++, drBufferChange %d", static_cast<int>(drBufferChange));
     dependency->serializeTo(m_resultOutput);
     m_numResultDependencies++;
 }
