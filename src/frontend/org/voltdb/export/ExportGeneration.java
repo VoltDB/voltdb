@@ -87,6 +87,8 @@ public class ExportGeneration implements Generation {
     // Export generation mailboxes under the same partition id, excludes the local one.
     private Map<Integer, ImmutableList<Long>> m_replicasHSIds = new HashMap<>();
 
+    private Map<Integer, Integer> m_newLeaderHostId = new HashMap<>();
+
     /**
      * Set of partition ids for which this export manager instance is master of
      */
@@ -697,11 +699,12 @@ public class ExportGeneration implements Generation {
      * mastership role for the given partition id
      * @param partitionId
      */
-    public void prepareUnacceptMastership(int partitionId) {
+    public void prepareTransferMastership(int partitionId, int hostId) {
         // ignore if mastership for partition id is not on this host
         if (!m_masterOfPartitions.contains(partitionId)) {
             return;
         }
+        m_newLeaderHostId.put(partitionId, hostId);
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
@@ -807,7 +810,14 @@ public class ExportGeneration implements Generation {
     }
 
     private void sendMigrateMastershipEvent(int partitionId, Map<String, ExportDataSource> partitionDataSourceMap) {
-        if (m_mbox != null && m_replicasHSIds.size() > 0) {
+        if (m_mbox == null || !m_replicasHSIds.containsKey(partitionId) || !m_newLeaderHostId.containsKey(partitionId)) {
+            return;
+        }
+
+        for (Long siteId : m_replicasHSIds.get(partitionId)) {
+            if (CoreUtils.getHostIdFromHSId(siteId) != m_newLeaderHostId.get(partitionId)) {
+                continue;
+            }
             // msg type(1) + partition:int(4) + array length:int(4)
             // { length:int(4) + signaturesBytes.length + usoToDrain:long(8) } repeat X times
             int msgLen = 1 + 4 + 4;
@@ -829,9 +839,9 @@ public class ExportGeneration implements Generation {
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
-            for( Long siteId: m_replicasHSIds.get(partitionId)) {
-                m_mbox.send(siteId, bpm);
-            }
+            m_mbox.send(siteId, bpm);
+            // also remove the from newLeaderHostId
+            m_newLeaderHostId.remove(partitionId);
 
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Partition " + partitionId + " mailbox hsid (" +

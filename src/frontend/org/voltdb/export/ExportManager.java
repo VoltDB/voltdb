@@ -215,10 +215,10 @@ public class ExportManager
 
     /**
      * Indicate to associated {@link ExportGeneration}s to
-     * prepare give up mastership for the given partition id
+     * prepare give up mastership for the given partition id to hostId
      * @param partitionId
      */
-    synchronized public void prepareUnacceptMastership(int partitionId) {
+    synchronized public void prepareTransferMastership(int partitionId, int hostId) {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("ExportManager has been notified the sp leader for " + partitionId + " has been migrated away");
         }
@@ -226,7 +226,7 @@ public class ExportManager
         if (generation == null) {
             return;
         }
-        generation.prepareUnacceptMastership(partitionId);
+        generation.prepareTransferMastership(partitionId, hostId);
     }
 
     /**

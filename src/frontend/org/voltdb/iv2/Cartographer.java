@@ -183,7 +183,7 @@ public class Cartographer extends StatsSource
                             // this host *could* contain old master
                             // inform the export manager to preapre mastership migration (drain existing PBD and notify new leader)
                             if (ExportManager.instance() != null) {
-                                ExportManager.instance().prepareUnacceptMastership(partitionId);
+                                ExportManager.instance().prepareTransferMastership(partitionId, hostId);
                             }
                         }
                     }
