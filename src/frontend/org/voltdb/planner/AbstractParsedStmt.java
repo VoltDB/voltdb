@@ -67,7 +67,7 @@ import org.voltdb.types.VoltDecimalHelper;
 
 public abstract class AbstractParsedStmt {
 
-    public static final String TEMP_TABLE_NAME = "VOLT_TEMP_TABLE";
+    public static final String TEMP_TABLE_NAME = "$$_VOLT_TEMP_TABLE_$$";
     public static final String WINDOWED_AGGREGATE_COLUMN_NAME = "WINAGG_COLUMN";
 
     protected String m_contentDeterminismMessage = null;
