@@ -298,7 +298,4 @@ public class StandaloneExportGeneration implements Generation {
     public String toString() {
         return "Standalone Export Generation";
     }
-
-    public void migrateDataSource(ExportDataSource source) {
-    }
 }

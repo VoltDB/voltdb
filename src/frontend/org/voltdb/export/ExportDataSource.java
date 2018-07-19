@@ -81,21 +81,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final ExportFormat m_format;
 
     private long m_firstUnpolledUso = 0;
-    private long m_lastReleaseUso = 0;
+    private long m_lastReleasedUso = 0;
     // End uso of most recently pushed export buffer
     private long m_lastPushedUso = 0L;
     // Relinquishes export master after this uso
     private long m_usoToDrain = -1L;
-    // EDS that will be demoted soon
-    private boolean m_retiredMaster = false;
-    // EDS that will be promoted as export master soon
-    private boolean m_wannabeMaster = false;
-    // This flag indicates there is no export master for the stream
-    private boolean m_anarchy = false;
     //This is released when all mailboxes are set.
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     // This EDS is export master when the flag set to true
     private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
+    // This is set when mastership is going to transfer to another node.
+    private Integer m_newLeaderHostId = null;
 
     private volatile boolean m_closed = false;
     private final StreamBlockQueue m_committedBuffers;
@@ -322,7 +318,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 break;
             }
         }
-        m_lastReleaseUso = releaseUso;
+        m_lastReleasedUso = releaseUso;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso+1);
     }
 
@@ -460,9 +456,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // Drop already acked buffer
                 final BBContainer cont = DBBPool.wrapBB(buffer);
                 long bufferSize = (buffer.capacity() - 8) - 1;
-                if (m_lastReleaseUso > 0 && m_lastReleaseUso >= (uso + bufferSize)) {
+                if (m_lastReleasedUso > 0 && m_lastReleasedUso >= (uso + bufferSize)) {
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Dropping already acked USO: " + m_lastReleaseUso
+                        exportLog.debug("Dropping already acked USO: " + m_lastReleasedUso
                                 + " Buffer info: " + uso + " Size: " + buffer.capacity());
                     }
                     cont.discard();
@@ -472,12 +468,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 StreamBlock sb = new StreamBlock(cont, uso, false);
 
                 // Mark release uso to partially acked buffer.
-                if (m_lastReleaseUso > 0 && m_lastReleaseUso >= sb.uso()) {
+                if (m_lastReleasedUso > 0 && m_lastReleasedUso >= sb.uso()) {
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Setting releaseUso as " + m_lastReleaseUso +
+                        exportLog.debug("Setting releaseUso as " + m_lastReleasedUso +
                                 " for sb with uso " + sb.uso() + " for partition " + m_partitionId);
                     }
-                    sb.releaseUso(m_lastReleaseUso);
+                    sb.releaseUso(m_lastReleasedUso);
                 }
 
                 m_lastPushedUso = uso + bufferSize;
@@ -892,14 +888,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 return;
             }
             // Current master sends migrate event to all export replicas
-            if (m_retiredMaster && uso >= m_usoToDrain) {
+            if (m_newLeaderHostId != null && uso >= m_usoToDrain) {
                 unacceptMastership();
-                m_generation.migrateDataSource(this);
-            }
-            // Receiving a ACK means new master is promoted, clear the anarchy state
-            if (m_anarchy && uso >= m_usoToDrain) {
-                m_anarchy = false;
-                m_usoToDrain = -1L;
+                sendTakeMastershipEvent(uso);
             }
         }
     }
@@ -915,22 +906,57 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * prepare to give up the mastership,
      * has to drain existing PBD and then notify new leaders (through ack)
      */
-    void prepareUnacceptMastership() {
+    void prepareTransferMastership(int newLeaderHostId) {
         m_es.submit(new Runnable() {
             public void run() {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Export table " + getTableName() + " mastership prepare to be demoted for partition " + getPartitionId());
                 }
-                m_retiredMaster = true;
+                m_newLeaderHostId = newLeaderHostId;
                 // memorize end USO of the most recently pushed buffer from EE
                 m_usoToDrain = m_lastPushedUso;
                 // if no new buffer to be drained, send the migrate event right away
-                if (m_usoToDrain == m_lastReleaseUso) {
+                if (m_usoToDrain == m_lastReleasedUso) {
                     unacceptMastership();
-                    m_generation.migrateDataSource(ExportDataSource.this);
+                    sendTakeMastershipEvent(m_usoToDrain);
                 }
             }
         });
+    }
+
+    private void sendTakeMastershipEvent(long uso) {
+        Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+        Mailbox mbx = p.getFirst();
+        if (mbx != null && p.getSecond().size() > 0 && m_newLeaderHostId != null) {
+            // msg type(1) + partition:int(4) + length:int(4) +
+            // signaturesBytes.length + ackUSO:long(8).
+            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
+
+            ByteBuffer buf = ByteBuffer.allocate(msgLen);
+            buf.put(ExportManager.TAKE_MASTERSHIP);
+            buf.putInt(m_partitionId);
+            buf.putInt(m_signatureBytes.length);
+            buf.put(m_signatureBytes);
+            buf.putLong(uso);
+
+            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
+
+            for(Long siteId: p.getSecond()) {
+                // Just send to the ack mailbox on the new master
+                if (CoreUtils.getHostIdFromHSId(siteId) == m_newLeaderHostId) {
+                    mbx.send(siteId, bpm);
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Partition " + m_partitionId + " mailbox hsid (" +
+                                CoreUtils.hsIdToString(mbx.getHSId()) + ") send TAKE_MASTERSHIP message to " +
+                                CoreUtils.hsIdToString(siteId));
+                    }
+                    break;
+                }
+            }
+
+            m_usoToDrain = -1L;
+            m_newLeaderHostId = null;
+        }
     }
 
     public synchronized void unacceptMastership() {
@@ -942,35 +968,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_mastershipAccepted.set(false);
         m_isInCatalog = false;
         m_eos = false;
-        m_usoToDrain = -1L;
-        m_anarchy = true;
-        m_retiredMaster = false;
+
         // For case where the previous export processor had only row of the first block to process
         // and it completed processing it, poll future is not set to null still. Set it to null to
         // prepare for the new processor polling
         if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
             m_pollFuture = null;
         }
-    }
-
-    /**
-     * indicate the partition leader has been promoted
-     * prepare to assume the mastership,
-     * still has to wait for the old leader to give up mastership (through ack)
-     */
-    synchronized void prepareAcceptMastership() {
-        m_es.submit(new Runnable() {
-            public void run() {
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Export table " + getTableName() + " mastership prepare to be promoted for partition " + getPartitionId());
-                }
-                m_wannabeMaster = true;
-                // If in anarchy state, promote master right away
-                if (m_anarchy) {
-                    acceptMastership();
-                }
-            }
-        });
     }
 
     /**
@@ -1052,24 +1056,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // Query all other node for current mastership
     }
 
-    public boolean readyForMastership() {
-        return m_wannabeMaster;
-    }
-
-    public boolean streamHasNoMaster() {
-        return m_anarchy;
-    }
-
     public byte[] getTableSignature() {
         return m_signatureBytes;
     }
     public long getLastReleaseUso() {
-        return m_lastReleaseUso;
-    }
-    // Anarchy state will be cleared when replicas receive ACK message equals or greater than m_usoToDrain
-    public void markStreamHasNoMaster(long uso) {
-        m_anarchy = true;
-        m_usoToDrain = uso;
+        return m_lastReleasedUso;
     }
 
     @Override

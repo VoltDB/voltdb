@@ -27,7 +27,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
 import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
 
 import java.io.File;
@@ -138,7 +137,7 @@ public class TestExportGeneration {
 
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
 
-        m_exportGeneration = new ExportGeneration(m_dataDirectory, mock(ExportManager.class));
+        m_exportGeneration = new ExportGeneration(m_dataDirectory);
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),

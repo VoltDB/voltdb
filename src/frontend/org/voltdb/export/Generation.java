@@ -38,6 +38,4 @@ public interface Generation {
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
-
-    public void migrateDataSource(ExportDataSource source);
 }

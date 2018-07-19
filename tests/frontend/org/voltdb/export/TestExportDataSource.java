@@ -127,10 +127,6 @@ public class TestExportDataSource extends TestCase {
         public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
-
-        public void migrateDataSource(ExportDataSource source) {
-        }
-
     }
 
     @Override
