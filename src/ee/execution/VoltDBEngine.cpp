@@ -69,6 +69,7 @@
 
 #include "common/SynchronizedThreadLock.h"
 #include "executors/abstractexecutor.h"
+#include "expressions/functionexpression.h"
 
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
@@ -166,6 +167,7 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
       m_drReplicatedStream(NULL),
       m_currExecutorVec(NULL)
 {
+    loadBuiltInJavaFunctions();
 }
 
 void
@@ -2802,6 +2804,17 @@ void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
         }
         updateReplicated = ! updateReplicated;
     } while (updateReplicated);
+}
+
+void VoltDBEngine::loadBuiltInJavaFunctions() {
+    // Hard code the info of format_timestamp function
+    UserDefinedFunctionInfo *info = new UserDefinedFunctionInfo();
+    info->returnType = VALUE_TYPE_VARCHAR;
+    info->paramTypes.resize(2);
+    info->paramTypes.at(0) = VALUE_TYPE_TIMESTAMP;
+    info->paramTypes.at(1) = VALUE_TYPE_VARCHAR;
+
+    m_functionInfo[FUNC_VOLT_FORMAT_TIMESTAMP] = info;
 }
 
 } // namespace voltdb
