@@ -315,6 +315,9 @@ public class SysprocFragmentTask extends FragmentTaskBase
                 traceLog.add(VoltTrace::endDuration);
             }
         }
+
+        // we don't want rollback or abort DR for sysproc
+        currentFragResponse.setDrBufferSize(1);
         return currentFragResponse;
     }
 

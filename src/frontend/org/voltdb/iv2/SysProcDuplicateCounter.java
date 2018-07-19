@@ -117,6 +117,8 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             VoltTable grouped = VoltTableUtil.unionTables(dep.getValue());
             unioned.addDependency(new DependencyPair.TableDependencyPair(dep.getKey(), grouped));
         }
+        // we don't want rollback or abort DR for sysproc
+        unioned.setDrBufferSize(1);
         return unioned;
     }
 }

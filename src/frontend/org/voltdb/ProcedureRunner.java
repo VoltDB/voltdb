@@ -1612,6 +1612,8 @@ public class ProcedureRunner {
                     m_txnState.uniqueId, m_isReadOnly, VoltTrace.log(VoltTrace.Category.EE) != null);
             final int totalSize;
             try {
+                // read the size of the DR buffer used
+                fragResult.readInt();
                 // read the complete size of the buffer used
                 totalSize = fragResult.readInt();
             } catch (final IOException ex) {

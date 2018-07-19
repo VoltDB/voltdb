@@ -359,7 +359,7 @@ class ExecutorContext {
 
     bool allOutputTempTablesAreEmpty() const;
 
-    void checkTransactionForDR();
+    bool checkTransactionForDR();
 
     void setUsedParameterCount(int usedParamcnt) { m_usedParamcnt = usedParamcnt; }
     int getUsedParameterCount() const { return m_usedParamcnt; }

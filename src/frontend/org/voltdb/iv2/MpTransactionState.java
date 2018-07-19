@@ -551,8 +551,8 @@ public class MpTransactionState extends TransactionState
             expectedMsg |= trackDependency(src_hsid, this_depId, this_dep);
         }
         if (msg.getTableCount() > 0) {
-            int drBufferChanged = msg.getDRBufferChangedAtIndex(msg.getTableCount() - 1);
-            // sum the dr buffer change size among all partitions for last fragment (which already aggregate all previous fragment buffer size)
+            int drBufferChanged = msg.getDRBufferSize();
+            // sum the dr buffer change size among all partitions (already aggregate all previous fragments buffer size)
             m_drBufferChangedAgg += drBufferChanged;
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("[trackDependency]:  drBufferSize added :" + drBufferChanged +

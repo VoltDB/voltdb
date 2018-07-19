@@ -422,7 +422,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                              uniqueId,
                                              traceOn);
 
-    m_executorContext->checkTransactionForDR();
+    bool hasDRBinaryLog = m_executorContext->checkTransactionForDR();
 
     // reset these at the start of each batch
     m_executorContext->m_progressStats.resetForNewBatch();
@@ -440,6 +440,17 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     // If the current procedure invocation is not sampled, all its batches will not be timed.
     bool perFragmentTimingEnabled = perFragmentStatsBufferIn.readByte() > 0;
 
+    /*
+    * Reserve space in the result output buffer for the number of
+    * result dependencies and for the dirty byte. Necessary for a
+    * plan fragment because the number of produced depenencies may
+    * not be known in advance.
+    * Also reserve space for counting DR Buffer used space
+    */
+    m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int8_t) + sizeof(int32_t) + sizeof(int32_t));
+    m_dirtyFragmentBatch = false;
+
+
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
         int usedParamcnt = serialInput.readShort();
         m_executorContext->setUsedParameterCount(usedParamcnt);
@@ -455,11 +466,11 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         if (perFragmentTimingEnabled) {
             startTime = std::chrono::high_resolution_clock::now();
         }
+
+
         // success is 0 and error is 1.
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
-                                m_currentIndexInBatch == 0,
-                                m_currentIndexInBatch == (numFragments - 1),
                                 traceOn)) {
             ++failures;
         }
@@ -478,8 +489,29 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
         m_stringPool.purge();
     }
-    m_perFragmentStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
 
+    // write dirty-ness of the batch and number of dependencies output to the FRONT of
+    // the result buffer
+    m_resultOutput.writeBoolAt(m_startOfResultBuffer, m_dirtyFragmentBatch);
+    size_t drBufferChange = size_t(0);
+    if (hasDRBinaryLog) {
+        if (m_drStream) {
+            drBufferChange = m_drStream->m_uso - m_drStream->m_committedUso;
+            assert(drBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
+            drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
+        }
+        if (m_drReplicatedStream) {
+            drBufferChange += m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
+            drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
+        }
+    }
+    m_resultOutput.writeIntAt(m_startOfResultBuffer+1, static_cast<int32_t> (drBufferChange));
+    VOLT_DEBUG("executePlanFragments : hasDRBinaryLog %d, drBufferChange %d", hasDRBinaryLog, static_cast<int32_t> (drBufferChange));
+    m_resultOutput.writeIntAt(m_startOfResultBuffer+5,
+                              static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t)- sizeof(int32_t) - sizeof(int8_t));
+
+
+    m_perFragmentStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
     m_currentIndexInBatch = -1;
 
     // If we were expanding the UDF buffer too much, shrink it back a little bit.
@@ -496,25 +528,11 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
 int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t inputDependencyId,
-                                      bool first,
-                                      bool last,
                                       bool traceOn)
 {
     assert(planfragmentId != 0);
 
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
-
-    /*
-     * Reserve space in the result output buffer for the number of
-     * result dependencies and for the dirty byte. Necessary for a
-     * plan fragment because the number of produced depenencies may
-     * not be known in advance.
-     */
-    if (first) {
-        m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int32_t)
-                                                            + sizeof(int8_t));
-        m_dirtyFragmentBatch = false;
-    }
 
     /*
      * Reserve space in the result output buffer for the number of
@@ -575,13 +593,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // if a fragment modifies any tuples, the whole batch is dirty
     if (tuplesModified > 0) {
         m_dirtyFragmentBatch = true;
-    }
-
-    // write dirty-ness of the batch and number of dependencies output to the FRONT of
-    // the result buffer
-    if (last) {
-        m_resultOutput.writeBoolAt(m_startOfResultBuffer, m_dirtyFragmentBatch);
-        m_resultOutput.writeIntAt(m_startOfResultBuffer+1, static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t) - sizeof(int8_t));
     }
 
     return ENGINE_ERRORCODE_SUCCESS;
@@ -713,28 +724,8 @@ void VoltDBEngine::serializeException(const SerializableEEException& e) {
 // RESULT FUNCTIONS
 // -------------------------------------------------
 void VoltDBEngine::send(Table* dependency) {
-    // legacy placeholder for old output id
-    // repurpose the placeholder to store bytes of Buffer allocated for DR
-
-    size_t drBufferChange = size_t(0);
-    if (m_drStream) {
-        drBufferChange = m_drStream->m_uso - m_drStream->m_committedUso;
-        if (drBufferChange > 0) {
-            assert(drBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
-            drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
-        }
-        if (m_drReplicatedStream) {
-            size_t drReplicatedStreamBufferChange = size_t(0);
-            drReplicatedStreamBufferChange = m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
-            if (drReplicatedStreamBufferChange > 0) {
-                assert(drReplicatedStreamBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
-                drReplicatedStreamBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
-            }
-            drBufferChange += drReplicatedStreamBufferChange;
-        }
-    }
-    m_resultOutput.writeInt(static_cast<int>(drBufferChange));
-    VOLT_DEBUG("Sending Dependency from C++, drBufferChange %d", static_cast<int>(drBufferChange));
+    VOLT_DEBUG("Sending Dependency from C++");
+    m_resultOutput.writeInt(-1); // legacy placeholder for old output id
     dependency->serializeTo(m_resultOutput);
     m_numResultDependencies++;
 }

@@ -217,7 +217,7 @@ public class CompleteTransactionTask extends TransactionTask
         }
         if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
-            // legacy interaces don't work this way and IV2 hasn't changed this
+            // legacy interfaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),

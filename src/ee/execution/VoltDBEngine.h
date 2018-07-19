@@ -572,8 +572,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
-                                bool first,
-                                bool last,
                                 bool traceOn);
 
         /**
