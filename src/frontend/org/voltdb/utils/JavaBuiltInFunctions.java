@@ -45,7 +45,7 @@ public class JavaBuiltInFunctions {
         try {
             offset = ZonedDateTime.ofInstant(fromEpochMilli, ZoneId.of(tz)).getOffset();
         } catch (DateTimeException offsetEx) {
-            throw new VoltAbortException("VOLTDB ERROR: SQL ERROR\n" + "    invalid timezone string.");
+            throw new VoltAbortException("Invalid timezone string.");
         }
 
         long offsetInSeconds = offset.getTotalSeconds();

@@ -22,6 +22,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltcore.logging.VoltLogger;
@@ -103,9 +105,13 @@ public class UserDefinedFunctionManager {
     }
 
     private void loadBuiltInJavaFunctions(ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder) {
-        // define the function object
-        builder.put(FunctionForVoltDB.getFunctionID("format_timestamp"), new UserDefinedFunctionRunner("FORMAT_TIMESTAMP",
-                FunctionForVoltDB.getFunctionID("format_timestamp"), "format_timestamp", new JavaBuiltInFunctions()));
+        // define the function objects
+        String[] fn_names = {"format_timestamp"};
+        for (String fn_name : fn_names) {
+            int fn_id = FunctionForVoltDB.getFunctionID(fn_name);
+            builder.put(fn_id, new UserDefinedFunctionRunner(fn_name,
+                    fn_id, fn_name, new JavaBuiltInFunctions()));
+        }
     }
 
 
@@ -159,7 +165,7 @@ public class UserDefinedFunctionManager {
         private void initFunctionMethod(String methodName) {
             for (final Method m : m_functionInstance.getClass().getDeclaredMethods()) {
                 if (m.getName().equals(methodName)) {
-                    if (!Modifier.isPublic(m.getModifiers())) {
+                    if (! Modifier.isPublic(m.getModifiers())) {
                         continue;
                     }
                     if (Modifier.isStatic(m.getModifiers())) {
