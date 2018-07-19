@@ -24,6 +24,9 @@ JUNIT = os.environ.get('junit', None)
 # set to True if you need to suppress updating the database or JIRA
 DRY_RUN = False
 
+# set threshold (greater than or equal to) of failures in a row to be significant
+FAIL_THRESHOLD = 2
+
 from string import maketrans
 TT = maketrans("[]-<>", "_____")
 
@@ -37,6 +40,16 @@ QUERY1 = """
         AND m.build <= %(build)s
     HAVING fixes > 0
     LIMIT 1
+"""
+
+QUERY1_5 = """
+    SELECT count(*) AS fails
+    FROM `junit-test-failures` m
+    WHERE m.job = %(job)s
+        AND m.name = %(name)s
+        AND m.status in ('FAILED', 'REGRESSION')
+        AND m.stamp > %(stamp)s - INTERVAL 30 DAY
+        AND m.build <= %(build)s
 """
 
 QUERY2 = """
@@ -464,18 +477,24 @@ class Stats(object):
                                 'build': test_data['build']
                             }
 
-                            # query to see if job was fixed in the past 30 days, if not will file ticket
+                            # query to see if job was fixed in the past 30 days
                             logging.debug("Q1 %s" % (QUERY1 % params1))
 
                             cursor.execute(QUERY1, params1)
                             everFixed = cursor.fetchone()
 
                             if not everFixed:
-                                logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
-                                try:
-                                    test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
-                                except:
-                                    logging.exception("failed to file a jira ticket")
+                                # query to see if number of failures in a row is significant, if so files ticket
+                                logging.debug("Q1_5 %s" % (QUERY1_5 % params1))
+
+                                cursor.execute(QUERY1_5, params1)
+                                numFails = cursor.fetchone()[0]
+                                if (numFails >= FAIL_THRESHOLD):
+                                    logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
+                                    try:
+                                        test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
+                                    except:
+                                        logging.exception("failed to file a jira ticket")
                             else:
                                 # if fixed in the past 30 days, checks if current fail sequence 2SD from AVG past 30 day fail sequence
                                 logging.debug("Q2 %s" % (QUERY2 % params1))
@@ -581,8 +600,8 @@ class Tests(unittest.TestCase):
          dict(job='test-nextrelease-1', name='class-1', build=9, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
          dict(job='test-nextrelease-1', name='class-1', build=10, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-26 10:10:10'),
 
-         dict(job='test-nextrelease-2', name='class-1', build=1, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
-         dict(job='test-nextrelease-2', name='class-1', build=2, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
+         dict(job='test-nextrelease-2', name='class-1', build=1, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-04 10:10:10'),
+         dict(job='test-nextrelease-2', name='class-1', build=2, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-05 10:10:10'),
          dict(job='test-nextrelease-2', name='class-1', build=3, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
         ]
 
@@ -600,7 +619,10 @@ class Tests(unittest.TestCase):
         everFixed = self.cursor.fetchone()
 
         if not everFixed:
-            print("FILE TICKET")
+            self.cursor.execute(QUERY1_5, param)
+            numFails = self.cursor.fetchone()[0]
+            if (numFails >= FAIL_THRESHOLD):
+                print("FILE TICKET")
             return
 
         self.cursor.execute(QUERY2, param)
