@@ -354,7 +354,7 @@ VOLTDB_ADD_LIBRARY(${VOLTDB_LIBNAME}
 
 TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
   -L${VOLTDB_3PTY_INSTALL_PREFIX}/lib
-  -lpcre2-8 -ls2geo -lcrypto
+  -lpcre2-8 -ls2geo -lcrypto -ltz
   ${VOLTDB_LINK_FLAGS})
 
 ADD_DEPENDENCIES(${VOLTDB_LIBNAME} s2geo pcre2 crypto)
@@ -373,7 +373,7 @@ VOLTDB_ADD_EXECUTABLE(${VOLTDB_IPCRUN_NAME}
 TARGET_LINK_LIBRARIES(${VOLTDB_IPCRUN_NAME}
   ${VOLTDB_LINK_FLAGS}
   -L${VOLTDB_3PTY_INSTALL_PREFIX}/lib
-  -lpcre2-8 -ls2geo -lcrypto
+  -lpcre2-8 -ls2geo -lcrypto -ltz
   -ldl)
 
 ########################################################################

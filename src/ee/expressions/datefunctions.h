@@ -19,13 +19,39 @@
 #define SRC_EE_EXPRESSIONS_DATEFUNCTIONS_H
 
 #include <ctime>
+#include <unordered_map>
+#include <boost/algorithm/string.hpp>
+#include <iostream>
+
 #include "common/SQLException.h"
 #include "common/executorcontext.hpp"
 #include "common/NValue.hpp"
 #include "expressions/dateconstants.h"
+#include "date/tz.h"
 
 static const int8_t QUARTER_START_MONTH_BY_MONTH[] = {
         /*[0] not used*/-1,  1, 1, 1,  4, 4, 4,  7, 7, 7,  10, 10, 10 };
+
+static const std::unordered_map<std::string, std::string> TIMEZONE_OFFSET_FROM_UTC = {{"NZDT", "+13:00"},
+        {"IDLE", "+12:00"}, {"NZST", "+12:00"}, {"NZT", "+12:00"}, {"AESST", "+11:00"}, {"ACSST", "+10:30"},
+        {"CADT", "+10:30"}, {"SADT", "+10:30"}, {"AEST", "+10:00"}, {"EAST", "+10:00"}, {"GST", "+10:00"},
+        {"LIGT", "+10:00"}, {"SAST", "+09:30"}, {"CAST", "+09:30"}, {"AWSST", "+09:00"}, {"JST", "+09:00"},
+        {"KST", "+09:00"}, {"MHT", "+09:00"}, {"WDT", "+09:00"}, {"MT", "+08:30"}, {"AWST", "+08:00"},
+        {"CCT", "+08:00"}, {"WADT", "+08:00"}, {"WST", "+08:00"}, {"JT", "+07:30"}, {"ALMST", "+07:00"},
+        {"WAST", "+07:00"}, {"CXT", "+07:00"}, {"ALMT", "+06:00"}, {"MAWT", "+06:00"}, {"IOT", "+05:00"},
+        {"MVT", "+05:00"}, {"TFT", "+05:00"}, {"AFT", "+04:30"}, {"EAST", "+04:00"}, {"MUT", "+04:00"},
+        {"RET", "+04:00"}, {"SCT", "+04:00"}, {"IT", "+03:30"}, {"EAT", "+03:00"}, {"BT", "+03:00"},
+        {"EETDST", "+03:00"}, {"HMT", "+03:00"}, {"BDST", "+02:00"}, {"CEST", "+02:00"}, {"CETDST", "+02:00"},
+        {"EET", "+02:00"}, {"FWT", "+02:00"}, {"IST", "+02:00"}, {"MEST", "+02:00"}, {"METDST", "+02:00"},
+        {"SST", "+02:00"}, {"BST", "+01:00"}, {"CET", "+01:00"}, {"DNT", "+01:00"}, {"FST", "+01:00"},
+        {"MET", "+01:00"}, {"MEWT", "+01:00"}, {"MEZ", "+01:00"}, {"NOR", "+01:00"}, {"SET", "+01:00"},
+        {"SWT", "+01:00"}, {"WETDST", "+01:00"}, {"GMT", "+00:00"}, {"UT", "+00:00"}, {"UTC", "+00:00"},
+        {"Z", "+00:00"}, {"ZULU", "+00:00"}, {"WET", "+00:00"}, {"WAT", "-01:00"}, {"NDT", "-02:30"},
+        {"ADT", "-03:00"}, {"AWT", "-03:00"}, {"NFT", "-03:30"}, {"NST", "-03:30"}, {"AST", "-04:00"},
+        {"ACST", "-04:00"}, {"ACT", "-05:00"}, {"EDT", "-04:00"}, {"CDT", "-05:00"}, {"EST", "-05:00"},
+        {"CST", "-06:00"}, {"MDT", "-06:00"}, {"MST", "-07:00"}, {"PDT", "-07:00"}, {"AKDT", "-08:00"},
+        {"PST", "-08:00"}, {"YDT", "-08:00"}, {"AKST", "-09:00"}, {"HDT", "-09:00"}, {"YST", "-09:00"},
+        {"AHST", "-10:00"}, {"HST", "-10:00"}, {"CAT", "-10:00"}, {"NT", "-11:00"}, {"IDLW", "-12:00"}};
 
 static const int64_t PTIME_MAX_YEARS = 10000;
 static const int64_t PTIME_MIN_YEARS = boost::gregorian::date(boost::gregorian::min_date_time).year();
@@ -1057,6 +1083,68 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::
     } catch (std::out_of_range &e) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large in DATEADD function");
     }
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_TIMESTAMP>(const std::vector<NValue>& arguments){
+    assert (arguments.size() == 2);
+
+    const NValue &time_stamp = arguments[0];
+    if (time_stamp.isNull()) {
+        return getNullValue(VALUE_TYPE_TIMESTAMP);
+    }
+
+    if (time_stamp.getValueType() != VALUE_TYPE_TIMESTAMP) {
+        throwCastSQLException(time_stamp.getValueType(), VALUE_TYPE_TIMESTAMP);
+    }
+
+    const NValue &time_offset = arguments[1];
+    if (time_offset.isNull()) {
+        return time_stamp;
+    }
+
+    if (time_offset.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException(time_offset.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    int32_t length;
+    const char *time_offset_buffer = time_offset.getObject_withoutNull(&length);
+    std::string time_offset_str(time_offset_buffer, length);
+    boost::trim(time_offset_str);
+
+    auto search = TIMEZONE_OFFSET_FROM_UTC.find(time_offset_str);
+    if (search != TIMEZONE_OFFSET_FROM_UTC.end()) {
+        time_offset_str = search->second;
+    }
+    using namespace date;
+    using namespace std::chrono;
+    auto zone = locate_zone("Europe/Berlin");
+    auto t2 = make_zoned(zone, system_clock::now());
+    std::cout << t2 << '\n';
+    // equivalent to [\+\-][0-1][0-9]:[0-5][0-9], since <regex> is not support by our c++ compiler
+    if (!(time_offset_str.length() == 6 && (time_offset_str.at(0) == '-' || time_offset_str.at(0) == '+') &&
+          (time_offset_str.at(1) == '0' || time_offset_str.at(1) == '1') && isdigit(time_offset_str.at(2)) &&
+          time_offset_str.at(3) == ':' && isdigit(time_offset_str.at(4)) && stoi(time_offset_str.substr(4, 1)) < 6 &&
+          isdigit(time_offset_str.at(5)))) {
+        throw SQLException(SQLException::data_exception_invalid_parameter,
+                           "time offset must use valid timezone name or meet the [+-]HH:MM format");
+    }
+
+    int64_t micro_seconds_offset = 1000000 * (stoll(time_offset_str.substr(1, 2)) * 3600 +
+                                              stoll(time_offset_str.substr(4, 2)) * 60);
+
+    micro_seconds_offset = (time_offset_str.at(0) == '-') ? -micro_seconds_offset : micro_seconds_offset;
+
+    int64_t total_micro_seconds = time_stamp.getTimestamp() + micro_seconds_offset;
+    int64_t total_seconds = total_micro_seconds / 1000000;
+    int64_t micro_seconds_tail = total_micro_seconds % 1000000;
+
+    std::time_t t = total_seconds;
+    struct std::tm *time_info = std::gmtime(&t);
+    char time_buffer[60];
+    std::strftime(time_buffer, 60, "%F %T.", time_info);
+    snprintf(time_buffer + strlen(time_buffer), 10, "%06ld", long(micro_seconds_tail));
+
+    return getTempStringValue(time_buffer, strlen(time_buffer));
 }
 
 const int64_t MIN_VALID_TIMESTAMP_VALUE = GREGORIAN_EPOCH;

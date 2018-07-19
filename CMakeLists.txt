@@ -397,6 +397,22 @@ ExternalProject_Add(s2geo
   INSTALL_COMMAND $(MAKE) install
   )
 ADD_DEPENDENCIES(s2geo crypto)
+
+SET (VOLTDB_DATE_SRC "${CMAKE_SOURCE_DIR}/third_party/cpp/date")
+SET (VOLTDB_DATE_OBJ "${VOLTDB_3PTY_INSTALL_PREFIX}/lib")
+SET (VOLTDB_DATE_CMAKE_CONFIG
+        -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
+        -DCMAKE_INSTALL_PREFIX=${VOLTDB_3PTY_INSTALL_PREFIX}
+        -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
+ExternalProject_Add(date
+        SOURCE_DIR ${VOLTDB_DATE_SRC}
+        BINARY_DIR ${VOLTDB_DATE_OBJ}
+        CMAKE_ARGS ${VOLTDB_DATE_CMAKE_CONFIG}
+        CMAKE_GENERATOR ${CMAKE_GENERATOR}
+        BUILD_COMMAND $(MAKE) tz
+        INSTALL_COMMAND $(MAKE) install
+        )
+
 ########################################################################
 #
 # Configure the ee files.
