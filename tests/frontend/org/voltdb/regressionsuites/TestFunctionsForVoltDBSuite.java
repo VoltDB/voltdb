@@ -3367,8 +3367,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertContentOfTable(new Object[][]{{"2013-07-18 02:00:00.123457"}}, cr.getResults()[0]);
 
         String[] invalid_offsets = {"I_AM_INVALID", "HOME/TRASH", "10:00", "-1:00"};
-        String expectedError = "VOLTDB ERROR: SQL ERROR\\s*" +
-                "invalid timezone string\\s*";
+        String expectedError = "Invalid timezone string\\s*";
         for (String invalid_offset : invalid_offsets) {
             verifyProcFails(client, expectedError, "FORMAT_TIMESTAMP", invalid_offset, 1);
         }

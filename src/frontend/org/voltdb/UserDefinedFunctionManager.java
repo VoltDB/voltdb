@@ -106,11 +106,11 @@ public class UserDefinedFunctionManager {
 
     private void loadBuiltInJavaFunctions(ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder) {
         // define the function objects
-        String[] fn_names = {"format_timestamp"};
-        for (String fn_name : fn_names) {
-            int fn_id = FunctionForVoltDB.getFunctionID(fn_name);
-            builder.put(fn_id, new UserDefinedFunctionRunner(fn_name,
-                    fn_id, fn_name, new JavaBuiltInFunctions()));
+        String[] functionNames = {"format_timestamp"};
+        for (String functionName : functionNames) {
+            int functionID = FunctionForVoltDB.getFunctionID(functionName);
+            builder.put(functionID, new UserDefinedFunctionRunner(functionName,
+                    functionID, functionName, new JavaBuiltInFunctions()));
         }
     }
 
