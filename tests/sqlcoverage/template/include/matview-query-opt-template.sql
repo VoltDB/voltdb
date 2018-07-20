@@ -2,8 +2,8 @@
 -- view on the same table. Such queries were recently optimized for performance
 -- purposes (see ENG-2878, July 2018); these tests ensure that the answers are
 -- still correct. Note that the GROUP BY query being tested need not exactly
--- match the one defined in a materialized view: it use a subset of the columns
--- from the view, or the columns may be in a different order.
+-- match the one defined in a materialized view: it may use a subset of the
+-- columns from the view, or the columns may be in a different order.
 
 -- Required preprocessor macros (with example values):
 -- {@agg = "_numagg"}
