@@ -22,7 +22,7 @@ from urllib2 import HTTPError, URLError, urlopen
 JUNIT = os.environ.get('junit', None)
 
 # set to True if you need to suppress updating the database or JIRA
-DRY_RUN = False
+DRY_RUN = True
 
 # set threshold (greater than or equal to) of failures in a row to be significant
 FAIL_THRESHOLD = 2
@@ -160,14 +160,13 @@ class Stats(object):
         history = sub('/\d+/testReport/', '/lastCompletedBuild/testReport/', error_url) + '/history/'
 
         failed_since = error_report['failedSince']
-        summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
+        summary = issue['name'] + ' is failing on ' + job + ' (' + issue['reason'] + ')'
         description = error_url + '\n\n------------------stack trace----------------------------\n\n' \
                       + str(error_report['errorStackTrace']) \
                       + '\n\n----------------------------------------------\n\n' \
-                      + "[query history|" + note + "]\n\n"
-        # current bug to look into with Phil, strange (root) directory cases
-        if "/(root)/" not in history:
-            description += "[jenkins history|" + history + "]\n"
+                      + 'Failing since build ' + str(failed_since) + '\n' \
+                      + '[query history|' + note + '] | [jenkins history|' + history + ']\n' \
+                      + '!' + history + 'durationGraph/png!'
 
         current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
                                     'master/version.txt'))
@@ -491,6 +490,7 @@ class Stats(object):
                                 numFails = cursor.fetchone()[0]
                                 if (numFails >= FAIL_THRESHOLD):
                                     logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
+                                    test_data['reason'] = "NEW"
                                     try:
                                         test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
                                     except:
@@ -505,7 +505,9 @@ class Stats(object):
                                 current = results[0][4]
 
                                 if (current < mean(values) - 2*std(values) or current > mean(values) + 2*std(values)):
+                                    logging.info(str(mean(values)) + ' ' + str(std(values)) + ' ' + str(current))
                                     logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
+                                    test_data['reason'] = "FLAKY"
                                     try:
                                         test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
                                         pass
