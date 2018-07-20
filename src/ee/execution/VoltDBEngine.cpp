@@ -490,27 +490,30 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         m_stringPool.purge();
     }
 
-    // write dirty-ness of the batch and number of dependencies output to the FRONT of
-    // the result buffer
-    m_resultOutput.writeBoolAt(m_startOfResultBuffer, m_dirtyFragmentBatch);
-    size_t drBufferChange = size_t(0);
-    if (hasDRBinaryLog) {
-        if (m_drStream) {
-            drBufferChange = m_drStream->m_uso - m_drStream->m_committedUso;
-            assert(drBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
-            drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
+    if (failures == 0) {
+        // write dirty-ness of the batch and number of dependencies output to the FRONT of
+        // the result buffer
+        m_resultOutput.writeBoolAt(m_startOfResultBuffer, m_dirtyFragmentBatch);
+        size_t drBufferChange = size_t(0);
+        if (hasDRBinaryLog) {
+            if (m_drStream) {
+                drBufferChange = m_drStream->m_uso - m_drStream->m_committedUso;
+                assert(drBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
+                drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
+            }
+            if (m_drReplicatedStream) {
+                drBufferChange += m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
+                drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
+            }
         }
-        if (m_drReplicatedStream) {
-            drBufferChange += m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
-            drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
-        }
+        m_resultOutput.writeIntAt(m_startOfResultBuffer + 1, static_cast<int32_t> (drBufferChange));
+        VOLT_DEBUG("executePlanFragments : hasDRBinaryLog %d, drBufferChange %d", hasDRBinaryLog,
+                   static_cast<int32_t> (drBufferChange));
+        m_resultOutput.writeIntAt(m_startOfResultBuffer + 5,
+                                  static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) -
+                                  sizeof(int32_t) - sizeof(int32_t) - sizeof(int8_t));
+
     }
-    m_resultOutput.writeIntAt(m_startOfResultBuffer+1, static_cast<int32_t> (drBufferChange));
-    VOLT_DEBUG("executePlanFragments : hasDRBinaryLog %d, drBufferChange %d", hasDRBinaryLog, static_cast<int32_t> (drBufferChange));
-    m_resultOutput.writeIntAt(m_startOfResultBuffer+5,
-                              static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t)- sizeof(int32_t) - sizeof(int8_t));
-
-
     m_perFragmentStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
     m_currentIndexInBatch = -1;
 
