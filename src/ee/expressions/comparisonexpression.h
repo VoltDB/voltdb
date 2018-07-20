@@ -211,6 +211,9 @@ public:
     inline static bool isNullRejecting() { return true; }
 };
 
+/*
+ * The Comparison Expression operator for 'STARTS WITH'
+ */
 class CmpStartsWith {
 public:
     inline static const char* op_name() { return "CmpStartsWith"; }

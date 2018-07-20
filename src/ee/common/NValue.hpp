@@ -3888,7 +3888,7 @@ inline NValue NValue::like(const NValue& rhs) const {
     const ValueType mType = getValueType();
     if (mType != VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
-                "lhs of LIKE expression is %s not %s",
+                "The left operand of the LIKE expression is %s not %s",
                 getValueTypeString().c_str(),
                 getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
@@ -3896,7 +3896,7 @@ inline NValue NValue::like(const NValue& rhs) const {
     const ValueType rhsType = rhs.getValueType();
     if (rhsType != VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
-                "rhs of LIKE expression is %s not %s",
+                "The right operand of the LIKE expression is %s not %s",
                 rhs.getValueTypeString().c_str(),
                 getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
@@ -4014,8 +4014,10 @@ inline NValue NValue::like(const NValue& rhs) const {
 }
 
 /*
- * The LHS (this) should always be the string being compared
- * and the RHS should always be a plain string used as pattern.
+ * This function checks to see if a VARCHAR string starts with the given prefix pattern.
+ *
+ * The LHS (this) should always be the string being checked
+ * and the RHS should always be a plain string used as the pattern.
  * The funtion returns NValue: true if rhs is a prefix of lhs, o/w NValue: false.
  *
  * Null check should have been handled in comparisonexpression.h already.
@@ -4027,7 +4029,7 @@ inline NValue NValue::startsWith(const NValue& rhs) const {
     const ValueType mType = getValueType();
     if (mType != VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
-                "lhs of STARTS WITH expression is %s not %s",
+                "The left operand of the STARTS WITH expression is %s not %s",
                 getValueTypeString().c_str(),
                 getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
@@ -4035,7 +4037,7 @@ inline NValue NValue::startsWith(const NValue& rhs) const {
     const ValueType rhsType = rhs.getValueType();
     if (rhsType != VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
-                "rhs of STARTS WITH expression is %s not %s",
+                "The right operand of the STARTS WITH expression is %s not %s",
                 rhs.getValueTypeString().c_str(),
                 getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
@@ -4065,7 +4067,7 @@ inline NValue NValue::startsWith(const NValue& rhs) const {
      */
     while (! m_pattern.atEnd()) {
         const uint32_t nextPatternCodePoint = m_pattern.extractCodePoint();
-        if (m_value.atEnd()) { // if left string is longer than pattern string
+        if (m_value.atEnd()) { // if the pattern is longer than the value being checked
             return getFalse();
         }
         const uint32_t nextValueCodePoint = m_value.extractCodePoint();

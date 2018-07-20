@@ -133,10 +133,6 @@ class StartsWith {
             }
         }
 
-        if (j != jLen) {
-            return false;
-        }
-
         return true;
     }
 

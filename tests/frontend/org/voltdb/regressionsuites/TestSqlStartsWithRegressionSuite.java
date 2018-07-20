@@ -41,12 +41,15 @@ public class TestSqlStartsWithRegressionSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+    /** Row numbers in the test table */
     static final int ROWS = 7;
 
-    static final String[] testString = {"aaa", "abc", "AbC", "zzz", "", "a", "âxxx", "aaaaaaa",
+    /** Test patterns that are going to be inserted into 'VAL STARTS WITH xxx' */
+    static final String[] testStrings = {"aaa", "abc", "AbC", "zzz", "", "a", "âxxx", "aaaaaaa",
             "abcdef", "abcdef%", "ab_d_fg", "â🀲x", "â🀲x一xxéyyԱ", "â🀲x一xéyyԱ"};
 
-    static final int[] testExpectedResult = {1, 3, 0, 0, 7, 4, 1, 1, 2, 0, 0, 2, 1, 0};
+    /** Expected row numbers returned after executing 'VAL STARTS WITH xxx' */
+    static final int[] testExpectedResults = {1, 3, 0, 0, 7, 4, 1, 1, 2, 0, 0, 2, 1, 0};
 
     /*
      * Load Data into tables method.
@@ -79,12 +82,12 @@ public class TestSqlStartsWithRegressionSuite extends RegressionSuite {
         String query;
 
         // test if returned row numbers is the same as preset or not
-        for (int index = 0; index < testString.length; index++) {
-            query = String.format("select * from STRINGS where val starts with '%s'", testString[index]);
+        for (int index = 0; index < testStrings.length; index++) {
+            query = String.format("select * from STRINGS where val starts with '%s'", testStrings[index]);
 
             VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
             assertEquals(String.format("\"%s\": bad row count:", query),
-                               testExpectedResult[index], result.getRowCount());
+                               testExpectedResults[index], result.getRowCount());
         }
     }
 
@@ -98,12 +101,12 @@ public class TestSqlStartsWithRegressionSuite extends RegressionSuite {
         String query;
 
         // test if returned row numbers is the same as preset or not
-        for (int index = 0; index < testString.length; index++) {
-            query = String.format("select * from STRINGS where val not starts with '%s'", testString[index]);
+        for (int index = 0; index < testStrings.length; index++) {
+            query = String.format("select * from STRINGS where val not starts with '%s'", testStrings[index]);
 
             VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
             assertEquals(String.format("\"%s\": bad row count:", query),
-                               ROWS - testExpectedResult[index], result.getRowCount());
+                               ROWS - testExpectedResults[index], result.getRowCount());
         }
     }
 
@@ -140,8 +143,8 @@ public class TestSqlStartsWithRegressionSuite extends RegressionSuite {
 
         int[] testResults = {1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 2, 2};
 
-        for (int index = 0; index < testString.length; index++) {
-            query = String.format("select * from STRINGS where '%s' starts with pat", testString[index]);
+        for (int index = 0; index < testStrings.length; index++) {
+            query = String.format("select * from STRINGS where '%s' starts with pat", testStrings[index]);
 
             VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
             assertEquals(String.format("\"%s\": bad row count:", query),
@@ -155,10 +158,10 @@ public class TestSqlStartsWithRegressionSuite extends RegressionSuite {
         Client client = getClient();
 
         // test if returned row numbers is the same as preset or not
-        for (int index = 0; index < testString.length; index++) {
-            VoltTable result = client.callProcedure("SelectStartsWith", testString[index]).getResults()[0];
-            assertEquals(String.format("\"%s\": bad row count:", testString[index]),
-                               testExpectedResult[index], result.getRowCount());
+        for (int index = 0; index < testStrings.length; index++) {
+            VoltTable result = client.callProcedure("SelectStartsWith", testStrings[index]).getResults()[0];
+            assertEquals(String.format("\"%s\": bad row count:", testStrings[index]),
+                               testExpectedResults[index], result.getRowCount());
         }
     }
 
@@ -191,15 +194,15 @@ public class TestSqlStartsWithRegressionSuite extends RegressionSuite {
         project.addStmtProcedure("SelectStartsWith", "select * from strings where val starts with ?;");
         project.addStmtProcedure("NotStartsWith", "select * from strings where val not starts with ?;");
 
-        config = new LocalCluster("sqllike-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqlstartswith-onesite.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        config = new LocalCluster("sqllike-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqlstartswith-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        config = new LocalCluster("sqllike-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqlstartswith-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 

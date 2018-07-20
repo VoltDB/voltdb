@@ -36,11 +36,12 @@ import java.util.Objects;
 public class ExpressionStartsWith extends ExpressionLogical {
 
     private StartsWith             startsWithObject;
+    private boolean noOptimization;
 
     /**
      * Create a STARTS WITH expression
      */
-    ExpressionStartsWith(Expression left, Expression right, boolean noOptimisation) {
+    ExpressionStartsWith(Expression left, Expression right, boolean noOptimization) {
 
         super(OpTypes.STARTS_WITH);
 
@@ -48,15 +49,7 @@ public class ExpressionStartsWith extends ExpressionLogical {
         nodes[LEFT]         = left;
         nodes[RIGHT]        = right;
         startsWithObject    = new StartsWith();
-        this.noOptimisation = noOptimisation;
-    }
-
-    private ExpressionStartsWith(ExpressionStartsWith other) {
-
-        super(OpTypes.STARTS_WITH);
-
-        this.nodes      = other.nodes;
-        this.startsWithObject = other.startsWithObject;
+        this.noOptimization = noOptimization;
     }
 
     @Override
@@ -85,7 +78,6 @@ public class ExpressionStartsWith extends ExpressionLogical {
 
         if (startsWithObject.isVariable) {
             startsWithObject.setPattern(session, rightValue);
-            return startsWithObject.compare(session, leftValue);
         }
 
         return startsWithObject.compare(session, leftValue);
@@ -150,7 +142,7 @@ public class ExpressionStartsWith extends ExpressionLogical {
 
         startsWithObject.setPattern(session, pattern);
 
-        if (noOptimisation) {
+        if (noOptimization) {
             return;
         }
 
@@ -231,7 +223,7 @@ public class ExpressionStartsWith extends ExpressionLogical {
         }
 
         if (other instanceof ExpressionStartsWith) {
-            if (noOptimisation == ((ExpressionStartsWith)other).noOptimisation) {
+            if (noOptimization == ((ExpressionStartsWith)other).noOptimization) {
                 return true;
             }
         }
@@ -240,6 +232,6 @@ public class ExpressionStartsWith extends ExpressionLogical {
 
     @Override
     public int hashCode() {
-        return super.hashCode() + Objects.hashCode(noOptimisation);
+        return super.hashCode() + Objects.hashCode(noOptimization);
     }
 }

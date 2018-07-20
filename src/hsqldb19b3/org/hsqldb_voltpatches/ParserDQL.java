@@ -3375,7 +3375,7 @@ public class ParserDQL extends ParserBase {
     }
 
     /**
-     *  Scan the right-side string value, return a Startswith Expression for generating XML
+     *  Scan the right-side string value, return a STARTS WITH Expression for generating XML
      *
      * @param a ExpressionColumn
      */
@@ -3388,11 +3388,15 @@ public class ParserDQL extends ParserBase {
             if (left.isParam() && right.isParam()) {  // again make sure the left side is valid
                 throw Error.error(ErrorCode.X_42567);
             }
+            /** In this case, we make the right parameter as the lower bound,
+             *  and the right parameter concatenating a special char (greater than any other chars) as the upper bound.
+             *  It now becomes a range scan for all the strings with right parameter as its prefix.
+             */
             Expression l = new ExpressionLogical(OpTypes.GREATER_EQUAL, left, right);
             Expression r = new ExpressionLogical(OpTypes.SMALLER_EQUAL, left,
                     new ExpressionArithmetic(OpTypes.CONCAT, right, new ExpressionValue("\uffff", Type.SQL_CHAR)));
             return new ExpressionLogical(OpTypes.AND, l, r);
-        } else {          // handle plain string value
+        } else {          // handle plain string value and the column
             Expression right      = XreadStringValueExpression();
             return new ExpressionStartsWith(left, right, this.isCheckOrTriggerCondition);
         }
