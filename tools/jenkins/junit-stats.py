@@ -505,7 +505,6 @@ class Stats(object):
                                 current = results[0][4]
 
                                 if (current < mean(values) - 2*std(values) or current > mean(values) + 2*std(values)):
-                                    logging.info(str(mean(values)) + ' ' + str(std(values)) + ' ' + str(current))
                                     logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
                                     test_data['reason'] = "FLAKY"
                                     try:
