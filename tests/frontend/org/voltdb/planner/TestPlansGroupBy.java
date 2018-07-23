@@ -994,9 +994,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         explainStr2 = buildExplainPlan(pns);
         if (! exact) {
             explainStr1 = explainStr1.replaceAll("TEMP_TABLE_\\$\\$\\.column#[\\d]",
-                    "TEMP_TABLE.column#[Index]");
+                    "TEMP_TABLE_\\$\\$.column#[Index]");
             explainStr2 = explainStr2.replaceAll("TEMP_TABLE_\\$\\$\\.column#[\\d]",
-                    "TEMP_TABLE.column#[Index]");
+                    "TEMP_TABLE_\\$\\$.column#[Index]");
             assertEquals(explainStr1, explainStr2);
         }
         assertEquals(explainStr1, explainStr2);
