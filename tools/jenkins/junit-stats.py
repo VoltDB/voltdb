@@ -14,10 +14,9 @@ import mysql.connector
 from datetime import datetime, timedelta
 from jenkinsbot import JenkinsBot
 from mysql.connector.errors import Error as MySQLError
+from numpy import std, mean
+from re import sub
 from urllib2 import HTTPError, URLError, urlopen
-
-# Number of failures in a row for a test needed to trigger a new JIRA issue
-TOLERANCE = 3
 
 # Slack channel to notify if and when issue is reported
 JUNIT = os.environ.get('junit', None)
@@ -25,67 +24,80 @@ JUNIT = os.environ.get('junit', None)
 # set to True if you need to suppress updating the database or JIRA
 DRY_RUN = False
 
+# set threshold (greater than or equal to) of failures in a row to be significant
+FAIL_THRESHOLD = 2
+
 from string import maketrans
 TT = maketrans("[]-<>", "_____")
 
 QUERY1 = """
-SELECT job, name,
-          (select status
-            from `junit-test-failures` z
-              where z.job=q1.job
-              and z.name=q1.name
-              and build=last
-              limit 1
-          ) status,
-          (select stamp
-            from `junit-test-failures` z
-            where z.job=q1.job
-              and z.name=q1.name
-              and build=last
-              limit 1
-          ) stamp,
-          (select max(build) lastrun from `junit-builds`
-            where name=q1.job) lastbuild,
-          (select max(stamp) lastrun from `junit-builds`
-            where name=q1.job) lastbuildtime,
-          last, lastpass,
-             (select count(*)
-                  from `junit-test-failures` n
-                  where n.job=q1.job
-                      and n.name=q1.name
-                      and status in ('FAILED', 'REGRESSION')
-                      and build>lastpass) run
-  FROM
-    (select job, name,
-      (select max(build)
-        from `junit-test-failures` m
-        where m.job=t.job
-          and m.name=t.name
-      ) last,
-      (select coalesce(max(build), last-%s)
-        from `junit-test-failures` m
-        where m.job=t.job
-          and m.name=t.name
-          and status in ('PASSED', 'FIXED')
-          and build>=last-%s
-      ) lastpass
-    from `junit-test-failures` t
-    WHERE name = %%(name)s
-       and job = %%(job)s
-    group by job,name order by build desc) q1
-HAVING status in ('REGRESSION', 'FAILED') AND run>0 AND last=lastbuild
-ORDER BY job, name, run desc
-""" % ((TOLERANCE, TOLERANCE-1))
+    SELECT count(*) AS fixes
+    FROM `junit-test-failures` m
+    WHERE m.job = %(job)s
+        AND m.name = %(name)s
+        AND m.status in ('FIXED')
+        AND m.stamp > %(stamp)s - INTERVAL 30 DAY
+        AND m.build <= %(build)s
+    HAVING fixes > 0
+    LIMIT 1
+"""
 
-QUERY2 = "select job, name, max(last-lastpass), sum(c) " + \
-         "from (" + \
-         QUERY1 + \
-         ") q2"""
+QUERY1_5 = """
+    SELECT count(*) AS fails
+    FROM `junit-test-failures` m
+    WHERE m.job = %(job)s
+        AND m.name = %(name)s
+        AND m.status in ('FAILED', 'REGRESSION')
+        AND m.stamp > %(stamp)s - INTERVAL 30 DAY
+        AND m.build <= %(build)s
+"""
+
+QUERY2 = """
+    SELECT job, build, name, ord-1-COALESCE(pre, 0) AS runs, current
+    FROM
+        (SELECT job, build, name, status, ord, stamp,
+                LAG(ord) OVER w2 AS pre,
+                LEAD(ord) OVER w2 AS post,
+                (SELECT last-MAX(ord)
+                FROM
+                    (SELECT job, name, status, stamp,
+                            ROW_NUMBER() OVER w1 AS ord,
+                            (SELECT count(*)
+                            FROM `junit-test-failures` n
+                            WHERE n.job=%(job)s
+                                AND n.name=%(name)s
+                                AND n.stamp > %(stamp)s - INTERVAL 30 DAY
+                                AND n.build <= %(build)s
+                            ) last
+                    FROM `junit-test-failures` n
+                    WHERE n.job=%(job)s
+                        AND n.name=%(name)s
+                        AND n.stamp > %(stamp)s - INTERVAL 30 DAY
+                        AND n.build <= %(build)s
+                    WINDOW w1 AS (ORDER BY build)
+                    ) q1
+                WHERE q1.status in ('FIXED')
+                LIMIT 1
+                ) current
+        FROM
+            (SELECT job, build, name, status, stamp,
+                    ROW_NUMBER() OVER w1 AS ord
+            FROM `junit-test-failures` n
+            WHERE n.job=%(job)s
+                AND n.name=%(name)s
+                AND n.stamp > %(stamp)s - INTERVAL 30 DAY
+                AND n.build <= %(build)s
+            WINDOW w1 AS (ORDER BY build)
+            ) q2
+        WHERE q2.status in ('FIXED')
+        WINDOW w2 AS (ORDER BY ord)
+        ) q3;
+"""
 
 class Stats(object):
     def __init__(self):
         self.jhost = 'http://ci.voltdb.lan'
-        self.dbhost = 'volt2.voltdb.lan'
+        self.dbhost = 'volt24'
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.dbname = os.environ.get('dbname', 'qa')
@@ -143,14 +155,19 @@ class Stats(object):
             return
 
         # throw a link to the query for the test history into the ticket to aid in checking/debugging the filer
-        note = 'http://volt2/adminer.php?server=volt2&username=qaquery&db=qa&sql=select+%2A+from+%60junit-test-failures%60+WHERE+name+%3D+%27'+issue['name']+'%27+and+job+%3D+%27'+job+'%27order+by+build+desc'
+        note = 'http://volt24/adminer.php?server=volt24&username=qaquery&db=qa&sql=select+%2A+from+%60junit-test-failures%60+WHERE+name+%3D+%27'+issue['name']+'%27+and+job+%3D+%27'+job+'%27order+by+build+desc'
+        # and a link to the test history on jenkins by last completed build
+        history = sub('/\d+/testReport/', '/lastCompletedBuild/testReport/', error_url) + '/history/'
 
         failed_since = error_report['failedSince']
         summary = issue['name'] + ' is failing since build ' + str(failed_since) + ' on ' + job
         description = error_url + '\n\n------------------stack trace----------------------------\n\n' \
                       + str(error_report['errorStackTrace']) \
                       + '\n\n----------------------------------------------\n\n' \
-                      + "[history|" + note + "]"
+                      + "[query history|" + note + "]\n\n"
+        # current bug to look into with Phil, strange (root) directory cases
+        if "/(root)/" not in history:
+            description += "[jenkins history|" + history + "]\n"
 
         current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
                                     'master/version.txt'))
@@ -356,7 +373,7 @@ class Stats(object):
                     }
 
                     add_target = ('INSERT INTO `junit-build-targets` '
-                                  '(name, build, target, duration, empty, failcount, passcount, skipcount) '
+                                  '(name, build, target, duration, `empty`, failcount, passcount, skipcount) '
                                   'VALUES (%(name)s, %(build)s, %(target)s, SEC_TO_TIME(%(duration)s), %(empty)s, %(failcount)s, %(passcount)s, %(skipcount)s)')
 
                     logging.debug(add_target % target_data)
@@ -401,10 +418,13 @@ class Stats(object):
                                 continue
 
                             name = name.translate(TT)
-                            testcase_url = run['url'] + 'testReport/' + name
+                            if "_init_" in name or "-vdm-" in run['url']:
+                                testcase_url = run['url'] + 'testReport/(root)/' + name
+                            else:
+                                testcase_url = run['url'] + 'testReport/' + name
                             n = testcase_url.count('.')
                             # find the testcase url that "works"
-                            for i in range(1, n+1):
+                            for i in range(n+1):
                                 try:
                                     page = self.read_url(testcase_url+"/api/python", ignore404=True)
                                 except:
@@ -446,26 +466,51 @@ class Stats(object):
                                     if e.errno != 1062:
                                         logging.exception('Could not add test data to database')
 
-                            #1. query to see if we already have one failure in same job
-                            #if we don't, skip filing the ticket
+                            # we do not need to file a jira ticket if test is currently fixed
+                            if status == 'FIXED':
+                                continue
+
                             params1 = {
                                 'name': test_data['name'],
-                                'job_number': test_data['build'],
-                                'job': test_data['job']
+                                'stamp': test_data['timestamp'],
+                                'job': test_data['job'],
+                                'build': test_data['build']
                             }
 
+                            # query to see if job was fixed in the past 30 days
                             logging.debug("Q1 %s" % (QUERY1 % params1))
 
                             cursor.execute(QUERY1, params1)
-                            output1 = cursor.fetchone()
+                            everFixed = cursor.fetchone()
 
-                            if output1 and output1[8] >= TOLERANCE:
-                                logging.info("will file: %s %s %s %s %s" % (output1, job, build, name, testcase_url))
-                                try:
-                                    test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
-                                    pass
-                                except:
-                                    logging.exception("failed to file a jira ticket")
+                            if not everFixed:
+                                # query to see if number of failures in a row is significant, if so files ticket
+                                logging.debug("Q1_5 %s" % (QUERY1_5 % params1))
+
+                                cursor.execute(QUERY1_5, params1)
+                                numFails = cursor.fetchone()[0]
+                                if (numFails >= FAIL_THRESHOLD):
+                                    logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
+                                    try:
+                                        test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
+                                    except:
+                                        logging.exception("failed to file a jira ticket")
+                            else:
+                                # if fixed in the past 30 days, checks if current fail sequence 2SD from AVG past 30 day fail sequence
+                                logging.debug("Q2 %s" % (QUERY2 % params1))
+
+                                cursor.execute(QUERY2, params1)
+                                results = cursor.fetchall()
+                                values = [int(v[3]) for v in results]
+                                current = results[0][4]
+
+                                if (current < mean(values) - 2*std(values) or current > mean(values) + 2*std(values)):
+                                    logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
+                                    try:
+                                        test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
+                                        pass
+                                    except:
+                                        logging.exception("failed to file a jira ticket")
 
             except KeyError:
                 logging.exception('Error retrieving test data for this particular build: %d\n' % build)
@@ -513,7 +558,7 @@ class Tests(unittest.TestCase):
         self.dbuser = os.environ.get('dbuser', None)
         self.dbpass = os.environ.get('dbpass', None)
         self.dbname = os.environ.get('dbname', "junitstatstests")
-        self.dbhost = 'volt2.voltdb.lan'
+        self.dbhost = 'volt24'
 
     def open_db(self):
         self.set_env()
@@ -539,46 +584,57 @@ class Tests(unittest.TestCase):
         self.close_db()
 
     def test_1(self):
-        #stats = Stats()
-        # job, name, build, status, stamp, url, host, issue_url
         add_test = ('INSERT INTO `junit-test-failures` '
-                    '(name, job, status, url, build, host, issue_url) '
+                    '(name, job, status, url, build, host, issue_url, stamp) '
                     'VALUES (%(name)s, %(job)s, %(status)s, '
-                    '%(url)s, %(build)s, %(host)s, %(new_issue_url)s)')
+                    '%(url)s, %(build)s, %(host)s, %(new_issue_url)s, %(stamp)s)')
         data = [
-         dict(job='test-nextrelease-1', name='class-1', build=1, status='REGRESSION', url='url-1', host='host-1', new_issue_url=None),
-         dict(job='test-nextrelease-1', name='class-1', build=2, status='FAILED', url='url-1', host='host-1', new_issue_url=None),
-         dict(job='test-nextrelease-1', name='class-1', build=3, status='FAILED', url='url-1', host='host-1', new_issue_url="filed"),
-         dict(job='test-nextrelease-1', name='class-1', build=4, status='FAILED', url='url-1', host='host-1', new_issue_url=None),
-         dict(job='test-nextrelease-1', name='class-1', build=5, status='FAILED', url='url-1', host='host-1', new_issue_url=None),
-         dict(job='test-nextrelease-1', name='class-1', build=6, status='FAILED', url='url-1', host='host-1', new_issue_url=None),
+         dict(job='test-nextrelease-1', name='class-1', build=1, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-05-28 10:10:10'),
+         dict(job='test-nextrelease-1', name='class-1', build=2, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
+         dict(job='test-nextrelease-1', name='class-1', build=3, status='FIXED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
+         dict(job='test-nextrelease-1', name='class-1', build=4, status='REGRESSION', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
+         dict(job='test-nextrelease-1', name='class-1', build=5, status='FIXED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
+         dict(job='test-nextrelease-1', name='class-1', build=6, status='REGRESSION', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
+         dict(job='test-nextrelease-1', name='class-1', build=7, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
+         dict(job='test-nextrelease-1', name='class-1', build=8, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
+         dict(job='test-nextrelease-1', name='class-1', build=9, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
+         dict(job='test-nextrelease-1', name='class-1', build=10, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-26 10:10:10'),
 
-         dict(job='test-nextrelease-2', name='class-1', build=1, status='FIXED', url='url-1', host='host-1', new_issue_url=None),
-         dict(job='test-nextrelease-2', name='class-1', build=2, status='REGRESSION', url='url-1', host='host-1', new_issue_url=None),
-         dict(job='test-nextrelease-2', name='class-1', build=3, status='FAILED', url='url-1', host='host-1', new_issue_url=None),
-         dict(job='test-nextrelease-2', name='class-1', build=4, status='FAILED', url='url-1', host='host-1', new_issue_url="filed"),
-         dict(job='test-nextrelease-2', name='class-1', build=5, status='FIXED', url='url-1', host='host-1', new_issue_url=None),
+         dict(job='test-nextrelease-2', name='class-1', build=1, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-04 10:10:10'),
+         dict(job='test-nextrelease-2', name='class-1', build=2, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-05 10:10:10'),
+         dict(job='test-nextrelease-2', name='class-1', build=3, status='FAILED', url='url-1', host='host-1', new_issue_url=None, stamp='2018-06-06 10:10:10'),
         ]
 
         for d in data:
             self.cursor.execute(add_test, d)
 
-        params1 = {
+        param = {
             'name': 'class-1',
-            'job_number': 1,
-            'job': 'test-nextrelease-1'
+            'stamp': '2018-06-26 10:10:10',
+            'job': 'test-nextrelease-1',
+            'build': 9
         }
 
-        self.cursor.execute(QUERY1, params1)
+        self.cursor.execute(QUERY1, param)
+        everFixed = self.cursor.fetchone()
 
-        for t in self.cursor:
-            print t
+        if not everFixed:
+            self.cursor.execute(QUERY1_5, param)
+            numFails = self.cursor.fetchone()[0]
+            if (numFails >= FAIL_THRESHOLD):
+                print("FILE TICKET")
+            return
 
-        self.cursor.execute(QUERY2, params1)
+        self.cursor.execute(QUERY2, param)
+        results = self.cursor.fetchall()
+        values = [int(v[3]) for v in results]
+        current = results[0][4]
 
-        for t in self.cursor:
-            print t
-        x = 1
+        if (current < mean(values) - 2*std(values) or current > mean(values) + 2*std(values)):
+            print("FILE TICKET")
+            return
+
+        print("DO NOT FILE")
 
 if __name__ == '__main__':
 
@@ -599,4 +655,4 @@ if __name__ == '__main__':
     if len(args) > 2:
         build_range = args[2]
 
-    stats.get_build_data(job, build_range, file_jira_ticket=True)
+    stats.get_build_data(job, build_range, file_jira_ticket=not DRY_RUN)

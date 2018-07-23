@@ -2322,10 +2322,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
 
-            //if there are failed hosts, remove this blocker in RealVoltDB.handleHostsFailedForMigratePartitionLeader()
+            //if there are failed hosts, this blocker will be removed in RealVoltDB.handleHostsFailedForMigratePartitionLeader()
             if (!anyFailedHosts) {
                 voltDB.scheduleWork(
-                        () -> {VoltZK.removeActionBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);},
+                        () -> removeMigrationZKNodes(),
                         5, 0, TimeUnit.SECONDS);
             }
 
@@ -2335,6 +2335,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         true);
             }
         }
+    }
+
+    private void removeMigrationZKNodes() {
+        VoltZK.removeActionBlocker(m_zk, VoltZK.migratePartitionLeaderBlocker, tmLog);
+        VoltZK.removeMigratePartitionLeaderInfo(m_zk);
     }
 
     private void notifyPartitionMigrationStatus(int partitionId, long targetHSId, boolean failed) {

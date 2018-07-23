@@ -307,6 +307,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("BITWISE_SHIFT_PARAM_1", "select BIT_SHIFT_LEFT(?, BIG), BIT_SHIFT_RIGHT(?, BIG) from R3 where id = ?");
         project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
 
+        project.addStmtProcedure("FORMAT_TIMESTAMP", "select FORMAT_TIMESTAMP (TM, ?) from P2 where id = ?");
+
         project.addProcedure(GotBadParamCountsInJava.class);
         project.addProcedure(BadParamTypesForTimestamp.class);
     }
@@ -3343,6 +3345,43 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         validateTableOfLongs(client,
                 "select * from p2 where not is_valid_timestamp(tm)",
                 new long[][] {});
+    }
+
+    public void testFORMAT_TIMESTAMP() throws Exception {
+        System.out.println("STARTING testFORMAT_TIMESTAMP");
+
+        Client client = getClient();
+        ClientResponse cr;
+
+        cr = client.callProcedure("P2.insert", 1, "2013-07-18 02:00:00.123457");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // null timestamp will return null
+        cr = client.callProcedure("FORMAT_TIMESTAMP", "UTC", 2);
+        assertContentOfTable(new Object[][]{{null}}, cr.getResults()[0]);
+
+        // null offset means offset == 0
+        cr = client.callProcedure("FORMAT_TIMESTAMP", null, 1);
+        assertContentOfTable(new Object[][]{{"2013-07-18 02:00:00.123457"}}, cr.getResults()[0]);
+
+        String[] invalid_offsets = {"I_AM_INVALID", "HOME/TRASH", "10:00", "-1:00"};
+        String expectedError = "Invalid timezone string\\s*";
+        for (String invalid_offset : invalid_offsets) {
+            verifyProcFails(client, expectedError, "FORMAT_TIMESTAMP", invalid_offset, 1);
+        }
+
+        String[] offsets = {"UTC", "Australia/Adelaide", "America/Atikokan", "America/Belize", "Asia/Shanghai",
+                "+02:30", "-10:00", "  +02:30", " -10:00 "};
+        String[] results = {"2013-07-18 02:00:00.123457", "2013-07-18 11:30:00.123457", "2013-07-17 21:00:00.123457",
+                "2013-07-17 20:00:00.123457", "2013-07-18 10:00:00.123457", "2013-07-18 04:30:00.123457",
+                "2013-07-17 16:00:00.123457", "2013-07-18 04:30:00.123457", "2013-07-17 16:00:00.123457"};
+
+        for (int i = 0; i < offsets.length; i++) {
+            cr = client.callProcedure("FORMAT_TIMESTAMP", offsets[i], 1);
+            assertContentOfTable(new Object[][]{{results[i]}}, cr.getResults()[0]);
+        }
     }
 
 }

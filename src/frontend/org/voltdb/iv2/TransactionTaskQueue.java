@@ -204,13 +204,11 @@ public class TransactionTaskQueue
      * Many network threads may be racing to reach here, synchronize to
      * serialize queue order
      * @param task
-     * @return true if this task was stored, false if not
      */
-    synchronized boolean offer(TransactionTask task)
+    synchronized void offer(TransactionTask task)
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
         TransactionState txnState = task.getTransactionState();
-        boolean retval = false;
         if (!m_backlog.isEmpty()) {
             /*
              * This branch happens during regular execution when a multi-part is in progress.
@@ -219,23 +217,31 @@ public class TransactionTaskQueue
              * and immediately queues them for execution. If any multi-part txn with smaller txnId shows up,
              * it must from repair process, just let it through.
              */
-            if (txnState.isSinglePartition() || TxnEgo.getSequence(task.getTxnId()) > TxnEgo.getSequence(m_backlog.getFirst().getTxnId())) {
+            if (txnState.isSinglePartition() ){
                 m_backlog.addLast(task);
-                retval = true;
+                return;
             }
-            /*
-             * This branch coordinates FragmentTask or CompletedTransactionTask,
-             * holds the tasks until all the sites on the node receive the task.
-             * Task with newer spHandle will
-             */
-            else if (task.needCoordination() && m_scoreboardEnabled) {
+
+            //It is possible a RO MP read with higher TxnId could be executed before a RO MP reader with lower TxnId
+            //so do not offer them to the site task queue in the same time, place it in the backlog instead. However,
+            //if it is an MP Write with a lower TxnId than the TxnId at the head of the backlog it could be a repair
+            //task so put the MP Write task into the Scoreboard or the SiteTaskQueue
+            TransactionTask headTask = m_backlog.getFirst();
+            if (txnState.isReadOnly() && headTask.getTransactionState().isReadOnly() ?
+                    TxnEgo.getSequence(task.getTxnId()) != TxnEgo.getSequence(headTask.getTxnId()) :
+                    TxnEgo.getSequence(task.getTxnId()) > TxnEgo.getSequence(headTask.getTxnId())) {
+                m_backlog.addLast(task);
+            } else if (task.needCoordination() && m_scoreboardEnabled) {
+                /*
+                 * This branch coordinates FragmentTask or CompletedTransactionTask,
+                 * holds the tasks until all the sites on the node receive the task.
+                 * Task with newer spHandle will
+                 */
                 coordinatedTaskQueueOffer(task);
-            }
-            else {
+            } else {
                 taskQueueOffer(task);
             }
-        }
-        else {
+        } else {
             /*
              * Base case nothing queued nothing in progress
              * If the task is a multipart then put an entry in the backlog which
@@ -244,7 +250,6 @@ public class TransactionTaskQueue
              */
             if (!txnState.isSinglePartition()) {
                 m_backlog.addLast(task);
-                retval = true;
             }
             /*
              * This branch coordinates FragmentTask or CompletedTransactionTask,
@@ -257,7 +262,6 @@ public class TransactionTaskQueue
                 taskQueueOffer(task);
             }
         }
-        return retval;
     }
 
     // Add a local method to offer to the SiteTaskerQueue so we have

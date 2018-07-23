@@ -293,6 +293,7 @@ static const int FUNC_VOLT_MIN_VALID_TIMESTAMP         = 21021;     // minimum v
 static const int FUNC_VOLT_MAX_VALID_TIMESTAMP         = 21022;     // maximum valid timestamp
 static const int FUNC_VOLT_IS_VALID_TIMESTAMP          = 21023;     // is a timestamp valid
 static const int FUNC_VOLT_MAKE_VALID_POLYGON          = 21024;     // Make a polygon valid if necessary.
+static const int FUNC_VOLT_FORMAT_TIMESTAMP            = 21025;     // Convert a timestamp to a String in a given timezone.
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;
