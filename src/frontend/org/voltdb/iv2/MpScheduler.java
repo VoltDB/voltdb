@@ -414,7 +414,7 @@ public class MpScheduler extends Scheduler
 
                 task = instantiateNpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), true);
+                        m_buddyHSIds.get(m_nextBuddy), true, m_leaderNodeId);
             }
 
             // if cannot figure out the involved partitions, run it as an MP txn
