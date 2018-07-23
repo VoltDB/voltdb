@@ -1676,6 +1676,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
 
                     handleHostsFailedForMigratePartitionLeader(failedHosts);
+                    acceptExportStreamMastership(failedHosts);
 
                     // Send KSafety trap - BTW the side effect of
                     // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
@@ -1733,7 +1734,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void handleHostsFailedForMigratePartitionLeader(Set<Integer> failedHosts) {
 
-        final boolean disableSpiTask = "true".equalsIgnoreCase(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "true"));
+        final boolean disableSpiTask = "true".equalsIgnoreCase(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false"));
         if (disableSpiTask) {
             return;
         }
@@ -1771,6 +1772,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 initiator.resetMigratePartitionLeaderStatus(newHostId);
             }
             VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
+        }
+    }
+
+    private void acceptExportStreamMastership(Set<Integer> failedHosts) {
+        for (Initiator initiator : m_iv2Initiators.values()) {
+            if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
+                SpInitiator spInitiator = (SpInitiator)initiator;
+                if (spInitiator.isLeader()) {
+                    ExportManager.instance().acceptMastership(spInitiator.getPartitionId());
+                }
+            }
         }
     }
 
@@ -2195,7 +2207,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void startMigratePartitionLeaderTask() {
-        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "true"));
+        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false"));
         if (disableSpiTask) {
             hostLog.info("MigratePartitionLeader is not scheduled.");
             return;
