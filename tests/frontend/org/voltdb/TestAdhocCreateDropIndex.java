@@ -386,6 +386,7 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a <= b", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a >= b", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "c LIKE 'abc%'", true);
+            ENG12024TestHelper(ddlTemplateForBooleanExpression, "c STARTS WITH 'abc'", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a IS NOT DISTINCT FROM b", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a > b AND b > 0", true);
             ENG12024TestHelper(ddlTemplateForBooleanExpression, "a > b OR b > 0", true);

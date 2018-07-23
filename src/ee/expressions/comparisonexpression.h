@@ -211,6 +211,21 @@ public:
     inline static bool isNullRejecting() { return true; }
 };
 
+/*
+ * The Comparison Expression operator for 'STARTS WITH'
+ */
+class CmpStartsWith {
+public:
+    inline static const char* op_name() { return "CmpStartsWith"; }
+    inline static NValue compare(const NValue& l, const NValue& r)
+    {
+        assert(!l.isNull());
+        assert(!r.isNull());
+        return l.startsWith(r);
+    }
+    inline static bool isNullRejecting() { return true; }
+};
+
 template <typename OP>
 class ComparisonExpression : public AbstractExpression {
 public:
