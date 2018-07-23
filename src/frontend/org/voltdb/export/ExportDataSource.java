@@ -994,6 +994,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_es;
     }
 
+    /**
+     * indicate the partition leader has been promoted
+     * prepare to assume the mastership,
+     * still has to wait for the old leader to give up mastership (through ack)
+     */
+    synchronized void handlePartitionFailure() {
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Export table " + getTableName() + " mastership for partition " + getPartitionId() + " needs to be reevaluated.");
+        }
+        // TODO
+        // Query all other node for current mastership
+    }
+
     @Override
     public String toString() {
         return "ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId();
