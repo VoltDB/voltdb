@@ -256,8 +256,8 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = cluster1Client.callProcedure("@AdHoc", "insert into object2 values (1143,6,8);");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            TestSaveRestoreSysprocSuite.saveTablesWithDefaultOptions(cluster1Client, "nonce");
-            TestSaveRestoreSysprocSuite.validateSnapshot(true, "nonce");
+            TestSaveRestoreSysprocSuite.saveTablesWithDefaultOptions(cluster1Client, TESTNONCE);
+            TestSaveRestoreSysprocSuite.validateSnapshot(true, TESTNONCE);
             m_config.shutDown();
             m_config.startUp();
 
@@ -274,7 +274,7 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
             JSONObject jsObj = new JSONObject();
             try {
                 jsObj.put(SnapshotUtil.JSON_PATH, TMPDIR);
-                jsObj.put(SnapshotUtil.JSON_NONCE, "nonce");
+                jsObj.put(SnapshotUtil.JSON_NONCE, TESTNONCE);
             } catch (JSONException e) {
                 fail("JSON exception" + e.getMessage());
             }
