@@ -248,8 +248,9 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
                         "C2 INTEGER NOT NULL," +
                                            ");";
 
-            cluster1Client.callProcedure("@AdHoc", simpleSchema);
-            ClientResponse cr = cluster1Client.callProcedure("@AdHoc", "insert into helloworld values (1132,3,5);");
+            ClientResponse cr = cluster1Client.callProcedure("@AdHoc", simpleSchema);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            cr = cluster1Client.callProcedure("@AdHoc", "insert into helloworld values (1132,3,5);");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = cluster1Client.callProcedure("@AdHoc", "insert into object1 values (1133,4,5);");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
