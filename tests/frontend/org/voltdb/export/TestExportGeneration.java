@@ -142,6 +142,7 @@ public class TestExportGeneration {
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
                 ImmutableList.of(m_part));
+        m_exportGeneration.createAckMailboxesIfNeeded(m_mockVoltDB.getHostMessenger(), ImmutableList.of(m_part));
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
