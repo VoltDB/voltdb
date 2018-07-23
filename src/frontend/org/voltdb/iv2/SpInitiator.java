@@ -253,6 +253,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
             // leave the export on the former leader, now a replica
             if (!migratePartitionLeader) {
                 ExportManager.instance().acceptMastership(m_partitionId);
+                // notify Export subsystem in host failure case
+//                ExportManager.instance().handlePartitionFailure(m_partitionId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
