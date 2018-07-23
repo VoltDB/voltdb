@@ -220,29 +220,48 @@ public class ExportGeneration implements Generation {
                                 " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
                         return;
                     }
-                    final long ackUSO = buf.getLong();
 
-                    try {
-                        if (exportLog.isDebugEnabled()) {
-                            if (msgType == ExportManager.RELEASE_BUFFER) {
+                    if (msgType == ExportManager.RELEASE_BUFFER) {
+                        final long ackUSO = buf.getLong();
+                        try {
+                            if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received RELEASE_BUFFER message for " + eds.toString() +
                                         " with uso: " + ackUSO +
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
-                            } else if (msgType == ExportManager.TAKE_MASTERSHIP) {
+                            }
+                            eds.ack(ackUSO);
+                        } catch (RejectedExecutionException ignoreIt) {
+                            // ignore it: as it is already shutdown
+                        }
+                    } else if (msgType == ExportManager.TAKE_MASTERSHIP) {
+                        final long ackUSO = buf.getLong();
+                        try {
+                            if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received TAKE_MASTERSHIP message for " + eds.toString() +
                                         " with uso:" + ackUSO +
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
+                            eds.ack(ackUSO);
+                        } catch (RejectedExecutionException ignoreIt) {
+                            // ignore it: as it is already shutdown
                         }
-                        eds.ack(ackUSO);
-                    } catch (RejectedExecutionException ignoreIt) {
-                        // ignore it: as it is already shutdown
-                    }
-
-                    if (msgType == ExportManager.TAKE_MASTERSHIP) {
                         eds.acceptMastership();
+                    } else if (msgType == ExportManager.QUERY_MEMBERSHIP) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Received QUERY_MEMBERSHIP message for " + eds.toString() +
+                                    " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
+                                    " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
+                        }
+                        eds.handleQueryMessage(message.m_sourceHSId);
+                    } else if (msgType == ExportManager.QUERY_RESPONSE) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Received QUERY_RESPONSE message for " + eds.toString() +
+                                    " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
+                                    " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
+                        }
+                        eds.handleQueryResponse(message);
                     }
                 } else {
                     exportLog.error("Receive unexpected message " + message + " in export subsystem");
@@ -719,7 +738,7 @@ public class ExportGeneration implements Generation {
      * mastership role for the given partition id
      * @param partitionId
      */
-    void handlePartitionFailure(int partitionId) {
+    void reassignExportStreamMaster(int partitionId) {
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
@@ -728,7 +747,7 @@ public class ExportGeneration implements Generation {
         }
 
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
-            eds.handlePartitionFailure();
+            eds.reassignExportStreamMaster();
         }
     }
 
