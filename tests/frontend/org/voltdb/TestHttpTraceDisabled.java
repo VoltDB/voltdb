@@ -23,22 +23,24 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
 import javax.servlet.http.HttpServletResponse;
 
+import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.HTTPAdminListener;
 
-import junit.framework.TestCase;
-
-public class TestHttpTraceDisabled extends TestCase{
+public class TestHttpTraceDisabled extends JUnit4LocalClusterTest{
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
+    @Test
     public void testCanAccessRootPath() throws IOException {
         try {
             LocalCluster cluster = new LocalCluster("testCanAccessRootPath.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -59,6 +61,7 @@ public class TestHttpTraceDisabled extends TestCase{
         }
     }
 
+    @Test
     public void testCannotAccessPathsByTrace() throws IOException {
         try {
             LocalCluster cluster = new LocalCluster("testCannotAccessRootPathsByTrace.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
