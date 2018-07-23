@@ -166,7 +166,7 @@ class Stats(object):
                       + '\n\n----------------------------------------------\n\n' \
                       + 'Failing since build ' + str(failed_since) + '\n' \
                       + '[query history|' + note + '] | [jenkins history|' + history + ']\n' \
-                      + '!' + history + 'durationGraph/png!'
+                      + '!durationGraph.png!'
 
         current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
                                     'master/version.txt'))
@@ -174,7 +174,9 @@ class Stats(object):
 
         try:
             new_issue = jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version,
-                                                        ['junit-consistent-failure', 'automatic'], DRY_RUN=DRY_RUN)
+                                                        ['junit-consistent-failure', 'automatic'],
+                                                        {'durationGraph.png' : error_url + '/history/durationGraph/png'},
+                                                        DRY_RUN=DRY_RUN)
 
             if new_issue:
                 new_issue_url = "https://issues.voltdb.com/browse/" + new_issue.key
