@@ -86,7 +86,8 @@ import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 // fredt@users 20031006 - patch 1.7.2 - reuse Like objects for all rows
 // fredt@users 1.9.0 - LIKE for binary strings
 class Like {
-
+    private final static int LEFT = 0;
+    private final static int RIGHT = 1;
     private final static BinaryData maxByteValue =
         new BinaryData(new byte[]{ -128 }, false);
     private char[]   cLike;
@@ -95,6 +96,7 @@ class Like {
     private boolean  isIgnoreCase;
     private int      iFirstWildCard;
     private boolean  isNull;
+    private boolean  isRightNull;
     int              escapeChar;
     boolean          hasCollation;
     static final int UNDERSCORE_CHAR = 1;
@@ -234,7 +236,7 @@ class Like {
     }
 
     void setPattern(Session session, Object pattern, Object escape,
-                    boolean hasEscape) {
+                    boolean hasEscape, Expression[] nodes) {
 
         isNull = pattern == null;
 
@@ -261,6 +263,10 @@ class Like {
         }
 
         if (isNull) {
+            // ENG-14266, solve 'col LIKE CAST(NULL AS VARCHAR)' problem
+            isRightNull = (nodes[LEFT] instanceof ExpressionColumn) &&
+                          (nodes[RIGHT] instanceof ExpressionOp) &&
+                          (nodes[RIGHT].getType() == 1) && (nodes[RIGHT].getValue(session) == null);
             return;
         }
 
@@ -336,8 +342,12 @@ class Like {
         return iFirstWildCard != -1;
     }
 
+    boolean isEquivalentToCastPredicate() {
+        return isRightNull;
+    }
+
     boolean isEquivalentToUnknownPredicate() {
-        return isNull;
+        return isNull && !isRightNull;
     }
 
     boolean isEquivalentToEqualsPredicate() {

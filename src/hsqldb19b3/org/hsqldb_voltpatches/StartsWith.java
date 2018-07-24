@@ -34,12 +34,12 @@ import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
  */
 
 class StartsWith {
-
     private final static BinaryData maxByteValue =
         new BinaryData(new byte[]{ -128 }, false);
     private char[]   cStartsWith;
     private int      iLen;
     private boolean  isNull;
+    private boolean  isRightNull;
     boolean          hasCollation;
     boolean          isVariable      = true;
     boolean          isBinary        = false;
@@ -136,11 +136,16 @@ class StartsWith {
         return true;
     }
 
-    void setPattern(Session session, Object pattern) {
+    void setPattern(Session session, Object pattern, Expression[] nodes) {
 
         isNull = pattern == null;
 
         if (isNull) {
+            // ENG-14266, solve 'col LIKE CAST(NULL AS VARCHAR)' problem
+            isRightNull = (nodes[Expression.LEFT] instanceof ExpressionColumn) &&
+                          (nodes[Expression.RIGHT] instanceof ExpressionOp) &&
+                          (nodes[Expression.RIGHT].getType() == 1) &&
+                          (nodes[Expression.RIGHT].getValue(session) == null);
             return;
         }
 
@@ -157,7 +162,11 @@ class StartsWith {
     }
 
     boolean isEquivalentToUnknownPredicate() {
-        return isNull;
+        return isNull && !isRightNull;
+    }
+
+    boolean isEquivalentToCastPredicate() {
+        return isRightNull;
     }
 
     boolean isEquivalentToNotNullPredicate() {

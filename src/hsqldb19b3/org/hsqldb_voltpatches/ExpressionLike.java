@@ -117,7 +117,7 @@ public final class ExpressionLike extends ExpressionLogical {
             synchronized (likeObject) {
                 likeObject.setPattern(session, rightValue, escapeValue,
 // A VoltDB extension to disable LIKE pattern escape characters
-                        (nodes.length == TERNARY) && (nodes[ESCAPE] != null));
+                        (nodes.length == TERNARY) && (nodes[ESCAPE] != null), nodes);
 /* disable 1 line ...
                                       nodes[ESCAPE] != null);
 ... disabled 1 line */
@@ -276,7 +276,7 @@ public final class ExpressionLike extends ExpressionLogical {
                         : null;
 
 // A VoltDB extension to disable LIKE pattern escape characters
-        likeObject.setPattern(session, pattern, escape, (nodes.length > 2));
+        likeObject.setPattern(session, pattern, escape, (nodes.length > 2), nodes);
 /* disable 1 line ...
         likeObject.setPattern(session, pattern, escape, nodes[ESCAPE] != null);
 ... disabled 1 line */
@@ -286,15 +286,15 @@ public final class ExpressionLike extends ExpressionLogical {
             return;
         }
 
-        if (likeObject.isEquivalentToUnknownPredicate()) {
+        if (likeObject.isEquivalentToCastPredicate()) {
+            // ENG-14266 solve 'col LIKE CAST(NULL AS VARCHAR)' problem
+            return;
+        } else if (likeObject.isEquivalentToUnknownPredicate()) {
             this.setAsConstantValue(null);
-
-            likeObject = null;
         } else if (likeObject.isEquivalentToEqualsPredicate()) {
             opType = OpTypes.EQUAL;
             nodes[RIGHT] = new ExpressionValue(likeObject.getRangeLow(),
                                                Type.SQL_VARCHAR);
-            likeObject = null;
         } else if (likeObject.isEquivalentToNotNullPredicate()) {
             Expression notNull = new ExpressionLogical(OpTypes.IS_NULL,
                 nodes[LEFT]);
@@ -302,7 +302,6 @@ public final class ExpressionLike extends ExpressionLogical {
             opType      = OpTypes.NOT;
             nodes       = new Expression[UNARY];
             nodes[LEFT] = notNull;
-            likeObject  = null;
         } else {
             if (nodes[LEFT].opType != OpTypes.COLUMN) {
                 return;
@@ -359,7 +358,6 @@ public final class ExpressionLike extends ExpressionLogical {
                 nodes[RIGHT] = new ExpressionLogical(OpTypes.SMALLER_EQUAL,
                                                      leftOld, rightBound);
                 opType     = OpTypes.AND;
-                likeObject = null;
             } else if (between && like) {
                 Expression gte = new ExpressionLogical(OpTypes.GREATER_EQUAL,
                                                        nodes[LEFT], leftBound);
