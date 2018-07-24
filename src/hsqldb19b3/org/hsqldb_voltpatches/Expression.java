@@ -1528,6 +1528,7 @@ public class Expression {
 
         // logicals - other predicates
         prototypes.put(OpTypes.LIKE,          (new VoltXMLElement("operation")).withValue("optype", "like"));
+        prototypes.put(OpTypes.STARTS_WITH,   (new VoltXMLElement("operation")).withValue("optype", "startswith"));
         prototypes.put(OpTypes.IN,            null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.EXISTS,        (new VoltXMLElement("operation")).withValue("optype", "exists"));
         prototypes.put(OpTypes.OVERLAPS,      null); // not yet supported ExpressionLogical

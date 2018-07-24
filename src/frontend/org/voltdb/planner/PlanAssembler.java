@@ -1538,7 +1538,7 @@ public class PlanAssembler {
         // Right now, the EE is going to use the original column names
         // and compare these to the persistent table column names in the
         // update executor in order to figure out which table columns get
-        // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
+        // updated.  We'll associate the actual values with $$_VOLT_TEMP_TABLE_$$
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> colEntry :
             m_parsedUpdate.m_columns.entrySet()) {

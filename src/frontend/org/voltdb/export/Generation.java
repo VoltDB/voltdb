@@ -18,6 +18,7 @@ package org.voltdb.export;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
+
 import org.voltcore.messaging.HostMessenger;
 
 /**
@@ -26,7 +27,7 @@ import org.voltcore.messaging.HostMessenger;
  */
 public interface Generation {
 
-    public void acceptMastershipTask(int partitionId);
+    public void acceptMastership(int partitionId);
     public void close(final HostMessenger messenger);
 
     public long getQueuedExportBytes(int partitionId, String signature);

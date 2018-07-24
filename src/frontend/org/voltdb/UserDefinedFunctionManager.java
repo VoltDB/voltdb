@@ -22,6 +22,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.voltcore.logging.VoltLogger;
@@ -33,6 +35,7 @@ import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.SerializationHelper;
+import org.voltdb.utils.JavaBuiltInFunctions;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -96,7 +99,19 @@ public class UserDefinedFunctionManager {
             assert(funcInstance != null);
             builder.put(catalogFunction.getFunctionid(), new UserDefinedFunctionRunner(catalogFunction, funcInstance));
         }
+
+        loadBuiltInJavaFunctions(builder);
         m_udfs = builder.build();
+    }
+
+    private void loadBuiltInJavaFunctions(ImmutableMap.Builder<Integer, UserDefinedFunctionRunner> builder) {
+        // define the function objects
+        String[] functionNames = {"format_timestamp"};
+        for (String functionName : functionNames) {
+            int functionID = FunctionForVoltDB.getFunctionID(functionName);
+            builder.put(functionID, new UserDefinedFunctionRunner(functionName,
+                    functionID, functionName, new JavaBuiltInFunctions()));
+        }
     }
 
 
@@ -117,32 +132,17 @@ public class UserDefinedFunctionManager {
         static final int VAR_LEN_SIZE = Integer.SIZE/8;
 
         public UserDefinedFunctionRunner(Function catalogFunction, Object funcInstance) {
-            m_functionName = catalogFunction.getFunctionname();
-            m_functionId = catalogFunction.getFunctionid();
+            this(catalogFunction.getFunctionname(), catalogFunction.getFunctionid(),
+                    catalogFunction.getMethodname(), funcInstance);
+        }
+
+        public UserDefinedFunctionRunner(String functionName, int functionId, String methodName, Object funcInstance) {
+            m_functionName = functionName;
+            m_functionId = functionId;
             m_functionInstance = funcInstance;
             m_functionMethod = null;
-            String methodName = catalogFunction.getMethodname();
-            for (final Method m : m_functionInstance.getClass().getDeclaredMethods()) {
-                if (m.getName().equals(methodName)) {
-                    if (! Modifier.isPublic(m.getModifiers())) {
-                        continue;
-                    }
-                    if (Modifier.isStatic(m.getModifiers())) {
-                        continue;
-                    }
-                    if (m.getReturnType().equals(Void.TYPE)) {
-                        continue;
-                    }
-                    m_functionMethod = m;
-                    break;
-                }
-            }
-            if (m_functionMethod == null) {
-                throw new RuntimeException(
-                        String.format("Error loading function %s: cannot find the %s() method.",
-                                m_functionName, methodName));
-            }
 
+            initFunctionMethod(methodName);
             Class<?>[] paramTypeClasses = m_functionMethod.getParameterTypes();
             m_paramCount = paramTypeClasses.length;
             m_paramTypes = new VoltType[m_paramCount];
@@ -159,10 +159,31 @@ public class UserDefinedFunctionManager {
             // We register the token again when initializing the user-defined function manager because
             // in a cluster setting the token may only be registered on the node where the CREATE FUNCTION DDL
             // is executed. We uses a static map in FunctionDescriptor to maintain the token list.
-            FunctionForVoltDB.registerTokenForUDF(m_functionName,
-                                                  m_functionId,
-                                                  m_returnType,
-                                                  m_paramTypes);
+            FunctionForVoltDB.registerTokenForUDF(m_functionName, m_functionId, m_returnType, m_paramTypes);
+        }
+
+        private void initFunctionMethod(String methodName) {
+            for (final Method m : m_functionInstance.getClass().getDeclaredMethods()) {
+                if (m.getName().equals(methodName)) {
+                    if (! Modifier.isPublic(m.getModifiers())) {
+                        continue;
+                    }
+                    if (Modifier.isStatic(m.getModifiers())) {
+                        continue;
+                    }
+                    if (m.getReturnType().equals(Void.TYPE)) {
+                        continue;
+                    }
+                    m_functionMethod = m;
+                    break;
+                }
+
+            }
+            if (m_functionMethod == null) {
+                throw new RuntimeException(
+                        String.format("Error loading function %s: cannot find the %s() method.",
+                                m_functionName, methodName));
+            }
         }
 
         // We should refactor those functions into SerializationHelper
@@ -319,5 +340,6 @@ public class UserDefinedFunctionManager {
         public String getFunctionName() {
             return m_functionName;
         }
+
     }
 }

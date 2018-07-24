@@ -126,4 +126,11 @@
                  "ddl": "DDL.sql",
                  "template": "pushdown.sql",
                  "normalizer": "normalizer.py"},
+
+# To test materialized view correctness, even with query optimization
+# (see ENG-2878)
+    "matview-query-opt": {"schema": "matview-query-opt-schema.py",
+                          "ddl": "matview-DDL.sql",
+                          "template": "matview-query-opt.sql",
+                          "normalizer": "nulls-lowest-normalizer.py"},
 }

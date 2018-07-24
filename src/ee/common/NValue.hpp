@@ -418,6 +418,7 @@ class NValue {
      * This NValue is the value and the rhs is the pattern
      */
     NValue like(const NValue& rhs) const;
+    NValue startsWith(const NValue& rhs) const;
 
     //TODO: passing NValue arguments by const reference SHOULD be standard practice
     // for the dozens of NValue "operator" functions. It saves on needless NValue copies.
@@ -3887,7 +3888,7 @@ inline NValue NValue::like(const NValue& rhs) const {
     const ValueType mType = getValueType();
     if (mType != VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
-                "lhs of LIKE expression is %s not %s",
+                "The left operand of the LIKE expression is %s not %s",
                 getValueTypeString().c_str(),
                 getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
@@ -3895,7 +3896,7 @@ inline NValue NValue::like(const NValue& rhs) const {
     const ValueType rhsType = rhs.getValueType();
     if (rhsType != VALUE_TYPE_VARCHAR) {
         throwDynamicSQLException(
-                "rhs of LIKE expression is %s not %s",
+                "The right operand of the LIKE expression is %s not %s",
                 rhs.getValueTypeString().c_str(),
                 getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
@@ -4010,6 +4011,72 @@ inline NValue NValue::like(const NValue& rhs) const {
     Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
 
     return liker.like() ? getTrue() : getFalse();
+}
+
+/*
+ * This function checks to see if a VARCHAR string starts with the given prefix pattern.
+ *
+ * The LHS (this) should always be the string being checked
+ * and the RHS should always be a plain string used as the pattern.
+ * The funtion returns NValue: true if rhs is a prefix of lhs, o/w NValue: false.
+ *
+ * Null check should have been handled in comparisonexpression.h already.
+ */
+inline NValue NValue::startsWith(const NValue& rhs) const {
+    /*
+     * Validate that all params are VARCHAR
+     */
+    const ValueType mType = getValueType();
+    if (mType != VALUE_TYPE_VARCHAR) {
+        throwDynamicSQLException(
+                "The left operand of the STARTS WITH expression is %s not %s",
+                getValueTypeString().c_str(),
+                getTypeName(VALUE_TYPE_VARCHAR).c_str());
+    }
+
+    const ValueType rhsType = rhs.getValueType();
+    if (rhsType != VALUE_TYPE_VARCHAR) {
+        throwDynamicSQLException(
+                "The right operand of the STARTS WITH expression is %s not %s",
+                rhs.getValueTypeString().c_str(),
+                getTypeName(VALUE_TYPE_VARCHAR).c_str());
+    }
+
+    int32_t valueUTF8Length;
+    const char* valueChars = getObject_withoutNull(&valueUTF8Length);
+    int32_t patternUTF8Length;
+    const char* patternChars = rhs.getObject_withoutNull(&patternUTF8Length);
+
+    /*
+     * The case if pattern is an empty string.
+     * Return true only if the left string is also an empty string.
+     */
+    if (0 == patternUTF8Length) {
+        if (0 == valueUTF8Length) {
+            return getTrue();
+        } else {
+            return getFalse();
+        }
+    }
+
+    UTF8Iterator m_value(valueChars, valueChars + valueUTF8Length);
+    UTF8Iterator m_pattern(patternChars, patternChars + patternUTF8Length);
+
+    /*
+     * Go through the pattern per single code point to see if pattern is the prefix
+     */
+    while (! m_pattern.atEnd()) {
+        const uint32_t nextPatternCodePoint = m_pattern.extractCodePoint();
+        if (m_value.atEnd()) { // if the pattern is longer than the value being checked
+            return getFalse();
+        }
+        const uint32_t nextValueCodePoint = m_value.extractCodePoint();
+        if (nextPatternCodePoint != nextValueCodePoint) { // if the current char is not the same
+            return getFalse();
+        }
+    }
+    // Have checked the pattern is the prefix of left string, return true
+    return getTrue();
 }
 
 } // namespace voltdb

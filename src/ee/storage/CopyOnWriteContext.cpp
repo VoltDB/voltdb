@@ -114,7 +114,6 @@ TableStreamerContext::ActivationReturnCode
 CopyOnWriteContext::handleReactivation(TableStreamType streamType)
 {
     // Not support multiple snapshot streams.
-    assert(m_tuplesRemaining == 0);
     if (streamType == TABLE_STREAM_SNAPSHOT) {
      return ACTIVATION_FAILED;
     }

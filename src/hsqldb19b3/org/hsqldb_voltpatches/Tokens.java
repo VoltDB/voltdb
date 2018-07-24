@@ -738,6 +738,9 @@ public class Tokens {
     static final String        T_SQL_TINYINT         = "SQL_TINYINT";
     static final String        T_SQL_VARBINARY       = "SQL_VARBINARY";
     static final String        T_SQL_VARCHAR         = "SQL_VARCHAR";
+    // A VoltDB extension to support fast match with some ranges starting with some patterns
+    static final String        T_STARTS              = "STARTS";
+    // End of VoltDB extensioin
     static final String        T_SYSDATE             = "SYSDATE";
     static final String        T_TEMP                = "TEMP";
     public static final String T_TEXT                = "TEXT";
@@ -1426,6 +1429,9 @@ public class Tokens {
     static final int        SCRIPTFORMAT          = 584;
     static final int        SEMICOLON             = 585;
     static final int        SHUTDOWN              = 586;
+    // A VoltDB extension to support fast match with some ranges starting with some patterns
+    static final int        STARTS                = 1011;
+    // End of VoltDB extension
     static final int        TEMP                  = 587;
     static final int        TEXT                  = 588;
     static final int        TO_CHAR               = 589;
@@ -1976,7 +1982,7 @@ public class Tokens {
         // End of VoltDB extension
     }
 
-    private static final IntValueHashMap commandSet = new IntValueHashMap(251);
+    private static final IntValueHashMap commandSet = new IntValueHashMap(252);
 
     static {
         commandSet.put(T_IF, Tokens.IF);
@@ -2142,6 +2148,9 @@ public class Tokens {
         commandSet.put(T_SQL_TSI_MONTH, SQL_TSI_MONTH);
         commandSet.put(T_SQL_TSI_QUARTER, SQL_TSI_QUARTER);
         commandSet.put(T_SQL_TSI_YEAR, SQL_TSI_YEAR);
+        // A VoltDB extension to support fast match with some ranges starting with some patterns
+        commandSet.put(T_STARTS, STARTS);
+        // End of VoltDB extension
         commandSet.put(T_STYLE, STYLE);
         commandSet.put(T_T_FACTOR, T);
         commandSet.put(T_TEMP, TEMP);
