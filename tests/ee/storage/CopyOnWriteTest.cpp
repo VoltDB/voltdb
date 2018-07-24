@@ -2009,11 +2009,23 @@ TEST_F(CopyOnWriteTest, ElasticIndexLowerUpperBounds) {
 // 3. Allow Cow Activation with Elastic_Index
 // 4. Allow Elastic_Index_Read / Clear with Cow
 TEST_F(CopyOnWriteTest, CoexistenceCheck) {
-    initTable(1, 0);
-    int tupleCount = 4;
+    const int NUM_PARTITIONS = 1;
+    const int TUPLES_PER_BLOCK = 50;
+    const int NUM_INITIAL = 300;
+    // const int NUM_CYCLES = 300;
+    const int FREQ_INSERT = 1;
+    const int FREQ_DELETE = 10;
+    const int FREQ_UPDATE = 5;
+    const int FREQ_COMPACTION = 100;
 
-    // Empty table has an assigned allocated tuple storage
-    ASSERT_EQ(1, m_table->allocatedBlockCount());
+    ElasticTableScrambler tableScrambler(*this,
+                                         NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
+                                         FREQ_INSERT, FREQ_DELETE,
+                                         FREQ_UPDATE, FREQ_COMPACTION);
+
+    tableScrambler.initialize();
+
+
     char config[4];
     ::memset(config, 0, 4);
     ReferenceSerializeInputBE input(config, 4);
@@ -2040,6 +2052,7 @@ TEST_F(CopyOnWriteTest, CoexistenceCheck) {
     ok = m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     ASSERT_TRUE(ok);
     // insert tuples
+    int tupleCount = 4;
     addRandomUniqueTuples(m_table, tupleCount);
 
     // try activate another Snapshot
