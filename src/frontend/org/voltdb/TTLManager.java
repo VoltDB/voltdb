@@ -35,7 +35,6 @@ import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientResponse;
@@ -82,20 +81,13 @@ public class TTLManager extends StatsSource{
     public class TTLTask implements Runnable {
 
         final String tableName;
-        final String columnName;
         final TTLStats stats;
-        int batchSize;
-        int maxFrequency;
-        long value;
+        AtomicReference<TimeToLive> ttlRef;
         AtomicBoolean canceled = new AtomicBoolean(false);
-        Object lock = new Object();
         public TTLTask(String table, TimeToLive timeToLive, TTLStats ttlStats) {
             tableName = table;
+            ttlRef = new AtomicReference<>(timeToLive);
             stats = ttlStats;
-            batchSize = timeToLive.getBatchsize();
-            maxFrequency = timeToLive.getMaxfrequency();
-            value =  transformValue(timeToLive);
-            columnName = timeToLive.getTtlcolumn().getName();
         }
 
         @Override
@@ -108,11 +100,7 @@ public class TTLManager extends StatsSource{
             }
             ClientInterface cl = voltdb.getClientInterface();
             if (!canceled.get() && cl != null && cl.isAcceptingConnections()) {
-                long ttlValue;
-                synchronized(lock){
-                    ttlValue = value;
-                }
-                performDelete(cl, columnName, ttlValue, TIMEOUT, this);
+                performDelete(cl, this);
             }
         }
 
@@ -126,14 +114,11 @@ public class TTLManager extends StatsSource{
         }
 
         public void updateTask(TimeToLive updatedTTL) {
-            synchronized(lock){
-                batchSize = updatedTTL.getBatchsize();
-                maxFrequency = updatedTTL.getMaxfrequency();
-                value =  transformValue(updatedTTL);
-            }
+            ttlRef.compareAndSet(ttlRef.get(), updatedTTL);
         }
 
-        private long transformValue(TimeToLive ttl) {
+        long getValue() {
+            TimeToLive ttl = ttlRef.get();
             if (VoltType.get((byte)ttl.getTtlcolumn().getType()) != VoltType.TIMESTAMP) {
                 return ttl.getTtlvalue();
             }
@@ -155,6 +140,15 @@ public class TTLManager extends StatsSource{
                 }
             }
             return ((System.currentTimeMillis() - timeUnit.toMillis(ttl.getTtlvalue())) * 1000);
+        }
+        int getMaxFrequency() {
+            return ttlRef.get().getMaxfrequency();
+        }
+        int getBatchSize() {
+            return ttlRef.get().getBatchsize();
+        }
+        String getColumnName() {
+            return ttlRef.get().getTtlcolumn().getName();
         }
     }
 
@@ -257,8 +251,7 @@ public class TTLManager extends StatsSource{
                 }
                 task = new TTLTask(t.getTypeName(), ttl, stats);
                 m_tasks.put(t.getTypeName(), task);
-                long interval = 1;
-                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY + random.nextInt((int)interval), interval, TimeUnit.MILLISECONDS));
+                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY + random.nextInt((int)INTERVAL), INTERVAL, TimeUnit.MILLISECONDS));
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));
             } else {
                 task.updateTask(ttl);
@@ -314,14 +307,14 @@ public class TTLManager extends StatsSource{
         }
     }
 
-    protected void performDelete(ClientInterface cl, String columnName, long ttlValue, int timeout, TTLTask task) {
+    protected void performDelete(ClientInterface cl, TTLTask task) {
         CountDownLatch latch = new CountDownLatch(1);
         final ProcedureCallback cb = new ProcedureCallback() {
             @Override
             public void clientCallback(ClientResponse resp) throws Exception {
                 if (resp.getStatus() != ClientResponse.SUCCESS) {
                     hostLog.warn(String.format("Fail to execute TTL on table: %s, column: %s, status: %s",
-                            task.tableName, columnName, resp.getStatusString()));
+                            task.tableName, task.getColumnName(), resp.getStatusString()));
                 }
                 if (resp.getResults() != null && resp.getResults().length > 0) {
                     VoltTable t = resp.getResults()[0];
@@ -344,29 +337,18 @@ public class TTLManager extends StatsSource{
                         hostLog.warn("Errors occured on TTL table " + task.tableName + ": " +  error + " " + drLimitError);
                     } else {
                         task.stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"), t.getLong("LAST_DELETE_TIMESTAMP"));
-                        adjustDeleteFrequency(task);
                     }
                 }
                 latch.countDown();
             }
         };
         cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, 1000 * 120, cb,
-                "@LowImpactDelete", new Object[] {task.tableName, columnName, ttlValue, "<", task.batchSize, timeout});
+                "@LowImpactDelete", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<", task.getBatchSize(),
+                        TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
             latch.await(1, TimeUnit.MINUTES);
         } catch (InterruptedException e) {
+            hostLog.warn("TTL waiting interrupted" + e.getMessage());
         }
-    }
-
-    private void adjustDeleteFrequency(TTLTask task) {
-        ScheduledFuture<?> fut = m_futures.get(task.tableName);
-        if (fut != null) {
-            fut.cancel(false);
-            m_futures.remove(task.tableName);
-        }
-
-        //TODO: determine a new interval based on latest stats.
-        long interval = TimeUnit.SECONDS.toMillis(1)/task.maxFrequency;
-        m_futures.put(task.tableName, m_timeToLiveExecutor.scheduleAtFixedRate(task, 0, interval, TimeUnit.MILLISECONDS));
     }
 }
