@@ -26,7 +26,7 @@ This file will be used by the first cluster of 3 nodes. Copy this file and repla
 
 The two clusters are differentiated with this id attribute. Notice how each cluster is assigned the xdcr role as well. 
 
-The connection source attribute is the unique hostnames or IP addresses of the opposite cluster. So node1, node2, and node3 use node4, node5, and node6, and vice versa.
+The connection source attribute is the unique hostnames or IP addresses of the opposite cluster. So node1, node2, and node3 use node4, node5, and node6, and vice versa. The nodes will use the default replication port 5555 unless otherwise stated using the syntax "node4:5560", for example.
 
 Sitesperhost and kfactor can be changed as desired. 
 
