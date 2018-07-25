@@ -449,8 +449,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     */
     m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int8_t) + sizeof(int32_t) + sizeof(int32_t));
     m_dirtyFragmentBatch = false;
-
-
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
         int usedParamcnt = serialInput.readShort();
         m_executorContext->setUsedParameterCount(usedParamcnt);
@@ -502,8 +500,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                 drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
             }
             if (m_drReplicatedStream) {
-                drBufferChange += m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
-                drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
+                size_t drReplicatedStreamBufferChange = m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
+                assert(drReplicatedStreamBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
+                drBufferChange += drReplicatedStreamBufferChange- DRTupleStream::BEGIN_RECORD_SIZE;
             }
         }
         m_resultOutput.writeIntAt(m_startOfResultBuffer + 1, static_cast<int32_t> (drBufferChange));
@@ -516,7 +515,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     }
     m_perFragmentStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
     m_currentIndexInBatch = -1;
-
     // If we were expanding the UDF buffer too much, shrink it back a little bit.
     // We check this at the end of every batch execution. So we won't resize the buffer
     // too frequently if most of the workload in the same batch requires a much larger buffer.
