@@ -177,12 +177,7 @@ public class ExportManager
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Export Manager has been notified that local partition " + partitionId + " to accept export mastership.");
         }
-
-        // can't acquire mastership twice for the same partition id
-        if (! m_masterOfPartitions.add(partitionId)) {
-            return;
-        }
-
+        m_masterOfPartitions.add(partitionId);
         /*
          * Only the first generation will have a processor which
          * makes it safe to accept mastership.
