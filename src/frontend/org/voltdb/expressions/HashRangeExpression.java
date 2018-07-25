@@ -94,7 +94,7 @@ public class HashRangeExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof HashRangeExpression == false) {
+        if (! (obj instanceof HashRangeExpression)) {
             return false;
         }
         HashRangeExpression expr = (HashRangeExpression) obj;
@@ -106,7 +106,7 @@ public class HashRangeExpression extends AbstractValueExpression {
             return false;
         }
         if (m_ranges != null) { // Implying both sides non-null
-            if (m_ranges.equals(expr.m_ranges) == false) {
+            if (! m_ranges.equals(expr.m_ranges)) {
                 return false;
             }
         }
@@ -139,8 +139,8 @@ public class HashRangeExpression extends AbstractValueExpression {
         stringer.key(Members.RANGES.name()).array();
         for (Map.Entry<Integer, Integer> e : m_ranges.entrySet()) {
             stringer.object();
-            stringer.keySymbolValuePair(Members.RANGE_START.name(), e.getKey().intValue());
-            stringer.keySymbolValuePair(Members.RANGE_END.name(), e.getValue().intValue());
+            stringer.keySymbolValuePair(Members.RANGE_START.name(), e.getKey());
+            stringer.keySymbolValuePair(Members.RANGE_END.name(), e.getValue());
             stringer.endObject();
         }
         stringer.endArray();

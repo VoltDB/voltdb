@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.hsqldb_voltpatches.FunctionSQL;
@@ -29,6 +30,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.ParsedColInfo;
+import org.voltdb.planner.optimizer.ExpressionNormalizer;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.SortDirectionType;
@@ -100,22 +102,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable, Compa
      */
     public boolean equivalent(AbstractExpression other) {
         return equals(other);
-    }
-
-    public void normalizeExpressions() {
-        new ArrayList<AbstractExpression>() {
-            void tryAdd(AbstractExpression... args) {
-                for (AbstractExpression e : args)
-                    if (e != null)
-                        add(e);
-            }
-            {
-                tryAdd(m_left, m_right);
-                if (m_args != null) {
-                    addAll(m_args);
-                }
-            }
-        }.forEach(AbstractExpression::normalizeExpressions);
     }
 
     /**
@@ -791,7 +777,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable, Compa
      * @param sortDirections The container for the sort directions.  This may
      *                       be null if we don't care about directions.  If there
      *                       are no directions in the list this will be empty.
-     * @param jarray
+     * @param jobj
      * @throws JSONException
      */
     public static void loadSortListFromJSONArray(

@@ -233,7 +233,7 @@ final class LogicExpressionFlattener implements Comparator<LogicExpressionFlatte
                                         ConstantValueExpression.getFalse() : ConstantValueExpression.getTrue()));
                             } else {
                                 final List<AbstractExpression> l = evaluatedLeaves.stream()        // then filter out all constant boolean values,
-                                        .filter(e -> !NormalizerUtil.isBooleanCVE(e))              // and combine transformed non-constant-boolean leaves.
+                                        .filter(e -> ! ConstantValueExpression.isBooleanValue(e))              // and combine transformed non-constant-boolean leaves.
                                         .collect(Collectors.toList());
                                 if (l.size() == 1) {                                // Combine transformed leaves into conjunctions (when necessary),
                                     add(new LogicExpressionFlattener(l.get(0)));

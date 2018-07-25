@@ -84,12 +84,8 @@ public abstract class JoinNode implements Cloneable {
     }
 
     public void normalizeExpressions() {
-        if (m_joinExpr != null) {
-            m_joinExpr = ExpressionNormalizer.normalize(m_joinExpr);
-        }
-        if (m_whereExpr != null) {
-            m_whereExpr = ExpressionNormalizer.normalize(m_whereExpr);
-        }
+        m_joinExpr = ExpressionNormalizer.normalize(m_joinExpr);
+        m_whereExpr = ExpressionNormalizer.normalize(m_whereExpr);
         new ArrayList<List<AbstractExpression>>() {
             void addAll(List<AbstractExpression>... args) {
                 for (List<AbstractExpression> arg : args) {
@@ -100,7 +96,11 @@ public abstract class JoinNode implements Cloneable {
                 addAll(m_joinOuterList, m_joinInnerList, m_joinInnerOuterList,
                         m_whereInnerList, m_whereOuterList, m_whereInnerOuterList);
             }
-        }.forEach(l -> l.forEach(v -> v = ExpressionNormalizer.normalize(v)));  // TODO: ok to write this way?
+        }.forEach(l -> {
+            for (int index = 0; index < l.size(); ++index) {
+                l.set(index, ExpressionNormalizer.normalize(l.get(index)));
+            }
+        });
         if (m_currentAccessPath != null) {
             m_currentAccessPath.normalizeExpressions();
         }

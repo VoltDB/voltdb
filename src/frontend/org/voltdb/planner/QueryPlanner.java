@@ -402,6 +402,9 @@ public class QueryPlanner implements AutoCloseable {
                 return null;
             }
         }
+        // -- Single place to enable select/union stmt query normalization for all expressions --
+        parsedStmt.normalizeExpressions();
+        // -- end of query normalization --
         if(parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt) {
             final MVQueryRewriter rewriter;
             if (parsedStmt instanceof ParsedSelectStmt) {

@@ -69,14 +69,6 @@ public class ParameterValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void normalizeExpressions() {
-        super.normalizeExpressions();
-        if (m_correlatedExpr != null) {
-            m_correlatedExpr = ExpressionNormalizer.normalize(m_correlatedExpr);
-        }
-    }
-
-    @Override
     public int compareTo(AbstractExpression other) {
         if (other instanceof ParameterValueExpression) {
             return Comparator

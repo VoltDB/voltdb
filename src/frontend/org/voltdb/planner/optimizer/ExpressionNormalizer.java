@@ -20,8 +20,11 @@ package org.voltdb.planner.optimizer;
 import org.voltdb.expressions.*;
 import org.voltdb.types.ExpressionType;
 
+import java.util.stream.Collectors;
+
 import static org.voltdb.planner.optimizer.NormalizerUtil.ConjunctionRelation;
 import static org.voltdb.planner.optimizer.NormalizerUtil.ArithOpType;
+import static org.voltdb.planner.optimizer.NormalizerUtil.isLiteralConstant;
 
 /**
  * Does the chain of all simplification and normalization work on an expression:
@@ -34,6 +37,8 @@ import static org.voltdb.planner.optimizer.NormalizerUtil.ArithOpType;
  * 6. After arithmetic simplification, simplify *integer* intervals on common left expressions
  * 7. Combine back to a new expression
  * 8. Do step 1-7 again, until the new expression is the same as old one.
+ *
+ * Non-destructive.
  */
 public class ExpressionNormalizer {
     private final AbstractExpression m_normalizedExpression;
@@ -48,16 +53,20 @@ public class ExpressionNormalizer {
         } else if (e instanceof ConstantValueExpression) {
             m_normalizedExpression = e;
         } else if (e instanceof ConjunctionExpression || e instanceof ComparisonExpression ||
-                e.getExpressionType().equals(ExpressionType.OPERATOR_NOT)) {
+                e.getExpressionType().equals(ExpressionType.OPERATOR_NOT)) {    // <that is, the expression is boolean type>
             m_normalizedExpression =
                     LogicExpressionFlattener.apply(
                             new LogicExpressionFlattener(
                                     OpExpressionBalancer.balance(UnaryMinusPushDown.eliminate(NegatePushDown.eliminate(e)))),
-                            ExpressionNormalizer::reduce).toExpression();
-        } else {
+                            ExpressionNormalizer::reduce).toExpression();      // When creating a brand-new, transformed expression,
+            m_normalizedExpression.setValueType(e.getValueType());             // be sure to restore the original expression's value type,
+            m_normalizedExpression.setValueSize(e.getValueSize());             // as none of sub-components used here heeds the value type,
+        } else {                                                               // <or the expression might assume any other value type>
             m_normalizedExpression = ArithmeticExpressionFlattener.apply(
                     new ArithmeticExpressionFlattener(UnaryMinusPushDown.eliminate(e), ArithOpType.PlusMinus),
                     ArithmeticSimplifier::of);
+            m_normalizedExpression.setValueType(e.getValueType());              // especially in this branch.
+            m_normalizedExpression.setValueSize(e.getValueSize());
         }
     }
     private AbstractExpression getNormalized() {
@@ -72,7 +81,8 @@ public class ExpressionNormalizer {
                     return e;
                 }
             default:
-                assert(e instanceof ComparisonExpression || e instanceof ConjunctionExpression);
+                //assert(e.getValueType() == VoltType.BOOLEAN);
+                assert(e instanceof ComparisonExpression || e instanceof ConjunctionExpression || e instanceof TupleValueExpression);
                 return e instanceof ComparisonExpression && ! (e instanceof InComparisonExpression) ?
                         new ComparisonExpression(e.getExpressionType(),
                                 ArithmeticSimplifier.of(op, e.getLeft()),
@@ -91,16 +101,28 @@ public class ExpressionNormalizer {
     }
 
     /**
-     * Simplify an expression to its simplest form.
+     * Simplify an expression to its simplest form. Nondestructive.
      * @param e original expression
      * @return equivalent expression in its simplest form.
      */
     public static AbstractExpression normalize(AbstractExpression e) {
-        AbstractExpression expr = e;
-        do {
-            e = expr;
-            expr = new ExpressionNormalizer(e).getNormalized();
-        } while (expr != null && !expr.equals(e));
-        return expr;
+        if (e == null) {
+            return null;
+        } else if (e instanceof FunctionExpression) {       // only need to normalize all args for a function expression
+            final AbstractExpression expr = e.clone();
+            if (e.getArgs() != null) {
+                expr.setArgs(e.getArgs().stream()
+                        .map(ExpressionNormalizer::normalize)
+                        .collect(Collectors.toList()));
+            }
+            return expr;
+        } else {
+            AbstractExpression expr = e;
+            do {
+                e = expr;
+                expr = new ExpressionNormalizer(e).getNormalized();
+            } while (expr != null && !expr.equals(e));
+            return expr;
+        }
     }
 }

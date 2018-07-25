@@ -223,6 +223,7 @@ public abstract class StatementCompiler {
                 if (e.getMessage() != null) {
                     msg += " Error: \"" + e.getMessage() + "\"";
                 }
+                // Arrays.asList(e.getStackTrace()).forEach(st -> System.err.println(st.toString()));
                 throw compiler.new VoltCompilerException(msg);
             }
 

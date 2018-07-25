@@ -13,7 +13,11 @@ import java.util.stream.Collectors;
 
 public class TinySexpSerializer extends TestCase {
     /**
-     * Deserialize a Sexp to Abstract expression
+     * Deserialize a Sexp to Abstract expression. Note that we deliberately do not set the expression's
+     * value type in here, and the evaluated expression might assume whatever value type deemed appropriate.
+     * We ignore setting the value type, so that we don't need to redo HSQL's logic to determine the resulting
+     * expression's value type.
+     *
      * @param arg Sexp
      * @return deserialized expression
      */

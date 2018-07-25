@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import org.voltcore.utils.Pair;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -52,10 +53,10 @@ import org.voltdb.types.JoinType;
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public List<ParsedColInfo> m_displayColumns = new ArrayList<>();
-    List<ParsedColInfo> m_orderColumns = new ArrayList<>();
-    AbstractExpression m_having = null;
-    List<ParsedColInfo> m_groupByColumns = new ArrayList<>();
-    List<ParsedColInfo> m_distinctGroupByColumns = null;
+    private List<ParsedColInfo> m_orderColumns = new ArrayList<>();
+    private AbstractExpression m_having = null;
+    private List<ParsedColInfo> m_groupByColumns = new ArrayList<>();
+    private List<ParsedColInfo> m_distinctGroupByColumns = null;
     private boolean m_groupAndOrderByPermutationWasTested = false;
     private boolean m_groupAndOrderByPermutationResult = false;
 
@@ -100,7 +101,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return m_limit != -1 || m_limitParameterId != -1;
         }
 
-        public boolean hasOffset() {
+        private boolean hasOffset() {
             return m_offset > 0 || m_offsetParameterId != -1;
         }
 
@@ -111,7 +112,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return false;
         }
 
-        public boolean hasLimitOrOffsetParameters() {
+        private boolean hasLimitOrOffsetParameters() {
             return m_limitParameterId != -1 || m_offsetParameterId != -1;
         }
 
@@ -131,8 +132,23 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return m_offset;
         }
 
-        public long getLimitParameterId () {
+        private long getLimitParameterId () {
             return m_limitParameterId;
+        }
+
+        /**
+         * Set the limit node when the predicate evaluates to false.
+         */
+        void setFalse() {
+            m_limitNodeTop = new LimitPlanNode();
+            getLimitNodeTop().setLimit(-1);
+            getLimitNodeTop().setOffset(0);
+            getLimitNodeTop().setLimitParameterIndex(0);
+            m_limitNodeDist = new LimitPlanNode();
+            m_limitNodeDist.setLimit(-1);
+            m_limitNodeDist.setOffset(0);
+            m_limitParameterId = 1;
+            m_limitCanPushdown = true;
         }
     }
 
@@ -237,22 +253,39 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         m_avgPushdownAggResultColumns);
             }
         }.forEach(ParsedColInfo::normalizeExpressions);
-        if (m_having != null) {
-            m_having = ExpressionNormalizer.normalize(m_having);
-        }
-        if (m_avgPushdownHaving != null) {
-            m_avgPushdownHaving = ExpressionNormalizer.normalize(m_avgPushdownHaving);
-        }
+        new ArrayList<NodeSchema>() {
+            void tryAdd(NodeSchema ns) {
+                if (ns != null)
+                    add(ns);
+            }
+            {
+                tryAdd(getFinalProjectionSchema());
+                tryAdd(getDistinctProjectionSchema());
+                tryAdd(m_avgPushdownProjectSchema);
+                tryAdd(m_avgPushdownFinalProjectSchema);
+            }
+        }.forEach(NodeSchema::normalizeExpressions);
+        m_having = ExpressionNormalizer.normalize(m_having);
+        m_avgPushdownHaving = ExpressionNormalizer.normalize(m_avgPushdownHaving);
         if (m_groupByExpressions != null) {
-            m_groupByExpressions.forEach((k, v) -> v = ExpressionNormalizer.normalize(v));
+            m_groupByExpressions = m_groupByExpressions.entrySet().stream().map(kv ->
+                    new AbstractMap.SimpleEntry<>(kv.getKey(),
+                            ExpressionNormalizer.normalize(kv.getValue())))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         }
         m_joinOrderList.forEach(JoinNode::normalizeExpressions);
+        if (m_joinTree != null && ConstantValueExpression.isBooleanValue(m_joinTree.getJoinExpression())) {
+            if (ConstantValueExpression.isBooleanFalse(m_joinTree.getJoinExpression())) {
+                m_limitOffset.setFalse();
+            }
+            m_joinTree.setJoinExpression(null);
+        }
     }
 
     @Override
-    void parse(VoltXMLElement stmtNode) {
-        String node;
-        if ((node = stmtNode.attributes.get("distinct")) != null) {
+    void parse(VoltXMLElement stmtNode) {       // TODO: to enable elimination of excessive projections in query like "SELECT a + b - a FROM foo ORDER BY a + b - a;",
+        String node;                            // we have to do the expression normalization piece-by-piece in this function. Doing it after parse() had been called
+        if ((node = stmtNode.attributes.get("distinct")) != null) { // is too late, as temp table, etc. are already replaced with.
             m_distinct = Boolean.parseBoolean(node);
         }
 

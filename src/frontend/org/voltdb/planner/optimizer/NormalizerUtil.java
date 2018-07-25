@@ -25,7 +25,7 @@ import org.voltdb.types.ExpressionType;
 
 import java.util.*;
 
-final class NormalizerUtil {
+public final class NormalizerUtil {
     private NormalizerUtil(){}
 
     private static final Number<Integer>
@@ -162,14 +162,19 @@ final class NormalizerUtil {
     }
 
     /**
-     * Checks if it's either CVE or PVE with literal value (i.e. not a parameter), or VVE
+     * Checks if it's either CVE or PVE with literal number (i.e. not a parameter), or VVE
      * @param e expression to check
      * @return whether it is either a VVE or a literal constant value
      */
     static boolean isLiteralConstant(AbstractExpression e) {
-        return e instanceof VectorValueExpression ||    // although VVE can be parameterized, it should always be on RHS.
-                e instanceof ConstantValueExpression ||
-                e instanceof ParameterValueExpression && ((ParameterValueExpression) e).getOriginalValue() != null;
+        if (e instanceof VectorValueExpression) {    // although VVE can be parameterized, it should always be on RHS.
+            return true;
+        } else if (e instanceof ConstantValueExpression ||
+                e instanceof ParameterValueExpression && ((ParameterValueExpression) e).getOriginalValue() != null) {
+            return e.getValueType().isNumber();
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -242,10 +247,6 @@ final class NormalizerUtil {
         }
     }
 
-    static boolean isBooleanCVE(AbstractExpression e) {
-        return ConstantValueExpression.isBooleanTrue(e) || ConstantValueExpression.isBooleanFalse(e);
-    }
-
     /**
      * Intersection between two sets of expressions, using equality.
      * @param lhs expression set #1
@@ -302,6 +303,13 @@ final class NormalizerUtil {
          * Two comparison types contradict with each other if no pairs of values exists to satisify both.
          * This is weaker condition than compliments, e.g. (=, >).
          * Requires same precondition.
+         *
+         * NOTE/TODO: A scenario not (yet) considered here is FLOATING expression comparison with value
+         * of +-Inf or NaN. VoltDB do not support those special float values for now, so it is safe to
+         * evaluate "expr = expr" as TRUE and "expr != expr" as FALSE.
+         *
+         * When we do add support, we need to revise the rules here.
+         *
          * @param left comparison type of the lesser of the two
          * @param right comparison type of the greater of the two
          * @return whether the two comparison types contradict with each other.
@@ -361,18 +369,26 @@ final class NormalizerUtil {
         static ExpressionType resolve(ExpressionType left, ExpressionType right, boolean isAnd) {
             return isAnd ? resolveAnd(left, right) : resolveOr(left, right);
         }
+
+        /**
+         * Does the comparison permit LHS = RHS?, i.e. =, >=, <=
+         * @return whether the comparison permits equality
+         */
+        static boolean permitsEqual(ExpressionType cmp) {
+            switch (cmp) {
+                case COMPARE_EQUAL:
+                case COMPARE_GREATERTHANOREQUALTO:
+                case COMPARE_LESSTHANOREQUALTO:
+                    return true;
+                default:
+                    return false;
+            }
+        }
         private static ExpressionType resolveAnd(ExpressionType left, ExpressionType right) {
             assert(left.compareTo(right) < 0);
             switch (left) {
                 case COMPARE_EQUAL:
-                    switch (right) {
-                        case COMPARE_GREATERTHANOREQUALTO:
-                        case COMPARE_LESSTHANOREQUALTO:
-                            return left;
-                        default:
-                            assert(false);
-                            return left;
-                    }
+                    return permitsEqual(right) ? left : right;
                 case COMPARE_NOTEQUAL:
                     switch (right) {
                         case COMPARE_LESSTHAN:

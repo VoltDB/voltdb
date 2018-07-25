@@ -75,9 +75,10 @@ public class TestExpressionNormalizer {
         assertFalse(getNumberConstant(deserialize("(vec-2 C0 P0)")).isPresent());
         final ConstantValueExpression c2 = new ConstantValueExpression();
         c2.setValueType(VoltType.NULL);
-        assertFalse(getNumberConstant(c2).isPresent());
+        assertFailure("Should bail on extracting number from Null", () -> getNumberConstant(c2));
         c2.setValueType(VoltType.STRING); c2.setValue("foobar");
-        assertFalse(getNumberConstant(c2).isPresent());
+        assertFailure("Should bail on extracting number from string type",
+                () -> getNumberConstant(new ConstantValueExpression("foo", 8)));
 
         assertEquals(6f, evalNumericOp(ExpressionType.OPERATOR_PLUS, 2, 4));
         assertEquals(-2f, evalNumericOp(ExpressionType.OPERATOR_MINUS, 2, 4));
@@ -92,11 +93,6 @@ public class TestExpressionNormalizer {
         assertFalse(evalComparison(ExpressionType.COMPARE_GREATERTHAN, 2, 4));
         assertFailure("Should bail when eval comparison expression on non-comparison expression type",
                 () -> evalComparison(ExpressionType.OPERATOR_DIVIDE, 2, 4));
-
-        assertTrue(isBooleanCVE(deserialize("ctrue")));
-        assertTrue(isBooleanCVE(deserialize("cfalse")));
-        assertFalse(isBooleanCVE(deserialize("c0")));
-        assertFalse(isBooleanCVE(null));
     }
 
     @Test
@@ -982,7 +978,6 @@ public class TestExpressionNormalizer {
             add("C1");
             add("c1");
             add("P1");
-            add("(fn-foo-2 (+ C1 P1) (/ c4 c2))");          // does not rewrite function expression
             add("(vec-5 C0 C2 C1 C2 C0)");                  // does not dedup VVE unless it's in some comparison
             add("(+ C1 c1)");
         }}.forEach(s ->
@@ -993,6 +988,8 @@ public class TestExpressionNormalizer {
             put("(/ P0 C0)", "P0");
             put("(&& ctrue cfalse)", "cfalse");
             put("(|| ctrue cfalse)", "ctrue");
+            put("(&& (!= (- C1 C1) c0) C0)", "cfalse");
+            put("(|| (<= (- C1 C1) c0) C0)", "ctrue");
             put("(* P0 C1)", "P0");
             put("(/ C2 C2)", "c1");
             put("(&& (> C1 P0) (> P0 C1))", "cfalse");
@@ -1003,6 +1000,8 @@ public class TestExpressionNormalizer {
             put("(|| (= C1 C0) (!= C0 C1))", "ctrue");
             put("(= (+ C0 C1) (- C1 C2))", "(= (@- C0) C2)");
             put("(&& (>= (+ C1 C0) (- C1 C2)) (<= (+ C0 C1) (- C1 C2)))", "(= (@- C0) C2)");
+            put("(fn-foo-1 (+ C0 (- C1 C0)))", "(fn-foo-1 C1)");
+            put("(fn-foo-2 (+ C1 P1) (/ c4 c2))", "(fn-foo-2 (+ C1 c1) c2)");
         }}.forEach((k, v) ->
                 assertEquals("Transform of form \"" + k + "\": expect \"" + v + "\".",
                         v, serialize(ExpressionNormalizer.normalize(deserialize(k)))));
@@ -1061,6 +1060,12 @@ public class TestExpressionNormalizer {
                                 "(|| (|| (>= P? (* C1 C2)) " +
                                          "(< C3 P10)) " +
                                     "(<= c9 (@- C3)))))"))));
+        // string comparison
+        final ComparisonExpression e = new ComparisonExpression(ExpressionType.COMPARE_LESSTHAN,
+                new ConstantValueExpression("foo", 8), new ConstantValueExpression("bar", 8)),
+                er = e.reverseOperator();
+        assertEquals(er, ExpressionNormalizer.normalize(e));
+        assertEquals(er, ExpressionNormalizer.normalize(er));
     }
     //CHECKSTYLE:ON
 }

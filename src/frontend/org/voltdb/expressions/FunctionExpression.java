@@ -194,7 +194,7 @@ public class FunctionExpression extends AbstractExpression {
 
     @Override
     public boolean hasEqualAttributes(AbstractExpression obj) {
-        if (obj instanceof FunctionExpression == false) {
+        if (! (obj instanceof FunctionExpression)) {
             return false;
         }
         FunctionExpression expr = (FunctionExpression) obj;

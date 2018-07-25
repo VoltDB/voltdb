@@ -69,9 +69,7 @@ public class SchemaColumn {
     }
 
     public void normalizeExpressions() {
-        if (m_expression != null) {
-            m_expression = ExpressionNormalizer.normalize(m_expression);
-        }
+        m_expression = ExpressionNormalizer.normalize(m_expression);
     }
 
     public SchemaColumn(String tableName, String tableAlias,

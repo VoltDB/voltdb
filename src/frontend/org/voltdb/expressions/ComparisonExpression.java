@@ -17,7 +17,6 @@
 
 package org.voltdb.expressions;
 
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 

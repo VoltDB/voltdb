@@ -150,7 +150,13 @@ class IntegerIntervalCombiner {
             List<ComparisonExpression> src, boolean isAnd, AtomicBoolean shortcut) {
         // convert to EquivalentExpression which use equivalence as equality when comparing, to help with grouping by expression.
         return src.stream()
-                .map(e -> Pair.of(Pair.of(new EquivalentExpression(e.getLeft()), new EquivalentExpression(e.getRight())),
+                .filter(e -> {                                                                      // remove "expr cmp expr", by either shortcut
+                    final boolean equals = e.getLeft().equivalent(e.getRight());                    // or remove that entry.
+                    if (equals && ComparisonTypeMerger.permitsEqual(e.getExpressionType()) ^ isAnd) {
+                        shortcut.set(true);
+                    }
+                    return !equals;
+                }).map(e -> Pair.of(Pair.of(new EquivalentExpression(e.getLeft()), new EquivalentExpression(e.getRight())),
                         e.getExpressionType()))
                 .collect(Collectors.toMap(Pair::getFirst, Pair::getSecond, (rel1, rel2) -> {        // found 2 comparisons with same LHS:
                     if (rel1.equals(rel2)) {                                                        // remove duplications
@@ -452,7 +458,7 @@ class IntegerIntervalCombiner {
                 final AbstractExpression inList = finalizeInList(conj, lhs, included, excluded);    // (nullable) expression representation for inclusion and exclusion lists.
                 if (inList == null) {
                     return expr;
-                } else if (NormalizerUtil.isBooleanCVE(expr)) {
+                } else if (ConstantValueExpression.isBooleanValue(expr)) {
                     return inList;
                 } else {  // place in-list before integer intervals in final expression, as part of expression normalization.
                     return new ConjunctionExpression(ConjunctionRelation.conjOf(conj), inList, expr);

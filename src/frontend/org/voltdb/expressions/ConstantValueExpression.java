@@ -41,7 +41,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
 
     protected String m_value = null;
-    protected boolean m_isNull = true;
+    private boolean m_isNull = true;
 
     public ConstantValueExpression() {
         super(ExpressionType.VALUE_CONSTANT);
@@ -61,6 +61,13 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
     public ConstantValueExpression(int val) {
         this(Integer.toString(val), VoltType.INTEGER);
+    }
+    public ConstantValueExpression(String content, int size) {
+        this();
+        setValue(content);
+        setValueSize(size);
+        setValueType(VoltType.STRING);
+        m_isNull = false;
     }
 
     @Override
@@ -572,6 +579,10 @@ public class ConstantValueExpression extends AbstractValueExpression {
     */
    public static boolean isBooleanFalse(AbstractExpression expr) {
        return isBooleanValue(expr, Boolean.FALSE);
+   }
+
+   public static boolean isBooleanValue(AbstractExpression expr) {
+       return isBooleanTrue(expr) || isBooleanFalse(expr);
    }
 
    private static boolean isBooleanValue(AbstractExpression expr, Boolean value) {

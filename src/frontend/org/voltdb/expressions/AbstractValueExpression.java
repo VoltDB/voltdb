@@ -51,7 +51,6 @@ public abstract class AbstractValueExpression extends AbstractExpression {
     // amounts to an equality test. If the values expressions are identical, the binding is trivially
     // possible, indicated by returning an empty list of binding requirements.
     // Otherwise, there is no binding possible, indicated by a null return.
-    // TODO: incorporate expression normalization
     @Override
     public List<AbstractExpression> bindingToIndexedExpression(AbstractExpression expr) {
         if (equals(expr)) {

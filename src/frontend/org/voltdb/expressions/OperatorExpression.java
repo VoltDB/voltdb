@@ -43,6 +43,7 @@ public class OperatorExpression extends AbstractExpression {
 
     public OperatorExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         super(type, left, right);
+        finalizeValueTypes();
     }
 
     public OperatorExpression() {
