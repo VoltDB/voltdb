@@ -22,7 +22,7 @@ from urllib2 import HTTPError, URLError, urlopen
 JUNIT = os.environ.get('junit', None)
 
 # set to True if you need to suppress updating the database or JIRA
-DRY_RUN = False
+DRY_RUN = True
 
 # set threshold (greater than or equal to) of failures in a row to be significant
 FAIL_THRESHOLD = 2
@@ -165,18 +165,23 @@ class Stats(object):
                       + str(error_report['errorStackTrace']) \
                       + '\n\n----------------------------------------------\n\n' \
                       + 'Failing since build ' + str(failed_since) + '\n' \
-                      + '[query history|' + note + '] | [jenkins history|' + history + ']\n' \
-                      + '!durationGraph.png!'
+                      + '[query history|' + note + ']\n' \
+                      + '!' + job + 'CountGraph.png!' \
+                      + '\nNOTE: this graph is from when this ticket was filed, click [here|' + history + '] for an updated graph\n'
 
         current_version = str(self.read_url('https://raw.githubusercontent.com/VoltDB/voltdb/'
                                     'master/version.txt'))
         new_issue_url = None
+        attachments = {
+            # filename : location
+            job + 'CountGraph.png' : error_url + '/history/countGraph/png?start=0&amp;end=25'
+        }
 
         try:
             new_issue = jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version,
-                                                        ['junit-consistent-failure', 'automatic'],
-                                                        {'durationGraph.png' : error_url + '/history/durationGraph/png'},
-                                                        DRY_RUN=DRY_RUN)
+                                                    ['junit-consistent-failure', 'automatic'],
+                                                    attachments,
+                                                    DRY_RUN=DRY_RUN)
 
             if new_issue:
                 new_issue_url = "https://issues.voltdb.com/browse/" + new_issue.key
@@ -492,7 +497,7 @@ class Stats(object):
                                 numFails = cursor.fetchone()[0]
                                 if (numFails >= FAIL_THRESHOLD):
                                     logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
-                                    test_data['reason'] = "NEW"
+                                    test_data['reason'] = "INTERMITTENT"
                                     try:
                                         test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
                                     except:
@@ -508,7 +513,7 @@ class Stats(object):
 
                                 if (current < mean(values) - 2*std(values) or current > mean(values) + 2*std(values)):
                                     logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
-                                    test_data['reason'] = "FLAKY"
+                                    test_data['reason'] = "CONSISTENT"
                                     try:
                                         test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
                                         pass
