@@ -140,6 +140,8 @@ typedef boost::multi_index::multi_index_container<
     >
 > PlanSet;
 
+  int32_t s_maxBufferAge=4000;  // export/tuple flush interval ms setting
+
 
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
@@ -163,7 +165,6 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
       m_executorContext(NULL),
       m_drPartitionedConflictStreamedTable(NULL),
       m_drReplicatedConflictStreamedTable(NULL),
-      m_drStream(NULL),
       m_drReplicatedStream(NULL),
       m_currExecutorVec(NULL)
 {
@@ -181,7 +182,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t defaultDrBufferSize,
                          int64_t tempTableMemoryLimit,
                          bool isLowestSiteId,
-                         int32_t compactionThreshold)
+                         int32_t compactionThreshold,
+                         int32_t maxBufferAge)
 {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
@@ -189,10 +191,11 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
+    s_maxBufferAge = maxBufferAge;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
-
+    // Git is fun -- STAKUTIS
     // create the template single long (int) table
     assert (m_templateSingleLongTable == NULL);
     m_templateSingleLongTable = new char[m_templateSingleLongTableSize];
@@ -1534,9 +1537,7 @@ void
 VoltDBEngine::markAllExportingStreamsNew() {
     //Mark all streams new so that schema is sent on next tuple.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingStreams) {
-        if (entry.second != NULL) {
-            entry.second->setNew();
-        }
+        entry.second->setNew();
     }
 }
 
