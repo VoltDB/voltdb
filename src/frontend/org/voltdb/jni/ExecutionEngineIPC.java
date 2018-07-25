@@ -435,6 +435,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     byte signatureBytes[] = new byte[signatureLength];
                     getBytes(signatureLength).get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
+
                     long uso = getBytes(8).getLong();
                     boolean sync = getBytes(1).get() == 1 ? true : false;
                     int length = getBytes(4).getInt();
