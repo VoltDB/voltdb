@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.PartitionDRGateway.DRRecordType;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.jni.ExecutionEngine.EventType;
 
@@ -135,17 +136,41 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         return pdrg;
     }
 
-    private static PartitionDRGateway tryToLoadProVersion()
+    private static Class<?> getPDRGImpl()
     {
         try {
             Class<?> pdrgiClass = null;
             pdrgiClass = Class.forName("org.voltdb.dr2.PartitionDRGatewayImpl");
+            return pdrgiClass;
+        } catch (Exception e) {
+        }
+        return null;
+    }
+
+    private static PartitionDRGateway tryToLoadProVersion()
+    {
+        try {
+            Class<?> pdrgiClass = getPDRGImpl();
             Constructor<?> constructor = pdrgiClass.getConstructor();
             Object obj = constructor.newInstance();
             return (PartitionDRGateway) obj;
         } catch (Exception e) {
         }
         return null;
+    }
+
+    public static int getMessageTypeLength(DRRecordType type) {
+        try {
+            Class<?> pdrgiClass = getPDRGImpl();
+            if (type == DRRecordType.BEGIN_TXN) {
+                return pdrgiClass.getField("BEGINTXN_OFFSET").getInt(null);
+            }
+            else if (type == DRRecordType.END_TXN) {
+                return pdrgiClass.getField("ENDTXN_OFFSET").getInt(null);
+            }
+        } catch (Exception e) {
+        }
+        return 0;
     }
 
     // empty methods for community edition

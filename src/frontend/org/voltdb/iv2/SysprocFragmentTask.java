@@ -315,6 +315,9 @@ public class SysprocFragmentTask extends FragmentTaskBase
                 traceLog.add(VoltTrace::endDuration);
             }
         }
+
+        // we should never rollback DR buffer for MP sysprocs because we don't report the DR buffer size and therefore don't know if it is empty or not.
+        currentFragResponse.setDrBufferSize(1);
         return currentFragResponse;
     }
 

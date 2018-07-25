@@ -305,7 +305,7 @@ public:
                  * Release the last quantum
                  */
             case 1: {
-                m_engine->releaseUndoToken(m_undoToken);
+                m_engine->releaseUndoToken(m_undoToken, false);
                 break;
             }
         }
@@ -1092,7 +1092,7 @@ public:
             m_engine->undoUndoToken(m_undoToken);
         }
         else {
-            m_engine->releaseUndoToken(m_undoToken);
+            m_engine->releaseUndoToken(m_undoToken, false);
         }
         ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
                                                                      0, 0, 0, 0, false);

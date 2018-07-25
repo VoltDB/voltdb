@@ -75,6 +75,9 @@ public class FragmentResponseMessage extends VoltMessage {
     // Used by MPI to differentiate responses due to the transaction restart
     long m_restartTimestamp = -1L;
 
+    // Used by MPI for rollback empty or overBufferLimit DR txn
+    int m_drBufferSize = 0;
+
     /** Empty constructor for de-serialization */
     FragmentResponseMessage() {
         m_subject = Subject.DEFAULT.getId();
@@ -183,8 +186,12 @@ public class FragmentResponseMessage extends VoltMessage {
         return m_dependencies.get(index).getBufferDependency();
     }
 
-    public int getDRBufferChangedAtIndex(int index) {
-        return m_dependencies.get(index).getDRBufferChange();
+    public void setDrBufferSize(int drBufferSize) {
+        this.m_drBufferSize = drBufferSize;
+    }
+
+    public int getDRBufferSize() {
+        return m_drBufferSize;
     }
 
     public SerializableException getException() {
@@ -204,9 +211,10 @@ public class FragmentResponseMessage extends VoltMessage {
             + 1 // dirty flag
             + 1 // node recovering flag
             + 2 // dependency count
-            + 4// partition id
-            + 1 //m_forLeader
-            + 8;// restart timestamp
+            + 4 // partition id
+            + 1 // m_forLeader
+            + 8 // restart timestamp
+            + 4;// drBuffer size
         // one int per dependency ID and table length (0 = null)
         msgsize += 8 * m_dependencyCount;
 
@@ -244,6 +252,7 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.putInt(m_partitionId);
         buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
         buf.putLong(m_restartTimestamp);
+        buf.putInt(m_drBufferSize);
         for (DependencyPair depPair : m_dependencies) {
             buf.putInt(depPair.depId);
 
@@ -279,10 +288,12 @@ public class FragmentResponseMessage extends VoltMessage {
         m_partitionId = buf.getInt();
         m_isForOldLeader = buf.get() == 1;
         m_restartTimestamp = buf.getLong();
+        m_drBufferSize = buf.getInt();
         for (int i = 0; i < m_dependencyCount; i++) {
             int depId = buf.getInt();
             int depLen = buf.getInt(buf.position());
             boolean isNull = depLen == 0 ? true : false;
+
             if (isNull) {
                 m_dependencies.add(new DependencyPair.TableDependencyPair(depId, null));
             } else {
@@ -316,6 +327,7 @@ public class FragmentResponseMessage extends VoltMessage {
         sb.append(TxnEgo.txnIdToString(m_spHandle));
         sb.append(", TIMESTAMP: ");
         sb.append(MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp));
+        sb.append(", DR Buffer Size: " + m_drBufferSize);
 
         if (m_status == SUCCESS)
             sb.append("\n  SUCCESS");

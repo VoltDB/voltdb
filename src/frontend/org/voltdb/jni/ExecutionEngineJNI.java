@@ -599,8 +599,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
-        return nativeReleaseUndoToken(pointer, undoToken);
+    public boolean releaseUndoToken(final long undoToken, boolean isEmptyDRTxn) {
+        return nativeReleaseUndoToken(pointer, undoToken, isEmptyDRTxn);
     }
 
     @Override

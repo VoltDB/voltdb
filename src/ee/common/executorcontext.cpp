@@ -399,7 +399,8 @@ void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedS
  * For single partition transactions, DR stream's binary logging is handled as is
  * at persistenttable level.
  */
-void ExecutorContext::checkTransactionForDR() {
+bool ExecutorContext::checkTransactionForDR() {
+    bool result = false;
     if (UniqueId::isMpUniqueId(m_uniqueId) && m_undoQuantum != NULL) {
         if (m_drStream && m_drStream->drStreamStarted()) {
             if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
@@ -408,6 +409,7 @@ void ExecutorContext::checkTransactionForDR() {
                         new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
                                 m_drStream->m_committedUso, 0));
             }
+            result = true;
         }
         if (m_drReplicatedStream && m_drReplicatedStream->drStreamStarted()) {
             if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
@@ -419,6 +421,7 @@ void ExecutorContext::checkTransactionForDR() {
             }
         }
     }
+    return result;
 }
 
 } // end namespace voltdb

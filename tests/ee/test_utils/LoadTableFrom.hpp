@@ -78,9 +78,12 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
     // compiler will complain.
     VOLT_TRACE("\n");
     if (! skipMsgHeader) {
-        IF_VOLT_TRACE(int32_t msg_size         = ) result.readInt();  // message length.
         IF_VOLT_TRACE(int8_t  status           = ) result.readByte(); // status
+        IF_VOLT_TRACE(int32_t drbuffer_size    = ) result.readInt();  // dr buffer length.
+        IF_VOLT_TRACE(int32_t msg_size         = ) result.readInt();  // message length.
+
         VOLT_TRACE("  msg size:              %d\n",   msg_size);
+        VOLT_TRACE("  drbuffer size:         %d\n",   drbuffer_size);
         VOLT_TRACE("  status:                %hhd\n", status);
     }
     IF_VOLT_TRACE(int32_t icl              = ) result.readInt();  // inter cluster latency
