@@ -63,6 +63,9 @@ public class FragmentResponseMessage extends VoltMessage {
     ArrayList<VoltTable> m_dependencies = new ArrayList<VoltTable>();
     SerializableException m_exception;
 
+    // Used by MPI for rollback empty or overBufferLimit DR txn
+    int m_drBufferSize = 0;
+
     /** Empty constructor for de-serialization */
     FragmentResponseMessage() {
         m_subject = Subject.DEFAULT.getId();
@@ -170,6 +173,14 @@ public class FragmentResponseMessage extends VoltMessage {
         return m_exception;
     }
 
+    public void setDrBufferSize(int drBufferSize) {
+        this.m_drBufferSize = drBufferSize;
+    }
+
+    public int getDRBufferSize() {
+        return m_drBufferSize;
+    }
+
     @Override
     public int getSerializedSize()
     {
@@ -182,6 +193,7 @@ public class FragmentResponseMessage extends VoltMessage {
             + 1 // status byte
             + 1 // dirty flag
             + 1 // node recovering flag
+            + 4 // drBuffer size
             + 2; // dependency count
 
         // one int per dependency ID
@@ -221,6 +233,7 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.put((byte) (m_dirty ? 1 : 0));
         buf.put((byte) (m_recovering ? 1 : 0));
         buf.putShort(m_dependencyCount);
+        buf.putInt(m_drBufferSize);
         for (int i = 0; i < m_dependencyCount; i++)
             buf.putInt(m_dependencyIds.get(i));
 
@@ -255,6 +268,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_dirty = buf.get() == 0 ? false : true;
         m_recovering = buf.get() == 0 ? false : true;
         m_dependencyCount = buf.getShort();
+        m_drBufferSize = buf.getInt();
         for (int i = 0; i < m_dependencyCount; i++)
             m_dependencyIds.add(buf.getInt());
         for (int i = 0; i < m_dependencyCount; i++) {
@@ -281,6 +295,7 @@ public class FragmentResponseMessage extends VoltMessage {
         sb.append(TxnEgo.txnIdToString(m_txnId));
         sb.append(", SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(m_spHandle));
+        sb.append(", DR Buffer Size: " + m_drBufferSize);
 
         if (m_status == SUCCESS)
             sb.append("\n  SUCCESS");

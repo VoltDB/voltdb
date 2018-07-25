@@ -206,4 +206,6 @@ public interface SiteProcedureConnection {
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
     public void setDRProtocolVersion(int drVersion);
+
+    int getDrBufferSize();
 }
