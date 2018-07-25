@@ -22,7 +22,7 @@ from urllib2 import HTTPError, URLError, urlopen
 JUNIT = os.environ.get('junit', None)
 
 # set to True if you need to suppress updating the database or JIRA
-DRY_RUN = True
+DRY_RUN = False
 
 # set threshold (greater than or equal to) of failures in a row to be significant
 FAIL_THRESHOLD = 2
@@ -42,7 +42,7 @@ QUERY1 = """
     LIMIT 1
 """
 
-QUERY1_5 = """
+QUERY2 = """
     SELECT count(*) AS fails
     FROM `junit-test-failures` m
     WHERE m.job = %(job)s
@@ -52,7 +52,7 @@ QUERY1_5 = """
         AND m.build <= %(build)s
 """
 
-QUERY2 = """
+QUERY3 = """
     SELECT job, build, name, ord-1-COALESCE(pre, 0) AS runs, current
     FROM
         (SELECT job, build, name, status, ord, stamp,
@@ -491,9 +491,9 @@ class Stats(object):
 
                             if not everFixed:
                                 # query to see if number of failures in a row is significant, if so files ticket
-                                logging.debug("Q1_5 %s" % (QUERY1_5 % params1))
+                                logging.debug("Q1_5 %s" % (QUERY2 % params1))
 
-                                cursor.execute(QUERY1_5, params1)
+                                cursor.execute(QUERY2, params1)
                                 numFails = cursor.fetchone()[0]
                                 if (numFails >= FAIL_THRESHOLD):
                                     logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
@@ -504,9 +504,9 @@ class Stats(object):
                                         logging.exception("failed to file a jira ticket")
                             else:
                                 # if fixed in the past 30 days, checks if current fail sequence 2SD from AVG past 30 day fail sequence
-                                logging.debug("Q2 %s" % (QUERY2 % params1))
+                                logging.debug("Q2 %s" % (QUERY3 % params1))
 
-                                cursor.execute(QUERY2, params1)
+                                cursor.execute(QUERY3, params1)
                                 results = cursor.fetchall()
                                 values = [int(v[3]) for v in results]
                                 current = results[0][4]
@@ -627,13 +627,13 @@ class Tests(unittest.TestCase):
         everFixed = self.cursor.fetchone()
 
         if not everFixed:
-            self.cursor.execute(QUERY1_5, param)
+            self.cursor.execute(QUERY2, param)
             numFails = self.cursor.fetchone()[0]
             if (numFails >= FAIL_THRESHOLD):
                 print("FILE TICKET")
             return
 
-        self.cursor.execute(QUERY2, param)
+        self.cursor.execute(QUERY3, param)
         results = self.cursor.fetchall()
         values = [int(v[3]) for v in results]
         current = results[0][4]

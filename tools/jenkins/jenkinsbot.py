@@ -837,7 +837,7 @@ tr:hover{
             # Find all tickets within same test suite and link them
             link_tickets = jira.search_issues('summary ~ \'%s\' and labels = automatic and status != Closed and reporter in (voltdbci)' % suite)
             for ticket in link_tickets:
-                jira.create_issue_link('Related', new_issue.id, ticket.id)
+                jira.create_issue_link('Related', new_issue.key, ticket)
         else:
             new_issue = None
 
