@@ -73,7 +73,7 @@ As you did when first creating the xdcr cluster. The two node clusters will use 
 
 However, if you need to make a change to the configuration file or schema that cannot be done while the clusters are running, you may need to stop the cluster and restore from snapshot.
 
-First, create a directory to use as a place to store the snapshot files. It should be easily accessible by all the nodes. It can be saved like this:
+First, create a directory to use as a place to store the snapshot files. The directory needs to exist on all the nodes. It can be saved like this:
 
 		voltadmin save ~/restore snapshot_1
 
