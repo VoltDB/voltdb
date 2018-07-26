@@ -223,11 +223,13 @@ public class TransactionTaskQueue
             }
 
             //It is possible a RO MP read with higher TxnId could be executed before a RO MP reader with lower TxnId
-            //so do not offer them to the site task queue in the same time, place it in the backlog instead.
+            //so do not offer them to the site task queue in the same time, place it in the backlog instead. However,
+            //if it is an MP Write with a lower TxnId than the TxnId at the head of the backlog it could be a repair
+            //task so put the MP Write task into the Scoreboard or the SiteTaskQueue
             TransactionTask headTask = m_backlog.getFirst();
-            if ((txnState.isReadOnly()) && headTask.getTransactionState().isReadOnly() &&
-                    TxnEgo.getSequence(task.getTxnId()) != TxnEgo.getSequence(headTask.getTxnId())
-                       || (TxnEgo.getSequence(task.getTxnId()) > TxnEgo.getSequence(headTask.getTxnId()))) {
+            if (txnState.isReadOnly() && headTask.getTransactionState().isReadOnly() ?
+                    TxnEgo.getSequence(task.getTxnId()) != TxnEgo.getSequence(headTask.getTxnId()) :
+                    TxnEgo.getSequence(task.getTxnId()) > TxnEgo.getSequence(headTask.getTxnId())) {
                 m_backlog.addLast(task);
             } else if (task.needCoordination() && m_scoreboardEnabled) {
                 /*

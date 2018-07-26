@@ -49,9 +49,13 @@ import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.plannodes.WindowFunctionPlanNode;
 
 /**
+ * This is the type of plan nodes.
  *
+ * Note that this implements PlanMatcher.  A PlanNodeType object
+ * matches an AbstractPlanNode if the AbstractPlanNode's type is
+ * the PlanNodeType object.  This is used in testing plans.
  */
-public enum PlanNodeType {
+public enum PlanNodeType implements PlanMatcher {
     INVALID         (0, null), // for parsing...
 
     //
@@ -142,5 +146,14 @@ public enum PlanNodeType {
     public static PlanNodeType get(String name) {
         PlanNodeType ret = PlanNodeType.name_lookup.get(name.toLowerCase().intern());
         return (ret == null ? PlanNodeType.INVALID : ret);
+    }
+
+    @Override
+    public String match(AbstractPlanNode node) {
+        if (node.getPlanNodeType() == this) {
+            return null;
+        }
+        return "Expected a plan node of type " + this
+                + " in node " + node.getPlanNodeId() + ".";
     }
 }

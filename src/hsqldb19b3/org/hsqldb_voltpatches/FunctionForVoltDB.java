@@ -33,7 +33,6 @@ package org.hsqldb_voltpatches;
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -195,6 +194,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?
         static final int FUNC_VOLT_MAKE_VALID_POLYGON           = 21024;    // Make an invalid polygon valid by reversing rings.
                                                                             // Note: This will only correct orientation errors.
+        static final int FUNC_VOLT_FORMAT_TIMESTAMP             = 21025;    // Convert a timestamp to a String in a given timezone.
 
         /*
          * All VoltDB user-defined functions must have IDs in this range.
@@ -416,7 +416,11 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             new FunctionDescriptor("makevalidpolygon", Type.VOLT_GEOGRAPHY, FUNC_VOLT_MAKE_VALID_POLYGON, -1,
             		new Type[] { Type.VOLT_GEOGRAPHY },
-            		singleParamList)
+            		singleParamList),
+
+            new FunctionDescriptor("format_timestamp", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_TIMESTAMP, -1,
+                    new Type[]{Type.SQL_TIMESTAMP, Type.SQL_VARCHAR},
+                    doubleParamList)
 
         };
 
@@ -508,6 +512,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
         FunctionSQL function = new FunctionForVoltDB(def);
         return function;
+    }
+
+    public static int getFunctionID(String token) {
+        return FunctionDescriptor.fn_by_name(token).getId();
     }
 
     public FunctionForVoltDB(FunctionDescriptor fn) {
@@ -1007,17 +1015,20 @@ public class FunctionForVoltDB extends FunctionSQL {
             assert((functionId < 0) || (functionId == retFunctionId));
         } else {
             // if the function was not already defined, then
-            //   if functionId is a valid UDF id, then use it
+            //   if functionId is a valid UDF id or pre-defined SQL function id, then use it
             //   otherwise, we want a new number.
             //
-            if (isUserDefinedFunctionId(functionId)) {
+            if (functionId > 0) {
                 retFunctionId = functionId;
             } else {
                 retFunctionId = getNextFunctionId();
             }
             FunctionDescriptor fd = makeFunctionDescriptorFromParts(functionName, retFunctionId,
                                                             hsqlReturnType, hsqlParameterTypes);
-            FunctionDescriptor.addDefinedFunction(functionName, fd);
+            // if the function id belongs to UDF, put it into the defined_function map
+            if (isUserDefinedFunctionId(retFunctionId)) {
+                FunctionDescriptor.addDefinedFunction(functionName, fd);
+            }
             m_logger.debug(String.format("Added UDF \"%s\"(%d) with %d parameters",
                                         functionName, retFunctionId, voltParameterTypes.length));
         }

@@ -435,7 +435,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
 
-        void releaseUndoToken(int64_t undoToken);
+        void releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn);
 
         void undoUndoToken(int64_t undoToken);
 
@@ -572,8 +572,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
-                                bool first,
-                                bool last,
                                 bool traceOn);
 
         /**
@@ -585,6 +583,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setExecutorVectorForFragmentId(int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector* execsForFrag);
+
+        void loadBuiltInJavaFunctions();
 
         // -------------------------------------------------
         // Data Members

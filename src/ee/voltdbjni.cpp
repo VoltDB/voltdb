@@ -889,7 +889,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeToggl
  * @returns JNI_TRUE on success. JNI_FALSE otherwise.
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeReleaseUndoToken
-(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken)
+(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken, jboolean isEmptyDRTxn)
 {
     VOLT_DEBUG("nativeReleaseUndoToken in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -897,7 +897,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeR
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         if (engine) {
-            engine->releaseUndoToken(undoToken);
+            engine->releaseUndoToken(undoToken, isEmptyDRTxn);
             return JNI_TRUE;
         }
     } catch (const FatalException &e) {

@@ -29,14 +29,12 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
-import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
-import org.voltdb.export.ExportManager;
 
 public class SpTerm implements Term
 {
@@ -87,14 +85,11 @@ public class SpTerm implements Term
                 }
                 m_mailbox.updateReplicas(replicas, null);
                 m_replicasUpdatedRequired = false;
-                // TODO ? JOIN case for export
             }
             if (m_replicas.isEmpty() || replicas.size() <= m_replicas.size()) {
                 //The cases for startup or host failure
                 m_mailbox.updateReplicas(replicas, null);
                 m_replicasUpdatedRequired = false;
-                // notify Export subsystem in host failure case
-                ExportManager.instance().handlePartitionFailure(m_partitionId);
             } else {
                 //The case for rejoin
                 m_replicasUpdatedRequired = true;

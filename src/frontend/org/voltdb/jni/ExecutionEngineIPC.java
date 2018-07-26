@@ -1333,10 +1333,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
+    public boolean releaseUndoToken(final long undoToken, boolean isEmptyDRTxn) {
         m_data.clear();
         m_data.putInt(Commands.releaseUndoToken.m_id);
         m_data.putLong(undoToken);
+        m_data.put((byte) (isEmptyDRTxn ? 1 : 0));
 
         try {
             m_data.flip();

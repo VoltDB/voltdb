@@ -8,6 +8,8 @@ JIRA_PASS = os.environ.get('jirapass', None)
 JIRA_PROJECT = os.environ.get('jiraproject', None)
 job = 'test-nextrelease-sql-grammar-gen'
 
+# Set to true to avoid updating Jira
+DRY_RUN = False
 
 class Issues(object):
     def __init__(self):
@@ -45,11 +47,14 @@ class Issues(object):
         summary_url = self.jhost + '/job/' + job + '/' + str(build) + '/artifact/summary.out'
         summary_report = self.read_url(summary_url)
 
-        pframe_split = summary_report.split('Problematic frame:')
-        pframe_split = pframe_split[1].split('C')
-        pframe_split = pframe_split[1].split(']')
-        pframe_split = pframe_split[1].split('#')
-        pframe = pframe_split[0].strip()
+        try:
+            pframe_split = summary_report.split('Problematic frame:')
+            pframe_split = pframe_split[1].split('C')
+            pframe_split = pframe_split[1].split(']')
+            pframe_split = pframe_split[1].split('#')
+            pframe = pframe_split[0].strip()
+        except:
+            pframe = 'FAILURE'
 
         summary = job + ':' + str(build) + ' - ' + pframe
         # search_issues gets a parsing error on (), so escape it.
@@ -59,7 +64,7 @@ class Issues(object):
             return 'Already reported'
 
         old_issue = ''
-        existing = jira.search_issues('summary ~ \'%s\'' % pframe_split[0].strip().replace('()','\\\\(\\\\)',10))
+        existing = jira.search_issues('summary ~ \'%s\'' % pframe.replace('()','\\\\(\\\\)',10))
         for issue in existing:
             if str(issue.fields.status) != 'Closed' and u'grammar-gen' in issue.fields.labels:
                 old_issue = issue
@@ -71,9 +76,12 @@ class Issues(object):
         query_split = summary_report.split('(or it was never started??), after SQL statement:')
         crash_query = query_split[1]
 
-        hash_split = summary_report.split('#', 1)
-        hash_split = hash_split[1].split('# See problematic frame for where to report the bug.')
-        sigsegv_message = hash_split[0] + '# See problematic frame for where to report the bug.\n#'
+        try:
+            hash_split = summary_report.split('#', 1)
+            hash_split = hash_split[1].split('# See problematic frame for where to report the bug.')
+            sigsegv_message = hash_split[0] + '# See problematic frame for where to report the bug.\n#'
+        except:
+            sigsegv_message = 'N/A'
 
         description = job + ' build ' + str(build) + ' : ' + str(build_result) + '\n' \
             + 'Jenkins build: ' + build_url + ' \n \n' \
@@ -140,12 +148,13 @@ class Issues(object):
             issue_dict['versions'] = [this_version]
             issue_dict['fixVersions'] = [this_version]
 
-        if old_issue:
-            new_comment = jira.add_comment(old_issue, description)
-            print 'JIRA-action: New comment on issue: ' + str(old_issue) + ' created for failure on build ' + str(build)
-        else:
-            new_issue = jira.create_issue(fields=issue_dict)
-            print 'JIRA-action: New issue ' + new_issue.key + ' created for failure on build ' + str(build)
+        if not DRY_RUN:
+            if old_issue:
+                new_comment = jira.add_comment(old_issue, description)
+                print 'JIRA-action: New comment on issue: ' + str(old_issue) + ' created for failure on build ' + str(build)
+            else:
+                new_issue = jira.create_issue(fields=issue_dict)
+                print 'JIRA-action: New issue ' + new_issue.key + ' created for failure on build ' + str(build)
 
 if __name__ == '__main__':
     this_build = os.environ.get('build', None)

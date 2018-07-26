@@ -220,7 +220,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteAllTuples(true);
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     delete m_table;
 
@@ -265,7 +265,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteAllTuples(true);
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     delete m_table;
 
@@ -284,7 +284,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     tableutil::getRandomTuple(m_table, tuple);
     ASSERT_FALSE( m_table->lookupTupleForUndo(tuple).isNullTuple());
 
-    m_engine->releaseUndoToken(INT64_MIN + 3);
+    m_engine->releaseUndoToken(INT64_MIN + 3, false);
 
     ASSERT_FALSE(m_table->lookupTupleForUndo(tuple).isNullTuple());
     ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)1000);

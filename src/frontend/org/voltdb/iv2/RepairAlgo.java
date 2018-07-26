@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.Future;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
 // Some comments on threading and organization.
@@ -46,6 +47,8 @@ import org.voltcore.messaging.VoltMessage;
  */
 public interface RepairAlgo
 {
+    static final VoltLogger repairLogger = new VoltLogger("REPAIR");
+
     public static class RepairResult
     {
         public final long m_txnId;

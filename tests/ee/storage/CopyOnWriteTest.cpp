@@ -305,7 +305,7 @@ public:
                  * Release the last quantum
                  */
             case 1: {
-                m_engine->releaseUndoToken(m_undoToken);
+                m_engine->releaseUndoToken(m_undoToken, false);
                 break;
             }
         }
@@ -1092,7 +1092,7 @@ public:
             m_engine->undoUndoToken(m_undoToken);
         }
         else {
-            m_engine->releaseUndoToken(m_undoToken);
+            m_engine->releaseUndoToken(m_undoToken, false);
         }
         ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
                                                                      0, 0, 0, 0, false);
@@ -1426,7 +1426,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 }
 
 /**
- * Exercise the multi-COW.
+ * Exercise the multi-Stream.
  */
 TEST_F(CopyOnWriteTest, MultiStream) {
 
@@ -2001,6 +2001,83 @@ TEST_F(CopyOnWriteTest, ElasticIndexLowerUpperBounds) {
 
     ASSERT_TRUE(key1 == *index.createLowerBoundIterator(1));
     ASSERT_TRUE(index.createUpperBoundIterator(3) == index.end());
+}
+
+// Sanity Check
+// 1. Disallow Multi-Cow Activation on Same Table Streamer
+// 2. Disallow Elastic_Index Activation during Snapshot
+// 3. Allow Cow Activation with Elastic_Index
+// 4. Allow Elastic_Index_Read / Clear with Cow
+TEST_F(CopyOnWriteTest, CoexistenceCheck) {
+    const int NUM_PARTITIONS = 1;
+    const int TUPLES_PER_BLOCK = 50;
+    const int NUM_INITIAL = 300;
+    // const int NUM_CYCLES = 300;
+    const int FREQ_INSERT = 1;
+    const int FREQ_DELETE = 10;
+    const int FREQ_UPDATE = 5;
+    const int FREQ_COMPACTION = 100;
+
+    ElasticTableScrambler tableScrambler(*this,
+                                         NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
+                                         FREQ_INSERT, FREQ_DELETE,
+                                         FREQ_UPDATE, FREQ_COMPACTION);
+
+    tableScrambler.initialize();
+
+
+    char config[4];
+    ::memset(config, 0, 4);
+    ReferenceSerializeInputBE input(config, 4);
+
+    // first active elastic_index
+    T_HashRangeVector ranges;
+    ranges.push_back(T_HashRange(0x00000000, 0x7fffffff));
+    std::vector<std::string> predicateStrings;
+    predicateStrings.push_back(generateHashRangePredicate(ranges));
+    boost::shared_ptr<ReferenceSerializeInputBE> predicateInput = getPredicateSerializeInput(predicateStrings);
+    DummyElasticTableStreamer *streamerPtr = new DummyElasticTableStreamer(*this, 0, predicateStrings);
+    boost::shared_ptr<TableStreamerInterface> streamer(streamerPtr);
+    m_outputStreams.reset(new TupleOutputStreamProcessor(m_serializationBuffer, sizeof(m_serializationBuffer)));
+    m_outputStream = &m_outputStreams->at(0);
+    bool ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+    ASSERT_TRUE(ok);
+
+    // scan all the index
+    while (doStreamMore(TABLE_STREAM_ELASTIC_INDEX) != 0) {
+        ;
+    }
+
+    // try activate snapshot
+    ok = m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    ASSERT_TRUE(ok);
+    // insert tuples
+    int tupleCount = 4;
+    addRandomUniqueTuples(m_table, tupleCount);
+
+    // try activate another Snapshot
+    ReferenceSerializeInputBE input2(config, 4);
+    ok = m_table->activateStream(TABLE_STREAM_SNAPSHOT, 0, m_tableId, input2);
+    ASSERT_FALSE(ok);
+
+    // try reactive elastic_index
+    ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
+    ASSERT_FALSE(ok);
+
+    // try materialize elastic_index
+    boost::shared_ptr<ReferenceSerializeInputBE> predicateInputRead = getHashRangePredicateInput(ranges[0]);
+    m_engine->setUndoToken(m_undoToken);
+    ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_READ, 0, m_tableId, *predicateInputRead);
+    ASSERT_TRUE(ok);
+    while ( m_table->streamMore(*m_outputStreams, TABLE_STREAM_ELASTIC_INDEX_READ, m_retPositions) != 0) {
+        ;
+    }
+    m_engine->releaseUndoToken(m_undoToken, false);
+
+    // try clear elastic_index
+    boost::shared_ptr<ReferenceSerializeInputBE> predicateInputClear = getHashRangePredicateInput(ranges[0]);
+    ok = m_table->activateStream(TABLE_STREAM_ELASTIC_INDEX_CLEAR, 0, m_tableId, *predicateInputClear);
+    ASSERT_TRUE(ok);
 }
 
 int main() {

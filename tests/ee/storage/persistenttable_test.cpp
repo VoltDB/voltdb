@@ -98,7 +98,7 @@ protected:
     }
 
     void commit() {
-        m_engine->releaseUndoToken(m_undoToken);
+        m_engine->releaseUndoToken(m_undoToken, false);
         ++m_undoToken;
         m_engine->setUndoToken(m_undoToken);
     }
