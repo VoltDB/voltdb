@@ -68,13 +68,13 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             client = ClientFactory.createClient(clientConfig);
             client.createConnection(cluster.getListenerAddress(0));
 
-            //Create a schema with table inventory and a view on table inventory. 
-            //Insert data into inventory and verify table and view entries. 
-            String createTable = "CREATE TABLE inventory (" + 
+            //Create a schema with table inventory and a view on table inventory.
+            //Insert data into inventory and verify table and view entries.
+            String createTable = "CREATE TABLE inventory (" +
                                  "productID INTEGER NOT NULL," +
                                  "warehouse INTEGER NOT NULL" +
                                  ");";
-            String insertData = "INSERT INTO inventory VALUES (61, 1);" + 
+            String insertData = "INSERT INTO inventory VALUES (61, 1);" +
                                 "INSERT INTO inventory VALUES (67, 1);" +
                                 "INSERT INTO inventory VALUES (273, 3);" +
                                 "INSERT INTO inventory VALUES (399, 2);" +
@@ -98,13 +98,13 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             TestSaveRestoreSysprocSuite.validateSnapshot(true, TESTNONCE);
             m_config.shutDown();
             m_config.startUp();
-    
+
             cr = client.callProcedure("@AdHoc", "drop view inventory_count_by_warehouse if exists");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure("@AdHoc", "drop table inventory;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-            //In a fresh db, do a partial restore where inventory is included in the list of tables to be restored. 
+            //In a fresh db, do a partial restore where inventory is included in the list of tables to be restored.
             //After the data is restored, make sure that view data is also correct.
             JSONObject restore = new JSONObject();
             try {
@@ -116,13 +116,13 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             }
             VoltTable[] results;
             results = client.callProcedure("@SnapshotRestore", restore.toString()).getResults();
-    
+
             while(results[0].advanceRow()) {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
                     fail(results[0].getString("ERR_MSG"));
                 }
             }
-    
+
             cr = client.callProcedure("@AdHoc", "select COUNT(*) from inventory;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             Long rowCount = cr.getResults()[0].asScalarLong();
@@ -165,13 +165,13 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             client = ClientFactory.createClient(clientConfig);
             client.createConnection(cluster.getListenerAddress(0));
 
-            //Create a schema with table inventory and a view on table inventory. 
-            //Insert data into inventory and verify table and view entries. 
-            String createTable = "CREATE TABLE inventory (" + 
+            //Create a schema with table inventory and a view on table inventory.
+            //Insert data into inventory and verify table and view entries.
+            String createTable = "CREATE TABLE inventory (" +
                                  "productID INTEGER NOT NULL," +
                                  "warehouse INTEGER NOT NULL" +
                                  ");";
-            String insertData = "INSERT INTO inventory VALUES (61, 1);" + 
+            String insertData = "INSERT INTO inventory VALUES (61, 1);" +
                                 "INSERT INTO inventory VALUES (67, 1);" +
                                 "INSERT INTO inventory VALUES (273, 3);" +
                                 "INSERT INTO inventory VALUES (399, 2);" +
@@ -211,13 +211,13 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             TestSaveRestoreSysprocSuite.validateSnapshot(true, TESTNONCE);
             m_config.shutDown();
             m_config.startUp();
-    
+
             cr = client.callProcedure("@AdHoc", "drop view inventory_count_by_warehouse if exists");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure("@AdHoc", "drop table inventory;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-            //In a fresh db, do a partial restore where the view inventory_count_by_warehouse is included in the list of tables to be restored. 
+            //In a fresh db, do a partial restore where the view inventory_count_by_warehouse is included in the list of tables to be restored.
             //After the data is restored, make sure that the table inventory is empty, the view is correct
             JSONObject restore1 = new JSONObject();
             try {
@@ -229,13 +229,13 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             }
             VoltTable[] results;
             results = client.callProcedure("@SnapshotRestore", restore1.toString()).getResults();
-    
+
             while(results[0].advanceRow()) {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
                     fail(results[0].getString("ERR_MSG"));
                 }
             }
-    
+
             cr = client.callProcedure("@AdHoc", "select COUNT(*) from inventory;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             Long rowCount = cr.getResults()[0].asScalarLong();
@@ -245,8 +245,8 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             rowCount = cr.getResults()[0].asScalarLong();
             assert(rowCount == 3);
 
-            //Do another partial restore where inventory is included. 
-            //After the data is restored, make sure that the table data is correct, 
+            //Do another partial restore where inventory is included.
+            //After the data is restored, make sure that the table data is correct,
             //and the data in the view doubled in value.
             JSONObject restore2 = new JSONObject();
             try {
@@ -257,13 +257,13 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
                 fail("JSON exception" + e.getMessage());
             }
             results = client.callProcedure("@SnapshotRestore", restore2.toString()).getResults();
-    
+
             while(results[0].advanceRow()) {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
                     fail(results[0].getString("ERR_MSG"));
                 }
             }
-    
+
             cr = client.callProcedure("@AdHoc", "select COUNT(*) from inventory;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             rowCount = cr.getResults()[0].asScalarLong();
