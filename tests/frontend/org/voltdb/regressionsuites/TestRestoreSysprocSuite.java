@@ -261,16 +261,6 @@ public class TestRestoreSysprocSuite extends SaveRestoreBase{
             m_config.shutDown();
             m_config.startUp();
 
-//            String cluster2Root = "/tmp/" + System.getProperty("user.name") + "-cluster2";
-//            cluster2 = LocalCluster.createLocalCluster("", 1, 1, 0, 1,
-//                    cluster2ReplicationPort, cluster1ReplicationPort, cluster2Root,
-//                    "restore-with-xdcr-stream-cluster2.jar", DrRoleType.XDCR, false, builder);
-//
-//            System.out.println("Getting client connected to cluster1.");
-//            ClientConfig client2Config = new ClientConfig();
-//            client2Config.setProcedureCallTimeout(10 * 60 * 1000); // 10 min
-//            cluster2Client = ClientFactory.createClient(client2Config);
-//            cluster2Client.createConnection(cluster2.getListenerAddress(0));
             cr = cluster1Client.callProcedure("@AdHoc", "drop table helloworld;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = cluster1Client.callProcedure("@AdHoc", "drop table object1;");
