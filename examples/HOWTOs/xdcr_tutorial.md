@@ -2,11 +2,11 @@ XDCR Guide
 ====================
 
 
-This is a tutorial about how to start up two XDCR 3 node clusters and do various maintenance tasks, such as restoring from snapshot.
+This is a tutorial about how to start up two XDCR 3 node clusters, do various maintenance tasks such as restoring from snapshot, and monitor some important details about the replication status.
 This tutorial was done in version 7.9.1 and should work with all future versions. If you are using an older version, you should consult the VoltDB docs, as some attributes and commands might not be available.
 
 
-Start up
+Start up the clusters
 ====================
 
 ###1) Making the deployment files:
@@ -60,7 +60,7 @@ Then, make sure this node is loaded with data. It is very important in starting 
 At this point, all data should have already copied over to the second cluster. Your two xdcr clusters are complete and ready to receive transactions.     
 
 
-Restarting the cluster
+Restarting the clusters
 ====================
 
 If you shut the clusters down and wish to restart them without changing the configuration file or schema, then you can simply do
@@ -94,5 +94,29 @@ Finally, use the following command to restore from snapshot:
 Once this completes and is successful, restart the second cluster and reload its schema with sqlcmd < ddl.sql. Your two xdcr clusters should be ready and copying each other as normal with their new configuration file and/or schema.
 
 
+Monitoring the clusters
+====================
 
- 
+It's important to know what status the XDCR clusters are in, because their resiliency depends on what they are doing, especially in regards to snapshots. XDCR clusters that are streaming snapshot data are particularly vulnerable; any nodes on any participating cluster going down during this time will halt the replication process entirely. The way you know this happened is when an XDCR cluster gives you this error message:
+
+		ERROR: DR Subsystem could not be recovered because the Sync Snapshot did not complete successfully. Please restart the cluster in CREATE mode and with the DR connection source of an existing cluster.
+
+The cluster that gives you this error message must be shut down, and the remaining cluster with the snapshot data must have its data replication reset, using the following command (note that "--all" can be replaced with the appropriate cluster id, which in this case would be 2):
+
+		voltadmin dr reset --all
+		
+Once that happens, the second cluster can be re-initiated with force:
+
+		voltdb init --force --config=deployment_2.xml
+
+And reloaded with the appropriate schema:
+
+		sqlcmd < ddl.sql
+		
+This should restart the replication process, but the XDCR clusters will still be vulnerable because the first cluster will be transmitting snapshot data to the second. Only when the clusters start transmitting transaction data will the replication be stable. You can monitor what data is being transmitted using sqlcmd, followed by @Statistics DRPRODUCER:
+
+		exec @Statistics DRPRODUCER 0;
+		
+This will show two tables of data, but the important column will be STREAMTYPE. It will either be TRANSACTIONS or SNAPSHOT. If it says SNAPSHOT, then the clusters are still vulnerable to replication being halted. It is imperative that no nodes go down during this time.
+		
+
