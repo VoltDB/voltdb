@@ -2072,7 +2072,7 @@ TEST_F(CopyOnWriteTest, CoexistenceCheck) {
     while ( m_table->streamMore(*m_outputStreams, TABLE_STREAM_ELASTIC_INDEX_READ, m_retPositions) != 0) {
         ;
     }
-    m_engine->releaseUndoToken(m_undoToken);
+    m_engine->releaseUndoToken(m_undoToken, false);
 
     // try clear elastic_index
     boost::shared_ptr<ReferenceSerializeInputBE> predicateInputClear = getHashRangePredicateInput(ranges[0]);
