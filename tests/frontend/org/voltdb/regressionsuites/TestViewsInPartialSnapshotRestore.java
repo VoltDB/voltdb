@@ -245,7 +245,7 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             rowCount = cr.getResults()[0].asScalarLong();
             assert(rowCount == 3);
 
-            //Do another partial restore where table1 is included. 
+            //Do another partial restore where inventory is included. 
             //After the data is restored, make sure that the table data is correct, 
             //and the data in the view doubled in value.
             JSONObject restore2 = new JSONObject();
