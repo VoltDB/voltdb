@@ -135,7 +135,6 @@ public class ExpressionStartsWith extends ExpressionLogical {
             return;
         }
 
-        // In this case, pattern will always be not null 
         Object pattern = isRightArgFixedConstant
                          ? nodes[RIGHT].getConstantValue(session)
                          : null;
@@ -150,6 +149,9 @@ public class ExpressionStartsWith extends ExpressionLogical {
         assert(!nodes[RIGHT].isParam);
 
         if (startsWithObject.isEquivalentToCastPredicate()) {
+            // ENG-14266 solve 'col STARTS WITH CAST(NULL AS VARCHAR)' problem
+            // If it is this case, we are already set.
+            // EE can handle this (left expression is a ExpressionColumn, right expression is a null VALUE).
             return;
         } else if (startsWithObject.isEquivalentToUnknownPredicate()) {
             this.setAsConstantValue(null);

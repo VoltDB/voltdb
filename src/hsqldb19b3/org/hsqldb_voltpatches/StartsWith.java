@@ -141,7 +141,11 @@ class StartsWith {
         isNull = pattern == null;
 
         if (isNull) {
-            // ENG-14266, solve 'col LIKE CAST(NULL AS VARCHAR)' problem
+            /* ENG-14266, solve 'col STARTS WITH CAST(NULL AS VARCHAR)' Null Pointer problem
+             * In this particular case, the right expression has been turned into VALUE type whose valueData is null.
+             * EE can handle this case.
+             * isRightNull set to be true if it is this case.
+             */
             isRightNull = (nodes[Expression.LEFT] instanceof ExpressionColumn) &&
                           (nodes[Expression.RIGHT] instanceof ExpressionOp) &&
                           (nodes[Expression.RIGHT].getType() == 1) &&
@@ -165,6 +169,7 @@ class StartsWith {
         return isNull && !isRightNull;
     }
 
+    // Specific check for 'col STARTS WITH CAST(NULL AS VARCHAR)' case
     boolean isEquivalentToCastPredicate() {
         return isRightNull;
     }

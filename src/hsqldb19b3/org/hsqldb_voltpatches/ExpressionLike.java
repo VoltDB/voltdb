@@ -288,6 +288,8 @@ public final class ExpressionLike extends ExpressionLogical {
 
         if (likeObject.isEquivalentToCastPredicate()) {
             // ENG-14266 solve 'col LIKE CAST(NULL AS VARCHAR)' problem
+            // If it is this case, we are already set.
+            // EE can handle this (left expression is a ExpressionColumn, right expression is a null VALUE).
             return;
         } else if (likeObject.isEquivalentToUnknownPredicate()) {
             this.setAsConstantValue(null);

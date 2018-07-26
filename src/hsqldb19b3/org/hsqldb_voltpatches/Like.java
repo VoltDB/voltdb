@@ -86,8 +86,6 @@ import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 // fredt@users 20031006 - patch 1.7.2 - reuse Like objects for all rows
 // fredt@users 1.9.0 - LIKE for binary strings
 class Like {
-    private final static int LEFT = 0;
-    private final static int RIGHT = 1;
     private final static BinaryData maxByteValue =
         new BinaryData(new byte[]{ -128 }, false);
     private char[]   cLike;
@@ -263,10 +261,15 @@ class Like {
         }
 
         if (isNull) {
-            // ENG-14266, solve 'col LIKE CAST(NULL AS VARCHAR)' problem
-            isRightNull = (nodes[LEFT] instanceof ExpressionColumn) &&
-                          (nodes[RIGHT] instanceof ExpressionOp) &&
-                          (nodes[RIGHT].getType() == 1) && (nodes[RIGHT].getValue(session) == null);
+            /* ENG-14266, solve 'col LIKE CAST(NULL AS VARCHAR)' Null Pointer problem
+             * In this particular case, the right expression has been turned into VALUE type whose valueData is null.
+             * EE can handle this case.
+             * isRightNull set to be true if it is this case.
+             */
+            isRightNull = (nodes[Expression.LEFT] instanceof ExpressionColumn) &&
+                          (nodes[Expression.RIGHT] instanceof ExpressionOp) &&
+                          (nodes[Expression.RIGHT].getType() == 1) &&
+                          (nodes[Expression.RIGHT].getValue(session) == null);
             return;
         }
 
@@ -342,6 +345,7 @@ class Like {
         return iFirstWildCard != -1;
     }
 
+    // Specific check for 'col LIKE CAST(NULL AS VARCHAR)' case
     boolean isEquivalentToCastPredicate() {
         return isRightNull;
     }
