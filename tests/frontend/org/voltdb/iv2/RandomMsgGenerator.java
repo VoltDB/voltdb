@@ -95,7 +95,7 @@ public class RandomMsgGenerator
     {
         CompleteTransactionMessage msg =
             new CompleteTransactionMessage(0l, 0l, m_mpiTxnEgo.getTxnId(), readOnly, 0, isRollback,
-                    false, isRestart, false, false, false);
+                    false, isRestart, false, false, false, false);
         return msg;
     }
 

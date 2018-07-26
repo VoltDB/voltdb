@@ -144,7 +144,7 @@ TEST_F(PersistentTableMemStatsTest, InsertTest) {
 
     m_table->insertTuple(tuple);
 
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     ASSERT_EQ(orig_size + added_bytes, m_table->nonInlinedMemorySize());
 
@@ -223,7 +223,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
 
     m_table->updateTuple(tuple, tempTuple);
 
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     ASSERT_EQ(orig_size + added_bytes - removed_bytes, m_table->nonInlinedMemorySize());
 
@@ -307,7 +307,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteTest) {
 
     m_table->deleteTuple(tuple, true);
 
-    m_engine->releaseUndoToken(INT64_MIN + 2);
+    m_engine->releaseUndoToken(INT64_MIN + 2, false);
 
     //cout << "Final non-inline size: " << m_table->nonInlinedMemorySize() << endl;
     ASSERT_EQ(orig_size - removed_bytes, m_table->nonInlinedMemorySize());

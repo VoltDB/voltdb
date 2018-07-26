@@ -39,6 +39,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     static final int ISRESTART = 2;
     static final int ISNPARTTXN = 3;
     static final int ISABORTDURINGREPAIR = 4;
+    static final int ISEMPTYDRTXN = 5;
 
     private void setBit(int position, boolean value)
     {
@@ -76,7 +77,8 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
                                       long txnId, boolean isReadOnly, int hash,
                                       boolean isRollback, boolean requiresAck,
                                       boolean isRestart, boolean isForReplay,
-                                      boolean isNPartTxn, boolean isAbortDuringRepair)
+                                      boolean isNPartTxn, boolean isAbortDuringRepair,
+                                      boolean isEmptyDRTxn)
     {
         super(initiatorHSId, coordinatorHSId, txnId, 0, isReadOnly, isForReplay);
         m_hash = hash;
@@ -85,6 +87,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(ISRESTART, isRestart);
         setBit(ISNPARTTXN, isNPartTxn);
         setBit(ISABORTDURINGREPAIR, isAbortDuringRepair);
+        setBit(ISEMPTYDRTXN, isEmptyDRTxn);
     }
 
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId, CompleteTransactionMessage msg)
@@ -116,6 +119,10 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 
     public boolean isAbortDuringRepair() {
         return getBit(ISABORTDURINGREPAIR);
+    }
+
+    public boolean isEmptyDRTxn() {
+        return getBit(ISEMPTYDRTXN);
     }
 
     public int getHash() {

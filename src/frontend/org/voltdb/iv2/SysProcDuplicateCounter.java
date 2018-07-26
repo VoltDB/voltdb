@@ -117,6 +117,8 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             VoltTable grouped = VoltTableUtil.unionTables(dep.getValue());
             unioned.addDependency(new DependencyPair.TableDependencyPair(dep.getKey(), grouped));
         }
+        // we should never rollback DR buffer for MP sysprocs because we don't report the DR buffer size and therefore don't know if it is empty or not.
+        unioned.setDrBufferSize(1);
         return unioned;
     }
 }
