@@ -97,7 +97,8 @@ public class VoltDBRules {
 
             // Exchage Rules
             , VoltDBPCalcExchangeTransposeRule.INSTANCE
-            , VoltDBPLimitExchangeTransposeRule.INSTANCE
+            , VoltDBPLimitExchangeTransposeRule.INSTANCE_DISTRIBUTION_ANY
+            , VoltDBPLimitExchangeTransposeRule.INSTANCE_DISTRIBUTION_SINGLE
             , VoltDBPSortExchangeTransposeRule.INSTANCE
     };
 
@@ -112,7 +113,7 @@ public class VoltDBRules {
             , VoltDBPLimitSortMergeRule.INSTANCE_1
             , VoltDBPLimitSortMergeRule.INSTANCE_2
             , VoltDBPAggregateScanMergeRule.INSTANCE
-            , VoltDBPLimitScanMergeRule.INSTANCE_1
+//            , VoltDBPLimitScanMergeRule.INSTANCE_1 -- looks like not needed
             , VoltDBPLimitScanMergeRule.INSTANCE_2
 
 
