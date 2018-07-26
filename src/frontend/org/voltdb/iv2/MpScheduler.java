@@ -59,6 +59,7 @@ import com.google_voltpatches.common.collect.Sets;
 public class MpScheduler extends Scheduler
 {
     static VoltLogger tmLog = new VoltLogger("TM");
+    static final VoltLogger repairLogger = new VoltLogger("REPAIR");
 
     // null if running community, fallback to MpProcedureTask
     private static final Constructor<?> NpProcedureTaskConstructor = loadNpProcedureTaskClass();
@@ -375,7 +376,7 @@ public class MpScheduler extends Scheduler
     public void handleMessageRepair(List<Long> needsRepair, VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
-            handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
+            handleIv2InitiateTaskMessageRepair((Iv2InitiateTaskMessage)message);
         }
         else {
             // MpInitiatorMailbox should throw RuntimeException for unhandled types before we could get here
@@ -384,7 +385,7 @@ public class MpScheduler extends Scheduler
         }
     }
 
-    private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)
+    private void handleIv2InitiateTaskMessageRepair(Iv2InitiateTaskMessage message)
     {
         // just reforward the Iv2InitiateTaskMessage for the txn being restarted
         // this copy may be unnecessary
@@ -429,6 +430,9 @@ public class MpScheduler extends Scheduler
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
+        if (repairLogger.isDebugEnabled()) {
+            repairLogger.debug("TXN repair:" + message );
+        }
     }
 
     // The MpScheduler will see InitiateResponseMessages from the Partition masters when

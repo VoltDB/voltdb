@@ -49,7 +49,7 @@ public class RepairLog
     private static final boolean IS_SP = true;
     private static final boolean IS_MP = false;
 
-    VoltLogger tmLog = new VoltLogger("TM");
+    VoltLogger repairLogger = new VoltLogger("REPAIR");
 
     // Initialize to Long MAX_VALUE to prevent feeding a newly joined node
     // transactions it should never have seen
@@ -210,10 +210,10 @@ public class RepairLog
         }
         else if (msg instanceof DumpMessage) {
             String who = CoreUtils.hsIdToString(m_HSId);
-            tmLog.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader
+            repairLogger.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader
                     + ", " + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
             for (Iv2RepairLogResponseMessage il : contents(0l, false)) {
-               tmLog.warn("[Repair log contents]" + who + ": msg: " + il);
+               repairLogger.warn("[Repair log contents]" + who + ": msg: " + il);
             }
         }
         else if (msg instanceof RepairLogTruncationMessage) {
@@ -290,8 +290,8 @@ public class RepairLog
         Collections.sort(items, m_handleComparator);
 
         int ofTotal = items.size() + 1;
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("Responding with " + ofTotal + " repair log parts.");
+        if (repairLogger.isDebugEnabled()) {
+            repairLogger.debug("Responding with " + ofTotal + " repair log parts.");
         }
         List<Iv2RepairLogResponseMessage> responses =
             new LinkedList<Iv2RepairLogResponseMessage>();
