@@ -2,7 +2,7 @@ XDCR Guide
 ====================
 
 
-This is a tutorial about how to start up two xdcr 3 node clusters and do various maintenance tasks, such as restoring from snapshot.
+This is a tutorial about how to start up two XDCR 3 node clusters and do various maintenance tasks, such as restoring from snapshot.
 This tutorial was done in version 7.9.1 and should work with all future versions. If you are using an older version, you should consult the VoltDB docs, as some attributes and commands might not be available.
 
 
