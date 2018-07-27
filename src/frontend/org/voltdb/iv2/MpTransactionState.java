@@ -106,9 +106,9 @@ public class MpTransactionState extends TransactionState
     static {
         StoredProcedureInvocation mpSpi = new StoredProcedureInvocation();
         mpSpi.setProcName("@ApplyBinaryLogMP");
-        StoreProcedureInvocationHeaderSize = mpSpi.getSerializedSizeWithoutParams();
-        InitiateTaskMessageHeaderSize = (new Iv2InitiateTaskMessage()).getSerializedSizeForHeader();
-        FragmentTaskMessageHeaderSize = (new FragmentTaskMessage()).getSerializedSizeForHeader();
+        StoreProcedureInvocationHeaderSize = mpSpi.getFixedHeaderSize();
+        InitiateTaskMessageHeaderSize = (new Iv2InitiateTaskMessage()).getFixedHeaderSize();
+        FragmentTaskMessageHeaderSize = (new FragmentTaskMessage()).getFixedHeaderSize();
     }
 
     private int getDRMessageSizeEstimation() {

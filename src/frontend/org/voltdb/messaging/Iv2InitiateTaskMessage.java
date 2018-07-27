@@ -144,29 +144,21 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_connectionId;
     }
 
+    public int getFixedHeaderSize()
+    {
+        int msgsize = super.getSerializedSize();
+        msgsize += 8; // m_clientInterfaceHandle
+        msgsize += 8; // m_connectionId
+        msgsize += 1; // is single partition flag
+        msgsize += 1; // should generate a response
+        return msgsize;
+    }
+
     @Override
     public int getSerializedSize()
     {
-        int msgsize = super.getSerializedSize();
-        msgsize += 8; // m_clientInterfaceHandle
-        msgsize += 8; // m_connectionId
-        msgsize += 1; // is single partition flag
-        msgsize += 1; // should generate a response
-        msgsize += m_invocation.getSerializedSize();
-        return msgsize;
+        return getFixedHeaderSize() + m_invocation.getSerializedSize();
     }
-
-    public int getSerializedSizeForHeader()
-    {
-        int msgsize = super.getSerializedSize();
-        msgsize += 8; // m_clientInterfaceHandle
-        msgsize += 8; // m_connectionId
-        msgsize += 1; // is single partition flag
-        msgsize += 1; // should generate a response
-        msgsize += 1; // flags (SP/NP/return tables)
-        return msgsize;
-    }
-
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException

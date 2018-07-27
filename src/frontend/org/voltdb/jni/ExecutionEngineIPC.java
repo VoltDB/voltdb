@@ -492,7 +492,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             for (int ii = 0; ii < tables.length; ii++) {
                 final int dependencyCount = resultTablesBuffer.getInt(); // ignore the table count
                 assert(dependencyCount == 1); //Expect one dependency generated per plan fragment
-                resultTablesBuffer.getInt(); // ignore the dependency ID
+                m_drBufferSize = resultTablesBuffer.getInt();; // read the dr Buffer size
                 tables[ii] = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(resultTablesBuffer);
             }
         }

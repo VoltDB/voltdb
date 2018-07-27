@@ -474,7 +474,7 @@ public class TestQueryTimeout extends RegressionSuite {
     //
 
     public TestQueryTimeout(String name) {
-        super(name);
+        super("testReplicatedProcTimeout");
     }
     static final Class<?>[] PROCEDURES = {
         org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedReadOnlyProc.class,
@@ -531,6 +531,7 @@ public class TestQueryTimeout extends RegressionSuite {
         boolean success;
 
         config = new LocalCluster("querytimeout-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        ((LocalCluster) config).setHasLocalServer(true);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
@@ -544,7 +545,7 @@ public class TestQueryTimeout extends RegressionSuite {
         config = new LocalCluster("querytimeout-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
-        builder.addServerConfig(config);
+        //builder.addServerConfig(config);
 
         return builder;
     }
