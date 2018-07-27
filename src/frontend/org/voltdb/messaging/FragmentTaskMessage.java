@@ -657,12 +657,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      *    fragment plan string: bytes: ? * nunplanned
      */
 
-    @Override
-    public int getSerializedSize()
-    {
-        assert(m_items != null);
-        assert(!m_items.isEmpty());
-
+    public int getFixedHeaderSize() {
         int msgsize = super.getSerializedSize();
 
         // Fixed header
@@ -701,6 +696,18 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         //nested initiate task message length prefix
         msgsize += 4;
+
+        return msgsize;
+    }
+
+    @Override
+    public int getSerializedSize()
+    {
+        assert(m_items != null);
+        assert(!m_items.isEmpty());
+
+        int msgsize = getFixedHeaderSize();
+
         if (m_initiateTaskBuffer != null) {
             msgsize += m_initiateTaskBuffer.remaining();
         }
@@ -750,49 +757,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 msgsize += 4 + item.m_stmtText.length;
             }
         }
-
-        return msgsize;
-    }
-
-    public int getSerializedSizeForHeader() {
-        int msgsize = super.getSerializedSize();
-
-        // Fixed header
-        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2 + 8;
-
-        // procname to load str if any
-        if (m_procNameToLoad != null) {
-            msgsize += m_procNameToLoad.length;
-        }
-
-        // perFragmentStatsRecording and coordinatorTask.
-        // TODO: We could use only one byte and bitmasks to represent all the
-        // boolean values used in this class, it can save a little bit space.
-        msgsize += 2;
-
-        // Fragment ID block (20 bytes per sha1-hash)
-        msgsize += 20 * m_items.size();
-
-        // short + str for proc name
-        msgsize += 2;
-        if (m_procedureName != null) {
-            msgsize += m_procedureName.length;
-        }
-
-        // int for which batch (4)
-        msgsize += 4;
-
-        // 1 byte for the timeout flag
-        msgsize += 1;
-
-        msgsize += 1; //m_handleByOriginalLeader
-        msgsize += m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4;
-
-        // Involved partitions
-        msgsize += 2 + m_involvedPartitions.size() * 4;
-
-        //nested initiate task message length prefix
-        msgsize += 4;
 
         return msgsize;
     }
