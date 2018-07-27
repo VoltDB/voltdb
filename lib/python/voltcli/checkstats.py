@@ -45,6 +45,7 @@ def check_exporter(runner):
                 notifyInterval = 10
                 if last_table_stat_time > 1 and export_tables_with_data:
                     print_export_pending(runner, export_tables_with_data)
+                    return
         lastUpdatedTime = monitorStatisticsProgress(last_export_tables_with_data, export_tables_with_data, lastUpdatedTime, runner, 'Exporter')
         last_export_tables_with_data = export_tables_with_data.copy()
 
