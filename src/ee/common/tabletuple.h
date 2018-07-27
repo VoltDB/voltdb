@@ -1051,13 +1051,13 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
     const int32_t hiddenColumnCount  = m_schema->hiddenColumnCount();
     tupleIn.readInt();
 
-    // uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
-    // for (uint16_t i = 0; i < nonInlinedColCount; i++) {
-    //     uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
-    //     const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-    //     char *dataPtr = getWritableDataPtr(columnInfo);
-    //     *reinterpret_cast<StringRef**>(storage) = NULL;
-    // }
+    uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+    for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+        uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+        char *dataPtr = getWritableDataPtr(columnInfo);
+        *reinterpret_cast<StringRef**>(dataPtr) = NULL;
+    }
 
     for (int j = 0; j < columnCount; ++j) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(j);
