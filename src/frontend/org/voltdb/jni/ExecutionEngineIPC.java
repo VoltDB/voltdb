@@ -648,6 +648,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             // check if anything was changed
             m_dirty |= dirtyBytes.get() > 0;
 
+            final ByteBuffer drBufferSizeBytes = ByteBuffer.allocate(4);
+            while (drBufferSizeBytes.hasRemaining()) {
+                int read = m_socketChannel.read(drBufferSizeBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            drBufferSizeBytes.flip();
+            final int drBufferSize = drBufferSizeBytes.getInt();
+
             final ByteBuffer resultTablesLengthBytes = ByteBuffer.allocate(4);
             //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
             while (resultTablesLengthBytes.hasRemaining()) {
@@ -663,8 +673,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 return resultTablesLengthBytes;
 
             final ByteBuffer resultTablesBuffer = ByteBuffer
-                    .allocate(resultTablesLength+4);
+                    .allocate(resultTablesLength+8);
             //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            resultTablesBuffer.putInt(drBufferSize);
             resultTablesBuffer.putInt(resultTablesLength);
             while (resultTablesBuffer.hasRemaining()) {
                 int read = m_socketChannel.read(resultTablesBuffer);
