@@ -316,7 +316,18 @@ public class InitiatorMailbox implements Mailbox
         assert(lockingVows());
         logRxMessage(message);
         boolean canDeliver = m_scheduler.sequenceForReplay(message);
-        if (message instanceof DumpMessage) {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
+                return;
+            }
+            initiateSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
+        }
+        else if (message instanceof FragmentTaskMessage) {
+            if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
+                return;
+            }
+        }
+        else if (message instanceof DumpMessage) {
             hostLog.warn("Received DumpMessage at " + CoreUtils.hsIdToString(m_hsId));
             try {
                 m_scheduler.dump();
@@ -324,7 +335,7 @@ public class InitiatorMailbox implements Mailbox
                 hostLog.warn("Failed to dump the content of the scheduler", ignore);
             }
         }
-        if (message instanceof Iv2RepairLogRequestMessage) {
+        else if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);
             return;
         }
@@ -340,19 +351,11 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
-        else if (message instanceof Iv2InitiateTaskMessage) {
-            if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
-                return;
-            }
-            initiateSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
-        } else if (message instanceof FragmentTaskMessage) {
-            if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
-                return;
-            }
-        }  else if (message instanceof MigratePartitionLeaderMessage) {
+        else if (message instanceof MigratePartitionLeaderMessage) {
             setMigratePartitionLeaderStatus((MigratePartitionLeaderMessage)message);
             return;
         }
+
         if (canDeliver) {
             //For a message delivered to partition leaders, the message may not have the updated transaction id yet.
             //The scheduler of partition leader will advance the transaction id, update the message and add it to repair log.
