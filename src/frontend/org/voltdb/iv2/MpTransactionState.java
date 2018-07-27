@@ -102,7 +102,7 @@ public class MpTransactionState extends TransactionState
     final Map<Long, Long> m_masterMapForFragmentRestart = Maps.newHashMap();
 
     //The timeout value for fragment response in minute. default: 5 min
-    private static long PULL_TIMEOUT = Long.valueOf(System.getProperty("MP_TXN_RESPONSE_TIMEOUT", "5")) * 60L;;
+    private static long PULL_TIMEOUT = Long.valueOf(System.getProperty("MP_TXN_RESPONSE_TIMEOUT", "5")) * 60L;
 
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
@@ -445,6 +445,7 @@ public class MpTransactionState extends TransactionState
                         }
                     }
                     m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
+                    m_mbox.send(m_mbox.getHSId(), new DumpMessage());
                 }
             }
         }
