@@ -1164,9 +1164,11 @@ var loadPage = function (serverName, portid) {
 
             if(producerDbId != undefined){
                 $("#drCLusterId").html(" (ID: " + producerDbId + ")");
+                $("#clusterId").html(" (ID: " + producerDbId + ")");
             }
             else{
                 $("#drCLusterId").html("");
+                $("#clusterId").html("");
             }
 
             if(drRoleDetail['DRROLE'].length > 0){
@@ -1256,10 +1258,6 @@ var loadPage = function (serverName, portid) {
                                                             $("#divDrReplication").hide();
                                                         }
                                                     } else {
-                                                        voltDbRenderer.GetDrInformations(function (clusterInfo) {
-                                                            $('#clusterId').show();
-                                                            $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
-                                                        });
                                                         //to show DR Mode
                                                         if (VoltDbUI.drMasterEnabled) {
                                                             $("#dbDrMode").text("Master");
