@@ -409,7 +409,7 @@
 
         //Check if cluster is replica or not
         this.GetClusterReplicaInformation = function (onConnectionAdded) {
-            this.processTask(onConnectionAdded, "CLUSTER_REPLICA_INFORMATION", ['@SystemInformation'], ["Overview"], ['0']);
+            this.processTask(onConnectionAdded, "CLUSTER_REPLICA_INFORMATION", ['@SystemInformation'], ["Overview"], [undefined]);
         };
 
         this.GetDrRoleInformation = function (onConnectionAdded) {

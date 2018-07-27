@@ -1202,6 +1202,8 @@ var loadPage = function (serverName, portid) {
                         var currentServer = getCurrentServer();
                         if (replicaDetail.hasOwnProperty(currentServer))
                             VoltDbUI.drReplicationRole = replicaDetail[currentServer]['status'];
+                        else
+                            return;
                         voltDbRenderer.GetDrStatusInformation(function (drDetails) {
                             if (getCurrentServer() != undefined) {
                                 var drResult = drDetails["Details"]["STATUS"];
