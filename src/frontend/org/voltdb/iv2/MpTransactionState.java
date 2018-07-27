@@ -61,7 +61,7 @@ public class MpTransactionState extends TransactionState
 
     private static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
     private static final String dr_max_consumer_partitionCount_str = "DR_MAX_CONSUMER_PARTITIONCOUNT";
-    private static final String dr_max_consumer_messageAdditionalSize_str = "DR_MAX_CONSUMER_MESSAGEADDSIZE";
+    private static final String dr_max_consumer_messageheader_room_str = "DR_MAX_CONSUMER_MESSAGEHEADER_ROOM";
     private static final String volt_output_buffer_overflow = "V0001";
     private static final int DR_BEGINTXN_MSG_LEN = PartitionDRGateway.getMessageTypeLength(DRRecordType.BEGIN_TXN);
     private static final int DR_ENDTXN_MSG_LEN = PartitionDRGateway.getMessageTypeLength(DRRecordType.END_TXN);
@@ -138,7 +138,7 @@ public class MpTransactionState extends TransactionState
         // For volt 7.0 < version <= 7.5 , it can connect to 7.6 and up, the message size at lease increased by 11 bytes. (10 from fragmentTaskMessage and 1 from Iv2InitiateTaskMessage).
         // For forward compatibility, reserve 100 bytes.
         // TODO: We could report an more accurate consumer side message header size via DR protocol change.
-        MessageAdditionalSize = Integer.getInteger(dr_max_consumer_messageAdditionalSize_str, 100);
+        MessageAdditionalSize = Integer.getInteger(dr_max_consumer_messageheader_room_str, 100);
     }
 
     private int getDRMessageSizeEstimation() {
