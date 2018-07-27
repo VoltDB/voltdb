@@ -26,9 +26,17 @@ import java.util.Calendar;
  */
 public interface LicenseApi {
     public boolean initializeFromFile(File license);
+    public boolean secondaryInitialization();
     public boolean isTrial();
+    public boolean isAWSMarketplace();
+    public boolean isEnterprise();
+    public boolean isPro();
+    public String licensee();
     public int maxHostcount();
+    public Calendar issued();
     public Calendar expires();
+    public String note();
+    public boolean hardExpiration();
     public boolean verify() throws LicenseException;
     public boolean isDrReplicationAllowed();
     public boolean isDrActiveActiveAllowed();

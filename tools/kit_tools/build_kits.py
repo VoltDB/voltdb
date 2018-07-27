@@ -116,7 +116,7 @@ def packagePro(version):
         run("tar xf ../voltdb-ent-%s.tar.gz" % version)
         run("mv voltdb-ent-%s voltdb-pro-%s" % (version, version))
         run("cp %s/pro/trial_*.xml voltdb-pro-%s/voltdb/license.xml" % (builddir, version))
-        run("tar cvf ../voltdb-pro-%s.tar.gz voltdb-pro-%s" % (version, version))
+        run("tar cvfz ../voltdb-pro-%s.tar.gz voltdb-pro-%s" % (version, version))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
