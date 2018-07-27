@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -24,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
@@ -205,12 +207,7 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                 }
             }
         }
-        StringBuilder errorMsg = new StringBuilder();
-        errorMessages.forEach((k,v) -> {
-            errorMsg.append("Partition " + k + ": receives failure response from nibble delete system procedure: " + v);
-            errorMsg.append("\n");
-        });
-        return new NibbleStatus(rowsLeft, rowsJustDeleted, errorMsg.toString());
+        return new NibbleStatus(rowsLeft, rowsJustDeleted, errorMessages.toString());
     }
 
     public VoltTable run(String tableName, String columnName, String valueStr, String comparisonOp, long chunksize, long timeoutms, long maxFrequency, long interval) {
@@ -247,7 +244,7 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                     catTable.getTypeName(), rowsLeft));
         }
 
-        long attemptsLeft = Math.min((long)Math.ceil((double)rowsLeft/(double)chunksize), maxFrequency) - 1;
+        int attemptsLeft = (int)Math.min((long)Math.ceil((double)rowsLeft/(double)chunksize), maxFrequency) - 1;
         // no more try
         if (attemptsLeft < 1) {
             returnTable.addRow(status.rowsJustDeleted, rowsLeft, status.rowsJustDeleted, System.currentTimeMillis(),
@@ -255,24 +252,27 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
             return returnTable;
         }
 
+        //spread additional deletes within the interval
         long delay = TimeUnit.SECONDS.toMillis(interval)/attemptsLeft;
         ScheduledExecutorService es = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("TTLDeleter"));
-        long attempts = 1;
-        CountDownLatch latch = new CountDownLatch((int)attemptsLeft);
-        StringBuffer builder = new StringBuffer();
+        CountDownLatch latch = new CountDownLatch(attemptsLeft);
+        String[] errors = new String[attemptsLeft];
+        Arrays.fill(errors, "");
+        AtomicBoolean success = new AtomicBoolean(true);
         class DeleteTask implements Runnable {
-            final boolean lastAttempt;
-            public DeleteTask(boolean lastAttempt) {
-                this.lastAttempt = lastAttempt;
+            final int attempt;
+            public DeleteTask(int attempt) {
+                this.attempt = attempt;
             }
             @Override
             public void run() {
                 NibbleStatus thisStatus = runNibbleDeleteOperation(tableName, columnName, comparisonOp, value, chunksize, catTable.getIsreplicated());
                 if (!thisStatus.errorMessages.isEmpty()) {
-                    builder.append(thisStatus.errorMessages + " ");
+                    errors[attempt-1] = thisStatus.errorMessages;
+                    success.set(false);
                 } else {
                     status.rowsDeleted.addAndGet(thisStatus.rowsJustDeleted);
-                    if (lastAttempt) {
+                    if (attempt == attemptsLeft) {
                         status.rowsLeft = thisStatus.rowsLeft;
                         status.rowsJustDeleted = thisStatus.rowsJustDeleted;
                     }
@@ -285,22 +285,22 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
         }
         status.rowsLeft = 0;
         status.rowsJustDeleted = 0;
+        int attempts = 1;
+        while (attempts <= attemptsLeft) {
+            DeleteTask task = new DeleteTask(attempts);
+            es.schedule(task, delay * attempts, TimeUnit.MILLISECONDS);
+            attempts++;
+        }
         try {
-            while (attempts <= attemptsLeft) {
-                DeleteTask task = new DeleteTask((attempts == attemptsLeft));
-                es.schedule(task, delay * attempts, TimeUnit.MILLISECONDS);
-                attempts++;
-            }
             latch.await(timeoutms, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
-            hostLog.warn("TTL waiting interrupted" + e.getMessage());
+            hostLog.warn("TTL interrupted" + e.getMessage());
         } finally {
             es.shutdownNow();
         }
 
         returnTable.addRow(status.rowsDeleted, status.rowsLeft, status.rowsJustDeleted, System.currentTimeMillis(),
-                builder.toString().isEmpty() ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE, builder.toString());
-
+                success.get() ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE, Arrays.toString(errors));
         return returnTable;
     }
 }
