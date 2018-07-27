@@ -139,15 +139,15 @@ https://voltdb.com/download
 
 When to use this open-source version:
 
-- When developing applications (as long as they don't need VoltDB Export).
-- When performance testing in non-redundant configurations.
+- When developing applications.
+- When point-in-time durability using snapshots is sufficient.
 - When reading or modifying source code.
 
 When to use the commercial version:
 
 - When disk persistence is required.
-- When the VoltDB Export feature is required.
-- When high availability features like redundant clustering, live node rejoin, and multi-datacenter replication are required.
+- When transaction-level durability with Command Logging
+- When enterprise features like elastic scaleout, databse replication and  multi-datacenter replication are required.
 
 
 Getting Help & Providing Feedback
@@ -155,7 +155,7 @@ Getting Help & Providing Feedback
 
 If you have any questions or comments about VoltDB, we encourage you to reach out to the VoltDB team and community.
 
-- **VoltDB Forums** - Create threads, post responses and search existing posts on our community forums at https://forum.voltdb.com.
+- **VoltDB Stack Overflow** – Create threads, post responses and search existing posts on our community forums at https://stackoverflow.com/questions/tagged/voltdb.
 - **VoltDB Community Slack Channel** - Get an invite to chat with community members and the VoltDB team at http://chat.voltdb.com.
 
 
