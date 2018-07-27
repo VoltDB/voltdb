@@ -1050,6 +1050,15 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
     const int32_t columnCount  = m_schema->columnCount();
     const int32_t hiddenColumnCount  = m_schema->hiddenColumnCount();
     tupleIn.readInt();
+
+    // uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
+    // for (uint16_t i = 0; i < nonInlinedColCount; i++) {
+    //     uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);
+    //     const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+    //     char *dataPtr = getWritableDataPtr(columnInfo);
+    //     *reinterpret_cast<StringRef**>(storage) = NULL;
+    // }
+
     for (int j = 0; j < columnCount; ++j) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(j);
 
@@ -1070,22 +1079,22 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
     }
 
-        for (int j = 0; j < hiddenColumnCount; ++j) {
-            const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
+    for (int j = 0; j < hiddenColumnCount; ++j) {
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
 
-            // tupleIn may not have hidden column
-            if (!tupleIn.hasRemaining()) {
-                std::ostringstream message;
-                message << "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
-                        << "(index=" << j << ")"
-                        << std::endl;
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
-            }
-
-            char *dataPtr = getWritableDataPtr(columnInfo);
-            NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
-                    columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
+        // tupleIn may not have hidden column
+        if (! tupleIn.hasRemaining()) {
+            std::ostringstream message;
+            message << "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
+                    << "(index=" << j << ")"
+                    << std::endl;
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
         }
+
+        char *dataPtr = getWritableDataPtr(columnInfo);
+        NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
+                columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
+    }
 }
 
 inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Pool *dataPool) {

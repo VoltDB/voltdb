@@ -2637,11 +2637,10 @@ inline void NValue::free() const {
     }
 }
 
-inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects)
-{
-
+inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects) {
     for (std::vector<char*>::const_iterator it = oldObjects.begin(); it != oldObjects.end(); ++it) {
         StringRef* sref = reinterpret_cast<StringRef*>(*it);
+        VOLT_DEBUG("Try to delete StringRef %p", sref);
         if (sref != NULL) {
             StringRef::destroy(sref);
         }
@@ -3017,7 +3016,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
             throw SQLException(SQLException::dynamic_sql_error, "Object length cannot be < -1");
         }
         if (isInlined) {
-            assert (type != VALUE_TYPE_GEOGRAPHY);
+            assert(type != VALUE_TYPE_GEOGRAPHY);
             assert(length <= OBJECT_MAX_LENGTH_SHORT_LENGTH);
             // Always reset the bits regardless of how long the actual value is.
             storage[0] = static_cast<char>(length);

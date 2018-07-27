@@ -85,7 +85,9 @@ int32_t StringRef::getAllocatedSizeInTempStorage() const {
 // An earlier implementation taking this approach proved hard to follow.
 inline StringRef::StringRef(int32_t sz)
   : m_stringPtr(reinterpret_cast<char*>(ThreadLocalPool::allocateRelocatable(&m_stringPtr, sz)))
-{ }
+{
+    VOLT_DEBUG("Create StringRef %p", this);
+}
 
 // Temporary strings are allocated in one piece with their referring
 // StringRefs -- the string data starts just past the StringRef object,
