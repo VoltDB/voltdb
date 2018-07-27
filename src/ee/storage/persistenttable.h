@@ -1060,7 +1060,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple& tuple, TBPtr block,
         }
     }
 
-    bool transitioningToBlockWithSpace = !block->hasFreeTuples();
+    bool transitioningToBlockWithSpace = ! block->hasFreeTuples();
 
     int retval = block->freeTuple(tuple.address());
     if (retval != NO_NEW_BUCKET_INDEX) {
