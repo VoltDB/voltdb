@@ -164,18 +164,19 @@ public class TestExecutionEngine extends TestCase {
         terminateSourceEngine();
     }
 
+    // ENG-14346
     public void testLoadTableTooWideColumnCleanupOnError() throws Exception {
         initializeSourceEngine(1);
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         project.addLiteralSchema("create table test (msg VARCHAR(200 bytes));");
-        Catalog catalog = project.compile("eng14346.jar", 1, 1, 0, null);
+        Catalog catalog = project.compile("ENG-14346.jar", 1, 1, 0, null);
         assert(catalog != null);
         sourceEngine.loadCatalog(0, catalog.serialize());
 
         int TEST_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("TEST").getRelativeIndex();
-        VoltTable testTable = new VoltTable(
-                new VoltTable.ColumnInfo("MSG", VoltType.STRING));
+        VoltTable testTable = new VoltTable(new VoltTable.ColumnInfo("MSG", VoltType.STRING));
+        // Assemble a very long string.
         testTable.addRow(String.join("", Collections.nCopies(15, "我能吞下玻璃而不伤身体。")));
         try {
             sourceEngine.loadTable(TEST_TABLEID, testTable, 0, 0, 0, 0, false, false, Long.MAX_VALUE);

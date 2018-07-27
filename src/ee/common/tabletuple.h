@@ -1051,6 +1051,13 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
     const int32_t hiddenColumnCount  = m_schema->hiddenColumnCount();
     tupleIn.readInt();
 
+    // ENG-14346, we may throw SQLException because of a too-wide VARCHAR column.
+    // In some systems, the uninitialized StringRef* is not NULL, which may result in
+    // unexpected errors during cleanup.
+    // This can only happen in the loadTable path, because we check the value length
+    // in Java for the normal transaction path.
+    // We explicitly initialize the StringRefs for those non-inlined columns here to
+    // prevent any surprises.
     uint16_t nonInlinedColCount = m_schema->getUninlinedObjectColumnCount();
     for (uint16_t i = 0; i < nonInlinedColCount; i++) {
         uint16_t idx = m_schema->getUninlinedObjectColumnInfoIndex(i);

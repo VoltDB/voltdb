@@ -2640,7 +2640,6 @@ inline void NValue::free() const {
 inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects) {
     for (std::vector<char*>::const_iterator it = oldObjects.begin(); it != oldObjects.end(); ++it) {
         StringRef* sref = reinterpret_cast<StringRef*>(*it);
-        VOLT_DEBUG("Try to delete StringRef %p", sref);
         if (sref != NULL) {
             StringRef::destroy(sref);
         }
