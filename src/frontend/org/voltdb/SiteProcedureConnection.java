@@ -163,7 +163,7 @@ public interface SiteProcedureConnection {
     /**
      * IV2 commit / rollback interface to the EE and java level roll back if needed
      */
-    public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoActions);
+    public void truncateUndoLog(boolean rollback, boolean isEmptyDRTxn, long token, long spHandle, List<UndoAction> undoActions);
 
     /**
      * IV2: send dependencies to the EE

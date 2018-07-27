@@ -445,7 +445,7 @@ public final class InvocationDispatcher {
                 if (retval != null) {
                     return retval;
                 }
-                if (m_isInitialRestore.compareAndSet(true, false) && isSchemaEmpty()) {
+                if (m_isInitialRestore.compareAndSet(true, false) && shouldLoadSchemaFromSnapshot()) {
                     m_NTProcedureService.isRestoring = true;
                     return useSnapshotCatalogToRestoreSnapshotSchema(task, handler, ccxn, user, bypass);
                 }
@@ -519,8 +519,15 @@ public final class InvocationDispatcher {
         return null;
     }
 
-    private final boolean isSchemaEmpty() {
-        return m_catalogContext.get().database.getTables().size() == 0;
+    private final boolean shouldLoadSchemaFromSnapshot() {
+        CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
+        if(tables.size() == 0) return true;
+        for(Table t : tables) {
+            if(!t.getSignature().startsWith("VOLTDB_AUTOGEN_XDCR")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public final static Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {

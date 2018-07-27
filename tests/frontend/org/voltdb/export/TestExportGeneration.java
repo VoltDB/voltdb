@@ -23,6 +23,10 @@
 
 package org.voltdb.export;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
 
 import java.io.File;
@@ -57,10 +61,6 @@ import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 
 public class TestExportGeneration {
 
@@ -142,6 +142,7 @@ public class TestExportGeneration {
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
                 ImmutableList.of(m_part));
+        m_exportGeneration.createAckMailboxesIfNeeded(m_mockVoltDB.getHostMessenger(), ImmutableList.of(m_part));
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
@@ -187,7 +188,7 @@ public class TestExportGeneration {
         final CountDownLatch promoted = new CountDownLatch(1);
         // Promote the data source to be master first, otherwise it won't send acks.
         m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature).setOnMastership(promoted::countDown, false);
-        m_exportGeneration.acceptMastershipTask(m_part);
+        m_exportGeneration.acceptMastership(m_part);
         promoted.await(5, TimeUnit.SECONDS);
 
         int retries = 4000;

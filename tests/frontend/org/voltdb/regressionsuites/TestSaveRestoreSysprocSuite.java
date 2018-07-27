@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -51,6 +53,7 @@ import java.util.zip.GZIPInputStream;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
@@ -65,11 +68,14 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.SnapshotRestoreResultSet;
@@ -758,7 +764,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
                     // Join the second node
                     lc.joinOne(1);
-                    Thread.sleep(1000);
+                    Thread.sleep(2000);
 
                     for (int ii = 0; ii < Integer.MAX_VALUE; ii++) {
                         cr = client.callProcedure("GetTxnId", ii);
@@ -3839,6 +3845,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
     }
+
 
     public static class SnapshotResult {
         Long hostID;

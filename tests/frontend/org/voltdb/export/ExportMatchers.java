@@ -116,6 +116,7 @@ public class ExportMatchers {
 
         AckPayloadMessage(BinaryPayloadMessage p) {
             ByteBuffer buf = ByteBuffer.wrap(p.m_payload);
+            buf.get(); // skip message type
 
             partitionId = buf.getInt();
 
@@ -150,12 +151,12 @@ public class ExportMatchers {
 
         VoltMessage asVoltMessage() {
             byte [] signatureBytes = signature.getBytes(Constants.UTF8ENCODING);
-            ByteBuffer buf = ByteBuffer.allocate(18 + signatureBytes.length);
+            ByteBuffer buf = ByteBuffer.allocate(17 + signatureBytes.length);
+            buf.put((byte)0);
             buf.putInt(partitionId);
             buf.putInt(signatureBytes.length);
             buf.put(signatureBytes);
             buf.putLong(uso);
-            buf.putShort((short )0);
 
             return new BinaryPayloadMessage(new byte[0], buf.array());
         }

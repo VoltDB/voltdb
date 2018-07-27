@@ -281,6 +281,7 @@ public class FragmentTask extends FragmentTaskBase
             }
         }
 
+        int drBufferChanged = 0;
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
             byte[] planHash = m_fragmentMsg.getPlanHash(frag);
@@ -345,14 +346,15 @@ public class FragmentTask extends FragmentTaskBase
                 // fragment response to the network
                 final int tableSize;
                 final byte fullBacking[];
-                final int drBufferChanged;
                 try {
+                    // read the size of the DR buffer used
+                    drBufferChanged = fragResult.readInt();
                     // read the complete size of the buffer used
                     fragResult.readInt();
                     // read number of dependencies (1)
                     fragResult.readInt();
                     // read the dependencyId() -1;
-                    drBufferChanged = fragResult.readInt();
+                    fragResult.readInt();
                     tableSize = fragResult.readInt();
                     fullBacking = new byte[tableSize];
                     // get a copy of the buffer
@@ -367,7 +369,7 @@ public class FragmentTask extends FragmentTaskBase
                        LogKeys.org_voltdb_ExecutionSite_SendingDependency.name(),
                        new Object[] { outputDepId }, null);
                 }
-                currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId, fullBacking, 0, tableSize, drBufferChanged));
+                currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId, fullBacking, 0, tableSize));
             } catch (final EEException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
@@ -436,6 +438,8 @@ public class FragmentTask extends FragmentTaskBase
                 }
             }
         }
+        // for multi fragments task, using the aggregated dr Buffer size
+        currentFragResponse.setDrBufferSize(drBufferChanged);
         return currentFragResponse;
     }
 
