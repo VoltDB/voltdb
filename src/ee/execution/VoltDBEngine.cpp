@@ -570,7 +570,18 @@ void VoltDBEngine::serializeException(const SerializableEEException& e) {
 // -------------------------------------------------
 bool VoltDBEngine::send(Table* dependency) {
     VOLT_DEBUG("Sending Dependency from C++");
-    m_resultOutput.writeInt(-1); // legacy placeholder for old output id
+    // legacy placeholder for old output id
+    // repurpose the placeholder to store bytes of Buffer allocated for DR
+
+    size_t drBufferChange = size_t(0);
+    if (m_drStream) {
+        drBufferChange = m_drStream->m_uso - m_drStream->m_committedUso;
+        if (m_drReplicatedStream) {
+            drBufferChange += m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
+        }
+    }
+    m_resultOutput.writeInt(static_cast<int>(drBufferChange));
+
     if (!dependency->serializeTo(m_resultOutput))
         return false;
     m_numResultDependencies++;

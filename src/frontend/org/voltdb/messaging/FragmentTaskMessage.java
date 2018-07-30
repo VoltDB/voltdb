@@ -158,7 +158,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     }
 
     /** Empty constructor for de-serialization */
-    FragmentTaskMessage() {
+    public FragmentTaskMessage() {
         m_subject = Subject.DEFAULT.getId();
     }
 
@@ -577,12 +577,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      *    fragment plan string: bytes: ? * nunplanned
      */
 
-    @Override
-    public int getSerializedSize()
-    {
-        assert(m_items != null);
-        assert(!m_items.isEmpty());
-
+    public int getFixedHeaderSize() {
         int msgsize = super.getSerializedSize();
 
         // Fixed header
@@ -615,6 +610,18 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         //nested initiate task message length prefix
         msgsize += 4;
+
+        return msgsize;
+    }
+
+    @Override
+    public int getSerializedSize()
+    {
+        assert(m_items != null);
+        assert(!m_items.isEmpty());
+
+        int msgsize = getFixedHeaderSize();
+
         if (m_initiateTaskBuffer != null) {
             msgsize += m_initiateTaskBuffer.remaining();
         }

@@ -99,6 +99,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     // is the execution site dirty
     protected boolean m_dirty;
 
+    // populated dr buffer size
+    protected int m_drBufferSize = 0;
+
     /** Error codes exported for JNI methods. */
     public static final int ERRORCODE_SUCCESS = 0;
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
@@ -156,6 +159,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Has the database changed any state since the last reset of dirty status? */
     public boolean getDirtyStatus() {
         return m_dirty;
+    }
+
+    public void resetDRBufferSize() {
+        m_drBufferSize = 0;
+    }
+
+    public int getDRBufferSize() {
+        return m_drBufferSize;
     }
 
     public void setBatchTimeout(int batchTimeout) {

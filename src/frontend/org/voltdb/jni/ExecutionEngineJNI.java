@@ -337,9 +337,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 for (int i = 0; i < batchSize; ++i) {
                     final int numdeps = fullBacking.getInt(); // number of dependencies for this frag
                     assert(numdeps == 1);
-                    @SuppressWarnings("unused")
-                    final
-                    int depid = fullBacking.getInt(); // ignore the dependency id
+                    m_drBufferSize = fullBacking.getInt(); // read the dr Buffer size
                     final int tableSize = fullBacking.getInt();
                     // reasonableness check
                     assert(tableSize < 50000000);

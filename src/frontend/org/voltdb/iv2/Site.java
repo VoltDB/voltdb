@@ -1597,6 +1597,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         hostLog.info("DR protocol version has been set to " + drVersion);
     }
 
+    @Override
+    public int getDrBufferSize() {
+        int result = m_ee.getDRBufferSize();
+        m_ee.resetDRBufferSize();
+        return result;
+    }
+
     /**
      * Generate a in-stream DR event which pushes an event buffer to topend
      */

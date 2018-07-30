@@ -53,7 +53,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     AtomicBoolean m_isDurable;
 
     /** Empty constructor for de-serialization */
-    Iv2InitiateTaskMessage() {
+    public Iv2InitiateTaskMessage() {
         super();
     }
 
@@ -144,16 +144,20 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_connectionId;
     }
 
-    @Override
-    public int getSerializedSize()
+    public int getFixedHeaderSize()
     {
         int msgsize = super.getSerializedSize();
         msgsize += 8; // m_clientInterfaceHandle
         msgsize += 8; // m_connectionId
         msgsize += 1; // is single partition flag
         msgsize += 1; // should generate a response
-        msgsize += m_invocation.getSerializedSize();
         return msgsize;
+    }
+
+    @Override
+    public int getSerializedSize()
+    {
+        return getFixedHeaderSize() + m_invocation.getSerializedSize();
     }
 
     @Override

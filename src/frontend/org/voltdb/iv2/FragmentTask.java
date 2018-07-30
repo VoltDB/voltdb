@@ -327,6 +327,8 @@ public class FragmentTask extends TransactionTask
                 }
             }
         }
+        // for multi fragments task, using the aggregated dr Buffer size
+        currentFragResponse.setDrBufferSize(siteConnection.getDrBufferSize());
         return currentFragResponse;
     }
 
