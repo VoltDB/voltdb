@@ -44,7 +44,7 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="HOST">
+    <!--logger name="HOST">
         <level value="INFO"/>
     </logger -->
 
@@ -64,7 +64,7 @@
         <level value="INFO"/>
     </logger -->
 
-    <!--logger name="EXPORT">
+    <!-- logger name="EXPORT">
         <level value="INFO"/>
     </logger -->
 
