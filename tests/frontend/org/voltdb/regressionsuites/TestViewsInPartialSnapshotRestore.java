@@ -59,7 +59,7 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             // Start cluster1 with consumer connection disabled.
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.setDrConsumerConnectionDisabled();
-            cluster = LocalCluster.createLocalCluster("", 1, 1, 0, 1,
+            cluster = LocalCluster.createLocalCluster("", 2, 2, 0, 1,
                     clusterReplicationPort, clusterReplicationPort + 100, clusterRoot,
                     "restore-with-views1.jar", DrRoleType.MASTER, false, builder);
 
@@ -156,7 +156,7 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
             String clusterRoot = TMPDIR;
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.setDrConsumerConnectionDisabled();
-            cluster = LocalCluster.createLocalCluster("", 1, 1, 0, 1,
+            cluster = LocalCluster.createLocalCluster("", 2, 2, 0, 1,
                     clusterReplicationPort, clusterReplicationPort + 100, clusterRoot,
                     "restore-with-views2.jar", DrRoleType.MASTER, false, builder);
 
