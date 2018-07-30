@@ -187,4 +187,22 @@ public class TestScoreboard {
         assertEquals(expectedTimestamp, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
         assertEquals(1, scoreboard.getCompletionTasks().size());
     }
+
+    @Test
+    public void testRepairsFromTwoMPIs() {
+        Scoreboard scoreboard = new Scoreboard();
+        MpRestartSequenceGenerator repairGen1 = new MpRestartSequenceGenerator(2, false);
+        MpRestartSequenceGenerator repairGen2 = new MpRestartSequenceGenerator(1, false);
+
+        long expectedTimestamp1 = repairGen1.getNextSeqNum();
+        CompleteTransactionTask comp1 = createComp(1000L, expectedTimestamp1);
+        scoreboard.addCompletedTransactionTask(comp1, false);
+
+        long expectedTimestamp2 = repairGen2.getNextSeqNum();
+        CompleteTransactionTask comp2 = createComp(1000L, expectedTimestamp2);
+        scoreboard.addCompletedTransactionTask(comp2, false);
+
+        assertEquals(1000L, scoreboard.getCompletionTasks().peekFirst().getFirst().getMsgTxnId());
+        assertEquals(expectedTimestamp2, scoreboard.getCompletionTasks().peekFirst().getFirst().getTimestamp());
+    }
 }

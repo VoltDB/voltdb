@@ -129,9 +129,11 @@ public class Scoreboard {
 
         // Retain the late one if they are from different hosts--new MPI could be promoted
         // before repairs are completed from older MPI
+        // A Dead MPI may send stale Initial Completion--no override
         return (c1.getTimestamp() < c2.getTimestamp() ||
+                (c2.getTimestamp() != CompleteTransactionMessage.INITIAL_TIMESTAMP &&
                 MpRestartSequenceGenerator.getNodeId(c1.getTimestamp()) !=
-                MpRestartSequenceGenerator.getNodeId(c2.getTimestamp()));
+                MpRestartSequenceGenerator.getNodeId(c2.getTimestamp())));
     }
 
     private boolean hasRestartCompletion(CompleteTransactionTask task) {
