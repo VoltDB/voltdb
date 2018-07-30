@@ -161,7 +161,7 @@ class Stats(object):
 
         failed_since = error_report['failedSince']
         summary = issue['name'] + ' is failing on ' + job + ' (' + issue['reason'] + ')'
-        description = error_url + '\n\n------------------stack trace----------------------------\n\n' \
+        description = error_url + '\n\n-----------------\-stack trace\----------------------------\n\n' \
                       + str(error_report['errorStackTrace']) \
                       + '\n\n----------------------------------------------\n\n' \
                       + 'Failing since build ' + str(failed_since) + '\n' \
@@ -511,7 +511,7 @@ class Stats(object):
                                 values = [int(v[3]) for v in results]
                                 current = results[0][4]
 
-                                if (current < mean(values) - 2*std(values) or current > mean(values) + 2*std(values)):
+                                if (current > mean(values) + 2*std(values)):
                                     logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
                                     test_data['reason'] = "CONSISTENT"
                                     try:
@@ -638,7 +638,7 @@ class Tests(unittest.TestCase):
         values = [int(v[3]) for v in results]
         current = results[0][4]
 
-        if (current < mean(values) - 2*std(values) or current > mean(values) + 2*std(values)):
+        if (current > mean(values) + 2*std(values)):
             print("FILE TICKET")
             return
 
