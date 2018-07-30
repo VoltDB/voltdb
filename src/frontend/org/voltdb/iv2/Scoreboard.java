@@ -71,8 +71,7 @@ public class Scoreboard {
                 m_compTasks.addFirst(Pair.of(task, missingTxn));
                 m_compTasks.addLast(head);
             } else {
-                // Only keep the completion with latest timestamp if txnId is same
-                if (head.getFirst().getTimestamp() < task.getTimestamp() && isComparable(head.getFirst(), task)) {
+                if (isComparable(head.getFirst(), task)) {
                     m_compTasks.removeFirst();
                     m_compTasks.addFirst(Pair.of(task, missingTxn));
                 }
@@ -86,10 +85,10 @@ public class Scoreboard {
             assert (task.getMsgTxnId() == head.getFirst().getMsgTxnId() || task.getMsgTxnId() == tail.getFirst().getMsgTxnId());
 
             // Keep newer completion, discard the older one
-            if ( task.getTimestamp() > head.getFirst().getTimestamp() && isComparable(head.getFirst(), task)) {
+            if (isComparable(head.getFirst(), task)) {
                 m_compTasks.removeFirst();
                 m_compTasks.addFirst(Pair.of(task, missingTxn));
-            } else if ( task.getTimestamp() > tail.getFirst().getTimestamp() && isComparable(tail.getFirst(), task)) {
+            } else if (isComparable(tail.getFirst(), task)) {
                 m_compTasks.removeLast();
                 m_compTasks.addLast(Pair.of(task, missingTxn));
             }
@@ -119,10 +118,20 @@ public class Scoreboard {
     //   2) repair completion can overwrite initial completion or older repair completion
     //   3) restart completion can overwrite initial completion or older restart completion
     //   4) restart completion and repair completion can't overwrite each other
+    //   5) Override if c2 has larger time stamp or two time stamps are from different nodes.
+    //      late time stamp could be smaller if a new MPI has a smaller host id.
     private static boolean isComparable(CompleteTransactionTask c1, CompleteTransactionTask c2) {
-        return c1.getMsgTxnId() == c2.getMsgTxnId() &&
-                MpRestartSequenceGenerator.isForRestart(c1.getTimestamp()) ==
-                MpRestartSequenceGenerator.isForRestart(c2.getTimestamp());
+        if (c1.getMsgTxnId() != c2.getMsgTxnId() ||
+                MpRestartSequenceGenerator.isForRestart(c1.getTimestamp()) !=
+                MpRestartSequenceGenerator.isForRestart(c2.getTimestamp())) {
+            return false;
+        }
+
+        // Retain the late one if they are from different hosts--new MPI could be promoted
+        // before repairs are completed from older MPI
+        return (c1.getTimestamp() < c2.getTimestamp() ||
+                MpRestartSequenceGenerator.getNodeId(c1.getTimestamp()) !=
+                MpRestartSequenceGenerator.getNodeId(c2.getTimestamp()));
     }
 
     private boolean hasRestartCompletion(CompleteTransactionTask task) {
