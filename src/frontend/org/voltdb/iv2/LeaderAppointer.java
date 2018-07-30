@@ -529,6 +529,7 @@ public class LeaderAppointer implements Promotable
             // just go ahead and promote our MPI
             VoltZK.registerPartitionRepair(m_zk, MpInitiator.MP_INIT_PID);
             m_MPI.acceptPromotion();
+            VoltZK.unregisterPartitionRepair(m_zk, MpInitiator.MP_INIT_PID, tmLog);
             // set up a watcher on the partitions dir so that new partitions will be picked up
             m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
             blocker.set(null);

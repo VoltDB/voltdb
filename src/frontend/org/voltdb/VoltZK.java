@@ -452,7 +452,7 @@ public class VoltZK {
                 } else if (blockers.contains(leafNodeElasticJoinInProgress)) {
                     errorMsg = "while an elastic join is active. Please retry node rejoin later.";
                 } else if (blockers.contains(migrate_partition_leader)){
-                    errorMsg = "while leader migratioon is active. Please retry node rejoin later.";
+                    errorMsg = "while leader migration is active. Please retry node rejoin later.";
                 } else {
                     // Upon node failures, new partition leaders, including MPI, will be registered right before they
                     // are promoted and unregistered after their promotions are done. Let rejoining nodes wait until
@@ -460,7 +460,10 @@ public class VoltZK {
                     // interference with the transaction repair process.
                     List<String> partitions = zk.getChildren(VoltZK.partitionRepair, false);
                     if (!partitions.isEmpty()) {
-                        errorMsg = "while leader promotion or transaction repair is in progress. Please retry node rejoin later.";
+                        errorMsg = "while leader promotions are in progress. Please retry node rejoin later.";
+                        if (hostLog.isDebugEnabled()) {
+                            hostLog.debug("Can not rejoin while leader promotion is in progress.");
+                        }
                     }
                 }
                 break;

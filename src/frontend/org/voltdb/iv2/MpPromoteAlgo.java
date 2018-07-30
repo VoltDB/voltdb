@@ -139,6 +139,7 @@ public class MpPromoteAlgo implements RepairAlgo
     public Future<RepairResult> start()
     {
         try {
+            VoltZK.registerPartitionRepair(((InitiatorMailbox)m_mailbox).getZK(), MpInitiator.MP_INIT_PID);
             prepareForFaultRecovery();
         } catch (Exception e) {
             repairLogger.error(m_whoami + "failed leader promotion:", e);
