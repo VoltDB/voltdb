@@ -30,7 +30,7 @@ FAIL_THRESHOLD = 2
 from string import maketrans
 TT = maketrans("[]-<>", "_____")
 
-QUERY1 = """
+QUERY2 = """
     SELECT count(*) AS fixes
     FROM `junit-test-failures` m
     WHERE m.job = %(job)s
@@ -42,7 +42,7 @@ QUERY1 = """
     LIMIT 1
 """
 
-QUERY2 = """
+QUERY1 = """
     SELECT count(*) AS fails
     FROM `junit-test-failures` m
     WHERE m.job = %(job)s
@@ -483,42 +483,45 @@ class Stats(object):
                                 'build': test_data['build']
                             }
 
-                            # query to see if job was fixed in the past 30 days
+                            # query to get number of failures in a row
                             logging.debug("Q1 %s" % (QUERY1 % params1))
 
                             cursor.execute(QUERY1, params1)
-                            everFixed = cursor.fetchone()
+                            numFails = cursor.fetchone()[0]
 
-                            if not everFixed:
-                                # query to see if number of failures in a row is significant, if so files ticket
-                                logging.debug("Q1_5 %s" % (QUERY2 % params1))
+                            if (numFails >= FAIL_THRESHOLD):
+                                if not everFixed:
+                                    # query to see if job was fixed in the past 30 days
+                                    logging.debug("Q2 %s" % (QUERY2 % params1))
 
-                                cursor.execute(QUERY2, params1)
-                                numFails = cursor.fetchone()[0]
-                                if (numFails >= FAIL_THRESHOLD):
+                                    cursor.execute(QUERY2, params1)
+                                    everFixed = cursor.fetchone()
+
+                                    # if first time failure sequence in past 30 days, file ticket
                                     logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
                                     test_data['reason'] = "INTERMITTENT"
                                     try:
                                         test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
                                     except:
                                         logging.exception("failed to file a jira ticket")
-                            else:
-                                # if fixed in the past 30 days, checks if current fail sequence 2SD from AVG past 30 day fail sequence
-                                logging.debug("Q2 %s" % (QUERY3 % params1))
+                                else:
+                                    # computes failure sequences over the past 30 days
+                                    logging.debug("Q3 %s" % (QUERY3 % params1))
 
-                                cursor.execute(QUERY3, params1)
-                                results = cursor.fetchall()
-                                values = [int(v[3]) for v in results]
-                                current = results[0][4]
+                                    cursor.execute(QUERY3, params1)
+                                    results = cursor.fetchall()
+                                    values = [int(v[3]) for v in results]
+                                    current = results[0][4]
 
-                                if (current > mean(values) + 2*std(values)):
-                                    logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
-                                    test_data['reason'] = "CONSISTENT"
-                                    try:
-                                        test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
-                                        pass
-                                    except:
-                                        logging.exception("failed to file a jira ticket")
+                                    # if current failure sequence exceeds 2SD from mean, file ticket
+                                    if (current > mean(values) + 2*std(values)):
+                                        logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
+                                        test_data['reason'] = "CONSISTENT"
+                                        try:
+                                            test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
+                                            pass
+                                        except:
+                                            logging.exception("failed to file a jira ticket")
 
             except KeyError:
                 logging.exception('Error retrieving test data for this particular build: %d\n' % build)
@@ -623,24 +626,24 @@ class Tests(unittest.TestCase):
             'build': 9
         }
 
-        self.cursor.execute(QUERY1, param)
-        everFixed = self.cursor.fetchone()
+        cursor.execute(QUERY1, params1)
+        numFails = cursor.fetchone()[0]
 
-        if not everFixed:
-            self.cursor.execute(QUERY2, param)
-            numFails = self.cursor.fetchone()[0]
-            if (numFails >= FAIL_THRESHOLD):
+        cursor.execute(QUERY2, params1)
+        everFixed = cursor.fetchone()
+
+        if (numFails >= FAIL_THRESHOLD):
+            if not everFixed:
                 print("FILE TICKET")
-            return
-
-        self.cursor.execute(QUERY3, param)
-        results = self.cursor.fetchall()
-        values = [int(v[3]) for v in results]
-        current = results[0][4]
-
-        if (current > mean(values) + 2*std(values)):
-            print("FILE TICKET")
-            return
+                return
+            else:
+                cursor.execute(QUERY3, params1)
+                results = cursor.fetchall()
+                values = [int(v[3]) for v in results]
+                current = results[0][4]
+                if (current > mean(values) + 2*std(values)):
+                    print("FILE TICKET")
+                    return
 
         print("DO NOT FILE")
 
