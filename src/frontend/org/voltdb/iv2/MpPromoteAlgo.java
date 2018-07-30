@@ -32,6 +32,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -142,6 +143,13 @@ public class MpPromoteAlgo implements RepairAlgo
         } catch (Exception e) {
             repairLogger.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
+        } finally {
+            //remove the flag for the partition if the repair process is not cancelled.
+            //The flag is registered upon host failure or MPI promotion. The repair may be interrupted but will
+            //be eventually completed.
+            if (!m_promotionResult.isCancelled()) {
+                VoltZK.unregisterPartitionRepair(m_mailbox.m_messenger.getZK(), MpInitiator.MP_INIT_PID, repairLogger);
+            }
         }
         return m_promotionResult;
     }

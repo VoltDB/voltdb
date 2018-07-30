@@ -39,6 +39,7 @@ import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
@@ -173,7 +174,7 @@ public class MpScheduler extends Scheduler
                         "had no responses.  This should be impossible?");
             }
         }
-
+        VoltZK.registerPartitionRepair(((InitiatorMailbox)m_mailbox).getZK(), MpInitiator.MP_INIT_PID);
         MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI);
         m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
         return new long[0];

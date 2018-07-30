@@ -203,7 +203,7 @@ public class VoltZK {
     public static final String actionLock = "/db/action_lock";
 
     //register partition while the partition elects a new leader upon node failure
-    public static final String promotingLeaders = "/db/promotingLeaders";
+    public static final String partitionRepair = "/db/partitionRepair";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -226,7 +226,7 @@ public class VoltZK {
             request_truncation_snapshot,
             host_ids_be_stopped,
             actionLock,
-            promotingLeaders
+            partitionRepair
     };
 
     /**
@@ -453,6 +453,15 @@ public class VoltZK {
                     errorMsg = "while an elastic join is active. Please retry node rejoin later.";
                 } else if (blockers.contains(migrate_partition_leader)){
                     errorMsg = "while leader migratioon is active. Please retry node rejoin later.";
+                } else {
+                    // Upon node failures, new partition leaders, including MPI, will be registered right before they
+                    // are promoted and unregistered after their promotions are done. Let rejoining nodes wait until
+                    // all the partition leader promotions have finished to avoid any
+                    // interference with the transaction repair process.
+                    List<String> partitions = zk.getChildren(VoltZK.partitionRepair, false);
+                    if (!partitions.isEmpty()) {
+                        errorMsg = "while leader promotion or transaction repair is in progress. Please retry node rejoin later.";
+                    }
                 }
                 break;
             case elasticJoinInProgress:
@@ -518,9 +527,9 @@ public class VoltZK {
         return true;
     }
 
-    // add partition under /db/promotingLeaders when the partition elects a new leader upon node failure
-    public static void registerPromotingPartition(ZooKeeper zk, int partitionId, VoltLogger log) {
-        String node = ZKUtil.joinZKPath(promotingLeaders, Integer.toString(partitionId));
+    // add partition under /db/partitionRepair when the partition elects a new leader upon node failure
+    public static void registerPartitionRepair(ZooKeeper zk, int partitionId) {
+        String node = ZKUtil.joinZKPath(partitionRepair, Integer.toString(partitionId));
         try {
             zk.create(node,
                       null,
@@ -535,9 +544,9 @@ public class VoltZK {
         }
     }
 
-    // remove the partition under /db/promotingLeaders when the new leader has accepted promotion
-    public static void unregisterPromotingPartition(ZooKeeper zk, int partitionId, VoltLogger log) {
-        String node = ZKUtil.joinZKPath(promotingLeaders, Integer.toString(partitionId));
+    // remove the partition under /db/partitionRepair when the new leader has accepted promotion
+    public static void unregisterPartitionRepair(ZooKeeper zk, int partitionId, VoltLogger log) {
+        String node = ZKUtil.joinZKPath(partitionRepair, Integer.toString(partitionId));
         try {
             zk.delete(node, -1);
         } catch (KeeperException e) {
@@ -545,24 +554,6 @@ public class VoltZK {
                 log.error("Failed to remove promoting partition: " + partitionId + "\n" + e.getMessage(), e);
             }
         } catch (InterruptedException e) {
-        }
-    }
-
-    // Upon node failures, new partition leaders, including MPI, will be registered right before they
-    // are promoted and unregistered after their promotions are done. Let rejoining nodes wait until
-    // all the partition leader promotions have finished to avoid any
-    // interference with the transaction repair process and score board.
-    public static void checkPartitionLeaderPromotion(ZooKeeper zk) {
-        try {
-            List<String> partitions = zk.getChildren(VoltZK.promotingLeaders, false);
-            // leader promotions could take time with high partition count.
-            long maxWait = TimeUnit.SECONDS.toNanos(120);
-            long start = System.nanoTime();
-            while(!partitions.isEmpty() && (System.nanoTime() - start < maxWait)) {
-                partitions = zk.getChildren(VoltZK.promotingLeaders, false);
-            }
-        } catch (KeeperException | InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Failed to validate partition leader promotions.", true, e);
         }
     }
 

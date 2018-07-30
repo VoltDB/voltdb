@@ -1158,12 +1158,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
-            if (m_rejoining) {
-                // check if any partition leader promotions are in progress upon node failures.
-                // avoid rejoining while partition leader promotions and transaction repairs are not done
-                VoltZK.checkPartitionLeaderPromotion(m_messenger.getZK());
-            }
-
             /*
              * Construct all the mailboxes for things that need to be globally addressable so they can be published
              * in one atomic shot.
@@ -1726,6 +1720,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // let the client interface know host(s) have failed to clean up any outstanding work
                     // especially non-transactional work
                     m_clientInterface.handleFailedHosts(failedHosts);
+
+                    //mark the transaction repair
+                    if (m_leaderAppointer.isLeader()) {
+                        VoltZK.registerPartitionRepair(m_messenger.getZK(), MpInitiator.MP_INIT_PID);
+                    }
                 }
             });
         }
