@@ -6,7 +6,7 @@ This is a tutorial about how to start up two XDCR 3 node clusters, do various ma
 This tutorial was done in version 7.9.1 and should work with all future versions. If you are using an older version, you should consult the VoltDB docs, as some attributes and commands might not be available.
 
 
-Start up the clusters
+Starting up the Clusters
 ====================
 
 ###1) Making the deployment files:
@@ -60,7 +60,7 @@ Then, make sure this node is loaded with data. It is very important in starting 
 At this point, all data should have already copied over to the second cluster. Your two xdcr clusters are complete and ready to receive transactions.     
 
 
-Restarting the clusters
+Restarting the Clusters from Snapshot
 ====================
 
 If you shut the clusters down and wish to restart them without changing the configuration file or schema, then you can simply do
@@ -94,7 +94,7 @@ Finally, use the following command to restore from snapshot:
 Once this completes and is successful, restart the second cluster and reload its schema with sqlcmd < ddl.sql. Your two xdcr clusters should be ready and copying each other as normal with their new configuration file and/or schema.
 
 
-Monitoring the clusters
+Monitoring the Clusters
 ====================
 
 It's important to know what status the XDCR clusters are in, because their resiliency depends on what they are doing, especially in regards to snapshots. XDCR clusters that are streaming snapshot data are particularly vulnerable; any nodes on any participating cluster going down during this time will halt the replication process entirely. The way you know this happened is when an XDCR cluster gives you this error message:
