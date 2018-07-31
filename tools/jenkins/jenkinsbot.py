@@ -833,7 +833,7 @@ tr:hover{
             #self.logger.info('NEW: Reported issue with summary "' + summary + '"')
             if self.connect_to_slack():
                 self.post_message(channel, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
-            suite = summary.split('.')[-2]
+            suite = summary.split('.')[-3]
             # Find all tickets within same test suite and link them
             link_tickets = jira.search_issues('summary ~ \'%s\' and labels = automatic and status != Closed and reporter in (voltdbci)' % suite)
             for ticket in link_tickets:

@@ -22,13 +22,23 @@ from urllib2 import HTTPError, URLError, urlopen
 JUNIT = os.environ.get('junit', None)
 
 # set to True if you need to suppress updating the database or JIRA
-DRY_RUN = False
+DRY_RUN = True
 
 # set threshold (greater than or equal to) of failures in a row to be significant
 FAIL_THRESHOLD = 2
 
 from string import maketrans
 TT = maketrans("[]-<>", "_____")
+
+QUERY1 = """
+    SELECT count(*) AS fails
+    FROM `junit-test-failures` m
+    WHERE m.job = %(job)s
+        AND m.name = %(name)s
+        AND m.status in ('FAILED', 'REGRESSION')
+        AND m.stamp > %(stamp)s - INTERVAL 30 DAY
+        AND m.build <= %(build)s
+"""
 
 QUERY2 = """
     SELECT count(*) AS fixes
@@ -42,17 +52,15 @@ QUERY2 = """
     LIMIT 1
 """
 
-QUERY1 = """
-    SELECT count(*) AS fails
-    FROM `junit-test-failures` m
-    WHERE m.job = %(job)s
-        AND m.name = %(name)s
-        AND m.status in ('FAILED', 'REGRESSION')
+QUERY3 = """
+    SELECT count(*) as runs
+    FROM `junit-builds` m
+    WHERE m.name = %(job)s
         AND m.stamp > %(stamp)s - INTERVAL 30 DAY
-        AND m.build <= %(build)s
+        AND m.stamp <= %(stamp)s
 """
 
-QUERY3 = """
+QUERY4 = """
     SELECT job, build, name, ord-1-COALESCE(pre, 0) AS runs, current
     FROM
         (SELECT job, build, name, status, ord, stamp,
@@ -160,7 +168,8 @@ class Stats(object):
         history = sub('/\d+/testReport/', '/lastCompletedBuild/testReport/', error_url) + '/history/'
 
         failed_since = error_report['failedSince']
-        summary = issue['name'] + ' is failing on ' + job + ' (' + issue['reason'] + ')'
+        failure_percent = str(issue['failurePercent'])
+        summary = issue['name'] + ' is failing ~' + failure_percent + '% of the time on ' + job + ' (' + issue['type'] + ')'
         description = error_url + '\n\n-----------------\-stack trace\----------------------------\n\n' \
                       + str(error_report['errorStackTrace']) \
                       + '\n\n----------------------------------------------\n\n' \
@@ -176,6 +185,8 @@ class Stats(object):
             # filename : location
             job + 'CountGraph.png' : error_url + '/history/countGraph/png?start=0&amp;end=25'
         }
+        print(summary)
+        print(description)
 
         try:
             new_issue = jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version,
@@ -487,28 +498,35 @@ class Stats(object):
                             logging.debug("Q1 %s" % (QUERY1 % params1))
 
                             cursor.execute(QUERY1, params1)
-                            numFails = cursor.fetchone()[0]
+                            numFails = float(cursor.fetchone()[0])
 
                             if (numFails >= FAIL_THRESHOLD):
+                                # query to see if job was fixed in the past 30 days
+                                logging.debug("Q2 %s" % (QUERY2 % params1))
+
+                                cursor.execute(QUERY2, params1)
+                                everFixed = cursor.fetchone()
+
+                                # query to count number of builds of certain job
+                                logging.debug("Q3 %s" % (QUERY3 % params1))
+
+                                cursor.execute(QUERY3, params1)
+                                runs = float(cursor.fetchone()[0])
+                                test_data['failurePercent'] = numFails / runs * 100
+
                                 if not everFixed:
-                                    # query to see if job was fixed in the past 30 days
-                                    logging.debug("Q2 %s" % (QUERY2 % params1))
-
-                                    cursor.execute(QUERY2, params1)
-                                    everFixed = cursor.fetchone()
-
                                     # if first time failure sequence in past 30 days, file ticket
                                     logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
-                                    test_data['reason'] = "INTERMITTENT"
+                                    test_data['type'] = "INTERMITTENT"
                                     try:
                                         test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
                                     except:
                                         logging.exception("failed to file a jira ticket")
                                 else:
                                     # computes failure sequences over the past 30 days
-                                    logging.debug("Q3 %s" % (QUERY3 % params1))
+                                    logging.debug("Q4 %s" % (QUERY4 % params1))
 
-                                    cursor.execute(QUERY3, params1)
+                                    cursor.execute(QUERY4, params1)
                                     results = cursor.fetchall()
                                     values = [int(v[3]) for v in results]
                                     current = results[0][4]
@@ -516,7 +534,7 @@ class Stats(object):
                                     # if current failure sequence exceeds 2SD from mean, file ticket
                                     if (current > mean(values) + 2*std(values)):
                                         logging.info("will file: %s %s %s %s" % (job, build, name, testcase_url))
-                                        test_data['reason'] = "CONSISTENT"
+                                        test_data['type'] = "CONSISTENT"
                                         try:
                                             test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
                                             pass
@@ -626,19 +644,19 @@ class Tests(unittest.TestCase):
             'build': 9
         }
 
-        cursor.execute(QUERY1, params1)
-        numFails = cursor.fetchone()[0]
+        self.cursor.execute(QUERY1, param)
+        numFails = self.cursor.fetchone()[0]
 
-        cursor.execute(QUERY2, params1)
-        everFixed = cursor.fetchone()
+        self.cursor.execute(QUERY2, param)
+        everFixed = self.cursor.fetchone()
 
         if (numFails >= FAIL_THRESHOLD):
             if not everFixed:
                 print("FILE TICKET")
                 return
             else:
-                cursor.execute(QUERY3, params1)
-                results = cursor.fetchall()
+                self.cursor.execute(QUERY4, param)
+                results = self.cursor.fetchall()
                 values = [int(v[3]) for v in results]
                 current = results[0][4]
                 if (current > mean(values) + 2*std(values)):
