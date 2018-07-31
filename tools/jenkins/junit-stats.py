@@ -22,7 +22,7 @@ from urllib2 import HTTPError, URLError, urlopen
 JUNIT = os.environ.get('junit', None)
 
 # set to True if you need to suppress updating the database or JIRA
-DRY_RUN = True
+DRY_RUN = False
 
 # set threshold (greater than or equal to) of failures in a row to be significant
 FAIL_THRESHOLD = 2
@@ -185,8 +185,6 @@ class Stats(object):
             # filename : location
             job + 'CountGraph.png' : error_url + '/history/countGraph/png?start=0&amp;end=25'
         }
-        print(summary)
-        print(description)
 
         try:
             new_issue = jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version,
