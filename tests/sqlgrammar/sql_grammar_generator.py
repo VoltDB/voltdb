@@ -156,7 +156,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                 existing_names.remove(en)
             last = len(existing_names) - 1
             for en in existing_names:
-                if (en is existing_names[last] or 
+                if (en is existing_names[last] or
                         randrange(0, 100) < optional_percent):
                     reuse_name = en
                     break
