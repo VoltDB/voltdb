@@ -227,6 +227,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
@@ -1780,6 +1781,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
                 SpInitiator spInitiator = (SpInitiator)initiator;
                 if (spInitiator.isLeader()) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Export Manager has been notified that local partition " +
+                                  spInitiator.getPartitionId() + " to reevaluate export stream master.");
+                    }
                     ExportManager.instance().acceptMastership(spInitiator.getPartitionId());
                 }
             }
