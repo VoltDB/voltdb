@@ -840,11 +840,49 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 mbx.send(siteId, bpm);
             }
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Send RELEASE_BUFFER for partition " + m_partitionId + "source signature " + m_tableName + " with uso " + uso
+                exportLog.debug("Send RELEASE_BUFFER " + toString() + " with uso " + uso
                         + " from " + CoreUtils.hsIdToString(mbx.getHSId())
                         + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
             }
         }
+    }
+
+    // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
+    // master stream resend the event when the export mailbox is aware of new streams.
+    public void forwardAckToNewJoinedReplicas(Set<Long> newReplicas) {
+        if (!m_mastershipAccepted.get()) {
+            return;
+        }
+
+        m_es.submit(new Runnable() {
+            public void run() {
+                Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+                Mailbox mbx = p.getFirst();
+                if (mbx != null && newReplicas.size() > 0) {
+                 // msg type(1) + partition:int(4) + length:int(4) +
+                    // signaturesBytes.length + ackUSO:long(8).
+                    final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
+
+                    ByteBuffer buf = ByteBuffer.allocate(msgLen);
+                    buf.put(ExportManager.RELEASE_BUFFER);
+                    buf.putInt(m_partitionId);
+                    buf.putInt(m_signatureBytes.length);
+                    buf.put(m_signatureBytes);
+                    buf.putLong(m_lastReleasedUso);
+
+                    BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
+
+                    for( Long siteId: newReplicas) {
+                        mbx.send(siteId, bpm);
+                    }
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Send RELEASE_BUFFER " + toString() + " with uso " + m_lastReleasedUso
+                                + " from " + CoreUtils.hsIdToString(mbx.getHSId())
+                                + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
+                    }
+                }
+            }
+        });
     }
 
     public void ack(final long uso) {
@@ -912,6 +950,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * has to drain existing PBD and then notify new leaders (through ack)
      */
     void prepareTransferMastership(int newLeaderHostId) {
+        if (!m_mastershipAccepted.get()) {
+            return;
+        }
         m_es.submit(new Runnable() {
             public void run() {
                 if (exportLog.isDebugEnabled()) {
