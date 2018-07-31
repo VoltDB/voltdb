@@ -17,11 +17,21 @@
 #      course a non-recursive option must also be available, to avoid infinite
 #      recursion.
 #   3. The | symbol means "or" (actually, XOR), with an equal probability of
-#      each possible option being chosen, by default (but see #4 below). The |
+#      each possible option being chosen, by default (but see #6 below). The |
 #      must be preceded and followed by a space (otherwise the || concatenation
 #      operator would be impossible without some sort of escape symbol, which
 #      I did not want to get into).
-#   4. Adding a (positive) integer before a | symbol makes the preceding option
+#   4. Something in brackets, such as [foo], is optional, with a 50-50 chance
+#      of being included; If you want to make something optional less likely,
+#      add more brackets, e.g., [[foo]] has only a 25% chance of being included.
+#   5. You cannot include | inside brackets, so [foo | bar] will not work
+#      properly, though the reverse, e.g. [foo] | [bar] is fine; to achieve
+#      the same effect as [foo | bar] use [{foo-or-bar}], with:
+#          foo-or-bar ::= foo | bar
+#      See "all-or-distinct" for one example of this.
+#
+# Later extensions to the original, simple syntax:
+#   6. Adding a (positive) integer before a | symbol makes the preceding option
 #      more likely; the "n|" still needs to be preceded and followed by a space.
 #      For example, in this definition:
 #          definition ::= foo 2| bar
@@ -34,22 +44,42 @@
 #      implicit "likelihood weight" of 1, as do any options preceded simply with
 #      a |. The actual probability of each option is its "likelihood weight"
 #      divided by the sum of all the "likelihood weights" of all options.
-#   5. Something in brackets, such as [foo], is optional, with a 50-50 chance
-#      of being included; If you want to make something optional less likely,
-#      add more brackets, e.g., [[foo]] has only a 25% chance of being included.
-#   6. You cannot include | inside brackets, so [foo | bar] will not work
-#      properly, though the reverse, e.g. [foo] | [bar] is fine; to achieve
-#      the same effect as [foo | bar] use [{foo-or-bar}], with:
-#          foo-or-bar ::= foo | bar
-#      See "all-or-distinct" for one example of this.
-#   7. It is possible (despite what I said in #3 above) to escape an open ("[")
-#      or close ("]") bracket symbol, by preceding it with a backslash, i.e.,
-#      "\[" or "\]"; these escaped versions will be interpreted as literal
+#   7. It is now possible (despite what it says in #3 above) to escape an open
+#      ("[") or close ("]") bracket symbol, by preceding it with a backslash,
+#      i.e., "\[" or "\]"; these escaped versions will be interpreted as literal
 #      bracket symbols ("[" or "]"), rather than as containing optional text.
 #   8. Similarly, an open or close curly brace, or an actual backslash, may
 #      also be escaped by preceding it with a backslash; i.e., "\{", "\}, and
 #      "\\" will be interpreted as those literal characters, that is, as "{",
 #      "}, and "\", respectively.
+#   9. If you want to refer to the same name, e.g. a table name, twice in the
+#      same SQL statement, you may use the following colon syntax, to specify
+#      a reusable name: {table-name:t1}; and a subsequent reference can either
+#      use that syntax again, or simply {:t1}, if you're sure that
+#      {table-name:t1} has already been used in the same SQL statement. The
+#      first time that {table-name:t1} is evaluated, one of the possible values
+#      of {table-name} will be selected, e.g. "R1" or "P2", and then that value
+#      becomes associated with {:t1}, and will be used again whenever {...:t1}
+#      appears, even if it's in, say, {view-name:t1}.
+#  10. If you want to refer to one of several reusable names (as defined in #9
+#      above) that have been defined elsewhere in the same SQL statement, e.g.
+#      one of several table names, you may use the following semicolon syntax:
+#      {table-name;t1,t2,t3,t4,t5}. This will be evaluated to be equal to one of
+#      the reusable names {:t1}, {:t2}, {:t3}, {:t4}, or {:t5}; however, it will
+#      only select a reusable name that has already been defined elsewhere in
+#      the same SQL statement. If multiple reusable names have been defined, one
+#      will be selected using a diminishing probability (e.g., {:t1} is most
+#      likely in the example above, and {:t5} is least likely); if and only if
+#      none of the reusable names has been defined, then {table-name} will be
+#      evaluated in the normal manner, as if the semicolon syntax were omitted.
+#      Definitions using the colon syntax are evaluated first, and definitions
+#      using the semicolon syntax are evaluated last, to maximize the chances
+#      for a reusable name having already been defined. This technique is useful
+#      in specifying column references that refer to a legitimate table (or view
+#      or sub-query) name (or alias); for example, R1.ID only makes sense if
+#      table R1 has been specified elsewhere in the SQL statement, so using a
+#      definition such as {table-name;t1,t2,t3,t4,t5}.{any-column-name} makes
+#      this much more likely.
 #
 ################################################################################
 
@@ -186,6 +216,7 @@ any-legit-column-name   ::= {any-table-column-name} 9| {any-view-column-name}
 any-column-name         ::= {any-legit-column-name} 399| NONEXISTENT_COLUMN
 
 # Note: if you add a new column to the DDL file, add it here
+# (and in other places with this comment)
 # (and in the appropriate section above)
 every-column-name       ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, \
                             VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
@@ -201,8 +232,67 @@ every-col-name-backward ::= VBIPV6, VBIPV4, IPV6, IPV4, \
 # one it is one that was actually defined
 table-alias             ::= TA1 96| TA2 48| TA3 24| TA4 12| TA5 6| TA6 3| TA7 2| TA8
 column-alias            ::= CA1 96| CA2 48| CA3 24| CA4 12| CA5 6| CA6 3| CA7 2| CA8
-table-alias-or-name     ::= {table-alias} 3| {table-or-view-name}
-table-name-or-alias     ::= {table-or-view-name} 4| {table-alias}
+
+# These '...-set' definitions (using ':t1', ':t2', etc.) are used to set a
+# table (or view or sub-query) name or alias that may be referred to elsewhere
+# in the SQL statement
+table-name-set          ::= {table-name:t1} 6| \
+                            {table-name:t2} 6| \
+                            {table-name:t3} 3| \
+                            {table-name:t4} 2| \
+                            {table-name:t5}
+view-name-set           ::= {view-name:t1} 6| \
+                            {view-name:t2} 6| \
+                            {view-name:t3} 3| \
+                            {view-name:t4} 2| \
+                            {view-name:t5}
+table-alias-set         ::= {table-name} [AS ]{table-alias:t1} 6| \
+                            {table-name} [AS ]{table-alias:t2} 6| \
+                            {table-name} [AS ]{table-alias:t3} 3| \
+                            {table-name} [AS ]{table-alias:t4} 2| \
+                            {table-name} [AS ]{table-alias:t5}
+view-alias-set          ::= {view-name} [AS ]{table-alias:t1} 6| \
+                            {view-name} [AS ]{table-alias:t2} 6| \
+                            {view-name} [AS ]{table-alias:t3} 3| \
+                            {view-name} [AS ]{table-alias:t4} 2| \
+                            {view-name} [AS ]{table-alias:t5}
+sub-query-set           ::= {sub-query} [AS ]{table-alias:t1} 6| \
+                            {sub-query} [AS ]{table-alias:t2} 6| \
+                            {sub-query} [AS ]{table-alias:t3} 3| \
+                            {sub-query} [AS ]{table-alias:t4} 2| \
+                            {sub-query} [AS ]{table-alias:t5}
+
+# Special case: when a "T0" table alias gets used, make sure that it gets "set"
+# as one of the table definitions (':t1', ':t2', etc.) used above
+t0-set                  ::= T0
+t0                      ::= {t0-set:t5} 6| \
+                            {t0-set:t4} 6| \
+                            {t0-set:t3} 3| \
+                            {t0-set:t2} 2| \
+                            {t0-set:t1}
+
+table-name-or-alias-set ::= {table-name-set} 3| {table-alias-set}
+view-name-or-alias-set  ::= {view-name-set}  3| {view-alias-set}
+
+table-ref-set           ::= {table-name-or-alias-set} 5| \
+                            {view-name-or-alias-set}  2| \
+                            {sub-query-set}
+
+# These '...-ref' definitions (using ';t1,t2,t3,t4,t5') are used to refer to a
+# table (or view or sub-query) name or alias that was previously set, elsewhere
+# in the SQL statement
+table-name-ref          ::= {table-name;t1,t2,t3,t4,t5}
+table-alias-ref         ::= {table-alias;t1,t2,t3,t4,t5}
+view-name-ref           ::= {view-name;t1,t2,t3,t4,t5}
+table-ref               ::= {table-name-ref} 2| {table-alias-ref} 2| {view-name-ref}
+
+# Same '...-set' and '...-ref' ideas as above, but here for a column alias
+column-alias-set        ::= {column-alias:ca1} 6| \
+                            {column-alias:ca2} 6| \
+                            {column-alias:ca3} 3| \
+                            {column-alias:ca4} 2| \
+                            {column-alias:ca5}
+column-alias-ref        ::= {column-alias;ca1,ca2,ca3,ca4,ca5,c1,c2,c3,c4}
 
 ################################################################################
 # Any (non-DDL) SQL statement:
@@ -229,7 +319,7 @@ insert-select-statement ::= {simple-insert-select} 9| {insert-clause} {select-st
 values-list             ::= {ordered-values-list}  9| {random-order-value-list}
 
 # Putting "({column-list})" in more than one set of brackets makes it less likely
-insert-clause           ::= INSERT INTO {table-name} [[({column-list})]]
+insert-clause           ::= INSERT INTO {table-name-set} [[({column-list})]]
 
 ordered-values-list     ::= {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, {integer-value}, \
                             {numeric-value}, {numeric-value}, {string-value}, {string-value}, {string-value}, \
@@ -252,30 +342,30 @@ in-or-up-sert-select    ::= {insert-select-multiple} 8| {insert-select-all}    2
                             {insert-sel-id-varb-ipv4} | {insert-sel-id-varb-ipv6}
 
 # We leave the IN off of INSERT here, so these can also be used for UPSERT
-insert-values-id-num    ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}) VALUES ({integer-non-null-value},  {numeric-value-or-subq})  | \
-                            SERT INTO {table-name} ({numeric-non-id-col-name}, ID) VALUES ({numeric-value-or-subq},   {integer-non-null-value}) | \
-                            SERT INTO {table-name} (ID, {int-non-id-column-name})  VALUES ({integer-non-null-value},  {integer-value-or-subq})  | \
-                            SERT INTO {table-name} ({int-non-id-column-name}, ID)  VALUES ({integer-value-or-subq},   {integer-non-null-value})
-insert-values-id-str    ::= SERT INTO {table-name} (ID, {string-column-name})      VALUES ({integer-non-null-value},  {string-value-or-subq}) | \
-                            SERT INTO {table-name} ({string-column-name}, ID)      VALUES ({string-value-or-subq},    {integer-non-null-value})
-insert-values-id-time   ::= SERT INTO {table-name} (ID, {timestamp-column-name})   VALUES ({integer-non-null-value},  {timestamp-value-or-subq}) | \
-                            SERT INTO {table-name} ({timestamp-column-name}, ID)   VALUES ({timestamp-value-or-subq}, {integer-non-null-value})
-insert-values-id-varbin ::= SERT INTO {table-name} (ID, {varbinary-column-name})   VALUES ({integer-non-null-value},  {varbinary-value-or-subq}) | \
-                            SERT INTO {table-name} ({varbinary-column-name}, ID)   VALUES ({varbinary-value-or-subq}, {integer-non-null-value})
-insert-values-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})       VALUES ({integer-non-null-value},  {point-value-or-subq}) | \
-                            SERT INTO {table-name} ({point-column-name}, ID)       VALUES ({point-value-or-subq},     {integer-non-null-value})
-insert-values-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})     VALUES ({integer-non-null-value},  {polygon-value-or-subq}) | \
-                            SERT INTO {table-name} ({polygon-column-name}, ID)     VALUES ({polygon-value-or-subq},   {integer-non-null-value})
-insert-values-id-json   ::= SERT INTO {table-name} (ID, {json-column-name})        VALUES ({integer-non-null-value},  {json-value-or-subq}) | \
-                            SERT INTO {table-name} ({json-column-name}, ID)        VALUES ({json-value-or-subq},      {integer-non-null-value})
-insert-vals-id-str-ipv4 ::= SERT INTO {table-name} (ID, {string-ipv4-column-name}) VALUES ({integer-non-null-value},  {str-ipv4-value-or-subq}) | \
-                            SERT INTO {table-name} ({string-ipv4-column-name}, ID) VALUES ({str-ipv4-value-or-subq},  {integer-non-null-value})
-insert-vals-id-str-ipv6 ::= SERT INTO {table-name} (ID, {string-ipv6-column-name}) VALUES ({integer-non-null-value},  {str-ipv6-value-or-subq}) | \
-                            SERT INTO {table-name} ({string-ipv6-column-name}, ID) VALUES ({str-ipv6-value-or-subq},  {integer-non-null-value})
-insert-vals-id-varb-ipv4::= SERT INTO {table-name} (ID, {varbin-ipv4-column-name}) VALUES ({integer-non-null-value},  {varb-ipv4-value-or-subq}) | \
-                            SERT INTO {table-name} ({varbin-ipv4-column-name}, ID) VALUES ({varb-ipv4-value-or-subq}, {integer-non-null-value})
-insert-vals-id-varb-ipv6::= SERT INTO {table-name} (ID, {varbin-ipv6-column-name}) VALUES ({integer-non-null-value},  {varb-ipv6-value-or-subq}) | \
-                            SERT INTO {table-name} ({varbin-ipv6-column-name}, ID) VALUES ({varb-ipv6-value-or-subq}, {integer-non-null-value})
+insert-values-id-num    ::= SERT INTO {table-name-set} (ID, {numeric-non-id-col-name}) VALUES ({integer-non-null-value},  {numeric-value-or-subq})  | \
+                            SERT INTO {table-name-set} ({numeric-non-id-col-name}, ID) VALUES ({numeric-value-or-subq},   {integer-non-null-value}) | \
+                            SERT INTO {table-name-set} (ID, {int-non-id-column-name})  VALUES ({integer-non-null-value},  {integer-value-or-subq})  | \
+                            SERT INTO {table-name-set} ({int-non-id-column-name}, ID)  VALUES ({integer-value-or-subq},   {integer-non-null-value})
+insert-values-id-str    ::= SERT INTO {table-name-set} (ID, {string-column-name})      VALUES ({integer-non-null-value},  {string-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({string-column-name}, ID)      VALUES ({string-value-or-subq},    {integer-non-null-value})
+insert-values-id-time   ::= SERT INTO {table-name-set} (ID, {timestamp-column-name})   VALUES ({integer-non-null-value},  {timestamp-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({timestamp-column-name}, ID)   VALUES ({timestamp-value-or-subq}, {integer-non-null-value})
+insert-values-id-varbin ::= SERT INTO {table-name-set} (ID, {varbinary-column-name})   VALUES ({integer-non-null-value},  {varbinary-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({varbinary-column-name}, ID)   VALUES ({varbinary-value-or-subq}, {integer-non-null-value})
+insert-values-id-point  ::= SERT INTO {table-name-set} (ID, {point-column-name})       VALUES ({integer-non-null-value},  {point-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({point-column-name}, ID)       VALUES ({point-value-or-subq},     {integer-non-null-value})
+insert-values-id-poly   ::= SERT INTO {table-name-set} (ID, {polygon-column-name})     VALUES ({integer-non-null-value},  {polygon-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({polygon-column-name}, ID)     VALUES ({polygon-value-or-subq},   {integer-non-null-value})
+insert-values-id-json   ::= SERT INTO {table-name-set} (ID, {json-column-name})        VALUES ({integer-non-null-value},  {json-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({json-column-name}, ID)        VALUES ({json-value-or-subq},      {integer-non-null-value})
+insert-vals-id-str-ipv4 ::= SERT INTO {table-name-set} (ID, {string-ipv4-column-name}) VALUES ({integer-non-null-value},  {str-ipv4-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({string-ipv4-column-name}, ID) VALUES ({str-ipv4-value-or-subq},  {integer-non-null-value})
+insert-vals-id-str-ipv6 ::= SERT INTO {table-name-set} (ID, {string-ipv6-column-name}) VALUES ({integer-non-null-value},  {str-ipv6-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({string-ipv6-column-name}, ID) VALUES ({str-ipv6-value-or-subq},  {integer-non-null-value})
+insert-vals-id-varb-ipv4::= SERT INTO {table-name-set} (ID, {varbin-ipv4-column-name}) VALUES ({integer-non-null-value},  {varb-ipv4-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({varbin-ipv4-column-name}, ID) VALUES ({varb-ipv4-value-or-subq}, {integer-non-null-value})
+insert-vals-id-varb-ipv6::= SERT INTO {table-name-set} (ID, {varbin-ipv6-column-name}) VALUES ({integer-non-null-value},  {varb-ipv6-value-or-subq}) | \
+                            SERT INTO {table-name-set} ({varbin-ipv6-column-name}, ID) VALUES ({varb-ipv6-value-or-subq}, {integer-non-null-value})
 
 numeric-value-or-subq   ::= {numeric-value}     9| {numeric-scalar-sub-q}
 integer-value-or-subq   ::= {integer-value}     9| {integer-scalar-sub-q}
@@ -291,10 +381,10 @@ str-ipv6-value-or-subq  ::= {string-ipv6-value} 9| {str-ipv6-scalar-sub-q}
 varb-ipv4-value-or-subq ::= {varbin-ipv4-value} 9| {varb-ipv4-scalar-sub-q}
 varb-ipv6-value-or-subq ::= {varbin-ipv6-value} 9| {varb-ipv6-scalar-sub-q}
 
-insert-values-multiple  ::= SERT INTO {table-name} ( ID, {numeric-non-id-col-name}, {string-column-name}, {timestamp-column-name}, \
+insert-values-multiple  ::= SERT INTO {table-name-set} ( ID, {numeric-non-id-col-name}, {string-column-name}, {timestamp-column-name}, \
                             {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) VALUES ( {insert-values-mult-val} )
-insert-values-all       ::= SERT INTO {table-name} [({every-column-name})]     VALUES ( {insert-values-all-val} )
-insert-values-backward  ::= SERT INTO {table-name} ({every-col-name-backward}) VALUES ( {insert-values-back-val} )
+insert-values-all       ::= SERT INTO {table-name-set} [({every-column-name})]     VALUES ( {insert-values-all-val} )
+insert-values-backward  ::= SERT INTO {table-name-set} ({every-col-name-backward}) VALUES ( {insert-values-back-val} )
 
 insert-values-mult-val  ::= {insert-values-mult-val1} 4| {insert-values-mult-val2}
 insert-values-mult-val1 ::= {integer-non-null-value}, {numeric-value}, {string-value}, {timestamp-value}, \
@@ -303,6 +393,7 @@ insert-values-mult-val2 ::= {integer-non-null-value}, {numeric-value-or-subq}, {
                             {varbinary-value-or-subq}, {point-value-or-subq}, {polygon-value-or-subq}
 
 # Note: if you add a new column to the DDL file, add it here
+# (and in other places with this comment)
 insert-values-all-val   ::= {insert-values-all-val1} 4| {insert-values-all-val2}
 insert-values-all-val1  ::= {integer-non-null-value}, {byte-value}, {integer-value}, {integer-value}, \
                             {integer-value}, {numeric-value}, {numeric-value}, \
@@ -317,6 +408,7 @@ insert-values-all-val2  ::= {integer-non-null-value}, {byte-value-or-subq}, {int
                             {str-ipv4-value-or-subq}, {str-ipv6-value-or-subq}, {varb-ipv4-value-or-subq}, {varb-ipv6-value-or-subq}
 
 # Note: if you add a new column to the DDL file, add it here
+# (and in other places with this comment)
 insert-values-back-val  ::= {insert-values-back-val1} 4| {insert-values-back-val2}
 insert-values-back-val1 ::= {varbin-ipv6-value}, {varbin-ipv4-value}, {string-ipv6-value}, {string-ipv4-value}, \
                             {polygon-value}, {point-value}, {varbinary-value}, {timestamp-value}, \
@@ -330,30 +422,30 @@ insert-values-back-val2 ::= {varb-ipv6-value-or-subq}, {varb-ipv4-value-or-subq}
                             {numeric-value-or-subq}, {numeric-value-or-subq}, {integer-value-or-subq}, {integer-value-or-subq}, \
                             {integer-value-or-subq}, {byte-value-or-subq}, {integer-non-null-value}
 
-insert-select-id-num    ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}) SELECT {int-column-name}, {numeric-col-or-subq}   FROM {table-reference} | \
-                            SERT INTO {table-name} ({numeric-non-id-col-name}, ID) SELECT {numeric-col-or-subq}, {int-column-name}   FROM {table-reference} | \
-                            SERT INTO {table-name} (ID, {int-non-id-column-name})  SELECT {int-column-name}, {integer-col-or-subq}   FROM {table-reference} | \
-                            SERT INTO {table-name} ({int-non-id-column-name}, ID)  SELECT {integer-col-or-subq}, {int-column-name}   FROM {table-reference}
-insert-select-id-str    ::= SERT INTO {table-name} (ID, {string-column-name})      SELECT {int-column-name}, {string-col-or-subq}    FROM {table-reference} | \
-                            SERT INTO {table-name} ({string-column-name}, ID)      SELECT {string-col-or-subq}, {int-column-name}    FROM {table-reference}
-insert-select-id-time   ::= SERT INTO {table-name} (ID, {timestamp-column-name})   SELECT {int-column-name}, {timestamp-col-or-subq} FROM {table-reference} | \
-                            SERT INTO {table-name} ({timestamp-column-name}, ID)   SELECT {timestamp-col-or-subq}, {int-column-name} FROM {table-reference}
-insert-select-id-varbin ::= SERT INTO {table-name} (ID, {varbinary-column-name})   SELECT {int-column-name}, {varbinary-col-or-subq} FROM {table-reference} | \
-                            SERT INTO {table-name} ({varbinary-column-name}, ID)   SELECT {varbinary-col-or-subq}, {int-column-name} FROM {table-reference}
-insert-select-id-point  ::= SERT INTO {table-name} (ID, {point-column-name})       SELECT {int-column-name}, {point-col-or-subq}     FROM {table-reference} | \
-                            SERT INTO {table-name} ({point-column-name}, ID)       SELECT {point-col-or-subq}, {int-column-name}     FROM {table-reference}
-insert-select-id-poly   ::= SERT INTO {table-name} (ID, {polygon-column-name})     SELECT {int-column-name}, {polygon-col-or-subq}   FROM {table-reference} | \
-                            SERT INTO {table-name} ({polygon-column-name}, ID)     SELECT {polygon-col-or-subq}, {int-column-name}   FROM {table-reference}
-insert-select-id-json   ::= SERT INTO {table-name} (ID, {json-column-name})        SELECT {int-column-name}, {json-col-or-subq}      FROM {table-reference} | \
-                            SERT INTO {table-name} ({json-column-name}, ID)        SELECT {json-col-or-subq}, {int-column-name}      FROM {table-reference}
-insert-sel-id-str-ipv4  ::= SERT INTO {table-name} (ID, {string-ipv4-column-name}) SELECT {int-column-name}, {str-ipv4-col-or-subq}  FROM {table-reference} | \
-                            SERT INTO {table-name} ({string-ipv4-column-name}, ID) SELECT {str-ipv4-col-or-subq}, {int-column-name}  FROM {table-reference}
-insert-sel-id-str-ipv6  ::= SERT INTO {table-name} (ID, {string-ipv6-column-name}) SELECT {int-column-name}, {str-ipv6-col-or-subq}  FROM {table-reference} | \
-                            SERT INTO {table-name} ({string-ipv6-column-name}, ID) SELECT {str-ipv6-col-or-subq}, {int-column-name}  FROM {table-reference}
-insert-sel-id-varb-ipv4 ::= SERT INTO {table-name} (ID, {varbin-ipv4-column-name}) SELECT {int-column-name}, {varb-ipv4-col-or-subq} FROM {table-reference} | \
-                            SERT INTO {table-name} ({varbin-ipv4-column-name}, ID) SELECT {varb-ipv4-col-or-subq}, {int-column-name} FROM {table-reference}
-insert-sel-id-varb-ipv6 ::= SERT INTO {table-name} (ID, {varbin-ipv6-column-name}) SELECT {int-column-name}, {varb-ipv6-col-or-subq} FROM {table-reference} | \
-                            SERT INTO {table-name} ({varbin-ipv6-column-name}, ID) SELECT {varb-ipv6-col-or-subq}, {int-column-name} FROM {table-reference}
+insert-select-id-num    ::= SERT INTO {table-name-set} (ID, {numeric-non-id-col-name}) SELECT {int-column-name}, {numeric-col-or-subq}   FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({numeric-non-id-col-name}, ID) SELECT {numeric-col-or-subq}, {int-column-name}   FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} (ID, {int-non-id-column-name})  SELECT {int-column-name}, {integer-col-or-subq}   FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({int-non-id-column-name}, ID)  SELECT {integer-col-or-subq}, {int-column-name}   FROM {table-ref-set}
+insert-select-id-str    ::= SERT INTO {table-name-set} (ID, {string-column-name})      SELECT {int-column-name}, {string-col-or-subq}    FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({string-column-name}, ID)      SELECT {string-col-or-subq}, {int-column-name}    FROM {table-ref-set}
+insert-select-id-time   ::= SERT INTO {table-name-set} (ID, {timestamp-column-name})   SELECT {int-column-name}, {timestamp-col-or-subq} FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({timestamp-column-name}, ID)   SELECT {timestamp-col-or-subq}, {int-column-name} FROM {table-ref-set}
+insert-select-id-varbin ::= SERT INTO {table-name-set} (ID, {varbinary-column-name})   SELECT {int-column-name}, {varbinary-col-or-subq} FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({varbinary-column-name}, ID)   SELECT {varbinary-col-or-subq}, {int-column-name} FROM {table-ref-set}
+insert-select-id-point  ::= SERT INTO {table-name-set} (ID, {point-column-name})       SELECT {int-column-name}, {point-col-or-subq}     FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({point-column-name}, ID)       SELECT {point-col-or-subq}, {int-column-name}     FROM {table-ref-set}
+insert-select-id-poly   ::= SERT INTO {table-name-set} (ID, {polygon-column-name})     SELECT {int-column-name}, {polygon-col-or-subq}   FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({polygon-column-name}, ID)     SELECT {polygon-col-or-subq}, {int-column-name}   FROM {table-ref-set}
+insert-select-id-json   ::= SERT INTO {table-name-set} (ID, {json-column-name})        SELECT {int-column-name}, {json-col-or-subq}      FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({json-column-name}, ID)        SELECT {json-col-or-subq}, {int-column-name}      FROM {table-ref-set}
+insert-sel-id-str-ipv4  ::= SERT INTO {table-name-set} (ID, {string-ipv4-column-name}) SELECT {int-column-name}, {str-ipv4-col-or-subq}  FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({string-ipv4-column-name}, ID) SELECT {str-ipv4-col-or-subq}, {int-column-name}  FROM {table-ref-set}
+insert-sel-id-str-ipv6  ::= SERT INTO {table-name-set} (ID, {string-ipv6-column-name}) SELECT {int-column-name}, {str-ipv6-col-or-subq}  FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({string-ipv6-column-name}, ID) SELECT {str-ipv6-col-or-subq}, {int-column-name}  FROM {table-ref-set}
+insert-sel-id-varb-ipv4 ::= SERT INTO {table-name-set} (ID, {varbin-ipv4-column-name}) SELECT {int-column-name}, {varb-ipv4-col-or-subq} FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({varbin-ipv4-column-name}, ID) SELECT {varb-ipv4-col-or-subq}, {int-column-name} FROM {table-ref-set}
+insert-sel-id-varb-ipv6 ::= SERT INTO {table-name-set} (ID, {varbin-ipv6-column-name}) SELECT {int-column-name}, {varb-ipv6-col-or-subq} FROM {table-ref-set} | \
+                            SERT INTO {table-name-set} ({varbin-ipv6-column-name}, ID) SELECT {varb-ipv6-col-or-subq}, {int-column-name} FROM {table-ref-set}
 
 numeric-col-or-subq     ::= {numeric-column-name}     9| {numeric-scalar-sub-q}
 integer-col-or-subq     ::= {int-column-name}         9| {integer-scalar-sub-q}
@@ -369,13 +461,13 @@ str-ipv6-col-or-subq    ::= {string-ipv6-column-name} 9| {str-ipv6-scalar-sub-q}
 varb-ipv4-col-or-subq   ::= {varbin-ipv4-column-name} 9| {varb-ipv4-scalar-sub-q}
 varb-ipv6-col-or-subq   ::= {varbin-ipv6-column-name} 9| {varb-ipv6-scalar-sub-q}
 
-insert-select-multiple  ::= SERT INTO {table-name} (ID, {numeric-non-id-col-name}, {string-column-name}, \
+insert-select-multiple  ::= SERT INTO {table-name-set} (ID, {numeric-non-id-col-name}, {string-column-name}, \
                             {timestamp-column-name}, {varbinary-column-name}, {point-column-name}, {polygon-column-name} ) \
-                            SELECT {insert-select-mult-val} FROM {table-reference}
-insert-select-all       ::= SERT INTO {table-name} [({every-column-name})] \
-                            SELECT {insert-select-all-val}  FROM {table-reference}
-insert-select-backward  ::= SERT INTO {table-name} ({every-col-name-backward}) \
-                            SELECT {insert-select-back-val} FROM {table-reference}
+                            SELECT {insert-select-mult-val} FROM {table-ref-set}
+insert-select-all       ::= SERT INTO {table-name-set} [({every-column-name})] \
+                            SELECT {insert-select-all-val}  FROM {table-ref-set}
+insert-select-backward  ::= SERT INTO {table-name-set} ({every-col-name-backward}) \
+                            SELECT {insert-select-back-val} FROM {table-ref-set}
 
 insert-select-mult-val  ::= {insert-select-mult-val1} 4| {insert-select-mult-val2}
 insert-select-mult-val1 ::= {int-column-name}, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
@@ -384,6 +476,7 @@ insert-select-mult-val2 ::= {int-column-name}, {numeric-col-or-subq}, {string-co
                             {varbinary-col-or-subq}, {point-col-or-subq}, {polygon-col-or-subq}
 
 # Note: if you add a new column to the DDL file, add it here
+# (and in other places with this comment)
 insert-select-all-val   ::= {insert-select-all-val1} 4| {insert-select-all-val2}
 insert-select-all-val1  ::= {int-column-name}, {byte-column-name}, {int-column-name}, {int-column-name}, \
                             {int-column-name}, {numeric-column-name}, {numeric-column-name}, \
@@ -399,6 +492,7 @@ insert-select-all-val2  ::= {int-column-name}, {byte-col-or-subq}, {integer-col-
                             {str-ipv4-col-or-subq}, {str-ipv6-col-or-subq}, {varb-ipv4-col-or-subq}, {varb-ipv6-col-or-subq}
 
 # Note: if you add a new column to the DDL file, add it here
+# (and in other places with this comment)
 insert-select-back-val  ::= {insert-select-back-val1} 4| {insert-select-back-val2}
 insert-select-back-val1 ::= {varbin-ipv6-column-name}, {varbin-ipv4-column-name}, {string-ipv6-column-name}, {string-ipv4-column-name}, \
                             {polygon-column-name}, {point-column-name}, {varbinary-column-name}, {timestamp-column-name}, \
@@ -425,7 +519,7 @@ upsert-values-statement ::= {simple-upsert-values} 9| {upsert-clause} VALUES ({v
 upsert-select-statement ::= {simple-upsert-select} 9| {upsert-clause} {select-statement}
 
 # Putting "({column-list})" in more than one set of brackets makes it less likely
-upsert-clause           ::= UPSERT INTO {table-name} [[({column-list})]]
+upsert-clause           ::= UPSERT INTO {table-name-set} [[({column-list})]]
 
 simple-upsert-values    ::= UP{in-or-up-sert-values}
 simple-upsert-select    ::= UP{in-or-up-sert-select}
@@ -434,7 +528,7 @@ simple-upsert-select    ::= UP{in-or-up-sert-select}
 # Grammar rules for an UPDATE statement:
 ################################################################################
 #
-update-statement        ::= UPDATE {table-name} [[AS ]{table-alias}] SET {column-updates} [{where-clause}] 4| \
+update-statement        ::= UPDATE {table-name-or-alias-set} SET {column-updates} [{where-clause}] 4| \
                             {corltd-update-statement}
 
 column-updates          ::= {column-update} [, {column-updates}]
@@ -453,11 +547,11 @@ valid-column-update     ::= {numeric-column-name}     = {numeric-expression}  7|
 
 # UPDATE statements making use of a correlated column, often in a sub-query,
 # in either the SET or the WHERE clause, or both
-corltd-update-statement ::= UPDATE {table-name} [AS ]T0     SET {column-updates} WHERE {correlated-t0-bool-expr}  | \
+corltd-update-statement ::= UPDATE {table-name} [AS ]{t0}   SET {column-updates} WHERE {correlated-t0-bool-expr}  | \
                             UPDATE {table-name-or-alias-t1} SET {column-updates} WHERE {correlated-t1-bool-expr}  | \
-                            UPDATE {table-name} [AS ]T0     SET {corltd-t0-column-updates} [{where-clause}] | \
+                            UPDATE {table-name} [AS ]{t0}   SET {corltd-t0-column-updates} [{where-clause}] | \
                             UPDATE {table-name-or-alias-t1} SET {corltd-t1-column-updates} [{where-clause}] | \
-                            UPDATE {table-name} [AS ]T0     SET {corltd-t0-column-updates} WHERE {correlated-t0-bool-expr} | \
+                            UPDATE {table-name} [AS ]{t0}   SET {corltd-t0-column-updates} WHERE {correlated-t0-bool-expr} | \
                             UPDATE {table-name-or-alias-t1} SET {corltd-t1-column-updates} WHERE {correlated-t1-bool-expr}
 
 corltd-t0-column-updates::= {corltd-t0-column-update} [, {corltd-t0-column-updates}]
@@ -488,7 +582,7 @@ corltd-t1-column-update ::= {column-update} 5| \
 #
 delete-statement        ::= {basic-delete-statement} 19| {truncate-statement}
 
-basic-delete-statement  ::= DELETE FROM {table-name} [{where-clause}] [{sort-clause}] 4| \
+basic-delete-statement  ::= DELETE FROM {table-name-set} [{where-clause}] [{sort-clause}] 4| \
                             DELETE FROM {table-name:t1} WHERE {correlated-t1-bool-expr}
 
 truncate-statement      ::= TRUNCATE TABLE {table-name}
@@ -567,75 +661,75 @@ basic-cte-9-mixed       ::= cte{optional-9-cte-cols} AS (\
 
 # Note: VALUES version not currently supported by VoltDB, so make this rare
 # TODO: change per Chris review: (add GROUP BY; also ORDER BY ???)
-basic-query-int         ::= SELECT {int-expression}[[ {cte-col1-alias}]]        {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+basic-query-int         ::= SELECT {int-expression}[[ {cte-col1-alias}]]        {one-as-depth} FROM {table-refs} [{where-clause}] 199| \
                             VALUES ({int-rarely-null-value} {one-as-depth})
-basic-query-num         ::= SELECT {numeric-expression}[[ {cte-col1-alias}]]    {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+basic-query-num         ::= SELECT {numeric-expression}[[ {cte-col1-alias}]]    {one-as-depth} FROM {table-refs} [{where-clause}] 199| \
                             VALUES ({num-rarely-null-value} {one-as-depth})
-basic-query-str         ::= SELECT {cte-string-expression}[[ {cte-col1-alias}]] {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+basic-query-str         ::= SELECT {cte-string-expression}[[ {cte-col1-alias}]] {one-as-depth} FROM {table-refs} [{where-clause}] 199| \
                             VALUES ({str-rarely-null-value} {one-as-depth})
-basic-query-time        ::= SELECT {timestamp-expression}[[ {cte-col1-alias}]]  {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+basic-query-time        ::= SELECT {timestamp-expression}[[ {cte-col1-alias}]]  {one-as-depth} FROM {table-refs} [{where-clause}] 199| \
                             VALUES ({time-rarely-null-value} {one-as-depth})
-basic-query-varbin      ::= SELECT {varbinary-expression}[[ {cte-col1-alias}]]  {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+basic-query-varbin      ::= SELECT {varbinary-expression}[[ {cte-col1-alias}]]  {one-as-depth} FROM {table-refs} [{where-clause}] 199| \
                             VALUES ({varbin-rarely-null-value} {one-as-depth})
-basic-query-point       ::= SELECT {point-expression}[[ {cte-col1-alias}]]      {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+basic-query-point       ::= SELECT {point-expression}[[ {cte-col1-alias}]]      {one-as-depth} FROM {table-refs} [{where-clause}] 199| \
                             VALUES ({point-rarely-null-value} {one-as-depth})
-basic-query-polygon     ::= SELECT {polygon-expression}[[ {cte-col1-alias}]]    {one-as-depth} FROM {table-references} [{where-clause}] 199| \
+basic-query-polygon     ::= SELECT {polygon-expression}[[ {cte-col1-alias}]]    {one-as-depth} FROM {table-refs} [{where-clause}] 199| \
                             VALUES ({poly-rarely-null-value} {one-as-depth})
-basic-query-num-str     ::= SELECT {numeric-expression},                  {cte-string-expression}                  {one-as-depth} FROM {table-references} [{where-clause}] 150| \
-                            SELECT {numeric-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias} {one-as-depth} FROM {table-references} [{where-clause}]  49| \
+basic-query-num-str     ::= SELECT {numeric-expression},                  {cte-string-expression}                  {one-as-depth} FROM {table-refs} [{where-clause}] 150| \
+                            SELECT {numeric-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias} {one-as-depth} FROM {table-refs} [{where-clause}]  49| \
                             VALUES ({num-rarely-null-value}, {str-rarely-null-value} {one-as-depth})
-basic-query-str-num     ::= SELECT {cte-string-expression},                  {numeric-expression}                  {one-as-depth} FROM {table-references} [{where-clause}] 150| \
-                            SELECT {cte-string-expression} {cte-col1-alias}, {numeric-expression} {cte-col2-alias} {one-as-depth} FROM {table-references} [{where-clause}]  49| \
+basic-query-str-num     ::= SELECT {cte-string-expression},                  {numeric-expression}                  {one-as-depth} FROM {table-refs} [{where-clause}] 150| \
+                            SELECT {cte-string-expression} {cte-col1-alias}, {numeric-expression} {cte-col2-alias} {one-as-depth} FROM {table-refs} [{where-clause}]  49| \
                             VALUES ({str-rarely-null-value}, {num-rarely-null-value} {one-as-depth})
 basic-query-3-int       ::= SELECT {int-expression},                  {int-expression},                  {int-expression} {one-as-depth} \
-                            FROM {table-references} [{where-clause}] 150| \
+                            FROM {table-refs} [{where-clause}] 150| \
                             SELECT {int-expression} {cte-col1-alias}, {int-expression} {cte-col2-alias}, {int-expression} {cte-col3-alias} {one-as-depth} \
-                            FROM {table-references} [{where-clause}]  49| \
+                            FROM {table-refs} [{where-clause}]  49| \
                             VALUES ({int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value} {one-as-depth})
 basic-query-3-str       ::= SELECT {cte-string-expression},                  {cte-string-expression},                  {cte-string-expression} {one-as-depth} \
-                            FROM {table-references} [{where-clause}] 150| \
+                            FROM {table-refs} [{where-clause}] 150| \
                             SELECT {cte-string-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias}, {cte-string-expression} {cte-col3-alias} {one-as-depth} \
-                            FROM {table-references} [{where-clause}]  49| \
+                            FROM {table-refs} [{where-clause}]  49| \
                             VALUES ({str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value} {one-as-depth})
 basic-query-9-int       ::= SELECT {int-expression}, {int-expression}, {int-expression}, \
                                    {int-expression}, {int-expression}, {int-expression}, \
                                    {int-expression}, {int-expression}, {int-expression} {one-as-depth} \
-                            FROM {table-references} [{where-clause}] 150| \
+                            FROM {table-refs} [{where-clause}] 150| \
                             SELECT {int-expression} {cte-col1-alias}, {int-expression} {cte-col2-alias}, {int-expression} {cte-col3-alias}, \
                                    {int-expression} {cte-col4-alias}, {int-expression} {cte-col5-alias}, {int-expression} {cte-col6-alias}, \
                                    {int-expression} {cte-col7-alias}, {int-expression} {cte-col8-alias}, {int-expression} {cte-col9-alias} {one-as-depth} \
-                            FROM {table-references} [{where-clause}]  49| \
+                            FROM {table-refs} [{where-clause}]  49| \
                             VALUES ({int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value}, \
                                     {int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value}, \
                                     {int-rarely-null-value}, {int-rarely-null-value}, {int-rarely-null-value} {one-as-depth})
 basic-query-9-str       ::= SELECT {cte-string-expression}, {cte-string-expression}, {cte-string-expression}, \
                                    {cte-string-expression}, {cte-string-expression}, {cte-string-expression}, \
                                    {cte-string-expression}, {cte-string-expression}, {cte-string-expression} {one-as-depth} \
-                            FROM {table-references} [{where-clause}] 150| \
+                            FROM {table-refs} [{where-clause}] 150| \
                             SELECT {cte-string-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias}, {cte-string-expression} {cte-col3-alias}, \
                                    {cte-string-expression} {cte-col4-alias}, {cte-string-expression} {cte-col5-alias}, {cte-string-expression} {cte-col6-alias}, \
                                    {cte-string-expression} {cte-col7-alias}, {cte-string-expression} {cte-col8-alias}, {cte-string-expression} {cte-col9-alias}  \
                                    {one-as-depth} \
-                            FROM {table-references} [{where-clause}]  49| \
+                            FROM {table-refs} [{where-clause}]  49| \
                             VALUES ({str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value}, \
                                     {str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value}, \
                                     {str-rarely-null-value}, {str-rarely-null-value}, {str-rarely-null-value} {one-as-depth})
 basic-query-9-mixed     ::= SELECT {int-expression}, {cte-string-expression}, {numeric-expression}, \
                                    {int-expression}, {cte-string-expression}, {varbinary-expression}, \
                                    {int-expression}, {cte-string-expression}, {timestamp-expression} {one-as-depth} \
-                            FROM {table-references} [{where-clause}] 150| \
+                            FROM {table-refs} [{where-clause}] 150| \
                             SELECT {int-expression} {cte-col1-alias}, {cte-string-expression} {cte-col2-alias}, {numeric-expression}   {cte-col3-alias}, \
                                    {int-expression} {cte-col4-alias}, {cte-string-expression} {cte-col5-alias}, {varbinary-expression} {cte-col6-alias}, \
                                    {int-expression} {cte-col7-alias}, {cte-string-expression} {cte-col8-alias}, {timestamp-expression} {cte-col9-alias}  \
                                    {one-as-depth} \
-                            FROM {table-references} [{where-clause}]  49| \
+                            FROM {table-refs} [{where-clause}]  49| \
                             VALUES ({int-rarely-null-value}, {str-rarely-null-value}, {num-rarely-null-value}, \
                                     {int-rarely-null-value}, {str-rarely-null-value}, {varbin-rarely-null-value}, \
                                     {int-rarely-null-value}, {str-rarely-null-value}, {time-rarely-null-value} {one-as-depth})
 
 cte-string-expression   ::= {simple-cte-string-expr} 49| {string-scalar-sub-q}
-simple-cte-string-expr  ::= {string-value} | [[[[{table-alias-or-name}.]]]]{cte-string-column-name} 8| \
-                            {string-function-expr}
+simple-cte-string-expr  ::= {table-ref}.{cte-string-column-name} 6| {cte-string-column-name} 2| \
+                            {string-value} | {string-function-expr}
 cte-string-column-name  ::= VCHAR 9| {any-string-column-name}
 
 cte-col1                ::= CTE_C1
@@ -1263,86 +1357,57 @@ set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
 # brackets makes them less likely
 basic-select-statement  ::= SELECT {top-all-or-distinct} {select-list} {from-clause}
 top-all-or-distinct     ::= [[[{top-clause}]]] [[{all-or-distinct}]]
-from-clause             ::= FROM {table-references} [[{where-clause}]] [[{group-clause}]] [{sort-clause}] 38| \
+from-clause             ::= FROM {table-refs} [[{where-clause}]] [[{group-clause}]] [{sort-clause}] 38| \
                             {from-clause-with-t0} | {from-clause-with-t1}
-from-clause-no-limit    ::= FROM {table-references} [[{where-clause}]] {group-order-no-limit} 38| \
+from-clause-no-limit    ::= FROM {table-refs} [[{where-clause}]] {group-order-no-limit} 38| \
                             {from-clause-with-t0} | {from-clause-with-t1}
 group-order-no-limit    ::= [[{group-clause}]] [{order-by-clause}]
 
 all-or-distinct         ::= ALL | DISTINCT
 select-list             ::= {select-list-item}[[, {select-list}]]
-select-list-item        ::= {star} 5| {column-expression} [[AS ]{column-alias}] 14| {window-function-expr} [[AS ]{column-alias}]
+select-list-item        ::= {star} 5| {column-name-ref} [[AS ]{column-alias-set}] 14| \
+                            {window-function-expr} [[AS ]{column-alias-set}]
 
-column-name-or-alias    ::= {any-column-name} 9| {column-alias}
-column-reference        ::= {column-name-ref} 4| {column-alias}
+column-name-or-alias    ::= {any-column-name} 9| {column-alias-ref}
 column-expression       ::= {column-name-ref} 3| {selection-expression}
-column-ref-or-expr      ::= {column-reference} | {column-expression}
-# The use of "-tn" (i.e., ":t1", ":t2", etc.), is mainly useful in the case of
-# a JOIN, so that the column names are unambiguous
-column-name-ref         ::= {table-reference-tn}.{any-column-name} 4| \
-                            {any-column-name}
 
-# Putting the ", {table-refs}" in more than one set of brackets makes it less likely
-table-references        ::= {table-list} 4| {table-refs} | {join-clause}
-table-refs              ::= {table-reference}[[, {table-refs}]]
+# The use of "{table-ref}" is useful to refer to a table name or alias that has
+# already been defined, elsewhere in the SQL statement
+column-name-ref         ::= {table-ref}.{any-column-name} 4| {any-column-name}
+column-reference        ::= {column-name-ref} 18| {column-alias-ref} | \
+                            {selection-expression}
+
+# Putting the ", {table-ref-list}" in more than one set of brackets makes it less likely
+table-refs              ::= {table-list} 8| {table-ref-list} | {join-clause}
+table-ref-list          ::= {table-ref-set}[[, {table-ref-list}]]
 table-list              ::= {table-reference-t1} \
                             [[, {table-reference-t2} \
                             [[, {table-reference-t3} \
                             [[, {table-reference-t4} \
                             [[, {table-reference-t5}]] ]] ]] ]]
 
-# The "5" before the first "|" makes the "table-name..." option, and the "2"
-# before the "view-name..." option, makes them more likely than the "sub-query..."
-# option, making simple, valid statements more likely
-table-reference         ::= {table-name}[[ AS] {table-alias}] 5| \
-                            {view-name}[[  AS] {table-alias}] 2| \
-                            {sub-query}[   AS] {table-alias}   | \
-                            {table-reference-tn}
-
 # Table/view/sub-query references that can be reused later in a SQL statement,
 # as ":t1", ":t2", etc.
-table-name-or-alias-t1  ::= {table-name:t1} 3| {table-name}[ AS] {table-alias:t1}
-view-name-or-alias-t1   ::= {view-name:t1}  3| {view-name}[  AS] {table-alias:t1}
-sub-query-t1            ::= {sub-query}[ AS] {table-alias:t1}
-
-table-name-or-alias-t2  ::= {table-name:t2} 3| {table-name}[ AS] {table-alias:t2}
-view-name-or-alias-t2   ::= {view-name:t2}  3| {view-name}[  AS] {table-alias:t2}
-sub-query-t2            ::= {sub-query}[ AS] {table-alias:t2}
-
-table-name-or-alias-t3  ::= {table-name:t3} 3| {table-name}[ AS] {table-alias:t3}
-view-name-or-alias-t3   ::= {view-name:t3}  3| {view-name}[  AS] {table-alias:t3}
-sub-query-t3            ::= {sub-query}[ AS] {table-alias:t3}
-
-table-name-or-alias-t4  ::= {table-name:t4} 3| {table-name}[ AS] {table-alias:t4}
-view-name-or-alias-t4   ::= {view-name:t4}  3| {view-name}[  AS] {table-alias:t4}
-sub-query-t4            ::= {sub-query}[ AS] {table-alias:t4}
-
-table-name-or-alias-t5  ::= {table-name:t5} 3| {table-name}[ AS] {table-alias:t5}
-view-name-or-alias-t5   ::= {view-name:t5}  3| {view-name}[  AS] {table-alias:t5}
-sub-query-t5            ::= {sub-query}[ AS] {table-alias:t5}
-
+table-name-or-alias-t1  ::= {table-name:t1} 2| {table-name}[ AS] {table-alias:t1}
 table-reference-t1      ::= {table-name-or-alias-t1} 6| \
-                            {view-name-or-alias-t1}  3| \
-                            {sub-query-t1}
-table-reference-t2      ::= {table-name-or-alias-t2} 6| \
-                            {view-name-or-alias-t2}  3| \
-                            {sub-query-t2}
-table-reference-t3      ::= {table-name-or-alias-t3} 6| \
-                            {view-name-or-alias-t3}  3| \
-                            {sub-query-t3}
-table-reference-t4      ::= {table-name-or-alias-t4} 6| \
-                            {view-name-or-alias-t4}  3| \
-                            {sub-query-t4}
-table-reference-t5      ::= {table-name-or-alias-t5} 6| \
-                            {view-name-or-alias-t5}  3| \
-                            {sub-query-t5}
+                            {view-name:t1}  2| {view-name}[  AS] {table-alias:t1} | \
+                            {sub-query}[ AS] {table-alias:t1}
 
-# Can be any one of the above, with the smaller numbers much more likely
-table-reference-tn      ::= {table-name-or-alias-t1} 54| \
-                            {table-name-or-alias-t2} 18| \
-                            {table-name-or-alias-t3}  6| \
-                            {table-name-or-alias-t4}  2| \
-                            {table-name-or-alias-t5}
+table-reference-t2      ::= {table-name:t2} 4| {table-name}[ AS] {table-alias:t2} 2| \
+                            {view-name:t2}  2| {view-name}[  AS] {table-alias:t2}  | \
+                            {sub-query}[ AS] {table-alias:t2}
+
+table-reference-t3      ::= {table-name:t3} 4| {table-name}[ AS] {table-alias:t3} 2| \
+                            {view-name:t3}  2| {view-name}[  AS] {table-alias:t3}  | \
+                            {sub-query}[ AS] {table-alias:t3}
+
+table-reference-t4      ::= {table-name:t4} 4| {table-name}[ AS] {table-alias:t4} 2| \
+                            {view-name:t4}  2| {view-name}[  AS] {table-alias:t4}  | \
+                            {sub-query}[ AS] {table-alias:t4}
+
+table-reference-t5      ::= {table-name:t5} 4| {table-name}[ AS] {table-alias:t5} 2| \
+                            {view-name:t5}  2| {view-name}[  AS] {table-alias:t5}  | \
+                            {sub-query}[ AS] {table-alias:t5}
 
 # Defining these separately so that they can optionally be overridden, for use
 # with SQLCoverage, to avoid syntax (TOP) not supported by PostgreSQL, and
@@ -1355,6 +1420,7 @@ limit-one               ::= LIMIT 1 98| LIMIT 0 | LIMIT {byte-non-null-value}
 # PostgreSQL-compatible versions of the above: avoids problems involving SELECT *
 # with Geospatial types; and involving TOP, which PostgreSQL does not support.
 # Note: if you add a new column to the DDL file, add it here
+# (and in other places with this comment)
 pg-star                 ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, \
                             VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR_OUTLINE_MIN, VCHAR, VCHAR_JSON, \
                             TIME, VARBIN, AsText(POINT), AsText(POLYGON), \
@@ -1363,16 +1429,16 @@ pg-top-clause           ::=
 pg-top-one              ::=
 
 where-clause            ::= WHERE {boolean-expression}
-boolean-expression      ::=   [NOT ] {boolean-type-expr}   [[{and-or} {boolean-expression}]] 8| \
-                            ([[NOT ]]{boolean-expression}) [[{and-or} {boolean-expression}]] 2| \
+boolean-expression      ::=  [NOT   ]{boolean-type-expr}   [[{and-or} {boolean-expression}]] 8| \
+                            [[NOT ]]({boolean-expression}) [[{and-or} {boolean-expression}]] 2| \
                             {correlated-bool-expr}
 and-or                  ::= AND | OR
 
 group-clause            ::= GROUP BY {group-by-list} [HAVING {boolean-expression}]
 order-by-clause         ::= ORDER BY {order-by-list}
 sort-clause             ::= [{order-by-clause}] [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
-group-by-list           ::= {column-ref-or-expr}[,[[            ]] {group-by-list}]
-order-by-list           ::= {column-ref-or-expr}[ {asc-or-desc}][, {order-by-list}]
+group-by-list           ::= {column-reference}[,[[            ]] {group-by-list}]
+order-by-list           ::= {column-reference}[ {asc-or-desc}][, {order-by-list}]
 asc-or-desc             ::= ASC | DESC
 
 # PostgreSQL-compatible version of the above: avoids LIMIT or OFFSET without
@@ -1391,7 +1457,8 @@ boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {sub-query} IS [
 boolean-numeric-expr    ::= {numeric-expression}   {comparison-operator} {numeric-expression}   4| \
                             {numeric-column-name}   IN {numeric-sub-query}
 boolean-string-expr     ::= {string-expression}    {comparison-operator} {string-expression}    4| \
-                            {string-column-name}    IN {string-sub-query}
+                            {string-column-name}    IN {string-sub-query} | \
+                            {string-like-expression}
 boolean-timestamp-expr  ::= {timestamp-expression} {comparison-operator} {timestamp-expression} 4| \
                             {timestamp-column-name} IN {timestamp-sub-query}
 boolean-varbinary-expr  ::= {varbinary-expression} {comparison-operator} {varbinary-expression} 4| \
@@ -1400,7 +1467,9 @@ boolean-point-expr      ::= {point-expression} {comparison-operator} {point-expr
                             {point-column-name}     IN {point-sub-query}
 boolean-polygon-expr    ::= {polygon-expression} {comparison-operator} {polygon-expression} 4| \
                             {polygon-column-name}   IN {polygon-sub-query}
-comparison-operator     ::= = 3| <> | != | < | > | <= | >= | IS NOT DISTINCT FROM
+comparison-operator     ::= {simple-comparison-op} 19| {str-comparison-operator}
+simple-comparison-op    ::= = 3| <> | != | < | > | <= | >= | IS NOT DISTINCT FROM
+str-comparison-operator ::= {simple-comparison-op} | LIKE | STARTS WITH
 
 ################################################################################
 # Joins, of various types, including multi-joins of up to 5 tables
@@ -1497,18 +1566,18 @@ varb-ipv6-scalar-sub-q  ::= (SELECT {non-num-aggregate-func}({varbin-ipv6-expres
 
 correlated-t0-bool-expr ::= {corltd-t0-bool-simp-expr}  | {corltd-t0-bool-subq-expr}
 correlated-t0-bool-expr2::= {corltd-t0-bool-simp-expr} 9| {corltd-t0-bool-subq-expr}
-corltd-t0-bool-simp-expr::= {numeric-expression}   {comparison-operator} T0.{numeric-column-name}  7| \
-                            {string-expression}    {comparison-operator} T0.{string-column-name}   4| \
-                            {timestamp-expression} {comparison-operator} T0.{timestamp-column-name} | \
-                            {varbinary-expression} {comparison-operator} T0.{varbinary-column-name} | \
-                            {point-expression}     {comparison-operator} T0.{point-column-name}     | \
-                            {polygon-expression}   {comparison-operator} T0.{polygon-column-name}   | \
-                            T0.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
-                            T0.{string-column-name}    {comparison-operator} {string-expression}   4| \
-                            T0.{timestamp-column-name} {comparison-operator} {timestamp-expression} | \
-                            T0.{varbinary-column-name} {comparison-operator} {varbinary-expression} | \
-                            T0.{point-column-name}     {comparison-operator} {point-expression}     | \
-                            T0.{polygon-column-name}   {comparison-operator} {polygon-expression}
+corltd-t0-bool-simp-expr::= {numeric-expression}   {comparison-operator} {t0}.{numeric-column-name}  7| \
+                            {string-expression}    {comparison-operator} {t0}.{string-column-name}   4| \
+                            {timestamp-expression} {comparison-operator} {t0}.{timestamp-column-name} | \
+                            {varbinary-expression} {comparison-operator} {t0}.{varbinary-column-name} | \
+                            {point-expression}     {comparison-operator} {t0}.{point-column-name}     | \
+                            {polygon-expression}   {comparison-operator} {t0}.{polygon-column-name}   | \
+                            {t0}.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
+                            {t0}.{string-column-name}    {comparison-operator} {string-expression}   4| \
+                            {t0}.{timestamp-column-name} {comparison-operator} {timestamp-expression} | \
+                            {t0}.{varbinary-column-name} {comparison-operator} {varbinary-expression} | \
+                            {t0}.{point-column-name}     {comparison-operator} {point-expression}     | \
+                            {t0}.{polygon-column-name}   {comparison-operator} {polygon-expression}
 corltd-t0-bool-subq-expr::= {numeric-expression}   {comparison-operator} ({numeric-corltd-t0-subq})   7| \
                             {string-expression}    {comparison-operator} ({string-corltd-t0-subq})    4| \
                             {timestamp-expression} {comparison-operator} ({timestamp-corltd-t0-subq})  | \
@@ -1542,8 +1611,8 @@ point-corltd-t0-subq    ::= SELECT {non-num-aggregate-func}({point-expression}) 
 polygon-corltd-t0-subq  ::= SELECT {non-num-aggregate-func}({polygon-expression}) {from-clause-corltd-t0} 6| \
                             SELECT {top-one}                {polygon-expression}  {from-clause-corltd-t0}  | \
                             SELECT                          {polygon-expression}  {from-clause-corltd-t0} {limit-one}
-from-clause-corltd-t0   ::= FROM {table-or-view-name}    WHERE {correlated-t0-bool-expr2} [{group-order-no-limit}]
-from-clause-with-t0     ::= FROM {table-or-view-name} T0 WHERE {corltd-t0-bool-subq-expr} [{group-order-no-limit}]
+from-clause-corltd-t0   ::= FROM {table-or-view-name}      WHERE {correlated-t0-bool-expr2} [{group-order-no-limit}]
+from-clause-with-t0     ::= FROM {table-or-view-name} {t0} WHERE {corltd-t0-bool-subq-expr} [{group-order-no-limit}]
 
 # Same idea as above, but without using a "T0" alias; instead, the same actual
 # table name (referred to here as {:t1}) is used again
@@ -1599,12 +1668,12 @@ from-clause-with-t1     ::= FROM {table-or-view-name:t1} WHERE {corltd-t1-bool-s
 
 # Similar ideas to the above, but returning values of a certain specified type,
 # rather than a boolean value
-corltd-t0-numeric-expr  ::= ({numeric-corltd-t0-subq})   3| T0.{numeric-column-name}
-corltd-t0-string-expr   ::= ({string-corltd-t0-subq})    3| T0.{string-column-name}
-corltd-t0-timestamp-expr::= ({timestamp-corltd-t0-subq}) 3| T0.{timestamp-column-name}
-corltd-t0-varbinary-expr::= ({varbinary-corltd-t0-subq}) 3| T0.{varbinary-column-name}
-corltd-t0-point-expr    ::= ({point-corltd-t0-subq})     3| T0.{point-column-name}
-corltd-t0-polygon-expr  ::= ({polygon-corltd-t0-subq})   3| T0.{polygon-column-name}
+corltd-t0-numeric-expr  ::= ({numeric-corltd-t0-subq})   3| {t0}.{numeric-column-name}
+corltd-t0-string-expr   ::= ({string-corltd-t0-subq})    3| {t0}.{string-column-name}
+corltd-t0-timestamp-expr::= ({timestamp-corltd-t0-subq}) 3| {t0}.{timestamp-column-name}
+corltd-t0-varbinary-expr::= ({varbinary-corltd-t0-subq}) 3| {t0}.{varbinary-column-name}
+corltd-t0-point-expr    ::= ({point-corltd-t0-subq})     3| {t0}.{point-column-name}
+corltd-t0-polygon-expr  ::= ({polygon-corltd-t0-subq})   3| {t0}.{polygon-column-name}
 
 corltd-t1-numeric-expr  ::= ({numeric-corltd-t1-subq})   3| {:t1}.{numeric-column-name}
 corltd-t1-string-expr   ::= ({string-corltd-t1-subq})    3| {:t1}.{string-column-name}
@@ -1615,24 +1684,24 @@ corltd-t1-polygon-expr  ::= ({polygon-corltd-t1-subq})   3| {:t1}.{polygon-colum
 
 # Similar idea to the above, but in a generic SELECT statement, where a table
 # alias of T0 or {table-name:t1} may or may not have been used
-correlated-bool-expr    ::= {numeric-expression}   {comparison-operator} {table-alias-or-name}.{numeric-column-name}  7| \
-                            {string-expression}    {comparison-operator} {table-alias-or-name}.{string-column-name}   4| \
-                            {timestamp-expression} {comparison-operator} {table-alias-or-name}.{timestamp-column-name} | \
-                            {table-alias-or-name}.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
-                            {table-alias-or-name}.{string-column-name}    {comparison-operator} {string-expression}   4| \
-                            {table-alias-or-name}.{timestamp-column-name} {comparison-operator} {timestamp-expression} | \
+correlated-bool-expr    ::= {numeric-expression}   {comparison-operator} {table-ref}.{numeric-column-name}  7| \
+                            {string-expression}    {comparison-operator} {table-ref}.{string-column-name}   4| \
+                            {timestamp-expression} {comparison-operator} {table-ref}.{timestamp-column-name} | \
+                            {table-ref}.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
+                            {table-ref}.{string-column-name}    {comparison-operator} {string-expression}   4| \
+                            {table-ref}.{timestamp-column-name} {comparison-operator} {timestamp-expression} | \
                             {numeric-expression}   {comparison-operator} {table-name:t1}.{numeric-column-name} 14| \
                             {string-expression}    {comparison-operator} {table-name:t1}.{string-column-name}   8| \
                             {timestamp-expression} {comparison-operator} {table-name:t1}.{timestamp-column-name} | \
                             {table-name:t1}.{numeric-column-name}   {comparison-operator} {numeric-expression} 14| \
                             {table-name:t1}.{string-column-name}    {comparison-operator} {string-expression}   8| \
                             {table-name:t1}.{timestamp-column-name} {comparison-operator} {timestamp-expression} | \
-                            {numeric-expression}   {comparison-operator} T0.{numeric-column-name}  7| \
-                            {string-expression}    {comparison-operator} T0.{string-column-name}   4| \
-                            {timestamp-expression} {comparison-operator} T0.{timestamp-column-name} | \
-                            T0.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
-                            T0.{string-column-name}    {comparison-operator} {string-expression}   4| \
-                            T0.{timestamp-column-name} {comparison-operator} {timestamp-expression}
+                            {numeric-expression}   {comparison-operator} {t0}.{numeric-column-name}  7| \
+                            {string-expression}    {comparison-operator} {t0}.{string-column-name}   4| \
+                            {timestamp-expression} {comparison-operator} {t0}.{timestamp-column-name} | \
+                            {t0}.{numeric-column-name}   {comparison-operator} {numeric-expression}  7| \
+                            {t0}.{string-column-name}    {comparison-operator} {string-expression}   4| \
+                            {t0}.{timestamp-column-name} {comparison-operator} {timestamp-expression}
 
 ################################################################################
 # Window functions - a.k.a. analytic functions
@@ -1695,11 +1764,16 @@ int-rarely-null-value   ::= {integer-non-null-value} 99| NULL
 numeric-value           ::= {numeric-non-null-value}  3| NULL
 num-rarely-null-value   ::= {numeric-non-null-value} 99| NULL
 
-byte-expression         ::= {byte-value}    | {byte-column-name}  2| {byte-function-expr}
-int-expression          ::= {integer-value} |  {int-column-name}  2|  {int-function-expr}
+byte-expression         ::= {table-ref}.{byte-column-name} 6| {byte-column-name} 2| \
+                            {byte-value} | {byte-function-expr}
+
+int-expression          ::= {simple-integer-expr} 49| {integer-scalar-sub-q}
+simple-integer-expr     ::= {table-ref}.{int-column-name} 6| {int-column-name} 2| \
+                            {integer-value} | {int-function-expr} | {byte-expression}
+
 numeric-expression      ::= {simple-numeric-expr} 49| {numeric-scalar-sub-q}
-simple-numeric-expr     ::= {numeric-value} | [[[[{table-alias-or-name}.]]]]{numeric-column-name} 9| \
-                            {numeric-function-expr} | {int-expression}
+simple-numeric-expr     ::= {table-ref}.{numeric-column-name} 6| {numeric-column-name} 2| \
+                            {numeric-value} | {numeric-function-expr} | {int-expression}
 
 int-function-expr       ::= {int-expression} {math-operator} {int-expression} | \
                             {int-function-1arg}({int-expression}) | \
@@ -1752,14 +1826,17 @@ character               ::= A | B | C | D | E | F | G | H | I | J | K | L | M | 
                             a | b | c | d | e | f | g | h | i | j | k | l | m | n | o | p | q | r | s | t | u | v | w | x | y | z | \
                             {digit} 10| . | , | ! | @ | # | $ | % | ^ | & | * | ( | ) | - | _ | + | =
 characters              ::= [{character}][{character}][{character}[{characters}]]
-string-non-null-value   ::= '{characters}'
+string-non-null-value   ::= '{characters}' 4| '{str-common-pattern}[{characters}]'
+
+# Useful for testing LIKE and STARTS WITH
+str-common-pattern      ::= abc 3| ab 2| a
 
 string-value            ::= {string-non-null-value}  3| NULL
 str-rarely-null-value   ::= {string-non-null-value} 99| NULL
 
 string-expression       ::= {simple-string-expr} 49| {string-scalar-sub-q}
-simple-string-expr      ::= {string-value} | [[[[{table-alias-or-name}.]]]]{string-column-name} 6| \
-                            {string-function-expr}
+simple-string-expr      ::= {table-ref}.{string-column-name} 6| {string-column-name} 2| \
+                            {string-value} | {string-function-expr}
 string-function-expr    ::= {string-expression} {string-operator} {string-expression} 2| \
                             {string-valued-int-expr}  4| {string-val-str-int-expr}  5| \
                             {string-val-num-int-expr} 2| {string-special-func-expr} 3| \
@@ -1817,6 +1894,16 @@ string-special-func-expr::= OVERLAY({string-expression} PLACING {string-expressi
                             TRIM([[{trim-keyword} ]['{character}'] FROM ]{string-expression})
 trim-keyword            ::= LEADING | TRAILING | BOTH
 
+# Some clauses (e.g., WHERE) can include a LIKE expression; or, starting in
+# V8.3, a STARTS WITH expression
+string-like-expression  ::= {string-expression} LIKE {string-like-pattern} | \
+                            {string-expression} STARTS WITH {str-starts-with-pattern}
+string-like-pattern     ::= '{characters}%' 2| '[{characters}]%[{characters}]' 2| \
+                            '%{characters}' 2| '{str-common-pattern}%' 2| \
+                            {string-expression} | {string-value}
+str-starts-with-pattern ::= {str-rarely-null-value} 3| '{str-common-pattern}' | \
+                            {string-like-pattern}
+
 ################################################################################
 # JSON (string / VARCHAR) constant values, functions, operators and expressions
 #
@@ -1848,8 +1935,8 @@ json-text-value         ::= {json-non-null-value}  3| NULL
 json-rarely-null-value  ::= {json-non-null-value} 99| NULL
 
 json-expression         ::= {simple-json-expr} 49| {json-scalar-sub-q}
-simple-json-expr        ::= {json-text-value} | [[[[{table-alias-or-name}.]]]]{json-column-name} 6| \
-                            {json-function-expr}
+simple-json-expr        ::= {table-ref}.{json-column-name} 6| {json-column-name} 2| \
+                            {json-text-value} | {json-function-expr}
 # TODO: add JSON functions:
 json-function-expr      ::= {json-text-value}
 json-function-1arg      ::= TODO
@@ -1878,8 +1965,8 @@ timestamp-value         ::= {timestamp-non-null-value}  3| NULL
 time-rarely-null-value  ::= {timestamp-non-null-value} 99| NULL
 
 timestamp-expression    ::= {simple-timestamp-expr} 49| {timestamp-scalar-sub-q}
-simple-timestamp-expr   ::= {timestamp-value} | [[[[{table-alias-or-name}.]]]]{timestamp-column-name} 6| \
-                            {timestamp-function-expr}
+simple-timestamp-expr   ::= {table-ref}.{timestamp-column-name} 6| {timestamp-column-name} 2| \
+                            {timestamp-value} | {timestamp-function-expr}
 timestamp-function-expr ::= {timestamp-func-0args} 4| \
                             FROM_UNIXTIME({int-expression}) | \
                             TO_TIMESTAMP({short-time-unit}, {int-expression}) | \
@@ -1938,12 +2025,12 @@ varbinary-value         ::= {varbinary-non-null-value}  3| NULL
 varbin-rarely-null-value::= {varbinary-non-null-value} 99| NULL
 
 varbinary-expression    ::= {simple-varbinary-expr} 49| {varbinary-scalar-sub-q}
-simple-varbinary-expr   ::= {varbinary-value} | [[[[{table-alias-or-name}.]]]]{varbinary-column-name} 6| \
-                            {varbinary-function-expr}
+simple-varbinary-expr   ::= {table-ref}.{varbinary-column-name} 6| {varbinary-column-name} 2| \
+                            {varbinary-value} | {varbinary-function-expr}
 
 varbinary-function-expr ::= {varbinary-udf-func-expr}
 varbinary-udf-func-2args::= add2Varbinary | add2VarbinaryBoxed | btrim | btrimBoxed
-varbinary-udf-func-expr ::= varbinary-udf-func-2args({varbinary-expression}, {varbinary-expression})
+varbinary-udf-func-expr ::= {varbinary-udf-func-2args}({varbinary-expression}, {varbinary-expression})
 
 # Some functions of a varbinary produce a string value
 string-valued-varb-func ::= BIN | CHAR | HEX | SPACE
@@ -1983,17 +2070,17 @@ varbin-ipv6-rnull-value ::= {varbin-ipv6-nnull-value} 99| NULL
 string-ipv4-rnull-value ::= {string-ipv4-nnull-value} 99| NULL
 string-ipv6-rnull-value ::= {string-ipv6-nnull-value} 99| NULL
 
-varbin-ipv4-expression  ::= {varbin-ipv4-value} | [[[[{table-alias-or-name}.]]]]{varbin-ipv4-column-name} 6| \
-                            {varbin-ipv4-func-expr}
-varbin-ipv6-expression  ::= {varbin-ipv6-value} | [[[[{table-alias-or-name}.]]]]{varbin-ipv6-column-name} 6| \
-                            {varbin-ipv6-func-expr}
+varbin-ipv4-expression  ::= {table-ref}.{varbin-ipv4-column-name} 6| {varbin-ipv4-column-name} 2| \
+                            {varbin-ipv4-value} | {varbin-ipv4-func-expr}
+varbin-ipv6-expression  ::= {table-ref}.{varbin-ipv6-column-name} 6| {varbin-ipv6-column-name} 2| \
+                            {varbin-ipv6-value} | {varbin-ipv6-func-expr}
 varbin-ipv4-func-expr   ::= INET_ATON({string-ipv4-expression})
 varbin-ipv6-func-expr   ::= INET6_ATON({string-ipv6-expression})
 
-string-ipv4-expression  ::= {string-ipv4-value} | [[[[{table-alias-or-name}.]]]]{string-ipv4-column-name} 6| \
-                            {string-ipv4-func-expr}
-string-ipv6-expression  ::= {string-ipv6-value} | [[[[{table-alias-or-name}.]]]]{string-ipv6-column-name} 6| \
-                            {string-ipv6-func-expr}
+string-ipv4-expression  ::= {table-ref}.{string-ipv4-column-name} 6| {string-ipv4-column-name} 2| \
+                            {string-ipv4-value} | {string-ipv4-func-expr}
+string-ipv6-expression  ::= {table-ref}.{string-ipv6-column-name} 6| {string-ipv6-column-name} 2| \
+                            {string-ipv6-value} | {string-ipv6-func-expr}
 string-ipv4-func-expr   ::= INET_NTOA({varbin-ipv4-expression})
 string-ipv6-func-expr   ::= INET6_NTOA({varbin-ipv6-expression})
 
@@ -2024,8 +2111,8 @@ point-value             ::= {point-non-null-value}  3| NULL
 point-rarely-null-value ::= {point-non-null-value} 99| NULL
 
 point-expression        ::= {simple-point-expr} 49| {point-scalar-sub-q}
-simple-point-expr       ::= {point-value} | [[[[{table-alias-or-name}.]]]]{point-column-name} 6| \
-                            {point-function-expr}
+simple-point-expr       ::= {table-ref}.{point-column-name} 6| {point-column-name} 2| \
+                            {point-value} | {point-function-expr}
 point-function-expr     ::= {simple-point-func-expr} 4| {point-udf-func-expr}
 simple-point-func-expr  ::= CENTROID({polygon-expression}) | {point-non-null-value}
 point-udf-func-expr     ::= add2GeographyPoint({point-expression}, {point-expression})
@@ -2050,8 +2137,8 @@ poly-rarely-null-value  ::= {polygon-non-null-value} 99| NULL
 #polygon-expression      ::= {non-num-aggregate-func}({polygon-expression}) 9| ...
 
 polygon-expression      ::= {simple-polygon-expr} 49| {polygon-scalar-sub-q}
-simple-polygon-expr     ::= {polygon-value} | [[[[{table-alias-or-name}.]]]]{polygon-column-name} 6| \
-                            {polygon-function-expr}
+simple-polygon-expr     ::= {table-ref}.{polygon-column-name} 6| {polygon-column-name} 2| \
+                            {polygon-value} | {polygon-function-expr}
 polygon-function-expr   ::= {simple-polygon-func-expr} 4| {polygon-udf-func-expr}
 simple-polygon-func-expr::= {polygon-non-null-value}
 polygon-udf-func-expr   ::= addGeographyPointToGeography({polygon-expression}, {point-expression})
@@ -2111,13 +2198,13 @@ ng-insert-values-backward  ::= SERT INTO {table-name} ( \
 ng-insert-select-multiple  ::= SERT INTO {table-name} ( ID, {numeric-column-name}, {string-column-name}, {timestamp-column-name}, \
                                {varbinary-column-name} ) SELECT {int-column-name}, \
                                {numeric-column-name}, {string-column-name}, {timestamp-column-name}, {varbinary-column-name} \
-                               FROM {table-reference}
+                               FROM {table-ref}
 ng-insert-select-all       ::= SERT INTO {table-name} ( \
                                ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN ) SELECT \
-                               ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN FROM {table-reference}
+                               ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN FROM {table-ref}
 ng-insert-select-backward  ::= SERT INTO {table-name} ( \
                                VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID ) SELECT \
-                               VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID FROM {table-reference}
+                               VARBIN, TIME, VCHAR_INLINE, VCHAR_INLINE_MAX, VCHAR, DEC, NUM, BIG, INT, SMALL, TINY, ID FROM {table-ref}
 ng-star                    ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR_INLINE_MAX, VCHAR_INLINE, TIME, VARBIN
 ng-point-value             ::= NULL
 ng-polygon-value           ::= NULL

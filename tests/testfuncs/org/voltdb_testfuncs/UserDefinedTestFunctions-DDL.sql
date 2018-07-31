@@ -9,6 +9,8 @@
 -- First, drop all the test UDF's (user-defined functions), and remove the class
 -- containing them, in case they were loaded and created previously
 
+file -inlinebatch END_OF_BATCH_DROP
+
 DROP FUNCTION add2Tinyint   IF EXISTS;
 DROP FUNCTION add2Smallint  IF EXISTS;
 DROP FUNCTION add2Integer   IF EXISTS;
@@ -72,6 +74,9 @@ DROP FUNCTION btrimBoxed     IF EXISTS;
 DROP FUNCTION concat2Varchar IF EXISTS;
 DROP FUNCTION concat3Varchar IF EXISTS;
 DROP FUNCTION concat4Varchar IF EXISTS;
+
+END_OF_BATCH_DROP
+file -inlinebatch END_OF_BATCH_CREATE
 
 -- Create the 'add...' test UDF's, which throw all kinds of exceptions, and
 -- return various flavors of VoltDB 'null' values, when given certain special
@@ -155,3 +160,5 @@ CREATE FUNCTION concat2Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestF
 
 CREATE FUNCTION concat3Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.concat3Varchar;
 CREATE FUNCTION concat4Varchar FROM METHOD org.voltdb_testfuncs.UserDefinedTestFunctions.concat4Varchar;
+
+END_OF_BATCH_CREATE
