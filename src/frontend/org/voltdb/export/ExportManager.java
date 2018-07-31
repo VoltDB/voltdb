@@ -174,9 +174,6 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export Manager has been notified that local partition " + partitionId + " to accept export mastership.");
-        }
         m_masterOfPartitions.add(partitionId);
         /*
          * Only the first generation will have a processor which
@@ -200,7 +197,7 @@ public class ExportManager
             return;
         }
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export Manager has been notified that local partition " + partitionId + " has became leader.");
+            exportLog.debug("Export streams on local partition " + partitionId + " will become master.");
         }
     }
 
@@ -215,7 +212,7 @@ public class ExportManager
         m_masterOfPartitions.remove(partitionId);
 
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("ExportManager has been notified the sp leader for " + partitionId + " has been migrated away");
+            exportLog.debug("Export stream masters on " + partitionId + " are going to migrate away");
         }
         ExportGeneration generation = m_generation.get();
         if (generation == null) {
@@ -496,7 +493,7 @@ public class ExportManager
         //Load any missing tables.
         generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
         for (int partition : partitions) {
-            generation.updateAckMailboxes(partition);
+            generation.updateAckMailboxes(partition, null);
         }
 
         //We create processor even if we dont have any streams.
