@@ -321,7 +321,7 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
                                int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush
-    if (timeInMillis < 0 || (m_flushInterval > 0 && timeInMillis - m_lastFlush > m_flushInterval)) {
+    if (timeInMillis < 0 || (s_exportFlushTimeout > 0 && timeInMillis - m_lastFlush > s_exportFlushTimeout)) {
         int64_t maxSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);
         if (timeInMillis > 0) {
             m_lastFlush = timeInMillis;
