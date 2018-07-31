@@ -847,7 +847,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorConfig hashinatorConfig,
-            final boolean isLowestSiteId) {
+            final boolean isLowestSiteId,
+            final long exportFlushTimeout) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -877,7 +878,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 defaultDrBufferSize,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
-                isLowestSiteId);
+                isLowestSiteId,
+                exportFlushTimeout);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -932,7 +934,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int defaultDrBufferSize,
             final long tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream)
+            final boolean createDrReplicatedStream,
+            final long exportFlushTimeout)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
