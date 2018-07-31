@@ -349,7 +349,7 @@ public class TupleValueExpression extends AbstractValueExpression {
                 return false;
             }
         }
-        return true;
+        return getColumnIndex() == expr.getColumnIndex();
     }
 
     @Override

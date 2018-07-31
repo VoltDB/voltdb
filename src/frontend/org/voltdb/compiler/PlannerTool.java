@@ -181,11 +181,9 @@ public class PlannerTool {
         boolean hasUserQuestionMark = false;
         boolean wrongNumberParameters = false;
         try {
-            if ((sql == null) || sql.trim().isEmpty()) {
+            if ((sql == null) || (sql = sql.trim()).isEmpty()) {    // remove any spaces or newlines
                 throw new RuntimeException("Can't plan empty or null SQL.");
             }
-            // remove any spaces or newlines
-            sql = sql.trim();
 
             // No caching for forced single partition or forced multi partition SQL,
             // since these options potentially get different plans that may be invalid
