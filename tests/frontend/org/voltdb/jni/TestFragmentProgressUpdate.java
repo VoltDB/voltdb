@@ -619,7 +619,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new HashinatorConfig(ElasticHashinator.getConfigureBytes(1),
                                      0,
                                      0),
-                true);
+                true, 4*1000);
     }
 
     @Override

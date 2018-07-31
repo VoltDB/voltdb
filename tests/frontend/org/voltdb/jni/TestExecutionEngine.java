@@ -223,7 +223,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
             }
         }).get();
 
@@ -315,7 +315,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
             }
         }).get();
 
@@ -465,7 +465,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
             }
         }).get();
 
@@ -542,7 +542,7 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(ElasticHashinator.getConfigureBytes(1), 0, 0), true);
+                        new HashinatorConfig(ElasticHashinator.getConfigureBytes(1), 0, 0), true, 4*1000);
     }
 
     private void terminateSourceEngine() throws Exception {
