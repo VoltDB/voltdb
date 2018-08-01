@@ -130,7 +130,7 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();
-    public Cartographer getCartograhper();
+    public Cartographer getCartographer();
     public void loadLegacyPathProperties(DeploymentType deployment) throws IOException;
 
     /**
