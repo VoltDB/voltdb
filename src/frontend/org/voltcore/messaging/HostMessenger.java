@@ -332,6 +332,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     volatile ImmutableMultimap<Integer, ForeignHost> m_foreignHosts = ImmutableMultimap.of();
 
+    Map<Integer, ArrayList<ForeignHost>> m_zombieForeignHosts = new HashMap<> ();
+
     /*
      * Reference to the target HSId to FH mapping
      * Updates via COW
@@ -656,8 +658,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         new InetSocketAddress(
                                 m_config.zkInterface.split(":")[0],
                                 Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                                m_config.backwardsTimeForgivenessWindow,
-                                m_failedHostsCallback);
+                        m_config.backwardsTimeForgivenessWindow,
+                        m_failedHostsCallback);
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
             m_zk = org.voltcore.zk.ZKUtil.getClient(
@@ -829,8 +831,22 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     .putAll(Maps.filterKeys(m_fhMapping, hostIdNotEqual))
                     .build();
         }
+        assert(Thread.holdsLock(this)); // Make sure m_zombieForeignHosts is protected
+        ArrayList<ForeignHost> zombies = new ArrayList<>(fhs.size());
+        m_zombieForeignHosts.put(hostId, zombies);
         for (ForeignHost fh : fhs) {
+            zombies.add(fh);
             fh.close();
+        }
+    }
+
+    public synchronized void networkThreadShutdown(int hostId, ForeignHost fh) {
+        ArrayList<ForeignHost> zombies = m_zombieForeignHosts.get(hostId);
+        if (zombies != null) {
+            zombies.remove(fh);
+            if (zombies.isEmpty()) {
+                m_zombieForeignHosts.remove(hostId);
+            }
         }
     }
 
@@ -899,7 +915,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             } catch (Exception e) {
                 networkLog.error("Error joining new node", e);
                 addFailedHost(hostId);
-                removeForeignHost(hostId);
+                synchronized(HostMessenger.this) {
+                    removeForeignHost(hostId);
+                }
                 m_acceptor.detract(hostId);
                 socket.close();
                 return;
@@ -1049,8 +1067,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     new InetSocketAddress(
                             m_config.zkInterface.split(":")[0],
                             Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                            m_config.backwardsTimeForgivenessWindow,
-                            m_failedHostsCallback);
+                   m_config.backwardsTimeForgivenessWindow,
+                   m_failedHostsCallback);
 
         /*
          * Now that the agreement site mailbox has been created it is safe
@@ -1774,6 +1792,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 fh.cutLink();
             }
         }
+    }
+
+    public synchronized boolean canCompleteRepair(int hostId) {
+        return !m_foreignHosts.containsKey(hostId) && !m_zombieForeignHosts.containsKey(hostId);
     }
 
     public void setPartitionGroupPeers(Set<Integer> partitionGroupPeers, int hostCount) {

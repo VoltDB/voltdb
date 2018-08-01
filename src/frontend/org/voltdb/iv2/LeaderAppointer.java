@@ -199,7 +199,7 @@ public class LeaderAppointer implements Promotable
                     // Ignore and just assume the normal number of replicas
                 }
                 if (children.size() == replicaCount) {
-                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                    m_currentLeader = assignLeader(m_partitionId, Long.MAX_VALUE, updatedHSIds);
                 } else {
                     tmLog.info("Waiting on " + ((m_kfactor + 1) - children.size()) + " more nodes " +
                             "for k-safety before startup");
@@ -225,19 +225,19 @@ public class LeaderAppointer implements Promotable
                 }
                 // If we survived the above gauntlet of fail, appoint a new leader for this partition.
                 if (missingHSIds.contains(m_currentLeader)) {
-                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                    m_currentLeader = assignLeader(m_partitionId, m_currentLeader, updatedHSIds);
                 }
                 // If this partition doesn't have a leader yet, and we have new replicas added,
                 // elect a leader.
                 if (m_currentLeader == Long.MAX_VALUE && !updatedHSIds.isEmpty()) {
-                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                    m_currentLeader = assignLeader(m_partitionId, Long.MAX_VALUE, updatedHSIds);
                 }
             }
             m_replicas.clear();
             m_replicas.addAll(updatedHSIds);
         }
 
-        private long assignLeader(int partitionId, List<Long> children)
+        private long assignLeader(int partitionId, long prevLeader, List<Long> children)
         {
             // We used masterHostId = -1 as a way to force the leader choice to be
             // the first replica in the list, if we don't have some other mechanism
@@ -277,10 +277,17 @@ public class LeaderAppointer implements Promotable
                     break;
                 }
             }
-            tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
+            if (prevLeader == Long.MAX_VALUE) {
+                tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
                         partitionId);
+            }
+            else {
+                tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader (Previous Leader was HSId " +
+                        CoreUtils.hsIdToString(prevLeader) + ") for partition " + partitionId);
+            }
+            String masterPair = Long.toString(prevLeader) + "/" + Long.toString(masterHSId);
             try {
-                m_iv2appointees.put(partitionId, masterHSId);
+                m_iv2appointees.put(partitionId, masterPair);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
             }
@@ -311,7 +318,7 @@ public class LeaderAppointer implements Promotable
             } else {
                 // update partition call backs with correct current leaders after MigratePartitionLeader
                 for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
-                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSID);
+                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSId);
                 }
             }
         }
