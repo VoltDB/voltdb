@@ -64,7 +64,7 @@
         <level value="INFO"/>
     </logger -->
 
-    <!--logger name="EXPORT">
+    <!-- logger name="EXPORT">
         <level value="INFO"/>
     </logger -->
 
