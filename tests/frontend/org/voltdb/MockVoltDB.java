@@ -850,7 +850,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Cartographer getCartograhper() {
+    public Cartographer getCartographer() {
         return null;
     }
 
