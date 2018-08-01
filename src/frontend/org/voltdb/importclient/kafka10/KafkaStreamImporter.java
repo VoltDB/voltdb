@@ -145,6 +145,8 @@ public class KafkaStreamImporter extends AbstractImporter {
         }
 
         LOGGER.info("Number of Kafka Consumers on this host:" + consumerCount);
+        // When the importer is initialized, insert a record in @Statistics IMPORTER to make sure VMC can keep track of the import progress
+        reportStat(m_config.getProcedure(m_config.getTopics()));
     }
 
     @Override
