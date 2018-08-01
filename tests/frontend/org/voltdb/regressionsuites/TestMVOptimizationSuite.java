@@ -24,19 +24,9 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.eclipse.jetty.util.IO;
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 import junit.framework.Test;

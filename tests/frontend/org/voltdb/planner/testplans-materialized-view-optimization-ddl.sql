@@ -12,6 +12,9 @@ create index tb on t3(a1, b);
 
 create view vt3 as select a1 a1, min(b) min_b, sum(a) sum_a, count(b) count_b, count(*) counts from t3 where abs(b) > abs(a) group by a1;
 
+-- no group-by in creation
+create view v1 as select min(b) min_b, sum(a) sum_a, count(*) counts from t3 where abs(b) > abs(a);
+
 create view v2 as select distinct a1 distinct_a1, count(*) counts from t1 where b > 2 group by a1;
 create view v5_1 as select distinct a1 distinct_a1, count(b1) count_b1, sum(a) sum_a, count(*) counts from t1 where b >= 2 or b1 in (3,30,300) group by a1;
 create view v5_2 as select distinct a1 distinct_a, sum(a) sum_a00, count(b) count_b00, count(*) counts from t1 group by a1;

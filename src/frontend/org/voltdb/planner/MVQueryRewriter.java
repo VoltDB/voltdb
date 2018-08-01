@@ -48,8 +48,9 @@ final class MVQueryRewriter {
     public MVQueryRewriter(ParsedSelectStmt stmt) {            // Constructor does not modify SELECT stmt
         m_unionStmt = null;
         m_selectStmt = stmt;
+        // NOTE: a MV creation stmt can be without group-by, e.g. "SELECT min(c1), max(c2), COUNT(*) FROM FOO"
         if (m_selectStmt.m_tableList.size() == 1 &&                   // For now, support rewrite SELECT from a single table
-                !m_selectStmt.hasOrderByColumns() && m_selectStmt.isGrouped() && m_selectStmt.getHavingPredicate() == null) {   // MVI has GBY, does not have OBY or HAVING clause
+                !m_selectStmt.hasOrderByColumns() && m_selectStmt.getHavingPredicate() == null) {   // MVI has GBY, does not have OBY or HAVING clause
             final Optional<Pair<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>>>
                     any = getMviAndViews(m_selectStmt.m_tableList).entrySet().stream()          // Scan all MV associated with SEL source tables,
                     .flatMap(kv -> {

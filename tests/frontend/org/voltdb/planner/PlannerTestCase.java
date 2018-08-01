@@ -54,7 +54,6 @@ public class PlannerTestCase extends TestCase {
     private boolean m_byDefaultPlanForSinglePartition;
     final private int m_defaultParamCount = 0;
     private String m_noJoinOrder = null;
-
     /**
      * @param sql
      * @return

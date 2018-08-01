@@ -334,8 +334,8 @@ public class LocalCluster extends VoltServerConfig {
         m_usesStagedSchema = schemaToStage != null || classesJarToStage != null;
         setNewCli(isNewCli() || m_usesStagedSchema);
 
-        assert siteCount > 0 : "site count is less than 0";
-        assert hostCount > 0 : "host count is less than 0";
+        assert siteCount > 0 : "site count is less than 1";
+        assert hostCount > 0 : "host count is less than 1";
 
         numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);

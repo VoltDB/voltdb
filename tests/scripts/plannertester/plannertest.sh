@@ -34,6 +34,8 @@
 #
 # -sv
 # Same as putting -s -re -rs.
+# For example, run:
+# $ ant && ./plannertest.sh -C=ENG-xxxx -sv
 
 export VOLTDB_HOME=../../..
 
@@ -57,4 +59,3 @@ done
 
 java -Xmx512m -classpath $TEST_HOME:${CLASSPATH} org.voltdb.planner.plannerTester "$@"
 
-#exec $CMDVAL

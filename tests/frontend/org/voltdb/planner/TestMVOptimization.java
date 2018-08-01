@@ -54,6 +54,8 @@ public class TestMVOptimization extends PlannerTestCase {
     public void testSimple() {      // Test SELECT stmt that is "almost" same as view definition, with except of column aliasing
         checkQueriesPlansAreTheSame("SELECT a1 a1, COUNT(b) count_b, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1",
                 "SELECT distinct_a, count_b00, sum_a00, counts from v5_2");
+        checkQueriesPlansAreTheSame("SELECT MIN(b) minb, SUM(a) sum_a, COUNT(*) counts FROM t3 WHERE abs(b) > abs(a)",
+                "SELECT min_b minb, sum_a, counts FROM v1");
         // Negative test: MV does not support HAVING clause
         assertMatch("SELECT a1 a1, COUNT(b) count_b, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1 HAVING SUM(a) >= 0",
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" " +
