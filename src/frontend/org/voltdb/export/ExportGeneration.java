@@ -262,6 +262,8 @@ public class ExportGeneration implements Generation {
                                     " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                         }
                         eds.handleQueryResponse(message);
+                    } else {
+                        exportLog.error("Receive unsupported message type " + message + " in export subsystem");
                     }
                 } else {
                     exportLog.error("Receive unexpected message " + message + " in export subsystem");
