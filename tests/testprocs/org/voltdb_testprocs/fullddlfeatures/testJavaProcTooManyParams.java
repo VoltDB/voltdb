@@ -47,11 +47,7 @@ public class testJavaProcTooManyParams extends VoltProcedure {
     public VoltTable[] run() {
         Object[] params = new Object[paramCount];
         for (int i = 0; i < paramCount; i++) {
-            byte[] arr = new byte[128];
-            params[i] = arr;
-            for (int j = 0; j < 128; j++) {
-                arr[j] = (byte)j;
-            }
+            params[i] = String.valueOf(i);
         }
         voltQueueSQL(query, params);
         return voltExecuteSQL(true);
