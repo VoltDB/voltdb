@@ -203,6 +203,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_tableAliasListAsJoinOrder.clear();
         m_tableAliasListAsJoinOrder.add(view.getTypeName());
         m_joinTree = new TableLeafNode(0, null, null, generateStmtTableScan(view));
+        prepareMVBasedQueryFix();   // update MaterializedViewFixInfo when partition key comes from multiple tables.
         return this;
     }
 
