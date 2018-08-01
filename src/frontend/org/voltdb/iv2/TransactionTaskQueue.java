@@ -469,19 +469,32 @@ public class TransactionTaskQueue
         return m_backlog.size();
     }
 
-    @Override
-    public String toString()
+    public void toString(StringBuilder sb)
     {
-        StringBuilder sb = new StringBuilder();
         sb.append("TransactionTaskQueue:").append("\n");
         sb.append("\tSIZE: ").append(size());
         if (!m_backlog.isEmpty()) {
-            sb.append("\tHEAD: ").append(m_backlog.getFirst());
+            Iterator<TransactionTask> it = m_backlog.iterator();
+            sb.append("\tHEAD: ").append(it.next());
+            // Print out any other MPs that are in the backlog
+            while (it.hasNext()) {
+                TransactionTask tt = it.next();
+                if (!tt.getTransactionState().isSinglePartition()) {
+                    sb.append("\n\tNEXT MP: ").append(tt);
+                }
+            }
         }
         sb.append("\n\tScoreboard:").append("\n");
         synchronized (s_lock) {
             sb.append("\t").append(m_scoreboard.toString());
         }
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        toString(sb);
         return sb.toString();
     }
 

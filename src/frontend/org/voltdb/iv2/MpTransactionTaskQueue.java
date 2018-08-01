@@ -20,10 +20,12 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -288,15 +290,33 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         return m_backlog.size();
     }
 
+    synchronized public void toString(StringBuilder sb)
+    {
+        sb.append("MpTransactionTaskQueue:").append("\n");
+        sb.append("\tSIZE: ").append(m_backlog.size());
+        if (!m_backlog.isEmpty()) {
+            // Print deduped list of backlog
+            Iterator<TransactionTask> it = m_backlog.iterator();
+            Set<String> pendingInvocations = new HashSet<>(m_backlog.size()*2);
+            if (it.hasNext()) {
+                String procName = it.next().m_txnState.getInvocation().getProcName();
+                pendingInvocations.add(procName);
+                sb.append("\n\tPENDING: ").append(procName);
+            }
+            while(it.hasNext()) {
+                String procName = it.next().m_txnState.getInvocation().getProcName();
+                if (pendingInvocations.add(procName)) {
+                    sb.append(", ").append(procName);
+                }
+            }
+        }
+    }
+
     @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append("MpTransactionTaskQueue:").append("\n");
-        sb.append("\tSIZE: ").append(m_backlog.size()).append("\n");
-        if (!m_backlog.isEmpty()) {
-            sb.append("\tHEAD: ").append(m_backlog.getFirst()).append("\n");
-        }
+        toString(sb);
         return sb.toString();
     }
 }

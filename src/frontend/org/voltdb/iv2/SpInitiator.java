@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
@@ -59,6 +60,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
     final private LeaderCache m_leaderCache;
     private final TickProducer m_tickProducer;
     private boolean m_promoted = false;
+
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
@@ -252,9 +256,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
             // Tag along and become the export master too
             // leave the export on the former leader, now a replica
             if (!migratePartitionLeader) {
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Export Manager has been notified that local partition " +
+                            m_partitionId + " to accept export stream mastership.");
+                }
                 ExportManager.instance().acceptMastership(m_partitionId);
-                // notify Export subsystem in host failure case
-//                ExportManager.instance().handlePartitionFailure(m_partitionId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
