@@ -143,6 +143,7 @@ function jars() {
     if [[ "$BUILD_ARGS" == *-Dbuild=debug*  ]]; then
         BUILD_UDF_ARGS="--build=debug"
     fi
+
     cd $UDF_TEST_DIR
     ./build_udf_jar.sh $BUILD_UDF_ARGS
     code2c=$?
@@ -201,9 +202,12 @@ function ddl() {
     echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql"
     $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql
     code4c=$?
-    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-DDL.sql"
-    $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-DDL.sql
+
+    cd $UDF_TEST_DDL
+    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-batch.sql"
+    $VOLTDB_BIN_DIR/sqlcmd < UserDefinedTestFunctions-batch.sql
     code4d=$?
+    cd -
 
     code[4]=$(($code4a|$code4b|$code4c|$code4d))
 }
