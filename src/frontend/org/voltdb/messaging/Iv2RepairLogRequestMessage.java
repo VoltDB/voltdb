@@ -63,6 +63,10 @@ public class Iv2RepairLogRequestMessage extends VoltMessage
         return m_repairRetryCount;
     }
 
+    public void disableDeadHostCheck() {
+        m_deadHostId = Integer.MAX_VALUE;
+    }
+
     public long getRequestId()
     {
         return m_requestId;
