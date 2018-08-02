@@ -526,12 +526,14 @@ public class LeaderAppointer implements Promotable
                 }
             }
             m_removedPartitionsAtPromotionTime = null;
+
+            // set up a watcher on the partitions dir so that new partitions will be picked up
+            m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
+
             // just go ahead and promote our MPI
             VoltZK.createMpRepairBlocker(m_zk);
             m_MPI.acceptPromotion();
             VoltZK.removeMpRepairBlocker(m_zk, tmLog);
-            // set up a watcher on the partitions dir so that new partitions will be picked up
-            m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
             blocker.set(null);
         }
         m_isLeader = true;
