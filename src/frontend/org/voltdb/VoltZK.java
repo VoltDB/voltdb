@@ -41,6 +41,7 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZooKeeperLock;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
+import org.voltdb.iv2.MpInitiator;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -203,7 +204,7 @@ public class VoltZK {
     public static final String actionLock = "/db/action_lock";
 
     //register partition while the partition elects a new leader upon node failure
-    public static final String partitionRepair = "/db/partitionRepair";
+    public static final String mp_repair_blocker = "/db/mp_repair_blocker";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -226,7 +227,7 @@ public class VoltZK {
             request_truncation_snapshot,
             host_ids_be_stopped,
             actionLock,
-            partitionRepair
+            mp_repair_blocker
     };
 
     /**
@@ -458,7 +459,7 @@ public class VoltZK {
                     // are promoted and unregistered after their promotions are done. Let rejoining nodes wait until
                     // all the partition leader promotions have finished to avoid any
                     // interference with the transaction repair process.
-                    List<String> partitions = zk.getChildren(VoltZK.partitionRepair, false);
+                    List<String> partitions = zk.getChildren(VoltZK.mp_repair_blocker, false);
                     if (!partitions.isEmpty()) {
                         errorMsg = "while leader promotions are in progress. Please retry node rejoin later.";
                         if (hostLog.isDebugEnabled()) {
@@ -530,9 +531,8 @@ public class VoltZK {
         return true;
     }
 
-    // add partition under /db/partitionRepair when the partition elects a new leader upon node failure
-    public static void registerPartitionRepair(ZooKeeper zk, int partitionId) {
-        String node = ZKUtil.joinZKPath(partitionRepair, Integer.toString(partitionId));
+    public static void createMpRepairBlocker(ZooKeeper zk) {
+        String node = ZKUtil.joinZKPath(mp_repair_blocker, Integer.toString(MpInitiator.MP_INIT_PID));
         try {
             zk.create(node,
                       null,
@@ -540,21 +540,20 @@ public class VoltZK {
                       CreateMode.EPHEMERAL);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NODEEXISTS) {
-                VoltDB.crashLocalVoltDB("Unable to register promoting partition " + partitionId, true, e);
+                VoltDB.crashLocalVoltDB("Unable to create MP repair blocker", true, e);
             }
         } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to register promoting partition " + partitionId, true, e);
+            VoltDB.crashLocalVoltDB("Unable to create MP repair blocker", true, e);
         }
     }
 
-    // remove the partition under /db/partitionRepair when the new leader has accepted promotion
-    public static void unregisterPartitionRepair(ZooKeeper zk, int partitionId, VoltLogger log) {
-        String node = ZKUtil.joinZKPath(partitionRepair, Integer.toString(partitionId));
+    public static void removeMpRepairBlocker(ZooKeeper zk, VoltLogger log) {
+        String node = ZKUtil.joinZKPath(mp_repair_blocker, Integer.toString(MpInitiator.MP_INIT_PID));
         try {
             zk.delete(node, -1);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
-                log.error("Failed to remove promoting partition: " + partitionId + "\n" + e.getMessage(), e);
+                log.error("Unable to remove MP repair blocker\n" + e.getMessage(), e);
             }
         } catch (InterruptedException e) {
         }

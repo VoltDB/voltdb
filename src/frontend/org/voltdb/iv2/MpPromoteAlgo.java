@@ -139,7 +139,6 @@ public class MpPromoteAlgo implements RepairAlgo
     public Future<RepairResult> start()
     {
         try {
-            VoltZK.registerPartitionRepair(((InitiatorMailbox)m_mailbox).getZK(), MpInitiator.MP_INIT_PID);
             prepareForFaultRecovery();
         } catch (Exception e) {
             repairLogger.error(m_whoami + "failed leader promotion:", e);
@@ -149,7 +148,7 @@ public class MpPromoteAlgo implements RepairAlgo
             //The flag is registered upon host failure or MPI promotion. The repair may be interrupted but will
             //be eventually completed.
             if (!m_promotionResult.isCancelled()) {
-                VoltZK.unregisterPartitionRepair(m_mailbox.m_messenger.getZK(), MpInitiator.MP_INIT_PID, repairLogger);
+                VoltZK.removeMpRepairBlocker(m_mailbox.m_messenger.getZK(), repairLogger);
             }
         }
         return m_promotionResult;
