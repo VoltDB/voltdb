@@ -29,6 +29,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.net.URL;
 import java.net.URLDecoder;
+import java.util.Collections;
 
 import org.junit.After;
 import org.junit.Before;
@@ -41,6 +42,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.utils.MiscUtils;
 
 public class TestDDLFeatures extends AdhocDDLTestBase {
@@ -57,6 +59,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         final URL url = TestDDLFeatures.class.getResource("fullDDL.sql");
         String schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
         builder.addSchema(schemaPath);
+        builder.setUseDDLSchema(true);
 
         boolean success = builder.compile(pathToCatalog);
         assertTrue(success);
@@ -130,6 +133,15 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertEquals(vt1.getRowCount(), 1);
         assertEquals(vt1.getLong(0), 1);
         assertEquals(vt1.getString("NAME"), "Kevin Durant");
+
+        // ENG-14210 more than 1025 parameters
+        StringBuilder tooManyParmsProcBuilder = new StringBuilder();
+        tooManyParmsProcBuilder.append("CREATE PROCEDURE ENG14210 AS SELECT * FROM T3 WHERE str IN (")
+                               .append(String.join(",", Collections.nCopies(1200, "?")))
+                               .append(");");
+
+        RegressionSuite.verifyProcFails(m_client, "The statement's parameter count 1200 must not exceed the maximum 1025",
+                "@AdHoc", tooManyParmsProcBuilder.toString());
     }
 
     @Test
@@ -171,6 +183,10 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         VoltTable vt = resp.getResults()[0];
         vt.advanceToRow(0);
         assertEquals(vt.get(0, VoltType.INTEGER), 1);
+
+        // ENG-14210 more than 1025 parameters
+        RegressionSuite.verifyProcFails(m_client, "The statement's parameter count 1200 must not exceed the maximum 1025",
+                "@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.fullddlfeatures.testJavaProcTooManyParams;");
     }
 
     @Test

@@ -1192,7 +1192,7 @@ public class RegressionSuite extends TestCase {
         verifyProcFails(client, expectedPattern, "@AdHoc", args);
     }
 
-    static protected void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
+    static public void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
 
         String what;
         if (storedProc.compareTo("@AdHoc") == 0) {

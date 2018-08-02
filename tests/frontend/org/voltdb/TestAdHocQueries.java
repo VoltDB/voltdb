@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -568,6 +569,24 @@ public class TestAdHocQueries extends AdHocQueryTester {
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = ?;", "2").getResults()[0];
             //System.out.println(result.toString());
             assertEquals(1, result.getRowCount());
+
+            // ENG-14210 more than 1025 parameters
+            StringBuilder tooManyParmsQueryBuilder = new StringBuilder();
+            tooManyParmsQueryBuilder.append("SELECT * FROM BLAH WHERE IVAL IN (")
+                                    .append(String.join(",", Collections.nCopies(1200, "?")))
+                                    .append(");");
+            Object[] params = new Object[1201];
+            // The first parameter is the query text.
+            params[0] = tooManyParmsQueryBuilder.toString();
+            for (int i = 1; i <= 1200; i++) {
+                params[i] = Long.valueOf(i);
+            }
+            try {
+                env.m_client.callProcedure("@AdHoc", params);
+                fail("The AdHoc query with more than 1025 parameters should fail, but it did not.");
+            } catch (ProcCallException ex) {
+                assertTrue(ex.getMessage().contains("The statement's parameter count 1200 must not exceed the maximum 1025"));
+            }
         }
         finally {
             env.tearDown();
