@@ -268,7 +268,7 @@ class Like {
              */
             isRightNull = (nodes[Expression.LEFT] instanceof ExpressionColumn) &&
                           (nodes[Expression.RIGHT] instanceof ExpressionOp) &&
-                          (nodes[Expression.RIGHT].getType() == 1) &&
+                          (nodes[Expression.RIGHT].getType() == OpTypes.VALUE) &&
                           (nodes[Expression.RIGHT].getValue(session) == null);
             return;
         }
@@ -346,7 +346,7 @@ class Like {
     }
 
     // Specific check for 'col LIKE CAST(NULL AS VARCHAR)' case
-    boolean isEquivalentToCastPredicate() {
+    boolean isEquivalentToCastNullPredicate() {
         return isRightNull;
     }
 

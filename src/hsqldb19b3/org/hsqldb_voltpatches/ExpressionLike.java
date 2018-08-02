@@ -286,17 +286,21 @@ public final class ExpressionLike extends ExpressionLogical {
             return;
         }
 
-        if (likeObject.isEquivalentToCastPredicate()) {
+        if (likeObject.isEquivalentToCastNullPredicate()) {
             // ENG-14266 solve 'col LIKE CAST(NULL AS VARCHAR)' problem
             // If it is this case, we are already set.
             // EE can handle this (left expression is a ExpressionColumn, right expression is a null VALUE).
+            likeObject = null;
             return;
         } else if (likeObject.isEquivalentToUnknownPredicate()) {
             this.setAsConstantValue(null);
+
+            likeObject = null;
         } else if (likeObject.isEquivalentToEqualsPredicate()) {
             opType = OpTypes.EQUAL;
             nodes[RIGHT] = new ExpressionValue(likeObject.getRangeLow(),
                                                Type.SQL_VARCHAR);
+            likeObject = null;
         } else if (likeObject.isEquivalentToNotNullPredicate()) {
             Expression notNull = new ExpressionLogical(OpTypes.IS_NULL,
                 nodes[LEFT]);
@@ -304,6 +308,7 @@ public final class ExpressionLike extends ExpressionLogical {
             opType      = OpTypes.NOT;
             nodes       = new Expression[UNARY];
             nodes[LEFT] = notNull;
+            likeObject = null;
         } else {
             if (nodes[LEFT].opType != OpTypes.COLUMN) {
                 return;
@@ -360,6 +365,7 @@ public final class ExpressionLike extends ExpressionLogical {
                 nodes[RIGHT] = new ExpressionLogical(OpTypes.SMALLER_EQUAL,
                                                      leftOld, rightBound);
                 opType     = OpTypes.AND;
+                likeObject = null;
             } else if (between && like) {
                 Expression gte = new ExpressionLogical(OpTypes.GREATER_EQUAL,
                                                        nodes[LEFT], leftBound);

@@ -148,13 +148,15 @@ public class ExpressionStartsWith extends ExpressionLogical {
         // User parameters should not arrive here.
         assert(!nodes[RIGHT].isParam);
 
-        if (startsWithObject.isEquivalentToCastPredicate()) {
+        if (startsWithObject.isEquivalentToCastNullPredicate()) {
             // ENG-14266 solve 'col STARTS WITH CAST(NULL AS VARCHAR)' problem
             // If it is this case, we are already set.
             // EE can handle this (left expression is a ExpressionColumn, right expression is a null VALUE).
+            startsWithObject = null;
             return;
         } else if (startsWithObject.isEquivalentToUnknownPredicate()) {
             this.setAsConstantValue(null);
+            startsWithObject = null;
         } else if (startsWithObject.isEquivalentToCharPredicate()) {    // handling plain prefix
             Expression leftOld = nodes[LEFT];
 
@@ -171,12 +173,14 @@ public class ExpressionStartsWith extends ExpressionLogical {
             nodes[RIGHT] = new ExpressionLogical(OpTypes.SMALLER_EQUAL,
                                                  leftOld, rightBound);
             opType     = OpTypes.AND;
+            startsWithObject = null;
         } else if (startsWithObject.isEquivalentToNotNullPredicate()) {
             Expression notNull = new ExpressionLogical(OpTypes.IS_NULL,
                 nodes[LEFT]);
             opType      = OpTypes.NOT;
             nodes       = new Expression[UNARY];
             nodes[LEFT] = notNull;
+            startsWithObject = null;
         } else {
             if (nodes[LEFT].opType != OpTypes.COLUMN) {
                 return;
