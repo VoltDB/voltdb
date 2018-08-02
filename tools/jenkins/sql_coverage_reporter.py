@@ -10,11 +10,6 @@ from jenkinsbot import JenkinsBot
 from jira import JIRA
 from sql_grammar_reporter import Issues # using symlink alias to reference file
 
-JIRA_USER = os.environ.get('jirauser', None)
-JIRA_PASS = os.environ.get('jirapass', None)
-JIRA_PROJECT = os.environ.get('jiraproject', None)
-JUNIT = os.environ.get('junit', None)
-
 # Set to true to avoid updating Jira
 DRY_RUN = False
 
@@ -76,7 +71,7 @@ class Reporter(Issues):
 
         jenkinsbot = JenkinsBot()
         jenkinsbot.create_bug_issue(JUNIT, summary, description, 'Core', current_version, ['sqlcoverage-failure', 'automatic'],
-                                    JIRA_USER, JIRA_PASS, JIRA_PROJECT, DRY_RUN)
+                                    DRY_RUN=DRY_RUN)
 
 if __name__ == '__main__':
     job = os.environ.get('job', None)
