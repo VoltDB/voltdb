@@ -1143,10 +1143,12 @@ var loadPage = function (serverName, portid) {
             var role = drRoleDetail['DRROLE'][0][0];
             $("#drModeName").html(drRoleDetail['DRROLE'][0][0])
             if(role == "MASTER" || role == "XDCR"){
+                // if it is Master or XDCR, get drDetails using @statistics dr
                 voltDbRenderer.GetDrDetails(function (drDetails) {
                     populateDRGraphandTable(drRoleDetail, drDetails)
                 });
             } else if (role == "REPLICA"){
+                // if it is REPLICA, get drInfo using @statistics DRCONSUMER
                  voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
                         populateDRGraphandTable(drRoleDetail, replicationData["DR_GRAPH"])
                  });
@@ -1160,26 +1162,28 @@ var loadPage = function (serverName, portid) {
             var response = drDetails;
             var replicaLatency = [];
             var role = drRoleDetail['DRROLE'][0][0];
-            var producerDbId = drDetails["CLUSTER_ID"];
+            var clusterId = drDetails["CLUSTER_ID"];
 
-            if(producerDbId != undefined){
-                $("#drCLusterId").html(" (ID: " + producerDbId + ")");
+            if(clusterId != undefined){
+                $("#drCLusterId").html(" (ID: " + clusterId + ")");
+                $("#clusterId").html(" (ID: " + clusterId + ")");
             }
             else{
                 $("#drCLusterId").html("");
+                $("#clusterId").html("");
             }
 
             if(drRoleDetail['DRROLE'].length > 0){
                 if(JSON.stringify(VoltDbUI.prevDrRoleDetail) != JSON.stringify(drRoleDetail)) {
                     VoltDbUI.prevDrRoleDetail = drRoleDetail;
                     for(var i = 0; i < drRoleDetail['DRROLE'].length ; i++){
-                        var htmlContent = getDrHtmlContent(i, producerDbId, drRoleDetail, response);
+                        var htmlContent = getDrHtmlContent(i, clusterId, drRoleDetail, response);
                     }
                     MonitorGraphUI.InitializeDrData();
                     MonitorGraphUI.InitializeDRGraph();
                     MonitorGraphUI.AddDrGraph("Seconds");
                 }
-                showDrGraphAndData(drRoleDetail, producerDbId)
+                showDrGraphAndData(drRoleDetail, clusterId)
             }
         }
 
@@ -1256,10 +1260,6 @@ var loadPage = function (serverName, portid) {
                                                             $("#divDrReplication").hide();
                                                         }
                                                     } else {
-                                                        voltDbRenderer.GetDrInformations(function (clusterInfo) {
-                                                            $('#clusterId').show();
-                                                            $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
-                                                        });
                                                         //to show DR Mode
                                                         if (VoltDbUI.drMasterEnabled) {
                                                             $("#dbDrMode").text("Master");
