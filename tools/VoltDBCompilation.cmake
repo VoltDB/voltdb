@@ -4,9 +4,9 @@
 #
 ########################################################################
 #
-# We give compiler options is two parts.  One is the set of base
+# We give compiler options in two parts.  One is the set of base
 # options, which all compilations use.  The second is the set of
-# compiler, platform and version options.
+# compiler, platform, and version options.
 #
 # These are the base compiler options, and some
 # other linker options.
