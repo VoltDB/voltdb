@@ -162,7 +162,7 @@ final class FilterMatcher {
     }
     /**
      * Compare two vectors as sets, e.g. "WHERE a in (1, 2, 3)" vs. "WHERE a in (2, 1, 3)", to check whether two VVEs match.
-     * \pre all contents of VVE are either CVE or PVE. TODO
+     * \pre all contents of VVE are either CVE or PVE.
      * @param e1 first expression
      * @param e2 second expression
      * @return whether they are equivalent as collection of sets.

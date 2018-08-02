@@ -16,6 +16,8 @@ create view vt3 as select a1 a1, min(b) min_b, sum(a) sum_a, count(b) count_b, c
 create view v1 as select min(b) min_b, sum(a) sum_a, count(*) counts from t3 where abs(b) > abs(a);
 
 create view v2 as select distinct a1 distinct_a1, count(*) counts from t1 where b > 2 group by a1;
+create view v2_0 as select a1 a1, abs(b) abs_b, count(*) counts from t1 where b > 2 group by a1, abs(b);
+create view v2_1 as select a + a1 aas, abs(b) abs_b, count(*) counts from t1 where a1 in (0, a, b, 1) group by a + a1, abs(b);
 create view v5_1 as select distinct a1 distinct_a1, count(b1) count_b1, sum(a) sum_a, count(*) counts from t1 where b >= 2 or b1 in (3,30,300) group by a1;
 create view v5_2 as select distinct a1 distinct_a, sum(a) sum_a00, count(b) count_b00, count(*) counts from t1 group by a1;
 

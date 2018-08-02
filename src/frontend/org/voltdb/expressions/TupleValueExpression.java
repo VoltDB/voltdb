@@ -349,7 +349,9 @@ public class TupleValueExpression extends AbstractValueExpression {
                 return false;
             }
         }
-        return getColumnIndex() == expr.getColumnIndex();
+        // NOTE: m_ColumnIndex was ignored in comparison, because it might not get properly set
+        // till end of planning, when query is made across several tables.
+        return true;
     }
 
     @Override

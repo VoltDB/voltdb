@@ -56,6 +56,8 @@ public class TestMVOptimization extends PlannerTestCase {
                 "SELECT distinct_a, count_b00, sum_a00, counts from v5_2");
         checkQueriesPlansAreTheSame("SELECT MIN(b) minb, SUM(a) sum_a, COUNT(*) counts FROM t3 WHERE abs(b) > abs(a)",
                 "SELECT min_b minb, sum_a, counts FROM v1");
+        checkQueriesPlansAreTheSame("SELECT a + a1 aa, ABS(b) abs_b, COUNT(*) FROM t1 WHERE a1 in (0, a, b, 1, b) GROUP BY ABS(b), a + a1",
+                "SELECT aas aa, abs_b, counts C2 FROM v2_1");
         // Negative test: MV does not support HAVING clause
         assertMatch("SELECT a1 a1, COUNT(b) count_b, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1 HAVING SUM(a) >= 0",
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" " +
@@ -67,6 +69,10 @@ public class TestMVOptimization extends PlannerTestCase {
                         "INNER JOIN inline Hash AGGREGATION ops: COUNT(T1.B), SUM(T1.A), COUNT(*) " +
                         "inline INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" uniquely match " +
                         "(B1 = T2.B0) SEQUENTIAL SCAN of \"T2\"");
+        // Negative tests: GBY column mismatch -- V2_0 from testplans-materialized-view-optimization-ddl.sql gby column a1, not a
+        assertMatch("SELECT a, ABS(b), COUNT(*) FROM t1 WHERE b > 2 GROUP BY ABS(b), a;",
+                "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" using \"TA\" " +
+                "(for optimized grouping only) filter by (B > 2) inline Partial AGGREGATION ops: COUNT(*)");
     }
 
     public void testDistinct() {  // Test SELECT stmt that is "almost" same as view definition with exception of GBY column distinctiveness
