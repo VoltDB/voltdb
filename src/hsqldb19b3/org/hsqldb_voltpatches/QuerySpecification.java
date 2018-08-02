@@ -1084,12 +1084,6 @@ public class QuerySpecification extends QueryExpression {
             if (e.getLeftNode().isAggregate) {
                 e.isAggregate = true;
             }
-
-            if (e.isAggregate && ! isGrouped) {
-                // Don't allow ordering by aggregate functions
-                // in ungrouped queries...
-                throw Error.error(ErrorCode.X_42576);
-            }
         }
 
         for (int i = indexStartOrderBy; i < indexStartAggregates; i++) {

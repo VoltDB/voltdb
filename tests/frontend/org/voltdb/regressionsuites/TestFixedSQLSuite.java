@@ -3153,6 +3153,10 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testOrderByAggregateNoGroupBy() throws Exception {
         Client client = getClient();
+        String sql;
+        VoltTable vt;
+        final String vdbPlannerError = "Aggregate functions are not allowed in the ORDER BY clause " +
+                "if they do not also appear in the SELECT list.";
         final String hsqlPlannerError = "invalid ORDER BY expression";
 
         // In this bug, both HSQL and VoltDB could not handle queries with:
@@ -3167,53 +3171,66 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // Related tickets: ENG-13929, ENG-13801.
 
         // This query is not valid.  The query does ungrouped aggregation, but has a
-        // raw column reference in the OB clause.
-        verifyStmtFails(client, "SELECT MIN(VCHAR_INLINE) FROM ENG_13852_R11 AS T1 ORDER BY COUNT(*), T1.BIG;",
-                hsqlPlannerError);
+        // raw column reference in the OB clause.  However, because we can optimize away
+        // the ORDER BY clause, we allow this.
+        // (HSQL does not catch the error... this is ENG-14177.)
+        sql =  "SELECT MIN(VCHAR_INLINE) FROM ENG_13852_R11 AS T1 ORDER BY COUNT(*), T1.BIG;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][] {{null}}, vt);
 
         // VoltDB complains about this one.
-        verifyStmtFails(client, "SELECT TOP 3  -699 AS CA4 " +
+        sql = "SELECT TOP 3  -699 AS CA4 " +
                 "FROM ENG_13852_R11, ENG_13852_VR5 " +
-                "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;", hsqlPlannerError);
+                "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;";
+        verifyStmtFails(client, sql, vdbPlannerError);
 
         // This query has an agg on OB clause not on the SELECT list
-        verifyStmtFails(client, "SELECT 'foo' AS CA2, OUTER_TBL.TINY " +
+        // BUT, because the
+        sql = "SELECT 'foo' AS CA2, OUTER_TBL.TINY " +
                 "FROM ENG_13852_P5 AS OUTER_TBL " +
                 "WHERE VCHAR_INLINE != (" +
                 "  SELECT MAX(VCHAR) " +
                 "  FROM ENG_13852_R11 AS INNER_TBL " +
                 "  WHERE POINT != OUTER_TBL.POINT " +
                 "  ORDER BY COUNT(*)) " +
-                "ORDER BY NUM;", hsqlPlannerError);
+                "ORDER BY NUM;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][] {}, vt);
 
-        verifyStmtFails(client, "SELECT 'foo' " +
+        sql = "SELECT 'foo' " +
                 "FROM ENG_13852_R11 T1 " +
-                "ORDER BY COUNT(*) DESC;", hsqlPlannerError);
+                "ORDER BY COUNT(*) DESC;";
+        verifyStmtFails(client, sql, vdbPlannerError);
 
         // Aggregate functions in subexpressions of OB clause should also
         // be invalid:
-        verifyStmtFails(client, "SELECT 'foo' " +
+        sql = "SELECT 'foo' " +
                 "FROM ENG_13852_R11 T1 " +
-                "ORDER BY MAX(ID) / COUNT(*) DESC;", hsqlPlannerError);
+                "ORDER BY MAX(ID) / COUNT(*) DESC;";
+        verifyStmtFails(client, sql, vdbPlannerError);
 
-        verifyStmtFails(client, "SELECT 'foo' " +
+        sql = "SELECT 'foo' " +
                 "FROM ENG_13852_R11 T1 " +
-                "ORDER BY ABS(COUNT(*)) DESC;", hsqlPlannerError);
+                "ORDER BY ABS(COUNT(*)) DESC;";
+        verifyStmtFails(client, sql, vdbPlannerError);
 
         // Similar query with AVG
-        verifyStmtFails(client, "SELECT 79 AS const_num " +
+        sql = "SELECT 79 AS const_num " +
                 "FROM ENG_13852_R11 T1 " +
-                "ORDER BY AVG(const_num);", hsqlPlannerError);
+                "ORDER BY AVG(const_num);";
+        verifyStmtFails(client, sql, vdbPlannerError);
 
         // Similar query with GB clause
-        verifyStmtFails(client, "SELECT 'foo' " +
+        sql = "SELECT 'foo' " +
                 "FROM ENG_13852_R11 T1 " +
                 "GROUP BY tiny " +
-                "ORDER BY COUNT(*)", hsqlPlannerError);
+                "ORDER BY COUNT(*)";
+        verifyStmtFails(client, sql, hsqlPlannerError);
 
-        verifyStmtFails(client, "SELECT TOP 3  -699 AS CA4 " +
+        sql = "SELECT TOP 3  -699 AS CA4 " +
                 "FROM ENG_13852_R11 , ENG_13852_VR5     " +
-                "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;", hsqlPlannerError);
+                "ORDER BY COUNT(*) DESC, ENG_13852_R11.ID DESC;";
+        verifyStmtFails(client, sql, vdbPlannerError);
     }
 
     //
