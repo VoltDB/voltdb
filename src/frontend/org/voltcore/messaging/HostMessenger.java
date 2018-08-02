@@ -29,6 +29,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -332,7 +333,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     volatile ImmutableMultimap<Integer, ForeignHost> m_foreignHosts = ImmutableMultimap.of();
 
-    Map<Integer, ArrayList<ForeignHost>> m_zombieForeignHosts = new HashMap<> ();
+    /*
+     * Track dead ForeignHosts that are reported independently by zookeeper and PicoNetwork.
+     * When both have reported both lists for that hostId should be empty (and removed).
+     */
+    Map<Integer, ArrayList<ForeignHost>> m_zkZombieForeignHosts = new HashMap<> ();
+    Map<Integer, ArrayList<ForeignHost>> m_picoZombieForeignHosts = new HashMap<> ();
 
     /*
      * Reference to the target HSId to FH mapping
@@ -832,22 +838,48 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     .build();
         }
         assert(Thread.holdsLock(this)); // Make sure m_zombieForeignHosts is protected
-        ArrayList<ForeignHost> zombies = new ArrayList<>(fhs.size());
-        m_zombieForeignHosts.put(hostId, zombies);
+        ArrayList<ForeignHost> picoNetworkZombies = m_picoZombieForeignHosts.get(hostId);
+        ArrayList<ForeignHost> zookeeperZombies = new ArrayList<>(fhs.size());
         for (ForeignHost fh : fhs) {
-            zombies.add(fh);
+            if (picoNetworkZombies != null && picoNetworkZombies.contains(fh)) {
+                picoNetworkZombies.remove(fh);
+            }
+            else {
+                zookeeperZombies.add(fh);
+            }
             fh.close();
+        }
+        if (picoNetworkZombies != null && picoNetworkZombies.isEmpty()) {
+            m_picoZombieForeignHosts.remove(hostId);
+        }
+        if (!zookeeperZombies.isEmpty()) {
+            m_zkZombieForeignHosts.put(hostId, zookeeperZombies);
         }
     }
 
-    public synchronized void networkThreadShutdown(int hostId, ForeignHost fh) {
-        ArrayList<ForeignHost> zombies = m_zombieForeignHosts.get(hostId);
-        if (zombies != null) {
-            zombies.remove(fh);
-            if (zombies.isEmpty()) {
-                m_zombieForeignHosts.remove(hostId);
+    public synchronized void piconetworkThreadShutdown(int hostId, ForeignHost fh) {
+        ArrayList<ForeignHost> zookeeperZombies = m_zkZombieForeignHosts.get(hostId);
+        if (zookeeperZombies != null) {
+            boolean removed = zookeeperZombies.remove(fh);
+            assert(removed);    // Since a zk notification moves all the ForeignHosts for a hostId at once
+            if (zookeeperZombies.isEmpty()) {
+                m_zkZombieForeignHosts.remove(hostId);
             }
         }
+        else {
+            ArrayList<ForeignHost> picoNetworkZombies = m_picoZombieForeignHosts.get(hostId);
+            if (picoNetworkZombies == null) {
+                picoNetworkZombies = new ArrayList<>(Arrays.asList(fh));
+                m_picoZombieForeignHosts.put(hostId, picoNetworkZombies);
+            }
+            else {
+                picoNetworkZombies.add(fh);
+            }
+        }
+    }
+
+    public synchronized boolean canCompleteRepair(int hostId) {
+        return !m_foreignHosts.containsKey(hostId) && !m_picoZombieForeignHosts.containsKey(hostId) && !m_zkZombieForeignHosts.containsKey(hostId);
     }
 
     /**
@@ -1792,10 +1824,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 fh.cutLink();
             }
         }
-    }
-
-    public synchronized boolean canCompleteRepair(int hostId) {
-        return !m_foreignHosts.containsKey(hostId) && !m_zombieForeignHosts.containsKey(hostId);
     }
 
     public void setPartitionGroupPeers(Set<Integer> partitionGroupPeers, int hostCount) {
