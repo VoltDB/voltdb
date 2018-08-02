@@ -137,7 +137,7 @@ public abstract class AbstractImporter
         }
     }
 
-    public void reportStat(String procName){
+    public void reportInitializedStat(String procName){
         m_importServerAdapter.reportInitialized(getName(), procName);
     }
 
