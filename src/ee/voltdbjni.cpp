@@ -481,7 +481,7 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
     if (cnt < 0) {
         throwFatalException( "parameter count is negative: %d", cnt);
     }
-    assert (cnt < MAX_PARAM_COUNT);
+    assert (cnt <= MAX_PARAM_COUNT);
     deserializeParameterSetCommon(cnt, serialize_in, params, stringPool);
     return cnt;
 }

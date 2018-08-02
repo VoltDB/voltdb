@@ -156,7 +156,7 @@ public class VoltDDLElementTracker {
         }
 
         // need to re-instantiate as descriptor fields are final
-        if( descriptor.m_singleStmt == null) {
+        if( descriptor.m_stmtLiterals == null) {
             // the longer form constructor asserts on singleStatement
             descriptor = m_compiler.new ProcedureDescriptor(
                     descriptor.m_authGroups,
@@ -167,7 +167,7 @@ public class VoltDDLElementTracker {
             descriptor = m_compiler.new ProcedureDescriptor(
                     descriptor.m_authGroups,
                     descriptor.m_className,
-                    descriptor.m_singleStmt,
+                    descriptor.m_stmtLiterals,
                     descriptor.m_joinOrder,
                     data,
                     false,
