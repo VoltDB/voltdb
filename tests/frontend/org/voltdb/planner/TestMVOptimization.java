@@ -160,6 +160,7 @@ public class TestMVOptimization extends PlannerTestCase {
                 "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4",
                 "GBY expression equivalent but different: should not match view");
         // negative tests: SELECT stmt's display column contains aggregates on its group by column
+        // Future improvements should rewrite the expression to match MV.
         assertMatch("SELECT ABS(WAGE), COUNT(*), MAX(ID), SUM(RENT), MIN(AGE),  COUNT(DEPT) FROM P2 M02  GROUP BY WAGE",
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"P2 (M02)\" " +
                         "using its primary key index (for deterministic order only) inline Hash AGGREGATION " +

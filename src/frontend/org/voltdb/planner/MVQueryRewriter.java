@@ -91,7 +91,7 @@ final class MVQueryRewriter {
         final AtomicInteger indx = new AtomicInteger(0);
         final AtomicBoolean updated = new AtomicBoolean(false);
         stmt.m_children.stream().flatMap(c -> {
-            if(c instanceof ParsedSelectStmt) {
+            if (c instanceof ParsedSelectStmt) {
                 final ParsedSelectStmt s = (ParsedSelectStmt) c;
                 if ((new MVQueryRewriter(s)).rewrite()) {
                     updated.set(true);
@@ -208,7 +208,7 @@ final class MVQueryRewriter {
      * @return accumulated indices.
      */
     private static List<Integer> extractTVEIndices(AbstractExpression e, List<Integer> accum) {
-        if(e != null) {
+        if (e != null) {
             if (e instanceof TupleValueExpression) {
                 accum.add(((TupleValueExpression) e).getColumnIndex());
             } else {
@@ -252,12 +252,11 @@ final class MVQueryRewriter {
         final FilterMatcher filter = new FilterMatcher(m_selectStmt.m_joinTree.getJoinExpression(), predicate_of(mv));
         //  *** Matching criteria/order: ***
         // 1. Filters match;
-        // 2. Select stmt contains group-by column;
-        // 3. Group-by-columns' table is same as MV's source table;
-        // 4. Those group-by-column's columns are same as MV's group-by columns;
-        // 5. Select stmt's group-by column names match with MV's
-        // 6. Each column's aggregation type match, in the sense of set equality;
-        if(filter.match() && gbyTablesEqual(mv) && gbyColumnsMatch(mv)) {
+        // 2. Group-by-columns' table is same as MV's source table;
+        // 3. Those group-by-column's columns are same as MV's group-by columns;
+        // 4. Select stmt's group-by column names match with MV's
+        // 5. Each column's aggregation type match, in the sense of set equality;
+        if (filter.match() && gbyTablesEqual(mv) && gbyColumnsMatch(mv)) {
             return getViewColumnMaps(mv);
         } else {
             return null;
