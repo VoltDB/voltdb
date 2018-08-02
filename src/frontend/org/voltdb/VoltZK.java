@@ -204,7 +204,7 @@ public class VoltZK {
     public static final String actionLock = "/db/action_lock";
 
     //register partition while the partition elects a new leader upon node failure
-    public static final String mp_repair_blocker = "/db/mp_repair_blocker";
+    public static final String mpRepairBlocker = "/db/mp_repair_blocker";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -227,7 +227,7 @@ public class VoltZK {
             request_truncation_snapshot,
             host_ids_be_stopped,
             actionLock,
-            mp_repair_blocker
+            mpRepairBlocker
     };
 
     /**
@@ -455,16 +455,12 @@ public class VoltZK {
                 } else if (blockers.contains(migrate_partition_leader)){
                     errorMsg = "while leader migration is active. Please retry node rejoin later.";
                 } else {
-                    // Upon node failures, new partition leaders, including MPI, will be registered right before they
-                    // are promoted and unregistered after their promotions are done. Let rejoining nodes wait until
-                    // all the partition leader promotions have finished to avoid any
+                    // Upon node failures, a MP repair blocker may be registered right before they
+                    // unregistered after repair is done. Let rejoining nodes wait to avoid any
                     // interference with the transaction repair process.
-                    List<String> partitions = zk.getChildren(VoltZK.mp_repair_blocker, false);
+                    List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
                     if (!partitions.isEmpty()) {
-                        errorMsg = "while leader promotions are in progress. Please retry node rejoin later.";
-                        if (hostLog.isDebugEnabled()) {
-                            hostLog.debug("Can not rejoin while leader promotion is in progress.");
-                        }
+                        errorMsg = "while leader promotion or transaction repair are in progress. Please retry node rejoin later.";
                     }
                 }
                 break;
@@ -532,7 +528,7 @@ public class VoltZK {
     }
 
     public static void createMpRepairBlocker(ZooKeeper zk) {
-        String node = ZKUtil.joinZKPath(mp_repair_blocker, Integer.toString(MpInitiator.MP_INIT_PID));
+        String node = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(MpInitiator.MP_INIT_PID));
         try {
             zk.create(node,
                       null,
@@ -548,7 +544,7 @@ public class VoltZK {
     }
 
     public static void removeMpRepairBlocker(ZooKeeper zk, VoltLogger log) {
-        String node = ZKUtil.joinZKPath(mp_repair_blocker, Integer.toString(MpInitiator.MP_INIT_PID));
+        String node = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(MpInitiator.MP_INIT_PID));
         try {
             zk.delete(node, -1);
         } catch (KeeperException e) {
