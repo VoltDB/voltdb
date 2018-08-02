@@ -535,7 +535,6 @@ class Stats(object):
                                         test_data['type'] = "CONSISTENT"
                                         try:
                                             test_data['new_issue_url'] = self.file_jira_issue(test_data, DRY_RUN=(not file_jira_ticket))
-                                            pass
                                         except:
                                             logging.exception("failed to file a jira ticket")
 
