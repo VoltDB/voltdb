@@ -764,7 +764,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
                     // Join the second node
                     lc.joinOne(1);
-                    Thread.sleep(2000);
+                    Thread.sleep(1000);
 
                     for (int ii = 0; ii < Integer.MAX_VALUE; ii++) {
                         cr = client.callProcedure("GetTxnId", ii);

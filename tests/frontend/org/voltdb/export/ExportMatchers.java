@@ -152,7 +152,7 @@ public class ExportMatchers {
         VoltMessage asVoltMessage() {
             byte [] signatureBytes = signature.getBytes(Constants.UTF8ENCODING);
             ByteBuffer buf = ByteBuffer.allocate(17 + signatureBytes.length);
-            buf.put((byte)0);
+            buf.put((byte)ExportManager.RELEASE_BUFFER);
             buf.putInt(partitionId);
             buf.putInt(signatureBytes.length);
             buf.put(signatureBytes);

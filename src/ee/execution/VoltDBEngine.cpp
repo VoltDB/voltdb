@@ -141,6 +141,8 @@ typedef boost::multi_index::multi_index_container<
     >
 > PlanSet;
 
+  int32_t s_exportFlushTimeout=4000;  // export/tuple flush interval ms setting
+
 
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
@@ -182,7 +184,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t defaultDrBufferSize,
                          int64_t tempTableMemoryLimit,
                          bool isLowestSiteId,
-                         int32_t compactionThreshold)
+                         int32_t compactionThreshold,
+                         int32_t exportFlushTimeout)
 {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
@@ -190,6 +193,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
+    s_exportFlushTimeout = exportFlushTimeout;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -457,7 +461,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         if (usedParamcnt < 0) {
             throwFatalException("parameter count is negative: %d", usedParamcnt);
         }
-        assert (usedParamcnt < MAX_PARAM_COUNT);
+        assert (usedParamcnt <= MAX_PARAM_COUNT);
 
         for (int j = 0; j < usedParamcnt; ++j) {
             params[j].deserializeFromAllocateForStorage(serialInput, &m_stringPool);

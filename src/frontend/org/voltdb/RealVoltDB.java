@@ -227,6 +227,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
@@ -238,9 +239,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "8.2";
+    static final String m_defaultVersionString = "8.3";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q8.2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q8.3\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -1676,6 +1677,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
 
                     handleHostsFailedForMigratePartitionLeader(failedHosts);
+                    acceptExportStreamMastership(failedHosts);
 
                     // Send KSafety trap - BTW the side effect of
                     // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
@@ -1733,7 +1735,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void handleHostsFailedForMigratePartitionLeader(Set<Integer> failedHosts) {
 
-        final boolean disableSpiTask = "true".equalsIgnoreCase(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "true"));
+        final boolean disableSpiTask = "true".equalsIgnoreCase(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false"));
         if (disableSpiTask) {
             return;
         }
@@ -1771,6 +1773,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 initiator.resetMigratePartitionLeaderStatus(newHostId);
             }
             VoltZK.removeMigratePartitionLeaderInfo(m_messenger.getZK());
+        }
+    }
+
+    private void acceptExportStreamMastership(Set<Integer> failedHosts) {
+        for (Initiator initiator : m_iv2Initiators.values()) {
+            if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
+                SpInitiator spInitiator = (SpInitiator)initiator;
+                if (spInitiator.isLeader()) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Export Manager has been notified that local partition " +
+                                  spInitiator.getPartitionId() + " to reevaluate export stream master.");
+                    }
+                    ExportManager.instance().acceptMastership(spInitiator.getPartitionId());
+                }
+            }
         }
     }
 
@@ -2195,7 +2212,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void startMigratePartitionLeaderTask() {
-        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "true"));
+        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false"));
         if (disableSpiTask) {
             hostLog.info("MigratePartitionLeader is not scheduled.");
             return;

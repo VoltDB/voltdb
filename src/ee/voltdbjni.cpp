@@ -269,7 +269,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
-    jint compactionThreshold)
+    jint compactionThreshold,
+    jint exportFlushTimeout)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -297,7 +298,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                            defaultDrBufferSize,
                            tempTableMemory,
                            createDrReplicatedStream,
-                           static_cast<int32_t>(compactionThreshold));
+                           static_cast<int32_t>(compactionThreshold),
+                           exportFlushTimeout);
         VOLT_DEBUG("initialize succeeded");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     }
@@ -481,7 +483,7 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
     if (cnt < 0) {
         throwFatalException( "parameter count is negative: %d", cnt);
     }
-    assert (cnt < MAX_PARAM_COUNT);
+    assert (cnt <= MAX_PARAM_COUNT);
     deserializeParameterSetCommon(cnt, serialize_in, params, stringPool);
     return cnt;
 }

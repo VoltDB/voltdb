@@ -207,18 +207,8 @@ public class StoredProcedureInvocation implements JSONString {
      * Also line 30 of AbstactDRTupleStream.h
      * Also line 38 of InvocationBuffer.java
      */
-    public int getSerializedSize()
-    {
-        // compute the size
-        int size = getSerializedSizeWithoutParams() +
-            getSerializedParamSize(); // parameters
-        assert(size > 0); // sanity
 
-        // MAKE SURE YOU SEE COMMENT ON TOP OF METHOD!!!
-        return size;
-    }
-
-    public int getSerializedSizeWithoutParams()
+    public int getFixedHeaderSize()
     {
         // get extension sizes - if not present, size is 0 for each
         // 6 is one byte for ext type, one for size, and 4 for integer value
@@ -229,12 +219,24 @@ public class StoredProcedureInvocation implements JSONString {
         // compute the size
         int size =
                 1 + // type
-                        4 + getProcNameBytes().length + // procname
-                        8 + // client handle
-                        1 + // extension count
-                        batchExtensionSize + allPartitionExtensionSize;
+                4 + getProcNameBytes().length + // procname
+                8 + // client handle
+                1 + // extension count
+                batchExtensionSize + allPartitionExtensionSize;
         return size;
     }
+
+    public int getSerializedSize()
+    {
+        // compute the size
+        int size = getFixedHeaderSize() +
+            getSerializedParamSize(); // parameters
+        assert(size > 0); // sanity
+
+        // MAKE SURE YOU SEE COMMENT ON TOP OF METHOD!!!
+        return size;
+    }
+
 
     /**
      * Get the serialized size of this SPI in the original serialization version.
