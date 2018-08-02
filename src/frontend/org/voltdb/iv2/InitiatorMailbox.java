@@ -551,7 +551,12 @@ public class InitiatorMailbox implements Mailbox
         // even though the PicoNetwork thread could still be alive so we will skeptically
         int deadHostId = req.getDeadHostId();
         if (deadHostId != Integer.MAX_VALUE) {
-            if (!m_messenger.canCompleteRepair(deadHostId)) {
+            if (m_messenger.canCompleteRepair(deadHostId)) {
+                // Make sure we are the last in the task queue when we know the ForeignHost is gone
+                req.disableDeadHostCheck();
+                deliver(message);
+            }
+            else {
                 if (req.getRepairRetryCount() > 100 && req.getRepairRetryCount() % 100 == 0) {
                     hostLog.warn("Repair Request for dead host " + deadHostId +
                             " has not been processed yet because connection has not closed");
@@ -564,8 +569,8 @@ public class InitiatorMailbox implements Mailbox
                 };
                 VoltDB.instance().scheduleWork(retryRepair, 10, -1, TimeUnit.MILLISECONDS);
                 // the repair message will be resubmitted shortly when the ForeignHosts to the dead host have been removed
-                return;
             }
+            return;
         }
 
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
