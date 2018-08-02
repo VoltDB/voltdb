@@ -248,6 +248,11 @@ public class PlannerTool {
                 // check the parameters count
                 // check user input question marks with input parameters
                 int inputParamsLengh = userParams == null ? 0: userParams.length;
+                if (planner.getAdhocUserParamsCount() > CompiledPlan.MAX_PARAM_COUNT) {
+                    throw new PlanningErrorException(
+                            "The statement's parameter count " + planner.getAdhocUserParamsCount() +
+                            " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
+                }
                 if (planner.getAdhocUserParamsCount() != inputParamsLengh) {
                     wrongNumberParameters = true;
                     if (!isExplainMode) {

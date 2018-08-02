@@ -461,7 +461,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         if (usedParamcnt < 0) {
             throwFatalException("parameter count is negative: %d", usedParamcnt);
         }
-        assert (usedParamcnt < MAX_PARAM_COUNT);
+        assert (usedParamcnt <= MAX_PARAM_COUNT);
 
         for (int j = 0; j < usedParamcnt; ++j) {
             params[j].deserializeFromAllocateForStorage(serialInput, &m_stringPool);
