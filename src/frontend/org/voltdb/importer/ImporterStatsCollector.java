@@ -90,6 +90,11 @@ public class ImporterStatsCollector extends SiteStatsSource
         statsInfo.m_failureCount.incrementAndGet();
     }
 
+    // Report that the importer was successfully initialized
+    public void reportInitialized(String importerName, String procName) {
+        getStatsInfo(importerName, procName);
+    }
+
     // One insert succeeded
     private void reportSuccess(String importerName, String procName) {
         StatsInfo statsInfo = getStatsInfo(importerName, procName);

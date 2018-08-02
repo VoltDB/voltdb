@@ -137,6 +137,10 @@ public abstract class AbstractImporter
         }
     }
 
+    public void reportInitializedStat(String procName){
+        m_importServerAdapter.reportInitialized(getName(), procName);
+    }
+
     private void reportFailureStat(String procName) {
         m_importServerAdapter.reportFailure(getName(), procName, false);
     }
