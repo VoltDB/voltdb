@@ -159,6 +159,15 @@ public class TestMVOptimization extends PlannerTestCase {
         checkQueriesPlansAreDifferent("SELECT a1 + a * 2, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a1 + a * 2, b - a;",
                 "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4",
                 "GBY expression equivalent but different: should not match view");
+        // negative tests: SELECT stmt's display column contains aggregates on its group by column
+        assertMatch("SELECT ABS(WAGE), COUNT(*), MAX(ID), SUM(RENT), MIN(AGE),  COUNT(DEPT) FROM P2 M02  GROUP BY WAGE",
+                "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"P2 (M02)\" " +
+                        "using its primary key index (for deterministic order only) inline Hash AGGREGATION " +
+                        "ops: COUNT(*), MAX(M02.ID), SUM(M02.RENT), MIN(M02.AGE), COUNT(M02.DEPT)");
+        assertMatch("SELECT ABS(WAGE), COUNT(*), MIN(AGE),    SUM(RENT), MAX(ID) FROM R2 M10  GROUP BY DEPT,  WAGE",
+                "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"R2 (M10)\" " +
+                        "using its primary key index (for deterministic order only) inline Hash AGGREGATION " +
+                        "ops: COUNT(*), MIN(M10.AGE), SUM(M10.RENT), MAX(M10.ID)");
     }
 
     public void testNestedSelQuery() {  // test SELECT stmt matching & rewriting inside sub-query

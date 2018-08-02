@@ -37,3 +37,31 @@ create view v4_1 as select b1, count(*) counts from t1 where c in ('foo', 'bar',
 create view vt2 as select distinct c0 distinct_c, sum(b0) sum_b, count(*) counts from t2 group by c0;
 create view vt2_1 as select b0 b, sum(c0) sum_c, count(*) counts from t2 group by b0;
 
+-- Testing on SELECT's display column contains aggregation of gby column
+CREATE TABLE R2 (
+  ID INTEGER NOT NULL,
+  WAGE SMALLINT,
+  DEPT SMALLINT,
+  AGE SMALLINT,
+  RENT SMALLINT,
+  PRIMARY KEY (ID)
+);
+
+CREATE VIEW V_R2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS
+	SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R2
+	GROUP BY wage, dept;
+
+CREATE TABLE P2 (
+  ID INTEGER NOT NULL,
+  WAGE SMALLINT,
+  DEPT SMALLINT,
+  AGE SMALLINT,
+  RENT SMALLINT,
+  PRIMARY KEY (ID)
+);
+PARTITION TABLE P2 ON COLUMN ID;
+
+CREATE VIEW P2_V1 (WAGE, CNT,      DEPT,        AGE,      RENT,      ID    ) AS
+    SELECT         WAGE, COUNT(*), COUNT(DEPT), MIN(AGE), SUM(RENT), MAX(ID) FROM P2
+    GROUP BY       WAGE;
+

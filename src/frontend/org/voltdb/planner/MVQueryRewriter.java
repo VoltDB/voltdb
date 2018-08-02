@@ -314,26 +314,33 @@ final class MVQueryRewriter {
                         .skip(mvGbys.size())        // where the first k columns correspond to k GBY columns/expressions,
                         .collect(Collectors.toMap(col -> {
                                     final Column matCol = col.getMatviewsource();   // source column of MV column/aggregation
-                                    return Pair.of(col.getAggregatetype(), matCol == null ? -1 : matCol.getIndex());
+                                    return Pair.of(col.getAggregatetype(),
+                                            matCol == null ? -1 : matCol.getIndex());    // -1 when it's arithmetic expression like "C1 - C2"
                                 },
-                                col -> Pair.of(col.getTypeName(), col.getIndex())));
+                                col -> Pair.of(col.getTypeName(), col.getIndex()),
+                                (a, b) -> a));      // dedup when MV contains duplicated entries
         // <aggType, viewSrcTblColIndx> ==> <displayColName, displayColIndx>
+        final AtomicBoolean hasAggregateOnGbyCol = new AtomicBoolean(false);        // when SELECT contains aggregate on its GBY column, and view doesn't
         final Map<Pair<Integer, Integer>, Pair<String, Integer>> nonGbyFromStmt =
                 m_selectStmt.displayColumns().stream()                              // iterate over SELECT stmt's display columns and
                         .filter(ci -> !selGbyColIndexMap.containsKey(ci.m_index))   // collect all but GBY columns/expressions,
-                        .map(ci -> {
+                        .flatMap(ci -> {
                             final Pair<String, Integer> value = Pair.of(ci.m_columnName, ci.m_index);  // Mapped value: display column name and index
                             if (ci.m_expression instanceof AggregateExpression) {   // if GBY over an aggregation function, then
                                 final AbstractExpression left = ci.m_expression.getLeft();
-                                return Pair.of(Pair.of(ci.m_expression.getExpressionType().getValue(), // extract aggregation type and argument:
+                                return Stream.of(Pair.of(Pair.of(ci.m_expression.getExpressionType().getValue(), // extract aggregation type and argument:
                                         // aggregate on what? For simple column, it contains column index; for "count(*)", set to -1;
-                                        left == null ? -1 : ((TupleValueExpression) left).getColumnIndex()), value);    // use it to map into value type.
-                            } else {    // otherwise, it's either column or distinct column: aggregation type is set to VALUE_TUPLE.
-                                return Pair.of(Pair.of(ExpressionType.VALUE_TUPLE.getValue(),
-                                        ((TupleValueExpression) ci.m_expression).getColumnIndex()), value);
+                                        left == null ? -1 : ((TupleValueExpression) left).getColumnIndex()), value));    // use it to map into value type.
+                            } else if (ci.m_expression instanceof TupleValueExpression) {    // otherwise, when it's either column or distinct column: aggregation type is set to VALUE_TUPLE.
+                                return Stream.of(Pair.of(Pair.of(ExpressionType.VALUE_TUPLE.getValue(),
+                                        ((TupleValueExpression) ci.m_expression).getColumnIndex()), value));
+                            } else {        // it could also be an aggregate function on a group-by column: do not support for now.
+                                hasAggregateOnGbyCol.set(true);
+                                return Stream.empty();
                             }
                         }).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond));
-        if (nonGbyFromView.keySet().containsAll(nonGbyFromStmt.keySet())) {   // when {SELECT stmt non-GBY columns} \belongs {VIEW columns non-GBY columns}
+        if (! hasAggregateOnGbyCol.get() &&
+                nonGbyFromView.keySet().containsAll(nonGbyFromStmt.keySet())) {   // when {SELECT stmt non-GBY columns} \belongs {VIEW columns non-GBY columns}
             // Join the above 2 maps to get <display column name, display column index> ==> <MV column name, MV column index> for non-GBY display columns in SELECT stmt
             final Map<Pair<String, Integer>, Pair<String, Integer>> rel = nonGbyFromStmt.entrySet().stream()
                     .collect(Collectors.toMap(Map.Entry::getValue, kv -> nonGbyFromView.get(kv.getKey())));
