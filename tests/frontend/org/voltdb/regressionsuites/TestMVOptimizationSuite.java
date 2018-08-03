@@ -48,7 +48,9 @@ public class TestMVOptimizationSuite extends RegressionSuite {
                         "CREATE INDEX TC ON T2(C0);\n" +
                         "PARTITION TABLE T2 ON COLUMN B0;\n" +
                         "CREATE TABLE T11(A INT, A1 INT);\n" +
-                        "CREATE TABLE T3(A INT, A1 INT, B INT);\n");
+                        "CREATE TABLE T3(A INT, A1 INT, B INT);\n" +
+                        "CREATE TABLE sensor(id int, zone smallint not null, temperature tinyint, humidity tinyint, " +
+                        "vibration tinyint, pressure smallint, uptime bigint, last_served timestamp);\n");
         builder.setUseDDLSchema(true);
     }
 
@@ -92,9 +94,7 @@ public class TestMVOptimizationSuite extends RegressionSuite {
             final Client client = getClient();
             populateTablesWithViews(client, views);
             return client;
-        } catch (IOException ex) {
-            fail(ex.getMessage());
-        } catch (ProcCallException ex) {
+        } catch (IOException | ProcCallException ex) {
             fail(ex.getMessage());
         }
         return null;
@@ -115,7 +115,12 @@ public class TestMVOptimizationSuite extends RegressionSuite {
     public void testSimple() throws IOException, ProcCallException {
         final Client client = withViews(
                 "CREATE VIEW v5_1 AS SELECT DISTINCT a1 distinct_a1, COUNT(b1) count_b1, SUM(a) sum_a, " +
-                        "COUNT(*) counts FROM t1 WHERE b >= 2 OR b1 IN (3,30,300) GROUP BY a1;");
+                        "COUNT(*) counts FROM t1 WHERE b >= 2 OR b1 IN (3,30,300) GROUP BY a1;",
+                "CREATE VIEW long_running (id, zone, min_temperature, max_temperature, sum_temperature, " +
+                        "min_humidity, max_humidity, max_uptime, counts) AS SELECT " +
+                        "id, zone, min(temperature), max(temperature), sum(temperature), min(humidity), " +
+                        "max(humidity), max(uptime), count(*) FROM sensor WHERE uptime >= 72000 " +
+                        "GROUP BY id, zone;");
         // An ad-hoc query that's "exactly the same" as an existing view definition will get rewritten
         checkThat(client,
                 "SELECT DISTINCT a1 a1, COUNT(b1) cnt_b1, SUM(a) sum_a, COUNT(*) cnt FROM t1 WHERE b >= 2 OR b1 IN (3, 30, 300) GROUP BY a1;",
@@ -134,6 +139,11 @@ public class TestMVOptimizationSuite extends RegressionSuite {
                 "SELECT SUM(a) FROM t1 WHERE b1 IN (3, 30, 300) OR b >= 20 GROUP BY a1",
                 null, "sequential scan of \"t1\"");
         cleanTableAndViews(client, "V5_1");
+        // Check that directly running matched query in subquery should not go wrong
+        final String q =
+                "SELECT * FROM (select zone, min(temperature) min_temperature, max(humidity) max_humidity FROM sensor " +
+                "WHERE uptime >= 72000 GROUP BY id, zone) foo ORDER BY zone;";
+        client.callProcedure("@AdHoc", q).getResults();
     }
 
     public void testMVResolution() throws IOException, ProcCallException {
@@ -168,9 +178,8 @@ public class TestMVOptimizationSuite extends RegressionSuite {
             assertTrue(config.compile(project));
             builder.addServerConfig(config);
             return builder;
-        }
-        catch (IOException excp) {
-            fail();
+        } catch (IOException excp) {
+            fail("Failure setting up schema for project");
         }
         return null;
     }
