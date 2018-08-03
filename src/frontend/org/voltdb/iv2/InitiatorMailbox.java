@@ -24,6 +24,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -688,5 +689,9 @@ public class InitiatorMailbox implements Mailbox
         m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
         m_repairLog.setLeaderState(true);
         m_newLeaderHSID = Long.MIN_VALUE;
+    }
+
+    public ZooKeeper getZK() {
+        return m_messenger.getZK();
     }
 }
