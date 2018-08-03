@@ -77,7 +77,7 @@ public class ExpressionStartsWith extends ExpressionLogical {
         Object rightValue  = nodes[RIGHT].getValue(session);
 
         if (startsWithObject.isVariable) {
-            startsWithObject.setPattern(session, rightValue);
+            startsWithObject.setPattern(session, rightValue, nodes);
         }
 
         return startsWithObject.compare(session, leftValue);
@@ -135,12 +135,11 @@ public class ExpressionStartsWith extends ExpressionLogical {
             return;
         }
 
-        // In this case, pattern will always be not null 
         Object pattern = isRightArgFixedConstant
                          ? nodes[RIGHT].getConstantValue(session)
                          : null;
 
-        startsWithObject.setPattern(session, pattern);
+        startsWithObject.setPattern(session, pattern, nodes);
 
         if (noOptimization) {
             return;
@@ -149,7 +148,13 @@ public class ExpressionStartsWith extends ExpressionLogical {
         // User parameters should not arrive here.
         assert(!nodes[RIGHT].isParam);
 
-        if (startsWithObject.isEquivalentToUnknownPredicate()) {
+        if (startsWithObject.isEquivalentToCastNullPredicate()) {
+            // ENG-14266 solve 'col STARTS WITH CAST(NULL AS VARCHAR)' problem
+            // If it is this case, we are already set.
+            // EE can handle this (left expression is a ExpressionColumn, right expression is a null VALUE).
+            startsWithObject = null;
+            return;
+        } else if (startsWithObject.isEquivalentToUnknownPredicate()) {
             this.setAsConstantValue(null);
             startsWithObject = null;
         } else if (startsWithObject.isEquivalentToCharPredicate()) {    // handling plain prefix
@@ -175,7 +180,7 @@ public class ExpressionStartsWith extends ExpressionLogical {
             opType      = OpTypes.NOT;
             nodes       = new Expression[UNARY];
             nodes[LEFT] = notNull;
-            startsWithObject  = null;
+            startsWithObject = null;
         } else {
             if (nodes[LEFT].opType != OpTypes.COLUMN) {
                 return;

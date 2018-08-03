@@ -172,9 +172,8 @@ public abstract class StatementCompiler {
 
 
         if (m_logger.isDebugEnabled()) {
-            Procedure procedure = (Procedure)catalogStmt.getParent();
             m_logger.debug(String.format("Compiling %s.%s: sql = \"%s\"\n",
-                                         procedure.getTypeName(),
+                                         catalogStmt.getParent().getTypeName(),
                                          catalogStmt.getTypeName(),
                                          catalogStmt.getSqltext()));
         }

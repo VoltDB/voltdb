@@ -49,13 +49,13 @@ CREATE VIEW V_P2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS
     GROUP BY wage, dept;
 
 -- Is this used anywhere??
-CREATE VIEW V_R2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS 
-	SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R2 
+CREATE VIEW V_R2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS
+	SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R2
 	GROUP BY wage, dept;
 
 -- Is this used anywhere??
-CREATE VIEW V_R2_ABS (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS 
-	SELECT ABS(wage), dept, count(*), sum(age), sum(rent)  FROM R2 
+CREATE VIEW V_R2_ABS (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS
+	SELECT ABS(wage), dept, count(*), sum(age), sum(rent)  FROM R2
 	GROUP BY ABS(wage), dept;
 
 -- Materialized Views with 0, 1, 2, 3, or 4 GROUP BY columns

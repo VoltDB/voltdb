@@ -1238,8 +1238,8 @@ public abstract class SubPlanAssembler {
          */
         public WindowFunctionScore(List<ParsedColInfo> orderByExpressions) {
             for (ParsedColInfo pci : orderByExpressions) {
-                SortDirectionType sortDir = pci.ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
-                m_unmatchedOrderByExprs.add(new ExpressionOrColumn(-1, pci.expression, sortDir));
+                SortDirectionType sortDir = pci.m_ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
+                m_unmatchedOrderByExprs.add(new ExpressionOrColumn(-1, pci.m_expression, sortDir));
             }
             // Statement level order by expressions are number STATEMENT_LEVEL_ORDER_BY_INDEX.
             m_windowFunctionNumber = STATEMENT_LEVEL_ORDER_BY_INDEX;
