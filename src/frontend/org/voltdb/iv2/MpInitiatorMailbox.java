@@ -83,18 +83,13 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                     },
                     "MpInitiator send", 1024 * 128);
 
-    @Override
-    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, final String whoami) {
-        return constructRepairAlgo(survivors, whoami , false);
-    }
-
-    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, final String whoami, boolean balanceSPI) {
+    public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, int deadHost, final String whoami, boolean balanceSPI) {
         RepairAlgo ra = null;
         if (Thread.currentThread().getId() != m_taskThreadId) {
             FutureTask<RepairAlgo> ft = new FutureTask<RepairAlgo>(new Callable<RepairAlgo>() {
                 @Override
                 public RepairAlgo call() throws Exception {
-                    RepairAlgo ra = new MpPromoteAlgo(survivors.get(), MpInitiatorMailbox.this,
+                    RepairAlgo ra = new MpPromoteAlgo(survivors.get(), deadHost, MpInitiatorMailbox.this,
                             m_restartSeqGenerator, whoami, balanceSPI);
                     setRepairAlgoInternal(ra);
                     return ra;
@@ -107,7 +102,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 Throwables.propagate(e);
             }
         } else {
-            ra = new MpPromoteAlgo(survivors.get(), this, m_restartSeqGenerator, whoami, balanceSPI);
+            ra = new MpPromoteAlgo(survivors.get(), deadHost, this, m_restartSeqGenerator, whoami, balanceSPI);
             setRepairAlgoInternal(ra);
         }
         return ra;
