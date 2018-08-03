@@ -151,7 +151,7 @@ public class LocalCluster extends VoltServerConfig {
     //wait before next node is started up in millisecond
     //to help matching the host id on the real cluster with the host id on the local
     //cluster
-    private long m_delayBetweenNodeStartupMS = 0;
+    private long m_deplayBetweenNodeStartupMS = 0;
     private boolean m_httpPortEnabled = false;
     private final ArrayList<EEProcess> m_eeProcs = new ArrayList<>();
     //This is additional process invironment variables that can be passed.
@@ -921,9 +921,9 @@ public class LocalCluster extends VoltServerConfig {
 
                 startOne(i, clearLocalDataDirectories, StartAction.CREATE, true, placementGroup);
                 //wait before next one
-                if (m_delayBetweenNodeStartupMS > 0) {
+                if (m_deplayBetweenNodeStartupMS > 0) {
                     try {
-                        Thread.sleep(m_delayBetweenNodeStartupMS);
+                        Thread.sleep(m_deplayBetweenNodeStartupMS);
                     } catch (InterruptedException e) {
                     }
                 }
@@ -1436,9 +1436,9 @@ public class LocalCluster extends VoltServerConfig {
                     initLocalServer(entry.getKey(), true);
                 }
                 startOne(entry.getKey(), true, StartAction.JOIN, false, entry.getValue());
-                if (m_delayBetweenNodeStartupMS > 0) {
+                if (m_deplayBetweenNodeStartupMS > 0) {
                     try {
-                        Thread.sleep(m_delayBetweenNodeStartupMS);
+                        Thread.sleep(m_deplayBetweenNodeStartupMS);
                     } catch (InterruptedException e) {
                     }
                 }
@@ -2359,8 +2359,8 @@ public class LocalCluster extends VoltServerConfig {
         return client;
     }
 
-    public void setDelayBetweenNodeStartup(long delayBetweenNodeStartup) {
-        m_delayBetweenNodeStartupMS = delayBetweenNodeStartup;
+    public void setDeplayBetweenNodeStartup(long deplayBetweenNodeStartup) {
+        m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
     }
 
     // Reset the message match result
