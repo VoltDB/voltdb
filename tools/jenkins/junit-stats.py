@@ -168,7 +168,7 @@ class Stats(object):
         history = sub('/\d+/testReport/', '/lastCompletedBuild/testReport/', error_url) + '/history/'
 
         failed_since = error_report['failedSince']
-        failure_percent = str(issue['failurePercent'])
+        failure_percent = issue['failurePercent']
         summary = issue['name'] + ' is failing ~' + failure_percent + '% of the time on ' + job + ' (' + issue['type'] + ')'
         description = error_url + '\n\n-----------------\-stack trace\----------------------------\n\n' \
                       + str(error_report['errorStackTrace']) \
@@ -510,7 +510,7 @@ class Stats(object):
 
                                 cursor.execute(QUERY3, params1)
                                 runs = float(cursor.fetchone()[0])
-                                test_data['failurePercent'] = numFails / runs * 100
+                                test_data['failurePercent'] = "%.2f" % (numFails / runs * 100)
 
                                 if not everFixed:
                                     # if first time failure sequence in past 30 days, file ticket
