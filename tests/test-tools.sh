@@ -201,7 +201,7 @@ function test-tools-wait-for-server-to-start() {
         echo -e "DEBUG: sqlcmd command:\n$SQLCMD_COMMAND"
     fi
 
-    MAX_SECONDS=5
+    MAX_SECONDS=15
     for (( i=1; i<=${MAX_SECONDS}; i++ )); do
         SQLCMD_RESPONSE=$(eval $SQLCMD_COMMAND)
         if [[ "$TT_DEBUG" -ge "4" ]]; then
@@ -372,6 +372,7 @@ function test-tools-help() {
     echo -e "  may have '-if-needed' appended, e.g., 'test-tools-server-if-needed'"
     echo -e "  will start a VoltDB server only if one is not already running."
     echo -e "Multiple options may be specified; but options usually call other options that are prerequisites.\n"
+    PRINT_ERROR_CODE=0
 }
 
 # If run on the command line with no options specified, run test-tools-help
