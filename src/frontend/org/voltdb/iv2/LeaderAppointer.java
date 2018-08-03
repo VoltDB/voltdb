@@ -529,12 +529,17 @@ public class LeaderAppointer implements Promotable
                 }
             }
             m_removedPartitionsAtPromotionTime = null;
+
+            // set up a watcher on the partitions dir so that new partitions will be picked up
+            // Register these call backs  before new MPI starts promotion so that if the promotion/repair process
+            // is interrupted upon more host down, these partition call backs can trigger partition leader elections
+            // and then drive the MPI promotion to completion.
+            m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
+
             // just go ahead and promote our MPI
             VoltZK.registerPromotingPartition(m_zk, MpInitiator.MP_INIT_PID, tmLog);
             m_MPI.acceptPromotion();
             VoltZK.unregisterPromotingPartition(m_zk, MpInitiator.MP_INIT_PID, tmLog);
-            // set up a watcher on the partitions dir so that new partitions will be picked up
-            m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
             blocker.set(null);
         }
     }
