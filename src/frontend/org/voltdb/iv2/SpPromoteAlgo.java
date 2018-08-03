@@ -40,6 +40,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
+    private final int m_deadHost;
     private long m_maxSeenTxnId;
     private final boolean m_isMigratePartitionLeader;
     // Each Term can process at most one promotion; if promotion fails, make
@@ -107,11 +108,12 @@ public class SpPromoteAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public SpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+    public SpPromoteAlgo(List<Long> survivors, int deadHost, InitiatorMailbox mailbox,
             String whoami, int partitionId, boolean isMigratePartitionLeader)
     {
         m_mailbox = mailbox;
         m_survivors = survivors;
+        m_deadHost = deadHost;
 
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
@@ -147,7 +149,7 @@ public class SpPromoteAlgo implements RepairAlgo
                  + " surviving replicas to repair. "
                  + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest =
-            new Iv2RepairLogRequestMessage(m_requestId, Iv2RepairLogRequestMessage.SPREQUEST);
+            new Iv2RepairLogRequestMessage(m_requestId, m_deadHost, Iv2RepairLogRequestMessage.SPREQUEST);
         m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_survivors), logRequest);
     }
 

@@ -4850,7 +4850,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public Cartographer getCartograhper() {
+    public Cartographer getCartographer() {
         return m_cartographer;
     }
 

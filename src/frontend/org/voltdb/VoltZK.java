@@ -41,6 +41,8 @@ import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZooKeeperLock;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
+import org.voltdb.iv2.LeaderCache;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -94,7 +96,6 @@ public class VoltZK {
     public static final String commandlog_init_barrier = "/db/commmandlog_init_barrier";
 
     // leader election
-    private static final String migrate_partition_leader_suffix = "_migrate_partition_leader_request";
 
     // root for MigratePartitionLeader information nodes
     public static final String migrate_partition_leader_info = "/core/migrate_partition_leader_info";
@@ -130,8 +131,9 @@ public class VoltZK {
 
                 if (arr != null) {
                     String data = new String(arr, "UTF-8");
-                    if ((iv2masters.equals(dir) || iv2appointees.equals(dir)) && !isHSIdFromMigratePartitionLeaderRequest(data)) {
-                        data = CoreUtils.hsIdToString(Long.parseLong(data));
+                    if (iv2masters.equals(dir) || iv2appointees.equals(dir)) {
+                        LeaderCallBackInfo info = LeaderCache.buildLeaderCallbackFromString(data);
+                        data = info.toString();
                     }
                     isData = true;
                     builder.append(key).append(" -> ").append(data).append(",");
@@ -564,32 +566,6 @@ public class VoltZK {
         } catch (KeeperException | InterruptedException e) {
             VoltDB.crashLocalVoltDB("Failed to validate partition leader promotions.", true, e);
         }
-    }
-
-    /**
-     * Generate a HSID string with BALANCE_SPI_SUFFIX information.
-     * When this string is updated, we can tell the reason why HSID is changed.
-     */
-    public static String suffixHSIdsWithMigratePartitionLeaderRequest(Long HSId) {
-        return Long.toString(HSId) + migrate_partition_leader_suffix;
-    }
-
-    /**
-     * Is the data string hsid written because of MigratePartitionLeader request?
-     */
-    public static boolean isHSIdFromMigratePartitionLeaderRequest(String hsid) {
-        return hsid.endsWith(migrate_partition_leader_suffix);
-    }
-
-    /**
-     * Given a data string, figure out what's the long HSID number. Usually the data string
-     * is read from the zookeeper node.
-     */
-    public static long getHSId(String hsid) {
-        if (isHSIdFromMigratePartitionLeaderRequest(hsid)) {
-            return Long.parseLong(hsid.substring(0, hsid.length() - migrate_partition_leader_suffix.length()));
-        }
-        return Long.parseLong(hsid);
     }
 
     public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {

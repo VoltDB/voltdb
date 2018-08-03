@@ -42,6 +42,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 public class TestLeaderCache extends ZKTestBase {
 
     private final int NUM_AGREEMENT_SITES = 8;
+    private final String LAST_HOST_PREFIX = Long.toString(Long.MAX_VALUE) + "/";
 
     public static class TestCallback extends LeaderCache.Callback
     {
@@ -76,9 +77,9 @@ public class TestLeaderCache extends ZKTestBase {
         Long bb = 87654321L;
         Long cc = 11223344L;
         zk.create(root, new byte[]{}, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        zk.create(root + "/0", aa.toString().getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        zk.create(root + "/1", bb.toString().getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        zk.create(root + "/2", cc.toString().getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create(root + "/0", (LAST_HOST_PREFIX + aa.toString()).getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create(root + "/1", (LAST_HOST_PREFIX + bb.toString()).getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        zk.create(root + "/2", (LAST_HOST_PREFIX + cc.toString()).getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
     @Test
@@ -111,9 +112,9 @@ public class TestLeaderCache extends ZKTestBase {
         dut.start(true);
 
         assertEquals("3 items cached.", 3, cb.m_cache.size());
-        assertEquals(12345678, cb.m_cache.get(0).m_HSID.longValue());
-        assertEquals(87654321, cb.m_cache.get(1).m_HSID.longValue());
-        assertEquals(11223344, cb.m_cache.get(2).m_HSID.longValue());
+        assertEquals(12345678, cb.m_cache.get(0).m_HSId.longValue());
+        assertEquals(87654321, cb.m_cache.get(1).m_HSId.longValue());
+        assertEquals(11223344, cb.m_cache.get(2).m_HSId.longValue());
 
         dut.shutdown();
         zk.close();
@@ -132,7 +133,7 @@ public class TestLeaderCache extends ZKTestBase {
         assertEquals("3 items cached.", 3, cache.size());
         assertEquals(12345678, dut.get(0).longValue());
 
-        zk.setData("/cache03/0", Long.toString(23456789).getBytes(), -1);
+        zk.setData("/cache03/0", (LAST_HOST_PREFIX + Long.toString(23456789)).getBytes(), -1);
         while(true) {
             if (dut.get(0) == 23456789) {
                 break;
@@ -159,20 +160,20 @@ public class TestLeaderCache extends ZKTestBase {
         Map<Integer, LeaderCallBackInfo> cache = cb.m_cache;
 
         assertEquals("3 items cached.", 3, cache.size());
-        assertEquals(12345678, cache.get(0).m_HSID.longValue());
+        assertEquals(12345678, cache.get(0).m_HSId.longValue());
 
         dut.put(0, 23456789);
         while(true) {
             cache = cb.m_cache;
-            if (cache.get(0).m_HSID == 23456789) {
+            if (cache.get(0).m_HSId == 23456789) {
                 break;
             }
         }
         cache = cb.m_cache;
         assertEquals("3 items cached.", 3, cache.size());
-        assertEquals(23456789, cache.get(0).m_HSID.longValue());
-        assertEquals(87654321, cache.get(1).m_HSID.longValue());
-        assertEquals(11223344, cache.get(2).m_HSID.longValue());
+        assertEquals(23456789, cache.get(0).m_HSId.longValue());
+        assertEquals(87654321, cache.get(1).m_HSId.longValue());
+        assertEquals(11223344, cache.get(2).m_HSId.longValue());
 
         dut.shutdown();
         zk.close();
@@ -232,8 +233,8 @@ public class TestLeaderCache extends ZKTestBase {
         }
         assertEquals("Item removed", 2, cache.size());
         assertEquals(null, cache.get(1));
-        assertEquals(12345678, cache.get(0).m_HSID.longValue());
-        assertEquals(11223344, cache.get(2).m_HSID.longValue());
+        assertEquals(12345678, cache.get(0).m_HSId.longValue());
+        assertEquals(11223344, cache.get(2).m_HSId.longValue());
 
         dut.shutdown();
         zk.close();
@@ -304,21 +305,21 @@ public class TestLeaderCache extends ZKTestBase {
             }
         }
         assertEquals("Item added", 4, cache.size());
-        assertEquals(12345678, cache.get(0).m_HSID.longValue());
-        assertEquals(87654321, cache.get(1).m_HSID.longValue());
-        assertEquals(11223344, cache.get(2).m_HSID.longValue());
-        assertEquals(88776655, cache.get(3).m_HSID.longValue());
+        assertEquals(12345678, cache.get(0).m_HSId.longValue());
+        assertEquals(87654321, cache.get(1).m_HSId.longValue());
+        assertEquals(11223344, cache.get(2).m_HSId.longValue());
+        assertEquals(88776655, cache.get(3).m_HSId.longValue());
 
         // modify the new child and make sure it has a watch set.
         dut.put(3, 99887766);
         while(true) {
             cache = cb.m_cache;
-            if (cache.get(3).m_HSID == 99887766) {
+            if (cache.get(3).m_HSId == 99887766) {
                 break;
             }
         }
         assertEquals("Items accounted for.", 4, cache.size());
-        assertEquals(99887766, cache.get(3).m_HSID.longValue());
+        assertEquals(99887766, cache.get(3).m_HSId.longValue());
 
         dut.shutdown();
         zk.close();
