@@ -117,7 +117,7 @@ public final class ExpressionLike extends ExpressionLogical {
             synchronized (likeObject) {
                 likeObject.setPattern(session, rightValue, escapeValue,
 // A VoltDB extension to disable LIKE pattern escape characters
-                        (nodes.length == TERNARY) && (nodes[ESCAPE] != null));
+                        (nodes.length == TERNARY) && (nodes[ESCAPE] != null), nodes);
 /* disable 1 line ...
                                       nodes[ESCAPE] != null);
 ... disabled 1 line */
@@ -276,7 +276,7 @@ public final class ExpressionLike extends ExpressionLogical {
                         : null;
 
 // A VoltDB extension to disable LIKE pattern escape characters
-        likeObject.setPattern(session, pattern, escape, (nodes.length > 2));
+        likeObject.setPattern(session, pattern, escape, (nodes.length > 2), nodes);
 /* disable 1 line ...
         likeObject.setPattern(session, pattern, escape, nodes[ESCAPE] != null);
 ... disabled 1 line */
@@ -286,7 +286,13 @@ public final class ExpressionLike extends ExpressionLogical {
             return;
         }
 
-        if (likeObject.isEquivalentToUnknownPredicate()) {
+        if (likeObject.isEquivalentToCastNullPredicate()) {
+            // ENG-14266 solve 'col LIKE CAST(NULL AS VARCHAR)' problem
+            // If it is this case, we are already set.
+            // EE can handle this (left expression is a ExpressionColumn, right expression is a null VALUE).
+            likeObject = null;
+            return;
+        } else if (likeObject.isEquivalentToUnknownPredicate()) {
             this.setAsConstantValue(null);
 
             likeObject = null;
@@ -302,7 +308,7 @@ public final class ExpressionLike extends ExpressionLogical {
             opType      = OpTypes.NOT;
             nodes       = new Expression[UNARY];
             nodes[LEFT] = notNull;
-            likeObject  = null;
+            likeObject = null;
         } else {
             if (nodes[LEFT].opType != OpTypes.COLUMN) {
                 return;

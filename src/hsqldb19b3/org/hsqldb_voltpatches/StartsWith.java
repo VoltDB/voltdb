@@ -34,12 +34,12 @@ import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
  */
 
 class StartsWith {
-
     private final static BinaryData maxByteValue =
         new BinaryData(new byte[]{ -128 }, false);
     private char[]   cStartsWith;
     private int      iLen;
     private boolean  isNull;
+    private boolean  isRightNull;
     boolean          hasCollation;
     boolean          isVariable      = true;
     boolean          isBinary        = false;
@@ -136,11 +136,20 @@ class StartsWith {
         return true;
     }
 
-    void setPattern(Session session, Object pattern) {
+    void setPattern(Session session, Object pattern, Expression[] nodes) {
 
         isNull = pattern == null;
 
         if (isNull) {
+            /* ENG-14266, solve 'col STARTS WITH CAST(NULL AS VARCHAR)' Null Pointer problem
+             * In this particular case, the right expression has been turned into VALUE type whose valueData is null.
+             * EE can handle this case.
+             * isRightNull set to be true if it is this case.
+             */
+            isRightNull = (nodes[Expression.LEFT] instanceof ExpressionColumn) &&
+                          (nodes[Expression.RIGHT] instanceof ExpressionOp) &&
+                          (nodes[Expression.RIGHT].getType() == OpTypes.VALUE) &&
+                          (nodes[Expression.RIGHT].getValue(session) == null);
             return;
         }
 
@@ -157,7 +166,12 @@ class StartsWith {
     }
 
     boolean isEquivalentToUnknownPredicate() {
-        return isNull;
+        return isNull && !isRightNull;
+    }
+
+    // Specific check for 'col STARTS WITH CAST(NULL AS VARCHAR)' case
+    boolean isEquivalentToCastNullPredicate() {
+        return isRightNull;
     }
 
     boolean isEquivalentToNotNullPredicate() {
