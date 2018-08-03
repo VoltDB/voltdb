@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -67,6 +68,40 @@ public class NodeSchema implements Iterable<SchemaColumn> {
     public NodeSchema() {
         m_columns = new ArrayList<>();
         m_columnsMapHelper = new TreeMap<>(BY_NAME);
+    }
+
+    // Substitute table name only for all schema columns and map entries
+    public NodeSchema resetTableName(String tbName, String tbAlias) {
+       m_columns.forEach(sc ->
+             sc.reset(tbName, tbAlias, sc.getColumnName(), sc.getColumnAlias()));
+       m_columnsMapHelper.forEach((k, v) ->
+             k.reset(tbName, tbAlias, k.getColumnName(), k.getColumnAlias()));
+       return this;
+    }
+
+    // Substitute column name with matching key to new value
+    // \pre: m_columns is a bi-map to \param m.
+    public NodeSchema toTVEAndFixColumns(Map<String, Pair<String, Integer>> nameMap) {
+      final NodeSchema ns = copyAndReplaceWithTVE();    // First convert all non-TVE expressions to TVE in a copy
+       m_columns.clear();
+       m_columnsMapHelper.clear();
+       for(int indx = 0; indx < ns.size(); ++indx) {    // then update columns
+           final SchemaColumn sc = ns.getColumn(indx);
+           assert(sc.getExpression() instanceof TupleValueExpression);
+           if(nameMap.containsKey(sc.getColumnName())) {
+               final String newColName = nameMap.get(sc.getColumnName()).getFirst();
+               sc.reset(sc.getTableName(), sc.getTableAlias(), newColName, sc.getColumnAlias());
+               sc.setDifferentiator(indx);
+               TupleValueExpression exp = (TupleValueExpression) sc.getExpression();
+               exp.setColumnIndex(indx);
+               exp.setColumnName(newColName);
+               exp.setDifferentiator(indx);
+           }
+       }
+       for(SchemaColumn sc : ns) {
+           addColumn(sc);
+       }
+       return this;
     }
 
     /**
