@@ -28,7 +28,6 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -80,9 +79,12 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
     @Override
     public AbstractPlanNode toPlanNode() {
         MergeReceivePlanNode rpn = new MergeReceivePlanNode();
+        rpn = (MergeReceivePlanNode) super.toPlanNode(rpn);
+        // Must set HaveSignificantOutputSchema after its own schema is generated
+        rpn.setHaveSignificantOutputSchema(true);
 
-        NodeSchema childOutputSchema = generatePreAggregateSchema();
-        rpn.setPreAggregateOutputSchema(childOutputSchema);
+        NodeSchema preAggregateOutputSchema = generatePreAggregateSchema(rpn);
+        rpn.setPreAggregateOutputSchema(preAggregateOutputSchema);
 
         // Collation must be converted to the inline OrderByPlanNode
         RelTrait collationTrait = getTraitSet().getTrait(RelCollations.EMPTY.getTraitDef());
@@ -101,10 +103,7 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
             }
             rpn.addInlinePlanNode(inlineLimitPlanNode);
         }
-        AbstractPlanNode result = super.toPlanNode(rpn);
-        // Must set HaveSignificantOutputSchema after its own schema is generated
-        result.setHaveSignificantOutputSchema(true);
-        return result;
+        return rpn;
     }
 
     @Override
@@ -119,12 +118,10 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
         return digest;
     }
 
-    private NodeSchema generatePreAggregateSchema() {
+    private NodeSchema generatePreAggregateSchema(MergeReceivePlanNode rpn) {
         // @TODO Set Pre aggregate output schema. for now no aggregate - from input
-        RelNode child = getInput();
-        assert(child != null);
-        NodeSchema childOutputSchema = RexConverter.convertToVoltDBNodeSchema(input.getRowType());
-        return childOutputSchema;
+        assert (rpn.getOutputSchema() != null);
+        return rpn.getOutputSchema();
     }
 
     public void setOffset(RexNode offset) {
