@@ -1,11 +1,13 @@
-[comment]: # This file is part of VoltDB.
-[comment]: # Copyright (C) 2008-2018 VoltDB Inc.
+[comment]: # (This file is part of VoltDB.)
+[comment]: # (Copyright © 2008-2018 VoltDB Inc.)
 
-Running a VoltDB Database Using Kubernetes
+# Running a VoltDB Database Using Kubernetes
 
 The accompanying scripts provide support for running VoltDB in a Kubernetes environment.
 Use these scripts as templates, customizing them as described in the following sections
 to match your requirements and/or environment.
+
+## Setting Up the Deployment
 
 Here's the procedure to setup a k8s deployment of VoltDB:
 
@@ -30,41 +32,47 @@ Here's the procedure to setup a k8s deployment of VoltDB:
     with provided assets, and a initial database root is created with your settings.
     This root will be copied to persistent storage on first run of the database (node).
 
-    ./build_image.sh CONFIG_FILE
+    `./build_image.sh CONFIG_FILE`
 
-6. To start the cluster:
+## Starting and Stopping the Cluster
 
-    kubectl create -f K8S_DEPLOYMENT
+* To start the cluster:
 
-7. To stop the cluster, retaining the persistent volume(s):
+  `kubectl create -f K8S_DEPLOYMENT`
 
-    voltadmin pause --wait                  (to quiesce the database, see other commands below)
+* To stop the cluster, retaining the persistent volume(s):
+
+    ```
+    voltadmin pause --wait
     kubectl delete -f K8S_DEPLOYMENT
+    ```
+* To display persistent volume(s) and claim(s):
 
-8. To display persistent volume(s) and claim(s):
-
+    ```
     kubectl get pvc
     kubectl get pv
+    ```
+    
+* To delete volumes (all data in the database will be lost):
 
-9. To delete volumes (all data in the database will be lost):
-
-    kubectl delete <pv/pvc name>
+    `kubectl delete <pv/pvc name>`
 
     nb. next time the database is brought up it will be in the initial state
 
+## Other Useful Commands
 
 Here are some other commands that are useful (assuming the name of the statefulset is "voltdb" and its pods are voltdb-0, ...)
 
 * To connect sqlcmd to a running cluster
 
-   kubectl exec -it voltdb-0 -- sqlcmd --servers=localhost
+   `kubectl exec -it voltdb-0 -- sqlcmd --servers=localhost`
 
 * To proxy VoltDB ports to localhost ports (ports are remote[:local])
 
-   kubectl port-forward statefulset/<name> 8080:8080 21212:21212 21211
+   `kubectl port-forward statefulset/<name> 8080:8080 21212:21212 21211`
 
    You can then run voltdb commands locally, for example:
 
-   $VOLTDB_HOME/bin/sqlcmd --servers=localhost --port=21212
+   `$VOLTDB_HOME/bin/sqlcmd --servers=localhost --port=21212`
 
-   $VOLTDB_HOME/bin/voltadmin ...
+   `$VOLTDB_HOME/bin/voltadmin ...`
