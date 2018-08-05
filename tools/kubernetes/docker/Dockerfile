@@ -44,11 +44,6 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Create necessary directories
 WORKDIR /opt
-# nb. Files need to be in the 'docker' directory to be accessible to docker 'COPY'
-#RUN wget http://downloads.voltdb.com/technologies/server/voltdb-ent-8.1.tar.gz
-#COPY voltdb-ent-8.1.tar.gz .
-#COPY voltdb-ent-8.1.tar.gz .
-#RUN tar -xf voltdb-ent-8.1.tar.gz
 RUN mkdir -p $VOLTDB_DIST
 COPY ./ $VOLTDB_DIST/
 RUN rm -rf $VOLTDB_DIST/doc $VOLTDB_DIST/examples
