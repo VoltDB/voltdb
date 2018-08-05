@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mycluster
+  labels:
+    app: mycluster
+spec:
+  ports:
+  - port: 8080
+    name: vmc
+  clusterIP: None
+  selector:
+    app: mycluster
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: voltdb
+spec:
+  selector:
+    matchLabels:
+      app: mycluster
+  serviceName: "mycluster"
+  replicas: 2
+  podManagementPolicy: "Parallel"
+  template:
+    metadata:
+      labels:
+        app: mycluster
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: voltdb
+        image: gcr.io/rich-charmer-207117/voltdb-image-k8s
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3021
+          name: intra-node
+        - containerPort: 3022
+          name: tls-intra-node
+        - containerPort: 21211
+          name: external-admin
+        - containerPort: 21212
+          name: external-client
+        - containerPort: 5555
+          name: replication
+        - containerPort: 8080
+          name: vmc
+        # the (pre-init) container ENTRYPOINT has start command for voltdb
+#        resources:
+#          limits:
+#            cpu:
+#            memory:
+#          requests:
+#           cpu:
+#           memory:
+#        securityContext:
+#          capabilities:
+#            add:
+#              - IPC_LOCK
+#        lifecycle:
+#          preStop:
+#            exec:
+#              command:
+#              - /bin/sh
+#              - -c
+#              - nodetool drain
+        env:
+#          - name: MAX_HEAP_SIZE
+#            value: 512M
+#         Specify 'voltdb start ...' command line args (space separated list)
+#         IMPORTANT!!!! VoltDB requires linux kernel feature Transparent Huge Pages (THP) be DISABLED when running VoltDB in PRODUCTION.
+#         running with the '--ignore=thp' parameter is not supported, contact support for further information
+          - name: VOLTDB_START_ARGS
+            value: "--ignore=thp"
+#            value: "--missing 1"
+#        readinessProbe:
+#          exec:
+#            command:
+#            - /bin/bash
+#            - -c
+#            - ...
+#       Persistent volume mounts
+#       Configuring for maximum performance often requires multiple local disk or ssd, particularly for commmand log and snapshots
+#       See our performance guide https://docs.voltdb.com/PerfGuide/
+#       Warning: localdisk provisioning is beta in k8s V1.10, support may be limited.
+        volumeMounts:
+        - name: voltdbroot
+          mountPath: /voltdbroot
+#        - name: commandlog
+#          mountPath: /commandlog
+#        - name: commandlogsnapshot
+#          mountPath: /commandlogsnapshot
+#        - name: exportoverflow
+#          mountPath: /exportoverflow
+#        - name: snapshots
+#          mountPath: /snapshots
+  # These are converted to volume claims by the controller
+  # and mounted at the paths mentioned above.
+  # do not use these in production until ssd GCEPersistentDisk or other ssd pd
+  volumeClaimTemplates  :
+  - metadata:
+      name: voltdbroot
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+---
+#kind: StorageClass
+#apiVersion: storage.k8s.io/v1
+#metadata:
+#  name: fast
+#provisioner: k8s.io/minikube-hostpath
+#parameters:
+#  type: pd-ssd
