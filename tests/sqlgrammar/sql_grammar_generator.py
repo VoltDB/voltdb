@@ -36,6 +36,7 @@ from traceback import print_exc
 __SYMBOL_DEFN      = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.*)")
 __SYMBOL_REF       = re.compile(r"{(?P<symbolname>[\w-]+)}")
 __SYMBOL_REF_REUSE = re.compile(r"{(?P<symbolname>[\w-]*):(?P<reusename>[\w-]+)}")
+__SYMBOL_REF_EXIST = re.compile(r"{(?P<symbolname>[\w-]*);(?P<existingnames>[\w,-]+)}")
 __OPTIONAL         = re.compile(r"(?<!\\)\[(?P<optionaltext>[^\[\]]*[^\[\]\\]?)\]")
 __WEIGHTED_XOR     = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
 __XOR              = ' | '
@@ -132,22 +133,46 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
         symbol_order = []
         symbol_depth = {}
         symbol_reuse = {}
-    symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
+    symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql) or __SYMBOL_REF_EXIST.search(sql)
     while symbol and count < max_count:
         count += 1
         bracketed_name = symbol.group(0)
         symbol_name = symbol.group('symbolname')
-        try:
-            reuse_name = symbol.group('reusename')
-        except IndexError as ex:
-            reuse_name = None
+        symbol_opts = None
+        existing_names = []
+        reuse_name = None
         reuse_value = None
-        definition  = grammar.get(symbol_name)
+        try:
+            symbol_opts = symbol.group('existingnames')
+            existing_names = symbol_opts.split(',')
+        except IndexError as ex:
+            pass
+        if existing_names:
+            remove_names = []
+            for en in existing_names:
+                if symbol_reuse.get(en) is None:
+                    remove_names.append(en)
+            for en in remove_names:
+                existing_names.remove(en)
+            last = len(existing_names) - 1
+            for en in existing_names:
+                if (en is existing_names[last] or
+                        randrange(0, 100) < optional_percent):
+                    reuse_name = en
+                    break
+        else:
+            try:
+                reuse_name = symbol.group('reusename')
+            except IndexError as ex:
+                reuse_name = None
+        definition = grammar.get(symbol_name)
         if debug > 6:
             print 'DEBUG: sql           :', str(sql)
             print 'DEBUG: symbol_reuse  :', str(symbol_reuse)
             print 'DEBUG: bracketed_name:', str(bracketed_name)
             print 'DEBUG: symbol_name   :', str(symbol_name)
+            print 'DEBUG: symbol_opts   :', str(symbol_opts)
+            print 'DEBUG: existing_names:', str(existing_names)
             print 'DEBUG: reuse_name    :', str(reuse_name)
             print 'DEBUG: definition    :', str(definition)
 
@@ -168,19 +193,20 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                 symbol_reuse[reuse_name] = reuse_value
 
             sql = sql.replace(bracketed_name, reuse_value)
-            symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
+            symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql) or __SYMBOL_REF_EXIST.search(sql)
 
             # For debugging purposes, we may wish to track symbol use
             if options.echo_grammar and symbol_name:
-                symbol_order.append((symbol_name, sql, reuse_name, reuse_value))
+                symbol_order.append((symbol_name, sql, symbol_opts, str(existing_names), reuse_name, reuse_value))
             continue
 
         # For debugging purposes, we may wish to track symbol use
         if options.echo_grammar and symbol_name:
-            symbol_order.append((symbol_name, sql, reuse_name, reuse_value))
+            symbol_order.append((symbol_name, sql, symbol_opts, str(existing_names), reuse_name, reuse_value))
 
         if definition is None:
-            print "\n\nFATAL ERROR: Could not find definition of '" + str(symbol_name) + "' in grammar dictionary!!!"
+            print "\n\nFATAL ERROR: Could not find definition of '" + str(symbol_name) + \
+                  "' in grammar dictionary!!!"
             exit(22)
 
         # Check how deep into a recursive definition we're going
@@ -230,7 +256,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
         sql = sql.replace(bracketed_name, definition, 1)
         #print 'DEBUG: sql:', sql
 
-        symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql)
+        symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql) or __SYMBOL_REF_EXIST.search(sql)
 
     if count >= max_count:
         print "Gave up after", count, "iterations: possible infinite loop in grammar dictionary!!!"
@@ -239,6 +265,10 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
                 print "DEBUG: bracketed_name:", bracketed_name
             if symbol_name:
                 print "DEBUG: symbol_name   :", symbol_name
+            if symbol_name:
+                print "DEBUG: symbol_opts   :", symbol_opts
+            if existing_names:
+                print "DEBUG: existing_names:", str(existing_names)
             if definition:
                 print "DEBUG: definition    :", definition
         if debug > 5:
@@ -675,7 +705,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
 
         # Change the behavior of SIGALRM, to use for timeout
         signal(SIGALRM, timeout_handler)
-        max_seconds_to_wait_for_sqlcmd = 15  # larger than query timeout of 10
+        max_seconds_to_wait_for_sqlcmd = 60  # must be larger than query timeout of 10
         if debug > 4:
             print 'max_seconds_to_wait_for_sqlcmd: ' + str(max_seconds_to_wait_for_sqlcmd)
 
@@ -838,8 +868,10 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
 
     if sql_contains_echo_substring and options.echo_grammar:
         print >> echo_output_file, '\nGrammar symbols used (in order), and how many times, and resulting SQL:'
-        for (symbol, partial_sql, reuse_name, reuse_value) in symbol_order:
+        for (symbol, partial_sql, symbol_opts, existing_names, reuse_name, reuse_value) in symbol_order:
             print >> echo_output_file, "{0:1d}: {1:24s}: {2:s}".format(symbol_depth.get(symbol, 0), symbol, partial_sql)
+            if symbol_opts:
+                print >> echo_output_file, "   ;{0:23s}: {1:s}".format(symbol_opts, existing_names)
             if reuse_name:
                 print >> echo_output_file, "   :{0:23s}: {1:s}".format(reuse_name, reuse_value)
         print >> echo_output_file, "{0:27s}: {1:s}".format('Final sql', sql)
@@ -988,6 +1020,8 @@ if __name__ == "__main__":
     debug = int(options.debug)
     if debug > 1:
         print "DEBUG: all arguments:", " ".join(sys.argv)
+        print "DEBUG: options (all):\n", options
+        print "DEBUG: args (all)            :", args
         print "DEBUG: options.path          :", options.path
         print "DEBUG: options.grammar_files :", options.grammar_files
         print "DEBUG: options.seed          :", options.seed
@@ -1013,8 +1047,6 @@ if __name__ == "__main__":
         print "DEBUG: options.echo_grammar  :", options.echo_grammar
         print "DEBUG: options.suffix        :", options.suffix
         print "DEBUG: options.debug         :", options.debug
-        print "DEBUG: options (all):\n", options
-        print "DEBUG: args (all):", args
 
     if options.seed:
         seed_type   = 'supplied'

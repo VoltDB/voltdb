@@ -143,6 +143,7 @@ function jars() {
     if [[ "$BUILD_ARGS" == *-Dbuild=debug*  ]]; then
         BUILD_UDF_ARGS="--build=debug"
     fi
+
     cd $UDF_TEST_DIR
     ./build_udf_jar.sh $BUILD_UDF_ARGS
     code2c=$?
@@ -201,9 +202,12 @@ function ddl() {
     echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql"
     $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-load.sql
     code4c=$?
-    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-DDL.sql"
-    $VOLTDB_BIN_DIR/sqlcmd < $UDF_TEST_DDL/UserDefinedTestFunctions-DDL.sql
+
+    cd $UDF_TEST_DDL
+    echo -e "\n$0 performing: ddl; running (in sqlcmd): $UDF_TEST_DDL/UserDefinedTestFunctions-batch.sql"
+    $VOLTDB_BIN_DIR/sqlcmd < UserDefinedTestFunctions-batch.sql
     code4d=$?
+    cd -
 
     code[4]=$(($code4a|$code4b|$code4c|$code4d))
 }
@@ -316,6 +320,7 @@ function all-pro() {
 function tests-help() {
     find-directories-if-needed
     python $SQLGRAMMAR_DIR/sql_grammar_generator.py --help
+    PRINT_ERROR_CODE=0
 }
 
 # Print a simple help message, describing the options for this script
@@ -348,7 +353,7 @@ function help() {
     echo -e "Some options (build[-pro], init, jars, server[-pro], ddl) may have '-if-needed' appended,"
     echo -e "  e.g., 'server-if-needed' will start a VoltDB server only if one is not already running."
     echo -e "Multiple options may be specified; but options usually call other options that are prerequisites.\n"
-    exit
+    PRINT_ERROR_CODE=0
 }
 
 # Check the exit code(s), and exit
@@ -381,7 +386,9 @@ function exit-with-code() {
         fi
         echo -e "\ncodes 0-6: ${code[*]} (build, init, jars, server, ddl, tests, shutdown)"
     fi
-    echo "error code:" $errcode
+    if [[ $PRINT_ERROR_CODE -ne 0 ]]; then
+        echo "error code:" $errcode
+    fi
     exit $errcode
 }
 
@@ -417,7 +424,14 @@ while [[ -n "$1" ]]; do
             BUILD_ARGS=$ARGS
         fi
     fi
+    PRINT_ERROR_CODE=1
     $CMD
+    COMMAND_CODE=$?
+    if [[ $COMMAND_CODE -eq 127 ]]; then
+        echo -e "Option '$CMD' returned exit code: $COMMAND_CODE. This is probably an"
+        echo -e "    unknown option, or it might have been used incorrectly."
+        echo -e "For more info about options, try: '$0 help'"
+    fi
     shift
 done
 exit-with-code
