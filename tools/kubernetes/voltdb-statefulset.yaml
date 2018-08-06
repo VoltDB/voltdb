@@ -45,22 +45,10 @@ spec:
           name: replication
         - containerPort: 8080
           name: vmc
-        # the (pre-init) container ENTRYPOINT has start command for voltdb
         resources:
           requests:
            cpu: --cpuCount--
            memory: --memorySize--
-#        securityContext:
-#          capabilities:
-#            add:
-#              - IPC_LOCK
-#        lifecycle:
-#          preStop:
-#            exec:
-#              command:
-#              - /bin/sh
-#              - -c
-#              - nodetool drain
         env:
 #         Specify 'voltdb start ...' command line args (space separated list)
 #         IMPORTANT!!!! VoltDB requires linux kernel feature Transparent Huge Pages (THP) be DISABLED when running VoltDB in PRODUCTION.
