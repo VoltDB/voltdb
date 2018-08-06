@@ -20,31 +20,44 @@ Here's the procedure to setup a k8s deployment of VoltDB:
     1. Set REP to the docker repository to push the image to
     2. Set IMAGE_TAG to the image tag
     3. Set NODECOUNT to the number of voltdb nodes
-    4. Set LICENSE_FILE to the location of your voltdb license file
-    5. Set DEPLOYMENT_FILE to the location of your VoltDB deployment file
-    6. Set SCHEMA_FILE to the location of your database startup schema (optional)
-    7. Set CLASSES_JAR to the location of your database startup classes (options)
-    8. Set EXTENSION_DIR, BUNDLES_DIR, LOG4J_CUSTOM_FILE  to the location of your lib-extension, bundes, or logging properties (optional)
+    4. Set PVOLUME_SIZE to the size of the persistent volume needed for each node
+    5. Set LICENSE_FILE to the location of your voltdb license file
+    6. Set DEPLOYMENT_FILE to the location of your VoltDB deployment file
+    7. Set SCHEMA_FILE to the location of your database startup schema (optional)
+    8. Set CLASSES_JAR to the location of your database startup classes (options)
+    9. Set EXTENSION_DIR, BUNDLES_DIR, LOG4J_CUSTOM_FILE  to the location of your lib-extension, bundes, or logging properties (optional)
+
+    Other customizations:
+
+    To set the Java Heap Size for VoltDB, edit the statefulset yaml file and set the following into the environment (env:) section:
+          env:
+            ...
+            - name: MAX_HEAP_SIZE
+              value: <required-heap-size> ex. 2G
+            ...
+     See VoltDB documentation for more information.
+
+    Passing startup parameters to VoltDB:
+
+    You can pass parameters to voltdb at startup by setting VOLTDB_START_ARGS in the k8s deployment yaml:
+        env:
+            ...
+            - name: VOLTDB_START_ARGS
+              value: "--missing=1"
+            ...
+    See VoltDB documentation for more information.
+
+    For your deployment there may be other things to configure such as persistent volume properties, sizes, etc.,
+    you'll need to edit the voltdb-statefulset.yaml template and set your specific requirements there.
 
 4. Build the image and voltdb-statefulset deployment file:
 
-    This step creates the voltdb image and configures a kubernetes statefullset deployment
-    for a VoltDB cluster. The name of CONFIG_FILE is used as the cluster name.
+    This step creates the voltdb image and configures a kubernetes deployment file.
+    The resulting deployment file will be named... The container image is customized
     with provided assets, and a initial database root is created with your settings.
     This root will be copied to persistent storage on first run of the database (node).
 
         ./build_image.sh CONFIG_FILE
-
-    input: CONFIG_FILE.cfg
-           VoltDB release kit
-    output: container (docker) image pushed to a designated docker repository
-            voltdb-statefulset.yaml configured and renamed (K8S_DEPLOYMENT)
-
-    Example: ./build_image.sh voltdb-boston.cfg
-
-    A voltdb-boston.yaml k8s stateufset deployment file which loads a container image named 'voltdb-boston'.
-    The deployed cluster will be discoverable in k8s as (<pod>.<service>.default.svc.cluster.local):
-        voltdb-boston-<n>.voltdb-boston.default.svc.cluster.local.
 
 ## Starting and Stopping the Cluster
 

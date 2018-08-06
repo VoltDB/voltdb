@@ -29,6 +29,7 @@ cp voltdb-statefulset.yaml                             $MANIFEST
 sed -i "" "s:--clusterName--:$CLUSTER_NAME:g"          $MANIFEST
 sed -i "" "s:--containerImage---:$REP/$IMAGE_TAG:g"    $MANIFEST
 sed -i "" "s:--replicaCount--:$NODECOUNT:g"            $MANIFEST
+sed -i "" "s:--pvolumeSize--:$PVOLUME_SIZE:g"          $MANIFEST
 
 TMP_DIR=.assets/$CLUSTER_NAME
 (rm -rf $TMP_DIR >/dev/null)
