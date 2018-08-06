@@ -54,6 +54,9 @@ public class ParameterizationInfo {
      * when parallel planning is possible.
      */
     static private int curParamIndex = 0;
+    // whether the query has been rewritten to use MV: when rewriting query, the query's predicates always gets shorter,
+    // effectively reducing number of parameters.
+    private boolean m_isRewritten = false;
 
     /**
      * Get the next parameter index for the current statement.
@@ -65,6 +68,14 @@ public class ParameterizationInfo {
         int nextOffset = curParamIndex;
         ++curParamIndex;
         return nextOffset;
+    }
+
+    public void rewrite() {
+        m_isRewritten = true;
+    }
+
+    public boolean isRewritten() {
+        return m_isRewritten;
     }
 
     /**
@@ -288,14 +299,16 @@ public class ParameterizationInfo {
     }
 
     public ParameterSet extractedParamValues(VoltType[] parameterTypes) {
-        // Make sure to update {\code parameterTypes} accordingly when rewriting query
-        assert(m_paramLiteralValues.length == parameterTypes.length);
-        Object[] params = new Object[m_paramLiteralValues.length];
+        // When we rewrite a query to use MV, the rewritten query is likely to have less parameters (from predicates) than
+        // the one before rewrite, but never more.
+        assert((! isRewritten() && m_paramLiteralValues.length == parameterTypes.length) ||
+                (isRewritten() && m_paramLiteralValues.length >= parameterTypes.length));
+        Object[] params = new Object[parameterTypes.length];
 
         // the extracted params are all strings at first.
         // after the planner infers their types, fix them up
         // the only exception is that nulls are Java NULL, and not the string "null".
-        for (int i = 0; i < m_paramLiteralValues.length; i++) {
+        for (int i = 0; i < parameterTypes.length; i++) {
             params[i] = valueForStringWithType(m_paramLiteralValues[i], parameterTypes[i]);
         }
         return ParameterSet.fromArrayNoCopy(params);
