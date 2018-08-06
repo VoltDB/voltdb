@@ -38,7 +38,7 @@ Here's the procedure to setup a k8s deployment of VoltDB:
     input: CONFIG_FILE.cfg
            VoltDB release kit
     output: container (docker) image pushed to a designated docker repository
-            voltdb-statefulset.yaml configured and renamed
+            voltdb-statefulset.yaml configured and renamed (K8S_DEPLOYMENT)
 
     Example: ./build_image.sh voltdb-boston.cfg
 
