@@ -15,7 +15,7 @@ Here's the procedure to setup a k8s deployment of VoltDB:
 
 2. cd kubernetes folder (this folder)
 
-3. Make a new CONFIG_FILE by copying config_template.sh, then customize it as follows:
+3. Make a new CONFIG_FILE by copying config_template.cfg, then customize it as follows:
 
     1. Set REP to the docker repository to push the image to
     2. Set IMAGE_TAG to the image tag
