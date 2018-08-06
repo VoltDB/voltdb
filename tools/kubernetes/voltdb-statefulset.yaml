@@ -65,13 +65,17 @@ spec:
 #              - -c
 #              - nodetool drain
         env:
-#          - name: MAX_HEAP_SIZE
-#            value: 512M
 #         Specify 'voltdb start ...' command line args (space separated list)
 #         IMPORTANT!!!! VoltDB requires linux kernel feature Transparent Huge Pages (THP) be DISABLED when running VoltDB in PRODUCTION.
 #         running with the '--ignore=thp' parameter is not supported, contact support for further information
           - name: VOLTDB_START_ARGS
             value: "--ignore=thp"
+#          - name: VOLTDB_HEAPMAX
+#            value: "3072"
+#          - name: VOLTDB_OPTS
+#            value: ""
+#          - name: JAVA_OPTS
+#            value: ""
 #       Persistent volume mounts
 #       Configuring for maximum performance often requires multiple local disk or ssd, particularly for commmand log and snapshots
 #       See our performance guide https://docs.voltdb.com/PerfGuide/
