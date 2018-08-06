@@ -21,10 +21,6 @@ mkdir -p $TMP_DIR
 # copy VOLTDB Deployment file - this must exist
 cp ${DEPLOYMENT_FILE} $TMP_DIR/.deployment
 
-# get the hostcount from the deployment file
-# set env HOSTCOUNT
-eval xmllint --xpath "/deployment/cluster/@hostcount" $TMP_DIR/.deployment | awk '{print toupper($1)}' | xargs
-
 # COPY customer supplied assets to the Dockerfile directory
 # make empty files if these don't exist
 cp ${SCHEMA_FILE:=/dev/null} $TMP_DIR/.schema
@@ -43,7 +39,7 @@ VOLTDB_DIST=$(basename `pwd`)
 docker image build -t ${IMAGE_TAG} \
             --build-arg IP_DIR=${OWD#$PWD/}/$TMP_DIR \
             --build-arg VOLTDB_DIST_NAME=$VOLTDB_DIST \
-            --build-arg HOSTCOUNT=2 \
+            --build-arg NODEOUNT=$NODECOUNT \
         -f tools/kubernetes/docker/Dockerfile \
         "$PWD"
 docker tag ${IMAGE_TAG} ${REP}/${IMAGE_TAG}

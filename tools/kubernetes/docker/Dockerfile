@@ -8,7 +8,7 @@ MAINTAINER Phil Rosgay <prosegay@voltdb.com>
 
 ARG IP_DIR
 ARG VOLTDB_DIST_NAME
-ARG HOSTCOUNT
+ARG NODECOUNT
 
 # Public VoltDB ports
 EXPOSE 22 5555 8080 8081 9000 21211 21212
@@ -61,6 +61,6 @@ RUN voltdb init --config $ASSETS/.deployment --schema=$ASSETS/.schema --classes=
 COPY ${IP_DIR}/.license         $VOLTDBPRISTINE/voltdbroot/license.xml
 COPY ${IP_DIR}/.log4j           $VOLTDBPRISTINE/voltdbroot/log4j.properties
 
-ENV HOSTCOUNT=$HOSTCOUNT
+ENV NODECOUNT=$NODECOUNT
 ENV LEADER=localhost
-ENTRYPOINT voltdbk8s.py voltdb start -H $LEADER -c $HOSTCOUNT $VOLTDB_START_ARGS
+ENTRYPOINT voltdbk8s.py voltdb start -H $LEADER -c $NODECOUNT $VOLTDB_START_ARGS

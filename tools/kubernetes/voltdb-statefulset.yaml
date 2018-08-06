@@ -22,7 +22,7 @@ spec:
       app: mycluster
   serviceName: "mycluster"
   replicas: 2
-  podManagementPolicy: "Parallel"
+  #podManagementPolicy: "Parallel" (experimental)
   template:
     metadata:
       labels:
