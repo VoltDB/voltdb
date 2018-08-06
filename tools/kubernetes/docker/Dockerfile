@@ -62,7 +62,7 @@ COPY ${IP_DIR}/.bundles/        $VOLTDB_DIST/bundles/
 WORKDIR $VOLTDBPRISTINE
 RUN voltdb init --config $ASSETS/.deployment --schema=$ASSETS/.schema --classes=$ASSETS/.classes
 COPY ${IP_DIR}/.license         $VOLTDBPRISTINE/license.xml
-COPY ${IP_DIR}/.log4j           $VOLTDBPRISTINE/log4j.properties
+#COPY ${IP_DIR}/.log4j           $VOLTDBPRISTINE/log4j.properties
 
 ENV NODECOUNT=$NODECOUNT
 ENV LEADER=localhost

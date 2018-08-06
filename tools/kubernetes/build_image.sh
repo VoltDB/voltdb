@@ -29,7 +29,9 @@ cp voltdb-statefulset.yaml                             $MANIFEST
 sed -i "" "s:--clusterName--:$CLUSTER_NAME:g"          $MANIFEST
 sed -i "" "s:--containerImage---:$REP/$IMAGE_TAG:g"    $MANIFEST
 sed -i "" "s:--replicaCount--:$NODECOUNT:g"            $MANIFEST
-sed -i "" "s:--pvolumeSize--:$PVOLUME_SIZE:g"          $MANIFEST
+sed -i "" "s:--pvolumeSize--:${PVOLUME_SIZE:-1Gi}:g"   $MANIFEST
+sed -i "" "s:--memorySize--:${MEMORY_SIZE:-4Gi}:g"     $MANIFEST
+sed -i "" "s:--cpuCount--:${CPU_COUNT:-2}:g"           $MANIFEST
 
 TMP_DIR=.assets/$CLUSTER_NAME
 (rm -rf $TMP_DIR >/dev/null)
@@ -42,10 +44,12 @@ cp ${DEPLOYMENT_FILE} $TMP_DIR/.deployment
 # make empty files if these don't exist
 cp ${SCHEMA_FILE:=/dev/null} $TMP_DIR/.schema
 cp ${CLASSES_JAR:=/dev/null} $TMP_DIR/.classes
-[ -n ${BUNDLES_DIR} ] && mkdir -p $TMP_DIR/.bundles && cp -a ${BUNDLES_DIR}/ $TMP_DIR/.bundles/
-[ -n ${EXTENSION_DIR} ] && mkdir $TMP_DIR/.extension && cp -a ${EXTENSION_DIR}/ $TMP_DIR/.extension/
-[ -n ${LOG4J_CUSTOM_FILE} ] && cp ${LOG4J_CUSTOM_FILE} $TMP_DIR/.log4j
-[ -n ${LICENSE_FILE} ] && cp ${LICENSE_FILE} $TMP_DIR/.license
+mkdir -p $TMP_DIR/.bundles
+[ -d "${BUNDLES_DIR}" ] && cp -a ${BUNDLES_DIR}/ $TMP_DIR/.bundles/
+mkdir -p $TMP_DIR/.extension
+[ -d "${EXTENSION_DIR}" ] && cp -a ${EXTENSION_DIR}/ $TMP_DIR/.extension/
+[ -f "${LOG4J_FILE}" ] && cp ${LOG4J_FILE} $TMP_DIR/.log4j
+[ -f "${LICENSE_FILE}" ] && cp ${LICENSE_FILE} $TMP_DIR/.license
 
 OWD=`pwd`
 pushd ../.. > /dev/null

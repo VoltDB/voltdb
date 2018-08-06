@@ -46,13 +46,10 @@ spec:
         - containerPort: 8080
           name: vmc
         # the (pre-init) container ENTRYPOINT has start command for voltdb
-#        resources:
-#          limits:
-#            cpu:
-#            memory:
-#          requests:
-#           cpu:
-#           memory:
+        resources:
+          requests:
+           cpu: --cpuCount--
+           memory: --memorySize--
 #        securityContext:
 #          capabilities:
 #            add:

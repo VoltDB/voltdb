@@ -20,14 +20,16 @@ Here's the procedure to setup a k8s deployment of VoltDB:
     1. Set REP to the docker repository to push the image to
     2. Set IMAGE_TAG to the image tag
     3. Set NODECOUNT to the number of voltdb nodes
-    4. Set PVOLUME_SIZE to the size of the persistent volume needed for each node
-    5. Set LICENSE_FILE to the location of your voltdb license file
-    6. Set DEPLOYMENT_FILE to the location of your VoltDB deployment file
-    7. Set SCHEMA_FILE to the location of your database startup schema (optional)
-    8. Set CLASSES_JAR to the location of your database startup classes (options)
-    9. Set EXTENSION_DIR, BUNDLES_DIR, LOG4J_CUSTOM_FILE  to the location of your lib-extension, bundes, or logging properties (optional)
+    4. Set MEMORYSIZE to the required memory size to request from k8s for each node
+    5. Set CPU_COUNT to the required number of cpus to request from k8s for each node
+    6. Set PVOLUME_SIZE to the size of the persistent volume needed for each node
+    7. Set LICENSE_FILE to the location of your voltdb license file
+    8. Set DEPLOYMENT_FILE to the location of your VoltDB deployment file
+    9. Set SCHEMA_FILE to the location of your database startup schema (optional)
+   10. Set CLASSES_JAR to the location of your database startup classes (options)
+   11. Set EXTENSION_DIR, BUNDLES_DIR, LOG4J_FILE  to the location of your lib-extension, bundes, or logging properties (optional)
 
-    Other customizations:
+    Other customizations to consider:
 
     To set the Java Heap Size for VoltDB, edit the statefulset yaml file and set the following into the environment (env:) section:
           env:
@@ -43,12 +45,13 @@ Here's the procedure to setup a k8s deployment of VoltDB:
         env:
             ...
             - name: VOLTDB_START_ARGS
-              value: "--missing=1"
+              value: "--missing=1 ..."
             ...
     See VoltDB documentation for more information.
 
     For your deployment there may be other things to configure such as persistent volume properties, sizes, etc.,
-    you'll need to edit the voltdb-statefulset.yaml template and set your specific requirements there.
+    you'll need to edit the voltdb-statefulset.yaml template and set your specific requirements there, and check
+    it into your source control.
 
 4. Build the image and voltdb-statefulset deployment file:
 
@@ -91,7 +94,7 @@ Here are some other commands that are useful (assuming the name of the statefuls
 
 * To proxy VoltDB ports to localhost ports (ports are remote[:local])
 
-        kubectl port-forward statefulset/<name> 8080:8080 21212:21212 21211
+        kubectl port-forward statefulset/<cluster name> 8080 21212 21211
 
    You can then run voltdb commands locally, for example:
 
