@@ -1,37 +1,37 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: mycluster
+  name: --clusterName--
   labels:
-    app: mycluster
+    app: --clusterName--
 spec:
   ports:
   - port: 8080
     name: vmc
   clusterIP: None
   selector:
-    app: mycluster
+    app: --clusterName--
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: voltdb
+  name: --clusterName--
 spec:
   selector:
     matchLabels:
-      app: mycluster
-  serviceName: "mycluster"
-  replicas: 2
+      app: --clusterName--
+  serviceName: "--clusterName--"
+  replicas: --replicaCount--
   #podManagementPolicy: "Parallel" (experimental)
   template:
     metadata:
       labels:
-        app: mycluster
+        app: --clusterName--
     spec:
       terminationGracePeriodSeconds: 10
       containers:
-      - name: voltdb
-        image: gcr.io/rich-charmer-207117/voltdb-image-k8s
+      - name: --clusterName--
+        image: --containerImage---
         imagePullPolicy: Always
         ports:
         - containerPort: 3021
@@ -95,9 +95,6 @@ spec:
 #          mountPath: /exportoverflow
 #        - name: snapshots
 #          mountPath: /snapshots
-  # These are converted to volume claims by the controller
-  # and mounted at the paths mentioned above.
-  # do not use these in production until ssd GCEPersistentDisk or other ssd pd
   volumeClaimTemplates  :
   - metadata:
       name: voltdbroot
@@ -106,11 +103,3 @@ spec:
       resources:
         requests:
           storage: 1Gi
----
-#kind: StorageClass
-#apiVersion: storage.k8s.io/v1
-#metadata:
-#  name: fast
-#provisioner: k8s.io/minikube-hostpath
-#parameters:
-#  type: pd-ssd

@@ -29,14 +29,14 @@ Here's the procedure to setup a k8s deployment of VoltDB:
 4. Build the image and voltdb-statefulset deployment file:
 
     This step creates the voltdb image and configures a kubernetes statefullset deployment
-    for a VoltDB cluster. The name of CONFIG_FILE is used as the cluster name. 
+    for a VoltDB cluster. The name of CONFIG_FILE is used as the cluster name.
     with provided assets, and a initial database root is created with your settings.
     This root will be copied to persistent storage on first run of the database (node).
 
         ./build_image.sh CONFIG_FILE
 
     input: CONFIG_FILE.cfg
-           VoltDB release kit  
+           VoltDB release kit
     output: container (docker) image pushed to a designated docker repository
             voltdb-statefulset.yaml configured and renamed
 
@@ -62,7 +62,6 @@ Here's the procedure to setup a k8s deployment of VoltDB:
         kubectl get pvc
         kubectl get pv
 
-    
 * To delete volumes (all data in the database will be lost):
 
         kubectl delete <pv/pvc name>
