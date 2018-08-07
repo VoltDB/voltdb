@@ -219,6 +219,10 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
         }
     }
 
+    public RexNode getPostPredicate() {
+        return m_postPredicate;
+    }
+
     @Override
     public int getSplitCount() {
         return m_splitCount;

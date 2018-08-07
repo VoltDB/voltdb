@@ -23,6 +23,7 @@ import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptRuleOperandChildPolicy;
 import org.apache.calcite.plan.RelOptRuleOperandChildren;
 import org.apache.calcite.rel.RelDistributions;
+import org.apache.calcite.rel.RelNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPAggregate;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPMergeExchange;
@@ -72,23 +73,33 @@ public class VoltDBPAggregateExchangeTransposeRule extends RelOptRule {
         AbstractVoltDBPAggregate aggr = call.rel(0);
         AbstractVoltDBPExchange exchange = call.rel(1);
 
-//        if (m_isSingleton) {
-//            assert (exchange instanceof VoltDBPSingeltonExchange);
-//            transformSingletonExchange(aggr, )
-//        }
-//
-//        Calc newCalc = calc.copy(
-//                // Update Calc distribution's trait
-//                calc.getTraitSet().plus(exchange.getChildDistribution()),
-//                exchange.getInput(),
-//                calc.getProgram(),
-//                exchange.getChildSplitCount());
-//        AbstractVoltDBPExchange newExchange = exchange.copy(
-//                exchange.getTraitSet(),
-//                newCalc,
-//                exchange.getChildDistribution(),
-//                exchange.getLevel() + 1);
-//
-//        call.transformTo(newExchange);
+        RelNode result;
+        if (m_isSingleton) {
+            assert (exchange instanceof VoltDBPSingletonExchange);
+            result = transformSingletonExchange(aggr, (VoltDBPSingletonExchange) exchange);
+            call.transformTo(result);
+        } else {
+            result = null;
+        }
+    }
+
+    private RelNode transformSingletonExchange(AbstractVoltDBPAggregate aggr, VoltDBPSingletonExchange exchange) {
+        // Simply push the aggregate below the exchange
+        AbstractVoltDBPAggregate newAggr = aggr.copy(
+                aggr.getCluster(),
+                aggr.getTraitSet().plus(exchange.getChildDistribution()),
+                exchange.getInput(),
+                aggr.indicator,
+                aggr.getGroupSet(),
+                aggr.getGroupSets(),
+                aggr.getAggCallList(),
+                aggr.getPostPredicate());
+
+        AbstractVoltDBPExchange newExchange = exchange.copy(
+                exchange.getTraitSet(),
+                newAggr,
+                exchange.getChildDistribution(),
+                exchange.getLevel() + 1);
+        return newExchange;
     }
 }
