@@ -138,12 +138,12 @@ public class TestMVOptimizationSuite extends RegressionSuite {
         checkThat(client,
                 "SELECT SUM(a) FROM t1 WHERE b1 IN (3, 30, 300) OR b >= 20 GROUP BY a1",
                 null, "sequential scan of \"t1\"");
-        cleanTableAndViews(client, "V5_1");
         // Check that directly running matched query in subquery should not go wrong
         final String q =
                 "SELECT * FROM (select zone, min(temperature) min_temperature, max(humidity) max_humidity FROM sensor " +
                 "WHERE uptime >= 72000 GROUP BY id, zone) foo ORDER BY zone;";
         client.callProcedure("@AdHoc", q).getResults();
+        cleanTableAndViews(client, "V5_1", "long_running");
     }
 
     public void testMVResolution() throws IOException, ProcCallException {
