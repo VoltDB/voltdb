@@ -150,7 +150,7 @@ public class MpPromoteAlgo implements RepairAlgo
             //remove the flag for the partition if the repair process is not cancelled.
             //The flag is registered upon host failure or MPI promotion. The repair may be interrupted but will
             //be eventually completed.
-            if (!m_promotionResult.isCancelled()) {
+            if (!m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
                 VoltZK.removeMpRepairBlocker(m_mailbox.m_messenger.getZK(), repairLogger);
             }
         }
