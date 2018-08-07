@@ -108,9 +108,6 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
         }
 
         call.transformTo(result);
-//        // Remove the original rel from the search space
-        call.getPlanner().setImportance(limitRel, 0);
-
     }
 
     private RelNode transposeSingletonExchange(VoltDBPSingeltonExchange exchangeRel, VoltDBPLimit limitRel) {

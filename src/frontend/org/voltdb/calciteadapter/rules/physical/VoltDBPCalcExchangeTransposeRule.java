@@ -62,8 +62,5 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
                 exchange.getLevel() + 1);
 
         call.transformTo(newExchange);
-        // Remove the original rel from the search space
-        call.getPlanner().setImportance(calc, 0);
-
     }
 }

@@ -47,6 +47,8 @@ import com.google.common.collect.ImmutableMap;
 
 /**
  *  Adopted from the Calcite's SortProjectTransposeRule
+ *  The rule pushes a Sort relation through a Calc one to position the Sort above the Scan
+ *  to be able to convert a sequential scan to an index one if sort's collation matches the index's one
  *
  */
 public class VoltDBPSortCalcTransposeRule extends RelOptRule {

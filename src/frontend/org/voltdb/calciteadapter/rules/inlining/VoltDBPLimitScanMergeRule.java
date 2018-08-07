@@ -30,11 +30,11 @@ public class VoltDBPLimitScanMergeRule extends RelOptRule {
 
     public static final VoltDBPLimitScanMergeRule INSTANCE_1 =
             new VoltDBPLimitScanMergeRule(operand(VoltDBPLimit.class,
-                                            operand(VoltDBPCalc.class,
-                                                    operand(AbstractVoltDBPTableScan.class, none()))));
+                    operand(AbstractVoltDBPTableScan.class, none())));
     public static final VoltDBPLimitScanMergeRule INSTANCE_2 =
             new VoltDBPLimitScanMergeRule(operand(VoltDBPLimit.class,
-                    operand(AbstractVoltDBPTableScan.class, none())));
+                                            operand(VoltDBPCalc.class,
+                                                    operand(AbstractVoltDBPTableScan.class, none()))));
 
     /**
      * Transform  VoltDBPLimit / AbstractVoltDBPTableScan to AbstractVoltDBPTableScan with Limit

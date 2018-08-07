@@ -70,6 +70,15 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
         RelNode result = transposeExchange(exchangeRel, newSortRel);
 
         call.transformTo(result);
+        // Ideally, this rule should work without the next line but...
+        // If we don't set the impotence of the original Sort expression to 0
+        // the compilation of the following simple SQL
+        // select si, i from P1 order by si
+        // would go into an infinite loop. This rule would keep firing matching the same VoltDBPSort
+        // expression somehow keep adding the new Exchange into its child result set.
+        // I suspect it has something to do with the Collation Trait that Calcite treats specially.
+        // If I add an additional VoltDBPSort on top of an Exchange node, the query would be compiled.
+        //
         // Remove the original rel from the search space
         call.getPlanner().setImportance(sortRel, 0);
 
@@ -78,7 +87,7 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
     private RelNode transposeExchange(AbstractVoltDBPExchange exchangeRel, VoltDBPSort sortRel) {
         // The new exchange that will be sitting above the Sort relation must have sort's collation trait
         // since the top relation is required to have collation matching the sort's one
-        RelTraitSet newExchangeTraits = exchangeRel.getTraitSet().replace(sortRel.getCollation());
+        RelTraitSet newExchangeTraits = exchangeRel.getTraitSet().plus(sortRel.getCollation());
         AbstractVoltDBPExchange newExchange = null;
         if (exchangeRel instanceof VoltDBPSingeltonExchange) {
             newExchange = exchangeRel.copy(
@@ -106,8 +115,8 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
                         newExchangeTraits,
                         mergeExchange,
                         mergeExchange.getLevel() + 1);
+            return newExchange;
         }
-        return newExchange;
     }
 
 }
