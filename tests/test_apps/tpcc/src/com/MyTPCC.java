@@ -216,8 +216,8 @@ public class MyTPCC
         ////
         System.out.printf("Total executions: %d\n", totExecutions);
         Collections.sort(indivLatencies);
-        System.out.printf(" + + +   Median Latency = %.2f\n", indivLatencies.get((int)(numSPCalls / 2)));
-        System.out.printf(" + + +   99th Tail = %.2f\n", indivLatencies.get((int)(numSPCalls * 0.99)));
+        System.out.printf(" + + +   Median Latency = %d\n", indivLatencies.get((int)(numSPCalls / 2)));
+        System.out.printf(" + + +   99th Tail = %d\n", indivLatencies.get((int)(numSPCalls * 0.99)));
         ////
 
         // 3. Performance statistics
