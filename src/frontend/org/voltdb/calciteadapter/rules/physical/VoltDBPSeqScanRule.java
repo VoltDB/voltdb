@@ -27,7 +27,7 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPSingeltonExchange;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPSingletonExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPTableSeqScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPUnionExchange;
 
@@ -58,7 +58,7 @@ public class VoltDBPSeqScanRule extends RelOptRule {
 
         AbstractVoltDBPExchange exchangeRel = null;
         if (Type.SINGLETON == tableDist.getType()) {
-            exchangeRel = new VoltDBPSingeltonExchange(
+            exchangeRel = new VoltDBPSingletonExchange(
                     tableScan.getCluster(),
                     convertedTraits.plus(RelDistributions.SINGLETON),
                     scanRel,

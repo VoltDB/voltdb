@@ -26,7 +26,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPMergeExchange;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPSingeltonExchange;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPSingletonExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPSort;
 
 import com.google.common.collect.ImmutableList;
@@ -89,7 +89,7 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
         // since the top relation is required to have collation matching the sort's one
         RelTraitSet newExchangeTraits = exchangeRel.getTraitSet().plus(sortRel.getCollation());
         AbstractVoltDBPExchange newExchange = null;
-        if (exchangeRel instanceof VoltDBPSingeltonExchange) {
+        if (exchangeRel instanceof VoltDBPSingletonExchange) {
             newExchange = exchangeRel.copy(
                     newExchangeTraits,
                     sortRel,
@@ -110,7 +110,7 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
             // The relations that will be transposed with the Singleton Exchange represent
             // the coordinator's nodes in the final VoltDB plan
             // and can not / should not be pushed beyond the VoltDBPMergeExchange exchange
-            newExchange = new VoltDBPSingeltonExchange(
+            newExchange = new VoltDBPSingletonExchange(
                         exchangeRel.getCluster(),
                         newExchangeTraits,
                         mergeExchange,

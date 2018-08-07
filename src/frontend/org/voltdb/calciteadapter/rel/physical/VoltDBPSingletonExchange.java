@@ -25,9 +25,9 @@ import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 
-public class VoltDBPSingeltonExchange extends AbstractVoltDBPExchange implements VoltDBPRel {
+public class VoltDBPSingletonExchange extends AbstractVoltDBPExchange implements VoltDBPRel {
 
-    public VoltDBPSingeltonExchange(RelOptCluster cluster,
+    public VoltDBPSingletonExchange(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
             int level) {
@@ -35,12 +35,12 @@ public class VoltDBPSingeltonExchange extends AbstractVoltDBPExchange implements
     }
 
     @Override
-    protected VoltDBPSingeltonExchange copyInternal(
+    protected VoltDBPSingletonExchange copyInternal(
             RelTraitSet traitSet,
             RelNode newInput,
             RelDistribution childDistribution,
             int level) {
-        VoltDBPSingeltonExchange exchange = new VoltDBPSingeltonExchange(
+        VoltDBPSingletonExchange exchange = new VoltDBPSingletonExchange(
                 getCluster(),
                 traitSet,
                 newInput,

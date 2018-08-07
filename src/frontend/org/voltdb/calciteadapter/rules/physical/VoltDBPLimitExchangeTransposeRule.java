@@ -33,7 +33,7 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPLimit;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPSingeltonExchange;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPSingletonExchange;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
@@ -101,8 +101,8 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
         AbstractVoltDBPExchange exchangeRel = call.rel(1);
 
         RelNode result;
-        if (exchangeRel instanceof VoltDBPSingeltonExchange) {
-            result = transposeSingletonExchange((VoltDBPSingeltonExchange) exchangeRel, limitRel);
+        if (exchangeRel instanceof VoltDBPSingletonExchange) {
+            result = transposeSingletonExchange((VoltDBPSingletonExchange) exchangeRel, limitRel);
         } else {
             result = transposeDistributedExchange(exchangeRel, limitRel);
         }
@@ -110,7 +110,7 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
         call.transformTo(result);
     }
 
-    private RelNode transposeSingletonExchange(VoltDBPSingeltonExchange exchangeRel, VoltDBPLimit limitRel) {
+    private RelNode transposeSingletonExchange(VoltDBPSingletonExchange exchangeRel, VoltDBPLimit limitRel) {
         // Simply push the limit through the exchange
         VoltDBPLimit newLimitRel = limitRel.copy(
                 // Update Limit distribution's trait
@@ -173,7 +173,7 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
             // the coordinator's nodes in the final VoltDB plan.
             // and can not / should not be pushed beyond the VoltDBPMergeExchange exchange -
             // their distribution is not ANY
-            result = new VoltDBPSingeltonExchange(
+            result = new VoltDBPSingletonExchange(
                     exchangeRel.getCluster(),
                     exchangeRel.getTraitSet(),
                     coordinatorLimitRel,
