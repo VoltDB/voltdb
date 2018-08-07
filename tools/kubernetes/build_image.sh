@@ -25,13 +25,15 @@ source $1
 
 # customize the k8s statefulset
 MANIFEST=`basename $1 .cfg`.yaml
-cp voltdb-statefulset.yaml                             $MANIFEST
-sed -i "" "s:--clusterName--:$CLUSTER_NAME:g"          $MANIFEST
-sed -i "" "s:--containerImage---:$REP/$IMAGE_TAG:g"    $MANIFEST
-sed -i "" "s:--replicaCount--:$NODECOUNT:g"            $MANIFEST
-sed -i "" "s:--pvolumeSize--:${PVOLUME_SIZE:-1Gi}:g"   $MANIFEST
-sed -i "" "s:--memorySize--:${MEMORY_SIZE:-4Gi}:g"     $MANIFEST
-sed -i "" "s:--cpuCount--:${CPU_COUNT:-2}:g"           $MANIFEST
+cp voltdb-statefulset.yaml                        $MANIFEST
+SED="sed -i"
+[[ "$OSTYPE" =~ "darwin" ]] && SED="sed -i ''"
+$SED "s:--clusterName--:$CLUSTER_NAME:g"          $MANIFEST
+$SED "s:--containerImage---:$REP/$IMAGE_TAG:g"    $MANIFEST
+$SED "s:--replicaCount--:$NODECOUNT:g"            $MANIFEST
+$SED "s:--pvolumeSize--:${PVOLUME_SIZE:-1Gi}:g"   $MANIFEST
+$SED "s:--memorySize--:${MEMORY_SIZE:-4Gi}:g"     $MANIFEST
+$SED "s:--cpuCount--:${CPU_COUNT:-2}:g"           $MANIFEST
 
 TMP_DIR=.assets/$CLUSTER_NAME
 (rm -rf $TMP_DIR >/dev/null)
