@@ -52,9 +52,9 @@ spec:
         env:
 #         Specify 'voltdb start ...' command line args (space separated list)
 #         IMPORTANT!!!! VoltDB requires linux kernel feature Transparent Huge Pages (THP) be DISABLED when running VoltDB in PRODUCTION.
-#         running with the '--ignore=thp' parameter is not supported, contact support for further information
-          - name: VOLTDB_START_ARGS
-            value: "--ignore=thp"
+#         Uncomment next 2 lines to ignore THP settings on non-production systems.
+#          - name: VOLTDB_START_ARGS
+#            value: "--ignore=thp"
 #          - name: VOLTDB_HEAPMAX
 #            value: "3072"
 #          - name: VOLTDB_OPTS
