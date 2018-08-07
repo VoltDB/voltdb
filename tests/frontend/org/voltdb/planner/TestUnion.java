@@ -36,6 +36,7 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.PlanMatcher;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
@@ -635,20 +636,33 @@ public class TestUnion extends PlannerTestCase {
                               PlanNodeType.UNION,
                               allOf(planWithInlineNodes(PlanNodeType.ORDERBY,
                                                         PlanNodeType.LIMIT),
-                                      // This is an order by node.  We know this
-                                      // already from the test above.  This is an
-                                      // example of using a lambda to test a node.
-                                      // One could add any computation here.  Of
-                                      // course, a tastier way to do this would be
-                                      // to have the lambda be statically defined
-                                      // in PlannerTestCase.  But this works better
-                                      // as an example.
-                                    (node) -> {
-                                        OrderByPlanNode obpn = (OrderByPlanNode)node;
-                                        if (obpn.getSortDirections().get(0) != SortDirectionType.ASC) {
-                                            return "Expected ascending order by node.";
+                                    // This is an order by node.  We know this
+                                    // already from the test above.  This is an
+                                    // example of using a lambda to test a node.
+                                    // One could add any computation here.  Of
+                                    // course, a tastier way to do this would be
+                                    // to have the lambda be statically defined
+                                    // in PlannerTestCase.  But this works better
+                                    // as an example.
+                                    new PlanMatcher() {
+                                        @Override
+                                        public String match(AbstractPlanNode node,
+                                                            int fragmentNo,
+                                                            int numFragments) {
+                                            OrderByPlanNode obpn = (OrderByPlanNode)node;
+                                            if (obpn.getSortDirections().get(0) != SortDirectionType.ASC) {
+                                                return String.format("Expected ascending order by node %d/%d, id %d.",
+                                                                     fragmentNo,
+                                                                     numFragments,
+                                                                     obpn.getPlanNodeId());
+                                            }
+                                            return null;
                                         }
-                                        return null;
+
+                                        @Override
+                                        public String matchName() {
+                                            return "ORDERBY";
+                                        }
                                     }),
                               planWithInlineNodes(PlanNodeType.SEQSCAN,
                                                   PlanNodeType.PROJECTION)));

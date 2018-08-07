@@ -229,7 +229,7 @@ public class EEPlanGenerator extends PlannerTestCase {
                                                            fragmentNumber,
                                                            nodes.size()));
         }
-        String planString = PlanSelector.outputPlanDebugString(nodes.get(fragmentNumber));
+        String planString = PlanSelector.outputPlanDebugString(nodes.get(fragmentNumber), false);
         return planString;
     }
 

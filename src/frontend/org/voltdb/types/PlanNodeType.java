@@ -149,11 +149,20 @@ public enum PlanNodeType implements PlanMatcher {
     }
 
     @Override
-    public String match(AbstractPlanNode node) {
+    public String match(AbstractPlanNode node, int fragmentNo, int numberFragments) {
         if (node.getPlanNodeType() == this) {
             return null;
         }
-        return "Expected a plan node of type " + this
-                + " in node " + node.getPlanNodeId() + ".";
+        return String.format("Expected plan node type %s not %s in fragment %d/%d, id %d.",
+                             this,
+                             node,
+                             fragmentNo,
+                             numberFragments,
+                             node.getPlanNodeId());
+    }
+
+    @Override
+    public String matchName() {
+        return toString();
     }
 }

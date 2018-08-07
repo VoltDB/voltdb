@@ -161,8 +161,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param paramValues
      * @param db
      */
-    public ParsedSelectStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
-        super(parent, paramValues, db);
+    public ParsedSelectStmt(AbstractParsedStmt parent, String[] paramValues, Database db, boolean isLargeQuery) {
+        super(parent, paramValues, db, isLargeQuery);
     }
 
     // update table names, convert all expressions to TupleValueExpressions, and also update each expression's
@@ -2653,7 +2653,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     protected AbstractParsedStmt parseCommonTableStatement(VoltXMLElement queryNode, boolean isBaseCase) {
-        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
+        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this,
+                                                                              queryNode,
+                                                                              m_paramValues,
+                                                                              m_db,
+                                                                              isLargeQuery());
         // Propagate parameters from the parent to the child
         commonTableStmt.m_paramsById.putAll(m_paramsById);
         commonTableStmt.setParamsByIndex(getParamsByIndex());

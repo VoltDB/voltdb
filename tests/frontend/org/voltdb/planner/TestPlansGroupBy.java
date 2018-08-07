@@ -25,8 +25,12 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
+import org.junit.Before;
+import org.junit.Ignore;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -44,14 +48,23 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.PlanMatcher;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
 public class TestPlansGroupBy extends PlannerTestCase {
+    // Set this to true to print the JSON string for the plan.
+    private static boolean PRINT_JSON_PLAN = true;
+    // Test normal sized temp tables.
+    private static boolean TEST_NORMAL_SIZE_QUERIES = true;
+    // Test large sized temp tables.
+    private static boolean TEST_LARGE_QUERIES = true;
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"),
                 "testplansgroupby", false);
+        planForLargeQueries(false);
     }
 
     @Override
@@ -59,57 +72,161 @@ public class TestPlansGroupBy extends PlannerTestCase {
         super.tearDown();
     }
 
+    /**
+     * There is no group by here.  So, we have
+     * just one big group, and the rows can happen
+     * in any order in the one group.  We compute an aggregate
+     * in the distributed fragment, and another,
+     * possibly different, in
+     * the coordinator fragment.  Min, Max and Sum are
+     * associative, so we don't care how they are
+     * distributed, and the aggregate is the same
+     * in both fragments.  Count is count in the distributed
+     * fragment and sum in the coordinator fragment.
+     *
+     * This tests both large temp table and normal temp
+     * table queries.
+     */
     public void testInlineSerialAgg_noGroupBy() {
-        checkSimpleTableInlineAgg("SELECT SUM(A1) from T1");
-        checkSimpleTableInlineAgg("SELECT MIN(A1) from T1");
-        checkSimpleTableInlineAgg("SELECT MAX(A1) from T1");
-        checkSimpleTableInlineAgg("SELECT SUM(A1), COUNT(A1) from T1");
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            // Try the normal sized queries.
+            planForLargeQueries(false);
+            basicTestInlineSerialAgg_noGroupBy();
+        }
+
+        if (TEST_LARGE_QUERIES) {
+            // Try large temp table queries.
+            planForLargeQueries(true);
+            basicTestInlineSerialAgg_noGroupBy();
+        }
+    }
+
+    public void basicTestInlineSerialAgg_noGroupBy() {
+        //
+        // Note: All these queries create a two-fragment plan
+        //       with a single scan node in the distributed fragment,
+        //       and no join nodes.  Each fragment has an aggregate
+        //       node.  The check routine will check that the
+        //       scan node is what we expect and both aggregates
+        //       are the ones we expect.
+        //
+        //       All these plans are the same, whether we use
+        //       large temp tables or not.  Since there are no
+        //       group by keys we can always do serial aggregation.
+        //
+        checkSimpleTableInlineAgg("SELECT SUM(A1) from T1",
+                                  // This is the scan node we expect.
+                                  PlanNodeType.SEQSCAN,
+                                  // This is the coordinator fragment aggregate matcher.
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM),
+                                  // This is the distributed fragment aggregate matcher.
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM));
+        checkSimpleTableInlineAgg("SELECT MIN(A1) from T1",
+                                  PlanNodeType.SEQSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MIN),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MIN));
+        checkSimpleTableInlineAgg("SELECT MAX(A1) from T1",
+                                  PlanNodeType.SEQSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MAX),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MAX));
+
+        checkSimpleTableInlineAgg("SELECT SUM(A1), COUNT(A1) from T1",
+                                  PlanNodeType.SEQSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM,
+                                                           ExpressionType.AGGREGATE_SUM),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM,
+                                                           ExpressionType.AGGREGATE_COUNT));
 
         // There is no index defined on column B3
-        checkSimpleTableInlineAgg("SELECT SUM(A3) from T3 WHERE B3 > 3");
-        checkSimpleTableInlineAgg("SELECT MIN(A3) from T3 WHERE B3 > 3");
-        checkSimpleTableInlineAgg("SELECT MAX(A3) from T3 WHERE B3 > 3");
-        checkSimpleTableInlineAgg("SELECT COUNT(A3) from T3 WHERE B3 > 3");
+        checkSimpleTableInlineAgg("SELECT SUM(A3) from T3 WHERE B3 > 3",
+                                  PlanNodeType.SEQSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM));
+        checkSimpleTableInlineAgg("SELECT MIN(A3) from T3 WHERE B3 > 3",
+                                  PlanNodeType.SEQSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MIN),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MIN));
+        checkSimpleTableInlineAgg("SELECT MAX(A3) from T3 WHERE B3 > 3",
+                                  PlanNodeType.SEQSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MAX),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MAX));
+
+        checkSimpleTableInlineAgg("SELECT COUNT(A3) from T3 WHERE B3 > 3",
+                                  PlanNodeType.SEQSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_COUNT));
 
         // Index scan
-        checkSimpleTableInlineAgg("SELECT SUM(A3) from T3 WHERE PKEY > 3");
-        checkSimpleTableInlineAgg("SELECT MIN(A3) from T3 WHERE PKEY > 3");
-        checkSimpleTableInlineAgg("SELECT MAX(A3) from T3 WHERE PKEY > 3");
-        checkSimpleTableInlineAgg("SELECT COUNT(A3) from T3 WHERE PKEY > 3");
+        checkSimpleTableInlineAgg("SELECT SUM(A3) from T3 WHERE PKEY > 3",
+                                  PlanNodeType.INDEXSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM));
+        checkSimpleTableInlineAgg("SELECT MIN(A3) from T3 WHERE PKEY > 3",
+                                  PlanNodeType.INDEXSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MIN),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MIN));
+        checkSimpleTableInlineAgg("SELECT MAX(A3) from T3 WHERE PKEY > 3",
+                                  PlanNodeType.INDEXSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MAX),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MAX));
+        checkSimpleTableInlineAgg("SELECT COUNT(A3) from T3 WHERE PKEY > 3",
+                                  PlanNodeType.INDEXSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_COUNT));
+
+        // Special
+        // AVG is optimized with SUM / COUNT, generating extra projection node
+        // In future, inline projection for aggregation.
+        checkSimpleTableInlineAgg("SELECT AVG(A1) from T1",
+                                  PlanNodeType.SEQSCAN,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM,
+                                                           ExpressionType.AGGREGATE_SUM),
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_SUM,
+                                                           ExpressionType.AGGREGATE_COUNT));
     }
 
-    private void checkSimpleTableInlineAgg(String sql) {
-        AbstractPlanNode p;
-        List<AbstractPlanNode> pns;
-
-        pns = compileToFragments(sql);
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
-        assertTrue(p.getChild(0) instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AbstractScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-    }
-
-    // AVG is optimized with SUM / COUNT, generating extra projection node
-    // In future, inline projection for aggregation.
-    public void testInlineSerialAgg_noGroupBy_special() {
-      AbstractPlanNode p;
-      List<AbstractPlanNode> pns;
-
-      pns = compileToFragments("SELECT AVG(A1) from T1");
-      //* enable to debug */ printExplainPlan(pns);
-      p = pns.get(0).getChild(0);
-      assertTrue(p instanceof ProjectionPlanNode);
-      assertTrue(p.getChild(0) instanceof AggregatePlanNode);
-      assertTrue(p.getChild(0).getChild(0) instanceof ReceivePlanNode);
-
-      p = pns.get(1).getChild(0);
-      assertTrue(p instanceof SeqScanPlanNode);
-      assertNotNull(p.getInlinePlanNode(PlanNodeType.PROJECTION));
-      assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+    private void checkSimpleTableInlineAgg(String sql,
+                                           PlanNodeType scanType,
+                                           PlanMatcher coordAggNode,
+                                           PlanMatcher distAggNode) {
+        validatePlan(sql,
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              // Sometimes we see a projection node here,
+                              // especially when computing average.
+                              new OptionalPlanNode(PlanNodeType.PROJECTION),
+                              coordAggNode,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(scanType,
+                                                      PlanNodeType.PROJECTION,
+                                                      distAggNode)));
     }
 
     /**
@@ -121,106 +238,166 @@ public class TestPlansGroupBy extends PlannerTestCase {
      * For simplicity, this case does not consider partial indexes -- it would have
      * to validate that the query conditions imply the predicate of the index.
      * This could be implemented some day.
+     *
+     * This tests large and normal sized temp table queries.
      */
     public void testAggregateOptimizationWithIndex() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestAggregateOptimizationWithIndex();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestAggregateOptimizationWithIndex();
+        }
+    }
+
+    public void basicTestAggregateOptimizationWithIndex() {
         AbstractPlanNode p;
         List<AbstractPlanNode> pns;
-
-        pns = compileToFragments("SELECT A, count(B) from R2 where B > 2 group by A;");
-        assertEquals(1, pns.size());
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof IndexScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("primary key index"));
-
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT A, count(B) from R2 where B > 2 group by A;",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_COUNT),
+                                  PlanNodeType.ORDERBY,
+                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN, // Primary Key.
+                                                          PlanNodeType.PROJECTION)));
+        } else {
+            validatePlan("SELECT A, count(B) from R2 where B > 2 group by A;",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                          PlanNodeType.HASHAGGREGATE,
+                                                          PlanNodeType.PROJECTION)));
+        }
         // matching the partial index where clause
-        pns = compileToFragments("SELECT A, count(B) from R2 where B > 3 group by A;");
-        assertEquals(1, pns.size());
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof IndexScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
+        validatePlan("SELECT A, count(B) from R2 where B > 3 group by A;",
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(new IndexScanPlanMatcher("PARTIAL_IDX_R2"),
+                                                      PlanNodeType.AGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
 
-        // using the partial index with serial aggregation
-        pns = compileToFragments("SELECT A, count(B) from R2 where A > 5 and B > 3 group by A;");
-        assertEquals(1, pns.size());
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof IndexScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
+        validatePlan("SELECT A, count(B) from R2 where A > 5 and B > 3 group by A;",
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(new IndexScanPlanMatcher("PARTIAL_IDX_R2"),
+                                                      PlanNodeType.AGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
 
-        // order by will help pick up the partial index
-        pns = compileToFragments("SELECT A, count(B) from R2 where B > 3 group by A order by A;");
-        assertEquals(1, pns.size());
-        //* enable to debug */ printExplainPlan(pns);
-        p = pns.get(0).getChild(0);
-        assertTrue(p instanceof IndexScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
+        validatePlan("SELECT A, count(B) from R2 where B > 3 group by A order by A;",
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(new IndexScanPlanMatcher("PARTIAL_IDX_R2"),
+                                                      PlanNodeType.AGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
 
         // using the partial index with partial aggregation
-        pns = compileToFragments("SELECT C, A, MAX(B) FROM R2 WHERE A > 0 and B > 3 GROUP BY C, A");
-        assertEquals(1, pns.size());
-        p = pns.get(0).getChild(0);
-        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
-
-        // Partition IndexScan with HASH aggregate is optimized to use Partial aggregate -
-        // index (F_D1) covers part of the GROUP BY columns
-        pns = compileToFragments("SELECT F_D1, F_VAL1, MAX(F_VAL2) FROM F WHERE F_D1 > 0 GROUP BY F_D1, F_VAL1 ORDER BY F_D1, MAX(F_VAL2)");
-        assertEquals(2, pns.size());
-        p = pns.get(1).getChild(0);
-        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("COL_F_TREE1"));
+        if (isPlanningForLargeQueries()) {
+            // We can't use the index at all for ordering, because
+            // the index does not contain column C.  But we can
+            // use it to filter B > 3.  So, we need an index scan
+            // followed by an order by.
+            validatePlan("SELECT C, A, MAX(B) FROM R2 WHERE A > 0 and B > 3 GROUP BY C, A",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                           ExpressionType.AGGREGATE_MAX),
+                                  PlanNodeType.ORDERBY,
+                                  // Match an index scan on "PARTIAL_IDX_R2".
+                                  new PlanWithInlineNodes(new IndexScanPlanMatcher("PARTIAL_IDX_R2"),
+                                                          PlanNodeType.PROJECTION)));
+        } else {
+            validatePlan("SELECT C, A, MAX(B) FROM R2 WHERE A > 0 and B > 3 GROUP BY C, A",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                          PlanNodeType.PARTIALAGGREGATE,
+                                                          PlanNodeType.PROJECTION)));
+        }
+        if (isPlanningForLargeQueries()) {
+            validatePlan(
+                    "SELECT MAX(F_VAL2), F_D1, F_VAL1 FROM F WHERE F_D1 > 0 GROUP BY F_D1, F_VAL1 ORDER BY F_D1, MAX(F_VAL2)",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.ORDERBY,   // Statement Level Orderby.
+                                                     // This has to be a parent of the
+                                                     // AGGREGATE node.
+                             PlanNodeType.AGGREGATE, // Coordinator MAX
+                             new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
+                                                     PlanNodeType.ORDERBY)),
+                    fragSpec(PlanNodeType.SEND,
+                             new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                      ExpressionType.AGGREGATE_MAX),
+                             PlanNodeType.ORDERBY,
+                             new PlanWithInlineNodes(new IndexScanPlanMatcher("COL_F_TREE1"),
+                                                     PlanNodeType.PROJECTION)));
+        } else {
+            // Partition IndexScan with HASH aggregate is optimized to use Partial aggregate -
+            // index (F_D1) covers part of the GROUP BY columns
+            validatePlan(
+                    "SELECT F_D1, F_VAL1, MAX(F_VAL2) FROM F WHERE F_D1 > 0 GROUP BY F_D1, F_VAL1 ORDER BY F_D1, MAX(F_VAL2)",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.HASHAGGREGATE,
+                             PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                             new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                     PlanNodeType.PARTIALAGGREGATE,
+                                                     PlanNodeType.PROJECTION)));
+        }
 
         // IndexScan with HASH aggregate is optimized to use Serial aggregate -
         // index (F_VAL1, F_VAL2) covers all of the GROUP BY columns
-        pns = compileToFragments("SELECT F_VAL1, F_VAL2, MAX(F_VAL3) FROM RF WHERE F_VAL1 > 0 GROUP BY F_VAL2, F_VAL1");
-        assertEquals(1, pns.size());
-        p = pns.get(0).getChild(0);
-        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("COL_RF_TREE2"));
+        validatePlan("SELECT F_VAL1, F_VAL2, MAX(F_VAL3) FROM RF WHERE F_VAL1 > 0 GROUP BY F_VAL2, F_VAL1",
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.AGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
 
         // IndexScan with HASH aggregate remains not optimized -
         // The first column index (F_VAL1, F_VAL2) is not part of the GROUP BY
-        pns = compileToFragments("SELECT F_VAL2, MAX(F_VAL2) FROM RF WHERE F_VAL1 > 0 GROUP BY F_VAL2");
-        assertEquals(1, pns.size());
-        p = pns.get(0).getChild(0);
-        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("COL_RF_TREE2"));
+        validatePlan("SELECT F_VAL2, MAX(F_VAL2) FROM RF WHERE F_VAL1 > 0 GROUP BY F_VAL2",
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.HASHAGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
 
         // Partition IndexScan with HASH aggregate remains unoptimized -
         // index (F_VAL1, F_VAL2) does not cover any of the GROUP BY columns
-        pns = compileToFragments("SELECT MAX(F_VAL2) FROM F WHERE F_VAL1 > 0 GROUP BY F_D1");
-        assertEquals(2, pns.size());
-        p = pns.get(1).getChild(0);
-        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("COL_F_TREE2"));
+        validatePlan("SELECT MAX(F_VAL2) FROM F WHERE F_VAL1 > 0 GROUP BY F_D1",
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              PlanNodeType.HASHAGGREGATE,
+                              PlanNodeType.RECEIVE),
+                     fragSpec(PlanNodeType.SEND,
+                         new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                 PlanNodeType.HASHAGGREGATE,
+                                                 PlanNodeType.PROJECTION)));
 
         // IndexScan with HASH aggregate remains unoptimized - the index COL_RF_HASH is not scannable
-        pns = compileToFragments("SELECT F_VAL3, MAX(F_VAL2) FROM RF WHERE F_VAL3 = 0 GROUP BY F_VAL3");
-        assertEquals(1, pns.size());
-        p = pns.get(0).getChild(0);
-        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("COL_RF_HASH"));
+        validatePlan("SELECT F_VAL3, MAX(F_VAL2) FROM RF WHERE F_VAL3 = 0 GROUP BY F_VAL3",
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.HASHAGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
 
         // where clause not matching
-        pns = compileToFragments("SELECT A, count(B) from R2 where B > 2 group by A order by A;");
-        assertEquals(1, pns.size());
-        p = pns.get(0).getChild(0);
-        if (p instanceof ProjectionPlanNode) {
-            p = p.getChild(0);
-        }
-        assertTrue(p instanceof OrderByPlanNode);
-        p = p.getChild(0);
-        assertTrue(p instanceof SeqScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        validatePlan("SELECT A, count(B) from R2 where B > 2 group by A order by A;",
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              new OptionalPlanNode(PlanNodeType.PROJECTION),
+                              PlanNodeType.ORDERBY,
+                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                      PlanNodeType.HASHAGGREGATE,
+                                                      PlanNodeType.PROJECTION)));
     }
 
     public void testCountStar() {
@@ -397,27 +574,27 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     // Group by with index
-    private void checkGroupByOnlyPlan(List<AbstractPlanNode> pns,
+    private void checkGroupByOnlyPlan(String SQL,
             boolean twoFragments, PlanNodeType type, boolean isIndexScan) {
-        AbstractPlanNode apn = pns.get(0).getChild(0);
+        // The distributed fragment always has this shape.
+        FragmentSpec distFragSpec = fragSpec(PlanNodeType.SEND,
+                                             new PlanWithInlineNodes((isIndexScan
+                                                                         ? PlanNodeType.INDEXSCAN
+                                                                         : PlanNodeType.SEQSCAN),
+                                                                     PlanNodeType.PROJECTION,
+                                                                     type));
+
         if (twoFragments) {
-            assertEquals(PlanNodeType.HASHAGGREGATE, apn.getPlanNodeType());
-            apn = pns.get(1).getChild(0);
-        }
-
-        // For a single table aggregate, it is inline always.
-        assertEquals(
-                (isIndexScan ? PlanNodeType.INDEXSCAN : PlanNodeType.SEQSCAN),
-                apn.getPlanNodeType());
-
-        if (type == PlanNodeType.HASHAGGREGATE) {
-            assertNotNull(apn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-        }
-        else if (type == PlanNodeType.AGGREGATE) {
-            assertNotNull(apn.getInlinePlanNode(PlanNodeType.AGGREGATE));
-        }
-        else if (type == PlanNodeType.PARTIALAGGREGATE) {
-            assertNotNull(apn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
+            validatePlan(SQL,
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.HASHAGGREGATE,
+                                  PlanNodeType.RECEIVE),
+                         distFragSpec);
+        } else {
+            validatePlan(SQL,
+                         PRINT_JSON_PLAN,
+                         distFragSpec);
         }
     }
 
@@ -426,8 +603,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
     PlanNodeType P_AGG = PlanNodeType.PARTIALAGGREGATE;
 
     public void testGroupByOnly() {
-        List<AbstractPlanNode> pns;
-
         System.out.println("Starting testGroupByOnly");
 
         /**
@@ -436,53 +611,40 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // Replicated Table
 
         // only GROUP BY cols in SELECT clause
-        pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1");
-        checkGroupByOnlyPlan(pns, false, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D1 FROM RF GROUP BY F_D1", false, S_AGG, true);
 
         // SELECT cols in GROUP BY and other aggregate cols
-        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1");
-        checkGroupByOnlyPlan(pns, false, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1", false, S_AGG, true);
 
         // aggregate cols are part of keys of used index
-        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1");
-        checkGroupByOnlyPlan(pns, false, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1", false, S_AGG, true);
 
         // expr index, full indexed case
-        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2");
-        checkGroupByOnlyPlan(pns, false, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2", false, S_AGG, true);
 
         // function index, prefix indexed case
-        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)");
-        checkGroupByOnlyPlan(pns, false, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)", false, S_AGG, true);
 
         // order of GROUP BY cols is different of them in index definition
         // index on (ABS(F_D1), F_D2 - F_D3), GROUP BY on (F_D2 - F_D3, ABS(F_D1))
-        pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)");
-        checkGroupByOnlyPlan(pns, false, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)", false, S_AGG, true);
 
-        pns = compileToFragments("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1");
         //* enable to debug */ System.out.println(pns, "DEBUG: " + pns.get(0).toExplainPlanString());
-        checkGroupByOnlyPlan(pns, false, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1", false, S_AGG, true);
 
         // Partitioned Table
-        pns = compileToFragments("SELECT F_D1 FROM F GROUP BY F_D1");
         // index scan for group by only, no need using hash aggregate
-        checkGroupByOnlyPlan(pns, true, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D1 FROM F GROUP BY F_D1", true, S_AGG, true);
 
-        pns = compileToFragments("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1");
-        checkGroupByOnlyPlan(pns, true, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1", true, S_AGG, true);
 
-        pns = compileToFragments("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1");
-        checkGroupByOnlyPlan(pns, true, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1", true, S_AGG, true);
 
-        pns = compileToFragments("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2");
-        checkGroupByOnlyPlan(pns, true, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2", true, S_AGG, true);
 
-        pns = compileToFragments("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)");
-        checkGroupByOnlyPlan(pns, true, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)", true, S_AGG, true);
 
-        pns = compileToFragments("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)");
-        checkGroupByOnlyPlan(pns, true, S_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)", true, S_AGG, true);
 
 
         /**
@@ -491,53 +653,44 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // unoptimized case (only use second col of the index), but will be replaced in
         // SeqScanToIndexScan optimization for deterministic reason
         // use EXPR_RF_TREE1 not EXPR_RF_TREE2
-        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
-        checkGroupByOnlyPlan(pns, false, H_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3", false, H_AGG, true);
 
         // unoptimized case: index is not scannable
-        pns = compileToFragments("SELECT F_VAL3, COUNT(*) FROM RF GROUP BY F_VAL3");
-        checkGroupByOnlyPlan(pns, false, H_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_VAL3, COUNT(*) FROM RF GROUP BY F_VAL3", false, H_AGG, true);
 
         // unoptimized case: F_D2 is not prefix indexable
-        pns = compileToFragments("SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2");
-        checkGroupByOnlyPlan(pns, false, H_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2", false, H_AGG, true);
 
         // unoptimized case (only uses second col of the index), will not be replaced in
         // SeqScanToIndexScan for determinism because of non-deterministic receive.
         // Use primary key index
-        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3");
-        checkGroupByOnlyPlan(pns, true, H_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3", true, H_AGG, true);
 
         // unoptimized case (only uses second col of the index), will be replaced in
         // SeqScanToIndexScan for determinism.
         // use EXPR_F_TREE1 not EXPR_F_TREE2
-        pns = compileToFragments("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3");
         //* enable to debug */ System.out.println(pns, pns.get(0).toExplainPlanString());
-        checkGroupByOnlyPlan(pns, false, H_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3", false, H_AGG, true);
 
         /**
          * Partial Aggregate cases
          */
         // unoptimized case: no prefix index found for (F_D1, F_D2)
-        pns = compileToFragments("SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2");
-        checkGroupByOnlyPlan(pns, false, P_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2", false, P_AGG, true);
 
-        pns = compileToFragments("SELECT ABS(F_D1), F_D3, COUNT(*) FROM RF GROUP BY ABS(F_D1), F_D3");
-        checkGroupByOnlyPlan(pns, false, P_AGG, true);
+        checkGroupByOnlyPlan("SELECT ABS(F_D1), F_D3, COUNT(*) FROM RF GROUP BY ABS(F_D1), F_D3", false, P_AGG, true);
 
         // partition table
-        pns = compileToFragments("SELECT F_D1, F_D2, COUNT(*) FROM F GROUP BY F_D1, F_D2");
-        checkGroupByOnlyPlan(pns, true, P_AGG, true);
+        checkGroupByOnlyPlan("SELECT F_D1, F_D2, COUNT(*) FROM F GROUP BY F_D1, F_D2", true, P_AGG, true);
 
-        pns = compileToFragments("SELECT ABS(F_D1), F_D3, COUNT(*) FROM F GROUP BY ABS(F_D1), F_D3");
-        checkGroupByOnlyPlan(pns, true, P_AGG, true);
+        checkGroupByOnlyPlan("SELECT ABS(F_D1), F_D3, COUNT(*) FROM F GROUP BY ABS(F_D1), F_D3", true, P_AGG, true);
 
         /**
          * Regression case
          */
         // ENG-9990 Repeating GROUP BY partition key in SELECT corrupts output schema.
         //* enable to debug */ boolean was = AbstractPlanNode.enableVerboseExplainForDebugging();
-        pns = compileToFragments("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY");
+        List<AbstractPlanNode> pns = compileToFragments("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY");
         //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
         //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
         //* enable to debug */ AbstractPlanNode.restoreVerboseExplainForDebugging(was);
@@ -993,10 +1146,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments(sql2);
         explainStr2 = buildExplainPlan(pns);
         if (! exact) {
-            explainStr1 = explainStr1.replaceAll("\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[\\d]",
-                    "\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[Index]");
+            explainStr1 = explainStr1.replaceAll("\\$\\$_VOLT_TEMP_TABLE_\\$\\$.column#[\\d]",
+                    "TEMP_TABLE.column#[Index]");
             explainStr2 = explainStr2.replaceAll("\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[\\d]",
-                    "\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[Index]");
+                    "TEMP_TABLE.column#[Index]");
             assertEquals(explainStr1, explainStr2);
         }
         assertEquals(explainStr1, explainStr2);

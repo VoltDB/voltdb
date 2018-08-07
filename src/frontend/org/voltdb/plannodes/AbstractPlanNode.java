@@ -1142,7 +1142,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 String.format("(%s)([0-9]+)(.*)(\\s*)%s(\\2)", AbstractSubqueryExpression.SUBQUERY_TAG, AbstractSubqueryExpression.SUBQUERY_TAG),
                 Pattern.DOTALL);
         Map<String, String> subqueries = new TreeMap<>();
-        String topStmt = extractExplainedSubquries(fullExpalinString, subqueryPattern, subqueries);
+        String topStmt = extractExplainedSubqueries(fullExpalinString, subqueryPattern, subqueries);
         StringBuilder fullSb = new StringBuilder(topStmt);
         for (Map.Entry<String, String> subquery : subqueries.entrySet()) {
             fullSb.append("\n").append(subquery.getKey()).append('\n').append(subquery.getValue());
@@ -1150,7 +1150,41 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return fullSb.toString();
     }
 
-    private String extractExplainedSubquries(String explainedSubquery, Pattern pattern, Map<String, String> subqueries) {
+    /**
+     * @return a formatted JSON plan string, with normal temp tables.  For debugging only.
+     */
+    public String toJSONExplainString() {
+        return toJSONExplainString(false);
+    }
+
+    /**
+     * @return a formatted JSON plan string, with possible large temp tables.  For debugging only.
+     */
+    public String toJSONExplainString(boolean isLargeQuery) {
+        try {
+            return toJSONExplainStringUnsafe(isLargeQuery);
+        } catch (JSONException ex) {
+            return "JSONException: " + ex.getMessage();
+        }
+    }
+
+    /**
+     * @return a formatted JSON plan string, with possible large temp tables.
+     *         This may throw a JSONException.  For debugging only.
+     */
+    public String toJSONExplainStringUnsafe(boolean isLargeQuery) throws JSONException {
+        PlanNodeList nodeList = new PlanNodeList(this, isLargeQuery);
+        // get the json serialized version of the plan
+        String json = null;
+
+        String crunchJson = nodeList.toJSONString();
+        JSONObject jobj = null;
+        jobj = new JSONObject(crunchJson);
+        json = jobj.toString(4);
+        return json;
+    }
+
+    private String extractExplainedSubqueries(String explainedSubquery, Pattern pattern, Map<String, String> subqueries) {
         Matcher matcher = pattern.matcher(explainedSubquery);
         int pos = 0;
         StringBuilder sb = new StringBuilder();
@@ -1159,7 +1193,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             sb.append(explainedSubquery.substring(pos, matcher.end(2)));
             pos = matcher.end();
             // Recurse into the subquery string to extract its own subqueries if any
-            String nextExplainedStmt = extractExplainedSubquries(matcher.group(3), pattern, subqueries);
+            String nextExplainedStmt = extractExplainedSubqueries(matcher.group(3), pattern, subqueries);
             subqueries.put(AbstractSubqueryExpression.SUBQUERY_TAG + matcher.group(2), nextExplainedStmt);
         }
         // Append the rest of the input string

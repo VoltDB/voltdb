@@ -67,8 +67,8 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     * @param paramValues
     * @param db
     */
-    public ParsedInsertStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
-        super(parent, paramValues, db);
+    public ParsedInsertStmt(AbstractParsedStmt parent, String[] paramValues, Database db, boolean isLargeQuery) {
+        super(parent, paramValues, db, isLargeQuery);
     }
 
     @Override
