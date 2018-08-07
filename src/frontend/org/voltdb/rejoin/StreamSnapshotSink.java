@@ -133,7 +133,9 @@ public class StreamSnapshotSink {
 
         @Override
         public void restore(SiteProcedureConnection connection) {
-            rejoinLog.info("remaining bytes for table " + tableId + " is " + tableBlock.remaining());
+            if (rejoinLog.isDebugEnabled()) {
+                rejoinLog.debug("remaining bytes for table " + tableId + " is " + tableBlock.remaining());
+            }
             VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBlock.duplicate(), true);
 
             // Currently, only export cares about this TXN ID.  Since we don't have one handy,
