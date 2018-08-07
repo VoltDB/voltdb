@@ -1111,37 +1111,37 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
             validateTableOfScalarLongs(vt, new long[] {1, 1, 2, 3, 3, 4});
 
             sql = "Select SUM(v_p1.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
-                    "order by 1;";
+                    "order by v_p1.v_g2;";
             sql = sql.replace("v_p1", tb);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {150});
 
             sql = "Select SUM(v_r4.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
-                    "order by 1;";
+                    "order by v_p1.v_g2;";
             sql = sql.replace("v_p1", tb);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {150});
 
             sql = "Select MIN(v_p1.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
-                    "order by 1;";
+                    "order by v_p1.v_g2;";
             sql = sql.replace("v_p1", tb);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {10});
 
             sql = "Select MIN(v_r4.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
-                    "order by 1;";
+                    "order by v_p1.v_g2;";
             sql = sql.replace("v_p1", tb);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {10});
 
             sql = "Select MAX(v_p1.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
-                    "order by 1;";
+                    "order by v_p1.v_g2;";
             sql = sql.replace("v_p1", tb);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {30});
 
             sql = "Select MAX(v_r4.v_g1) from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
-                    "order by 1;";
+                    "order by v_p1.v_g2;";
             sql = sql.replace("v_p1", tb);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {30});
@@ -1197,7 +1197,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 sql = "Select SUM(v_p1.v_sum_age) as c1, MAX(v_r4.v_sum_rent) as c2 from v_p1 join v_r4 " +
                         "on v_p1.v_cnt >= v_r4.v_cnt " +
                         "where v_p1.v_sum_rent > -1 and v_p1.v_g1 > 15 and v_p1.v_cnt <= 2 " +
-                        "order by c1, c2 ";
+                        "order by v_p1.v_g1, v_p1.v_g2 ";
                 sql = sql.replace("v_p1", tb);
                 vt = client.callProcedure("@AdHoc", sql).getResults()[0];
                 validateTableOfLongs(vt, new long[][] {{114,13}});
@@ -1206,7 +1206,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                         "from v_p1 join v_r4 on v_p1.v_g1 = v_r4.v_g1 " +
                         "where v_p1.v_cnt < 4 " +
                         "group by v_p1.v_g2 " +
-                        "order by c0, c1, c2 ";
+                        "order by c0 ";
                 sql = sql.replace("v_p1", tb);
                 vt = client.callProcedure("@AdHoc", sql).getResults()[0];
                 //* enable for debug*/ System.out.println(vt);

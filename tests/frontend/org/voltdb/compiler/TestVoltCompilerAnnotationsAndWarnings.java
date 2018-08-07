@@ -24,6 +24,7 @@
 package org.voltdb.compiler;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 
 import org.voltdb.VoltDB.Configuration;
@@ -75,13 +76,13 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      *            expressions. This may be true of no errors are expected.
      * @param expectSuccess
      *            If this is true, the compilation should succeed.
-     * @throws Exception
+     * @throws IOException
      */
     public void testCompilationFailure(String     testName,
                                        String     simpleSchema,
                                        Object     procObject,
                                        String[]   errorMessages,
-                                       boolean    expectSuccess) throws Exception {
+                                       boolean    expectSuccess) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         ByteArrayOutputStream capturer = new ByteArrayOutputStream();
         PrintStream capturing = new PrintStream(capturer);
@@ -122,9 +123,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * Test that a stored procedure with a parameter type of float will not
      * compile. The Java type float is not legal for stored procedures.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testFloatParamComplaint() throws Exception {
+    public void testFloatParamComplaint() throws IOException {
         String simpleSchema =
             "create table floatie (" +
             "ival bigint default 0 not null, " +
@@ -143,9 +144,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * Test that a stored procedure with an aggregate whose parameter is FLOAT
      * causes a compilation error.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testInsertAggregatesOfFloat() throws Exception {
+    public void testInsertAggregatesOfFloat() throws IOException {
         String simpleSchema =
                 "create table floatingaggs_input ( alpha float );" +
                 "create table floatingaggs_output ( beta float );" +
@@ -161,9 +162,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * Test that a stored procedure with an aggregate of floating point type in
      * a having clause causes a compilation error.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testInsertAggregatesOfFloatInHaving() throws Exception {
+    public void testInsertAggregatesOfFloatInHaving() throws IOException {
         String simpleSchema =
                 "create table floatingaggs_input ( alpha float );" +
                 "create table floatingaggs_output ( beta float );" +
@@ -180,9 +181,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * Test that a statement procedure with an aggregate of floating point type
      * causes a compilation error.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testAggregatesOfFloatDDL() throws Exception {
+    public void testAggregatesOfFloatDDL() throws IOException {
         String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
         testCompilationFailure("testAggregatesOfFloatDDL",
                                simpleSchema,
@@ -196,13 +197,16 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * Test that a statement procedure with an aggregate of floating point type
      * in a subquery in a from clause causes an error.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testAggregatesOfFloatInSubquery() throws Exception {
+    public void testAggregatesOfFloatInSubquery() throws IOException {
         String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
         testCompilationFailure("testAggregatesOfFloatInSubquery",
                                simpleSchema,
-                               new String[] { "AggregatesOfFloatInSubquery", "insert into floatingaggs_output select sq.ss from ( select sum(alpha) as ss from floatingaggs_input where alpha > 0.0 order by ss ) as sq;" },
+                               new String[] { "AggregatesOfFloatInSubquery",
+                                       "insert into floatingaggs_output select sq.ss from ( " +
+                                               "select sum(alpha) as ss from floatingaggs_input " +
+                                               "where alpha > 0.0 ) as sq;" },
                                new String[] { ".*AggregatesOfFloatInSubquery.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
                                false);
     }
@@ -212,13 +216,16 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * subexpression which is an aggregate of floating point type in a subquery
      * in a from clause causes an error.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testAggregatesOfFloatInComplexSubquery() throws Exception {
+    public void testAggregatesOfFloatInComplexSubquery() throws IOException {
         String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
         testCompilationFailure("testAggregatesOfFloatInComplexSubquery",
                                simpleSchema,
-                               new String[] { "AggregatesOfFloatInComplexSubquery", "insert into floatingaggs_output select sq.ss + 100 from ( select sum(alpha) as ss from floatingaggs_input where alpha > 0.0 order by ss ) as sq;" },
+                               new String[] { "AggregatesOfFloatInComplexSubquery",
+                                       "insert into floatingaggs_output select sq.ss + 100 from ( " +
+                                               "select sum(alpha) as ss from floatingaggs_input " +
+                                               "where alpha > 0.0 ) as sq;" },
                                new String[] { ".*AggregatesOfFloatInComplexSubquery.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
                                false);
     }
@@ -229,14 +236,18 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * expression is more than a column reference and which is also part of a
      * larger expression causes a compilation error.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testAggregatesOfFloatInComplexSubquery2() throws Exception {
+    public void testAggregatesOfFloatInComplexSubquery2() throws IOException {
         String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
         testCompilationFailure("testAggregatesOfFloatInComplexSubquery2",
                                simpleSchema,
-                               new String[] { "AggregatesOfFloatInComplexSubquery2", "insert into floatingaggs_output select sq.ss + 100 from ( select sum(alpha + 42) as ss from floatingaggs_input where alpha > 0.0 order by ss ) as sq;" },
-                               new String[] { ".*AggregatesOfFloatInComplexSubquery2.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               new String[] { "AggregatesOfFloatInComplexSubquery2",
+                                       "insert into floatingaggs_output select sq.ss + 100 from ( " +
+                                               "select sum(alpha + 42) as ss from floatingaggs_input " +
+                                               "where alpha > 0.0 ) as sq;" },
+                               new String[] { ".*AggregatesOfFloatInComplexSubquery2.*Aggregate functions of floating point columns " +
+                                       "may not be deterministic.  We suggest converting to DECIMAL.*" },
                                false);
     }
 
@@ -245,9 +256,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * subexpression which is an aggregate whose type is float and is in a
      * subquery causes a compilation error.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testAggregatesOfFloatInLeftOfJoin() throws Exception {
+    public void testAggregatesOfFloatInLeftOfJoin() throws IOException {
         String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
         testCompilationFailure("testAggregatesOfFloatInLeftOfJoin",
                                simpleSchema,
@@ -262,9 +273,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * subexpression which is an aggregate whose type is float and is in a
      * subquery causes a compilation error.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testAggregatesOfFloatInRightOfJoins() throws Exception {
+    public void testAggregatesOfFloatInRightOfJoins() throws IOException {
         String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
         testCompilationFailure("testAggregatesOfFloatInRightOfJoin",
                                simpleSchema,
@@ -281,7 +292,7 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
      * be a Java Stored Procedure. This will only be a warning, so the
      * compilation will pass.
      */
-    public void testAggregatesOfFloatInSetops() throws Exception {
+    public void testAggregatesOfFloatInSetops() throws IOException {
         String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
         testCompilationFailure("testAggregatesOfFloatInSetops",
                                simpleSchema,
@@ -293,9 +304,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
     /**
      * Test that Min does not trigger non-determinism errors.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testMinOfFloatIsOk() throws Exception {
+    public void testMinOfFloatIsOk() throws IOException {
         String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
         testCompilationFailure("testMinOfFloat",
                                simpleSchema,
@@ -307,9 +318,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
     /**
      * Test that Max does not trigger non-determinism errors.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testMaxOfFloatIsOk() throws Exception {
+    public void testMaxOfFloatIsOk() throws IOException {
         String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
         testCompilationFailure("testMaxOfFloat",
                                simpleSchema,
@@ -321,9 +332,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
     /**
      * Test that we haven't broken the obvious good case.
      *
-     * @throws Exception
+     * @throws IOException
      */
-    public void testGoodInsert() throws Exception {
+    public void testGoodInsert() throws IOException {
         String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
         testCompilationFailure("testAggregatesOfFloatInComplexSubquery2",
                                simpleSchema,
@@ -332,7 +343,7 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
                                true);
     }
 
-    public void testSimple() throws Exception {
+    public void testSimple() throws IOException {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +

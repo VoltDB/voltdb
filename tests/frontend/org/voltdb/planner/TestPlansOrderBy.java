@@ -753,16 +753,6 @@ public class TestPlansOrderBy extends PlannerTestCase {
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
         {
-            // Serial aggregation instead of ORDERING
-            //          select max(indexed_partition_key)
-            //          from partitioned
-            //          order by max(indexed_partition_key);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select max(P_D1) from P order by max(P_D1)");
-            AbstractPlanNode pn = frags.get(0).getChild(0);
-            assertEquals(PlanNodeType.AGGREGATE, pn.getPlanNodeType());
-        }
-        {
             // Sequential scan (P1). Partition results are not sorted
             //          select non_indexed_partition, max(col)
             //          from partitioned
