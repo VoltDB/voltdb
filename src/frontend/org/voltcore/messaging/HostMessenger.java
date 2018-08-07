@@ -29,6 +29,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -331,6 +332,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Updates via COW
      */
     volatile ImmutableMultimap<Integer, ForeignHost> m_foreignHosts = ImmutableMultimap.of();
+
+    /*
+     * Track dead ForeignHosts that are reported independently by zookeeper and PicoNetwork.
+     * When both have reported both lists for that hostId should be empty (and removed).
+     */
+    Map<Integer, ArrayList<ForeignHost>> m_zkZombieForeignHosts = new HashMap<> ();
+    Map<Integer, ArrayList<ForeignHost>> m_picoZombieForeignHosts = new HashMap<> ();
 
     /*
      * Reference to the target HSId to FH mapping
@@ -656,8 +664,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         new InetSocketAddress(
                                 m_config.zkInterface.split(":")[0],
                                 Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                                m_config.backwardsTimeForgivenessWindow,
-                                m_failedHostsCallback);
+                        m_config.backwardsTimeForgivenessWindow,
+                        m_failedHostsCallback);
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
             m_zk = org.voltcore.zk.ZKUtil.getClient(
@@ -829,9 +837,49 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     .putAll(Maps.filterKeys(m_fhMapping, hostIdNotEqual))
                     .build();
         }
+        assert(Thread.holdsLock(this)); // Make sure m_zombieForeignHosts is protected
+        ArrayList<ForeignHost> picoNetworkZombies = m_picoZombieForeignHosts.get(hostId);
+        ArrayList<ForeignHost> zookeeperZombies = new ArrayList<>(fhs.size());
         for (ForeignHost fh : fhs) {
+            if (picoNetworkZombies != null && picoNetworkZombies.contains(fh)) {
+                picoNetworkZombies.remove(fh);
+            }
+            else {
+                zookeeperZombies.add(fh);
+            }
             fh.close();
         }
+        if (picoNetworkZombies != null && picoNetworkZombies.isEmpty()) {
+            m_picoZombieForeignHosts.remove(hostId);
+        }
+        if (!zookeeperZombies.isEmpty()) {
+            m_zkZombieForeignHosts.put(hostId, zookeeperZombies);
+        }
+    }
+
+    public synchronized void piconetworkThreadShutdown(int hostId, ForeignHost fh) {
+        ArrayList<ForeignHost> zookeeperZombies = m_zkZombieForeignHosts.get(hostId);
+        if (zookeeperZombies != null) {
+            boolean removed = zookeeperZombies.remove(fh);
+            assert(removed);    // Since a zk notification moves all the ForeignHosts for a hostId at once
+            if (zookeeperZombies.isEmpty()) {
+                m_zkZombieForeignHosts.remove(hostId);
+            }
+        }
+        else {
+            ArrayList<ForeignHost> picoNetworkZombies = m_picoZombieForeignHosts.get(hostId);
+            if (picoNetworkZombies == null) {
+                picoNetworkZombies = new ArrayList<>(Arrays.asList(fh));
+                m_picoZombieForeignHosts.put(hostId, picoNetworkZombies);
+            }
+            else {
+                picoNetworkZombies.add(fh);
+            }
+        }
+    }
+
+    public synchronized boolean canCompleteRepair(int hostId) {
+        return !m_foreignHosts.containsKey(hostId) && !m_picoZombieForeignHosts.containsKey(hostId) && !m_zkZombieForeignHosts.containsKey(hostId);
     }
 
     /**
@@ -899,7 +947,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             } catch (Exception e) {
                 networkLog.error("Error joining new node", e);
                 addFailedHost(hostId);
-                removeForeignHost(hostId);
+                synchronized(HostMessenger.this) {
+                    removeForeignHost(hostId);
+                }
                 m_acceptor.detract(hostId);
                 socket.close();
                 return;
@@ -1049,8 +1099,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     new InetSocketAddress(
                             m_config.zkInterface.split(":")[0],
                             Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                            m_config.backwardsTimeForgivenessWindow,
-                            m_failedHostsCallback);
+                   m_config.backwardsTimeForgivenessWindow,
+                   m_failedHostsCallback);
 
         /*
          * Now that the agreement site mailbox has been created it is safe
