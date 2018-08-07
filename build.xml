@@ -651,6 +651,7 @@ DISTRIBUTION
             <include name="kafka/**"/>
             <include name="lib/**" />
             <include name="draingen" />
+            <include name="kubernetes/**" />
         </fileset>
     </copy>
 

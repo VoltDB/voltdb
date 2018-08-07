@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: --clusterName--
+  labels:
+    app: --clusterName--
+spec:
+  ports:
+  - port: 8080
+    name: vmc
+  clusterIP: None
+  selector:
+    app: --clusterName--
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: --clusterName--
+spec:
+  selector:
+    matchLabels:
+      app: --clusterName--
+  serviceName: "--clusterName--"
+  replicas: --replicaCount--
+  template:
+    metadata:
+      labels:
+        app: --clusterName--
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: --clusterName--
+        image: --containerImage---
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3021
+          name: intra-node
+        - containerPort: 3022
+          name: tls-intra-node
+        - containerPort: 21211
+          name: external-admin
+        - containerPort: 21212
+          name: external-client
+        - containerPort: 5555
+          name: replication
+        - containerPort: 8080
+          name: vmc
+        resources:
+          requests:
+           cpu: --cpuCount--
+           memory: --memorySize--
+        env:
+#         Specify 'voltdb start ...' command line args (space separated list)
+#         IMPORTANT!!!! VoltDB requires linux kernel feature Transparent Huge Pages (THP) be DISABLED when running VoltDB in PRODUCTION.
+#         running with the '--ignore=thp' parameter is not supported, contact support for further information
+          - name: VOLTDB_START_ARGS
+            value: "--ignore=thp"
+#          - name: VOLTDB_HEAPMAX
+#            value: "3072"
+#          - name: VOLTDB_OPTS
+#            value: ""
+#          - name: JAVA_OPTS
+#            value: ""
+#       Persistent volume mounts
+#       Configuring for maximum performance often requires multiple local disk or ssd, particularly for commmand log and snapshots
+#       See our performance guide https://docs.voltdb.com/PerfGuide/
+#       Warning: localdisk provisioning is beta in k8s V1.10, support may be limited.
+        volumeMounts:
+        - name: voltdbroot
+          mountPath: /voltdbroot
+#        - name: commandlog
+#          mountPath: /commandlog
+#        - name: commandlogsnapshot
+#          mountPath: /commandlogsnapshot
+#        - name: exportoverflow
+#          mountPath: /exportoverflow
+#        - name: snapshots
+#          mountPath: /snapshots
+  volumeClaimTemplates:
+  - metadata:
+      name: voltdbroot
+    spec:
+      #storageClassName:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: --pvolumeSize--
