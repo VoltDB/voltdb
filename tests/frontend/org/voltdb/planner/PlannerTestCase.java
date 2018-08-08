@@ -722,7 +722,6 @@ public class PlannerTestCase extends TestCase {
      * Match some kind of index scan plan node.
      */
     protected static class IndexScanPlanMatcher implements PlanMatcher {
-        private IIndexScanMatcher m_nodeMatcher;
         private String      m_indexName;
 
         /**
@@ -734,33 +733,6 @@ public class PlannerTestCase extends TestCase {
         public IndexScanPlanMatcher(String indexName) {
             assert(indexName != null);
             m_indexName = indexName;
-            m_nodeMatcher = null;
-        }
-
-        /**
-         * Create an {@link IndexScanPlanMatcher} without an index
-         * name matching requirement.
-         *
-         * @param matcher Thehe node must match this.
-         */
-        public IndexScanPlanMatcher(IIndexScanMatcher matcher) {
-            assert(matcher != null);
-            m_indexName = null;
-            m_nodeMatcher = matcher;
-        }
-
-        /**
-         * Create an {@link IndexScanPlanMatcher}.
-         *
-         * @param indexName The index must equal this string.
-         * @param matcher   This must match the node.
-         */
-        public IndexScanPlanMatcher(String indexName,
-                                    IIndexScanMatcher matcher) {
-            assert(indexName != null);
-            assert(matcher != null);
-            m_indexName = indexName;
-            m_nodeMatcher = matcher;
         }
 
         @Override
@@ -769,10 +741,6 @@ public class PlannerTestCase extends TestCase {
                 return String.format("Expected IndexScanPlanNode, not %s: node %d/%d, id %d",
                                      node.getPlanNodeType(),
                                      fn, nf, node.getPlanNodeId());
-            }
-
-            if (m_nodeMatcher != null) {
-                m_nodeMatcher.match((IndexScanPlanNode)node);
             }
 
             if (m_indexName != null) {
@@ -791,6 +759,32 @@ public class PlannerTestCase extends TestCase {
         }
     }
 
+    protected class ExplainStringMatcher implements PlanMatcher {
+        String m_expected;
+
+        public ExplainStringMatcher(String expected) {
+            m_expected = expected;
+        }
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            if (node.toExplainPlanString().contains(m_expected)) {
+                return null;
+            }
+            return String.format("Expected \"%s\" in plan explain string at plan node %d/%d, id %d. ",
+                                 m_expected,
+                                 fragmentNo,
+                                 numFragments,
+                                 node.getPlanNodeId());
+        }
+
+        @Override
+        public String matchName() {
+            return "ExplainPlanContain[" + m_expected + "]";
+        }
+    }
     /**
      * Match an aggregate node of some kind.  This can
      * be hash, partial or serial aggregate.
@@ -831,7 +825,12 @@ public class PlannerTestCase extends TestCase {
                             int numFragments) {
             // This is really a test failure.  The matcher
             // should be something like an AggregatePlanNode.
-            assertTrue("Expected an AggregatePlanNode, not " + node.getPlanNodeType(),
+            assertTrue(String.format(
+                            "Expected an AggregatePlanNode, not %s at plan node %d/%d, id %d.",
+                            node.getPlanNodeType(),
+                            fragmentNo,
+                            numFragments,
+                            node.getPlanNodeId()),
                        node instanceof AggregatePlanNode);
             AggregatePlanNode pn = (AggregatePlanNode) node;
             String err = null;
@@ -854,6 +853,47 @@ public class PlannerTestCase extends TestCase {
         public String matchName() {
             return String.format("AggregateNode(%s)",
                                  m_mainMatcher.matchName());
+        }
+    }
+
+    protected interface NodeTester {
+        boolean match(AbstractPlanNode node);
+    }
+
+    /**
+     * This class is used most often with allOf.  It
+     * takes a description and a test function, which is
+     * a boolean predicate on nodes.  It is alot like
+     * the PlanMatcher interface, but it make things
+     * a bit more easy to read.
+     */
+    protected class NodeTestMatcher implements PlanMatcher {
+        String m_name;
+        NodeTester m_tester;
+
+        public NodeTestMatcher(String name,
+                               NodeTester tester) {
+            m_name = name;
+            m_tester = tester;
+        }
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            if (m_tester.match(node)) {
+                return null;
+            }
+            return String.format("NodeTest %s failed at %d/%d, id %d",
+                                 m_name,
+                                 fragmentNo,
+                                 numFragments,
+                                 node.getPlanNodeId());
+        }
+
+        @Override
+        public String matchName() {
+            return m_name;
         }
     }
     /**
@@ -890,6 +930,37 @@ public class PlannerTestCase extends TestCase {
         }
     }
 
+    /**
+     * Match if a condition holds.  Otherwise treat this as
+     * OptionalPlanNode.  If
+     */
+    protected static class MatchIf extends OptionalPlanNode {
+        boolean m_condition;
+        public MatchIf(boolean condition, PlanMatcher matcher) {
+            super(matcher);
+            m_condition = condition;
+        }
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            if ( ! m_condition ) {
+                return "MatchIf fails";
+            } else {
+                String err = super.match(node, fragmentNo, numFragments);
+                if (err != null) {
+                    return err;
+                }
+                return null;
+            }
+        }
+
+        @Override
+        public String matchName() {
+            return "MatchIf";
+        }
+    }
     /**
      * Match a plan with inline nodes.  All inline nodes must be
      * listed.  Optional inline nodes are not allowed here.
@@ -1126,7 +1197,9 @@ public class PlannerTestCase extends TestCase {
                 return "Expected fewer nodes in plan at node "
                        + (idx + 1)
                        + ": "
-                       + node.getPlanNodeType();
+                       + node.getPlanNodeType()
+                       + ", id: "
+                       + node.getPlanNodeId();
             }
             return null;
         }
