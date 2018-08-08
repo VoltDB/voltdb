@@ -18,8 +18,6 @@
 package org.voltdb.sysprocs;
 
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -33,7 +31,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ParameterConverter;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltNTSystemProcedure;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -44,7 +41,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientResponseWithPartitionKey;
-import org.voltdb.iv2.MpInitiator;
 
 public class LowImpactDelete extends VoltNTSystemProcedure {
     VoltLogger hostLog = new VoltLogger("HOST");
