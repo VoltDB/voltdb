@@ -226,7 +226,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertTablesAreEqual(prefix + "VENG6511TwoIndexes: ", tresult, vresult, EPSILON);
 
         vresult = client.callProcedure("@AdHoc", "SELECT * FROM VENG6511NoGroup ORDER BY 1, 2, 3;").getResults()[0];
-        tresult = client.callProcedure("@AdHoc", "SELECT COUNT(*), MIN(v1) AS vmin, MAX(v2) AS vmax FROM ENG6511 ORDER BY 1, 2, 3;").getResults()[0];
+        tresult = client.callProcedure("@AdHoc", "SELECT COUNT(*), MIN(v1) AS vmin, MAX(v2) AS vmax FROM ENG6511;").getResults()[0];
         assertTablesAreEqual(prefix + "VENG6511NoGroup: ", tresult, vresult, EPSILON);
     }
 

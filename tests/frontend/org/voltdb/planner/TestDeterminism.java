@@ -998,12 +998,6 @@ public class TestDeterminism extends PlannerTestCase {
         assertPlanDeterminismCore(sql, true, true, DeterminismMode.FASTER);
     }
 
-    public void testFloatingAggs() throws Exception {
-        String sql = "select sum(alpha + beta + gamma) as fsum " +
-                "from floataggs order by fsum;";
-        assertPlanDeterminismFullCore(sql, true, true, false, DeterminismMode.FASTER);
-    }
-
     public void testDeterminismForUniqueConstraintEquivalence() {
         String sql;
 
