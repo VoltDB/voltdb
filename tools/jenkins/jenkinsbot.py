@@ -18,6 +18,7 @@ from logging import handlers
 from mysql.connector.errors import Error as MySQLError
 from slackclient import SlackClient
 from tabulate import tabulate  # Used for pretty printing tables
+from urllib import urlretrieve
 
 # Get job names from environment variables
 COMMUNITY = os.environ.get('community', None)
@@ -735,7 +736,7 @@ tr:hover{
         else:
             self.response_html()
 
-    def create_bug_issue(self, channel, summary, description, component, version, labels,
+    def create_bug_issue(self, channel, summary, description, component, version, labels, attachments={},
                          user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT, DRY_RUN=False):
         """
         Creates a bug issue on Jira
@@ -749,6 +750,13 @@ tr:hover{
         :param passwd: Password
         :param project: Jira project
         """
+
+        def add_attachments(jira, ticketId, attachments):
+            for file in attachments:
+                urlretrieve(attachments[file], file)
+                jira.add_attachment(ticketId, os.getcwd() + '/' + file, file)
+                os.unlink(file)
+
         if user and passwd and project:
             try:
                 jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(user, passwd), options=dict(verify=False))
@@ -763,8 +771,23 @@ tr:hover{
         test_case = summary.split(' ')[0]
         existing = jira.search_issues('summary ~ \'%s\' and labels = automatic and status != Closed' % test_case)
         if len(existing) > 0:
-            # Already reported
             self.logger.info('Found open issue(s) for "' + test_case + '" ' + ' '.join([k.key for k in existing]))
+
+            # Check if new failure is on different job than existing ticket, if so comments
+            job = summary.split()[-2]
+            existing_ticket = jira.issue(existing[0].id)
+            if job not in existing_ticket.fields.summary:
+                comments = jira.comments(existing[0].id)
+                for comment in comments:
+                    # Check for existing comment for same job, if there are any, suppress commenting another
+                    if job in comment.body:
+                        self.logger.info('Found existing comment(s) for "' + job + '" on open issue')
+                        return
+
+                self.logger.info('Commenting about separate job failure for %s on open issue' % test_case)
+                if not DRY_RUN:
+                    jira.add_comment(existing[0].id, summary + '\n\n' + description)
+                    add_attachments(jira, existing[0].id, attachments)
             return
 
         issue_dict = {
@@ -814,9 +837,15 @@ tr:hover{
         self.logger.info("Filing ticket: %s" % summary)
         if not DRY_RUN:
             new_issue = jira.create_issue(fields=issue_dict)
+            add_attachments(jira, new_issue.id, attachments)
             #self.logger.info('NEW: Reported issue with summary "' + summary + '"')
             if self.connect_to_slack():
                 self.post_message(channel, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
+            suite = summary.split('.')[-3]
+            # Find all tickets within same test suite and link them
+            link_tickets = jira.search_issues('summary ~ \'%s\' and labels = automatic and status != Closed and reporter in (voltdbci)' % suite)
+            for ticket in link_tickets:
+                jira.create_issue_link('Related', new_issue.key, ticket)
         else:
             new_issue = None
 

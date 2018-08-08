@@ -44,6 +44,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -174,6 +175,7 @@ public class MpScheduler extends Scheduler
             }
         }
 
+        // This is a non MPI Promotion (but SPI Promotion) path for repairing outstanding MP Txns
         MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI);
         m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
         return new long[0];
@@ -209,6 +211,9 @@ public class MpScheduler extends Scheduler
             handleEOLMessage();
         }
         else if (message instanceof DummyTransactionTaskMessage) {
+            // leave empty to ignore it on purpose
+        }
+        else if (message instanceof DumpMessage) {
             // leave empty to ignore it on purpose
         }
         else {
@@ -605,5 +610,14 @@ public class MpScheduler extends Scheduler
 
     public int getLeaderNodeId() {
         return m_leaderNodeId;
+    }
+
+    @Override
+    public void dump()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[dump] current truncation handle: ").append(TxnEgo.txnIdToString(m_repairLogTruncationHandle)).append("\n");
+        m_pendingTasks.toString(sb);
+        hostLog.warn(sb.toString());
     }
 }

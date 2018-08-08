@@ -61,4 +61,9 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
     public void reportQueued(String importerName, String procName) {
         m_statsCollector.reportQueued(importerName, procName);
     }
+
+    @Override
+    public void reportInitialized(String importerName, String procName) {
+        m_statsCollector.reportInitialized(importerName, procName);
+    }
 }

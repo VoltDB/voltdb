@@ -89,6 +89,23 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
+     * Reset table/column name/alias. Useful when matching in complex
+     * gby/oby expressions in query rewrite.
+     */
+    public AbstractExpression anonymize() {
+       if (getLeft() != null) {
+          getLeft().anonymize();
+       }
+       if (getRight() != null) {
+          getRight().anonymize();
+       }
+       if (getArgs() != null) {
+          getArgs().forEach(AbstractExpression::anonymize);
+       }
+       return this;
+    }
+
+    /**
      * Get the inherent non-determinism state of this expression. This is not
      * valid before finalizeValueTypes is called.
      *
@@ -301,7 +318,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public void setValueSize(int size) {
         assert (size >= 0);
-        assert (size <= 10000000);
+        assert (size <= 10_000_000);
         m_valueSize = size;
     }
 
@@ -835,8 +852,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (ii != null) {
             ParsedColInfo col = indexToColumnMap.get(ii);
             TupleValueExpression tve = new TupleValueExpression(
-                    col.tableName, col.tableAlias,
-                    col.columnName, col.alias,
+                    col.m_tableName, col.m_tableAlias,
+                    col.m_columnName, col.m_alias,
                     this, ii);
             if (this instanceof TupleValueExpression) {
                 tve.setOrigStmtId(((TupleValueExpression)this).getOrigStmtId());

@@ -719,9 +719,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                     VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
                     VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
 
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Load REPLICATED_TESTER and PARTITION_TESTER");
                     loadTable(client, "REPLICATED_TESTER", true, repl_table);
                     loadTable(client, "PARTITION_TESTER", false, partition_table);
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Save snapshot");
                     saveTablesWithDefaultOptions(client, TESTNONCE);
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Validate snapshot");
                     validateSnapshot(true, true, TESTNONCE);
                 }
                 finally {
@@ -733,6 +736,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
 
+        System.out.println("testRestoreWithGhostPartitionAndJoin - Copy over snapshot data from removed node");
         //Copy over snapshot data from removed node
         for (File f : lc.getPathInSubroots(new File(TMPDIR))[1].listFiles()) {
             if (f.getName().startsWith(TESTNONCE)) {
@@ -743,6 +747,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
 
         // Restore snapshot to 1 nodes 1 sites/host cluster.
+        System.out.println("testRestoreWithGhostPartitionAndJoin - Restore snapshot to 1 nodes 1 sites/host cluster.");
         {
             lc.setHostCount(1);
             lc.compile(project);
@@ -762,9 +767,10 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
                     assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Join the second node.");
                     // Join the second node
                     lc.joinOne(1);
-                    Thread.sleep(2000);
+                    Thread.sleep(1000);
 
                     for (int ii = 0; ii < Integer.MAX_VALUE; ii++) {
                         cr = client.callProcedure("GetTxnId", ii);

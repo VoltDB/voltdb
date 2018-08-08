@@ -70,7 +70,7 @@
          };
 
         this.GetClusterInformation = function (onConnectionAdded) {
-            this.processTask(onConnectionAdded, "CLUSTER_INFORMATION", ['@SystemInformation'], ["OVERVIEW"], [undefined]);
+            this.processTask(onConnectionAdded, "CLUSTER_INFORMATION", ['@SystemInformation'], ["OVERVIEW"], []);
         };
 
         this.GetSystemInformationDeployment = function (onConnectionAdded) {
@@ -409,7 +409,7 @@
 
         //Check if cluster is replica or not
         this.GetClusterReplicaInformation = function (onConnectionAdded) {
-            this.processTask(onConnectionAdded, "CLUSTER_REPLICA_INFORMATION", ['@SystemInformation'], ["Overview"], ['0']);
+            this.processTask(onConnectionAdded, "CLUSTER_REPLICA_INFORMATION", ['@SystemInformation'], ["Overview"], []);
         };
 
         this.GetDrRoleInformation = function (onConnectionAdded) {

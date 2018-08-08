@@ -130,6 +130,16 @@ public class TupleValueExpression extends AbstractValueExpression {
         super(ExpressionType.VALUE_TUPLE);
     }
 
+    @Override
+    public TupleValueExpression anonymize() {
+       setTableName(null);
+       setTableAlias(null);
+       setColumnName(null);
+       setColumnAlias(null);
+       setDifferentiator(-1);
+       return this;
+    }
+
     /*
      *  Only set for the special case of an aggregate function result used in
      *  an "ORDER BY" clause. This TupleValueExpression represents the
@@ -228,11 +238,11 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     boolean matchesTableAlias(String tableAlias) {
-        if (m_tableAlias == null) {
-            return m_tableName.equals(tableAlias);
-        }
-
-        return m_tableAlias.equals(tableAlias);
+       if (m_tableAlias == null) {
+          return m_tableName.equals(tableAlias);
+       } else {
+          return m_tableAlias.equals(tableAlias);
+       }
     }
 
     public int getTableIndex() {
@@ -339,6 +349,8 @@ public class TupleValueExpression extends AbstractValueExpression {
                 return false;
             }
         }
+        // NOTE: m_ColumnIndex was ignored in comparison, because it might not get properly set
+        // till end of planning, when query is made across several tables.
         return true;
     }
 

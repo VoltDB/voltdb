@@ -25,6 +25,8 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
@@ -400,7 +402,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testIv2RepairLogRequestMessage() throws IOException
     {
-        Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100, Iv2RepairLogRequestMessage.SPREQUEST);
+        Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100, 200, Iv2RepairLogRequestMessage.SPREQUEST);
         Iv2RepairLogRequestMessage rlm2 = (Iv2RepairLogRequestMessage) checkVoltMessage(rlm);
         assertEquals(rlm.getRequestId(), rlm2.getRequestId());
         assertEquals(rlm.isMPIRequest(), rlm2.isMPIRequest());

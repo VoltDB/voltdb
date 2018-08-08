@@ -35,12 +35,14 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZooKeeperLock;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
+import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.LeaderCache;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -94,7 +96,6 @@ public class VoltZK {
     public static final String commandlog_init_barrier = "/db/commmandlog_init_barrier";
 
     // leader election
-    private static final String migrate_partition_leader_suffix = "_migrate_partition_leader_request";
 
     // root for MigratePartitionLeader information nodes
     public static final String migrate_partition_leader_info = "/core/migrate_partition_leader_info";
@@ -130,8 +131,9 @@ public class VoltZK {
 
                 if (arr != null) {
                     String data = new String(arr, "UTF-8");
-                    if ((iv2masters.equals(dir) || iv2appointees.equals(dir)) && !isHSIdFromMigratePartitionLeaderRequest(data)) {
-                        data = CoreUtils.hsIdToString(Long.parseLong(data));
+                    if (iv2masters.equals(dir) || iv2appointees.equals(dir)) {
+                        LeaderCallBackInfo info = LeaderCache.buildLeaderCallbackFromString(data);
+                        data = info.toString();
                     }
                     isData = true;
                     builder.append(key).append(" -> ").append(data).append(",");
@@ -203,7 +205,7 @@ public class VoltZK {
     public static final String actionLock = "/db/action_lock";
 
     //register partition while the partition elects a new leader upon node failure
-    public static final String promotingLeaders = "/db/promotingLeaders";
+    public static final String mpRepairBlocker = "/db/mp_repair_blocker";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -226,7 +228,7 @@ public class VoltZK {
             request_truncation_snapshot,
             host_ids_be_stopped,
             actionLock,
-            promotingLeaders
+            mpRepairBlocker
     };
 
     /**
@@ -452,7 +454,15 @@ public class VoltZK {
                 } else if (blockers.contains(leafNodeElasticJoinInProgress)) {
                     errorMsg = "while an elastic join is active. Please retry node rejoin later.";
                 } else if (blockers.contains(migrate_partition_leader)){
-                    errorMsg = "while leader migratioon is active. Please retry node rejoin later.";
+                    errorMsg = "while leader migration is active. Please retry node rejoin later.";
+                } else {
+                    // Upon node failures, a MP repair blocker may be registered right before they
+                    // unregistered after repair is done. Let rejoining nodes wait to avoid any
+                    // interference with the transaction repair process.
+                    List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
+                    if (!partitions.isEmpty()) {
+                        errorMsg = "while leader promotion or transaction repair are in progress. Please retry node rejoin later.";
+                    }
                 }
                 break;
             case elasticJoinInProgress:
@@ -518,9 +528,8 @@ public class VoltZK {
         return true;
     }
 
-    // add partition under /db/promotingLeaders when the partition elects a new leader upon node failure
-    public static void registerPromotingPartition(ZooKeeper zk, int partitionId, VoltLogger log) {
-        String node = ZKUtil.joinZKPath(promotingLeaders, Integer.toString(partitionId));
+    public static void createMpRepairBlocker(ZooKeeper zk) {
+        String node = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(MpInitiator.MP_INIT_PID));
         try {
             zk.create(node,
                       null,
@@ -528,68 +537,23 @@ public class VoltZK {
                       CreateMode.EPHEMERAL);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NODEEXISTS) {
-                VoltDB.crashLocalVoltDB("Unable to register promoting partition " + partitionId, true, e);
+                VoltDB.crashLocalVoltDB("Unable to create MP repair blocker", true, e);
             }
         } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to register promoting partition " + partitionId, true, e);
+            VoltDB.crashLocalVoltDB("Unable to create MP repair blocker", true, e);
         }
     }
 
-    // remove the partition under /db/promotingLeaders when the new leader has accepted promotion
-    public static void unregisterPromotingPartition(ZooKeeper zk, int partitionId, VoltLogger log) {
-        String node = ZKUtil.joinZKPath(promotingLeaders, Integer.toString(partitionId));
+    public static void removeMpRepairBlocker(ZooKeeper zk, VoltLogger log) {
+        String node = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(MpInitiator.MP_INIT_PID));
         try {
             zk.delete(node, -1);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
-                log.error("Failed to remove promoting partition: " + partitionId + "\n" + e.getMessage(), e);
+                log.error("Unable to remove MP repair blocker\n" + e.getMessage(), e);
             }
         } catch (InterruptedException e) {
         }
-    }
-
-    // Upon node failures, new partition leaders, including MPI, will be registered right before they
-    // are promoted and unregistered after their promotions are done. Let rejoining nodes wait until
-    // all the partition leader promotions have finished to avoid any
-    // interference with the transaction repair process and score board.
-    public static void checkPartitionLeaderPromotion(ZooKeeper zk) {
-        try {
-            List<String> partitions = zk.getChildren(VoltZK.promotingLeaders, false);
-            // leader promotions could take time with high partition count.
-            long maxWait = TimeUnit.SECONDS.toNanos(120);
-            long start = System.nanoTime();
-            while(!partitions.isEmpty() && (System.nanoTime() - start < maxWait)) {
-                partitions = zk.getChildren(VoltZK.promotingLeaders, false);
-            }
-        } catch (KeeperException | InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Failed to validate partition leader promotions.", true, e);
-        }
-    }
-
-    /**
-     * Generate a HSID string with BALANCE_SPI_SUFFIX information.
-     * When this string is updated, we can tell the reason why HSID is changed.
-     */
-    public static String suffixHSIdsWithMigratePartitionLeaderRequest(Long HSId) {
-        return Long.toString(HSId) + migrate_partition_leader_suffix;
-    }
-
-    /**
-     * Is the data string hsid written because of MigratePartitionLeader request?
-     */
-    public static boolean isHSIdFromMigratePartitionLeaderRequest(String hsid) {
-        return hsid.endsWith(migrate_partition_leader_suffix);
-    }
-
-    /**
-     * Given a data string, figure out what's the long HSID number. Usually the data string
-     * is read from the zookeeper node.
-     */
-    public static long getHSId(String hsid) {
-        if (isHSIdFromMigratePartitionLeaderRequest(hsid)) {
-            return Long.parseLong(hsid.substring(0, hsid.length() - migrate_partition_leader_suffix.length()));
-        }
-        return Long.parseLong(hsid);
     }
 
     public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {

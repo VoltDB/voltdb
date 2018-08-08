@@ -220,29 +220,50 @@ public class ExportGeneration implements Generation {
                                 " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
                         return;
                     }
-                    final long ackUSO = buf.getLong();
 
-                    try {
-                        if (exportLog.isDebugEnabled()) {
-                            if (msgType == ExportManager.RELEASE_BUFFER) {
+                    if (msgType == ExportManager.RELEASE_BUFFER) {
+                        final long ackUSO = buf.getLong();
+                        try {
+                            if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received RELEASE_BUFFER message for " + eds.toString() +
                                         " with uso: " + ackUSO +
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
-                            } else if (msgType == ExportManager.TAKE_MASTERSHIP) {
+                            }
+                            eds.ack(ackUSO);
+                        } catch (RejectedExecutionException ignoreIt) {
+                            // ignore it: as it is already shutdown
+                        }
+                    } else if (msgType == ExportManager.TAKE_MASTERSHIP) {
+                        final long ackUSO = buf.getLong();
+                        try {
+                            if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received TAKE_MASTERSHIP message for " + eds.toString() +
                                         " with uso:" + ackUSO +
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
+                            eds.ack(ackUSO);
+                        } catch (RejectedExecutionException ignoreIt) {
+                            // ignore it: as it is already shutdown
                         }
-                        eds.ack(ackUSO);
-                    } catch (RejectedExecutionException ignoreIt) {
-                        // ignore it: as it is already shutdown
-                    }
-
-                    if (msgType == ExportManager.TAKE_MASTERSHIP) {
                         eds.acceptMastership();
+                    } else if (msgType == ExportManager.QUERY_MEMBERSHIP) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Received QUERY_MEMBERSHIP message for " + eds.toString() +
+                                    " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
+                                    " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
+                        }
+                        eds.handleQueryMessage(message.m_sourceHSId);
+                    } else if (msgType == ExportManager.QUERY_RESPONSE) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Received QUERY_RESPONSE message for " + eds.toString() +
+                                    " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
+                                    " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
+                        }
+                        eds.handleQueryResponse(message);
+                    } else {
+                        exportLog.error("Receive unsupported message type " + message + " in export subsystem");
                     }
                 } else {
                     exportLog.error("Receive unexpected message " + message + " in export subsystem");
@@ -255,12 +276,17 @@ public class ExportGeneration implements Generation {
     }
 
     // Access by multiple threads
-    public void updateAckMailboxes(int partition) {
+    public void updateAckMailboxes(int partition, Set<Long> newHSIds) {
         synchronized (m_dataSourcesByPartition) {
+            ImmutableList<Long> replicaHSIds = m_replicasHSIds.get(partition);
             for( ExportDataSource eds: m_dataSourcesByPartition.get(partition).values()) {
-                ImmutableList<Long> replicaHSIds = m_replicasHSIds.get(partition);
                 if (replicaHSIds != null) {
                     eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
+                }
+                // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
+                // master stream resend the event when the export mailbox is aware of new streams.
+                if (newHSIds != null) {
+                    eds.forwardAckToNewJoinedReplicas(newHSIds);
                 }
             }
         }
@@ -314,7 +340,7 @@ public class ExportGeneration implements Generation {
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
                     m_replicasHSIds.put(partition, mailboxHsids);
-                    updateAckMailboxes(partition);
+                    updateAckMailboxes(partition, null);
                 }
             }
         });
@@ -385,16 +411,16 @@ public class ExportGeneration implements Generation {
                                 mailboxes.add(Long.valueOf(child));
                             }
                             ImmutableList<Long> mailboxHsids = mailboxes.build();
+                            Set<Long> newHSIds = Sets.difference(new HashSet<Long>(mailboxHsids),
+                                    new HashSet<Long>(m_replicasHSIds.get(partition)));
                             if (exportLog.isDebugEnabled()) {
-                                Set<Long> newHSIds = Sets.difference(new HashSet<Long>(mailboxHsids),
-                                        new HashSet<Long>(m_replicasHSIds.get(partition)));
                                 Set<Long> removedHSIds = Sets.difference(new HashSet<Long>(m_replicasHSIds.get(partition)),
                                         new HashSet<Long>(mailboxHsids));
                                 exportLog.debug("Current export generation added mailbox: " + CoreUtils.hsIdCollectionToString(newHSIds) +
                                         ", removed mailbox: " + CoreUtils.hsIdCollectionToString(removedHSIds));
                             }
                             m_replicasHSIds.put(partition, mailboxHsids);
-                            updateAckMailboxes(partition);
+                            updateAckMailboxes(partition, newHSIds);
                         } catch (Throwable t) {
                             VoltDB.crashLocalVoltDB("Error in export ack handling", true, t);
                         }
@@ -719,7 +745,7 @@ public class ExportGeneration implements Generation {
      * mastership role for the given partition id
      * @param partitionId
      */
-    void handlePartitionFailure(int partitionId) {
+    void reassignExportStreamMaster(int partitionId) {
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
@@ -728,7 +754,7 @@ public class ExportGeneration implements Generation {
         }
 
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
-            eds.handlePartitionFailure();
+            eds.reassignExportStreamMaster();
         }
     }
 

@@ -26,14 +26,13 @@ package org.voltdb.jni;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
-
-import junit.framework.TestCase;
 
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.utils.DBBPool;
@@ -49,11 +48,15 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.ReplicatedTableException;
+import org.voltdb.exceptions.SQLException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+
+import junit.framework.TestCase;
 
 /**
  * Tests native execution engine JNI interface.
@@ -161,6 +164,30 @@ public class TestExecutionEngine extends TestCase {
         terminateSourceEngine();
     }
 
+    // ENG-14346
+    public void testLoadTableTooWideColumnCleanupOnError() throws Exception {
+        initializeSourceEngine(1);
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.setUseDDLSchema(true);
+        project.addLiteralSchema("create table test (msg VARCHAR(200 bytes));");
+        Catalog catalog = project.compile("ENG-14346.jar", 1, 1, 0, null);
+        assert(catalog != null);
+        sourceEngine.loadCatalog(0, catalog.serialize());
+
+        int TEST_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("TEST").getRelativeIndex();
+        VoltTable testTable = new VoltTable(new VoltTable.ColumnInfo("MSG", VoltType.STRING));
+        // Assemble a very long string.
+        testTable.addRow(String.join("", Collections.nCopies(15, "我能吞下玻璃而不伤身体。")));
+        try {
+            sourceEngine.loadTable(TEST_TABLEID, testTable, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
+            fail("The loadTable() call is expected to fail, but did not.");
+        }
+        catch (SQLException ex) {
+            assertTrue(ex.getMessage().contains("exceeds the size of the VARCHAR(200 BYTES) column"));
+        }
+        terminateSourceEngine();
+    }
+
     private Pair<byte[], byte[]> verifyMultiSiteLoadTable(boolean returnUniqueViolations) throws Exception {
         int ITEM_TABLEID = itemTableId(m_twoSiteCatalog);
 
@@ -196,7 +223,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
             }
         }).get();
 
@@ -288,7 +315,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
             }
         }).get();
 
@@ -438,7 +465,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
             }
         }).get();
 
@@ -496,7 +523,6 @@ public class TestExecutionEngine extends TestCase {
         es.shutdown();
     }
 
-
     private ExecutionEngine sourceEngine;
     private static final int CLUSTER_ID = 2;
     private static final int NODE_ID = 1;
@@ -516,7 +542,7 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(ElasticHashinator.getConfigureBytes(1), 0, 0), true);
+                        new HashinatorConfig(ElasticHashinator.getConfigureBytes(1), 0, 0), true, 4*1000);
     }
 
     private void terminateSourceEngine() throws Exception {

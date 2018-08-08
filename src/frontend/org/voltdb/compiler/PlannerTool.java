@@ -171,7 +171,7 @@ public class PlannerTool {
         return plan;
     }
 
-    public synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
+    public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
             boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
 
         CacheUse cacheUse = CacheUse.FAIL;
@@ -181,11 +181,9 @@ public class PlannerTool {
         boolean hasUserQuestionMark = false;
         boolean wrongNumberParameters = false;
         try {
-            if ((sqlIn == null) || (sqlIn.length() == 0)) {
+            if ((sql == null) || (sql = sql.trim()).isEmpty()) {    // remove any spaces or newlines
                 throw new RuntimeException("Can't plan empty or null SQL.");
             }
-            // remove any spaces or newlines
-            String sql = sqlIn.trim();
 
             // No caching for forced single partition or forced multi partition SQL,
             // since these options potentially get different plans that may be invalid
@@ -200,7 +198,7 @@ public class PlannerTool {
             // point it seems worthwhile to cache such plans, we can explore it.
             if (partitioning.isInferred() && !isLargeQuery) {
                 // Check the literal cache for a match.
-                AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlIn);
+                AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sql);
                 if (cachedPlan != null) {
                     cacheUse = CacheUse.HIT1;
                     return cachedPlan;
@@ -248,6 +246,11 @@ public class PlannerTool {
                 // check the parameters count
                 // check user input question marks with input parameters
                 int inputParamsLengh = userParams == null ? 0: userParams.length;
+                if (planner.getAdhocUserParamsCount() > CompiledPlan.MAX_PARAM_COUNT) {
+                    throw new PlanningErrorException(
+                            "The statement's parameter count " + planner.getAdhocUserParamsCount() +
+                            " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
+                }
                 if (planner.getAdhocUserParamsCount() != inputParamsLengh) {
                     wrongNumberParameters = true;
                     if (!isExplainMode) {
@@ -347,7 +350,7 @@ public class PlannerTool {
 
                 assert(parsedToken != null);
                 // Again, plans with inferred partitioning are the only ones supported in the cache.
-                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planHasExceptionsWhenParameterized);
+                m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planHasExceptionsWhenParameterized);
             }
             return ahps;
         }

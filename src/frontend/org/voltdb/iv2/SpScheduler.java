@@ -1408,25 +1408,25 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
         StringBuilder builder = new StringBuilder();
-        builder.append("START OF STATE DUMP FOR SITE: " + who);
-        builder.append("\n  partition: " + m_partitionId + ", isLeader: " + m_isLeader);
+        builder.append("START OF STATE DUMP FOR SITE: ").append(who);
+        builder.append("\n  partition: ").append(m_partitionId).append(", isLeader: ").append(m_isLeader);
         if (m_isLeader) {
-            builder.append("  replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
+            builder.append("  replicas: ").append(CoreUtils.hsIdCollectionToString(m_replicaHSIds));
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, new DumpMessage());
             }
         }
-        builder.append("\n  most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
-        builder.append("  outstanding txns: " + m_outstandingTxns.keySet() + " " +
-                TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
-        builder.append("\n  " + m_pendingTasks.toString());
+        builder.append("\n  most recent SP handle: ").append(TxnEgo.txnIdToString(getCurrentTxnId()));
+        builder.append("\n  outstanding txns: ").append(TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
+        builder.append("\n  ");
+        m_pendingTasks.toString(builder);
         if (m_duplicateCounters.size() > 0) {
             builder.append("\n  DUPLICATE COUNTERS:\n ");
             for (Entry<DuplicateCounterKey, DuplicateCounter> e : m_duplicateCounters.entrySet()) {
-                builder.append("  " + e.getKey().toString() + ": " + e.getValue().toString());
+                builder.append("  ").append(e.getKey().toString()).append(": ").append(e.getValue().toString());
             }
         }
-        builder.append("END of STATE DUMP FOR SITE: " + who);
+        builder.append("END of STATE DUMP FOR SITE: ").append(who);
         hostLog.warn(builder.toString());
     }
 
@@ -1733,7 +1733,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     //When a partition leader is migrated from one host to a new host, the new host may fail before it gets chance
     //to allow the site to be promoted. Remove the sites on the new host from the replica list and
     //update the duplicated counters after the host failure.
-    public void updateReplicasFromMigrationLeaderFailedHost(long failedHostId) {
+    public void updateReplicasFromMigrationLeaderFailedHost(int failedHostId) {
         List<Long> replicas = new ArrayList<>();
         for (long hsid : m_replicaHSIds) {
             if (failedHostId != CoreUtils.getHostIdFromHSId(hsid)) {

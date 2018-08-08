@@ -172,6 +172,11 @@
                               "template": "advanced-matview-join.sql",
                               "normalizer": "normalizer.py"},
 
+    "optimizer-matview": {"schema": "optimizer-matview-schema.py",
+                              "ddl": "matview-DDL.sql",
+                              "template": "optimizer-matview.sql",
+                              "normalizer": "nulls-lowest-normalizer.py"},
+
 # To test index count
     "index-count1": {"schema": "index-count1-schema.py",
                      "ddl": "DDL.sql",

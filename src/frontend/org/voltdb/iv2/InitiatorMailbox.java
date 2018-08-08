@@ -22,8 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -114,8 +116,8 @@ public class InitiatorMailbox implements Mailbox
         enableWritingIv2FaultLogInternal();
     }
 
-    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami, boolean isMigratePartitionLeader) {
-        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId, isMigratePartitionLeader);
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, int deadHost, String whoami, boolean isMigratePartitionLeader) {
+        RepairAlgo ra = new SpPromoteAlgo(survivors.get(), deadHost, this, whoami, m_partitionId, isMigratePartitionLeader);
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
                     m_partitionId + ", survivors: " + CoreUtils.hsIdCollectionToString(survivors.get()));
@@ -124,9 +126,6 @@ public class InitiatorMailbox implements Mailbox
         return ra;
     }
 
-    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
-        return constructRepairAlgo(survivors, whoami, false);
-    }
     protected void setRepairAlgoInternal(RepairAlgo algo)
     {
         assert(lockingVows());
@@ -316,7 +315,18 @@ public class InitiatorMailbox implements Mailbox
         assert(lockingVows());
         logRxMessage(message);
         boolean canDeliver = m_scheduler.sequenceForReplay(message);
-        if (message instanceof DumpMessage) {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
+                return;
+            }
+            initiateSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
+        }
+        else if (message instanceof FragmentTaskMessage) {
+            if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
+                return;
+            }
+        }
+        else if (message instanceof DumpMessage) {
             hostLog.warn("Received DumpMessage at " + CoreUtils.hsIdToString(m_hsId));
             try {
                 m_scheduler.dump();
@@ -324,7 +334,7 @@ public class InitiatorMailbox implements Mailbox
                 hostLog.warn("Failed to dump the content of the scheduler", ignore);
             }
         }
-        if (message instanceof Iv2RepairLogRequestMessage) {
+        else if (message instanceof Iv2RepairLogRequestMessage) {
             handleLogRequest(message);
             return;
         }
@@ -340,19 +350,11 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
-        else if (message instanceof Iv2InitiateTaskMessage) {
-            if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
-                return;
-            }
-            initiateSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
-        } else if (message instanceof FragmentTaskMessage) {
-            if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
-                return;
-            }
-        }  else if (message instanceof MigratePartitionLeaderMessage) {
+        else if (message instanceof MigratePartitionLeaderMessage) {
             setMigratePartitionLeaderStatus((MigratePartitionLeaderMessage)message);
             return;
         }
+
         if (canDeliver) {
             //For a message delivered to partition leaders, the message may not have the updated transaction id yet.
             //The scheduler of partition leader will advance the transaction id, update the message and add it to repair log.
@@ -380,7 +382,7 @@ public class InitiatorMailbox implements Mailbox
 
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
         int hostId = Integer.parseInt(params[2].toString());
-        Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, pid);
+        Long newLeaderHSId = db.getCartographer().getHSIDForPartitionHost(hostId, pid);
         if (newLeaderHSId == null || newLeaderHSId == m_hsId) {
             tmLog.warn(String.format("@MigratePartitionLeader the partition leader is already on the host %d or the host id is invalid.", hostId));
             return;
@@ -400,7 +402,7 @@ public class InitiatorMailbox implements Mailbox
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
-            leaderAppointee.put(pid, VoltZK.suffixHSIdsWithMigratePartitionLeaderRequest(newLeaderHSId));
+            leaderAppointee.put(pid, LeaderCache.suffixHSIdsWithMigratePartitionLeaderRequest(newLeaderHSId));
         } catch (InterruptedException | ExecutionException | KeeperException e) {
             VoltDB.crashLocalVoltDB("fail to start MigratePartitionLeader",true, e);
         } finally {
@@ -542,6 +544,36 @@ public class InitiatorMailbox implements Mailbox
     private void handleLogRequest(VoltMessage message)
     {
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
+        // It is possible for a dead host to queue messages after a repair request is processed
+        // so make sure this can't happen by re-queuing this message after we know the dead host is gone
+        // Since we are not checking validateForeignHostId on the PicoNetwork thread, it is possible for
+        // the PicoNetwork thread to validateForeignHostId and queue a message behind this repair message.
+        // Further, we loose visibility to the ForeignHost as soon as HostMessenger marks the host invalid
+        // even though the PicoNetwork thread could still be alive so we will skeptically
+        int deadHostId = req.getDeadHostId();
+        if (deadHostId != Integer.MAX_VALUE) {
+            if (m_messenger.canCompleteRepair(deadHostId)) {
+                // Make sure we are the last in the task queue when we know the ForeignHost is gone
+                req.disableDeadHostCheck();
+                deliver(message);
+            }
+            else {
+                if (req.getRepairRetryCount() > 100 && req.getRepairRetryCount() % 100 == 0) {
+                    hostLog.warn("Repair Request for dead host " + deadHostId +
+                            " has not been processed yet because connection has not closed");
+                }
+                Runnable retryRepair = new Runnable() {
+                    @Override
+                    public void run() {
+                        InitiatorMailbox.this.deliver(message);
+                    }
+                };
+                VoltDB.instance().scheduleWork(retryRepair, 10, -1, TimeUnit.MILLISECONDS);
+                // the repair message will be resubmitted shortly when the ForeignHosts to the dead host have been removed
+            }
+            return;
+        }
+
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
@@ -685,5 +717,9 @@ public class InitiatorMailbox implements Mailbox
         m_migratePartitionLeaderStatus = MigratePartitionLeaderStatus.NONE;
         m_repairLog.setLeaderState(true);
         m_newLeaderHSID = Long.MIN_VALUE;
+    }
+
+    public ZooKeeper getZK() {
+        return m_messenger.getZK();
     }
 }
