@@ -116,7 +116,7 @@ public class VoltDBRules {
 //            , VoltDBPLimitSortMergeRule.INSTANCE_2
             , VoltDBPAggregateScanMergeRule.INSTANCE
             , VoltDBPLimitScanMergeRule.INSTANCE_1
-//            , VoltDBPLimitScanMergeRule.INSTANCE_2 -- looks like not needed
+            , VoltDBPLimitScanMergeRule.INSTANCE_2
 
 
     };
