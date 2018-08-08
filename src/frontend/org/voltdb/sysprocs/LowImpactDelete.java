@@ -145,7 +145,6 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                 new ColumnInfo("col1", VoltType.typeFromObject(value)),
         });
         parameter.addRow(value);
-        Map<Integer, String> errorMessages = new HashMap<>();
         if (isReplicated) {
             try {
                 CompletableFuture<ClientResponse> cf = callProcedure("@NibbleDeleteMP", tableName, columnName, comparisonOp, parameter, chunksize);
@@ -168,7 +167,7 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                     // Could because node failure, nothing to do here I guess
                     break;
                 default:
-                    errorMessages.put(MpInitiator.MP_INIT_PID, cri.toJSONString());
+                    return new NibbleStatus(rowsLeft, rowsJustDeleted, cri.toJSONString());
                 }
             } catch (Exception e) {
                 return new NibbleStatus(rowsLeft, rowsJustDeleted, e.getMessage());
@@ -202,12 +201,11 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
                     // Could because node failure, nothing to do here I guess
                     break;
                 default:
-                    int partitionId = TheHashinator.getPartitionForParameter(VoltType.INTEGER, crwp.partitionKey);
-                    errorMessages.put(partitionId, cri.toJSONString());
+                    return new NibbleStatus(rowsLeft, rowsJustDeleted, cri.toJSONString());
                 }
             }
         }
-        return new NibbleStatus(rowsLeft, rowsJustDeleted, errorMessages.toString());
+        return new NibbleStatus(rowsLeft, rowsJustDeleted, "");
     }
 
     public VoltTable run(String tableName, String columnName, String valueStr, String comparisonOp, long chunksize, long timeoutms, long maxFrequency, long interval) {
@@ -300,7 +298,8 @@ public class LowImpactDelete extends VoltNTSystemProcedure {
         }
 
         returnTable.addRow(status.rowsDeleted, status.rowsLeft, status.rowsJustDeleted, System.currentTimeMillis(),
-                success.get() ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE, Arrays.toString(errors));
+                success.get() ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
+                success.get() ? "" : Arrays.toString(errors));
         return returnTable;
     }
 }
