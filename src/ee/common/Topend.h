@@ -120,46 +120,46 @@ public:
     DummyTopend();
 
     int loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination);
+        int32_t dependencyId, voltdb::Pool *pool, Table* destination) override;
 
     virtual int64_t fragmentProgressUpdate(
             int32_t batchIndex,
             PlanNodeType planNodeType,
             int64_t tuplesFound,
             int64_t currMemoryInBytes,
-            int64_t peakMemoryInBytes);
+            int64_t peakMemoryInBytes) override;
 
-    std::string planForFragmentId(int64_t fragmentId);
+    std::string planForFragmentId(int64_t fragmentId) override;
 
-    void crashVoltDB(voltdb::FatalException e);
+    void crashVoltDB(voltdb::FatalException e) override;
 
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
+    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) override;
 
-    virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync);
-    virtual void pushEndOfStream(int32_t partitionId, std::string signature);
+    virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync) override;
+    virtual void pushEndOfStream(int32_t partitionId, std::string signature) override;
 
-    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) override;
 
-    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
+    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) override;
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
             Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
             DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
-            Table *newMetaTableForInsert, Table *newTupleTableForInsert);
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert) override;
 
-    void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) override;
 
-    std::string decodeBase64AndDecompress(const std::string& buffer);
+    std::string decodeBase64AndDecompress(const std::string& buffer) override;
 
-    virtual bool storeLargeTempTableBlock(LargeTempTableBlock* block);
+    virtual bool storeLargeTempTableBlock(LargeTempTableBlock* block) override;
 
-    virtual bool loadLargeTempTableBlock(LargeTempTableBlock* block);
+    virtual bool loadLargeTempTableBlock(LargeTempTableBlock* block) override;
 
-    virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
+    virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId) override;
 
-    int32_t callJavaUserDefinedFunction();
-    void resizeUDFBuffer(int32_t size);
+    int32_t callJavaUserDefinedFunction() override;
+    void resizeUDFBuffer(int32_t size) override;
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;

@@ -73,8 +73,8 @@ namespace voltdb {
             return m_engine.get();
          }
 
-         int loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, voltdb::Table* destination);
-         void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { }
+         int loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, voltdb::Table* destination) override;
+         void fallbackToEEAllocatedBuffer(char *buffer, size_t length) override { }
 
          /**
           * Retrieve a dependency from Java via the IPC connection.
@@ -92,22 +92,22 @@ namespace voltdb {
                voltdb::PlanNodeType planNodeType,
                int64_t tuplesProcessed,
                int64_t currMemoryInBytes,
-               int64_t peakMemoryInBytes);
+               int64_t peakMemoryInBytes) override;
 
-         std::string decodeBase64AndDecompress(const std::string& base64Data);
+         std::string decodeBase64AndDecompress(const std::string& base64Data) override;
 
          /**
           * Retrieve a plan from Java via the IPC connection for a fragment id.
           * Plan is JSON. Returns the empty string on failure, but failure is
           * probably going to be detected somewhere else.
           */
-         std::string planForFragmentId(int64_t fragmentId);
+         std::string planForFragmentId(int64_t fragmentId) override;
 
          bool execute(ipc_command *cmd);
 
-         int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+         int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) override;
 
-         void pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block);
+         void pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block) override;
 
          /**
           * Log a statement on behalf of the IPC log proxy at the specified log level
@@ -117,7 +117,7 @@ namespace voltdb {
           */
          void log(voltdb::LoggerId loggerId, voltdb::LogLevel level, const char *statement) const;
 
-         void crashVoltDB(voltdb::FatalException e);
+         void crashVoltDB(voltdb::FatalException e) override;
 
          /*
           * Cause the engine to terminate gracefully after finishing execution of the current command.
@@ -127,21 +127,21 @@ namespace voltdb {
           */
          void terminate();
 
-         int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-         void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync);
-         void pushEndOfStream(int32_t partitionId, std::string signature);
+         int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) override;
+         void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync) override;
+         void pushEndOfStream(int32_t partitionId, std::string signature) override;
 
          int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
                voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
                voltdb::Table *expectedMetaTableForDelete, voltdb::Table *expectedTupleTableForDelete,
                voltdb::DRConflictType insertConflict, voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,
-               voltdb::Table *newMetaTableForInsert, voltdb::Table *newTupleTableForInsert);
+               voltdb::Table *newMetaTableForInsert, voltdb::Table *newTupleTableForInsert) override;
 
-         bool storeLargeTempTableBlock(voltdb::LargeTempTableBlock* block);
+         bool storeLargeTempTableBlock(voltdb::LargeTempTableBlock* block) override;
 
-         bool loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block);
+         bool loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block) override;
 
-         bool releaseLargeTempTableBlock(voltdb::LargeTempTableBlockId blockId);
+         bool releaseLargeTempTableBlock(voltdb::LargeTempTableBlockId blockId) override;
 
 
       private:
@@ -190,13 +190,13 @@ namespace voltdb {
 
          void sendPerFragmentStatsBuffer();
 
-         int callJavaUserDefinedFunction();
+         int callJavaUserDefinedFunction() override;
 
          void setViewsEnabled(ipc_command*);
 
          // We do not adjust the UDF buffer size in the IPC mode.
          // The buffer sizes are always MAX_MSG_SZ (10M)
-         void resizeUDFBuffer(int32_t size) {
+         void resizeUDFBuffer(int32_t size) override {
             return;
          }
 

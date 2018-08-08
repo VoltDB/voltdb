@@ -28,57 +28,6 @@
 namespace voltdb {
 
 class JNITopend : public Topend {
-public:
-    JNITopend(JNIEnv *env, jobject caller);
-    ~JNITopend();
-
-    inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
-    int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
-    void traceLog(bool isBegin,
-                  const char *name,
-                  const char *args);
-    int64_t fragmentProgressUpdate(
-                int32_t batchIndex,
-                PlanNodeType planNodeType,
-                int64_t tuplesProcessed,
-                int64_t currMemoryInBytes,
-                int64_t peakMemoryInBytes);
-    std::string planForFragmentId(int64_t fragmentId);
-    void crashVoltDB(FatalException e);
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-    void pushExportBuffer(
-            int32_t partitionId,
-            std::string signature,
-            StreamBlock *block,
-            bool sync);
-    void pushEndOfStream(
-            int32_t partitionId,
-            std::string signature);
-
-    int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
-
-    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
-
-    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
-            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
-            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
-            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
-            Table *newMetaTableForInsert, Table *newTupleTableForInsert);
-
-    void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
-
-    std::string decodeBase64AndDecompress(const std::string& buffer);
-
-    bool storeLargeTempTableBlock(LargeTempTableBlock* block);
-
-    bool loadLargeTempTableBlock(LargeTempTableBlock* block);
-
-    bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId);
-
-    int32_t callJavaUserDefinedFunction();
-    void resizeUDFBuffer(int32_t size);
-
-private:
     JNIEnv *m_jniEnv;
 
     /**
@@ -107,6 +56,55 @@ private:
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_decompressionClass;
+public:
+    JNITopend(JNIEnv *env, jobject caller);
+    ~JNITopend();
+
+    inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
+    int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination) override;
+    void traceLog(bool isBegin,
+                  const char *name,
+                  const char *args);
+    int64_t fragmentProgressUpdate(
+                int32_t batchIndex,
+                PlanNodeType planNodeType,
+                int64_t tuplesProcessed,
+                int64_t currMemoryInBytes,
+                int64_t peakMemoryInBytes) override;
+    std::string planForFragmentId(int64_t fragmentId) override;
+    void crashVoltDB(FatalException e) override;
+    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) override;
+    void pushExportBuffer(
+            int32_t partitionId,
+            std::string signature,
+            StreamBlock *block,
+            bool sync) override;
+    void pushEndOfStream(
+            int32_t partitionId,
+            std::string signature) override;
+
+    int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) override;
+
+    void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) override;
+
+    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert) override;
+
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) override;
+
+    std::string decodeBase64AndDecompress(const std::string& buffer) override;
+
+    bool storeLargeTempTableBlock(LargeTempTableBlock* block) override;
+
+    bool loadLargeTempTableBlock(LargeTempTableBlock* block) override;
+
+    bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId) override;
+
+    int32_t callJavaUserDefinedFunction() override;
+    void resizeUDFBuffer(int32_t size) override;
 };
 
 }
