@@ -2403,7 +2403,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
            }
        };
        m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
-               true, 1000 * 120, cb, "@LowImpactDelete", new Object[] {task.tableName, columnName, ttlValue, "<", chunkSize, timeout});
+               true, 1000 * 120, cb, "@LowImpactDelete", new Object[] {task.tableName, columnName, ttlValue, "<=", chunkSize, timeout});
        try {
            latch.await(1, TimeUnit.MINUTES);
        } catch (InterruptedException e) {
