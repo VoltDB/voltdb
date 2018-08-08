@@ -3483,4 +3483,8 @@ public class PlanAssembler {
         return false;
     }
 
+    boolean isLargeQuery() {
+        return m_isLargeQuery;
+    }
+
 }

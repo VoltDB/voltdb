@@ -29,6 +29,7 @@ import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Ignore;
+import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
@@ -684,13 +685,27 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                                                          : PlanNodeType.SEQSCAN),
                                                                      PlanNodeType.PROJECTION,
                                                                      type));
-
         if (twoFragments) {
+            FragmentSpec coordSpec;
+            if (isPlanningForLargeQueries()) {
+                // If this is a large query, then we
+                // need to use serial aggregation, and
+                // sort the distributed result.
+                // Note: This may actually be a merge receive
+                //       node, with an inline order by.  That
+                //       would be better.
+                coordSpec = fragSpec(PlanNodeType.SEND,
+                                     PlanNodeType.AGGREGATE,
+                                     PlanNodeType.ORDERBY,
+                                     PlanNodeType.RECEIVE);
+            } else {
+                coordSpec = fragSpec(PlanNodeType.SEND,
+                                     PlanNodeType.HASHAGGREGATE,
+                                     PlanNodeType.RECEIVE);
+            }
             validatePlan(SQL,
                          PRINT_JSON_PLAN,
-                         fragSpec(PlanNodeType.SEND,
-                                  PlanNodeType.HASHAGGREGATE,
-                                  PlanNodeType.RECEIVE),
+                         coordSpec,
                          distFragSpec);
         } else {
             validatePlan(SQL,
@@ -791,20 +806,30 @@ public class TestPlansGroupBy extends PlannerTestCase {
          */
         // ENG-9990 Repeating GROUP BY partition key in SELECT corrupts output schema.
         //* enable to debug */ boolean was = AbstractPlanNode.enableVerboseExplainForDebugging();
-        List<AbstractPlanNode> pns = compileToFragments("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY");
-        //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
-        //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
-        //* enable to debug */ AbstractPlanNode.restoreVerboseExplainForDebugging(was);
-        AbstractPlanNode pn = pns.get(0);
-        pn = pn.getChild(0);
-        NodeSchema os = pn.getOutputSchema();
-        // The problem was a mismatch between the output schema
-        // of the coordinator's send node and its feeding receive node
-        // that had incorrectly rearranged its columns.
-        SchemaColumn middleCol = os.getColumn(1);
-        System.out.println(middleCol.toString());
-        assertTrue(middleCol.getColumnAlias().equals("C"));
-
+        if ( ! isPlanningForLargeQueries() ) {
+            validatePlan("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  allOf(PlanNodeType.PROJECTION,
+                                        new OutputSchemaMatcher("C", VoltType.BIGINT, 1)),
+                                  new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                          PlanNodeType.HASHAGGREGATE,
+                                                          PlanNodeType.PROJECTION)));
+        } else {
+            validatePlan("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.AGGREGATE,
+                                  PlanNodeType.ORDERBY,
+                                  allOf(PlanNodeType.PROJECTION,
+                                        new OutputSchemaMatcher("C", VoltType.BIGINT, 1)),
+                                  new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                          PlanNodeType.PROJECTION)));
+        }
     }
 
     private void checkPartialAggregate(List<AbstractPlanNode> pns,

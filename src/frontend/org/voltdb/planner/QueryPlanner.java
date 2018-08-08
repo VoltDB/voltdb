@@ -371,7 +371,7 @@ public class QueryPlanner implements AutoCloseable {
      * </li>
      * <li>
      *   Do some final cleaning up and verifying of the plan.  For example,
-     *   We renumber the nodes starting at 1.
+     *   we renumber the nodes starting at 1.
      * </li>
      * </ol>
      *

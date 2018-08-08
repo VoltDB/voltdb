@@ -30,6 +30,8 @@ import java.util.Map.Entry;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.utils.Pair;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
@@ -759,7 +761,107 @@ public class PlannerTestCase extends TestCase {
         }
     }
 
-    protected class ExplainStringMatcher implements PlanMatcher {
+    public static class MatchSchemaColumn {
+        String m_columnName;
+        VoltType m_columnType;
+        int m_columnIndex;
+        public MatchSchemaColumn(String columnName, VoltType columnType, int columnIndex) {
+            m_columnName = columnName;
+            m_columnType = columnType;
+            m_columnIndex = columnIndex;
+        }
+    }
+
+    public static MatchSchemaColumn[] makeSchema(Object ... args) {
+        assertTrue(args.length % 3 == 0);
+        MatchSchemaColumn[] answer = new MatchSchemaColumn[args.length/3];
+        for (int idx = 0; idx < args.length/3; idx += 1) {
+            assertTrue(args[3*idx] instanceof String);
+            assertTrue(args[3*idx+1] instanceof VoltType);
+            assertTrue(args[3*idx+2] instanceof Integer);
+            answer[idx] = new MatchSchemaColumn((String)args[3*idx],
+                                                (VoltType)args[3*idx+1],
+                                                (Integer)args[3*idx+2]);
+        }
+        return answer;
+    }
+    /**
+     * This matcher matches a node schema.  If the name is null, it
+     * matches everything.
+     */
+    protected static class OutputSchemaMatcher implements PlanMatcher {
+        private MatchSchemaColumn[] m_schema;
+
+        public OutputSchemaMatcher(Object ... args) {
+            assertTrue(args.length % 3 == 0);
+            m_schema = new MatchSchemaColumn[args.length/3];
+            for (int idx = 0; idx < args.length/3; idx += 1) {
+                assertTrue(args[3*idx] instanceof String);
+                assertTrue(args[3*idx+1] instanceof VoltType);
+                assertTrue(args[3*idx+2] instanceof Integer);
+                m_schema[idx] = new MatchSchemaColumn((String)args[3*idx],
+                                                      (VoltType)args[3*idx+1],
+                                                      (Integer)args[3*idx+2]);
+            }
+        }
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            int idx;
+            NodeSchema schema = node.getOutputSchema();
+            for (idx = 0; idx < m_schema.length && idx < schema.size(); idx += 1) {
+                String name = m_schema[idx].m_columnName;
+                VoltType type = m_schema[idx].m_columnType;
+                int index = m_schema[idx].m_columnIndex;
+                if ( index < 0 || schema.size() <= index) {
+                    return String.format("Index %d is too big for Output Schema Column of %s node whose length is %d: fragment %d/%d, id %d",
+                                         index,
+                                         node.getPlanNodeType(),
+                                         schema.size(),
+                                         fragmentNo,
+                                         numFragments,
+                                         node.getPlanNodeId());
+                }
+
+                SchemaColumn col = schema.getColumn(index);
+                if (name != null &&
+                        ! ( name.equals(col.getColumnAlias())
+                                || name.equals(col.getColumnName()))) {
+                    return String.format("Expected schema column with name or alias %s , not name %s, alias %s at %d: fragment %d/%d, id %d",
+                                         name,
+                                         col.getColumnName(),
+                                         col.getColumnAlias(),
+                                         index,
+                                         fragmentNo,
+                                         numFragments,
+                                         node.getPlanNodeId());
+                }
+                if (col.getValueType() != type) {
+                    return String.format("Expected schema type %s, found %s in column %d: fragment %d/%d, node id %d",
+                                         type,
+                                         col.getValueType(),
+                                         index,
+                                         fragmentNo,
+                                         numFragments,
+                                         node.getPlanNodeId());
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public String matchName() {
+            return null;
+        }
+    }
+    /**
+     * This class matches a substring of the conventional
+     * explain plan string.  It's most often used with
+     * allOf.
+     */
+    protected static class ExplainStringMatcher implements PlanMatcher {
         String m_expected;
 
         public ExplainStringMatcher(String expected) {
