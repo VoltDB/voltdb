@@ -264,6 +264,7 @@ SET (VOLTDB_SRC
   storage/StreamedTableStats.cpp
   storage/TableCatalogDelegate.cpp
   storage/table.cpp
+  storage/tableiterator.cpp
   storage/tablefactory.cpp
   storage/TableStats.cpp
   storage/TableStreamerContext.cpp

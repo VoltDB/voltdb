@@ -20,40 +20,50 @@
 #include "common/serializeio.h"
 #include "execution/VoltDBEngine.h"
 
-namespace voltdb {
+using namespace voltdb;
 
 #ifdef VOLT_DEBUG_ENABLED
-static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exceptionType)
-{
-    switch(exceptionType) {
-    case VOLT_EE_EXCEPTION_TYPE_NONE: return "VOLT_EE_EXCEPTION_TYPE_NONE";
-    case VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION: return "VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION";
-    case VOLT_EE_EXCEPTION_TYPE_SQL: return "VOLT_EE_EXCEPTION_TYPE_SQL";
-    case VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION: return "VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION";
-    case VOLT_EE_EXCEPTION_TYPE_INTERRUPT: return "VOLT_EE_EXCEPTION_TYPE_INTERRUPT";
-    case VOLT_EE_EXCEPTION_TYPE_TXN_RESTART: return "VOLT_EE_EXCEPTION_TYPE_TXN_RESTART";
-    case VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION: return "VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION";
-    case VOLT_EE_EXCEPTION_TYPE_SPECIFIED: return "VOLT_EE_EXCEPTION_TYPE_SPECIFIED";
-    case VOLT_EE_EXCEPTION_TYPE_GENERIC: return "VOLT_EE_EXCEPTION_TYPE_GENERIC";
-    case VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED: return "VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED";
-    case VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE: return "VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE";
-    default: return "UNKNOWN";
-    }
+static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exceptionType) {
+   switch(exceptionType) {
+      case VOLT_EE_EXCEPTION_TYPE_NONE:
+         return "VOLT_EE_EXCEPTION_TYPE_NONE";
+      case VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION:
+         return "VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION";
+      case VOLT_EE_EXCEPTION_TYPE_SQL:
+         return "VOLT_EE_EXCEPTION_TYPE_SQL";
+      case VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION:
+         return "VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION";
+      case VOLT_EE_EXCEPTION_TYPE_INTERRUPT:
+         return "VOLT_EE_EXCEPTION_TYPE_INTERRUPT";
+      case VOLT_EE_EXCEPTION_TYPE_TXN_RESTART:
+         return "VOLT_EE_EXCEPTION_TYPE_TXN_RESTART";
+      case VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION:
+         return "VOLT_EE_EXCEPTION_TYPE_TXN_TERMINATION";
+      case VOLT_EE_EXCEPTION_TYPE_SPECIFIED:
+         return "VOLT_EE_EXCEPTION_TYPE_SPECIFIED";
+      case VOLT_EE_EXCEPTION_TYPE_GENERIC:
+         return "VOLT_EE_EXCEPTION_TYPE_GENERIC";
+      case VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED:
+         return "VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED";
+      case VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE:
+         return "VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE";
+      default:
+         return "UNKNOWN";
+   }
 }
 #endif
 
-SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string message) :
-    m_exceptionType(exceptionType), m_message(message)
-{
+SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType,
+      const std::string& message) :
+    std::runtime_error(message), m_exceptionType(exceptionType), m_message(message) {
     VOLT_DEBUG("Created SerializableEEException: type: %s message: %s",
                translateVoltEEExceptionTypeToString(exceptionType), message.c_str());
 }
 
-SerializableEEException::SerializableEEException(std::string message) :
-    m_exceptionType(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION), m_message(message)
-{
-    VOLT_DEBUG("Created SerializableEEException: default type, %s",
-               message.c_str());
+SerializableEEException::SerializableEEException(std::string const& message) :
+    std::runtime_error(message),
+    m_exceptionType(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION), m_message(message) {
+    VOLT_DEBUG("Created SerializableEEException: default type, %s", message.c_str());
 }
 
 void SerializableEEException::serialize(ReferenceSerializeOutput *output) const {
@@ -66,12 +76,7 @@ void SerializableEEException::serialize(ReferenceSerializeOutput *output) const 
     p_serialize(output);
     if (m_exceptionType == VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION)
         output->writeInt(ENGINE_ERRORCODE_ERROR);
-    const int32_t length = static_cast<int32_t>(output->position() - (lengthPosition + sizeof(int32_t)));
-    output->writeIntAt( lengthPosition, length);
+    const int32_t len = static_cast<int32_t>(output->position() - (lengthPosition + sizeof(int32_t)));
+    output->writeIntAt( lengthPosition, len);
 }
 
-SerializableEEException::~SerializableEEException() {
-    // TODO Auto-generated destructor stub
-}
-
-}

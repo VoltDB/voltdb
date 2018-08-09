@@ -116,7 +116,7 @@ SegvException::SegvException(
     }
 
     if (!bp || !ip) {
-        m_traces = traces;
+        setTraces(traces);
     }
 #endif
 #endif

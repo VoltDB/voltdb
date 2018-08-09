@@ -1650,7 +1650,7 @@ VoltDBEngine::loadTable(int32_t tableId,
             // This is legacy behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
             // other kind of exception?
             s_loadTableException = serializableExc.getType();
-            throwFatalException("%s", serializableExc.message().c_str());
+            throwFatalException("%s", serializableExc.what());
         }
 
         if (table->isCatalogTableReplicated() && returnConflictRows) {

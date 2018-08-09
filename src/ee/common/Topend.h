@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TOPEND_H_
-#define TOPEND_H_
+#pragma once
 #include <string>
 #include <queue>
 #include <vector>
@@ -24,8 +23,6 @@
 #include <boost/shared_array.hpp>
 
 #include "common/ids.h"
-#include "common/FatalException.hpp"
-#include "common/LargeTempTableBlockId.hpp"
 #include "common/types.h"
 
 namespace voltdb {
@@ -33,6 +30,8 @@ class Table;
 class Pool;
 class StreamBlock;
 class LargeTempTableBlock;
+class FatalException;
+class LargeTempTableBlockId;
 
 /*
  * Topend abstracts the EE's calling interface to Java to
@@ -41,61 +40,36 @@ class LargeTempTableBlock;
  */
 class Topend {
   public:
-    virtual int loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
-
-    virtual void traceLog(bool isBegin,
-                          const char *name,
-                          const char *args) {};
-
+    virtual int loadNextDependency(int32_t dependencyId, Pool *pool, Table* destination) = 0;
+    virtual void traceLog(bool isBegin, const char *name, const char *args) {};
     // Update the topend on query progress and give the topend a chance to tell the
     // query to stop.
     // Return 0 if the Topend wants the EE to stop processing the current fragment
     // or the number of tuples the EE should process before repeating this call.
-    virtual int64_t fragmentProgressUpdate(
-                int32_t batchIndex,
-                PlanNodeType planNodeType,
-                int64_t tuplesProcessed,
-                int64_t currMemoryInBytes,
-                int64_t peakMemoryInBytes) = 0;
-
+    virtual int64_t fragmentProgressUpdate(int32_t batchIndex, PlanNodeType planNodeType,
+          int64_t tuplesProcessed, int64_t currMemoryInBytes, int64_t peakMemoryInBytes) = 0;
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;
-
-    virtual void crashVoltDB(voltdb::FatalException e) = 0;
-
-    virtual int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) = 0;
-    virtual void pushExportBuffer(
-            int32_t partitionId,
-            std::string signature,
-            StreamBlock *block,
-            bool sync) = 0;
-    virtual void pushEndOfStream(
-            int32_t partitionId,
-            std::string signature) = 0;
-
+    virtual void crashVoltDB(FatalException const& e) = 0;
+    virtual int64_t getQueuedExportBytes(int32_t partitionId, std::string const& signature) = 0;
+    virtual void pushExportBuffer(int32_t partitionId, std::string const& signature,
+            StreamBlock *block, bool sync) = 0;
+    virtual void pushEndOfStream(int32_t partitionId, std::string const& signature) = 0;
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
-
     virtual void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) = 0;
-
-    virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
-            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
-            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
-            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
-            Table *newMetaTableForInsert, Table *newTupleTableForInsert) = 0;
-
+    virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName,
+          DRRecordType action, DRConflictType deleteConflict, Table* existingMetaTableForDelete,
+          Table* existingTupleTableForDelete, Table* expectedMetaTableForDelete, Table* expectedTupleTableForDelete,
+          DRConflictType insertConflict, Table* existingMetaTableForInsert, Table* existingTupleTableForInsert,
+          Table* newMetaTableForInsert, Table* newTupleTableForInsert) = 0;
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
-
     /** Calls the java method in org.voltdb.utils.Encoder */
     virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
-
     /** Store the given block to disk to make room for more large temp table data. */
     virtual bool storeLargeTempTableBlock(LargeTempTableBlock* block) = 0;
-
     /** Load the given block into memory from disk. */
     virtual bool loadLargeTempTableBlock(LargeTempTableBlock* block) = 0;
-
     /** Delete any data for the specified block that is stored on disk. */
-    virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId) = 0;
+    virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId const& blockId) = 0;
 
     // Call into the Java top end to execute a user-defined function.
     // The function ID for the function to be called and the parameter data is stored in a
@@ -109,79 +83,55 @@ class Topend {
     // This function will not do anything under IPC mode.
     // The buffer size in the IPC mode is always MAX_MSG_SZ (10M)
     virtual void resizeUDFBuffer(int32_t size) = 0;
-
-    virtual ~Topend()
-    {
-    }
+    virtual ~Topend() {}
 };
 
 class DummyTopend : public Topend {
+    using table_ptr_t = std::unique_ptr<Table>;
+    std::queue<int32_t> m_partitionIds;
+    std::queue<std::string> m_signatures;
+    std::deque<std::unique_ptr<StreamBlock> > m_blocks;
+    std::deque<boost::shared_array<char> > m_data;
+    bool m_receivedDRBuffer = false;
+    bool m_receivedExportBuffer = false;
+    int64_t m_pushDRBufferRetval = -1;
+    DRRecordType m_actionType;
+    DRConflictType m_deleteConflictType;
+    DRConflictType m_insertConflictType;
+    int32_t m_remoteClusterId;
+    int64_t m_remoteTimestamp;
+    table_ptr_t m_existingMetaRowsForDelete;
+    table_ptr_t m_existingTupleRowsForDelete;
+    table_ptr_t m_expectedMetaRowsForDelete;
+    table_ptr_t m_expectedTupleRowsForDelete;
+    table_ptr_t m_existingMetaRowsForInsert;
+    table_ptr_t m_existingTupleRowsForInsert;
+    table_ptr_t m_newMetaRowsForInsert;
+    table_ptr_t m_newTupleRowsForInsert;
 public:
-    DummyTopend();
-
-    int loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination) override;
-
-    virtual int64_t fragmentProgressUpdate(
-            int32_t batchIndex,
-            PlanNodeType planNodeType,
-            int64_t tuplesFound,
-            int64_t currMemoryInBytes,
-            int64_t peakMemoryInBytes) override;
-
+    DummyTopend() = default;
+    int loadNextDependency(int32_t dependencyId, Pool *pool, Table* destination) override;
+    int64_t fragmentProgressUpdate(int32_t batchIndex, PlanNodeType planNodeType,
+            int64_t tuplesFound, int64_t currMemoryInBytes, int64_t peakMemoryInBytes) override;
     std::string planForFragmentId(int64_t fragmentId) override;
-
-    void crashVoltDB(voltdb::FatalException e) override;
-
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) override;
-
-    virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync) override;
-    virtual void pushEndOfStream(int32_t partitionId, std::string signature) override;
-
-    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) override;
-
+    void crashVoltDB(FatalException const& e) override;
+    int64_t getQueuedExportBytes(int32_t partitionId, std::string const& signature) override;
+    void pushExportBuffer(int32_t partitionId, std::string const& signature, StreamBlock *block, bool sync) override;
+    void pushEndOfStream(int32_t partitionId, std::string const& signature) override;
+    int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) override;
     void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) override;
-
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
-            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
-            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
-            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
-            Table *newMetaTableForInsert, Table *newTupleTableForInsert) override;
-
+            DRConflictType deleteConflict, Table* existingMetaTableForDelete, Table* existingTupleTableForDelete,
+            Table* expectedMetaTableForDelete, Table* expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table* existingMetaTableForInsert, Table* existingTupleTableForInsert,
+            Table* newMetaTableForInsert, Table* newTupleTableForInsert) override;
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) override;
-
     std::string decodeBase64AndDecompress(const std::string& buffer) override;
-
-    virtual bool storeLargeTempTableBlock(LargeTempTableBlock* block) override;
-
-    virtual bool loadLargeTempTableBlock(LargeTempTableBlock* block) override;
-
-    virtual bool releaseLargeTempTableBlock(LargeTempTableBlockId blockId) override;
-
+    bool storeLargeTempTableBlock(LargeTempTableBlock* block) override;
+    bool loadLargeTempTableBlock(LargeTempTableBlock* block) override;
+    bool releaseLargeTempTableBlock(LargeTempTableBlockId const& blockId) override;
     int32_t callJavaUserDefinedFunction() override;
     void resizeUDFBuffer(int32_t size) override;
-
-    std::queue<int32_t> partitionIds;
-    std::queue<std::string> signatures;
-    std::deque<boost::shared_ptr<StreamBlock> > blocks;
-    std::deque<boost::shared_array<char> > data;
-    bool receivedDRBuffer;
-    bool receivedExportBuffer;
-    int64_t pushDRBufferRetval;
-    DRRecordType actionType;
-    DRConflictType deleteConflictType;
-    DRConflictType insertConflictType;
-    int32_t remoteClusterId;
-    int64_t remoteTimestamp;
-    boost::shared_ptr<Table> existingMetaRowsForDelete;
-    boost::shared_ptr<Table> existingTupleRowsForDelete;
-    boost::shared_ptr<Table> expectedMetaRowsForDelete;
-    boost::shared_ptr<Table> expectedTupleRowsForDelete;
-    boost::shared_ptr<Table> existingMetaRowsForInsert;
-    boost::shared_ptr<Table> existingTupleRowsForInsert;
-    boost::shared_ptr<Table> newMetaRowsForInsert;
-    boost::shared_ptr<Table> newTupleRowsForInsert;
 };
 
 }
-#endif /* TOPEND_H_ */

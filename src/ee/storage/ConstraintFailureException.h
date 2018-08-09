@@ -34,6 +34,15 @@ class VoltDBEngine;
  * A constraint exception is generated when an update or an insert on a table violates a constraint
  */
 class ConstraintFailureException: public SQLException {
+    Table *m_table;
+    TableTuple m_tuple;
+    TableTuple m_otherTuple;
+    ConstraintType m_type;
+    PersistentTableSurgeon *m_surgeon;
+
+    static std::string enrichedMessage(ConstraintType const& type,
+          std::string const& tblName, TableTuple const& curTuple,
+          TableTuple const& otherTuple);
 public:
     /**
      * General constructor for for CFE
@@ -43,7 +52,9 @@ public:
      * @param otherTuple updated tuple values or a null tuple.
      * @param type Type of constraint that was violated
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type, PersistentTableSurgeon *surgeon =  NULL);
+    ConstraintFailureException(Table *table, TableTuple const& tuple,
+          TableTuple const& otherTuple, ConstraintType const& type,
+          PersistentTableSurgeon *surgeon =  NULL);
 
     /**
      * Special constructor for partitioning error CFEs only
@@ -52,21 +63,17 @@ public:
      * @param tuple Tuple that was being inserted or updated
      * @param message Description of the partitioning failure.
      */
-    ConstraintFailureException(Table *table, TableTuple tuple, std::string message, PersistentTableSurgeon *surgeon =  NULL);
-
-    virtual const std::string message() const;
+    ConstraintFailureException(Table *table, TableTuple const& tuple,
+          std::string const& message, PersistentTableSurgeon *surgeon =  NULL);
     virtual ~ConstraintFailureException();
-
-    const TableTuple* getConflictTuple() const { return &m_tuple; }
-    const TableTuple* getOriginalTuple() const { return &m_otherTuple; }
+    const TableTuple* getConflictTuple() const {
+       return &m_tuple;
+    }
+    const TableTuple* getOriginalTuple() const {
+       return &m_otherTuple;
+    }
 protected:
     void p_serialize(ReferenceSerializeOutput *output) const;
-
-    Table *m_table;
-    TableTuple m_tuple;
-    TableTuple m_otherTuple;
-    ConstraintType m_type;
-    PersistentTableSurgeon *m_surgeon;
 };
 
 }

@@ -39,7 +39,7 @@ namespace voltdb {
    class Table;
    struct ipc_command;
 
-   class VoltDBIPC : public voltdb::Topend {
+   class VoltDBIPC : public Topend {
       public:
          // must match ERRORCODE_SUCCESS|ERROR in ExecutionEngine.java
          enum {
@@ -69,11 +69,11 @@ namespace voltdb {
 
          ~VoltDBIPC();
 
-         const voltdb::VoltDBEngine* getEngine() const {
+         const VoltDBEngine* getEngine() const {
             return m_engine.get();
          }
 
-         int loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, voltdb::Table* destination) override;
+         int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination) override;
          void fallbackToEEAllocatedBuffer(char *buffer, size_t length) override { }
 
          /**
@@ -89,7 +89,7 @@ namespace voltdb {
 
          int64_t fragmentProgressUpdate(
                int32_t batchIndex,
-               voltdb::PlanNodeType planNodeType,
+               PlanNodeType planNodeType,
                int64_t tuplesProcessed,
                int64_t currMemoryInBytes,
                int64_t peakMemoryInBytes) override;
@@ -105,9 +105,9 @@ namespace voltdb {
 
          bool execute(ipc_command *cmd);
 
-         int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) override;
+         int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) override;
 
-         void pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block) override;
+         void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block) override;
 
          /**
           * Log a statement on behalf of the IPC log proxy at the specified log level
@@ -115,9 +115,9 @@ namespace voltdb {
           * @param level Log level of the statement
           * @param statement null terminated UTF-8 string containing the statement to log
           */
-         void log(voltdb::LoggerId loggerId, voltdb::LogLevel level, const char *statement) const;
+         void log(LoggerId loggerId, LogLevel level, const char *statement) const;
 
-         void crashVoltDB(voltdb::FatalException e) override;
+         void crashVoltDB(FatalException const& e) override;
 
          /*
           * Cause the engine to terminate gracefully after finishing execution of the current command.
@@ -127,21 +127,22 @@ namespace voltdb {
           */
          void terminate();
 
-         int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) override;
-         void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync) override;
-         void pushEndOfStream(int32_t partitionId, std::string signature) override;
+         int64_t getQueuedExportBytes(int32_t partitionId, std::string const& signature) override;
+         void pushExportBuffer(int32_t partitionId, std::string const& signature, StreamBlock *block, bool sync) override;
+         void pushEndOfStream(int32_t partitionId, std::string const& signature) override;
 
-         int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
-               voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
-               voltdb::Table *expectedMetaTableForDelete, voltdb::Table *expectedTupleTableForDelete,
-               voltdb::DRConflictType insertConflict, voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,
-               voltdb::Table *newMetaTableForInsert, voltdb::Table *newTupleTableForInsert) override;
+         int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName,
+               DRRecordType action, DRConflictType deleteConflict, Table* existingMetaTableForDelete,
+               Table* existingTupleTableForDelete, Table* expectedMetaTableForDelete,
+               Table* expectedTupleTableForDelete, DRConflictType insertConflict,
+               Table* existingMetaTableForInsert, Table* existingTupleTableForInsert,
+               Table* newMetaTableForInsert, Table* newTupleTableForInsert) override;
 
-         bool storeLargeTempTableBlock(voltdb::LargeTempTableBlock* block) override;
+         bool storeLargeTempTableBlock(LargeTempTableBlock* block) override;
 
-         bool loadLargeTempTableBlock(voltdb::LargeTempTableBlock* block) override;
+         bool loadLargeTempTableBlock(LargeTempTableBlock* block) override;
 
-         bool releaseLargeTempTableBlock(voltdb::LargeTempTableBlockId blockId) override;
+         bool releaseLargeTempTableBlock(LargeTempTableBlockId const& blockId) override;
 
 
       private:
@@ -211,7 +212,7 @@ namespace voltdb {
          static void signalDispatcher(int signum, siginfo_t *info, void *context);
          void setupSigHandler(void) const;
 
-         std::unique_ptr<voltdb::VoltDBEngine> m_engine{};
+         std::unique_ptr<VoltDBEngine> m_engine{};
          long int m_counter = 0;
 
          int m_fd;
@@ -294,8 +295,8 @@ namespace voltdb {
     */
    struct activate_tablestream {
       ipc_command cmd;
-      voltdb::CatalogId tableId;
-      voltdb::TableStreamType streamType;
+      CatalogId tableId;
+      TableStreamType streamType;
       int64_t undoToken;
       char data[0];
    }__attribute__((packed));
@@ -305,8 +306,8 @@ namespace voltdb {
     */
    struct tablestream_serialize_more {
       ipc_command cmd;
-      voltdb::CatalogId tableId;
-      voltdb::TableStreamType streamType;
+      CatalogId tableId;
+      TableStreamType streamType;
       int bufferCount;
       char data[0];
    }__attribute__((packed));
@@ -388,13 +389,4 @@ namespace voltdb {
       char enabled;
       char viewNameBytes[0];
    }__attribute__((packed));
-
-   /**
-    * Utility used for deserializing ParameterSet passed from Java.
-    */
-   void deserializeParameterSetCommon(int cnt, ReferenceSerializeInputBE &serialize_in,
-         NValueArray &params, Pool *stringPool);
-
-   void *eethread(void *ptr);
-   void checkBytesRead(ssize_t byteCountExpected, ssize_t byteCountRead, std::string description);
 }
