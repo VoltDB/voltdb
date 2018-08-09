@@ -53,7 +53,7 @@ def query_dns_srv(query):
             print rdata
     print m_list
     # return a list of fq hostnames of pods in the service domain
-    return m_list
+    return sorted(m_list)
 
 
 def try_to_connect(host, port):
