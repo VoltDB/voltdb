@@ -620,6 +620,15 @@ public class MpTransactionState extends TransactionState
      * @param partitionMastersMap The current partition masters
      */
     public void restartFragment(FragmentResponseMessage message, List<Long> masters, Map<Integer, Long> partitionMastersMap) {
+        // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
+        if (m_restartTimestamp != message.getRestartTimestamp()) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Receives stale misrouted fragment response, " +
+                        "expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
+                        " actually receives: " + message);
+            }
+            return;
+        }
         final int partionId = message.getPartitionId();
         Long restartHsid = partitionMastersMap.get(partionId);
         Long hsid = message.getExecutorSiteId();
