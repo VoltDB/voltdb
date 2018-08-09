@@ -131,7 +131,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 }
                 next.doRestart(masters, partitionMasters);
 
-                if (!balanceSPI || readonly) {
+                if (!balanceSPI) {
                     MpTransactionState txn = (MpTransactionState)next.getTransactionState();
                     // inject poison pill
                     FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L,
