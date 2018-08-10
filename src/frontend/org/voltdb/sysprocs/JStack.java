@@ -51,40 +51,40 @@ public class JStack extends VoltSystemProcedure {
         List<String> processList = new ArrayList<String>();
         try {
             JSONObject jsObj = new JSONObject(command);
-            String host = jsObj.getString("Host");
+            String hsIDs = jsObj.getString("hsId");
             process = Runtime.getRuntime().exec("jps");
             BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line = "";
             while ((line = input.readLine()) != null) {
                 processList.add(line);
             }
-            input.close();
+            input.close();    
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        List<String> stackTrace = new ArrayList<>();
-        for (String line : processList) {
-            String[] ss = line.split(" ");
-            if(ss.length > 1 && ss[1].equals("VoltDB")) {
-                int pid = Integer.parseInt(ss[0]);
-                try {
-                    Process pcsStackTrace = Runtime.getRuntime().exec("jstack " + pid);
-                    BufferedReader input = new BufferedReader(new InputStreamReader(pcsStackTrace.getInputStream()));
-                    stackTrace.add("--------------Stack trace for PID " + pid + "--------------");
-                    String s = "";
-                    while ((s = input.readLine()) != null) {
-                        stackTrace.add(s);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-
-        for(String s : stackTrace) {
-            JSTACK_LOG.info(s);
-        }
+//
+//        List<String> stackTrace = new ArrayList<>();
+//        for (String line : processList) {
+//            String[] ss = line.split(" ");
+//            if(ss.length > 1 && ss[1].equals("VoltDB")) {
+//                int pid = Integer.parseInt(ss[0]);
+//                try {
+//                    Process pcsStackTrace = Runtime.getRuntime().exec("jstack " + pid);
+//                    BufferedReader input = new BufferedReader(new InputStreamReader(pcsStackTrace.getInputStream()));
+//                    stackTrace.add("--------------Stack trace for PID " + pid + "--------------");
+//                    String s = "";
+//                    while ((s = input.readLine()) != null) {
+//                        stackTrace.add(s);
+//                    }
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//        }
+//
+//        for(String s : stackTrace) {
+//            JSTACK_LOG.info(s);
+//        }
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);
