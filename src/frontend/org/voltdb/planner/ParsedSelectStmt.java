@@ -2329,6 +2329,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (size != m_orderColumns.size()) {
             return false;
         }
+        // Put some of the order by expressions and
+        // group by key expressions in hash sets, to test
+        // for equality.
+        //
+        // Note that we will not put the iith group by and
+        // the iith order by expression in the sets if
+        // they are equal.  If they are equal we know
+        // they are in both sets, and that's good enough.
         Set<AbstractExpression> orderPrefixExprs = new HashSet<>(size);
         Set<AbstractExpression> groupExprs = new HashSet<>(size);
         int ii = 0;
@@ -2346,6 +2354,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             groupExprs.add(gexpr);
             orderPrefixExprs.add(oexpr);
         }
+        // Test for set equality here.  This is potentially n^2.
         m_groupAndOrderByPermutationResult = groupExprs.equals(orderPrefixExprs);
         return m_groupAndOrderByPermutationResult;
     }
