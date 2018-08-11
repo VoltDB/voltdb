@@ -21,6 +21,7 @@ import java.util.*;
 import java.util.Map.Entry;
 
 import org.json_voltpatches.JSONException;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -2393,9 +2394,8 @@ public class PlanAssembler {
             }
 
             // If we changed to serial aggregation then we don't
-            // need hash aggregation.  But if it's it's multipartition,
-            // or there is a join of a replicated table (m_multiPartition
-            // is misnamed) then we might still need a hash aggregation.
+            // need hash aggregation.  But if it's multipartition,
+            // then we might still need a hash aggregation.
             if (isChangedToSerialAggregate() && ! m_multiPartition) {
                 return false;
             }
@@ -2471,20 +2471,51 @@ public class PlanAssembler {
     }
 
     /**
+     * Try to convert a candidate subplan to one which can be used for serial
+     * or partial aggregation.  The candidate subplan can be the entire
+     * subplan, or it can be the distributed node of a multi fragment
+     * plan.  There are a couple of cases.
+     * <ol>
+     *     <li>If the candidate subplan is an index scan node then we record
+     *         how well the index scan's expression sequence matches
+     *         the group by key expressions.  See below for what this
+     *         means.</li>
+     *     <li>Otherwise, look for the outermost scan node in the
+     *         candidate subplan.  If the subplan is a single scan
+     *         node, it's the outermost node.  If the subplan is a
+     *         join tree, then the outermost scan node is the left
+     *         most, deepest scan node.  If this outermost scan
+     *         node is a sequential scan of a persistent table, then,
+     *         look for the index which best matches the group by
+     *         key expressions.  Here an index matches the group
+     *         by keys when each of an initial sequence of the indexes
+     *         expressions is in the group by keys.  The index that
+     *         best matches is the one with the longest matching
+     *         initial sequence.  Record how the index matches the
+     *         group by key expressions in the {@link IndexGroupByInfo}
+     *         argument.</li>
+     * </ol>
+     *
+     * Original Comment:
+     *
      * For a seqscan feeding a GROUP BY, consider substituting an IndexScan
      * that pre-sorts by the GROUP BY keys.
      * If a candidate is already an indexscan,
-     * simply calculate GROUP BY column coverage
+     * simply calculate GROUP BY column coverage.
      *
-     * @param candidate The candidate plan we want to work on.
+     * @param candidate The candidate subplan we want to work on.
      * @param gbInfo Information about the transformation we are
      *               about to do.  This is initially empty, and is
      *               used to return detailed results.
-     * @return We return true if we have found or created a useful
-     *         ordering to allow partial or serial aggregation.  We
-     *         return some other bits of data in gbInfo, but only if
-     *         the return value here is true.  If the return value here
-     *         is false, gbInfo's data is undefined.
+     * @return Return true if we found an interesting index and we
+     *         replaced an sequential scan node with an index scan
+     *         node and the sequential scan node had no parent.  This
+     *         distinction is important because in this case the
+     *         entire subplan is the single sequential scan node.  If
+     *         we replaced it with an index scan node we have to abandon
+     *         the old candidate plan and pick up the new index scan
+     *         node as the candidate plan.
+     *
      */
     private boolean switchToIndexScanForGroupBy(AbstractPlanNode candidate,
             IndexGroupByInfo gbInfo) {
@@ -2500,8 +2531,8 @@ public class PlanAssembler {
                 // of the GROUP BY columns and can be serialized.
                 // This could be serial or partial aggregation.
                 gbInfo.m_indexAccess = candidate;
-                gbInfo.m_rootPlanAfterSuccessfulSwitch = candidate;
-                return true;
+                // Drop through to return false, because we
+                // haven't changed the candidate subplan.
             }
             return false;
         }
@@ -2527,12 +2558,16 @@ public class PlanAssembler {
             // the sequential scan with an index scan
             gbInfo.m_indexAccess.clearParents();
             // For two children join node, index 0 is its outer side
-            parent.replaceChild(0, indexAccess);
-
+            parent.replaceChild(0, gbInfo.m_indexAccess);
+            // We have found a useful index scan node.  But
+            // we haven't replaced the candidate subplan, so
+            // we return false.
             return false;
         }
 
-        // parent is null and switched to index scan from sequential scan
+        // The original candidate subplan was the entire
+        // subplan, and we have a new candidate.  So we
+        // return true.
         return true;
     }
 
@@ -2682,195 +2717,35 @@ public class PlanAssembler {
                     // We may not be able to switch to index scan, but
                     // we don't really care here.  The root will stay the
                     // same in any case, and we don't really care about
-                    // the index scan node.
+                    // the index scan node here.  We will later.
                     switchToIndexScanForGroupBy(candidate, gbInfo);
                 }
             }
             else if (switchToIndexScanForGroupBy(root, gbInfo)) {
-                root = gbInfo.m_rootPlanAfterSuccessfulSwitch;
+                root = gbInfo.m_indexAccess;
             }
             // If this is a large query and the stuff above didn't switch
             // to serial aggregation, then hit it with Mjölnir.
             if ( isLargeQuery() && ( ! gbInfo.isChangedToSerialAggregate())) {
                 root = forceSwitchToSerialAccess(root, gbInfo);
             }
-            boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
+
+            Pair<AggregatePlanNode, AggregatePlanNode> aggregateNodes = makeAggregateNodes(root, gbInfo);
+            AggregatePlanNode aggNode = aggregateNodes.getFirst();
+            AggregatePlanNode topAggNode = aggregateNodes.getSecond();
+
             // It's a disaster to need hash aggregation if this is
-            // a large temp table.  I want this to be stronger than
+            // a large temp table.  Note that aggNode may not be null,
+            // topAggNode may be null, but neither may be hash or
+            // partial aggregation.  I want this to be stronger than
             // assert, because I want it to fail, even in production.
-            if (needHashAgg && isLargeQuery() ) {
-                throw new PlanningErrorException("Internal Error: Hash aggregation in planning for large temp tables.");
+            if (aggNode == null) {
+                throw new PlanningErrorException("Internal Error: null distributed aggregate node.");
             }
-
-            TopAndBottomAggregatePair aggregateNodes = new TopAndBottomAggregatePair(root, gbInfo, needHashAgg).invoke();
-            AggregatePlanNode aggNode = aggregateNodes.getAggNode();
-            AggregatePlanNode topAggNode = aggregateNodes.getTopAggNode();
-
-
-            NodeSchema agg_schema = new NodeSchema();
-            NodeSchema top_agg_schema = new NodeSchema();
-
-            for ( int outputColumnIndex = 0;
-                    outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
-                    outputColumnIndex += 1) {
-                ParsedColInfo col = m_parsedSelect.m_aggResultColumns.get(outputColumnIndex);
-                AbstractExpression rootExpr = col.m_expression;
-                AbstractExpression agg_input_expr = null;
-                SchemaColumn schema_col = null;
-                SchemaColumn top_schema_col = null;
-                if (rootExpr instanceof AggregateExpression) {
-                    ExpressionType agg_expression_type = rootExpr.getExpressionType();
-                    agg_input_expr = rootExpr.getLeft();
-
-                    // A bit of a hack: ProjectionNodes after the
-                    // aggregate node need the output columns here to
-                    // contain TupleValueExpressions (effectively on a temp table).
-                    // So we construct one based on the output of the
-                    // aggregate expression, the column alias provided by HSQL,
-                    // and the offset into the output table schema for the
-                    // aggregate node that we're computing.
-                    // Oh, oh, it's magic, you know..
-                    TupleValueExpression tve = new TupleValueExpression(
-                            AbstractParsedStmt.TEMP_TABLE_NAME,
-                            AbstractParsedStmt.TEMP_TABLE_NAME,
-                            "", col.m_alias,
-                            rootExpr, outputColumnIndex);
-                    tve.setDifferentiator(col.m_differentiator);
-
-                    boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
-                    aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
-                    schema_col = new SchemaColumn(
-                            AbstractParsedStmt.TEMP_TABLE_NAME,
-                            AbstractParsedStmt.TEMP_TABLE_NAME,
-                            "", col.m_alias,
-                            tve, outputColumnIndex);
-                    top_schema_col = new SchemaColumn(
-                            AbstractParsedStmt.TEMP_TABLE_NAME,
-                            AbstractParsedStmt.TEMP_TABLE_NAME,
-                            "", col.m_alias,
-                            tve, outputColumnIndex);
-
-                    /*
-                     * Special case count(*), count(), sum(), min() and max() to
-                     * push them down to each partition. It will do the
-                     * push-down if the select columns only contains the listed
-                     * aggregate operators and other group-by columns. If the
-                     * select columns includes any other aggregates, it will not
-                     * do the push-down. - nshi
-                     */
-                    if (topAggNode != null) {
-                        ExpressionType top_expression_type = agg_expression_type;
-                        /*
-                         * For count(*), count() and sum(), the pushed-down
-                         * aggregate node doesn't change. An extra sum()
-                         * aggregate node is added to the coordinator to sum up
-                         * the numbers from all the partitions. The input schema
-                         * and the output schema of the sum() aggregate node is
-                         * the same as the output schema of the push-down
-                         * aggregate node.
-                         *
-                         * If DISTINCT is specified, don't do push-down for
-                         * count() and sum() when not group by partition column.
-                         * An exception is the aggregation arguments are the
-                         * partition column (ENG-4980).
-                         */
-                        if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
-                            agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
-                            agg_expression_type == ExpressionType.AGGREGATE_SUM) {
-                            if (is_distinct &&
-                                    ! (m_parsedSelect.hasPartitionColumnInGroupby() ||
-                                            canPushDownDistinctAggregation((AggregateExpression)rootExpr) ) ) {
-                                topAggNode = null;
-                            }
-                            else {
-                                // for aggregate distinct when group by
-                                // partition column, the top aggregate node
-                                // will be dropped later, thus there is no
-                                // effect to assign the top_expression_type.
-                                top_expression_type = ExpressionType.AGGREGATE_SUM;
-                            }
-                        }
-                        /*
-                         * For min() and max(), the pushed-down aggregate node
-                         * doesn't change. An extra aggregate node of the same
-                         * type is added to the coordinator. The input schema
-                         * and the output schema of the top aggregate node is
-                         * the same as the output schema of the pushed-down
-                         * aggregate node.
-                         *
-                         * APPROX_COUNT_DISTINCT can be similarly pushed down, but
-                         * must be split into two different functions, which is
-                         * done later, from pushDownAggregate().
-                         */
-                        else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
-                                 agg_expression_type != ExpressionType.AGGREGATE_MAX &&
-                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
-                            /*
-                             * Unsupported aggregate for push-down (AVG for example).
-                             */
-                            topAggNode = null;
-                        }
-
-                        if (topAggNode != null) {
-                            /*
-                             * Input column of the top aggregate node is the
-                             * output column of the push-down aggregate node
-                             */
-                            boolean topDistinctFalse = false;
-                            topAggNode.addAggregate(top_expression_type,
-                                    topDistinctFalse, outputColumnIndex, tve);
-                        }
-                    }// end if we have a top agg node
-                }
-                else {
-                    // All complex aggregations have been simplified,
-                    // cases like "MAX(counter)+1" or "MAX(col)/MIN(col)"
-                    // has already been broken down.
-                    assert( ! rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class));
-
-                    /*
-                     * These columns are the pass through columns that are not being
-                     * aggregated on. These are the ones from the SELECT list. They
-                     * MUST already exist in the child node's output. Find them and
-                     * add them to the aggregate's output.
-                     */
-                    schema_col = new SchemaColumn(
-                            col.m_tableName, col.m_tableAlias,
-                            col.m_columnName, col.m_alias,
-                            col.m_expression,
-                            outputColumnIndex);
-                    AbstractExpression topExpr = null;
-                    if (col.m_groupBy) {
-                        topExpr = m_parsedSelect.m_groupByExpressions.get(col.m_alias);
-                    }
-                    else {
-                        topExpr = col.m_expression;
-                    }
-                    top_schema_col = new SchemaColumn(
-                            col.m_tableName, col.m_tableAlias,
-                            col.m_columnName, col.m_alias,
-                            topExpr, outputColumnIndex);
-                }
-
-                agg_schema.addColumn(schema_col);
-                top_agg_schema.addColumn(top_schema_col);
-            }// end for each ParsedColInfo in m_aggResultColumns
-
-            for (ParsedColInfo col : m_parsedSelect.groupByColumns()) {
-                aggNode.addGroupByExpression(col.m_expression);
-
-                if (topAggNode != null) {
-                    topAggNode.addGroupByExpression(m_parsedSelect.m_groupByExpressions.get(col.m_alias));
-                }
-            }
-            aggNode.setOutputSchema(agg_schema);
-            if (topAggNode != null) {
-                if (m_parsedSelect.hasComplexGroupby()) {
-                    topAggNode.setOutputSchema(top_agg_schema);
-                }
-                else {
-                    topAggNode.setOutputSchema(agg_schema);
-                }
+            if (isLargeQuery() &&
+                    (( aggNode.getPlanNodeType() != PlanNodeType.AGGREGATE )
+                      || ((topAggNode != null) && ( topAggNode.getPlanNodeType() != PlanNodeType.AGGREGATE)))) {
+                throw new PlanningErrorException("Internal Error: Hash or partial aggregation in planning for large temp tables.");
             }
 
             // Never push down aggregation for MV fix case.
@@ -2880,9 +2755,222 @@ public class PlanAssembler {
         return handleDistinctWithGroupby(root);
     }
 
+    private AggregatePlanNode calculateAggregateSchemasAndOperators(AggregatePlanNode aggNode, AggregatePlanNode topAggNode) {
+        NodeSchema agg_schema = new NodeSchema();
+        NodeSchema top_agg_schema = new NodeSchema();
+
+        for ( int outputColumnIndex = 0;
+                outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
+                outputColumnIndex += 1) {
+            ParsedColInfo col = m_parsedSelect.m_aggResultColumns.get(outputColumnIndex);
+            AbstractExpression rootExpr = col.m_expression;
+            AbstractExpression agg_input_expr = null;
+            SchemaColumn schema_col = null;
+            SchemaColumn top_schema_col = null;
+            if (rootExpr instanceof AggregateExpression) {
+                ExpressionType agg_expression_type = rootExpr.getExpressionType();
+                agg_input_expr = rootExpr.getLeft();
+
+                // A bit of a hack: ProjectionNodes after the
+                // aggregate node need the output columns here to
+                // contain TupleValueExpressions (effectively on a temp table).
+                // So we construct one based on the output of the
+                // aggregate expression, the column alias provided by HSQL,
+                // and the offset into the output table schema for the
+                // aggregate node that we're computing.
+                // Oh, oh, it's magic, you know..
+                TupleValueExpression tve = new TupleValueExpression(
+                        AbstractParsedStmt.TEMP_TABLE_NAME,
+                        AbstractParsedStmt.TEMP_TABLE_NAME,
+                        "", col.m_alias,
+                        rootExpr, outputColumnIndex);
+                tve.setDifferentiator(col.m_differentiator);
+
+                boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
+                aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
+                schema_col = new SchemaColumn(
+                        AbstractParsedStmt.TEMP_TABLE_NAME,
+                        AbstractParsedStmt.TEMP_TABLE_NAME,
+                        "", col.m_alias,
+                        tve, outputColumnIndex);
+                top_schema_col = new SchemaColumn(
+                        AbstractParsedStmt.TEMP_TABLE_NAME,
+                        AbstractParsedStmt.TEMP_TABLE_NAME,
+                        "", col.m_alias,
+                        tve, outputColumnIndex);
+
+                /*
+                 * Special case count(*), count(), sum(), min() and max() to
+                 * push them down to each partition. It will do the
+                 * push-down if the select columns only contains the listed
+                 * aggregate operators and other group-by columns. If the
+                 * select columns includes any other aggregates, it will not
+                 * do the push-down. - nshi
+                 */
+                if (topAggNode != null) {
+                    ExpressionType top_expression_type = agg_expression_type;
+                    /*
+                     * For count(*), count() and sum(), the pushed-down
+                     * aggregate node doesn't change. An extra sum()
+                     * aggregate node is added to the coordinator to sum up
+                     * the numbers from all the partitions. The input schema
+                     * and the output schema of the sum() aggregate node is
+                     * the same as the output schema of the push-down
+                     * aggregate node.
+                     *
+                     * If DISTINCT is specified, don't do push-down for
+                     * count() and sum() when not group by partition column.
+                     * An exception is the aggregation arguments are the
+                     * partition column (ENG-4980).
+                     */
+                    if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
+                        agg_expression_type == ExpressionType.AGGREGATE_COUNT ||
+                        agg_expression_type == ExpressionType.AGGREGATE_SUM) {
+                        if (is_distinct &&
+                                ! (m_parsedSelect.hasPartitionColumnInGroupby() ||
+                                        canPushDownDistinctAggregation((AggregateExpression)rootExpr) ) ) {
+                            topAggNode = null;
+                        }
+                        else {
+                            // for aggregate distinct when group by
+                            // partition column, the top aggregate node
+                            // will be dropped later, thus there is no
+                            // effect to assign the top_expression_type.
+                            top_expression_type = ExpressionType.AGGREGATE_SUM;
+                        }
+                    }
+                    /*
+                     * For min() and max(), the pushed-down aggregate node
+                     * doesn't change. An extra aggregate node of the same
+                     * type is added to the coordinator. The input schema
+                     * and the output schema of the top aggregate node is
+                     * the same as the output schema of the pushed-down
+                     * aggregate node.
+                     *
+                     * APPROX_COUNT_DISTINCT can be similarly pushed down, but
+                     * must be split into two different functions, which is
+                     * done later, from pushDownAggregate().
+                     */
+                    else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
+                             agg_expression_type != ExpressionType.AGGREGATE_MAX &&
+                             agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
+                        /*
+                         * Unsupported aggregate for push-down (AVG for example).
+                         */
+                        topAggNode = null;
+                    }
+
+                    if (topAggNode != null) {
+                        /*
+                         * Input column of the top aggregate node is the
+                         * output column of the push-down aggregate node
+                         */
+                        boolean topDistinctFalse = false;
+                        topAggNode.addAggregate(top_expression_type,
+                                topDistinctFalse, outputColumnIndex, tve);
+                    }
+                }// end if we have a top agg node
+            }
+            else {
+                // All complex aggregations have been simplified,
+                // cases like "MAX(counter)+1" or "MAX(col)/MIN(col)"
+                // has already been broken down.
+                assert( ! rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class));
+
+                /*
+                 * These columns are the pass through columns that are not being
+                 * aggregated on. These are the ones from the SELECT list. They
+                 * MUST already exist in the child node's output. Find them and
+                 * add them to the aggregate's output.
+                 */
+                schema_col = new SchemaColumn(
+                        col.m_tableName, col.m_tableAlias,
+                        col.m_columnName, col.m_alias,
+                        col.m_expression,
+                        outputColumnIndex);
+                AbstractExpression topExpr = null;
+                if (col.m_groupBy) {
+                    topExpr = m_parsedSelect.m_groupByExpressions.get(col.m_alias);
+                }
+                else {
+                    topExpr = col.m_expression;
+                }
+                top_schema_col = new SchemaColumn(
+                        col.m_tableName, col.m_tableAlias,
+                        col.m_columnName, col.m_alias,
+                        topExpr, outputColumnIndex);
+            }
+
+            agg_schema.addColumn(schema_col);
+            top_agg_schema.addColumn(top_schema_col);
+        }// end for each ParsedColInfo in m_aggResultColumns
+
+        for (ParsedColInfo col : m_parsedSelect.groupByColumns()) {
+            aggNode.addGroupByExpression(col.m_expression);
+
+            if (topAggNode != null) {
+                topAggNode.addGroupByExpression(m_parsedSelect.m_groupByExpressions.get(col.m_alias));
+            }
+        }
+        aggNode.setOutputSchema(agg_schema);
+        if (topAggNode != null) {
+            if (m_parsedSelect.hasComplexGroupby()) {
+                topAggNode.setOutputSchema(top_agg_schema);
+            }
+            else {
+                topAggNode.setOutputSchema(agg_schema);
+            }
+        }
+        return topAggNode;
+    }
+
+    public Pair<AggregatePlanNode, AggregatePlanNode> makeAggregateNodes(AbstractPlanNode root,
+                                                                         IndexGroupByInfo gbInfo) {
+        AggregatePlanNode aggNode;
+        AggregatePlanNode topAggNode = null;
+        boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
+
+        // Construct the aggregate nodes
+        if (needHashAgg) {
+            // Belt and suspenders.
+            assert( ! isLargeQuery() );
+            if ( m_parsedSelect.m_mvFixInfo.needed() ) {
+                // TODO: may optimize this edge case in future
+                aggNode = new HashAggregatePlanNode();
+            }
+            else {
+                if (gbInfo.isChangedToSerialAggregate()) {
+                    assert(root instanceof ReceivePlanNode);
+                    aggNode = new AggregatePlanNode();
+                }
+                else if (gbInfo.isChangedToPartialAggregate()) {
+                    assert ( ! isLargeQuery() );
+                    aggNode = new PartialAggregatePlanNode(gbInfo.m_coveredGroupByColumns);
+                }
+                else {
+                    assert( ! isLargeQuery() );
+                    aggNode = new HashAggregatePlanNode();
+                }
+
+                assert( ! isLargeQuery() );
+                topAggNode = new HashAggregatePlanNode();
+            }
+        }
+        else {
+            aggNode = new AggregatePlanNode();
+
+            if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
+                topAggNode = new AggregatePlanNode();
+            }
+        }
+
+        topAggNode = calculateAggregateSchemasAndOperators(aggNode, topAggNode);
+        return Pair.of(aggNode, topAggNode);
+    }
+
     private AbstractPlanNode forceSwitchToSerialAccess(AbstractPlanNode root,
-                                           IndexGroupByInfo gbInfo) {
-        %%%;
+                                                       IndexGroupByInfo gbInfo) {
+        // %%%;
         return root;
     }
 
@@ -3560,64 +3648,5 @@ public class PlanAssembler {
 
     boolean isLargeQuery() {
         return m_isLargeQuery;
-    }
-
-    private class TopAndBottomAggregatePair {
-        private AbstractPlanNode root;
-        private IndexGroupByInfo gbInfo;
-        private boolean needHashAgg;
-        private AggregatePlanNode topAggNode;
-        private AggregatePlanNode aggNode;
-
-        public TopAndBottomAggregatePair(AbstractPlanNode root,
-                                         IndexGroupByInfo gbInfo,
-                                         boolean needHashAgg) {
-            this.root = root;
-            this.gbInfo = gbInfo;
-            this.needHashAgg = needHashAgg;
-            this.topAggNode = topAggNode;
-        }
-
-        public AggregatePlanNode getAggNode() {
-            return aggNode;
-        }
-
-        public AggregatePlanNode getTopAggNode() {
-            return topAggNode;
-        }
-
-        public TopAndBottomAggregatePair invoke() {
-            // Construct the aggregate nodes
-            if (needHashAgg) {
-                // Belt and suspenders.
-                assert( ! isLargeQuery() );
-                if ( m_parsedSelect.m_mvFixInfo.needed() ) {
-                    // TODO: may optimize this edge case in future
-                    aggNode = new HashAggregatePlanNode();
-                }
-                else {
-                    if (gbInfo.isChangedToSerialAggregate()) {
-                        assert(root instanceof ReceivePlanNode);
-                        aggNode = new AggregatePlanNode();
-                    }
-                    else if (gbInfo.isChangedToPartialAggregate()) {
-                        aggNode = new PartialAggregatePlanNode(gbInfo.m_coveredGroupByColumns);
-                    }
-                    else {
-                        aggNode = new HashAggregatePlanNode();
-                    }
-
-                    topAggNode = new HashAggregatePlanNode();
-                }
-            }
-            else {
-                aggNode = new AggregatePlanNode();
-
-                if ( ! m_parsedSelect.m_mvFixInfo.needed()) {
-                    topAggNode = new AggregatePlanNode();
-                }
-            }
-            return this;
-        }
     }
 }
