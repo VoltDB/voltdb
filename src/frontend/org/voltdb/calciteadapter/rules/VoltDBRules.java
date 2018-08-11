@@ -102,6 +102,8 @@ public class VoltDBRules {
             , VoltDBPLimitExchangeTransposeRule.INSTANCE_DISTRIBUTION_SINGLE
             , VoltDBPSortExchangeTransposeRule.INSTANCE
             , VoltDBPAggregateExchangeTransposeRule.INSTANCE_1
+            , VoltDBPAggregateExchangeTransposeRule.INSTANCE_2
+            , VoltDBPAggregateExchangeTransposeRule.INSTANCE_3
     };
 
     public static RelOptRule[] INLINING_RULES = {
@@ -113,7 +115,7 @@ public class VoltDBRules {
             , VoltDBPCalcAggregateMergeRule.INSTANCE
             , VoltDBPCalcScanMergeRule.INSTANCE
             , VoltDBPLimitSortMergeRule.INSTANCE_1
-//            , VoltDBPLimitSortMergeRule.INSTANCE_2
+            , VoltDBPLimitSortMergeRule.INSTANCE_2
             , VoltDBPAggregateScanMergeRule.INSTANCE
             , VoltDBPLimitScanMergeRule.INSTANCE_1
             , VoltDBPLimitScanMergeRule.INSTANCE_2
