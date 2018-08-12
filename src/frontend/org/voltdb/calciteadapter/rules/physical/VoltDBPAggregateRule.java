@@ -67,11 +67,11 @@ public class VoltDBPAggregateRule extends RelOptRule {
             call.transformTo(hashAggr);
         }
 
-        // Transform to a physical Serial Aggregate with an enforcer - A Sort rel which collation
-        // matches the aggreagte's GROUP BY columns (for now)
+        // Transform to a physical Serial Aggregate. To enforce a required ordering add a collation
+        // that matches the aggreagte's GROUP BY columns (for now) to the aggregate's input.
+        // Calcite will create a sort relation out of it
         if (hasGroupBy(aggregate)) {
             RelCollation groupByCollation = buildGroupByCollation(aggregate);
-            convertedAggrTraits = convertedAggrTraits.plus(groupByCollation);
             convertedInputTraits = convertedInputTraits.plus(groupByCollation);
         }
         RelNode convertedSerialAggrInput = convert(input, convertedInputTraits);

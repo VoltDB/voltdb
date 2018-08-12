@@ -62,10 +62,10 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode postPredicate,
-            int splitCOunt) {
+            int splitCount) {
       super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
       m_postPredicate = postPredicate;
-      m_splitCount = splitCOunt;
+      m_splitCount = splitCount;
     }
 
     @Override
@@ -124,6 +124,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
      * @param groupSets
      * @param aggCalls
      * @param postPredicate
+     * @param splitCount
      * @return
      */
     public abstract AbstractVoltDBPAggregate copy(
@@ -134,7 +135,8 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate);
+            RexNode postPredicate,
+            int splitCount);
 
     protected abstract AggregatePlanNode getAggregatePlanNode();
 

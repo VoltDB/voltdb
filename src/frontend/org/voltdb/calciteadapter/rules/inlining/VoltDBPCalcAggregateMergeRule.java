@@ -64,7 +64,8 @@ public class VoltDBPCalcAggregateMergeRule extends RelOptRule {
                 aggregate.getGroupSet(),
                 aggregate.getGroupSets(),
                 aggregate.getAggCallList(),
-                conditionExpr);
+                conditionExpr,
+                aggregate.getSplitCount());
 
         RexProgramBuilder programBuilder = RexProgramBuilder
                 .forProgram(program, calc.getCluster().getRexBuilder(), false);

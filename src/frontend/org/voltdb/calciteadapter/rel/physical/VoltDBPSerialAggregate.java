@@ -97,27 +97,6 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate) {
-        return new VoltDBPSerialAggregate(
-                cluster,
-                traitSet,
-                input,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                postPredicate,
-                m_splitCount);
-    }
-
-    public VoltDBPSerialAggregate copy(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls,
             RexNode postPredicate,
             int splitCount) {
         return new VoltDBPSerialAggregate(
