@@ -15,8 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef FATALEXCEPTION_HPP_
-#define FATALEXCEPTION_HPP_
+#pragma once
 
 #include <cstdio>
 #include <ostream>
@@ -27,37 +26,62 @@
 
 #include "common/debuglog.h"
 
-#define throwFatalException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::FatalException( reallysuperbig_nonce_message, __FILE__, __LINE__); }
+#define throwFatalException(...) {                                                 \
+   char reallysuperbig_nonce_message[8192];                                        \
+   snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__);                      \
+   throw voltdb::FatalException(reallysuperbig_nonce_message, __FILE__, __LINE__); \
+}
+
+#define __crash_volt_with_fatal_exception__(topend, ...) {                         \
+   char reallysuperbig_nonce_message[8192];                                        \
+   snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__);                      \
+   topend.crashVoltDB(voltdb::FatalException(reallysuperbig_nonce_message,         \
+            __FILE__, __LINE__));                                                  \
+}
+
 #define HACK_HARDCODED_BACKTRACE_PATH "/tmp/voltdb_backtrace.txt"
 
 namespace voltdb {
-class FatalException {
-public:
-    /**
-     * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
-     *
-     */
-    FatalException(std::string message, const char *filename, unsigned long lineno,
-                   std::string backtrace_path = HACK_HARDCODED_BACKTRACE_PATH);
-
-    void reportAnnotations(const std::string& str);
-
-    const std::string m_reason;
+class FatalException : public std::runtime_error {
+    std::string m_reason;
     const char *m_filename;
     const unsigned long m_lineno;
     const std::string m_backtracepath;
+    FILE* m_bt;
     std::vector<std::string> m_traces;
-};
-
-
-inline std::ostream& operator<<(std::ostream& out, const FatalException& fe)
-{
-    out << fe.m_reason << fe.m_filename << ':' << fe.m_lineno << std::endl;
-    for (int ii=0; ii < fe.m_traces.size(); ii++) {
-        out << fe.m_traces[ii] << std::endl;
+protected:
+    void setTraces(std::vector<std::string> const& traces) {
+       m_traces = traces;
     }
-    return out;
-}
+public:
+    /**
+     * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
+     */
+    FatalException(std::string const& message, const char *filename, unsigned long lineno,
+                   std::string const& backtrace_path = HACK_HARDCODED_BACKTRACE_PATH);
+    ~FatalException() {
+       fclose(m_bt);
+    }
+    void appendReason(const std::string& app) {
+       m_reason.append(app);
+    }
+    void reportAnnotations(const std::string& str);
+    const char* what() const noexcept {
+       return m_reason.c_str();
+    }
+    const unsigned long lineno() const {
+       return m_lineno;
+    }
+    const char* filename() const {
+       return m_filename;
+    }
+    const char* backtracepath() const {
+       return m_backtracepath.c_str();
+    }
+    const std::vector<std::string>& traces() const {
+       return m_traces;
+    }
+};
 
 //TODO: The long-term intent is that there be a ubiquitous exception class that can be thrown from anywhere we
 // detect evidence of a significant bug -- worth reporting and crashing the executable, exporting any remotely
@@ -78,47 +102,23 @@ inline std::ostream& operator<<(std::ostream& out, const FatalException& fe)
 // Instead, FatalException functionality is accessed via a data member that never actually gets thrown/caught.
 // In contrast, std::runtime_error is working out well as a base class, in the normal case when (re)throw goes uncaught.
 
-// Macro-ized base class to aid experimentation
-#define FatalLogicErrorBase std::runtime_error
-// This is how FatalLogicError ctors initialize their base class.
-#define FatalLogicErrorBaseInitializer(NAME) FatalLogicErrorBase(NAME)
-
-class FatalLogicError : public FatalLogicErrorBase {
+class FatalLogicError : public FatalException {
 public:
-// ctor wrapper macro supports caller's __FILE__ and __LINE__ and any number of printf-like __VARARGS__ arguments
-#define throwFatalLogicErrorFormatted(...) { \
-    char reallysuperbig_nonce_message[8192]; \
-    snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); \
-    throw voltdb::FatalLogicError(reallysuperbig_nonce_message, __FILE__, __LINE__); }
-
     FatalLogicError(const char* buffer, const char *filename, unsigned long lineno);
-
-// ctor wrapper macro supports caller's __FILE__ and __LINE__ and any number of STREAMABLES separated by '<<'
-#define throwFatalLogicErrorStreamed(STREAMABLES) { \
-    std::ostringstream tFLESbuffer; tFLESbuffer << STREAMABLES << std::endl; \
-    throw voltdb::FatalLogicError(tFLESbuffer.str(), __FILE__, __LINE__); }
-
-    FatalLogicError(const std::string buffer, const char *filename, unsigned long lineno);
-
-    ~FatalLogicError() throw (); // signature required by exception base class?
-
-// member function wrapper macro supports any number of STREAMABLES separated by '<<'
-#define appendAnnotationToFatalLogicError(ERROR_AS_CAUGHT, STREAMABLES) { \
-    std::ostringstream aATFLEbuffer; \
-    aATFLEbuffer << "rethrown from " << __FILE__ << ':' << __LINE__ << ':' << STREAMABLES << std::endl; \
-    ERROR_AS_CAUGHT.appendAnnotation(aATFLEbuffer.str()); }
-
+    FatalLogicError(const std::string& buffer, const char *filename, unsigned long lineno);
     void appendAnnotation(const std::string& buffer);
 
-    virtual const char* what() const throw();
-
-private:
-    void initWhat();
-
-    // FatalLogicError(const voltdb::FatalLogicError&); // Purposely undefined.
-
-    FatalException m_fatality;
-    std::string m_whatwhat;
+// ctor wrapper macro supports caller's __FILE__ and __LINE__ and any number of STREAMABLES separated by '<<'
+#define throwFatalLogicErrorStreamed(STREAMABLES) {                          \
+    std::ostringstream tFLESbuffer; tFLESbuffer << STREAMABLES << std::endl; \
+    throw voltdb::FatalLogicError(tFLESbuffer.str(), __FILE__, __LINE__);    \
+}
+// member function wrapper macro supports any number of STREAMABLES separated by '<<'
+#define appendAnnotationToFatalLogicError(ERROR_AS_CAUGHT, STREAMABLES) {                               \
+    std::ostringstream aATFLEbuffer;                                                                    \
+    aATFLEbuffer << "rethrown from " << __FILE__ << ':' << __LINE__ << ':' << STREAMABLES << std::endl; \
+    ERROR_AS_CAUGHT.appendAnnotation(aATFLEbuffer.str());                                               \
+}
 };
 
 //
@@ -244,4 +244,3 @@ extern int control_ignore_or_throw_fatal_or_crash_123;
                                        STREAMABLES)
 
 }
-#endif /* FATALEXCEPTION_HPP_ */

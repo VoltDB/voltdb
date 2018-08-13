@@ -130,9 +130,8 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
             try {
                 temp_tuple.setNValue(ctr, params[m_allParamArray[ctr]]);
             } catch (SQLException& ex) {
-                std::string errorMsg = ex.message()
-                                    + " '" + (m_outputTable -> getColumnNames()).at(ctr) + "'";
-
+                std::string errorMsg(ex.what());
+                errorMsg.append(" '").append(m_outputTable -> getColumnNames().at(ctr)).append("'");
                 throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
             }
         }
@@ -145,9 +144,8 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
             try {
                 temp_tuple.setNValue(ctr, m_expressionArray[ctr]->eval(&dummy, NULL));
             } catch (SQLException& ex) {
-                std::string errorMsg = ex.message()
-                                    + " '" + (m_outputTable -> getColumnNames()).at(ctr) + "'";
-
+                std::string errorMsg(ex.what());
+                errorMsg.append(" '").append(m_outputTable -> getColumnNames().at(ctr)).append("'");
                 throw SQLException(ex.getSqlState(), errorMsg, ex.getInternalFlags());
             }
         }

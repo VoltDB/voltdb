@@ -24,41 +24,46 @@ using std::string;
 
 ConstraintFailureException::ConstraintFailureException(
         Table *table,
-        TableTuple tuple,
-        TableTuple otherTuple,
-        ConstraintType type,
+        TableTuple const& tuple,
+        TableTuple const& otherTuple,
+        ConstraintType const& type,
         PersistentTableSurgeon *surgeon) :
-    SQLException(
-            SQLException::integrity_constraint_violation,
+    SQLException(SQLException::integrity_constraint_violation,
             "Attempted violation of constraint",
             VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
-    m_table(table),
-    m_tuple(tuple),
-    m_otherTuple(otherTuple),
-    m_type(type),
-    m_surgeon(surgeon)
-{
+    m_table(table), m_tuple(tuple), m_otherTuple(otherTuple),
+    m_type(type), m_surgeon(surgeon) {
     assert(table);
     assert(!tuple.isNullTuple());
+    m_message.append(enrichedMessage(m_type, m_table->name(), m_tuple, m_otherTuple));
 }
 
-ConstraintFailureException::ConstraintFailureException(
-        Table *table,
-        TableTuple tuple,
-        string message,
-        PersistentTableSurgeon *surgeon) :
-        SQLException(
-                SQLException::integrity_constraint_violation,
-                message,
-                VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
-    m_table(table),
-    m_tuple(tuple),
-    m_otherTuple(TableTuple()),
-    m_type(CONSTRAINT_TYPE_PARTITIONING),
-    m_surgeon(surgeon)
-{
+std::string ConstraintFailureException::enrichedMessage(
+      ConstraintType const& type, std::string const& tblName,
+      TableTuple const& curTuple, TableTuple const& otherTuple) {
+   std::string s("\nConstraint violation type: ");
+   s.append(constraintutil::getTypeName(type))
+      .append("\non table: ")
+      .append(tblName)
+      .append("\nNew tuple:\n\t")
+      .append(curTuple.debug(tblName));
+    if (! otherTuple.isNullTuple()) {
+       s.append("\nOriginal tuple:\n\t")
+          .append(otherTuple.debug(tblName));
+    }
+    s.append("\n");
+    return s;
+}
+
+ConstraintFailureException::ConstraintFailureException(Table *table, TableTuple const& tuple,
+      string const& message, PersistentTableSurgeon *surgeon) :
+   SQLException(SQLException::integrity_constraint_violation,
+         message, VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
+    m_table(table), m_tuple(tuple), m_otherTuple(TableTuple()),
+    m_type(CONSTRAINT_TYPE_PARTITIONING), m_surgeon(surgeon) {
     assert(table);
     assert(!tuple.isNullTuple());
+    m_message.append(enrichedMessage(m_type, m_table->name(), m_tuple, m_otherTuple));
 }
 
 void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) const {
@@ -78,29 +83,11 @@ void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) c
 ConstraintFailureException::~ConstraintFailureException() {
     // if delayed tuple deallocation for serialization (by passing in tableSurgeon),
     // do cleanup here
+    // TODO: it is very odd to do state cleanning inside an
+    // exception class.
     VOLT_DEBUG("ConstraintFailureException has table surgeon %s", ((m_surgeon!=NULL) ? "true": "false"));
     if (m_surgeon && !m_tuple.isNullTuple()) {
         m_surgeon->deleteTupleStorage(m_tuple);
     }
 }
 
-const string
-ConstraintFailureException::message() const
-{
-    // This should probably be an override of the << operator and then used here, but meh
-    string msg = SQLException::message();
-    msg.append("\nConstraint violation type: ");
-    string type_string = constraintutil::getTypeName(m_type);
-    msg.append(type_string);
-    msg.append("\non table: ");
-    msg.append(m_table->name());
-
-    msg.append("\nNew tuple:\n\t");
-    msg.append(m_tuple.debug(m_table->name()));
-    if (!m_otherTuple.isNullTuple()) {
-        msg.append("\nOriginal tuple:\n\t");
-        msg.append(m_otherTuple.debug(m_table->name()));
-    }
-    msg.append("\n");
-    return msg;
-}

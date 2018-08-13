@@ -26,7 +26,7 @@ namespace voltdb {
  * A log proxy implementation that logs all messages to stdout.
  */
 class StdoutLogProxy : public LogProxy {
-
+public:
     /**
      * Log a statement on behalf of the specified logger at the specified log level
      * @param LoggerId ID of the logger that received this statement

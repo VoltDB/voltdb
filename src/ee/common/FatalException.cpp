@@ -17,76 +17,48 @@
 
 #include "common/FatalException.hpp"
 
+#include <cassert>
 #include <cxxabi.h>   // for abi
 
 #ifdef MACOSX // mac os requires _XOPEN_SOURCE for ucontext for some reason
 #define _XOPEN_SOURCE
 #endif
 
-namespace voltdb {
-FatalException::FatalException(std::string message,
-                               const char *filename, unsigned long lineno,
-                               std::string backtrace_path)
-  : m_reason(message)
-  , m_filename(filename), m_lineno(lineno)
-  , m_backtracepath(backtrace_path)
-{
-    FILE *bt = fopen(m_backtracepath.c_str(), "a+");
+using namespace voltdb;
 
-    if (bt) {
-        StackTrace::printMangledAndUnmangledToFile(bt);
-        fclose(bt);
-    }
+FatalException::FatalException(std::string const& message,
+      const char *filename, unsigned long lineno,
+      std::string const& backtrace_path) :
+   std::runtime_error(message), m_reason(message), m_filename(filename),
+   m_lineno(lineno), m_backtracepath(backtrace_path),
+   m_bt(fopen(m_backtracepath.c_str(), "a")) {
+   if (m_bt == nullptr) {     // failed to open file for reporting: write to stderr
+      m_bt = stderr;
+   }
+   StackTrace::printMangledAndUnmangledToFile(m_bt);
 }
 
-void FatalException::reportAnnotations(const std::string& str)
-{
-    FILE *bt = fopen(m_backtracepath.c_str(), "a+");
-    if (!bt) {
-        return;
-    }
-    // append to backtrace file
-    fprintf(bt, "Additional annotations to the above Fatal Exception:\n%s", str.c_str());
-    fclose(bt);
+void FatalException::reportAnnotations(const std::string& str) {
+   // append to backtrace file
+   fprintf(m_bt, "Additional annotations to the above Fatal Exception:\n%s", str.c_str());
 }
 
-FatalLogicError::FatalLogicError(const std::string buffer, const char *filename, unsigned long lineno)
-  : FatalLogicErrorBaseInitializer("FatalLogicError")
-  , m_fatality(buffer, filename, lineno)
-{
-    initWhat();
-}
+FatalLogicError::FatalLogicError(const std::string& buffer, const char *filename, unsigned long lineno)
+  : FatalException(buffer, filename, lineno) { }
 
-FatalLogicError::~FatalLogicError() throw () {} // signature required by exception base class?
-
-void FatalLogicError::initWhat()
-{
-    std::ostringstream buffer;
-    buffer << m_fatality;
-    m_whatwhat = buffer.str();
-}
-
-void FatalLogicError::appendAnnotation(const std::string& buffer)
-{
-    m_whatwhat += buffer;
-    m_fatality.reportAnnotations(buffer);
-}
-
-const char* FatalLogicError::what() const throw()
-{
-    return m_whatwhat.c_str();
+void FatalLogicError::appendAnnotation(const std::string& buffer) {
+    appendReason(buffer);
+    reportAnnotations(buffer);
 }
 
 // Reset either or both of these control variables from the debugger to dynamically
 // control the error responses that depend on them.
-int control_assert_or_throw_fatal_or_crash_123 =
+int voltdb::control_assert_or_throw_fatal_or_crash_123 =
     /* assert             */ 1;  //default
     // throw fatal                            *-/ 2;
     // crash on the spot                      */ 3;
-int control_ignore_or_throw_fatal_or_crash_123 =
+int voltdb::control_ignore_or_throw_fatal_or_crash_123 =
     /* fall through to throw something softer */ 1;  //default
     // throw fatal        *-/ 2;
     // crash on the spot  */ 3;
 
-
-}
