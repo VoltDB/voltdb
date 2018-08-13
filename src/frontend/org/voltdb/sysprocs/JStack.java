@@ -25,15 +25,20 @@ import java.util.Map;
 
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.LocalMailbox;
 
 public class JStack extends VoltSystemProcedure {
     private static final VoltLogger JSTACK_LOG = new VoltLogger("JSTACK");
-
+    HostMessenger m_hostMessenger = new HostMessenger(new HostMessenger.Config(false), null, null);
     @Override
     public long[] getPlanFragmentIds() {
         return new long[]{};
@@ -47,45 +52,17 @@ public class JStack extends VoltSystemProcedure {
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String command)
     {
-        Process process = null;
-        List<String> processList = new ArrayList<String>();
         try {
             JSONObject jsObj = new JSONObject(command);
-            String hsIDs = jsObj.getString("hsId");
-            process = Runtime.getRuntime().exec("jps");
-            BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line = "";
-            while ((line = input.readLine()) != null) {
-                processList.add(line);
+            String[] hsIDs = jsObj.getString("hsId").split(",");
+            long[] hsID_arr = new long[hsIDs.length];
+            for(int i = 0 ; i < hsIDs.length ; i++) {
+                hsID_arr[i] = Long.parseLong(hsIDs[i]);
             }
-            input.close();    
+            m_hostMessenger.sendPoisonPillJStack(hsID_arr, "Send poison pill for JStack command.");          
         } catch (Exception e) {
             e.printStackTrace();
         }
-//
-//        List<String> stackTrace = new ArrayList<>();
-//        for (String line : processList) {
-//            String[] ss = line.split(" ");
-//            if(ss.length > 1 && ss[1].equals("VoltDB")) {
-//                int pid = Integer.parseInt(ss[0]);
-//                try {
-//                    Process pcsStackTrace = Runtime.getRuntime().exec("jstack " + pid);
-//                    BufferedReader input = new BufferedReader(new InputStreamReader(pcsStackTrace.getInputStream()));
-//                    stackTrace.add("--------------Stack trace for PID " + pid + "--------------");
-//                    String s = "";
-//                    while ((s = input.readLine()) != null) {
-//                        stackTrace.add(s);
-//                    }
-//                } catch (Exception e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }
-//
-//        for(String s : stackTrace) {
-//            JSTACK_LOG.info(s);
-//        }
-
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);
         return (new VoltTable[] {t});
