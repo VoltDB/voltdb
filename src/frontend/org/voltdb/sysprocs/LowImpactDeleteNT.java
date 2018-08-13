@@ -222,7 +222,13 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
         Object value = getValidatedValue(colType, valueStr);
 
         // always run nibble delete at least once
-        NibbleStatus status = runNibbleDeleteOperation(tableName, columnName, comparisonOp, value, chunksize, catTable.getIsreplicated());
+        NibbleStatus status = runNibbleDeleteOperation(
+                    tableName,
+                    columnName,
+                    comparisonOp,
+                    value,
+                    chunksize,
+                    catTable.getIsreplicated());
         long rowsLeft = status.rowsLeft;
         // If any partition receive failure, report the delete status plus the error message back.
         if (!status.errorMessages.isEmpty()) {
@@ -234,13 +240,12 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
         if (status.rowsJustDeleted == 0 && status.rowsLeft > 0) {
             throw new VoltAbortException(String.format(
                     "While removing tuples from table %s, first delete deleted zero tuples while %d"
-                  + " still met the criteria for delete. This is unexpected, but doesn't imply corrupt state.",
+                    + " still met the criteria for delete. This is unexpected, but doesn't imply corrupt state.",
                     catTable.getTypeName(), rowsLeft));
         }
 
-        int attemptsLeft = (int)Math.min((long)Math.ceil((double)rowsLeft/(double)chunksize), maxFrequency) - 1;
-        // no more try
-        if (attemptsLeft < 1) {
+        int attemptsLeft = (int)Math.min((long)Math.ceil((double)rowsLeft/(double)chunksize), (maxFrequency-1));
+        if (attemptsLeft == 0) {
             returnTable.addRow(status.rowsJustDeleted, rowsLeft, status.rowsJustDeleted, System.currentTimeMillis(),
                     ClientResponse.SUCCESS, "");
             return returnTable;
@@ -260,13 +265,19 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
             }
             @Override
             public void run() {
-                NibbleStatus thisStatus = runNibbleDeleteOperation(tableName, columnName, comparisonOp, value, chunksize, catTable.getIsreplicated());
+                NibbleStatus thisStatus = runNibbleDeleteOperation(
+                        tableName,
+                        columnName,
+                        comparisonOp,
+                        value,
+                        chunksize,
+                        catTable.getIsreplicated());
                 if (!thisStatus.errorMessages.isEmpty()) {
-                    errors[attempt-1] = thisStatus.errorMessages;
+                    errors[attempt] = thisStatus.errorMessages;
                     success.set(false);
                 } else {
                     status.rowsDeleted.addAndGet(thisStatus.rowsJustDeleted);
-                    if (attempt == attemptsLeft) {
+                    if (attempt == (attemptsLeft-1)) {
                         status.rowsLeft = thisStatus.rowsLeft;
                         status.rowsJustDeleted = thisStatus.rowsJustDeleted;
                     }
@@ -279,8 +290,8 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
         }
         status.rowsLeft = 0;
         status.rowsJustDeleted = 0;
-        int attempts = 1;
-        while (attempts <= attemptsLeft) {
+        int attempts = 0;
+        while (attempts < attemptsLeft) {
             DeleteTask task = new DeleteTask(attempts);
             es.schedule(task, delay * attempts, TimeUnit.MILLISECONDS);
             attempts++;
@@ -293,7 +304,11 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
             es.shutdownNow();
         }
 
-        returnTable.addRow(status.rowsDeleted, status.rowsLeft, status.rowsJustDeleted, System.currentTimeMillis(),
+        returnTable.addRow(
+                status.rowsDeleted,
+                status.rowsLeft,
+                status.rowsJustDeleted,
+                System.currentTimeMillis(),
                 success.get() ? ClientResponse.SUCCESS : ClientResponse.GRACEFUL_FAILURE,
                 success.get() ? "" : Arrays.toString(errors));
         return returnTable;

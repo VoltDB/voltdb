@@ -39,6 +39,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.utils.CatalogUtil;
 
 //schedule and process time-to-live feature via @LowImpactDeleteNT. The host with smallest host id
@@ -251,7 +252,7 @@ public class TTLManager extends StatsSource{
                 }
                 task = new TTLTask(t.getTypeName(), ttl, stats);
                 m_tasks.put(t.getTypeName(), task);
-                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY + random.nextInt((int)INTERVAL), INTERVAL, TimeUnit.MILLISECONDS));
+                m_futures.put(t.getTypeName(), m_timeToLiveExecutor.scheduleAtFixedRate(task, DELAY + random.nextInt(INTERVAL), INTERVAL, TimeUnit.MILLISECONDS));
                 hostLog.info(String.format(info + " has been scheduled.", t.getTypeName()));
             } else {
                 task.updateTask(ttl);
@@ -326,7 +327,9 @@ public class TTLManager extends StatsSource{
                             // The buffer limit for a DR transaction is 50M. If over the limit,
                             // the transaction will be aborted. The same is true for nibble delete transaction.
                             // If hit this error, no more data can be deleted in this TTL table.
-                            drLimitError = "TTL is disabled for this table.";
+                            drLimitError = "The transaction exceeds DR Buffer Limit of "
+                                        + MpTransactionState.DR_MAX_AGGREGATE_BUFFERSIZE
+                                        + " TTL is disabled for the table. Please change BATCH_SIZE to a smaller value.";
                             task.cancel();
                             ScheduledFuture<?> fut = m_futures.get(task.tableName);
                             if (fut != null) {
@@ -343,7 +346,7 @@ public class TTLManager extends StatsSource{
             }
         };
         cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, 1000 * 120, cb,
-                "@LowImpactDeleteNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<", task.getBatchSize(),
+                "@LowImpactDeleteNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
                         TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
             latch.await(1, TimeUnit.MINUTES);
