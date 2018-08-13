@@ -55,13 +55,15 @@ public class VoltDBPProject extends Project implements VoltDBPRel {
 
         /** Creates an VoltDBProject, specifying row type rather than field
          * names. */
-        public static VoltDBPProject create(final RelNode input,
-            final List<? extends RexNode> projects, RelDataType rowType) {
+        public static VoltDBPProject create(
+                final RelTraitSet traits,
+                final RelNode input,
+                final List<? extends RexNode> projects,
+                final RelDataType rowType) {
           final RelOptCluster cluster = input.getCluster();
           final RelMetadataQuery mq = RelMetadataQuery.instance();
           final RelTraitSet traitSet =
-              cluster.traitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL)
-                  .replaceIfs(RelCollationTraitDef.INSTANCE,
+                  traits.replaceIfs(RelCollationTraitDef.INSTANCE,
                       new Supplier<List<RelCollation>>() {
                         @Override
                         public List<RelCollation> get() {
