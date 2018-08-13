@@ -2690,6 +2690,31 @@ public class PlanAssembler {
         return null;
     }
 
+    private static class AggregatePlanNodes {
+        private AggregatePlanNode m_topAggNode;
+        private AggregatePlanNode m_aggNode;
+        private OrderByPlanNode   m_topOrderByNode;
+
+        public AggregatePlanNodes(AggregatePlanNode topAggNode,
+                                  AggregatePlanNode aggNode,
+                                  OrderByPlanNode   topOrderByNode) {
+            m_topAggNode     = topAggNode;
+            m_aggNode        = aggNode;
+            m_topOrderByNode = topOrderByNode;
+        }
+
+        public AggregatePlanNode getTopAggNode() {
+            return m_topAggNode;
+        }
+
+        public AggregatePlanNode getAggNode() {
+            return m_aggNode;
+        }
+
+        public OrderByPlanNode getTopOrderByNode() {
+            return m_topOrderByNode;
+        }
+    }
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         /* Check if any aggregate expressions are present */
 
@@ -2730,9 +2755,10 @@ public class PlanAssembler {
                 root = forceSwitchToSerialAccess(root, gbInfo);
             }
 
-            Pair<AggregatePlanNode, AggregatePlanNode> aggregateNodes = makeAggregateNodes(root, gbInfo);
-            AggregatePlanNode aggNode = aggregateNodes.getFirst();
-            AggregatePlanNode topAggNode = aggregateNodes.getSecond();
+            AggregatePlanNodes aggregateNodes = makeAggregateNodes(root, gbInfo);
+            AggregatePlanNode aggNode        = aggregateNodes.getAggNode();
+            AggregatePlanNode topAggNode     = aggregateNodes.getTopAggNode();
+            OrderByPlanNode   topOrderByNode = aggregateNodes.getTopOrderByNode();
 
             // It's a disaster to need hash aggregation if this is
             // a large temp table.  Note that aggNode may not be null,
@@ -2755,9 +2781,12 @@ public class PlanAssembler {
         return handleDistinctWithGroupby(root);
     }
 
-    private AggregatePlanNode calculateAggregateSchemasAndOperators(AggregatePlanNode aggNode, AggregatePlanNode topAggNode) {
-        NodeSchema agg_schema = new NodeSchema();
-        NodeSchema top_agg_schema = new NodeSchema();
+    private AggregatePlanNodes calculateAggregateSchemasAndOperators(AggregatePlanNodes aggNodes) {
+        AggregatePlanNode topAggNode      = aggNodes.getTopAggNode();
+        AggregatePlanNode aggNode         = aggNodes.getAggNode();
+        OrderByPlanNode   topOrderByNode  = aggNodes.getTopOrderByNode();
+        NodeSchema        agg_schema      = new NodeSchema();
+        NodeSchema        top_agg_schema  = new NodeSchema();
 
         for ( int outputColumnIndex = 0;
                 outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
@@ -2921,13 +2950,20 @@ public class PlanAssembler {
                 topAggNode.setOutputSchema(agg_schema);
             }
         }
-        return topAggNode;
+        return new AggregatePlanNodes(aggNode, topAggNode, topOrderByNode);
     }
 
-    public Pair<AggregatePlanNode, AggregatePlanNode> makeAggregateNodes(AbstractPlanNode root,
-                                                                         IndexGroupByInfo gbInfo) {
+    public AggregatePlanNodes makeAggregateNodes(AbstractPlanNode root,
+                                                 IndexGroupByInfo gbInfo) {
+        // This is the distributed node.
         AggregatePlanNode aggNode;
-        AggregatePlanNode topAggNode = null;
+        // This is the aggregate node for the coordinator.
+        // It may be null.
+        AggregatePlanNode topAggNode     = null;
+        // This is the orderby for large temp table serial aggregation
+        // when we can't find any other convenient and useful ordering.
+        OrderByPlanNode   topOrderByNode = null;
+
         boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
 
         // Construct the aggregate nodes
@@ -2964,8 +3000,7 @@ public class PlanAssembler {
             }
         }
 
-        topAggNode = calculateAggregateSchemasAndOperators(aggNode, topAggNode);
-        return Pair.of(aggNode, topAggNode);
+        return calculateAggregateSchemasAndOperators(new AggregatePlanNodes(aggNode, topAggNode, topOrderByNode));
     }
 
     private AbstractPlanNode forceSwitchToSerialAccess(AbstractPlanNode root,
