@@ -20,11 +20,13 @@ package org.voltdb.calciteadapter.rules.physical;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.Sort;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
+import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPSort;
 
@@ -54,8 +56,13 @@ public class VoltDBPSortConvertRule extends ConverterRule {
             RelNode input = sort.getInput();
             RelNode convertedInput = convert(input,
                     input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
-            int splitCount = (convertedInput instanceof VoltDBPRel) ?
-                    ((VoltDBPRel)convertedInput).getSplitCount() : 1;
+            RelTraitSet childTraits = convertedInput.getTraitSet();
+            RelDistribution childDistribution =
+                    (RelDistribution) childTraits.getTrait(RelDistributions.ANY.getTraitDef());
+            // If a RelDistribution trait is ANY then this Sort relation still sits above an Exchange node
+            // and its distribution is unknown yet. Set it simply to 1
+            int splitCount = (childDistribution.getType().equals(RelDistributions.ANY.getType())) ?
+                    1 : AbstractVoltDBPExchange.DISTRIBUTED_SPLIT_COUNT;
 
             RelNode newRel = new VoltDBPSort(
                                 sort.getCluster(),
