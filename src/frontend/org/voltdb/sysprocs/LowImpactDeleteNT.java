@@ -42,7 +42,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientResponseWithPartitionKey;
 
-public class LowImpactDelete extends VoltNTSystemProcedure {
+public class LowImpactDeleteNT extends VoltNTSystemProcedure {
     VoltLogger hostLog = new VoltLogger("HOST");
 
     public static enum ComparisonOperation {

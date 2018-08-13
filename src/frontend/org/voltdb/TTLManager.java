@@ -41,7 +41,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.CatalogUtil;
 
-//schedule and process time-to-live feature via @LowImpactDelete. The host with smallest host id
+//schedule and process time-to-live feature via @LowImpactDeleteNT. The host with smallest host id
 //will get the task done.
 public class TTLManager extends StatsSource{
 
@@ -343,7 +343,7 @@ public class TTLManager extends StatsSource{
             }
         };
         cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, 1000 * 120, cb,
-                "@LowImpactDelete", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<", task.getBatchSize(),
+                "@LowImpactDeleteNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<", task.getBatchSize(),
                         TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
             latch.await(1, TimeUnit.MINUTES);

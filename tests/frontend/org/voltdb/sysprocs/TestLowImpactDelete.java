@@ -187,7 +187,7 @@ public class TestLowImpactDelete extends TestCase {
     public void testMissingTable() throws Exception {
         // fail on missing table
         try {
-            m_client.callProcedure("@LowImpactDelete", "notable", "nocolumn", "75", "<", 1000, 2000, MAX_FREQUENCEY, INTERVAL);
+            m_client.callProcedure("@LowImpactDeleteNT", "notable", "nocolumn", "75", "<", 1000, 2000, MAX_FREQUENCEY, INTERVAL);
             fail();
         }
         catch (ProcCallException e) {
@@ -199,7 +199,7 @@ public class TestLowImpactDelete extends TestCase {
 
         // fail on missing column
         try {
-            m_client.callProcedure("@LowImpactDelete", "foo", "nocolumn", "75", "<", 1000, 2000, MAX_FREQUENCEY, INTERVAL);
+            m_client.callProcedure("@LowImpactDeleteNT", "foo", "nocolumn", "75", "<", 1000, 2000, MAX_FREQUENCEY, INTERVAL);
             fail();
         }
         catch (ProcCallException e) {
@@ -208,7 +208,7 @@ public class TestLowImpactDelete extends TestCase {
 
         // fail on improper type
         try {
-            m_client.callProcedure("@LowImpactDelete", "foo", "a", "stringdata", "<", 1000, 2000, MAX_FREQUENCEY, INTERVAL);
+            m_client.callProcedure("@LowImpactDeleteNT", "foo", "a", "stringdata", "<", 1000, 2000, MAX_FREQUENCEY, INTERVAL);
             fail();
         }
         catch (ProcCallException e) {
@@ -224,14 +224,14 @@ public class TestLowImpactDelete extends TestCase {
         VoltTable inputTable = createTable(numberOfItems, 0, 0, 0, 0);
         loadTable(m_client, "part", false, inputTable);
         loadTable(m_client, "rep", true, inputTable);
-        ClientResponse response = m_client.callProcedure("@LowImpactDelete", "part", "ts", "9000", "<", 500, 1000 * 1000, MAX_FREQUENCEY, INTERVAL);
+        ClientResponse response = m_client.callProcedure("@LowImpactDeleteNT", "part", "ts", "9000", "<", 500, 1000 * 1000, MAX_FREQUENCEY, INTERVAL);
         VoltTable result = response.getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
         long deleted = result.getLong("ROWS_DELETED");
         assertTrue (deleted == 1500);
 
-        response = m_client.callProcedure("@LowImpactDelete", "rep", "ts", "9000", "<", 500, 1000 * 1000, MAX_FREQUENCEY, INTERVAL);
+        response = m_client.callProcedure("@LowImpactDeleteNT", "rep", "ts", "9000", "<", 500, 1000 * 1000, MAX_FREQUENCEY, INTERVAL);
         result = response.getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
@@ -272,7 +272,7 @@ public class TestLowImpactDelete extends TestCase {
             while (now < end) {
                 ClientResponse response = null;
                 try {
-                    response = m_client.callProcedure("@LowImpactDelete", "part", "ts", "1000000000", "<", 10000, 1000 * 1000, 4, INTERVAL);
+                    response = m_client.callProcedure("@LowImpactDeleteNT", "part", "ts", "1000000000", "<", 10000, 1000 * 1000, 4, INTERVAL);
                 } catch (NoConnectionsException e) {
                     e.printStackTrace();
                 } catch (IOException e) {
