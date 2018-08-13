@@ -41,7 +41,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
-import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 
 public class NibbleDeleteBase extends VoltSystemProcedure {
 
