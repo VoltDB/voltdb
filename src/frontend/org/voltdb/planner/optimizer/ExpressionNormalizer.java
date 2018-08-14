@@ -17,6 +17,7 @@
 
 package org.voltdb.planner.optimizer;
 
+import org.voltdb.VoltType;
 import org.voltdb.expressions.*;
 import org.voltdb.types.ExpressionType;
 
@@ -48,9 +49,7 @@ public class ExpressionNormalizer {
      * @param e original expression
      */
     private ExpressionNormalizer(AbstractExpression e) {
-        if (e == null) {
-            m_normalizedExpression = null;
-        } else if (e instanceof ConstantValueExpression) {
+        if (isAtomicExpr(e)) {
             m_normalizedExpression = e;
         } else if (e instanceof ConjunctionExpression || e instanceof ComparisonExpression ||
                 e.getExpressionType().equals(ExpressionType.OPERATOR_NOT)) {    // <that is, the expression is boolean type>
@@ -81,8 +80,7 @@ public class ExpressionNormalizer {
                     return e;
                 }
             default:
-                //assert(e.getValueType() == VoltType.BOOLEAN);
-                assert(e instanceof ComparisonExpression || e instanceof ConjunctionExpression || e instanceof TupleValueExpression);
+                assert(e.getValueType() == VoltType.BOOLEAN);
                 return e instanceof ComparisonExpression && ! (e instanceof InComparisonExpression) ?
                         new ComparisonExpression(e.getExpressionType(),
                                 ArithmeticSimplifier.of(op, e.getLeft()),
@@ -91,13 +89,21 @@ public class ExpressionNormalizer {
         }
     }
     private static AbstractExpression reduce(AbstractExpression e, ConjunctionRelation rel) {
-        if (e instanceof ConstantValueExpression) {
-            return e;
-        } else {
-            return IntegerIntervalCombiner.combine(ArithmeticExpressionFlattener.apply(
-                    new ArithmeticExpressionFlattener(e, ArithOpType.PlusMinus),
-                    ExpressionNormalizer::createExpression), rel);
-        }
+        return isAtomicExpr(e) ? e :
+                IntegerIntervalCombiner.combine(ArithmeticExpressionFlattener.apply(
+                        new ArithmeticExpressionFlattener(e, ArithOpType.PlusMinus),
+                        ExpressionNormalizer::createExpression), rel);
+    }
+
+    /**
+     * Test whether expression may be further split and simplified
+     * @param e source expression
+     * @return whether expression may be further split and simplified
+     */
+    private static boolean isAtomicExpr(AbstractExpression e) {
+        return e == null || e instanceof ConstantValueExpression || e instanceof ParameterValueExpression ||
+                e instanceof TupleValueExpression || e instanceof FunctionExpression ||
+                e.getExpressionType() == ExpressionType.OPERATOR_IS_NULL;
     }
 
     /**

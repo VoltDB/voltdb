@@ -87,9 +87,18 @@ public class ConstantValueExpression extends AbstractValueExpression {
     @Override
     public boolean equivalent(AbstractExpression other) {
         if (other instanceof ConstantValueExpression) {
-            return equals(other);
+            if (m_isNull != ((ConstantValueExpression) other).m_isNull) {
+                return false;
+            } else if (equals(other)) {
+                return true;
+            } else if (getValueType().isNumber() && other.getValueType().isNumber()) {
+                return Double.valueOf(getValue())           // Special treatment of different number constants: as long as
+                        .equals(Double.valueOf(((ConstantValueExpression) other).getValue()));  // their values match
+            } else {
+                return false;
+            }
         } else if (other instanceof ParameterValueExpression) {
-            return equals(((ParameterValueExpression) other).getOriginalValue());
+            return equivalent(((ParameterValueExpression) other).getOriginalValue());
         } else {
             return false;
         }

@@ -140,6 +140,7 @@ public final class NormalizerUtil {
     static boolean isInt(AbstractExpression e) {
         return e != null && isLiteralConstant(e) &&
                 ! (e instanceof VectorValueExpression) &&
+                getNumberConstant(e).isPresent() &&         // when "cast(null as int)"
                 isInt(getNumberConstant(e).get());
     }
 
@@ -228,6 +229,23 @@ public final class NormalizerUtil {
         return Math.abs(lhs - rhs) < 1e-10;
     }
 
+    /**
+     * Checks whether the value type of expression type can possibly evaluate to boolean type.
+     * Excludes comparisons and conjunctions because they are taken care of by several classes together.
+     * @param op expression type
+     * @return whether the value type of expression type can possibly evaluate to boolean type.
+     */
+    static boolean isBoolean(ExpressionType op) {
+        switch (op) {
+            case FUNCTION:
+            case OPERATOR_EXISTS:
+            case OPERATOR_IS_NULL:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     static boolean evalComparison(ExpressionType cmp, float lhs, float rhs) {
         switch (cmp) {
             case COMPARE_EQUAL:
@@ -296,6 +314,25 @@ public final class NormalizerUtil {
             } else {
                 return left.equals(ExpressionType.COMPARE_GREATERTHAN) &&
                         right.equals(ExpressionType.COMPARE_LESSTHANOREQUALTO);
+            }
+        }
+
+        /**
+         * Some non-InComparison Comparisons cannot be reversed, like like.
+         * @param t expression type
+         * @return whether the argument expression type can be reversed
+         */
+        static boolean reversible(ExpressionType t) {
+            switch (t) {
+                case COMPARE_EQUAL:
+                case COMPARE_NOTEQUAL:
+                case COMPARE_GREATERTHAN:
+                case COMPARE_GREATERTHANOREQUALTO:
+                case COMPARE_LESSTHAN:
+                case COMPARE_LESSTHANOREQUALTO:
+                    return true;
+                default:
+                    return false;
             }
         }
 

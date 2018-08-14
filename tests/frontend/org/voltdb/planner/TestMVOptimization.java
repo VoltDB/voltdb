@@ -164,10 +164,9 @@ public class TestMVOptimization extends PlannerTestCase {
     public void testComplexGbyExpr() {  // test complex GBY expressions
         checkQueriesPlansAreTheSame("SELECT a * 2 + a1, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a * 2 + a1, b - a;",
                 "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4");
-        // negative test: equivalent but different expression
-        checkQueriesPlansAreDifferent("SELECT a1 + a * 2, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a1 + a * 2, b - a;",
-                "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4",
-                "GBY expression equivalent but different: should not match view");
+        // Now it could handle comparisons of equivalent but different expressions!
+        checkQueriesPlansAreTheSame("SELECT a1 + a * 2, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a1 + a * 2, b - a;",
+                "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4");
         // negative tests: SELECT stmt's display column contains aggregates on its group by column
         // Future improvements should rewrite the expression to match MV.
         assertMatch("SELECT ABS(WAGE), COUNT(*), MAX(ID), SUM(RENT), MIN(AGE),  COUNT(DEPT) FROM P2 M02  GROUP BY WAGE",
@@ -213,7 +212,7 @@ public class TestMVOptimization extends PlannerTestCase {
         assertMatch("SELECT distinct a1 distinct_a1, COUNT(b1) count_b1, SUM(a) sum_a, COUNT(*) counts " +
                 "FROM t1 WHERE b >= ? OR b1 IN (3, 30, 300) GROUP BY a1",
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" " +
-                        "(for deterministic order only) filter by ((B >= ?0) OR (B1 IN ANY (3, 30, 300))) " +
+                        "(for deterministic order only) filter by ((?0 <= B) OR (B1 IN ANY (3, 30, 300))) " +
                         "inline Hash AGGREGATION ops: COUNT(T1.B1), SUM(T1.A), COUNT(*)");
         // But could match when parameter is somewhere else.
         assertMatch("SELECT distinct a1 distinct_a1, COUNT(b1) count_b1, SUM(a) sum_a, COUNT(*) counts " +

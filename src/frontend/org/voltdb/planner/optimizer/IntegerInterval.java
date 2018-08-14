@@ -41,7 +41,7 @@ final class IntegerInterval implements OrderedInterval<Integer, IntegerInterval>
     private final int m_cardinality;
 
     private IntegerInterval(Number<Integer> lower, Number<Integer> upper) {
-        assert(lower.less(upper));
+        assert(lower.less(upper)) : lower.toString() + "<" + upper.toString();
         m_lower = lower;
         m_upper = upper;
         m_hasInf = m_lower.class_of() != Number.Classify.NORMAL || m_upper.class_of() != Number.Classify.NORMAL;

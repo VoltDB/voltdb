@@ -69,7 +69,7 @@ final class FilterMatcher {
             // Exception to the rule:
             // 1. CVE and PVE need to be translated before compared.
             // 2. Comparisons could be reversed, e.g. "a >= b" and "b <= a" are the same relation
-            return valueConstantsMatch(m_expr1, m_expr2) || revComparisonsMatch(m_expr1, m_expr2);
+            return m_expr1.equivalent(m_expr2) || revComparisonsMatch(m_expr1, m_expr2);
         } else if (m_expr1 instanceof ConstantValueExpression) {
             return m_expr1.equals(m_expr2);
         } else if (m_expr1 instanceof TupleValueExpression) {
@@ -116,18 +116,6 @@ final class FilterMatcher {
     }
 
     /**
-     * Value comparison between one CVE and one PVE.
-     * @param e1 first expression
-     * @param e2 second expression
-     * @return whether one is CVE, the other is PVE, and their values equal.
-     */
-    private static boolean valueConstantsMatch(AbstractExpression e1, AbstractExpression e2) {
-        return (e1 instanceof ParameterValueExpression && e2 instanceof ConstantValueExpression ||
-                e1 instanceof ConstantValueExpression && e2 instanceof ParameterValueExpression) &&
-                equalsAsCVE(e1, e2);
-    }
-
-    /**
      * Checks whether two expressions are comparisons, and are equivalent by reversing one, e.g. "a >= b" vs. "b <= a".
      * @param e1 First expression
      * @param e2 second expression
@@ -135,21 +123,10 @@ final class FilterMatcher {
      */
     private static boolean revComparisonsMatch(AbstractExpression e1, AbstractExpression e2) {
         return e1 instanceof ComparisonExpression &&
-                e1.getExpressionType() == ComparisonExpression.reverses.get(e2.getExpressionType()) &&
-                new FilterMatcher(((ComparisonExpression) e1).reverseOperator(), e2).match();
+               e1.getExpressionType() == ComparisonExpression.reverses.get(e2.getExpressionType()) &&
+              new FilterMatcher(((ComparisonExpression) e1).reverseOperator(), e2).match();
     }
 
-    /**
-     * Check whether two expressions, each either a CVE or PVE, have same content.
-     * \pre both must be either CVE or PVE.
-     * @param e1 first expression
-     * @param e2 second expression
-     * @return whether their contents match.
-     */
-    private static boolean equalsAsCVE(AbstractExpression e1, AbstractExpression e2) {
-        final ConstantValueExpression ce1 = asCVE(e1), ce2 = asCVE(e2);
-        return ce1 == null || ce2 == null ? ce1 == ce2 : ce1.equals(ce2);
-    }
     /**
      * Convert a ConstantValueExpression or ParameterValueExpression into a ConstantValueExpression.
      * \pre argument must be either of the two.

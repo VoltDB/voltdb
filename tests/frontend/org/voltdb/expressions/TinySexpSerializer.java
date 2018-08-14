@@ -47,7 +47,7 @@ public class TinySexpSerializer extends TestCase {
                 final Pair<String, String> split = scan(sexp.substring(sexp.indexOf(' '), sexp.lastIndexOf(')')));
                 return new OperatorExpression(sexp.startsWith("(! ") ?
                         ExpressionType.OPERATOR_NOT : ExpressionType.OPERATOR_UNARY_MINUS,
-                        deserialize(split.getFirst()), null);
+                        deserialize(split.getFirst()), null, 0);
             } else if (sexp.startsWith("(+ ") || sexp.startsWith("(- ") || sexp.startsWith("(* ") || sexp.startsWith("(/ ")) {
                 // arithmetic operations
                 final Pair<String, String> split = scan(sexp.substring(sexp.indexOf(' '), sexp.lastIndexOf(')')));
@@ -69,7 +69,7 @@ public class TinySexpSerializer extends TestCase {
                     default:
                         fail("Programing error");
                 }
-                return new OperatorExpression(type, deserialize(split.getFirst()), deserialize(split.getSecond()));
+                return new OperatorExpression(type, deserialize(split.getFirst()), deserialize(split.getSecond()), 0);
             } else if (sexp.startsWith("(&& ") || sexp.startsWith("(|| ")) {
                 final Pair<String, String> split = scan(sexp.substring(sexp.indexOf(' '), sexp.lastIndexOf(')')));
                 assertNotNull("Missing right argument inside conjunction op: " + sexp, split.getSecond());
@@ -113,6 +113,7 @@ public class TinySexpSerializer extends TestCase {
                 final FunctionExpression expr = new FunctionExpression();
                 expr.setAttributes(m.group(1), null, 0);
                 expr.setArgs(getArgs(Integer.valueOf(m.group(2)), "Function call ", sexp));
+                expr.setValueType(VoltType.FLOAT);
                 return expr;
             } else if (sexp.startsWith("(vec")) {
                 final Matcher m = Pattern.compile("^\\(vec-(\\d+)").matcher(sexp);
@@ -133,6 +134,8 @@ public class TinySexpSerializer extends TestCase {
                 ParameterValueExpression expr = new ParameterValueExpression();
                 if (sexp.charAt(1) != '?') {
                     expr.setOriginalValue(createCVE(sexp.substring(1, Math.max(sexp.indexOf(' '), sexp.length()))));
+                } else {                            // Set parametric PVE's type to be Integer
+                    expr.setValueType(VoltType.INTEGER);
                 }
                 return expr;
             } else if (sexp.startsWith("c")) {  // CVE

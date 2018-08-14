@@ -19,6 +19,7 @@ package org.voltdb.planner.optimizer;
 
 import com.google_voltpatches.common.util.concurrent.AtomicDouble;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
@@ -28,6 +29,7 @@ import static org.voltdb.planner.optimizer.NormalizerUtil.*;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -103,7 +105,7 @@ final class ArithmeticSimplifier {
      * @return transformed/simplified expression
      */
     static AbstractExpression ofPlusMinus(AbstractExpression e) {
-        return new ArithmeticSimplifier(e,
+        return new ArithmeticSimplifier(expandComplexExpression(e),
                 new HashMap<ExpressionType, ExpressionType>() {{
                     put(ExpressionType.OPERATOR_PLUS, ExpressionType.OPERATOR_MINUS);
                     put(ExpressionType.OPERATOR_MINUS, ExpressionType.OPERATOR_PLUS);
@@ -128,6 +130,69 @@ final class ArithmeticSimplifier {
     // generate simplified expression tree as leftest tree, e.g. (op5 (op3 (op2 (op1 v11 v12) v22) v32) v42)
     private AbstractExpression get() {
         return m_termSimplifier.get();
+    }
+
+    /**
+     * Expand a "number * aggregate term" only one level (i.e. non-recursively). An aggregate term is +/- operations.
+     * @param e
+     * @return
+     */
+    private static AbstractExpression expand(AbstractExpression e) {
+        if (e != null &&
+                e.getExpressionType() == ExpressionType.OPERATOR_MULTIPLY &&
+                (isLiteralConstant(e.getLeft()) || isLiteralConstant(e.getRight()))) {
+            final AbstractExpression number, term;
+            if (isLiteralConstant(e.getLeft())) {
+                number = e.getLeft();
+                term = e.getRight();
+            } else {
+                number = e.getRight();
+                term = e.getLeft();
+            }
+            final ExpressionType op = term.getExpressionType();
+            if (op == ExpressionType.OPERATOR_PLUS || op == ExpressionType.OPERATOR_MINUS) {
+                final UnaryOperator<AbstractExpression> combine = expr ->
+                        isLiteralConstant(expr) ? createConstant(expr,
+                                getNumberConstant(expr).get() * getNumberConstant(number).get()) :
+                                new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY, number, expr, 0);
+                final AbstractExpression left = combine.apply(term.getLeft()),
+                        right = combine.apply(term.getRight());
+                if (isLiteralConstant(left) && op == ExpressionType.OPERATOR_PLUS &&
+                        getNumberConstant(left).get() < 0) {       // -5 + C0 ==> C0 - 5
+                    return new OperatorExpression(ExpressionType.OPERATOR_MINUS, right, negate_of(left), 0);
+                } else if (isLiteralConstant(right) && getNumberConstant(right).get() < 0) {    // C0 + -5 ==> C0 - 5; C0 - -5 ==> C0 + 5
+                    return new OperatorExpression(op == ExpressionType.OPERATOR_PLUS ?
+                            ExpressionType.OPERATOR_MINUS : ExpressionType.OPERATOR_PLUS,
+                            left, negate_of(right), 0);
+                } else {
+                    return new OperatorExpression(op, left, right, 0);
+                }
+            } else {
+                return e;
+            }
+        } else {
+            return e;
+        }
+    }
+
+    /**
+     * Expand an expression like "term (+-) number * aggregate term" one level.
+     * @param e
+     * @return
+     */
+    private static AbstractExpression expandComplexExpression(AbstractExpression e) {
+        if (e == null) {
+            return null;
+        } else {
+            switch (e.getExpressionType()) {
+                case OPERATOR_PLUS:
+                case OPERATOR_MINUS:
+                    return new OperatorExpression(e.getExpressionType(),
+                            expand(e.getLeft()), expand(e.getRight()), 0);
+                default:
+                    return e;
+            }
+        }
     }
 
     /**
@@ -174,9 +239,9 @@ final class ArithmeticSimplifier {
          * @return either an AbstractExpression when that is the single Term included, or an OperatorExpression.
          */
         private AbstractExpression simplify(List<Term> src) {
-            assert(src.size() % 2 == 1);
+            assert(src.isEmpty() || src.size() % 2 == 1);
             if(src.size() <= 1) {   // If there is only one term found, then return it as is.
-                return src.get(0).getOperand();
+                return src.isEmpty() ? null : src.get(0).getOperand();
             } else { // Otherwise, first transform into <operator, operand> pairs
                 AtomicDouble value = new AtomicDouble(m_unit);
                 // operator that can be freely applied to an operand based on the context: + for PlusMinus or * for MultDiv
@@ -244,10 +309,11 @@ final class ArithmeticSimplifier {
                                     } else if (m_negator == ExpressionType.OPERATOR_MINUS) {    // When combining in PlusMinus mode, change coefficients into coef * <term>;
                                         return Stream.of(Pair.of(multiplier > 0 ? m_freeop : m_negator,
                                                 (AbstractExpression) new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
-                                                        new ConstantValueExpression(Math.abs(multiplier)), expr)));
+                                                        new ConstantValueExpression(Math.abs(multiplier)), expr, 0)));
                                     } else {     // in MultDiv mode, use POWER() with positive raised power to handle coefficients,
                                         assert(m_negator == ExpressionType.OPERATOR_DIVIDE);
                                         FunctionExpression power = new FunctionExpression();
+                                        power.setValueType(VoltType.FLOAT);
                                         power.setAttributes("POWER", null, 14 /* From src/ee/functionexpression.h */);
                                         power.setArgs(new ArrayList<AbstractExpression>(){{
                                             add(expr);
@@ -274,7 +340,7 @@ final class ArithmeticSimplifier {
                         } else {        // Otherwise negate the expression by changing <term> into -<term>
                             pairs.set(0, Pair.of(firstTerms.getFirst(),
                                     new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS,
-                                            firstTerms.getSecond(), null)));
+                                            firstTerms.getSecond(), null, 0)));
                         }
                     }
                 }
@@ -286,7 +352,7 @@ final class ArithmeticSimplifier {
                     return new ConstantValueExpression(m_unit);
                 } else if (pairs.get(0).getFirst() == m_negator) {    // If the expression doesn't contain any + or * in expression, then rewrite 1st term to rid of its negator:
                     if (pairs.get(0).getFirst() == ExpressionType.OPERATOR_MINUS) { // (-, term) => unary_minus term
-                        pairs.set(0, Pair.of(m_freeop, new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, pairs.get(0).getSecond(), null)));
+                        pairs.set(0, Pair.of(m_freeop, new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, pairs.get(0).getSecond(), null, 0)));
                     } else {    // (/, term) => 1 / term
                         pairs.add(0, Pair.of(m_freeop, new ConstantValueExpression(m_unit)));
                     }
@@ -299,8 +365,8 @@ final class ArithmeticSimplifier {
                 }
                 // For general case, assemble simplified expression together into rightest expression tree (i.e. left node of each node is always leaf).
                 return pairs.stream().skip(1)           // Use 1st (operator, operand) pair as init for folding
-                        .map(pair -> (AbstractExpression) (new OperatorExpression(pair.getFirst(), pair.getSecond(), null)))
-                        .reduce(pairs.get(0).getSecond(), (acc, rhs) -> new OperatorExpression(rhs.getExpressionType(), acc, rhs.getLeft()));
+                        .map(pair -> (AbstractExpression) (new OperatorExpression(pair.getFirst(), pair.getSecond(), null, 0)))
+                        .reduce(pairs.get(0).getSecond(), (acc, rhs) -> new OperatorExpression(rhs.getExpressionType(), acc, rhs.getLeft(), 0));
             }
         }
 
@@ -353,7 +419,9 @@ final class ArithmeticSimplifier {
              * @return Flattened representation
              */
             List<Term> flatten() {
-                if (getLeaf() != null) {
+                if (getLeaf() == null && getLeft() == null) {
+                    return new ArrayList<>();
+                } else if (getLeaf() != null) {
                     return new ArrayList<Term>(){{ add(new Term(getLeaf())); }};
                 } else {
                     return new ArrayList<Term>() {{

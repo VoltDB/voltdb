@@ -70,7 +70,7 @@ final class ArithmeticExpressionFlattener {
         m_children = bottom;
         m_expr = bottom.stream().map(p -> Pair.of(p.getFirst(), p.getSecond().m_expr))
                 .reduce((a, b) -> Pair.of(a.getFirst(),
-                        new OperatorExpression(b.getFirst(), a.getSecond(), b.getSecond())))
+                        new OperatorExpression(b.getFirst(), a.getSecond(), b.getSecond(), 0)))
                 .get().getSecond();
         m_leaf = null;
         m_op = getAlternativeOp(ArithOpType.get(bottom.get(0).getFirst()));
@@ -123,7 +123,7 @@ final class ArithmeticExpressionFlattener {
                     obj.getChildren().stream()          // For each (leaf) child, apply function on it, then combine all children into a new arithmetic expression,
                             .map(p -> Pair.of(p.getFirst(), postCombFn.apply(ArithOpType.Atom, p.getSecond().getLeaf())))   // apply on the combined one, and
                             .reduce((a, b) -> Pair.of(a.getFirst(),                                    // create a new flattener out of it.
-                                    new OperatorExpression(b.getFirst(), a.getSecond(), b.getSecond())))
+                                    new OperatorExpression(b.getFirst(), a.getSecond(), b.getSecond(), 0)))
                             .get().getSecond()));
         } else {            // has both leaf and non-leaf children: recurse for each child, combine into a new flattener, and then
             assert(!obj.getChildren().isEmpty());       // recurse on the flattener.

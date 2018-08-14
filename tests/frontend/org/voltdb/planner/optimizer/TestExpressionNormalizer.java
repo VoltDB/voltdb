@@ -181,10 +181,27 @@ public class TestExpressionNormalizer {
                 serialize(OpExpressionBalancer.balance(deserialize("(> (* P-21 C1) (/ C2 P-7))"))));
         assertEquals("(> (/ P0.33333334 C2) C1)",       // -21 * C1 > -7 / C2 ==> 0.33333334 / C2 > C1
                 serialize(OpExpressionBalancer.balance(deserialize("(> (* P-21 C1) (/ P-7 C2))"))));
+        assertEquals("(= C1 P3)",       // -21 / C1 = -7 ==> C1 = 3
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ P-21 C1) P-7)"))));
+        assertEquals("(= C1 P-0.33333334)",       // -21 / C1 = -7 ==> C1 = 3
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ P-7 C1) P21)"))));
+        assertEquals("(= (* C1 C2) P0.33333334)",       // -21 * C1 = -7 / C2 ==> C2 * C1 = 0.333334
+                serialize(OpExpressionBalancer.balance(deserialize("(= (* P-21 C1) (/ P-7 C2))"))));
         assertEquals("(< (* c-15 C1) C0)",       // C0 / 5 > -3 * C1 ==> -15 * C1 < C0
                 serialize(OpExpressionBalancer.balance(deserialize("(> (/ C0 P5) (* c-3 C1))"))));
         assertEquals("(< (/ P-1.6666666 C0) C1)",       // 5 / C0 > -3 * C1 ==> (-5/3) / C0 < C1
                 serialize(OpExpressionBalancer.balance(deserialize("(> (/ P5 C0) (* c-3 C1))"))));
+        // has both * and /, and comparison is eq
+        assertEquals("(= (* P-50 C1) C2)",          // C1 * -5 = C2 / 10 ==> -50 * C1 = C2
+                serialize(OpExpressionBalancer.balance(deserialize("(= (* C1 P-5) (/ C2 P10))"))));
+        assertEquals("(= (* P50 C1) C2)",          // 5 * C1 = C2 / 10 ==> 50 * C1 = C2
+                serialize(OpExpressionBalancer.balance(deserialize("(= (* P5 C1) (/ C2 P10))"))));
+        assertEquals("(= (* P50 C1) C2)",
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ C2 P10) (* P5 C1))"))));
+        assertEquals("(= (* C1 C2) c2)",           // 10 / C1 = 5 * C2 ==> C1 * C2 = 2
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ c10 C1) (* P5 C2))"))));
+        assertEquals("(= (* C1 C2) P2)",
+                serialize(OpExpressionBalancer.balance(deserialize("(= (* P5 C1) (/ c10 C2))"))));
         // Both divisions
         assertEquals("(> (* P-3 C2) C1)",          // C1 / -21 > C2 / 7 ==> -3 * C2 > C1
                 serialize(OpExpressionBalancer.balance(deserialize("(> (/ C1 P-21) (/ C2 P7))"))));
@@ -196,6 +213,21 @@ public class TestExpressionNormalizer {
                 serialize(OpExpressionBalancer.balance(deserialize("(> (/ C0 P-3) (/ c5 C1))"))));
         assertEquals("(>= (/ P-21 C1) (/ c7 C2))",   // not changed if both non-number terms are in denominator
                 serialize(OpExpressionBalancer.balance(deserialize("(>= (/ P-21 C1) (/ c7 C2))"))));
+        // Both divisions, eq
+        assertEquals("(= (* P-2 C2) C1)",   // C1 / 10 = C2 / -5 ==> -2 * C2 = C1
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ C1 P10) (/ C2 P-5))"))));
+        assertEquals("(= (* P-2 C1) C2)",   // C1 / 5 = C2 / -10 ==> -2 * C1 = C2
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ C1 P5) (/ C2 P-10))"))));
+        assertEquals("(= (* P-0.4 C1) C2)",   // C1 / 10 = C2 / -4 ==> -0.4 * C1 = C2
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ C1 P10) (/ C2 P-4))"))));
+        assertEquals("(= (* C1 C2) P-50)",   // 10 / C1 = C2 / -5 ==> C1 * C2 = -50
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ P10 C1) (/ C2 P-5))"))));
+        assertEquals("(= (* C1 C2) P-50)",
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ C1 P-5) (/ P10 C2))"))));
+        assertEquals("(= (* P-2 C2) C1)",   // 10 / C1 = -5 / C2 ==> -2 * C2 = C1
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ P10 C1) (/ P-5 C2))"))));
+        assertEquals("(= (* P-2 C2) C1)",
+                serialize(OpExpressionBalancer.balance(deserialize("(= (/ P-5 C2) (/ P10 C1))"))));
     }
 
     @Test
@@ -571,6 +603,7 @@ public class TestExpressionNormalizer {
     @Test
     public void testArithmaticSimplifier() {
         // +/- simplifier
+        assertNull(ArithmeticSimplifier.ofPlusMinus(null));
         assertEquals("C1",
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("C1"))));
         assertEquals("(+ C1 C2)",
@@ -589,6 +622,8 @@ public class TestExpressionNormalizer {
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(+ (- (- C1 P2) C2) (- C2 (+ C1 (@- c2))))"))));
         assertEquals("(+ C1 C2)",
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(- C1 (@- C2))"))));
+        assertEquals("(+ C1 c-5)",
+                serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(+ (* c1 (+ P-5 C1)) c0)"))));
         assertEquals("c0",
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(- (* C1 C2) (* C2 C1))"))));
         assertEquals("(+ (- C1 C2) c5.3)",      // (C1 + (2 - C2.1) + 3.2 ==> (C1 - C2) + 5.3
@@ -599,11 +634,11 @@ public class TestExpressionNormalizer {
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(- (- C1 c3) (+ C1 (- C1 c3)))"))));
         assertEquals("c-5",                   // (C1 - 3) - (C1 + 2) ==> -5
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(- (- C1 c3) (+ C1 c2))"))));
-        assertEquals("(* c5.0 (- C1 c3))",      // 2 * (C1 - 3) + (C1 - 3) * 3 ==> 5 * (C1 - 3)
+        assertEquals("(+ (* c5.0 C1) c-15)",      // 2 * (C1 - 3) + (C1 - 3) * 3 ==> 5 * (C1 - 3)
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(+ (* c2 (- C1 c3)) (* (- C1 c3) P3))"))));
-        assertEquals("(- C1 c3)",               // 3 * (C1 - 3) - (C1 - 3) * 2 ==> C1 - 3
+        assertEquals("(+ C1 c-3)",               // 3 * (C1 - 3) - (C1 - 3) * 2 ==> C1 - 3
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(- (* c3 (- C1 c3)) (* (- C1 c3) P2))"))));
-        assertEquals("(- c3 C1)",               // 3 * (C1 - 3) - (C1 - 3) * 2 ==> 3 - C1
+        assertEquals("(+ (@- C1) c3)",               // 3 * (C1 - 3) - (C1 - 3) * 2 ==> 3 - C1
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(- (* c2 (- C1 c3)) (* (- C1 c3) P3))"))));
         assertEquals("c0",
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(- (+ C1 C2) (+ C1 C2))"))));
@@ -612,6 +647,7 @@ public class TestExpressionNormalizer {
         assertEquals("(+ (+ (* c2.0 C2) C1) c8)",
                 serialize(ArithmeticSimplifier.ofPlusMinus(deserialize("(- (+ (* c2 C1) C2) (- (+ C1 P1) (+ C2 c9)))"))));
         // */ simplifier
+        assertNull(ArithmeticSimplifier.ofMultDiv(null));
         assertEquals("(fn-power-2 C1 c2.0)",      // C1 * C1 ==> C1 ** 2
                 serialize(ArithmeticSimplifier.ofMultDiv(deserialize("(* C1 C1)"))));
         assertEquals("(fn-power-2 C1 c2.0)",      // (-C1) * (-C1) ==> C1 ** 2
@@ -747,7 +783,7 @@ public class TestExpressionNormalizer {
         assertEquals("ctrue",
                 serialize(IntegerIntervalCombiner.combine(deserializeAsList("(= C1 c0)", "(!= C1 c0)"),
                         ConjunctionRelation.OR)));
-        assertEquals("(= (- C1 C2) P0)",
+        assertEquals("(= (- C1 C2) c0)",
                 serialize(IntegerIntervalCombiner.combine(deserializeAsList("(= C1 c0)", "(!= C1 c0)", "(= (- C1 C2) P0)"),
                         ConjunctionRelation.OR)));
         assertEquals("(< C2 c0)",
@@ -994,7 +1030,8 @@ public class TestExpressionNormalizer {
             add("C1");
             add("c1");
             add("P1");
-            add("(vec-5 C0 C2 C1 C2 C0)");                  // does not dedup VVE unless it's in some comparison
+            add("(vec-7 C0 C2 P? C1 C2 C0 P?)");                  // does not dedup VVE unless it's in some comparison
+            add("(in C0 (vec-3 P? P? P0))");
             add("(+ C1 c1)");
         }}.forEach(s ->
                 assertEquals("Transformation of form \"" + s + "\" is not identical.",
@@ -1004,8 +1041,8 @@ public class TestExpressionNormalizer {
             put("(/ P0 C0)", "P0");
             put("(&& ctrue cfalse)", "cfalse");
             put("(|| ctrue cfalse)", "ctrue");
-            put("(&& (!= (- C1 C1) c0) C0)", "cfalse");
-            put("(|| (<= (- C1 C1) c0) C0)", "ctrue");
+            put("(&& (!= (- C1 C1) c0) (< c0 C0))", "cfalse");
+            put("(|| (<= (- C1 C1) c0) (> C0 c0))", "ctrue");
             put("(* P0 C1)", "P0");
             put("(/ C2 C2)", "c1");
             put("(&& (> C1 P0) (> P0 C1))", "cfalse");
@@ -1018,6 +1055,10 @@ public class TestExpressionNormalizer {
             put("(&& (>= (+ C1 C0) (- C1 C2)) (<= (+ C0 C1) (- C1 C2)))", "(= (@- C0) C2)");
             put("(fn-foo-1 (+ C0 (- C1 C0)))", "(fn-foo-1 C1)");
             put("(fn-foo-2 (+ C1 P1) (/ c4 c2))", "(fn-foo-2 (+ C1 c1) c2)");
+            put("(>= (* P-5 C1) (* P10 C1))", "(<= C1 c0)");
+            put("(!= (* P-5 C1) (* P10 C1))", "(!= C1 c0)");
+            put("(!= (* P-5 (- C1 C2)) (* P10 (- C1 C2)))", "(!= C1 C2)");
+            put("(!= (* P-5 (- C2 C1)) (* P10 (- C1 C2)))", "(!= C1 C2)");
         }}.forEach((k, v) ->
                 assertEquals("Transform of form \"" + k + "\": expect \"" + v + "\".",
                         v, serialize(ExpressionNormalizer.normalize(deserialize(k)))));
@@ -1076,12 +1117,16 @@ public class TestExpressionNormalizer {
                                 "(|| (|| (>= P? (* C1 C2)) " +
                                          "(< C3 P10)) " +
                                     "(<= c9 (@- C3)))))"))));
-        // string comparison
-        final ComparisonExpression e = new ComparisonExpression(ExpressionType.COMPARE_LESSTHAN,
-                new ConstantValueExpression("foo", 8), new ConstantValueExpression("bar", 8)),
-                er = e.reverseOperator();
-        assertEquals(er, ExpressionNormalizer.normalize(e));
-        assertEquals(er, ExpressionNormalizer.normalize(er));
+        // string comparison: comparison expression construction cannot be made in one step, because finalizeValueTypes()
+        // method will fail on variable length type.
+        final ConstantValueExpression left = new ConstantValueExpression("foo", 8),
+                right = new ConstantValueExpression("bar", 8);
+        final ComparisonExpression e = new ComparisonExpression(ExpressionType.COMPARE_LESSTHAN);
+        e.setLeft(left);
+        e.setRight(right);
+        final ComparisonExpression er = e.reverseOperator();
+        assertEquals(TinySexpSerializer.serialize(er), TinySexpSerializer.serialize(ExpressionNormalizer.normalize(e)));
+        assertEquals(TinySexpSerializer.serialize(er), TinySexpSerializer.serialize(ExpressionNormalizer.normalize(er)));
     }
     //CHECKSTYLE:ON
 }

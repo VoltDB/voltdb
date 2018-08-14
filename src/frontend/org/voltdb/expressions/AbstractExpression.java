@@ -72,16 +72,15 @@ public abstract class AbstractExpression implements JSONString, Cloneable, Compa
      * aggregate function applied to a floating point expression.
      */
     private String m_contentDeterminismMessage = null;
-    private static final Comparator<List<AbstractExpression>> s_listComparator =
-            (a, b) -> {
-                final int len = a.size();
-                return len != b.size() ? Integer.compare(a.size(), b.size()) :
-                        IntStream.range(0, len).map(index -> a.get(index).compareTo(b.get(index)))
-                                .reduce(0, (acc, cur) -> acc == 0 ? cur : acc);
-            };
 
     static protected Comparator<List<AbstractExpression>> getArgComparator() {
-        return s_listComparator;
+        return Comparator.nullsFirst(
+                (a, b) -> {
+                    final int len = a.size();
+                    return len != b.size() ? Integer.compare(a.size(), b.size()) :
+                            IntStream.range(0, len).map(index -> a.get(index).compareTo(b.get(index)))
+                                    .reduce(0, (acc, cur) -> acc == 0 ? cur : acc);
+                });
     }
 
     @Override

@@ -23,6 +23,8 @@ import org.voltdb.types.ExpressionType;
 
 import java.util.stream.Collectors;
 
+import static org.voltdb.planner.optimizer.NormalizerUtil.*;
+
 /**
  * Push down a NOT (...) expression to the bottom of AND/OR relation. e.g.
  * NOT (a && b) is converted/pushed-down as (NOT a) || (NOT b).
@@ -39,12 +41,19 @@ final class NegatePushDown {
             m_expr = eliminate(new ConjunctionExpression(type == ExpressionType.CONJUNCTION_AND ?
                     ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND,
                     new NegatePushDown(expr.getLeft()).get(), new NegatePushDown(expr.getRight()).get()));
-        } else if (expr instanceof ComparisonExpression && ! (expr instanceof InComparisonExpression)) {
+        } else if (expr instanceof ComparisonExpression && ! (expr instanceof InComparisonExpression) &&
+                ComparisonTypeMerger.reversible(type)) {
             m_expr = new ComparisonExpression(reverseCmpOperator(type), expr.getLeft(), expr.getRight());
         } else {    // other types of terminal node
-            m_expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr, null);
+            m_expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr, null, 0);
         }
     }
+
+    /**
+     * Reverse a comparison type
+     * @param from comparison type to be reversed
+     * @return reversed comparison type
+     */
     private static ExpressionType reverseCmpOperator(ExpressionType from) {
         switch (from) {
             case COMPARE_EQUAL:

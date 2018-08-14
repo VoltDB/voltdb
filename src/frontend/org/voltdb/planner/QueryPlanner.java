@@ -402,9 +402,6 @@ public class QueryPlanner implements AutoCloseable {
                 return null;
             }
         }
-        // -- Single place to enable select/union stmt query normalization for all expressions --
-        parsedStmt.normalizeExpressions();
-        // -- end of query normalization --
         if(parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt) {
             final MVQueryRewriter rewriter;
             if (parsedStmt instanceof ParsedSelectStmt) {
@@ -416,6 +413,9 @@ public class QueryPlanner implements AutoCloseable {
                 m_paramzInfo.rewrite();
             }
         }
+        // -- Single place to enable select/union stmt query normalization for all expressions --
+        parsedStmt.normalizeExpressions();
+        // -- end of query normalization --
         m_planSelector.outputParsedStatement(parsedStmt);
 
         if (m_isLargeQuery) {

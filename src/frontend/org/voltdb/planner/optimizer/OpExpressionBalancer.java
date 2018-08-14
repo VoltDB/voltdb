@@ -36,7 +36,8 @@ import static org.voltdb.planner.optimizer.NormalizerUtil.*;
 final class OpExpressionBalancer {
     private final AbstractExpression m_expr;
     private OpExpressionBalancer(AbstractExpression e) {
-        if (e instanceof InComparisonExpression) {      // do nothing for "expr in [...]" expression
+        if (e instanceof InComparisonExpression ||      // do nothing for "expr in [...]" expression, or String1 like String2
+                (e instanceof ComparisonExpression && ! ComparisonTypeMerger.reversible(e.getExpressionType()))) {
             m_expr = e;
         }else if (e instanceof ComparisonExpression) {
             m_expr = balance((ComparisonExpression) e);
@@ -124,7 +125,7 @@ final class OpExpressionBalancer {
                     // x + y cmp 0 ==> x cmp -y; x - y cmp 0 ==> x cmp y
                     return balance(new ComparisonExpression(cmp, left.getLeft(),
                             left.getExpressionType() == ExpressionType.OPERATOR_PLUS ?
-                                    new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, left.getRight(), null) :
+                                    new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, left.getRight(), null, 0) :
                                     left.getRight()));
                 } else if (left.getExpressionType() == ExpressionType.OPERATOR_UNARY_MINUS) {
                     // The caller for OpExpressionBalancer should ensure that unary minus is pushed down. Prefer simpler "expr" over "-expr",
@@ -159,10 +160,14 @@ final class OpExpressionBalancer {
                                 if (expr.isNumberOnRight()) {       // expr / number1 cmp number 2 ==> expr ?cmp? number1 * number2
                                     return balance(new ComparisonExpression(lhsValue > 0 ? cmp : negatedCmp,
                                             expr.getExpression(), createConstant(right, lhsValue * rhsValue)));
+                                } else if (cmp == ExpressionType.COMPARE_EQUAL) { // number / expr1 = expr2 ==> expr1 * expr2 = number
+                                    return balance(new ComparisonExpression(cmp,
+                                            new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY, expr.getExpression(), right, 0),
+                                            expr.getNumberTerm()));
                                 } else {        // -3 / x < 5 ==> 1 / x > -5/3, no further simplification possible
                                     return new ComparisonExpression(lhsValue > 0 ? cmp : negatedCmp,
                                             new OperatorExpression(left.getExpressionType(),
-                                                    createConstant(expr.getNumberTerm(), 1), expr.getExpression()),
+                                                    createConstant(expr.getNumberTerm(), 1), expr.getExpression(), 0),
                                             createConstant(right, rhsValue / lhsValue));
                                 }
                             default:
@@ -210,7 +215,7 @@ final class OpExpressionBalancer {
             return e;
         } else  {
             final AbstractExpression l = ArithmeticSimplifier.ofPlusMinus(      // move right to left and combine/simplify
-                    new OperatorExpression(ExpressionType.OPERATOR_MINUS, left, right));
+                    new OperatorExpression(ExpressionType.OPERATOR_MINUS, left, right, 0));
             final ExpressionType cmp = e.getExpressionType();
         switch (l.getExpressionType()) {            // put back to balanced form
                 case OPERATOR_MINUS:
@@ -223,7 +228,7 @@ final class OpExpressionBalancer {
                         fl = l.getRight(); fr = l.getLeft();
                     }
                     return new ComparisonExpression(cmp,
-                            new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, fl, null),
+                            new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, fl, null, 0),
                             fr);
                 default:
                     return new ComparisonExpression(cmp, l, new ConstantValueExpression(0));
@@ -272,43 +277,43 @@ final class OpExpressionBalancer {
         final boolean lhsNumOnRight = lhs.isNumberOnRight(), rhsNumOnRight = rhs.isNumberOnRight();
         if (lhsType == ExpressionType.OPERATOR_PLUS && rhsType == lhsType) {  // x + 3 > y + 5 ==> x - y > 2
             return balance(new ComparisonExpression(cmp,
-                    new OperatorExpression(ExpressionType.OPERATOR_MINUS, lhs.getExpression(), rhs.getExpression()),
+                    new OperatorExpression(ExpressionType.OPERATOR_MINUS, lhs.getExpression(), rhs.getExpression(), 0),
                     createConstant(rightResult, r - l)));
         } else if (lhsType != rhsType) {
             if (lhsType == ExpressionType.OPERATOR_PLUS && rhsNumOnRight) {    // x + 3 > y - 5 ==> x - y > -8
                 return balance(new ComparisonExpression(cmp,
-                        new OperatorExpression(ExpressionType.OPERATOR_MINUS, lhs.getExpression(), rhs.getExpression()),
+                        new OperatorExpression(ExpressionType.OPERATOR_MINUS, lhs.getExpression(), rhs.getExpression(), 0),
                         createConstant(rightResult, -r-l)));
             } else if (lhsType == ExpressionType.OPERATOR_PLUS) {              // x + 3 > 5 - y ==> x + y > 2
                 return balance(new ComparisonExpression(cmp,
-                        new OperatorExpression(ExpressionType.OPERATOR_PLUS, lhs.getExpression(), rhs.getExpression()),
+                        new OperatorExpression(ExpressionType.OPERATOR_PLUS, lhs.getExpression(), rhs.getExpression(), 0),
                         createConstant(rightResult, r - l)));
             } else if (lhsType == ExpressionType.OPERATOR_MINUS && lhsNumOnRight) {    // x - 3 > y + 5 ==> x - y > 8
                 return balance(new ComparisonExpression(cmp,
-                        new OperatorExpression(ExpressionType.OPERATOR_MINUS, lhs.getExpression(), rhs.getExpression()),
+                        new OperatorExpression(ExpressionType.OPERATOR_MINUS, lhs.getExpression(), rhs.getExpression(), 0),
                         createConstant(rightResult, l + r)));
             } else {                                                                // 3 - x > y + 5 ==> -2 > x + y ==> x + y < -2
                 return balance(new ComparisonExpression(cmp,
                         createConstant(leftResult, l - r),
-                        new OperatorExpression(ExpressionType.OPERATOR_PLUS, lhs.getExpression(), rhs.getExpression()))
+                        new OperatorExpression(ExpressionType.OPERATOR_PLUS, lhs.getExpression(), rhs.getExpression(), 0))
                         .reverseOperator());
             }
         } else {    // both -
             if (lhsNumOnRight && rhsNumOnRight) {                                   // x - 3 > y - 5 ==> x - y > -2
                 return balance(new ComparisonExpression(cmp,
-                        new OperatorExpression(ExpressionType.OPERATOR_MINUS, lhs.getExpression(), rhs.getExpression()),
+                        new OperatorExpression(ExpressionType.OPERATOR_MINUS, lhs.getExpression(), rhs.getExpression(), 0),
                         createConstant(rightResult, l - r)));
             } else if (lhsNumOnRight == rhsNumOnRight) {                            // 3 - x > 5 - y ==> y - x > 2
                 return balance(new ComparisonExpression(cmp,
-                        new OperatorExpression(ExpressionType.OPERATOR_MINUS, rhs.getExpression(), lhs.getExpression()),
+                        new OperatorExpression(ExpressionType.OPERATOR_MINUS, rhs.getExpression(), lhs.getExpression(), 0),
                         createConstant(rightResult, r - l)));
             } else if (lhsNumOnRight) {                                             // x - 3 > 5 - y ==> x + y > 8
                 return balance(new ComparisonExpression(cmp,
-                        new OperatorExpression(ExpressionType.OPERATOR_PLUS, lhs.getExpression(), rhs.getExpression()),
+                        new OperatorExpression(ExpressionType.OPERATOR_PLUS, lhs.getExpression(), rhs.getExpression(), 0),
                         createConstant(rightResult, l + r)));
             } else {                                                                // 3 - x > y - 5 ==> 8 > y + x ==> y + x < 8
                 return balance(new ComparisonExpression(cmp, createConstant(leftResult, l + r),
-                        new OperatorExpression(ExpressionType.OPERATOR_PLUS, rhs.getExpression(), lhs.getExpression()))
+                        new OperatorExpression(ExpressionType.OPERATOR_PLUS, rhs.getExpression(), lhs.getExpression(), 0))
                         .reverseOperator());
             }
         }
@@ -341,15 +346,17 @@ final class OpExpressionBalancer {
                         return balance(new ComparisonExpression(calcCmp.apply(lhs.getNumber()),
                                 lhs.getExpression(), createConstant(rightResult, 0)));
                     }
+                } else if (lhs.getExpression().equivalent(rhs.getExpression())) {   // when the non-number terms are the same: combine left and right.
+                    return mergeSimplify(e);
                 } else {            // neither side has 0: make it into form of <number> * <term> cmp <term>
                     // check if either l/r or r/l might be an integer
                     if (l_divisible || !r_divisible) {      // either r is a multiple of l, or neither r is of l, nor l of r.
                         return balance(new ComparisonExpression(calcCmp.apply(l), lhs.getExpression(),
-                                new OperatorExpression(lhsType, createConstant(rightResult, r / l), rhs.getExpression()))
+                                new OperatorExpression(lhsType, createConstant(rightResult, r / l), rhs.getExpression(), 0))
                                 .reverseOperator());
                     } else {        // l is a multiple of r
                         return balance(new ComparisonExpression(calcCmp.apply(r),
-                                new OperatorExpression(lhsType, createConstant(leftResult, l/r), lhs.getExpression()),
+                                new OperatorExpression(lhsType, createConstant(leftResult, l / r), lhs.getExpression(), 0),
                                 rhs.getExpression()));
                     }
                 }
@@ -358,44 +365,91 @@ final class OpExpressionBalancer {
                     if (l_divisible || !r_divisible) {                  // e.g. x / 3 > y / 6
                         return balance(new ComparisonExpression(calcCmp.apply(r),
                                 new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY, // prefer multiplication over division
-                                        createConstant(leftResult, r/l), lhs.getExpression()), rhs.getExpression()));
+                                        createConstant(leftResult, r / l), lhs.getExpression(), 0), rhs.getExpression()));
                     } else {
                         return balance(new ComparisonExpression(calcCmp.apply(l), lhs.getExpression(),
                                 new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
-                                        createConstant(rightResult, l/r), rhs.getExpression()))
+                                        createConstant(rightResult, l / r), rhs.getExpression(), 0))
                                 .reverseOperator());
+                    }
+                } else if (comparisonType == ExpressionType.COMPARE_EQUAL) {    // at least one number is on left side of division, equality.
+                    if (lhs.isNumberOnRight()) {                        // e.g. x / 3 = 5 / y ==> x * y = 5 * 3
+                        return balance(new ComparisonExpression(comparisonType,
+                                new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY, lhs.getExpression(), rhs.getExpression(), 0),
+                                createConstant(rightResult, l * r)));
+                    } else if (rhs.isNumberOnRight()) {                 // e.g. 3 / x = y / 5 ==> x * y = 5 * 3
+                        return balance(new ComparisonExpression(comparisonType,
+                                new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY, lhs.getExpression(), rhs.getExpression(), 0),
+                                createConstant(rightResult, l * r)));
+                    } else {                                            // e.g. 3 / x = 5 / y ==> 3 * y = 5 * x ==> y = 5 / 3 * x or x = 3 / 5 * y,
+                        final float r1 = r / l, r2 = l / r;             // depending on which resulting number is integer.
+                        if (l_divisible || ! r_divisible) {                  // ==> y = 5 / 3 * x
+                            return balance(new ComparisonExpression(comparisonType, rhs.getExpression(),
+                                    new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
+                                            createConstant(leftResult, r1), lhs.getExpression(), 0)));
+                        } else {                                        // ==> x = 3 / 5 * y
+                            return balance(new ComparisonExpression(comparisonType, lhs.getExpression(),
+                                    new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
+                                    createConstant(rightResult, r2), rhs.getExpression(), 0)));
+                        }
                     }
                 } else if (lhs.isNumberOnRight()) {         // e.g. x/3 > 5/y ==> x > 15/y
                     return balance(new ComparisonExpression(calcCmp.apply(l), lhs.getExpression(),
-                            new OperatorExpression(rhsType, createConstant(rightResult, l * r), rhs.getExpression())));
+                            new OperatorExpression(rhsType, createConstant(rightResult, l * r), rhs.getExpression(), 0)));
                 } else if (rhs.isNumberOnRight()) {         // e.g. 3/x > y/5 ==> 3*5/x > y ==> y < 15/x
                     return balance(new ComparisonExpression(calcCmp.apply(r),
-                            new OperatorExpression(lhsType, createConstant(leftResult, l * r), lhs.getExpression()),
+                            new OperatorExpression(lhsType, createConstant(leftResult, l * r), lhs.getExpression(), 0),
                             rhs.getExpression()).reverseOperator());
                 } else {                                    // e.g. 3/x > 5/y ==> leave as it is
                     return e;
                 }
             }
-        } else {        // one is *, one is /
+        } else if (comparisonType == ExpressionType.COMPARE_EQUAL) {        // one is *, one is /; equality
+            final boolean isLeftMultiply = lhsType == ExpressionType.OPERATOR_MULTIPLY,
+                    isDivisionNumberOnRight = isLeftMultiply ? rhs.isNumberOnRight() : lhs.isNumberOnRight();
+            if (isDivisionNumberOnRight) {                      // x * 5 = y / 6  or y / 6 = 5 * x
+                if (isLeftMultiply) {                           // x * 5 = y / 6 ==> 5 * 6 * x = y
+                    return balance(new ComparisonExpression(comparisonType,
+                            new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
+                                    createConstant(leftResult, l * r), lhs.getExpression(), 0),
+                            rhs.getExpression()));
+                } else {                                        // y / 6 = 5 * x ==> 5 * 6 * x = y
+                    return balance(new ComparisonExpression(comparisonType,
+                            new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
+                                    createConstant(leftResult, l * r), rhs.getExpression(), 0),
+                            lhs.getExpression()));
+                }
+            } else if (isLeftMultiply) {                    // x * 5 = 6 / y ==> x * y = 6 / 5
+                return balance(new ComparisonExpression(comparisonType,
+                        new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
+                                lhs.getExpression(), rhs.getExpression(), 0),
+                        createConstant(leftResult, r / l)));
+            } else {                                        // 6 / y = 5 * x ==> y * x = 6 / 5
+                return balance(new ComparisonExpression(comparisonType,
+                        new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
+                                lhs.getExpression(), rhs.getExpression(), 0),
+                        createConstant(leftResult, l / r)));
+            }
+        } else {        // one is *, one is /, comparison is not equality
             final boolean isDivisionNumberOnRight = lhsType == ExpressionType.OPERATOR_MULTIPLY ?
                     rhs.isNumberOnRight() : lhs.isNumberOnRight();
             if (isDivisionNumberOnRight) {
                 if (lhsType == ExpressionType.OPERATOR_MULTIPLY) {     // 3 * x > y / 5 ==> 15 * x > y
                     return balance(new ComparisonExpression(calcCmp.apply(r),
                             new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
-                                    createConstant(leftResult, l * r), lhs.getExpression()), rhs.getExpression()));
+                                    createConstant(leftResult, l * r), lhs.getExpression(), 0), rhs.getExpression()));
                 } else {            // y / 5 > 3 * x ==> y > (3 * 5) * x ==> 15 * x < y
                     return balance(new ComparisonExpression(calcCmp.apply(l), lhs.getExpression(),
-                            new OperatorExpression(rhsType, createConstant(rightResult, l * r), rhs.getExpression()))
+                            new OperatorExpression(rhsType, createConstant(rightResult, l * r), rhs.getExpression(), 0))
                             .reverseOperator());
                 }
             } else if (lhsType == ExpressionType.OPERATOR_MULTIPLY) {  // 3 * x > 5 / y ==> x > (5/3) / y
                 return balance(new ComparisonExpression(calcCmp.apply(l), lhs.getExpression(),
                         new OperatorExpression(ExpressionType.OPERATOR_DIVIDE, createConstant(rightResult, r / l),
-                                rhs.getExpression())));
+                                rhs.getExpression(), 0)));
             } else {                                                        // 5/y > 3*x ==> (5/3)/y > x ==> x < (5/3)/y
                 return balance(new ComparisonExpression(calcCmp.apply(r),
-                        new OperatorExpression(lhsType, createConstant(leftResult, l/r), lhs.getExpression()),
+                        new OperatorExpression(lhsType, createConstant(leftResult, l/r), lhs.getExpression(), 0),
                         rhs.getExpression()).reverseOperator());
             }
         }

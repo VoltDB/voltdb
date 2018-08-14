@@ -384,10 +384,10 @@ public class TestPlansCount extends PlannerTestCase {
 
     public void testCountStar29() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T1 WHERE AGE / 2 = 10 AND ABS(AGE) > ?");
-        checkIndexCounter(pn, true);
+        checkIndexCounter(pn, false);
 
         pn = compileToFragments("SELECT COUNT(1) FROM T1 WHERE AGE / 2 = 10 AND ABS(AGE) > ?");
-        checkIndexCounter(pn, true);
+        checkIndexCounter(pn, false);
     }
 
     // should not replace

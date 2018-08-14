@@ -18,6 +18,7 @@
 package org.voltdb.planner.optimizer;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltType;
 import org.voltdb.expressions.*;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
@@ -57,7 +58,7 @@ class IntegerIntervalCombiner {
     private final AbstractExpression m_result;
     // Generate new expression -expr based on given expr.
     private static final UnaryOperator<AbstractExpression> s_negator = e ->
-            UnaryMinusPushDown.eliminate(new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, e, null));
+            UnaryMinusPushDown.eliminate(new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, e, null, 0));
 
     /**
      * Takes a list of comparison (or NOT comparison) operations and a conjunction relation, and simplify
@@ -65,42 +66,40 @@ class IntegerIntervalCombiner {
      * @param src A list of comparisons
      * @param rel Conjunction relation between those comparisons
      */
-    private IntegerIntervalCombiner(List<AbstractExpression> src, ConjunctionRelation rel) {
-        final Predicate<AbstractExpression> isComparison =      // test that e is either an (in)-comparison, or a "NOT (x in (expr...))" comparison.
-                e -> e instanceof ComparisonExpression ||
-                        e.getExpressionType() == ExpressionType.OPERATOR_NOT && e.getLeft() instanceof InComparisonExpression;
-        if (src.size() == 1 && (src.get(0) instanceof InComparisonExpression || ! isComparison.test(src.get(0)))) {
+    private IntegerIntervalCombiner(List<AbstractExpression> src, List<AbstractExpression> tvesOrIsNulls, ConjunctionRelation rel) {
+        assert(tvesOrIsNulls.stream().allMatch(IntegerIntervalCombiner::isTveOrIsNullOrFunction));
+        if (src.size() == 1 && (src.get(0) instanceof InComparisonExpression)) {
             m_result = src.get(0);      // single comparison in the form of "x in (...)" or any boolean constant: return as is.
         } else {
-            assert (rel != ConjunctionRelation.ATOM);                   // Sanity check: 1. conjunction relationship is sound;
-            assert(src.stream().allMatch(isComparison::test));          // 2. all expressions are indeed comparisons.
+            assert (rel != ConjunctionRelation.ATOM);                   // Sanity check: . conjunction relationship is sound;
             final boolean isAnd = rel == ConjunctionRelation.AND;
             src = compactNumberComparisons(src);                        // Take care of comparisons like "a - b >= 3" and "b - a <= 5" together.
             AtomicBoolean hasEmpty = new AtomicBoolean(false);      // flag for logic shortcut when merging intervals, e.g. "x > 3" && "x < 0"
             // comparisons whose LHS is not an integer constant, or TVE of integer type, and hence should not be combined by IntegerIntervals,
             final List<ComparisonExpression> nonIntegerExpr = new ArrayList<>();    // but can be compacted by compactComplexComparisons().
-            final List<Pair<AbstractExpression, range_t>> tt = src.stream().flatMap(e -> {
-                if (e.getExpressionType() == ExpressionType.OPERATOR_NOT) {
-                    if (isIntegerExpression(e.getLeft().getLeft())) {   // "expr NOT in (...)" calls notRangeOf;
-                        return Stream.of(Pair.of(e.getLeft().getLeft(), notRangeOf((ComparisonExpression) e.getLeft())));
-                    }
-                } else if (isLiteralConstant(e.getLeft()) && isLiteralConstant(e.getRight())) {     // both sides of comparison are numbers
-                    // neither side can be VVE in this case.
-                    assert(! (e.getLeft() instanceof VectorValueExpression || e.getRight() instanceof VectorValueExpression));
-                    final boolean val = evalComparison(e.getExpressionType(),       // evaluate to boolean value,
-                            getNumberConstant(e.getLeft()).get(), getNumberConstant(e.getRight()).get());
-                    if (isAnd ^ val) {          // mark logic shortcut if it is,
-                        hasEmpty.set(true);
-                    }
-                    return Stream.empty();      // erase the expression.
-                } else if (isIntegerExpression(e.getLeft()) && isLiteralConstant(e.getRight()) &&  // when RHS is an integer, call rangeOf().
-                        (e.getRight() instanceof VectorValueExpression || isInt(e.getRight()))) {  // NOTE: check that number literal is integer. We will relax this check when we support FloatInterval operations.
-                    return Stream.of(Pair.of(e.getLeft(), rangeOf((ComparisonExpression) e)));
-                }
-                assert(e instanceof ComparisonExpression && ! (e instanceof InComparisonExpression));   // otherwise, it is an order-comparison
-                nonIntegerExpr.add((ComparisonExpression) e);                                           // with non-literal expression on both sides.
-                return Stream.empty();                                                              // Transfer it to non-integer expression collection.
-            }).collect(Collectors.toList());
+            final List<Pair<AbstractExpression, range_t>> tt = src.stream()
+                    .flatMap(e -> {
+                        if (e.getExpressionType() == ExpressionType.OPERATOR_NOT) {
+                            if (isIntegerExpression(e.getLeft().getLeft())) {   // "expr NOT in (...)" calls notRangeOf;
+                                return Stream.of(Pair.of(e.getLeft().getLeft(), notRangeOf((ComparisonExpression) e.getLeft())));
+                            }
+                        } else if (isLiteralConstant(e.getLeft()) && isLiteralConstant(e.getRight())) {     // both sides of comparison are numbers
+                            // neither side can be VVE in this case.
+                            assert(! (e.getLeft() instanceof VectorValueExpression || e.getRight() instanceof VectorValueExpression));
+                            final boolean val = evalComparison(e.getExpressionType(),       // evaluate to boolean value,
+                                    getNumberConstant(e.getLeft()).get(), getNumberConstant(e.getRight()).get());
+                            if (isAnd != val) {          // mark logic shortcut if it is,
+                                hasEmpty.set(true);
+                            }
+                            return Stream.empty();      // erase the expression.
+                        } else if (isIntegerExpression(e.getLeft()) && isLiteralConstant(e.getRight()) &&  // when RHS is an integer, call rangeOf().
+                                (e.getRight() instanceof VectorValueExpression || isInt(e.getRight()))) {  // NOTE: check that number literal is integer. We will relax this check when we support FloatInterval operations.
+                            return Stream.of(Pair.of(e.getLeft(), rangeOf((ComparisonExpression) e)));
+                        }
+                        assert(e instanceof ComparisonExpression);   // otherwise, it is an order-comparison
+                        nonIntegerExpr.add((ComparisonExpression) e);                                           // with non-literal expression on both sides.
+                        return Stream.empty();                                                              // Transfer it to non-integer expression collection.
+                    }).collect(Collectors.toList());
             final List<ComparisonExpression> compactedNonIntegerExpr =        // compact/merge on complex comparisons
                     compactComplexComparisons(nonIntegerExpr, isAnd, hasEmpty);
             if (hasEmpty.get() || (tt.isEmpty() && compactedNonIntegerExpr.isEmpty())) {     // When no expression-expression or integer-expression comparisons remains, or has been shortcut.
@@ -123,12 +122,33 @@ class IntegerIntervalCombiner {
                             }
                         }).collect(Collectors.toList());    // This transformation step ensures that each LHS expression appear at most once.
                 // Now combine integer intervals for integer expressions, with non-integer comparison expressions.
-                final AbstractExpression expr = Stream.concat(compactedNonIntegerExpr.stream(), intIntervals.stream())
+                final AbstractExpression expr = Stream.concat(tvesOrIsNulls.stream(),
+                        Stream.concat(compactedNonIntegerExpr.stream(), intIntervals.stream()))
                         .sorted().reduce((a, b) -> new ConjunctionExpression(ConjunctionRelation.conjOf(rel), a, b))
                         .orElse(getDefaultConst(rel));
                 m_result = isAnd && hasEmpty.get() ?        // OR with one integer expression ranging from -inf to inf does not eliminate other LHS expressions
                         ConstantValueExpression.getFalse() : expr;
             }
+        }
+    }
+
+    /**
+     * Check whether the expression is TVE, "x is null", a function call, a EXISTS expression, or NOT of either.
+     * @param e
+     * @return
+     */
+    private static boolean isTveOrIsNullOrFunction(AbstractExpression e) {
+        assert(e.getValueType() == VoltType.BOOLEAN);
+        final Predicate<AbstractExpression> permissible = expr ->
+            expr instanceof TupleValueExpression || expr instanceof FunctionExpression ||
+                    isBoolean(expr.getExpressionType());
+        if (permissible.test(e)) {
+            return true;
+        } else if (e.getExpressionType() == ExpressionType.OPERATOR_NOT) {
+            return permissible.test(e.getLeft());
+        } else {
+            System.err.println(e.toString());
+            return false;
         }
     }
 
@@ -193,9 +213,9 @@ class IntegerIntervalCombiner {
     private static List<AbstractExpression> compactNumberComparisons(List<AbstractExpression> src) {
         // collect LHS of comparison expressions
         final List<AbstractExpression> lefts = new ArrayList<>(
-                src.stream()
-                        .filter(e -> e instanceof ComparisonExpression)
-                        .map(AbstractExpression::getLeft)
+                src.stream()        // At this point, it might contain string comparisons like c1 = 'foo',
+                        .filter(e -> e instanceof ComparisonExpression && e.getLeft().getValueType().isNumber())
+                        .map(AbstractExpression::getLeft)   // certainly they cannot be minus-ed.
                         .collect(Collectors.toSet()));
         // filter on those LHS expressions whose -{expression} is equivalent to some entry in the collection:
         // <pseudo-code>
@@ -206,12 +226,12 @@ class IntegerIntervalCombiner {
         //      }
         // }
         // </pseudo-code>
-        final Set<AbstractExpression> duplicatedIndices =
-                IntStream.range(0, lefts.size()).mapToObj(i -> {
+        final Set<AbstractExpression> duplicatedIndices = IntStream.range(0, lefts.size())
+                .mapToObj(i -> {
                     final AbstractExpression e1 = s_negator.apply(lefts.get(i));
                     return IntStream.range(i + 1, lefts.size()).filter(j -> lefts.get(j).equivalent(e1));
                 }).reduce(IntStream::concat).orElse(IntStream.empty())
-                        .mapToObj(i -> lefts.get(i)).collect(Collectors.toSet());
+                .mapToObj(i -> lefts.get(i)).collect(Collectors.toSet());
         return duplicatedIndices.isEmpty() ? src :      // When found any duplications, minus-negate both sides for those
                 src.stream().map(e ->                   // duplications, and reverse comparisons, e.g. "a - b > 5" ==> "b - a < -5".
                         e instanceof ComparisonExpression && duplicatedIndices.contains(e.getLeft()) ?
@@ -283,7 +303,12 @@ class IntegerIntervalCombiner {
      * @return interval merge/combined expression
      */
     static AbstractExpression combine(List<AbstractExpression> src, ConjunctionRelation rel) {
-        return new IntegerIntervalCombiner(src, rel).get();
+        final Predicate<AbstractExpression> isComparison =      // test that e is either an (in)-comparison, or a "NOT (x in (expr...))" comparison.
+                e -> e instanceof ComparisonExpression ||
+                        e.getExpressionType() == ExpressionType.OPERATOR_NOT && e.getLeft() instanceof InComparisonExpression;
+        return new IntegerIntervalCombiner(src.stream().filter(isComparison).collect(Collectors.toList()),
+                src.stream().filter(isComparison.negate()).collect(Collectors.toList()),
+                rel).get();
     }
     /**
      * API to use the integer interval combiner.
@@ -292,9 +317,15 @@ class IntegerIntervalCombiner {
      * @return interval merge/combined expression
      */
     static AbstractExpression combine(AbstractExpression e, ConjunctionRelation rel) {
-        return rel == ConjunctionRelation.ATOM ?
-                new IntegerIntervalCombiner(new ArrayList<AbstractExpression>(){{ add(e); }}, ConjunctionRelation.AND).get() :
-                combine(conjunctionAdder(e, rel), rel);
+        if (rel == ConjunctionRelation.ATOM) {
+            return e.getValueType().isNumber() ?        // Skip for non-number (i.e. string) comparisons.
+                    new IntegerIntervalCombiner(
+                    new ArrayList<AbstractExpression>() {{ add(e); }}, new ArrayList<>(),
+                    ConjunctionRelation.AND).get() :
+                    e;
+        } else {
+            return combine(conjunctionAdder(e, rel), rel);
+        }
     }
 
     /**
@@ -494,7 +525,7 @@ class IntegerIntervalCombiner {
                         .map(e -> (AbstractExpression) new ComparisonExpression(ExpressionType.COMPARE_NOTEQUAL, lhs, e))
                         .reduce((a, b) -> new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, a, b)).get();
             } else {       // otherwise, use negated InComparison.
-                excludedExpr = new OperatorExpression(ExpressionType.OPERATOR_NOT, new InComparisonExpression(lhs, excluded), null);
+                excludedExpr = new OperatorExpression(ExpressionType.OPERATOR_NOT, new InComparisonExpression(lhs, excluded), null, 0);
             }
             if (included != null && excluded != null) {     // combine converted inclusion/exclusion representations
                 return new ConjunctionExpression(ConjunctionRelation.conjOf(conj), includedExpr, excludedExpr);

@@ -42,11 +42,11 @@ final class UnaryMinusPushDown {
                     break;
                 case OPERATOR_PLUS:             // a + b ==> -a - b
                     m_expr = new OperatorExpression(ExpressionType.OPERATOR_MINUS,
-                            new UnaryMinusPushDown(e.getLeft()).get(), eliminate(e.getRight()));
+                            new UnaryMinusPushDown(e.getLeft()).get(), eliminate(e.getRight()), 0);
                     break;
                 case OPERATOR_MINUS:            // -(a - b) ==> b - a
                     m_expr = new OperatorExpression(e.getExpressionType(),
-                            eliminate(e.getRight()), eliminate(e.getLeft()));
+                            eliminate(e.getRight()), eliminate(e.getLeft()), 0);
                     break;
                 case OPERATOR_MULTIPLY:         // If there is a number constant in multiplication/division, negate that number constant;
                 case OPERATOR_DIVIDE:
@@ -65,10 +65,10 @@ final class UnaryMinusPushDown {
                             right = new UnaryMinusPushDown(right).get();
                         }
                     }
-                    m_expr = new OperatorExpression(e.getExpressionType(), eliminate(left), eliminate(right));
+                    m_expr = new OperatorExpression(e.getExpressionType(), eliminate(left), eliminate(right), 0);
                     break;
                 default:
-                    m_expr = new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, e, null);
+                    m_expr = new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, e, null, 0);
             }
         }
     }

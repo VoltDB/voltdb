@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.QuantifierType;
 
 import java.util.Comparator;
 
@@ -34,6 +35,7 @@ public class InComparisonExpression extends ComparisonExpression {
         this();
         setLeft(left);
         setRight(right);
+        setQuantifier(QuantifierType.ANY);
     }
 
     @Override
