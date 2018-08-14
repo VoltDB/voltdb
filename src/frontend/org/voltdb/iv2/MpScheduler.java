@@ -518,11 +518,9 @@ public class MpScheduler extends Scheduler
         // RTB: Didn't we decide early rollback can do this legitimately.
         if (txn != null) {
             SerializableException ex = message.getException();
-            if (ex != null && ex instanceof TransactionRestartException) {
-                if (((TransactionRestartException)ex).isMisrouted()) {
-                    ((MpTransactionState)txn).restartFragment(message, m_iv2Masters, m_partitionMasters);
-                    return;
-                }
+            if (ex instanceof TransactionRestartException && ((TransactionRestartException)ex).isMisrouted()) {
+                tmLog.debug("MpScheduler received misroute FragmentResponseMessage");
+                ((TransactionRestartException)ex).updateReplicas(m_iv2Masters, m_partitionMasters);
             }
             ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
         }
