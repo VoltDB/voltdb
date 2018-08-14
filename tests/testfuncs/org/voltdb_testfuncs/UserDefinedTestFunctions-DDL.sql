@@ -2,10 +2,6 @@
 -- UserDefinedTestFunctions.java, using various data types, and with
 -- various numbers of arguments.
 
--- TODO: I'm not certain whether Byte[] (as opposed to byte[]) is a valid
--- way to represent VARBINARY; if not, then add2VarbinaryBoxed & btrimBoxed
--- should be removed
-
 -- First, drop all the test UDF's (user-defined functions), and remove the class
 -- containing them, in case they were loaded and created previously
 

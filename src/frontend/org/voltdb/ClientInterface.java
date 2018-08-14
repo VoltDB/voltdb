@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -2369,44 +2368,4 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
     }
-
-    public void runTimeToLive(String columnName, long ttlValue, int chunkSize, int timeout,
-            TTLManager.TTLTask task) {
-
-       CountDownLatch latch = new CountDownLatch(1);
-       final ProcedureCallback cb = new ProcedureCallback() {
-           @Override
-           public void clientCallback(ClientResponse resp) throws Exception {
-               if (resp.getStatus() != ClientResponse.SUCCESS) {
-                   hostLog.warn(String.format("Fail to execute TTL on table: %s, column: %s, status: %s",
-                           task.tableName, columnName, resp.getStatusString()));
-               }
-               if (resp.getResults() != null && resp.getResults().length > 0) {
-                   VoltTable t = resp.getResults()[0];
-                   t.advanceRow();
-                   String error = t.getString("MESSAGE");
-                   if (!error.isEmpty()) {
-                       String drLimitError = "";
-                       if (error.indexOf(TTLManager.DR_LIMIT_MSG) > -1) {
-                           // The buffer limit for a DR transaction is 50M. If over the limit,
-                           // the transaction will be aborted. The same is true for nibble delete transaction.
-                           // If hit this error, no more data can be deleted in this TTL table.
-                           drLimitError = "TTL is disabled for this table.";
-                           task.cancel();
-                       }
-                       hostLog.warn("Errors occured on TTL table " + task.tableName + ": " +  error + " " + drLimitError);
-                   } else {
-                       task.stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"), t.getLong("LAST_DELETE_TIMESTAMP"));
-                   }
-               }
-               latch.countDown();
-           }
-       };
-       m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
-               true, 1000 * 120, cb, "@LowImpactDelete", new Object[] {task.tableName, columnName, ttlValue, "<", chunkSize, timeout});
-       try {
-           latch.await(1, TimeUnit.MINUTES);
-       } catch (InterruptedException e) {
-       }
-   }
 }

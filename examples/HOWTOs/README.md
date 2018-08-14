@@ -5,12 +5,15 @@ In this directory, we're collecting short tutorials and other "How to" examples 
 
 Development:
 ------------
+ * [Changing the Schema on a live cluster](MakeChanges.md)
  * [Using Eclipse to develop, unit test, and debug VoltDB stored procedures and java clients](EclipseUnitTestDebug.md)
  * [Configure Logging](ConfigureLogging.md)
  * [Use the BulkLoader API from a java client to load a table](bulkloader/README.md)
+ * [Start and Maintain an XDCR Cluster](xdcr_tutorial.md)
 
 Administration:
 ---------------
+ * [Changing the Schema or Deployment configuration on a live cluster](MakeChanges.md)
  * [Run VoltDB Server as a Daemon (in the background)](RunServerInTheBackground.md)
  * [Run VoltDB Examples on a Cluster](RunAnExampleInACluster.md)
  * [Run VoltDB Virtualized, Containerized or in the Cloud](VirtualizeOrContainerize.md)

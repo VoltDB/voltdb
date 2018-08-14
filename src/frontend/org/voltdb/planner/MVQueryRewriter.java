@@ -174,9 +174,6 @@ final class MVQueryRewriter {
      * match.
      * \pre both SELECT stmt and candidate MV has a single table source. This is guaranteed in the constructor logic.
      *
-     * TODO: 1. Verify the case that GBY complex expressions ordering mismatch should actually be optimized/matched
-     * TODO: 2. Verify that the combination of complex and simple GBY expressions from different tables should *NOT* be matched.
-     *
      * @param mv candidate materialized view
      * @return whether given candidate MV might match SELECT stmt, by looking only at the group-by expressions.
      */

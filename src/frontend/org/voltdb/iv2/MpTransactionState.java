@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -59,7 +60,7 @@ public class MpTransactionState extends TransactionState
 {
     static VoltLogger tmLog = new VoltLogger("TM");
 
-    private static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
+    public static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
     private static final String dr_max_consumer_partitionCount_str = "DR_MAX_CONSUMER_PARTITIONCOUNT";
     private static final String dr_max_consumer_messageheader_room_str = "DR_MAX_CONSUMER_MESSAGEHEADER_ROOM";
     private static final String volt_output_buffer_overflow = "V0001";
@@ -175,6 +176,11 @@ public class MpTransactionState extends TransactionState
 
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
+        // TODO separate NPTransactionState from MPTransactionState when work on concurrent np transaction
+        if (m_nPartTxn) {
+            partitionMasters = trimPartitionMasters(partitionMasters);
+            masters = Lists.newArrayList(partitionMasters.values());
+        }
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("[MpTransactionState] TXN ID: " + TxnEgo.txnIdSeqToString(txnId) + " update masters from " +  CoreUtils.hsIdCollectionToString(m_useHSIds)
             + " to "+ CoreUtils.hsIdCollectionToString(masters));
@@ -184,6 +190,15 @@ public class MpTransactionState extends TransactionState
         m_masterHSIds.clear();
         m_masterHSIds.putAll(partitionMasters);
         m_localPartitionCount = m_masterHSIds.size();
+    }
+
+    private HashMap<Integer, Long> trimPartitionMasters(Map<Integer, Long> partitionMasters)
+    {
+        HashMap<Integer,Long> partitionMastersCopy = Maps.newHashMap(partitionMasters);
+
+        // For n-partition transaction, only care about the partitions involved in the transaction.
+        partitionMastersCopy.keySet().retainAll(m_masterHSIds.keySet());
+        return partitionMastersCopy;
     }
 
     /**
@@ -605,6 +620,15 @@ public class MpTransactionState extends TransactionState
      * @param partitionMastersMap The current partition masters
      */
     public void restartFragment(FragmentResponseMessage message, List<Long> masters, Map<Integer, Long> partitionMastersMap) {
+        // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
+        if (m_restartTimestamp != message.getRestartTimestamp()) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Receives stale misrouted fragment response, " +
+                        "expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
+                        " actually receives: " + message);
+            }
+            return;
+        }
         final int partionId = message.getPartitionId();
         Long restartHsid = partitionMastersMap.get(partionId);
         Long hsid = message.getExecutorSiteId();

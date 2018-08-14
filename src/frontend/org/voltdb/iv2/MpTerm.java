@@ -62,7 +62,7 @@ public class MpTerm implements Term
             HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>();
             boolean migratePartitionLeaderRequested = false;
             for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
-                long hsid = e.getValue().m_HSID;
+                long hsid = e.getValue().m_HSId;
                 builder.add(hsid);
                 cacheCopy.put(e.getKey(), hsid);
 

@@ -771,15 +771,23 @@ tr:hover{
         test_case = summary.split(' ')[0]
         existing = jira.search_issues('summary ~ \'%s\' and labels = automatic and status != Closed' % test_case)
         if len(existing) > 0:
-            # Already reported
             self.logger.info('Found open issue(s) for "' + test_case + '" ' + ' '.join([k.key for k in existing]))
-            # If failing on different job, comment about new failure on previous ticket
-            reported_ticket = jira.issue(existing[0].id)
-            reported_job = reported_ticket.fields.summary.split('(')[0].split()[-1]
-            if reported_job not in summary and not DRY_RUN:
+
+            # Check if new failure is on different job than existing ticket, if so comments
+            job = summary.split()[-2]
+            existing_ticket = jira.issue(existing[0].id)
+            if job not in existing_ticket.fields.summary:
+                comments = jira.comments(existing[0].id)
+                for comment in comments:
+                    # Check for existing comment for same job, if there are any, suppress commenting another
+                    if job in comment.body:
+                        self.logger.info('Found existing comment(s) for "' + job + '" on open issue')
+                        return
+
                 self.logger.info('Commenting about separate job failure for %s on open issue' % test_case)
-                jira.add_comment(existing[0].id, summary + '\n\n' + description)
-                add_attachments(jira, existing[0].id, attachments)
+                if not DRY_RUN:
+                    jira.add_comment(existing[0].id, summary + '\n\n' + description)
+                    add_attachments(jira, existing[0].id, attachments)
             return
 
         issue_dict = {
