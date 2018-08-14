@@ -82,7 +82,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean m_hasPartitionColumnInGroupby = false;
     private boolean m_hasAggregateDistinct = false;
-    private boolean m_hasPartitionColumnInDistinctGroupby = false;
     private boolean m_isComplexOrderBy = false;
 
     // Limit plan node information.
@@ -1836,14 +1835,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public void setHasPartitionColumnInGroupby() {
         m_hasPartitionColumnInGroupby = true;
-    }
-
-    public boolean hasPartitionColumnInDistinctGroupby() {
-        return m_hasPartitionColumnInDistinctGroupby;
-    }
-
-    public void setHasPartitionColumnInDistinctGroupby() {
-        m_hasPartitionColumnInDistinctGroupby = true;
     }
 
     /**

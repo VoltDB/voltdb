@@ -21,7 +21,6 @@ import java.util.*;
 import java.util.Map.Entry;
 
 import org.json_voltpatches.JSONException;
-import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -2327,11 +2326,19 @@ public class PlanAssembler {
      * which can provide ordering for partial or serial aggregation.
      */
     private static class IndexGroupByInfo {
-        // This is true iff this is a multipartition plan with no
-        // join on the coordinator node.  If we have a join an a
-        // replicated table this will be set to false as well,
-        // so the name is not completely evocative.
-        boolean m_multiPartition = false;
+        final boolean m_isLargeQuery;
+        // This is true iff this is a multipartition aggregation plan.
+        // That is to say, if the aggregation spans the
+        // RECEIVE/SEND boundary.
+        //
+        // Keep in mind that we can always just stick a hash aggregation
+        // or an order by followed by a serial aggregation on top of
+        // any subplan, whether it is a distributed plan or not.
+        // For queries with distinct aggregates where the group by
+        // does not contain a partition column that's what we have
+        // to do.  In this case m_multipartition will be false even
+        // for multipartition queries.
+        boolean m_multiPartitionAggregation = false;
 
         // If we found or created an ordering node which provides a useful
         // order for partial or serial aggregation then this is the
@@ -2345,6 +2352,7 @@ public class PlanAssembler {
         // size as the group by column list then we use serial
         // aggregation.
         List<Integer> m_coveredGroupByColumns;
+
         // This is true if we have an ordering node (cf. m_indexAccess) and
         // all the group by columns are covered by the keys of the ordering
         // node.  The ordering node can be an index scan or an order by
@@ -2355,13 +2363,18 @@ public class PlanAssembler {
 
         // If we have a node that can provide order for serial or partial
         // aggregation, it is stored here.  If this is null there is no
-        // helpful order.
+        // helpful order.  This can be an index scan node or else an
+        // order by node.
         AbstractPlanNode m_indexAccess = null;
 
-        // This will be the root of the subplan.  Sometimes it
-        // is the same as the original root, and sometimes we pile more
-        // nodes onto the original root.
-        AbstractPlanNode m_rootPlanAfterSuccessfulSwitch = null;
+        // This is set to true if we determine that we will need a
+        // top order by node.  This happens if we have forced a switch
+        // to serial aggregation for large temp table queries.
+        boolean m_needTopOrderByNode;
+
+        public IndexGroupByInfo(boolean isLargeQuery) {
+            m_isLargeQuery = isLargeQuery;
+        }
 
         // Serial aggregation happens when there is an ordering node whose
         // keys cover all group by keys.  In this case we can avoid hash aggregation
@@ -2388,22 +2401,29 @@ public class PlanAssembler {
          */
         boolean needHashAggregator(AbstractPlanNode root, ParsedSelectStmt parsedSelect) {
             // If there are no group by keys, then there is one
-            // big group, and we can do serial aggregation.
+            // big group, and we can do serial aggregation with
+            // no order by or index scan.
             if (! parsedSelect.isGrouped()) {
                 return false;
             }
 
-            // If we changed to serial aggregation then we don't
-            // need hash aggregation.  But if it's multipartition,
-            // then we might still need a hash aggregation.
-            if (isChangedToSerialAggregate() && ! m_multiPartition) {
+            // Large queries can never use hash aggregation for anything.
+            if (m_isLargeQuery) {
+                return false;
+            }
+            // If we changed to serial aggregation and we don't have a
+            // multipartition aggregation then we don't need a hash
+            // aggregate.  This happens if we have a single fragment
+            // plan.
+            if (isChangedToSerialAggregate() && !m_multiPartitionAggregation) {
                 return false;
             }
 
             // Currently, an index scan only claims to have a sort direction when its output
             // matches the order demanded by the ORDER BY clause.  So if the group by keys
             // form a permutation of the order by keys then the group by keys
-            // match an index.
+            // match the index.  We don't care anything about the order, other than
+            // that it's set and not INVALID.
             boolean predeterminedOrdering = false;
             if (root instanceof IndexScanPlanNode) {
                 if (((IndexScanPlanNode)root).getSortDirection() !=
@@ -2496,6 +2516,9 @@ public class PlanAssembler {
      *         argument.</li>
      * </ol>
      *
+     * Note that we don't add order by nodes here.  If we need to force
+     * serial aggregation for large temp tables that will be done elsewhere.
+     *
      * Original Comment:
      *
      * For a seqscan feeding a GROUP BY, consider substituting an IndexScan
@@ -2525,50 +2548,128 @@ public class PlanAssembler {
 
         if (candidate instanceof IndexScanPlanNode) {
             calculateIndexGroupByInfo((IndexScanPlanNode) candidate, gbInfo);
+            // If we found an index suitable for serial aggregation, then
+            // just note it in gbInfo.  We set this in the call to
+            // calculateIndexGroupByInfo.
+            if (gbInfo.m_canBeFullySerialized) {
+                gbInfo.m_indexAccess = candidate;
+                // No new plan node is created, so return false;
+                return false;
+            }
+            // So, it's either partial aggregation or hash aggregation.
             if (gbInfo.m_coveredGroupByColumns != null &&
                     !gbInfo.m_coveredGroupByColumns.isEmpty()) {
-                // The candidate index does cover all or some
-                // of the GROUP BY columns and can be serialized.
-                // This could be serial or partial aggregation.
-                gbInfo.m_indexAccess = candidate;
-                // Drop through to return false, because we
-                // haven't changed the candidate subplan.
+                // The candidate index does cover some
+                // of the GROUP BY columns.  Since we checked
+                // for serial aggregation via the index above, this
+                // must be partial aggregation.
+                //
+                // For normal sized temp table queries partial aggregation
+                // is perfectly alright.
+                if (!isLargeQuery()) {
+                    gbInfo.m_indexAccess = candidate;
+                    // Again, no new plan node is created, so return false.
+                    return false;
+                }
             }
+            // So, either no index is useful or else the best index
+            // is only only partially useful in a large temp table query.
+            // If this is a large temp table query then force it to be
+            // serial aggregation by adding an order by node.
+            if (isLargeQuery()) {
+                return convertToSerialAggregation(candidate, gbInfo);
+            }
+            // No index is useful for normal size temp tables.
+            // So this entire venture is a failure.  Don't think
+            // about changing the index node to something else,
+            // since it may be used for something like filtering.
+            // It's not very useful for order by or window functions,
+            // but we'll sort that out later in handleOrderBy.
             return false;
         }
 
+        // The candidate is some sort of subplan, maybe a sequential scan
+        // or maybe a join of some sort.  Try to find the outermost
+        // sequential scan node.  We'll try to convert it to an index
+        // scan.
         AbstractPlanNode sourceSeqScan = findSeqScanCandidateForGroupBy(candidate);
         if (sourceSeqScan == null) {
+            // Maybe the leftmost scan is already an index scan.  It's
+            // not useful to us then.  Return false, since we haven't
+            // changed the plan tree at all.
             return false;
         }
         assert(sourceSeqScan instanceof SeqScanPlanNode);
+
+        // Look for an index which is compatible with the
+        // group by keys.  If we can't find one, then what we do depends
+        // on whether this is a large or normal temp table query.
+        if ( ! indexAccessForGroupByExprs((SeqScanPlanNode)sourceSeqScan, gbInfo)) {
+            // If it's a large temp table query, then we need to convert
+            // it to be sorted.  So put an order by node here and remember it.
+            // in gbInfo.  Return whether we changed the tree or not.
+            if (isLargeQuery()) {
+                return convertToSerialAggregation(candidate, gbInfo);
+            }
+            // If we have no useful index, and it's not a large query,
+            // then we haven't done anything.  We will use hash aggregation,
+            // but that's ok.
+            return false;
+        }
+
+        // We have to have created an index node here in indexAccessForGroupByExprs.
+        assert( gbInfo.m_indexAccess != null);
 
         AbstractPlanNode parent = null;
         if (sourceSeqScan.getParentCount() > 0) {
             parent = sourceSeqScan.getParent(0);
         }
-        if ( ! indexAccessForGroupByExprs((SeqScanPlanNode)sourceSeqScan, gbInfo)) {
-            return false;
-        }
-
-        assert( gbInfo.m_indexAccess != null);
 
         if (parent != null) {
             // have a parent and would like to replace
-            // the sequential scan with an index scan
+            // the sequential scan with the new index scan
+            // node found in gbInfo.m_indexAccess.
             gbInfo.m_indexAccess.clearParents();
             // For two children join node, index 0 is its outer side
             parent.replaceChild(0, gbInfo.m_indexAccess);
             // We have found a useful index scan node.  But
-            // we haven't replaced the candidate subplan, so
-            // we return false.
+            // we have just replaced a leaf node in a larger
+            // tree, not the root of the tree.  So we return false.
             return false;
         }
 
         // The original candidate subplan was the entire
         // subplan, and we have a new candidate.  So we
-        // return true.
+        // return true.  The new answer is in gbInfo.
         return true;
+    }
+
+    /**
+     * Insert an order by node above the candidate.  Record it
+     * in gbInfo.m_indexAccess.  Return true iff the original
+     * candidate had no parents.
+     *
+     * @param candidate A subplan which needs ordering.
+     * @param gbInfo The {@link IndexGroupByInfo} that records
+     *               indexing information, and into which we want
+     *               to put the new order by node.
+     * @return true iff the original candidate had no parents.
+     */
+    private boolean convertToSerialAggregation(AbstractPlanNode candidate,
+                                               IndexGroupByInfo gbInfo) {
+        AbstractPlanNode parentNode = null;
+        if (candidate.getParentCount() > 0) {
+            parentNode = candidate.getParent(0);
+            candidate.clearParents();
+        }
+        OrderByPlanNode sortNode = buildOrderByPlanNode(m_parsedSelect.groupByColumns());
+        sortNode.addAndLinkChild(candidate);
+        if (parentNode != null) {
+            parentNode.replaceChild(0, sortNode);
+        }
+        gbInfo.m_canBeFullySerialized = true;
+        gbInfo.m_indexAccess = sortNode;
+        return (parentNode == null);
     }
 
     /**
@@ -2690,17 +2791,23 @@ public class PlanAssembler {
         return null;
     }
 
-    private static class AggregatePlanNodes {
+    private static class AggregatePlanNodesForGroupBy {
         private AggregatePlanNode m_topAggNode;
         private AggregatePlanNode m_aggNode;
         private OrderByPlanNode   m_topOrderByNode;
 
-        public AggregatePlanNodes(AggregatePlanNode topAggNode,
-                                  AggregatePlanNode aggNode,
-                                  OrderByPlanNode   topOrderByNode) {
+        public AggregatePlanNodesForGroupBy(AggregatePlanNode topAggNode,
+                                            AggregatePlanNode aggNode,
+                                            OrderByPlanNode   topOrderByNode) {
             m_topAggNode     = topAggNode;
             m_aggNode        = aggNode;
             m_topOrderByNode = topOrderByNode;
+        }
+
+        public AggregatePlanNodesForGroupBy(AggregatePlanNode topAggNode,
+                                            AggregatePlanNode aggNode) {
+            this(topAggNode, aggNode, null);
+
         }
 
         public AggregatePlanNode getTopAggNode() {
@@ -2714,31 +2821,36 @@ public class PlanAssembler {
         public OrderByPlanNode getTopOrderByNode() {
             return m_topOrderByNode;
         }
-    }
-    private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
-        /* Check if any aggregate expressions are present */
 
+    }
+
+    private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. "Select max(A) from T;" is not grouped but has an aggregate
          * function.  We want to inspect both cases here.
          */
         if (m_parsedSelect.hasAggregateOrGroupby()) {
-            IndexGroupByInfo gbInfo = new IndexGroupByInfo();
+            IndexGroupByInfo gbInfo = new IndexGroupByInfo(isLargeQuery());
 
             if (root instanceof AbstractReceivePlanNode) {
                 // Do not apply index scan for serial/partial aggregation
                 // for distinct that does not group by partition column.
                 //
-                // If we have a distinct agg *and* a non-partition column group key,
-                // then we we may see the same aggregate *argument* values in different
-                // partition result sets.  We can't do much of anything on the
-                // distributed node in this case.  The coordinator needs to see
-                // all the rows to dedupe them for the aggregate distinct calculation.
+                // If we have a distinct agg *and* no partition column is a group by key,
+                // then we we may see the same aggregate *argument* values in one
+                // group but in different partition result sets.  We can't
+                // do much of anything on the distributed node in this case.
+                // The coordinator needs to see all the rows to dedupe them
+                // for the aggregate distinct calculation.
+                //
+                // For non-distinct aggregates this is not a problem,
+                // since we can compute partial answers on the partitions
+                // and then compute the final answer on the coordinator.
                 if ( ! m_parsedSelect.hasAggregateDistinct() ||
                         m_parsedSelect.hasPartitionColumnInGroupby()) {
                     AbstractPlanNode candidate = root.getChild(0).getChild(0);
-                    gbInfo.m_multiPartition = true;
+                    gbInfo.m_multiPartitionAggregation = true;
                     // We may not be able to switch to index scan, but
                     // we don't really care here.  The root will stay the
                     // same in any case, and we don't really care about
@@ -2747,18 +2859,17 @@ public class PlanAssembler {
                 }
             }
             else if (switchToIndexScanForGroupBy(root, gbInfo)) {
+                // Since switchToIndexScanForGroupBy returned true,
+                // we created a new top node.  Switch to it.
                 root = gbInfo.m_indexAccess;
             }
-            // If this is a large query and the stuff above didn't switch
-            // to serial aggregation, then hit it with Mjölnir.
-            if ( isLargeQuery() && ( ! gbInfo.isChangedToSerialAggregate())) {
-                root = forceSwitchToSerialAccess(root, gbInfo);
-            }
 
-            AggregatePlanNodes aggregateNodes = makeAggregateNodes(root, gbInfo);
-            AggregatePlanNode aggNode        = aggregateNodes.getAggNode();
-            AggregatePlanNode topAggNode     = aggregateNodes.getTopAggNode();
-            OrderByPlanNode   topOrderByNode = aggregateNodes.getTopOrderByNode();
+            // Here gbInfo knows if we've switched to serial or partial
+            // aggregation, or if we can't do anything interesting in the
+            // distributed fragments.
+            AggregatePlanNodesForGroupBy aggregateNodes = makeAggregateNodes(root, gbInfo);
+            AggregatePlanNode  aggNode        = aggregateNodes.getAggNode();
+            AggregatePlanNode  topAggNode     = aggregateNodes.getTopAggNode();
 
             // It's a disaster to need hash aggregation if this is
             // a large temp table.  Note that aggNode may not be null,
@@ -2775,19 +2886,60 @@ public class PlanAssembler {
             }
 
             // Never push down aggregation for MV fix case.
-            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect);
+            root = pushDownAggregate(root, aggregateNodes, m_parsedSelect);
         }
 
         return handleDistinctWithGroupby(root);
     }
 
-    private AggregatePlanNodes calculateAggregateSchemasAndOperators(AggregatePlanNodes aggNodes) {
+    private AggregatePlanNodesForGroupBy calculateAggregateSchemasAndOperators(AggregatePlanNodesForGroupBy aggNodes) {
         AggregatePlanNode topAggNode      = aggNodes.getTopAggNode();
         AggregatePlanNode aggNode         = aggNodes.getAggNode();
-        OrderByPlanNode   topOrderByNode  = aggNodes.getTopOrderByNode();
+        // We haven't filled this in in aggNodes yet.
+        OrderByPlanNode   topOrderByNode  = null;
         NodeSchema        agg_schema      = new NodeSchema();
         NodeSchema        top_agg_schema  = new NodeSchema();
 
+        // We will need an order by node on top iff there is a partition
+        // column among the group by keys and it's a large query.
+        //
+        // If this holds then each the group
+        // will be found on a single partition.  One partition may have several
+        // groups but no group will have rows in more than one partition.  So
+        // the rows we read from the partitions will have all the aggregation
+        // done already.  If the group by keys have no partition column then
+        // a group might have rows in multiple partitions, and the coordinator
+        // will have to sort them.  Note that this is independent of whether
+        // the distributed fragment is order by an order by node or an index
+        // scan.  If it is ordered it will be ordered by group by key values,
+        // and we will have squashed all of these into one row before sending
+        // them to the coordinator.
+        //
+        // For normal sized queries we just use hash aggregation.
+        //
+        // Note that if m_multiPartitionAggregation is false we will need
+        // a top order by node.  But this is implied by the partition in
+        // group by requirement, so we are ok.
+        boolean needTopOrderby = isLargeQuery() && (! m_parsedSelect.hasPartitionColumnInGroupby());
+
+        // Calculate the order by node if we need one.
+        if (needTopOrderby && topAggNode != null) {
+            topOrderByNode = new OrderByPlanNode();
+        }
+        // If we don't have a top order by node we must have
+        // some kind of hash aggregation.  This includes partial
+        // aggregation.
+        /*
+        assert( ( topOrderByNode == null)
+                ? true
+                : (topAggNode instanceof HashAggregatePlanNode) || (topAggNode instanceof PartialAggregatePlanNode));
+        */
+
+        // Build the output schemas for the aggregate nodes.
+        // If we are building a top order by node we add the
+        // sort columns here.  They should all be TVEs, since
+        // we are sorting by the group by key values in the
+        // tables from the partitions.
         for ( int outputColumnIndex = 0;
                 outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
                 outputColumnIndex += 1) {
@@ -2928,6 +3080,14 @@ public class PlanAssembler {
                         col.m_tableName, col.m_tableAlias,
                         col.m_columnName, col.m_alias,
                         topExpr, outputColumnIndex);
+                // Sort by the indexes of the group by columns.
+                if (topOrderByNode != null && col.m_groupBy) {
+                    // Sort order doesn't really matter here,
+                    // but choose one.  These should all be
+                    // tuple value expressions.
+                    assert(topExpr instanceof TupleValueExpression);
+                    topOrderByNode.addSortExpression(topExpr.clone(), SortDirectionType.DESC);
+                }
             }
 
             agg_schema.addColumn(schema_col);
@@ -2950,25 +3110,21 @@ public class PlanAssembler {
                 topAggNode.setOutputSchema(agg_schema);
             }
         }
-        return new AggregatePlanNodes(aggNode, topAggNode, topOrderByNode);
+        return new AggregatePlanNodesForGroupBy(topAggNode, aggNode, topOrderByNode);
     }
 
-    public AggregatePlanNodes makeAggregateNodes(AbstractPlanNode root,
-                                                 IndexGroupByInfo gbInfo) {
+    public AggregatePlanNodesForGroupBy makeAggregateNodes(AbstractPlanNode root,
+                                                           IndexGroupByInfo gbInfo) {
         // This is the distributed node.
         AggregatePlanNode aggNode;
         // This is the aggregate node for the coordinator.
         // It may be null.
         AggregatePlanNode topAggNode     = null;
-        // This is the orderby for large temp table serial aggregation
-        // when we can't find any other convenient and useful ordering.
-        OrderByPlanNode   topOrderByNode = null;
 
         boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
-
         // Construct the aggregate nodes
         if (needHashAgg) {
-            // Belt and suspenders.
+            // This is deadly.
             assert( ! isLargeQuery() );
             if ( m_parsedSelect.m_mvFixInfo.needed() ) {
                 // TODO: may optimize this edge case in future
@@ -2980,15 +3136,12 @@ public class PlanAssembler {
                     aggNode = new AggregatePlanNode();
                 }
                 else if (gbInfo.isChangedToPartialAggregate()) {
-                    assert ( ! isLargeQuery() );
                     aggNode = new PartialAggregatePlanNode(gbInfo.m_coveredGroupByColumns);
                 }
                 else {
-                    assert( ! isLargeQuery() );
                     aggNode = new HashAggregatePlanNode();
                 }
 
-                assert( ! isLargeQuery() );
                 topAggNode = new HashAggregatePlanNode();
             }
         }
@@ -3000,13 +3153,7 @@ public class PlanAssembler {
             }
         }
 
-        return calculateAggregateSchemasAndOperators(new AggregatePlanNodes(aggNode, topAggNode, topOrderByNode));
-    }
-
-    private AbstractPlanNode forceSwitchToSerialAccess(AbstractPlanNode root,
-                                                       IndexGroupByInfo gbInfo) {
-        // %%%;
-        return root;
+        return calculateAggregateSchemasAndOperators(new AggregatePlanNodesForGroupBy(topAggNode, aggNode));
     }
 
     // Sets IndexGroupByInfo for an IndexScan
@@ -3234,10 +3381,12 @@ public class PlanAssembler {
      *            push-down. If this is null, no push-down will be performed.
      * @return The new root node.
      */
-    private static AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
-                                       AggregatePlanNode distNode,
-                                       AggregatePlanNode coordNode,
-                                       ParsedSelectStmt selectStmt) {
+    private static AbstractPlanNode pushDownAggregate(AbstractPlanNode     root,
+                                                      AggregatePlanNodesForGroupBy aggNodes,
+                                                      ParsedSelectStmt     selectStmt) {
+        AggregatePlanNode coordNode   = aggNodes.getTopAggNode();
+        AggregatePlanNode distNode    = aggNodes.getAggNode();
+        OrderByPlanNode   topSortNode = aggNodes.getTopOrderByNode();
         AggregatePlanNode rootAggNode;
 
         // remember that coordinating aggregation has a pushed-down
@@ -3261,6 +3410,8 @@ public class PlanAssembler {
             distNode.addAndLinkChild(root);
 
             if (selectStmt.hasPartitionColumnInGroupby()) {
+                // We should not have a top sort node here.
+                assert(topSortNode == null);
                 // Set post predicate for final distributed Aggregation node
                 distNode.setPostPredicate(selectStmt.getHavingPredicate());
 
@@ -3287,9 +3438,14 @@ public class PlanAssembler {
             // Now that we're certain the aggregate will be pushed down
             // (no turning back now!), fix any APPROX_COUNT_DISTINCT aggregates.
             fixDistributedApproxCountDistinct(distNode, coordNode);
-
             // Put the send/receive pair back into place
             accessPlanTemp.getChild(0).addAndLinkChild(distNode);
+            // If we have a top order by node for the coordinator
+            // aggregate node, then push it on here.
+            if (topSortNode != null) {
+                topSortNode.addAndLinkChild(accessPlanTemp);
+                accessPlanTemp = topSortNode;
+            }
             // Add the top node
             coordNode.addAndLinkChild(accessPlanTemp);
             rootAggNode = coordNode;

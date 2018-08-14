@@ -59,7 +59,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     // Test normal sized temp tables.
     private static boolean TEST_NORMAL_SIZE_QUERIES = true;
     // Test large sized temp tables.
-    private static boolean TEST_LARGE_QUERIES = false;
+    private static boolean TEST_LARGE_QUERIES = true;
 
     @Override
     protected void setUp() throws Exception {
@@ -314,7 +314,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             validatePlan("SELECT C, A, MAX(B) FROM R2 WHERE A > 0 and B > 3 GROUP BY C, A",
                          PRINT_JSON_PLAN,
                          fragSpec(PlanNodeType.SEND,
-                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                  new PlanWithInlineNodes(new IndexScanPlanMatcher("PARTIAL_IDX_R2"),
                                                           PlanNodeType.PARTIALAGGREGATE,
                                                           PlanNodeType.PROJECTION)));
         }
@@ -362,13 +362,23 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // IndexScan with HASH aggregate remains not optimized -
         // The first column index (F_VAL1, F_VAL2) is not part of the GROUP BY
-        validatePlan("SELECT F_VAL2, MAX(F_VAL2) FROM RF WHERE F_VAL1 > 0 GROUP BY F_VAL2",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                                      PlanNodeType.HASHAGGREGATE,
-                                                      PlanNodeType.PROJECTION)));
-
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT F_VAL2, MAX(F_VAL2) FROM RF WHERE F_VAL1 > 0 GROUP BY F_VAL2",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.AGGREGATE,  // need serial aggregation
+                                  PlanNodeType.ORDERBY,    // need orderby because COL_RF_TREE2
+                                                           // indexes on F_VAL1 first.
+                                  new PlanWithInlineNodes(new IndexScanPlanMatcher("COL_RF_TREE2"),
+                                                          PlanNodeType.PROJECTION)));
+        } else {
+            validatePlan("SELECT F_VAL2, MAX(F_VAL2) FROM RF WHERE F_VAL1 > 0 GROUP BY F_VAL2",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(new IndexScanPlanMatcher("COL_RF_TREE2"),
+                                                          PlanNodeType.HASHAGGREGATE,
+                                                          PlanNodeType.PROJECTION)));
+        }
         // Partition IndexScan with HASH aggregate remains unoptimized -
         // index (F_VAL1, F_VAL2) does not cover any of the GROUP BY columns
         validatePlan("SELECT MAX(F_VAL2) FROM F WHERE F_VAL1 > 0 GROUP BY F_D1",
