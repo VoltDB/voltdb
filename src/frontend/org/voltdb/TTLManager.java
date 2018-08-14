@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -53,7 +54,7 @@ public class TTLManager extends StatsSource{
     static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1) * 1000;
     static final int CHUNK_SIZE = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
     static final int TIMEOUT = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
-
+    static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
     public static class TTLStats {
         final String tableName;
         long rowsLeft = 0L;
@@ -337,7 +338,8 @@ public class TTLManager extends StatsSource{
                                 m_futures.remove(task.tableName);
                             }
                         }
-                        hostLog.warn("Errors occured on TTL table " + task.tableName + ": " +  error + " " + drLimitError);
+                        hostLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
+                                "Errors occured on TTL table %s: %s %s", task.tableName, error, drLimitError);
                     } else {
                         task.stats.update(t.getLong("ROWS_DELETED"), t.getLong("ROWS_LEFT"), t.getLong("LAST_DELETE_TIMESTAMP"));
                     }
