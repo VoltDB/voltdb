@@ -148,8 +148,7 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
                 try {
                     cr = cf.get(ONE, TimeUnit.MINUTES);
                 } catch (Exception e) {
-                    return new NibbleStatus(-1, rowsJustDeleted, "Received exception while waiting response back "
-                            + "from smart delete system procedure:" + e.getMessage());
+                    return new NibbleStatus(-1, rowsJustDeleted, "TTL system procedure task failed after timeout (60 seconds)");
                 }
                 ClientResponseImpl cri = (ClientResponseImpl) cr;
                 switch(cri.getStatus()) {
@@ -180,8 +179,7 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
             try {
                 crs = pf.get(ONE, TimeUnit.MINUTES);
             } catch (Exception e) {
-                return new NibbleStatus(-1, rowsJustDeleted, "Received exception while waiting response back "
-                        + "from smart delete system procedure:" + e.getMessage());
+                return new NibbleStatus(-1, rowsJustDeleted, "TTL system procedure task failed after timeout (60 seconds)");
             }
 
             for (ClientResponseWithPartitionKey crwp : crs) {
