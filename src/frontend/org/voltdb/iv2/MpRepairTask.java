@@ -46,7 +46,7 @@ import com.google_voltpatches.common.base.Suppliers;
  */
 public class MpRepairTask extends SiteTasker
 {
-    static VoltLogger tmLog = new VoltLogger("TM");
+    static VoltLogger repairLogger = new VoltLogger("REPAIR");
 
     private InitiatorMailbox m_mailbox;
     private List<Long> m_spMasters;
@@ -61,7 +61,7 @@ public class MpRepairTask extends SiteTasker
         m_spMasters = new ArrayList<Long>(spMasters);
         whoami = "MP leader repair " +
                 CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
-        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), whoami, balanceSPI);
+        algo = mailbox.constructRepairAlgo(Suppliers.ofInstance(m_spMasters), Integer.MAX_VALUE, whoami, balanceSPI);
     }
 
     @Override
@@ -75,10 +75,10 @@ public class MpRepairTask extends SiteTasker
                         success = true;
                     } catch (CancellationException e) {}
                     if (success) {
-                        tmLog.info(whoami + "finished repair.");
+                        repairLogger.info(whoami + "finished repair.");
                     }
                     else {
-                        tmLog.info(whoami + "interrupted during repair.  Retrying.");
+                        repairLogger.info(whoami + "interrupted during repair.  Retrying.");
                     }
                 }
                 catch (InterruptedException ie) {}

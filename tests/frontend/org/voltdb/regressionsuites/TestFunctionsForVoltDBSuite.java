@@ -307,6 +307,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("BITWISE_SHIFT_PARAM_1", "select BIT_SHIFT_LEFT(?, BIG), BIT_SHIFT_RIGHT(?, BIG) from R3 where id = ?");
         project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
 
+        project.addStmtProcedure("FORMAT_TIMESTAMP", "select FORMAT_TIMESTAMP (TM, ?) from P2 where id = ?");
+
         project.addProcedure(GotBadParamCountsInJava.class);
         project.addProcedure(BadParamTypesForTimestamp.class);
     }
@@ -911,7 +913,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("SQL error while compiling query"));
             assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
         }
 
@@ -1051,7 +1053,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             //* enable for debug */ System.out.println(cr.getResults()[0]);
             fail("Expected to detect missing SELECT columns");
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("SQL error while compiling query"));
             assertTrue(ex.getMessage().contains("unexpected token: FROM"));
             return;
         }
@@ -1082,7 +1084,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             cr = client.callProcedure("@AdHoc", "select to_timestamp(second, '1372640523') from P2 limit 1");
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("SQL error while compiling query"));
             assertTrue(ex.getMessage().contains("incompatible data type"));
         }
 
@@ -1191,7 +1193,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             ex = e;
         } finally {
             assertNotNull(ex);
-            assertTrue((ex.getMessage().contains("PlanningErrorException")));
+            assertTrue((ex.getMessage().contains("SQL error while compiling query")));
             assertTrue((ex.getMessage().contains("TRUNCATE")));
         }
 
@@ -2961,7 +2963,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "SELECT DATEADD(NULL, 1, TM) FROM P2 WHERE ID = 20005;");
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
+            assertTrue(e.getClientResponse().getStatusString().contains("SQL error while compiling query"));
             throwed = true;
         }
         assertTrue(throwed);
@@ -2971,7 +2973,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             client.callProcedure("@AdHoc", "SELECT DATEADD(WEEK, 1, TM) FROM P2 WHERE ID = 20005;");
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
+            assertTrue(e.getClientResponse().getStatusString().contains("SQL error while compiling query"));
             throwed = true;
         }
         assertTrue(throwed);
@@ -3343,6 +3345,43 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         validateTableOfLongs(client,
                 "select * from p2 where not is_valid_timestamp(tm)",
                 new long[][] {});
+    }
+
+    public void testFORMAT_TIMESTAMP() throws Exception {
+        System.out.println("STARTING testFORMAT_TIMESTAMP");
+
+        Client client = getClient();
+        ClientResponse cr;
+
+        cr = client.callProcedure("P2.insert", 1, "2013-07-18 02:00:00.123457");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // null timestamp will return null
+        cr = client.callProcedure("FORMAT_TIMESTAMP", "UTC", 2);
+        assertContentOfTable(new Object[][]{{null}}, cr.getResults()[0]);
+
+        // null offset means offset == 0
+        cr = client.callProcedure("FORMAT_TIMESTAMP", null, 1);
+        assertContentOfTable(new Object[][]{{"2013-07-18 02:00:00.123457"}}, cr.getResults()[0]);
+
+        String[] invalid_offsets = {"I_AM_INVALID", "HOME/TRASH", "10:00", "-1:00"};
+        String expectedError = "Invalid timezone string\\s*";
+        for (String invalid_offset : invalid_offsets) {
+            verifyProcFails(client, expectedError, "FORMAT_TIMESTAMP", invalid_offset, 1);
+        }
+
+        String[] offsets = {"UTC", "Australia/Adelaide", "America/Atikokan", "America/Belize", "Asia/Shanghai",
+                "+02:30", "-10:00", "  +02:30", " -10:00 "};
+        String[] results = {"2013-07-18 02:00:00.123457", "2013-07-18 11:30:00.123457", "2013-07-17 21:00:00.123457",
+                "2013-07-17 20:00:00.123457", "2013-07-18 10:00:00.123457", "2013-07-18 04:30:00.123457",
+                "2013-07-17 16:00:00.123457", "2013-07-18 04:30:00.123457", "2013-07-17 16:00:00.123457"};
+
+        for (int i = 0; i < offsets.length; i++) {
+            cr = client.callProcedure("FORMAT_TIMESTAMP", offsets[i], 1);
+            assertContentOfTable(new Object[][]{{results[i]}}, cr.getResults()[0]);
+        }
     }
 
 }

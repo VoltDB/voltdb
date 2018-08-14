@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertEquals;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -51,6 +53,7 @@ import java.util.zip.GZIPInputStream;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
@@ -65,11 +68,14 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.SnapshotRestoreResultSet;
@@ -143,13 +149,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         raf.close();
     }
 
-    private VoltTable createReplicatedTable(int numberOfItems,
+    static VoltTable createReplicatedTable(int numberOfItems,
             int indexBase,
             Set<String> expectedText) {
         return createReplicatedTable(numberOfItems, indexBase, expectedText, false);
     }
 
-    private VoltTable createReplicatedTable(int numberOfItems,
+    static VoltTable createReplicatedTable(int numberOfItems,
                                             int indexBase,
                                             Set<String> expectedText,
                                             boolean generateCSV)
@@ -230,7 +236,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return repl_table;
     }
 
-    private VoltTable createPartitionedTable(int numberOfItems,
+    static VoltTable createPartitionedTable(int numberOfItems,
                                              int indexBase)
     {
         VoltTable partition_table =
@@ -255,7 +261,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return partition_table;
     }
 
-    private VoltTable[] loadTable(Client client, String tableName, boolean replicated,
+    static VoltTable[] loadTable(Client client, String tableName, boolean replicated,
                                   VoltTable table)
     {
         VoltTable[] results = null;
@@ -316,7 +322,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-    private VoltTable[] saveTablesWithDefaultOptions(Client client, String nonce)
+    static VoltTable[] saveTablesWithDefaultOptions(Client client, String nonce)
     {
         return saveTables(client, TMPDIR, nonce, null, null, true, false);
     }
@@ -337,7 +343,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return results;
     }
 
-    private VoltTable[] saveTables(Client client, String dir, String nonce, String[] tables, String[] skiptables,
+    public static VoltTable[] saveTables(Client client, String dir, String nonce, String[] tables, String[] skiptables,
             boolean block, boolean csv)
     {
         VoltTable[] results = null;
@@ -418,11 +424,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-    private void validateSnapshot(boolean expectSuccess, String nonce) {
+    static void validateSnapshot(boolean expectSuccess, String nonce) {
         validateSnapshot(expectSuccess, false, nonce);
     }
 
-    private boolean validateSnapshot(boolean expectSuccess,
+    static boolean validateSnapshot(boolean expectSuccess,
             boolean onlyReportSuccess,String nonce) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
@@ -713,9 +719,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                     VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
                     VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
 
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Load REPLICATED_TESTER and PARTITION_TESTER");
                     loadTable(client, "REPLICATED_TESTER", true, repl_table);
                     loadTable(client, "PARTITION_TESTER", false, partition_table);
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Save snapshot");
                     saveTablesWithDefaultOptions(client, TESTNONCE);
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Validate snapshot");
                     validateSnapshot(true, true, TESTNONCE);
                 }
                 finally {
@@ -727,6 +736,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
 
+        System.out.println("testRestoreWithGhostPartitionAndJoin - Copy over snapshot data from removed node");
         //Copy over snapshot data from removed node
         for (File f : lc.getPathInSubroots(new File(TMPDIR))[1].listFiles()) {
             if (f.getName().startsWith(TESTNONCE)) {
@@ -737,6 +747,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
 
         // Restore snapshot to 1 nodes 1 sites/host cluster.
+        System.out.println("testRestoreWithGhostPartitionAndJoin - Restore snapshot to 1 nodes 1 sites/host cluster.");
         {
             lc.setHostCount(1);
             lc.compile(project);
@@ -756,6 +767,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
                     assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Join the second node.");
                     // Join the second node
                     lc.joinOne(1);
                     Thread.sleep(1000);
@@ -3839,6 +3851,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
     }
+
 
     public static class SnapshotResult {
         Long hostID;

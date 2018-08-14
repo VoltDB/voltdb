@@ -9,7 +9,7 @@
 # it's convenient and useful for debugging to put it here, so that the
 # tests can easily be generated manually.
 
-BUILD=release
+BUILD_TYPE=release
 VERBOSE=
 ECHO=+x
 
@@ -78,14 +78,24 @@ if [ -z "$TEST_CLASSES" ] ; then
     exit 100
 fi
 
-SRC_DIR="$VOLTDB_ROOT/tests/ee/"
-GENERATED_DIR='ee_auto_generated_unit_tests'
+SRC_DIR="$VOLTDB_ROOT/tests/ee"
+GENERATED_DIR_NAME='ee_auto_generated_unit_tests'
+GENERATED_DIR_PATH="${SRC_DIR}/${GENERATED_DIR_NAME}"
 OBJDIR="$VOLTDB_ROOT/obj/${BUILD_TYPE}"
+TEST_NAMES_FILE="${GENERATED_DIR_PATH}/generated_tests.txt"
+# echo "SRC_DIR=${SRC_DIR}"
+# echo "GENERATED_DIR_PATH=${GENERATED_DIR_PATH}"
+# echo "TEST_NAMES_FILE=${TEST_NAMES_FILE}"
+# echo "OBJDIR=${OBJDIR}"
+#
+# Empty out the test names file.
+#
+rm -f "$TEST_NAMES_FILE"
 for CLASS in $TEST_CLASSES; do
     (set $ECHO; java $VERBOSE \
                      -cp ${OBJDIR}/prod:${OBJDIR}/test:${VOLTDB_ROOT}/lib/\*:${VOLTDB_ROOT}/third_party/java/jars/\* \
                      -Dlog4j.configuration=file:${VOLTDB_ROOT}/tests/log4j-allconsole.xml $CLASS \
-                     --test-source-dir="$SRC_DIR" \
-                     --test-generated-dir="$GENERATED_DIR"
+                     --generated-source-dir="$GENERATED_DIR_PATH" \
+                     --test-names-file="$TEST_NAMES_FILE"
     )
 done

@@ -34,6 +34,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
@@ -278,8 +279,11 @@ public class RejoinProducer extends JoinProducerBase {
         if (m_commaSeparatedNameOfViewsToPause == null) {
             // The very first execution of runForRejoin will lead us here.
             StringBuilder commaSeparatedViewNames = new StringBuilder();
+            Database db = VoltDB.instance().getCatalogContext().database;
             for (Table table : VoltDB.instance().getCatalogContext().tables) {
-                if (CatalogUtil.isSnapshottedView(table)) {
+                if (CatalogUtil.isSnapshotablePersistentTableView(db, table)) {
+                    // If the table is a snapshotted persistent table view, we will try to
+                    // temporarily disable its maintenance job to boost restore performance.
                     commaSeparatedViewNames.append(table.getTypeName()).append(",");
                 }
             }

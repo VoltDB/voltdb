@@ -128,7 +128,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), true));
+                                new HashinatorConfig(configBytes, 0, 0), true, 4*1000));
             }
         }).get();
 
@@ -148,7 +148,7 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(configBytes, 0, 0), false));
+                                new HashinatorConfig(configBytes, 0, 0), false, 4*1000));
             }
         }).get();
 
@@ -231,8 +231,11 @@ public class TestTwoSitePlans extends TestCase {
                         0,
                         42,
                         Long.MAX_VALUE, false);
+                // ignore drBufferSize field in message
+                fragResult2.readInt();
                 // ignore totalsize field in message
                 fragResult2.readInt();
+
                 VoltTable[] results = TableHelper.convertBackedBufferToTables(fragResult2.buffer(), 1);
                 assert(results[0].asScalarLong() == 1L);
                 return results;
@@ -261,6 +264,8 @@ public class TestTwoSitePlans extends TestCase {
                         1,
                         42,
                         Long.MAX_VALUE, false);
+                // ignore drBufferSize field in message
+                fragResult1.readInt();
                 // ignore totalsize field in message
                 fragResult1.readInt();
                 VoltTable[] results = TableHelper.convertBackedBufferToTables(fragResult1.buffer(), 1);
@@ -294,6 +299,8 @@ public class TestTwoSitePlans extends TestCase {
         FastDeserializer fragResult1 = ft.get();
         VoltTable dependency1 = null;
         try {
+            // ignore drBufferSize field in message
+            fragResult1.readInt();
             // ignore totalsize field in message
             fragResult1.readInt();
 
@@ -322,6 +329,8 @@ public class TestTwoSitePlans extends TestCase {
         FastDeserializer fragResult2 = ft.get();
         VoltTable dependency2 = null;
         try {
+            // ignore drBufferSize field in message
+            fragResult2.readInt();
             // ignore totalsize field in message
             fragResult2.readInt();
 
@@ -353,6 +362,8 @@ public class TestTwoSitePlans extends TestCase {
         // The underlying buffers are being reused
         assert(fragResult1.buffer() == fragResult3.buffer());
         try {
+            // ignore drBufferSize field in message
+            fragResult3.readInt();
             // ignore totalsize field in message
             fragResult3.readInt();
 

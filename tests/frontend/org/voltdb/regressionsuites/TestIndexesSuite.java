@@ -1185,7 +1185,7 @@ public class TestIndexesSuite extends RegressionSuite {
                                                            "select * from P1 where ID = ?;", 6000000000L);
             fail();
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (6000000000) of type:"
+            assertTrue(ex.getMessage().contains("The provided value: (6000000000) of type:"
                     + " java.lang.Long is not a match or is out of range for the target parameter type: int"));
         }
     }

@@ -42,6 +42,7 @@ import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
+import io.netty_voltpatches.util.internal.StringUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.CatalogContext;
@@ -1192,7 +1193,7 @@ public class RegressionSuite extends TestCase {
         verifyProcFails(client, expectedPattern, "@AdHoc", args);
     }
 
-    static protected void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
+    static public void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
 
         String what;
         if (storedProc.compareTo("@AdHoc") == 0) {
@@ -1338,12 +1339,17 @@ public class RegressionSuite extends TestCase {
      */
     protected static void dumpQueryPlans(Client client, String... queries)
             throws IOException, NoConnectionsException, ProcCallException {
-        VoltTable vts[] = client.callProcedure("@Explain", StringUtils.join(queries, '\n')).getResults();
-        int ii = 0;
-        for (VoltTable vtn : vts) {
-            System.out.println("DEBUG: plan for " + queries[ii] + "\n" + vtn + "\n");
-            ++ii;
+        for (String query : Arrays.asList(queries)) {
+            System.out.println("DEBUG: plan for " + query + "\n" + getQueryPlan('\n', client, query));
         }
+    }
+
+    protected static String getQueryPlan(char splitter, Client client, String... queries) throws IOException, ProcCallException{
+        StringBuilder sb = new StringBuilder();
+        for (VoltTable vtb : Arrays.asList(client.callProcedure("@Explain", StringUtils.join(queries, '\n')).getResults())) {
+            sb.append(vtb.toString()).append(splitter);
+        }
+        return sb.toString();
     }
 
     protected static void truncateTables(Client client, String... tables)

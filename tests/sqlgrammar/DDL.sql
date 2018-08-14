@@ -1,6 +1,8 @@
 -- Define "standard" DDL (tables, indexes, views), for use with the SQL grammar generator
 
 -- Drop all items first, in case they already exist
+file -inlinebatch END_OF_BATCH_1
+
 DROP PROCEDURE RPROC0      IF EXISTS;
 DROP PROCEDURE RPROC1      IF EXISTS;
 DROP PROCEDURE RPROC2      IF EXISTS;
@@ -206,7 +208,11 @@ DROP PROCEDURE JSPP7insMax IF EXISTS;
 DROP PROCEDURE JSPP7ins    IF EXISTS;
 DROP PROCEDURE JSPP7sel    IF EXISTS;
 
+END_OF_BATCH_1
+
 remove classes sqlgrammartest.*;
+
+file -inlinebatch END_OF_BATCH_2
 
 DROP TABLE R0 IF EXISTS CASCADE;
 DROP TABLE P0 IF EXISTS CASCADE;
@@ -233,6 +239,8 @@ DROP TABLE P21 IF EXISTS CASCADE;
 DROP TABLE R22 IF EXISTS CASCADE;
 DROP TABLE P22 IF EXISTS CASCADE;
 
+END_OF_BATCH_2
+file -inlinebatch END_OF_BATCH_3
 
 CREATE TABLE R0 (
   ID      INTEGER,
@@ -941,6 +949,8 @@ CREATE INDEX IDX_P22_TIME ON P22 (TIME);
 CREATE INDEX IDX_P22_VBIN ON P22 (VARBIN);
 CREATE INDEX IDX_P22_POLY ON P22 (POLYGON);
 
+END_OF_BATCH_3
+file -inlinebatch END_OF_BATCH_4
 
 -- The following are views defined on most of the above tables
 -- (but not the ones used for testing @SwapTables)
@@ -1121,6 +1131,8 @@ CREATE INDEX IDX_VP5_SVT ON VP5 (SMALL, VCHAR, TINY)      WHERE SMALL >= 0;
 CREATE INDEX IDX_VP5_VID ON VP5 (VCHAR_INLINE, INT, DEC)  WHERE VCHAR_INLINE < 'a';
 CREATE INDEX IDX_VP5_VS  ON VP5 (VCHAR_INLINE_MAX, SMALL) WHERE SMALL >= 0 AND VCHAR_INLINE_MAX IS NOT NULL;
 
+END_OF_BATCH_4
+file -inlinebatch END_OF_BATCH_5
 
 -- The following are SQL stored procedures defined on some of the above tables
 -- Note: some of these stored procedures (namely the "insMin" & "insMax" ones)
@@ -1195,8 +1207,13 @@ CREATE PROCEDURE SSPP2ins    AS INSERT INTO P2 VALUES (?,
                                                        null, null, null, null, null, null, null, null);
 CREATE PROCEDURE SSPP2sel    AS SELECT * FROM P2 WHERE ID = ?;
 
+END_OF_BATCH_5
+
 -- The following are Java stored procedures defined on some of the above tables
 load classes testgrammar.jar;
+
+file -inlinebatch END_OF_BATCH_6
+
 CREATE PROCEDURE FROM CLASS sqlgrammartest.JSPR1min;
 CREATE PROCEDURE FROM CLASS sqlgrammartest.JSPR1max;
 CREATE PROCEDURE FROM CLASS sqlgrammartest.JSPR1insMin;
@@ -1209,3 +1226,5 @@ CREATE PROCEDURE FROM CLASS sqlgrammartest.JSPP1insMin;
 CREATE PROCEDURE FROM CLASS sqlgrammartest.JSPP1insMax;
 CREATE PROCEDURE FROM CLASS sqlgrammartest.JSPP1ins;
 CREATE PROCEDURE FROM CLASS sqlgrammartest.JSPP1sel;
+
+END_OF_BATCH_6

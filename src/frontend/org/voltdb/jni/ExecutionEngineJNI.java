@@ -22,7 +22,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -151,7 +150,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int defaultDrBufferSize,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean isLowestSiteId)
+            final boolean isLowestSiteId,
+            final int exportFlushTimeout)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -181,7 +181,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     defaultDrBufferSize,
                     tempTableMemory * 1024 * 1024,
                     isLowestSiteId,
-                    EE_COMPACTION_THRESHOLD);
+                    EE_COMPACTION_THRESHOLD,
+                    exportFlushTimeout);
         checkErrorCode(errorCode);
 
         setupPsetBuffer(smallBufferSize);
@@ -599,8 +600,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
-        return nativeReleaseUndoToken(pointer, undoToken);
+    public boolean releaseUndoToken(final long undoToken, boolean isEmptyDRTxn) {
+        return nativeReleaseUndoToken(pointer, undoToken, isEmptyDRTxn);
     }
 
     @Override

@@ -86,7 +86,6 @@ import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 // fredt@users 20031006 - patch 1.7.2 - reuse Like objects for all rows
 // fredt@users 1.9.0 - LIKE for binary strings
 class Like {
-
     private final static BinaryData maxByteValue =
         new BinaryData(new byte[]{ -128 }, false);
     private char[]   cLike;
@@ -95,6 +94,7 @@ class Like {
     private boolean  isIgnoreCase;
     private int      iFirstWildCard;
     private boolean  isNull;
+    private boolean  isRightNull;
     int              escapeChar;
     boolean          hasCollation;
     static final int UNDERSCORE_CHAR = 1;
@@ -234,7 +234,7 @@ class Like {
     }
 
     void setPattern(Session session, Object pattern, Object escape,
-                    boolean hasEscape) {
+                    boolean hasEscape, Expression[] nodes) {
 
         isNull = pattern == null;
 
@@ -261,6 +261,15 @@ class Like {
         }
 
         if (isNull) {
+            /* ENG-14266, solve 'col LIKE CAST(NULL AS VARCHAR)' Null Pointer problem
+             * In this particular case, the right expression has been turned into VALUE type whose valueData is null.
+             * EE can handle this case.
+             * isRightNull set to be true if it is this case.
+             */
+            isRightNull = (nodes[Expression.LEFT] instanceof ExpressionColumn) &&
+                          (nodes[Expression.RIGHT] instanceof ExpressionOp) &&
+                          (nodes[Expression.RIGHT].getType() == OpTypes.VALUE) &&
+                          (nodes[Expression.RIGHT].getValue(session) == null);
             return;
         }
 
@@ -336,8 +345,13 @@ class Like {
         return iFirstWildCard != -1;
     }
 
+    // Specific check for 'col LIKE CAST(NULL AS VARCHAR)' case
+    boolean isEquivalentToCastNullPredicate() {
+        return isRightNull;
+    }
+
     boolean isEquivalentToUnknownPredicate() {
-        return isNull;
+        return isNull && !isRightNull;
     }
 
     boolean isEquivalentToEqualsPredicate() {

@@ -152,7 +152,7 @@ public class TestMpPromoteAlgo
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox,
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, 5, mailbox,
                 new MpRestartSequenceGenerator(0, false), "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
@@ -203,7 +203,7 @@ public class TestMpPromoteAlgo
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox,
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, 5, mailbox,
                 new MpRestartSequenceGenerator(0, false), "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
@@ -269,7 +269,7 @@ public class TestMpPromoteAlgo
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox,
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, 5, mailbox,
                 new MpRestartSequenceGenerator(0, false), "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
@@ -304,7 +304,7 @@ public class TestMpPromoteAlgo
         masters.add(1L);
         masters.add(2L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox,
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, 5, mailbox,
                 new MpRestartSequenceGenerator(0, false), "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
@@ -381,7 +381,7 @@ public class TestMpPromoteAlgo
         survivors.add(0l);
         survivors.add(1l);
         survivors.add(2l);
-        MpPromoteAlgo dut = new MpPromoteAlgo(survivors, mbox,
+        MpPromoteAlgo dut = new MpPromoteAlgo(survivors, 5, mbox,
                 new MpRestartSequenceGenerator(0, false), "bleh ");
         Future<RepairResult> result = dut.start();
         for (int i = 0; i < 3; i++) {

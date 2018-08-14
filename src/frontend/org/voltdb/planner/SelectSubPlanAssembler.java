@@ -17,15 +17,15 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
+import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.DeterminismMode;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -34,7 +34,7 @@ import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.SubqueryLeafNode;
-    import org.voltdb.plannodes.IndexSortablePlanNode;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;

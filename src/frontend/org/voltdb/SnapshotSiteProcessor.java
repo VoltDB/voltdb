@@ -76,6 +76,9 @@ public class SnapshotSiteProcessor {
 
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
+    /** Optional parameter to disable immediate rescheduling of snapshot work when partition is idle. */
+    private static final boolean DISABLE_IMMEDIATE_SNAPSHOT_RESCHEDULING = Boolean.valueOf(System.getProperty("DISABLE_IMMEDIATE_SNAPSHOT_RESCHEDULING","false"));
+
     /** Global count of execution sites on this node performing snapshot */
     public static final Set<Object> ExecutionSitesCurrentlySnapshotting =
             Collections.synchronizedSet(new HashSet<Object>());
@@ -322,8 +325,8 @@ public class SnapshotSiteProcessor {
          */
         if (m_snapshotPriority > 0) {
             final long now = System.currentTimeMillis();
-            //Ask if the site is idle, and if it is queue the work immediately
-            if (m_idlePredicate.idle(now)) {
+            //Unless disabled, ask if the site is idle, and if it is queue the work immediately
+            if (!DISABLE_IMMEDIATE_SNAPSHOT_RESCHEDULING && m_idlePredicate.idle(now)) {
                 m_siteTaskerQueue.offer(new SnapshotTask());
                 return;
             }

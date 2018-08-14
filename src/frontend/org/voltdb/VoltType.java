@@ -309,7 +309,7 @@ public enum VoltType {
             // Normally, only compatible NON-ARRAY types are listed,
             // but byte array is included here as the special case
             // most suitable representation of VARBINARY.
-            new Class[] {byte[].class, Byte[].class},
+            new Class[] {byte[].class, Byte[].class, ByteBuffer.class},
             byte[][].class,
             'l',
             java.sql.Types.VARBINARY,  // java.sql.Types DATA_TYPE
@@ -742,7 +742,12 @@ public enum VoltType {
     public static VoltType typeFromClass(Class<?> cls) {
         VoltType type = s_classes.get(cls);
         if (type == null) {
-            throw new VoltTypeException("Unimplemented Object Type: " + cls);
+            // Deal with private HeapByteBuffer.class and DirectByteBuffer.class (subclass of ByteBuffer.class)
+            if (cls != null && ByteBuffer.class.isAssignableFrom(cls)) {
+                type = VoltType.VARBINARY;
+            } else {
+                throw new VoltTypeException("Unimplemented Object Type: " + cls);
+            }
         }
         return type;
     }

@@ -403,7 +403,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         // This fails in a different way due to a bug in HSQL. OFFSET with no
         // LIMIT confuses HSQL.
         verifyStmtFails(client, "DELETE FROM R1 OFFSET 1",
-                "PlanningErrorException");
+                "SQL error while compiling query");
 
         verifyStmtFails(
                 client,

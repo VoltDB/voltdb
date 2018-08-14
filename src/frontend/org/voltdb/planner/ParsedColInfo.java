@@ -35,29 +35,29 @@ import org.voltdb.plannodes.SchemaColumn;
  */
 public class ParsedColInfo implements Cloneable {
     /* Schema information: table may be AbstractParsedStmt.TEMP_TABLE_NAME */
-    public String alias = null;
-    public String columnName = null;
-    public String tableName = null;
-    public String tableAlias = null;
+    public String m_alias = null;
+    public String m_columnName = null;
+    public String m_tableName = null;
+    public String m_tableAlias = null;
 
     /** The expression that this column refers to */
-    public AbstractExpression expression = null;
+    public AbstractExpression m_expression = null;
 
     /** Index of the column in its table.  This is used for MV sanity-checking */
-    public int index = 0;
+    public int m_index = 0;
 
     /** A differentiator used to tell apart column references when there are
      * duplicate column names produced by the expansion of "*" that happens in HSQL.*/
-    public int differentiator = -1;
+    public int m_differentiator = -1;
     //
     // Used in ParsedSelectStmt.m_displayColumns
     //
-    public boolean orderBy = false;
-    public boolean ascending = true; // Only relevant if orderBy is true.
-    public boolean groupBy = false;
+    public boolean m_orderBy = false;
+    public boolean m_ascending = true; // Only relevant if orderBy is true.
+    public boolean m_groupBy = false;
 
     // Used in ParsedSelectStmt.m_groupByColumns
-    public boolean groupByInDisplay = false;
+    public boolean m_groupByInDisplay = false;
 
     /** Sometimes the expression in the parsed column needs to be adjusted
      * for its context.  This is the case for AVG aggregates in SELECT statements,
@@ -83,6 +83,39 @@ public class ParsedColInfo implements Cloneable {
         return fromOrderByXml(parsedStmt, orderByXml, adjuster);
     }
 
+    /**
+     * Helpers
+     */
+    public ParsedColInfo updateTableName(String tblName, String tblAlias) {
+       m_tableName = tblName;
+       m_tableAlias = tblAlias;
+       return this;
+    }
+
+    /**
+     * Helpers
+     */
+    public ParsedColInfo updateColName(String colName, String colAlias) {
+       m_columnName = colName;
+       m_alias = colAlias;
+       if (m_expression instanceof TupleValueExpression) {
+          TupleValueExpression expr = (TupleValueExpression) m_expression;
+          expr.setColumnName(colName);
+          expr.setColumnAlias(colAlias);
+       }
+       return this;
+    }
+
+    // Convert any non-TupleValueExpression, i.e. AggregateExpression to TupleValueExpression,
+    // and syncs with (table/column) * (name/alias).
+    public ParsedColInfo toTVE(int indx, int diff) {
+       TupleValueExpression exp = new TupleValueExpression(m_tableName, m_tableAlias,
+               m_columnName, m_alias, m_expression, indx);
+       exp.setDifferentiator(diff);
+       m_expression = exp;
+       return this;
+    }
+
     /** Construct a ParsedColInfo from Volt XML.
      *  Allow caller to specify actions to finalize the parsed expression.
      */
@@ -102,11 +135,11 @@ public class ParsedColInfo implements Cloneable {
 
         // create the orderby column
         ParsedColInfo orderCol = new ParsedColInfo();
-        orderCol.orderBy = true;
-        orderCol.ascending = !descending;
+        orderCol.m_orderBy = true;
+        orderCol.m_ascending = !descending;
         AbstractExpression orderExpr = parsedStmt.parseExpressionTree(child);
         assert(orderExpr != null);
-        orderCol.expression = adjuster.adjust(orderExpr);
+        orderCol.m_expression = adjuster.adjust(orderExpr);
 
         // Cases:
         // child could be columnref, in which case it's either a normal column
@@ -117,21 +150,21 @@ public class ParsedColInfo implements Cloneable {
         // right thing later.
         if (orderExpr instanceof TupleValueExpression) {
             TupleValueExpression tve = (TupleValueExpression) orderExpr;
-            orderCol.columnName = tve.getColumnName();
-            orderCol.tableName = tve.getTableName();
-            orderCol.tableAlias = tve.getTableAlias();
-            if (orderCol.tableAlias == null) {
-                orderCol.tableAlias = orderCol.tableName;
+            orderCol.m_columnName = tve.getColumnName();
+            orderCol.m_tableName = tve.getTableName();
+            orderCol.m_tableAlias = tve.getTableAlias();
+            if (orderCol.m_tableAlias == null) {
+                orderCol.m_tableAlias = orderCol.m_tableName;
             }
 
-            orderCol.alias = tve.getColumnAlias();
+            orderCol.m_alias = tve.getColumnAlias();
         }
         else {
             String alias = child.attributes.get("alias");
-            orderCol.alias = alias;
-            orderCol.tableName = AbstractParsedStmt.TEMP_TABLE_NAME;
-            orderCol.tableAlias = AbstractParsedStmt.TEMP_TABLE_NAME;
-            orderCol.columnName = "";
+            orderCol.m_alias = alias;
+            orderCol.m_tableName = AbstractParsedStmt.TEMP_TABLE_NAME;
+            orderCol.m_tableAlias = AbstractParsedStmt.TEMP_TABLE_NAME;
+            orderCol.m_columnName = "";
             // Replace its expression to TVE after we build the ExpressionIndexMap
 
             if ((child.name.equals("operation") == false) &&
@@ -152,17 +185,17 @@ public class ParsedColInfo implements Cloneable {
 
     /** Return this as an instance of SchemaColumn */
     public SchemaColumn asSchemaColumn() {
-        String columnAlias = (alias == null) ? columnName : alias;
-        return new SchemaColumn(tableName, tableAlias,
-                columnName, columnAlias,
-                expression, differentiator);
+        String columnAlias = (m_alias == null) ? m_columnName : m_alias;
+        return new SchemaColumn(m_tableName, m_tableAlias,
+                m_columnName, columnAlias,
+                m_expression, m_differentiator);
     }
 
     @Override
     public String toString() {
-        return "ParsedColInfo: " + tableName + "(" + tableAlias + ")." +
-            columnName + "(" + alias + ") diff'tor:" + differentiator +
-            " expr:(" + expression + ")";
+        return "ParsedColInfo: " + m_tableName + "(" + m_tableAlias + ")." +
+                m_columnName + "(" + m_alias + ") diff'tor:" + m_differentiator +
+            " expr:(" + m_expression + ")";
     }
 
     @Override
@@ -174,10 +207,10 @@ public class ParsedColInfo implements Cloneable {
             return false;
         }
         ParsedColInfo col = (ParsedColInfo) obj;
-        if (columnName != null && columnName.equals(col.columnName) &&
-                tableName != null && tableName.equals(col.tableName) &&
-                tableAlias != null && tableAlias.equals(col.tableAlias) &&
-                expression != null && expression.equals(col.expression) ) {
+        if (m_columnName != null && m_columnName.equals(col.m_columnName) &&
+                m_tableName != null && m_tableName.equals(col.m_tableName) &&
+                m_tableAlias != null && m_tableAlias.equals(col.m_tableAlias) &&
+                m_expression != null && m_expression.equals(col.m_expression) ) {
             return true;
         }
         return false;
@@ -187,10 +220,10 @@ public class ParsedColInfo implements Cloneable {
     @Override
     public int hashCode() {
         int result = new HashCodeBuilder(17, 31).
-                append(columnName).append(tableName).append(tableAlias).
+                append(m_columnName).append(m_tableName).append(m_tableAlias).
                 toHashCode();
-        if (expression != null) {
-            result += expression.hashCode();
+        if (m_expression != null) {
+            result += m_expression.hashCode();
         }
         return result;
     }
@@ -204,7 +237,7 @@ public class ParsedColInfo implements Cloneable {
         catch (CloneNotSupportedException e) {
             e.printStackTrace();
         }
-        col.expression = expression.clone();
+        col.m_expression = m_expression.clone();
         return col;
     }
 }

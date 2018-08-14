@@ -29,7 +29,6 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
-import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 

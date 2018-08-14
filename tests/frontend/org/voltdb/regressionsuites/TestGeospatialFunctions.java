@@ -857,7 +857,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         }
         catch (ProcCallException excp) {
             exception = excp;
-            assertTrue(exception.getMessage().contains("Error compiling query"));
+            assertTrue(exception.getMessage().contains("SQL error while compiling query"));
             assertTrue(exception.getMessage().contains("incompatible data type in operation"));
         } finally {
             assertNotNull(exception);

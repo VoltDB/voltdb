@@ -39,12 +39,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -426,83 +428,111 @@ public class SQLCommand
         String describeArgs = SQLParser.parseDescribeStatement(line);
         if (describeArgs != null) {
 
+            // Check if table exists
             String tableName = "";
             String type = "";
-            String remarks = "";
             VoltTable tableData = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
             while (tableData.advanceRow()) {
                 String t = tableData.getString(2);
                 if (t.equalsIgnoreCase(describeArgs)) {
                     tableName = t;
                     type = tableData.getString(3);
-                    remarks = tableData.getString(4);
                     break;
                 }
             }
-
             if (tableName.equals("")) {
                 System.err.println("Table does not exist");
                 return true;
             }
 
+            // Class to temporarily store and sort column attributes
+            class Column implements Comparable {
+                String name;
+                String type;
+                long size;
+                String remarks;
+                long position;
+                String notNull;
+
+                @Override
+                public String toString() {return "";}
+
+                @Override
+                public int compareTo(Object obj) {
+                    Column col = (Column) obj;
+                    return (int)(this.position - col.position);
+                }
+            }
+
+            // sort the columns as they are inserted
+            SortedSet set = new TreeSet();
+
+            // Retrieve Column attributes
             VoltTable columnData = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
-            // get max column name width
             int maxNameWidth = 10;
             while (columnData.advanceRow()) {
                 if (tableName.equalsIgnoreCase(columnData.getString(2))) {
-                    String colname = columnData.getString(3);
-                    if (colname.length() > maxNameWidth) {
-                        maxNameWidth = colname.length();
+
+                    Column c = new Column();
+                    c.name = columnData.getString(3);
+                    if (c.name.length() > maxNameWidth) {
+                        maxNameWidth = c.name.length();
                     }
+
+                    c.type = columnData.getString(5);
+
+                    c.size = columnData.getLong(6);
+                    if (columnData.wasNull()) {
+                        if (c.type.equals("GEOGRAPHY")) {
+                            c.size = 32768;
+                        }
+                        if (c.type.equals("GEOGRAPHY_POINT")) {
+                            c.size = 16;
+                        }
+                    } else if (c.type.equals("TINYINT")) {
+                        c.size = 1;
+                    } else if (c.type.equals("SMALLINT")) {
+                        c.size = 2;
+                    } else if (c.type.equals("INTEGER")) {
+                        c.size = 4;
+                    } else if (c.type.equals("BIGINT")) {
+                        c.size = 8;
+                    } else if (c.type.equals("FLOAT")) {
+                        c.size = 8;
+                    } else if (c.type.equals("DECIMAL")) {
+                        c.size = 16;
+                    } else if (c.type.equals("TIMESTAMP")) {
+                        c.size = 8;
+                    }
+
+                    c.remarks = columnData.getString(11);
+                    if (columnData.wasNull()) {
+                        c.remarks = "";
+                    }
+
+                    c.position = columnData.getLong(16);
+
+                    String nullableYesNo = columnData.getString(17);
+                    c.notNull = "";
+                    if (nullableYesNo.equals("NO")) {
+                        c.notNull = "NOT NULL";
+                    }
+
+                    set.add(c);
                 }
             }
-            columnData.resetRowPosition();
+
+            // print output
             String headerFormat = "%-" + maxNameWidth + "s|%-16s|%-11s|%-9s|%-16s\n";
             String rowFormat = "%-" + maxNameWidth + "s|%-16s|%11d|%-9s|%-16s\n";
             System.out.printf(headerFormat,"COLUMN","DATATYPE","SIZE","NULLABLE","REMARKS");
             String DASHES = new String(new char[56+maxNameWidth]).replace("\0", "-");
             System.out.println(DASHES);
-            while (columnData.advanceRow()) {
-                if (tableName.equalsIgnoreCase(columnData.getString(2))) {
-                    String colName = columnData.getString(3);
-                    String dataType = columnData.getString(5);
-                    long size = columnData.getLong(6);
-                    if (columnData.wasNull()) {
-                        if (dataType.equals("GEOGRAPHY")) {
-                            size = 32768;
-                        }
-                        if (dataType.equals("GEOGRAPHY_POINT")) {
-                            size = 16;
-                        }
-                    } else if (dataType.equals("TINYINT")) {
-                        size = 1;
-                    } else if (dataType.equals("SMALLINT")) {
-                        size = 2;
-                    } else if (dataType.equals("INTEGER")) {
-                        size = 4;
-                    } else if (dataType.equals("BIGINT")) {
-                        size = 8;
-                    } else if (dataType.equals("FLOAT")) {
-                        size = 8;
-                    } else if (dataType.equals("DECIMAL")) {
-                        size = 16;
-                    } else if (dataType.equals("TIMESTAMP")) {
-                        size = 8;
-                    }
 
-                    String partitionColumn = columnData.getString(11);
-                    if (columnData.wasNull()) {
-                        partitionColumn = "";
-                    }
-
-                    String isNullable = columnData.getString(17);
-                    String notNull = "";
-                    if (isNullable.equals("NO")) {
-                        notNull = "NOT NULL";
-                    }
-
-                    System.out.printf(rowFormat,colName,dataType,size,notNull,partitionColumn);
-                }
+            Iterator it = set.iterator();
+            while (it.hasNext()) {
+                Column c = (Column)it.next();
+                System.out.printf(rowFormat,c.name,c.type,c.size,c.notNull,c.remarks);
             }
             System.out.println(DASHES);
 
@@ -519,7 +549,9 @@ public class SQLCommand
                 }
             }
             if (!primaryKey.equals("")) {
-                System.out.println("Primary Key (" + primaryKey + ")");
+                System.out.println("Type: " + type + ", Primary Key (" + primaryKey + ")");
+            } else {
+                System.out.println("Type: " + type);
             }
             return true;
         }

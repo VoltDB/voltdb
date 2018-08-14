@@ -27,10 +27,13 @@ import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.PartitionDRGateway;
+import org.voltdb.PartitionDRGateway.DRRecordType;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -57,9 +60,12 @@ public class MpTransactionState extends TransactionState
 {
     static VoltLogger tmLog = new VoltLogger("TM");
 
-    private static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
+    public static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
     private static final String dr_max_consumer_partitionCount_str = "DR_MAX_CONSUMER_PARTITIONCOUNT";
+    private static final String dr_max_consumer_messageheader_room_str = "DR_MAX_CONSUMER_MESSAGEHEADER_ROOM";
     private static final String volt_output_buffer_overflow = "V0001";
+    private static final int DR_BEGINTXN_MSG_LEN = PartitionDRGateway.getMessageTypeLength(DRRecordType.BEGIN_TXN);
+    private static final int DR_ENDTXN_MSG_LEN = PartitionDRGateway.getMessageTypeLength(DRRecordType.END_TXN);
 
     /**
      *  This is thrown by the TransactionState instance when something
@@ -98,7 +104,7 @@ public class MpTransactionState extends TransactionState
     final Map<Long, Long> m_masterMapForFragmentRestart = Maps.newHashMap();
 
     //The timeout value for fragment response in minute. default: 5 min
-    private static long PULL_TIMEOUT = Long.valueOf(System.getProperty("MP_TXN_RESPONSE_TIMEOUT", "5")) * 60L;;
+    private static long PULL_TIMEOUT = Long.valueOf(System.getProperty("MP_TXN_RESPONSE_TIMEOUT", "5")) * 60L;
 
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
@@ -118,13 +124,22 @@ public class MpTransactionState extends TransactionState
     static final int StoreProcedureInvocationHeaderSize;
     static final int InitiateTaskMessageHeaderSize;
     static final int FragmentTaskMessageHeaderSize;
+    static final int MessageAdditionalSize;
 
     static {
         StoredProcedureInvocation mpSpi = new StoredProcedureInvocation();
         mpSpi.setProcName("@ApplyBinaryLogMP");
-        StoreProcedureInvocationHeaderSize = mpSpi.getSerializedSizeWithoutParams();
-        InitiateTaskMessageHeaderSize = (new Iv2InitiateTaskMessage()).getSerializedSizeForHeader();
-        FragmentTaskMessageHeaderSize = (new FragmentTaskMessage()).getSerializedSizeForHeader();
+        StoreProcedureInvocationHeaderSize = mpSpi.getFixedHeaderSize();
+        InitiateTaskMessageHeaderSize = (new Iv2InitiateTaskMessage()).getFixedHeaderSize();
+        FragmentTaskMessageHeaderSize = (new FragmentTaskMessage()).getFixedHeaderSize();
+        // We estimate the message size for the consumer cluster via the message size on producer cluster.
+        // However, this could be underestimation if consumer cluster's message is bigger. (usually true for newer volt version).
+        // We add MessageAdditionSize for capturing max additional size the consumer side can have over producer side.
+        // For volt version < 7.0, it can only connect to 7.0, the message size didn't change.
+        // For volt 7.0 < version <= 7.5 , it can connect to 7.6 and up, the message size at lease increased by 11 bytes. (10 from fragmentTaskMessage and 1 from Iv2InitiateTaskMessage).
+        // For forward compatibility, reserve 100 bytes.
+        // TODO: We could report an more accurate consumer side message header size via DR protocol change.
+        MessageAdditionalSize = Integer.getInteger(dr_max_consumer_messageheader_room_str, 100);
     }
 
     private int getDRMessageSizeEstimation() {
@@ -134,15 +149,15 @@ public class MpTransactionState extends TransactionState
         // user can also override this via system property
         int remotePartitionCount = Integer.getInteger(dr_max_consumer_partitionCount_str, m_localPartitionCount);
 
-        // assume still has replicated stream for upper bound estimation
-        // avoid check the dr system for performance concern
+        // assume still has replicated stream for upper bound estimation avoid check the dr system for
+        // performance concern. The streamCount could be m_localPartitionCount if DR ProtocolVersion is 8 or more.
         int streamCount = m_localPartitionCount + 1;
-        int concatLogSize = m_drBufferChangedAgg + 13 * streamCount; // adding END_Transaction Size
+        int concatLogSize = m_drBufferChangedAgg + (DR_BEGINTXN_MSG_LEN + DR_ENDTXN_MSG_LEN) * streamCount; // adding BEGIN_Transaction and END_Transaction Size
 
         // estimate of ParametersSet Size of @ApplyBinaryLogMP on the consumer side
         int serializedParamSize = getSerializedParamSizeForApplyBinaryLog(streamCount, remotePartitionCount, concatLogSize);
 
-        return serializedParamSize + StoreProcedureInvocationHeaderSize + InitiateTaskMessageHeaderSize + FragmentTaskMessageHeaderSize;
+        return serializedParamSize + StoreProcedureInvocationHeaderSize + InitiateTaskMessageHeaderSize + FragmentTaskMessageHeaderSize + MessageAdditionalSize;
     }
 
     // calculate based on BinaryLogHelper and ParameterSet.fromArrayNoCopy
@@ -161,6 +176,11 @@ public class MpTransactionState extends TransactionState
 
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
+        // TODO separate NPTransactionState from MPTransactionState when work on concurrent np transaction
+        if (m_nPartTxn) {
+            partitionMasters = trimPartitionMasters(partitionMasters);
+            masters = Lists.newArrayList(partitionMasters.values());
+        }
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("[MpTransactionState] TXN ID: " + TxnEgo.txnIdSeqToString(txnId) + " update masters from " +  CoreUtils.hsIdCollectionToString(m_useHSIds)
             + " to "+ CoreUtils.hsIdCollectionToString(masters));
@@ -170,6 +190,15 @@ public class MpTransactionState extends TransactionState
         m_masterHSIds.clear();
         m_masterHSIds.putAll(partitionMasters);
         m_localPartitionCount = m_masterHSIds.size();
+    }
+
+    private HashMap<Integer, Long> trimPartitionMasters(Map<Integer, Long> partitionMasters)
+    {
+        HashMap<Integer,Long> partitionMastersCopy = Maps.newHashMap(partitionMasters);
+
+        // For n-partition transaction, only care about the partitions involved in the transaction.
+        partitionMastersCopy.keySet().retainAll(m_masterHSIds.keySet());
+        return partitionMastersCopy;
     }
 
     /**
@@ -441,6 +470,7 @@ public class MpTransactionState extends TransactionState
                         }
                     }
                     m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
+                    m_mbox.send(m_mbox.getHSId(), new DumpMessage());
                 }
             }
         }
@@ -547,8 +577,8 @@ public class MpTransactionState extends TransactionState
             expectedMsg |= trackDependency(src_hsid, this_depId, this_dep);
         }
         if (msg.getTableCount() > 0) {
-            int drBufferChanged = msg.getDRBufferChangedAtIndex(msg.getTableCount() - 1);
-            // sum the dr buffer change size among all partitions for last fragment (which already aggregate all previous fragment buffer size)
+            int drBufferChanged = msg.getDRBufferSize();
+            // sum the dr buffer change size among all partitions (already aggregate all previous fragments buffer size)
             m_drBufferChangedAgg += drBufferChanged;
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("[trackDependency]:  drBufferSize added :" + drBufferChanged +
@@ -578,6 +608,10 @@ public class MpTransactionState extends TransactionState
         m_newDeps.offer(message);
     }
 
+    public boolean drTxnDataCanBeRolledBack() {
+        return m_drBufferChangedAgg == 0;
+    }
+
     /**
      * Restart this fragment after the fragment is mis-routed from MigratePartitionLeader
      * If the masters have been updated, the fragment will be routed to its new master. The fragment will be routed to the old master.
@@ -586,6 +620,15 @@ public class MpTransactionState extends TransactionState
      * @param partitionMastersMap The current partition masters
      */
     public void restartFragment(FragmentResponseMessage message, List<Long> masters, Map<Integer, Long> partitionMastersMap) {
+        // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
+        if (m_restartTimestamp != message.getRestartTimestamp()) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Receives stale misrouted fragment response, " +
+                        "expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
+                        " actually receives: " + message);
+            }
+            return;
+        }
         final int partionId = message.getPartitionId();
         Long restartHsid = partitionMastersMap.get(partionId);
         Long hsid = message.getExecutorSiteId();

@@ -382,6 +382,7 @@ public class ProcedureRunner {
                     }
                     try {
                         Object rawResult = m_procMethod.invoke(m_procedure, paramList);
+
                         results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
                     } catch (IllegalAccessException e) {
                         // If reflection fails, invoke the same error handling that other exceptions do
@@ -1612,6 +1613,8 @@ public class ProcedureRunner {
                     m_txnState.uniqueId, m_isReadOnly, VoltTrace.log(VoltTrace.Category.EE) != null);
             final int totalSize;
             try {
+                // read the size of the DR buffer used
+                fragResult.readInt();
                 // read the complete size of the buffer used
                 totalSize = fragResult.readInt();
             } catch (final IOException ex) {
@@ -1630,7 +1633,7 @@ public class ProcedureRunner {
         } catch (Throwable ex) {
             if (!m_isReadOnly) {
                 // roll back the current batch and re-throw the EE exception
-                m_site.truncateUndoLog(true,
+                m_site.truncateUndoLog(true, false,
                         m_spBigBatchBeginToken >= 0 ? m_spBigBatchBeginToken : m_site.getLatestUndoToken(),
                         m_txnState.m_spHandle, null);
             }

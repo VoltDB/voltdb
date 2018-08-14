@@ -759,16 +759,26 @@ public class TestCatalogDiffs extends TestCase {
 
         // start with a table
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1)) USING TTL 10 SECOND ON COLUMN C2;");
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1)) USING TTL 10 SECONDS ON COLUMN C2;");
         builder.addPartitionInfo("A", "C1");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL1.jar"));
         Catalog catOriginal = catalogForJar(testDir + File.separator + "testAlterTableTTL1.jar");
 
         // alter TTL
-        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTE ON COLUMN C2;");
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAlterTableTTL2.jar");
         verifyDiff(catOriginal, catUpdated, false, null, true, false, true);
+
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 MAX_FREQUENCY 1;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL21.jar"));
+        Catalog catUpdated1 = catalogForJar(testDir + File.separator + "testAlterTableTTL21.jar");
+        verifyDiff(catUpdated, catUpdated1, false, null, true, false, true);
+
+        builder.addLiteralSchema("\nALTER TABLE A USING TTL 20 MINUTES ON COLUMN C2 BATCH_SIZE 10 MAX_FREQUENCY 3;");
+        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL22.jar"));
+        Catalog catUpdated2 = catalogForJar(testDir + File.separator + "testAlterTableTTL22.jar");
+        verifyDiff(catUpdated1, catUpdated2, false, null, true, false, true);
 
         builder.addLiteralSchema("\nALTER TABLE A DROP TTL;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL3.jar"));

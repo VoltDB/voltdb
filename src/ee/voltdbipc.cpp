@@ -301,6 +301,7 @@ typedef struct {
 struct undo_token {
     struct ipc_command cmd;
     int64_t token;
+    char isEmptyDRTxn;
 }__attribute__((packed));
 
 /*
@@ -743,9 +744,10 @@ int8_t VoltDBIPC::releaseUndoToken(struct ipc_command *cmd) {
 
 
     struct undo_token * cs = (struct undo_token*) cmd;
+    bool isEmptyDRTxn = cs->isEmptyDRTxn > 0;
 
     try {
-        m_engine->releaseUndoToken(ntohll(cs->token));
+        m_engine->releaseUndoToken(ntohll(cs->token), isEmptyDRTxn);
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }

@@ -707,7 +707,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
             // RETURN RESULTS TO STORED PROCEDURE
             //  Hash AGGREGATION ops
             //   ORDER BY (SORT)
-            //    Hash AGGREGATION ops: MAX(VOLT_TEMP_TABLE.column#0)
+            //    Hash AGGREGATION ops: MAX($$_VOLT_TEMP_TABLE_$$.column#0)
             //     RECEIVE FROM ALL PARTITIONS
             List<AbstractPlanNode> frags =  compileToFragments(
                     "select distinct max(P_D2), P_D1 + 3 from P where P_D1 + 3 > 0 group by P_D1 order by P_D1 + 3;");
@@ -737,7 +737,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
             // Coordinator fragment with OrderBy, Projection, and Aggregation
             // ORDER BY (SORT)
             //  PROJECTION
-            //   Hash AGGREGATION ops: SUM(VOLT_TEMP_TABLE.column#0)
+            //   Hash AGGREGATION ops: SUM($$_VOLT_TEMP_TABLE_$$.column#0)
             //    RECEIVE FROM ALL PARTITIONS
             // Not supported yet because we do not support inlining a projection before
             // the order by into the MergeReceive AND we don't recognize cases like this

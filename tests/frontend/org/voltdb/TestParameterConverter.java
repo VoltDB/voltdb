@@ -78,7 +78,7 @@ public class TestParameterConverter extends TestCase
             ParameterConverter.
                 tryToMakeCompatible(int.class, -9000000000L);
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (-9000000000) of type:"
+            assertTrue(ex.getMessage().contains("The provided value: (-9000000000) of type:"
                     + " java.lang.Long is not a match or is out of range for the target parameter type: int"));
         }
     }
@@ -88,7 +88,7 @@ public class TestParameterConverter extends TestCase
             ParameterConverter.
                 tryToMakeCompatible(Integer.class, -9000000000L);
         } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("tryToMakeCompatible: The provided value: (-9000000000) of type:"
+            assertTrue(ex.getMessage().contains("The provided value: (-9000000000) of type:"
                     + " java.lang.Long is not a match or is out of range for the target parameter type: java.lang.Integer"));
         }
     }
@@ -316,7 +316,7 @@ public class TestParameterConverter extends TestCase
                 tryToMakeCompatible(Byte.class, -128);
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "tryToMakeCompatible: The provided short, int or long value: (-128) might be interpreted "
+                    "The provided short, int or long value: (-128) might be interpreted "
                     + "as tinyint null. Try explicitly using a byte parameter."));
         }
     }
@@ -327,7 +327,7 @@ public class TestParameterConverter extends TestCase
                 tryToMakeCompatible(Short.class, -32768);
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "tryToMakeCompatible: The provided int or long value: (-32768) might be interpreted "
+                    "The provided int or long value: (-32768) might be interpreted "
                     + "as smallint null. Try explicitly using a short parameter."));
         }
     }
@@ -338,7 +338,7 @@ public class TestParameterConverter extends TestCase
                 tryToMakeCompatible(int.class, -2147483648L);
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "tryToMakeCompatible: The provided long value: (-2147483648) might be interpreted "
+                    "The provided long value: (-2147483648) might be interpreted "
                     + "as integer null. Try explicitly using a int parameter."));
         }
     }
@@ -349,7 +349,7 @@ public class TestParameterConverter extends TestCase
                 tryToMakeCompatible(Integer.class, -2147483648L);
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "tryToMakeCompatible: The provided long value: (-2147483648) might be interpreted "
+                    "The provided long value: (-2147483648) might be interpreted "
                     + "as integer null. Try explicitly using a int parameter."));
         }
     }
@@ -361,7 +361,7 @@ public class TestParameterConverter extends TestCase
                 tryToMakeCompatible(byte.class, "ABC");
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "tryToMakeCompatible: Unable to convert string ABC"
+                    "Unable to convert string ABC"
                     + " to byte value for target parameter"));
         }
     }
@@ -372,7 +372,7 @@ public class TestParameterConverter extends TestCase
                 tryToMakeCompatible(Byte.class, "ABC");
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains(
-                    "tryToMakeCompatible: Unable to convert string ABC"
+                    "Unable to convert string ABC"
                     + " to java.lang.Byte value for target parameter"));
         }
     }

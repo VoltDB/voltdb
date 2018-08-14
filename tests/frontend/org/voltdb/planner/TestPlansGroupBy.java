@@ -993,10 +993,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments(sql2);
         explainStr2 = buildExplainPlan(pns);
         if (! exact) {
-            explainStr1 = explainStr1.replaceAll("TEMP_TABLE\\.column#[\\d]",
-                    "TEMP_TABLE.column#[Index]");
-            explainStr2 = explainStr2.replaceAll("TEMP_TABLE\\.column#[\\d]",
-                    "TEMP_TABLE.column#[Index]");
+            explainStr1 = explainStr1.replaceAll("\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[\\d]",
+                    "\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[Index]");
+            explainStr2 = explainStr2.replaceAll("\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[\\d]",
+                    "\\$\\$_VOLT_TEMP_TABLE_\\$\\$\\.column#[Index]");
             assertEquals(explainStr1, explainStr2);
         }
         assertEquals(explainStr1, explainStr2);

@@ -269,7 +269,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
-    jint compactionThreshold)
+    jint compactionThreshold,
+    jint exportFlushTimeout)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -297,7 +298,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                            defaultDrBufferSize,
                            tempTableMemory,
                            createDrReplicatedStream,
-                           static_cast<int32_t>(compactionThreshold));
+                           static_cast<int32_t>(compactionThreshold),
+                           exportFlushTimeout);
         VOLT_DEBUG("initialize succeeded");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     }
@@ -481,7 +483,7 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
     if (cnt < 0) {
         throwFatalException( "parameter count is negative: %d", cnt);
     }
-    assert (cnt < MAX_PARAM_COUNT);
+    assert (cnt <= MAX_PARAM_COUNT);
     deserializeParameterSetCommon(cnt, serialize_in, params, stringPool);
     return cnt;
 }
@@ -889,7 +891,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeToggl
  * @returns JNI_TRUE on success. JNI_FALSE otherwise.
  */
 SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeReleaseUndoToken
-(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken)
+(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken, jboolean isEmptyDRTxn)
 {
     VOLT_DEBUG("nativeReleaseUndoToken in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -897,7 +899,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeR
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         if (engine) {
-            engine->releaseUndoToken(undoToken);
+            engine->releaseUndoToken(undoToken, isEmptyDRTxn);
             return JNI_TRUE;
         }
     } catch (const FatalException &e) {

@@ -61,7 +61,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
-import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -497,8 +497,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long spHandle,
-            List<UndoAction> undoActions)
+    public void truncateUndoLog(boolean rollback, boolean isEmptyDRTxn, long beginUndoToken,
+            long spHandle, List<UndoAction> undoActions)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -727,5 +727,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
         return m_sysprocContext;
+    }
+
+    @Override
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
+        // TODO Auto-generated method stub
     }
 }

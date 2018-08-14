@@ -82,7 +82,7 @@ public class MatViewFallbackQueryXMLGenerator {
             List<VoltXMLElement> groupcolumns = groupcolumnsElement.children;
             for (int i=0; i<m_groupByColumnsParsedInfo.size(); ++i) {
                 String index = String.valueOf(i);
-                String valueType = m_groupByColumnsParsedInfo.get(i).expression.getValueType().getName();
+                String valueType = m_groupByColumnsParsedInfo.get(i).m_expression.getValueType().getName();
                 VoltXMLElement column = groupcolumns.get(i);
                 // Add the column to the parameter list.
                 parameters.add( VoltXMLElementHelper.buildParamElement( nextElementId(), index, valueType ) );
@@ -115,7 +115,7 @@ public class MatViewFallbackQueryXMLGenerator {
                 columns.add(column);
                 VoltXMLElement aggArg = column.children.get(0);
                 String operator = optype.equals("min") ? "greaterthanorequalto" : "lessthanorequalto";
-                String valueType = m_displayColumnsParsedInfo.get(i).expression.getValueType().getName();
+                String valueType = m_displayColumnsParsedInfo.get(i).m_expression.getValueType().getName();
                 parameters.add( VoltXMLElementHelper.buildParamElement(nextElementId(), paramIndex, valueType) );
                 VoltXMLElement aggArgJoincond = VoltXMLElementHelper.buildColumnParamJoincondElement(operator, aggArg, lastElementId(), nextElementId());
                 joincondList.add( VoltXMLElementHelper.mergeTwoElementsUsingOperator("and", nextElementId(), joincond, aggArgJoincond) );

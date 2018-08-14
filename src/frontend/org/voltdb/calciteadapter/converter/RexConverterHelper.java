@@ -44,10 +44,7 @@ public class RexConverterHelper {
             String impliedArg) {
         int functionId = FunctionSQL.voltGetFunctionId(funcName);
         if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
-            FunctionDescriptor functionDesc = FunctionForVoltDB.newVoltDBFunctionId(funcName);
-            if (functionDesc != null) {
-                functionId = functionDesc.getId();
-            }
+            functionId = FunctionForVoltDB.getFunctionID(funcName);
         }
         if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
             throw new CalcitePlanningException("Unsupported function:" + funcName);

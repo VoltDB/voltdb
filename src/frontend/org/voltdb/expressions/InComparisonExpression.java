@@ -52,6 +52,15 @@ public class InComparisonExpression extends ComparisonExpression {
         }
     }
 
+    /**
+     * A "x in (a, b, c)" relation cannot be reversed as "x > y" to "y < x", so
+     * we return itself.
+     */
+    @Override
+    public ComparisonExpression reverseOperator() {
+       return this;
+    }
+
     @Override
     public void finalizeValueTypes()
     {

@@ -7,7 +7,7 @@ Expect to fail because the jar has not been loaded yet.
 Expect to fail as Trivial should have failed proc creation.
 Undefined procedure: Trivial
 Expect to fail because we can't call "@SwapClasses" as a SQLStmt.
-[BadSwap.class]: Failed to plan for statement (badswap) "@SwapTables t1 t2;". Error: "Error in "@SwapTables t1 t2;" unknown token"
+[BadSwap.class]: Failed to plan for statement (badswap) "@SwapTables t1 t2;". Error: "Error in "@SwapTables t1 t2;" - unknown token"
 Expect to fail because of failure to "redefine" the Trivial proc with its
     underlying class removed. The error message could be better here.
 Classes not found in @UpdateClasses jar: sqlcmdtest.Trivial
@@ -67,4 +67,4 @@ Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSab
 
 End of error output.
 Expect to fail because we can't create a single statement procedure with @SwapTables.
-[badswap]: Failed to plan for statement (sql0) "@SwapTables swap2 swap1;". Error: "Error in "@SwapTables swap2 swap1;" unknown token"
+[badswap]: Failed to plan for statement (sql0) "@SwapTables swap2 swap1;". Error: "Error in "@SwapTables swap2 swap1;" - unknown token"

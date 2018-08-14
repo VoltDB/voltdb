@@ -32,7 +32,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 
 /**
  * VoltProcedures invoke SiteProcedureConnection methods to
@@ -163,7 +163,7 @@ public interface SiteProcedureConnection {
     /**
      * IV2 commit / rollback interface to the EE and java level roll back if needed
      */
-    public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoActions);
+    public void truncateUndoLog(boolean rollback, boolean isEmptyDRTxn, long token, long spHandle, List<UndoAction> undoActions);
 
     /**
      * IV2: send dependencies to the EE
@@ -235,6 +235,7 @@ public interface SiteProcedureConnection {
     public void updateHashinator(TheHashinator hashinator);
     public void setViewsEnabled(String viewNames, boolean enabled);
     public long[] validatePartitioning(long tableIds[], byte hashinatorConfig[]);
+    public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, int remotePartitionId, byte logData[]);
     public void setDRProtocolVersion(int drVersion);
     /*

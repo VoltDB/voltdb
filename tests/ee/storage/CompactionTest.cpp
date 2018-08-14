@@ -211,7 +211,7 @@ public:
                  * Release the last quantum
                  */
             case 1: {
-                m_engine->releaseUndoToken(m_undoToken);
+                m_engine->releaseUndoToken(m_undoToken, false);
                 break;
             }
         }
