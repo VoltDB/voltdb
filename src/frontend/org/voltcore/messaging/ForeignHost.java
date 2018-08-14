@@ -382,6 +382,9 @@ public class ForeignHost {
             } else if (cause == ForeignHost.CRASH_ALL || cause == ForeignHost.CRASH_SPECIFIED) {
                 org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
             } else if (cause == ForeignHost.PRINT_STACKTRACE) {
+                //for debug
+                System.out.println("Start printing stacktrace.");
+
                 Process process = Runtime.getRuntime().exec("jps");
                 List<String> processList = new ArrayList<>();
                 BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));

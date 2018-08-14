@@ -53,8 +53,9 @@ public class JStack extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String command)
     {
         try {
+            System.out.println(command);
             JSONObject jsObj = new JSONObject(command);
-            String[] hsIDs = jsObj.getString("hsId").split(",");
+            String[] hsIDs = jsObj.getString("hsIds").split(",");
             long[] hsID_arr = new long[hsIDs.length];
             for(int i = 0 ; i < hsIDs.length ; i++) {
                 hsID_arr[i] = Long.parseLong(hsIDs[i]);

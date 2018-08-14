@@ -23,17 +23,17 @@ from voltcli import utility
     bundles = VOLT.AdminBundle(),
     description = 'Print out stacktrace using jstack for all clusters.',
     options = (
-        VOLT.StringOption('-h', '--hsId', 'hsId',
+        VOLT.StringOption(None, '--hsIds', 'hsIds',
                               'Specify the host you want to dump stack trace.',
                               default = '0')
     ),
 )
 
 def jstack(runner):
-    if not runner.opts.hsId:
+    if not runner.opts.hsIds:
         print "Must provide site IDs for dumping stack traces."
         return
-    json_opts = ['{hsId: %s}' % (runner.opts.hsId)]
+    json_opts = ['{hsIds: "%s"}' % (runner.opts.hsIds)]
     runner.verbose_info('@JStack "%s"' % json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
     print 'voltadmin: JStack command has been executed. Check the server logs for results.'

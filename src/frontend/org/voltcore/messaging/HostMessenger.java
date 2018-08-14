@@ -1680,6 +1680,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void sendPoisonPillJStack(long[] hostIds, String err) {
+        System.out.println("Sending Poison Pill");
         for (long hostId : hostIds) {
             int id = new Long(hostId).intValue();
             Iterator<ForeignHost> it = m_foreignHosts.get(id).iterator();
