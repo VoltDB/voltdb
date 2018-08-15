@@ -465,9 +465,24 @@ public class MpTransactionState extends TransactionState
                     m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
                     m_mbox.send(m_mbox.getHSId(), new DumpMessage());
                 }
-                // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
 
-                if (msg != null && m_restartTimestamp != msg.getRestartTimestamp()) {
+                SerializableException se = msg.getException();
+                if (se instanceof TransactionRestartException) {
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug("Transaction exception, txnid: " + TxnEgo.txnIdToString(msg.getTxnId()) + " status:" + msg.getStatusCode()  + " isMisrouted:"+ ((TransactionRestartException) se).isMisrouted()
+                                + " msg: " + msg);
+                    }
+
+                    // If this is a restart exception from the inject poison pill, we don't need to match up the DependencyId
+                    // Don't rely on the restartTimeStamp check since it's not reliable for poison
+                    if (!((TransactionRestartException) se).isMisrouted()) {
+                        setNeedsRollback(true);
+                        throw se;
+                    }
+                }
+
+                // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
+                if (m_restartTimestamp != msg.getRestartTimestamp()) {
                     if (tmLog.isDebugEnabled()) {
                         tmLog.debug("Receives unmatched fragment response, expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
                                 " actually receives: " + msg);
@@ -476,21 +491,12 @@ public class MpTransactionState extends TransactionState
                 }
 
                 if (msg != null) {
-                    SerializableException se = msg.getException();
                     if (se instanceof TransactionRestartException) {
-                        if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("Transaction exception, txnid: " + TxnEgo.txnIdToString(msg.getTxnId()) + " status:" + msg.getStatusCode()  + " isMisrouted:"+ ((TransactionRestartException) se).isMisrouted()
-                            + " msg: " + msg);
-                        }
-
                         // If this is an misrouted exception, rerouted only this fragment
                         if (((TransactionRestartException) se).isMisrouted()) {
                             restartFragment(msg, ((TransactionRestartException) se).getMasterList(), ((TransactionRestartException) se).getPartitionMasterMap());
-                            return msg;
+                            msg = null;
                         }
-                        // If this is a restart exception, we don't need to match up the DependencyId
-                        setNeedsRollback(true);
-                        throw se;
                     }
                 }
             }
