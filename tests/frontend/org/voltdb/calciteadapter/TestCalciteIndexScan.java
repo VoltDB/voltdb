@@ -87,6 +87,7 @@ public class TestCalciteIndexScan extends TestCalciteBase {
         ignores.put("\"INLINE_NODES\":[{\"ID\":4", "\"INLINE_NODES\":[{\"ID\":3");
         ignores.put("\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\"", "\"ID\":4,\"PLAN_NODE_TYPE\":\"LIMIT\"");
         ignores.put("\"TYPE\":1,\"VALUE_TYPE\":5", "\"TYPE\":1,\"VALUE_TYPE\":6");
+        ignores.put("\"SORT_DIRECTION\":\"ASC\"", "\"SORT_DIRECTION\":\"INVALID\"");
         comparePlans(sql, ignores);
     }
 
@@ -149,7 +150,10 @@ public class TestCalciteIndexScan extends TestCalciteBase {
     public void testIndexScanPartitioned1() throws Exception {
         String sql;
         sql = "select I from PI1 where I > 0";
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"SORT_DIRECTION\":\"ASC\"", "\"SORT_DIRECTION\":\"INVALID\"");
+
+        comparePlans(sql, ignores);
     }
 
     public void testIndexScanPartitioned2() throws Exception {
@@ -164,6 +168,7 @@ public class TestCalciteIndexScan extends TestCalciteBase {
 
     public void testIndexScanPartitioned3() throws Exception {
         String sql;
+        // VoltDB Inferred partition.
         sql = "select I from PI1 where I = 0";
         comparePlans(sql);
     }
@@ -171,7 +176,9 @@ public class TestCalciteIndexScan extends TestCalciteBase {
     public void testIndexScanPartitioned31() throws Exception {
         String sql;
         sql = "select I from PI1 where cast(I as integer) = 0";
-        comparePlans(sql);
+        Map<String, String> ignores = new HashMap<>();
+        ignores.put("\"SORT_DIRECTION\":\"ASC\"", "\"SORT_DIRECTION\":\"INVALID\"");
+        comparePlans(sql, ignores);
     }
 
     public void testIndexScanPartitioned4() throws Exception {
