@@ -55,7 +55,7 @@ import org.voltdb.types.SortDirectionType;
 
 public class TestPlansGroupBy extends PlannerTestCase {
     // Set this to true to print the JSON string for the plan.
-    private static boolean PRINT_JSON_PLAN = true;
+    private static boolean PRINT_JSON_PLAN = false;
     // Test normal sized temp tables.
     private static boolean TEST_NORMAL_SIZE_QUERIES = true;
     // Test large sized temp tables.
@@ -115,15 +115,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
         //       large temp tables or not.  Since there are no
         //       group by keys we can always do serial aggregation.
         //
-        checkSimpleTableInlineAgg("SELECT SUM(A1) from T1",
-                                  // This is the scan node we expect.
+        String sql;
+        sql = "SELECT SUM(A1) from T1";
+
+        checkSimpleTableInlineAgg(sql,
                                   PlanNodeType.SEQSCAN,
-                                  // This is the coordinator fragment aggregate matcher.
                                   new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
                                                            ExpressionType.AGGREGATE_SUM),
-                                  // This is the distributed fragment aggregate matcher.
                                   new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
                                                            ExpressionType.AGGREGATE_SUM));
+
         checkSimpleTableInlineAgg("SELECT MIN(A1) from T1",
                                   PlanNodeType.SEQSCAN,
                                   new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
@@ -381,34 +382,74 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
         // Partition IndexScan with HASH aggregate remains unoptimized -
         // index (F_VAL1, F_VAL2) does not cover any of the GROUP BY columns
-        validatePlan("SELECT MAX(F_VAL2) FROM F WHERE F_VAL1 > 0 GROUP BY F_D1",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              PlanNodeType.PROJECTION,
-                              PlanNodeType.HASHAGGREGATE,
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                         new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                                 PlanNodeType.HASHAGGREGATE,
-                                                 PlanNodeType.PROJECTION)));
+        if ( ! isPlanningForLargeQueries() ) {
+            validatePlan("SELECT MAX(F_VAL2) FROM F WHERE F_VAL1 > 0 GROUP BY F_D1",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.HASHAGGREGATE,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                          PlanNodeType.HASHAGGREGATE,
+                                                          PlanNodeType.PROJECTION)));
+        }
+        else {
+            validatePlan("SELECT MAX(F_VAL2) FROM F WHERE F_VAL1 > 0 GROUP BY F_D1",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.AGGREGATE,
+                                  new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
+                                                          PlanNodeType.ORDERBY)),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.AGGREGATE,
+                                  PlanNodeType.ORDERBY,
+                                  new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                                          PlanNodeType.PROJECTION)));
+        }
 
-        // IndexScan with HASH aggregate remains unoptimized - the index COL_RF_HASH is not scannable
-        validatePlan("SELECT F_VAL3, MAX(F_VAL2) FROM RF WHERE F_VAL3 = 0 GROUP BY F_VAL3",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                                      PlanNodeType.HASHAGGREGATE,
-                                                      PlanNodeType.PROJECTION)));
+        if ( isPlanningForLargeQueries() ) {
+            validatePlan("SELECT F_VAL3, MAX(F_VAL2) FROM RF WHERE F_VAL3 = 0 GROUP BY F_VAL3",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.AGGREGATE,
+                                  PlanNodeType.ORDERBY,
+                                  new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                                          PlanNodeType.PROJECTION)));
+        }
+        else {
+            validatePlan("SELECT F_VAL3, MAX(F_VAL2) FROM RF WHERE F_VAL3 = 0 GROUP BY F_VAL3",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                          PlanNodeType.HASHAGGREGATE,
+                                                          PlanNodeType.PROJECTION)));
+        }
 
-        // where clause not matching
-        validatePlan("SELECT A, count(B) from R2 where B > 2 group by A order by A;",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              new OptionalPlanNode(PlanNodeType.PROJECTION),
-                              PlanNodeType.ORDERBY,
-                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
-                                                      PlanNodeType.HASHAGGREGATE,
-                                                      PlanNodeType.PROJECTION)));
+        if ( isPlanningForLargeQueries() ) {
+            // where clause not matching
+            validatePlan("SELECT A, count(B) from R2 where B > 2 group by A order by A;",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new OptionalPlanNode(PlanNodeType.PROJECTION),
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.AGGREGATE,
+                                  PlanNodeType.ORDERBY,
+                                  new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                                          PlanNodeType.PROJECTION)));
+        }
+        else {
+            // where clause not matching
+            validatePlan("SELECT A, count(B) from R2 where B > 2 group by A order by A;",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new OptionalPlanNode(PlanNodeType.PROJECTION),
+                                  PlanNodeType.ORDERBY,
+                                  new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                          PlanNodeType.HASHAGGREGATE,
+                                                          PlanNodeType.PROJECTION)));
+        }
     }
 
     /**
@@ -837,13 +878,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                   PlanNodeType.ORDERBY,
                                   allOf(PlanNodeType.PROJECTION,
                                         new OutputSchemaMatcher("C", VoltType.BIGINT, 1)),
-                                  new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
-                                                          PlanNodeType.PROJECTION)));
+                                                          PlanNodeType.PROJECTION));
         }
     }
 
-    private void checkPartialAggregate(List<AbstractPlanNode> pns,
+    private void checkPartialAggregate(String sql,
             boolean twoFragments) {
+        List<AbstractPlanNode> pns = compileToFragments(sql);
         AbstractPlanNode apn;
         if (twoFragments) {
             assertEquals(2, pns.size());
@@ -853,7 +894,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
             assertEquals(1, pns.size());
             apn = pns.get(0).getChild(0);
         }
-
         assertTrue(apn.toExplainPlanString().toLowerCase().contains("partial"));
     }
 
@@ -864,15 +904,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql = "SELECT G.G_D1, RF.F_D2, COUNT(*) " +
                 "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
                 "GROUP BY G.G_D1, RF.F_D2";
-        pns = compileToFragments(sql);
-        checkPartialAggregate(pns, true);
+        checkPartialAggregate(sql, true);
 
         // With different group by key ordered
         sql = "SELECT G.G_D1, RF.F_D2, COUNT(*) " +
                 "FROM G LEFT OUTER JOIN RF ON G.G_D2 = RF.F_D1 " +
                 "GROUP BY RF.F_D2, G.G_D1";
-        pns = compileToFragments(sql);
-        checkPartialAggregate(pns, true);
+        checkPartialAggregate(sql, true);
 
 
         // three table joins with aggregate
@@ -880,24 +918,21 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
                 "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
                 "GROUP BY G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3";
-        pns = compileToFragments(sql);
-        checkPartialAggregate(pns, true);
+        checkPartialAggregate(sql, true);
 
         // With different group by key ordered
         sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
                 "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
                 "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
                 "GROUP BY G.G_PKEY, RF.F_D2, G.G_D1, F.F_D3";
-        pns = compileToFragments(sql);
-        checkPartialAggregate(pns, true);
+        checkPartialAggregate(sql, true);
 
         // With different group by key ordered
         sql = "SELECT G.G_D1, G.G_PKEY, RF.F_D2, F.F_D3, COUNT(*) " +
                 "FROM G LEFT OUTER JOIN F ON G.G_PKEY = F.F_PKEY " +
                 "     LEFT OUTER JOIN RF ON G.G_D1 = RF.F_D1 " +
                 "GROUP BY RF.F_D2, G.G_PKEY, F.F_D3, G.G_D1";
-        pns = compileToFragments(sql);
-        checkPartialAggregate(pns, true);
+        checkPartialAggregate(sql, true);
     }
 
 

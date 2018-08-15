@@ -1268,6 +1268,11 @@ public class PlannerTestCase extends TestCase {
             int idx;
             for (idx = 0; node != null && idx < m_nodeSpecs.size(); idx += 1) {
                 PlanMatcher pm = m_nodeSpecs.get(idx);
+                // Magic AnyFragment matches everything
+                // after this, with no testing.
+                if (pm instanceof AnyFragment) {
+                    return null;
+                }
                 String err = pm.match(node, fragmentNo, numberFragments);
                 if (err != null) {
                     /*
@@ -1411,6 +1416,25 @@ public class PlannerTestCase extends TestCase {
     }
 
     /**
+     * A matcher which will match any fragment.  This is
+     * all nodes of any fragment.  This is magic in the
+     * matching routine.
+     */
+    protected static class AnyFragment implements PlanMatcher {
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            return null;
+        }
+
+        @Override
+        public String matchName() {
+            return "AnyFragment";
+        }
+    }
+    /**
      * Match all the given node specifications.  Specifications
      * after the first failure are not evaluated.
      *
@@ -1483,17 +1507,8 @@ public class PlannerTestCase extends TestCase {
     protected void validatePlan(String SQL,
                                 boolean printPlan,
                                 FragmentSpec ... spec) {
-        if (printPlan) {
-            System.out.printf("SQL: %s\n", SQL);
-        }
         List<AbstractPlanNode> fragments = compileToFragments(SQL);
-        if (printPlan) {
-            for (int idx = 0; idx < fragments.size(); idx += 1) {
-                AbstractPlanNode node = fragments.get(idx);
-                System.out.printf("Fragment %d/%d:\n%s\n", idx + 1, fragments.size(), node.toExplainPlanString());
-                printJSONString(node);
-            }
-        }
+        printJSONPlan(printPlan, SQL, fragments);
         assertEquals(String.format("Expected %d fragments, not %d",
                                    spec.length,
                                    fragments.size()),
@@ -1502,6 +1517,21 @@ public class PlannerTestCase extends TestCase {
         for (int idx = 0; idx < fragments.size(); idx += 1) {
             String error = spec[idx].match(fragments.get(idx), idx + 1, fragments.size());
             assertNull(error, error);
+        }
+    }
+
+    protected void printJSONPlan(boolean printPlan,
+                                 String SQL,
+                                 List<AbstractPlanNode> fragments) {
+        if (printPlan) {
+            System.out.printf("SQL: %s\n", SQL);
+        }
+        if (printPlan) {
+            for (int idx = 0; idx < fragments.size(); idx += 1) {
+                AbstractPlanNode node = fragments.get(idx);
+                System.out.printf("Fragment %d/%d:\n%s\n", idx + 1, fragments.size(), node.toExplainPlanString());
+                printJSONString(node);
+            }
         }
     }
 

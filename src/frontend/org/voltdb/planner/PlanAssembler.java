@@ -2900,27 +2900,25 @@ public class PlanAssembler {
         NodeSchema        agg_schema      = new NodeSchema();
         NodeSchema        top_agg_schema  = new NodeSchema();
 
-        // We will need an order by node on top iff there is a partition
-        // column among the group by keys and it's a large query.
-        //
-        // If this holds then each the group
-        // will be found on a single partition.  One partition may have several
-        // groups but no group will have rows in more than one partition.  So
-        // the rows we read from the partitions will have all the aggregation
-        // done already.  If the group by keys have no partition column then
-        // a group might have rows in multiple partitions, and the coordinator
-        // will have to sort them.  Note that this is independent of whether
-        // the distributed fragment is order by an order by node or an index
-        // scan.  If it is ordered it will be ordered by group by key values,
-        // and we will have squashed all of these into one row before sending
-        // them to the coordinator.
-        //
-        // For normal sized queries we just use hash aggregation.
+        // We will need an order by node on top iff we have group keys,
+        // and there is not a partition column among the group by keys
+        // and it's a large query.
+        //   1.) If we have no group by expressions we don't need anything
+        //       to do serial aggregation.
+        //   2.) If we have group by expressions and a partition column among the
+        //       group by keys then the groups are all on the partitions,
+        //       and the rows we read will be the grouped values already.
+        //   3.) If we have group keys and no partition column among
+        //       the group by expressions but normal sized temp tables we
+        //       will just to hash aggregation, and no order by is needed.
         //
         // Note that if m_multiPartitionAggregation is false we will need
         // a top order by node.  But this is implied by the partition in
         // group by requirement, so we are ok.
-        boolean needTopOrderby = isLargeQuery() && (! m_parsedSelect.hasPartitionColumnInGroupby());
+        boolean needTopOrderby
+                = isLargeQuery()
+                    && m_parsedSelect.isGrouped()
+                    && (! m_parsedSelect.hasPartitionColumnInGroupby());
 
         // Calculate the order by node if we need one.
         if (needTopOrderby && topAggNode != null) {

@@ -122,10 +122,13 @@ public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
             //
             for (int i = 0; i < node.getParentCount(); i++) {
                 AbstractPlanNode parent = node.getParent(i);
-                int remaining = child_cnts.get(parent) - 1;
-                child_cnts.put(parent, remaining);
-                if (remaining == 0) {
-                    execute_list.add(parent);
+                Integer pcount = child_cnts.get(parent);
+                if (pcount != null) {
+                    int remaining = pcount - 1;
+                    child_cnts.put(parent, remaining);
+                    if (remaining == 0) {
+                        execute_list.add(parent);
+                    }
                 }
             }
         }
