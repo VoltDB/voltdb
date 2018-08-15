@@ -118,8 +118,9 @@ public class ConnectionUtil {
      * @return The bytes of the hashed password.
      */
     public static byte[] getHashedPassword(ClientAuthScheme scheme, String password) {
-        if (password == null)
+        if (password == null) {
             return null;
+        }
 
         MessageDigest md = null;
         try {
@@ -179,7 +180,9 @@ public class ConnectionUtil {
     };
 
     public final static Optional<DelegatePrincipal> getDelegate(Subject s) {
-        if (s == null) return Optional.absent();
+        if (s == null) {
+            return Optional.absent();
+        }
         return FluentIterable
                 .from(s.getPrincipals())
                 .filter(Predicates.instanceOf(DelegatePrincipal.class))
@@ -395,7 +398,9 @@ public class ConnectionUtil {
                 bb.clear().limit(4);
 
                 while (bb.hasRemaining()) {
-                    if (channel.read(bb) == -1) throw new EOFException();
+                    if (channel.read(bb) == -1) {
+                        throw new EOFException();
+                    }
                 }
                 bb.flip();
 
@@ -409,7 +414,9 @@ public class ConnectionUtil {
                 bb.clear().limit(msgSize);
 
                 while (bb.hasRemaining()) {
-                    if (channel.read(bb) == -1) throw new EOFException();
+                    if (channel.read(bb) == -1) {
+                        throw new EOFException();
+                    }
                 }
                 bb.flip();
 
@@ -494,7 +501,9 @@ public class ConnectionUtil {
                     } catch (IOException ex) {
                         throw new RuntimeException(ex);
                     } finally {
-                        if (context != null) try { context.dispose(); } catch (Exception ignoreIt) {}
+                        if (context != null) {
+                            try { context.dispose(); } catch (Exception ignoreIt) {}
+                        }
                     }
                     return null;
                 }
