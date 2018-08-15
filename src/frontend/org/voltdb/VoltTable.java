@@ -712,7 +712,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     public final int getColumnIndex(String name) {
 
         if (m_columnNameIndexMap != null) {
-            Integer cachedIndex = m_columnNameIndexMap.get(name);
+            Integer cachedIndex = m_columnNameIndexMap.get(name.toUpperCase());
             if (cachedIndex != null) {
                 return cachedIndex;
             }
@@ -722,9 +722,10 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
         assert(verifyTableInvariants());
         for (int i = 0; i < m_colCount; i++) {
-            if (getColumnName(i).equalsIgnoreCase(name))
-                m_columnNameIndexMap.put(name, Integer.valueOf(i));
+            if (getColumnName(i).equalsIgnoreCase(name)) {
+                m_columnNameIndexMap.put(name.toUpperCase(), Integer.valueOf(i));
                 return i;
+            }
         }
         String msg = "No Column named '" + name + "'. Existing columns are:";
         for (int i = 0; i < m_colCount; i++) {
