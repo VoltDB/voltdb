@@ -71,7 +71,7 @@ public class VoltDBRexUtil {
             outputCollation = indexCollation;
 
             // Convert index collation to take the program into an account
-            outputCollation = VoltDBRexUtil.adjustIndexCollation(builder, program,
+            outputCollation = VoltDBRexUtil.adjustCollationForProgram(builder, program,
                     indexCollation);
         }
         return outputCollation;
@@ -85,7 +85,7 @@ public class VoltDBRexUtil {
      * @param inputCollation - index collation
      * @return RelCollation
      */
-    public static RelCollation adjustIndexCollation(
+    public static RelCollation adjustCollationForProgram(
             RexBuilder builder,
             RexProgram program,
             RelCollation inputCollation) {

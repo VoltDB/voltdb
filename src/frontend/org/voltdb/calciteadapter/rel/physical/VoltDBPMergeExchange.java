@@ -23,7 +23,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexLiteral;
@@ -55,7 +55,7 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
             int level,
             List<RexNode> collationFieldExprs) {
         super(cluster, traitSet, input, childDistribution, childSplitCount, level);
-        assert(traitSet.getTrait(RelCollations.EMPTY.getTraitDef()) instanceof RelCollation);
+        assert(traitSet.getTrait(RelCollationTraitDef.INSTANCE) instanceof RelCollation);
         m_collationFieldExprs = ImmutableList.copyOf(collationFieldExprs);
     }
 
@@ -87,7 +87,7 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
         rpn.setPreAggregateOutputSchema(preAggregateOutputSchema);
 
         // Collation must be converted to the inline OrderByPlanNode
-        RelTrait collationTrait = getTraitSet().getTrait(RelCollations.EMPTY.getTraitDef());
+        RelTrait collationTrait = getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
         OrderByPlanNode inlineOrderByPlanNode =
                 VoltDBRexUtil.collationToOrderByNode((RelCollation) collationTrait, this.m_collationFieldExprs);
         rpn.addInlinePlanNode(inlineOrderByPlanNode);

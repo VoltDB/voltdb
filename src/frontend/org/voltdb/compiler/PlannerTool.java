@@ -239,6 +239,7 @@ public class PlannerTool {
                 if (isSwapTables) {
                     planner.planSwapTables();
                 } else {
+                    // @TODO Calcite. No need to parse if we use Calcite planner
                     planner.parse();
                 }
                 parsedToken = planner.parameterize();
@@ -304,17 +305,7 @@ public class PlannerTool {
                 }
 
                 // If not caching or there was no cache hit, do the expensive full planning.
-                try {
-                    System.out.println("Plan using CALCITE planner");
-                    plan = planner.planUsingCalcite();
-                } catch (Exception e) {
-                    logException(e, "Error compiling query using CALCITE");
-                    System.out.println(
-                            "Failed to plan the statement using Calcite planner.\n"
-                                    + "Statement: " + sql + "\n"
-                                    + "Falling back to VoltDB.");
-                    plan = planner.plan();
-                }
+                plan = planCalciteFallBackToVoltDB(planner, sql);
                 if (plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
@@ -369,5 +360,20 @@ public class PlannerTool {
                 m_plannerStats.endStatsCollection(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
             }
         }
+    }
+
+    private CompiledPlan planCalciteFallBackToVoltDB(QueryPlanner planner, String sql) {
+        try {
+            System.out.println("Plan using CALCITE planner");
+            return planner.planUsingCalcite();
+        } catch (Exception e) {
+            logException(e, "Error compiling query using CALCITE");
+            System.out.println(
+                    "Failed to plan the statement using Calcite planner.\n"
+                            + "Statement: " + sql + "\n"
+                            + "Falling back to VoltDB.");
+            return planner.plan();
+        }
+
     }
 }

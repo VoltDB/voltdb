@@ -21,10 +21,15 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperandChildPolicy;
 import org.apache.calcite.plan.RelOptRuleOperandChildren;
+import org.apache.calcite.plan.RelTrait;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.core.Calc;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
+import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 
 import com.google.common.collect.ImmutableList;
 
@@ -55,8 +60,17 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
                 exchange.getInput(),
                 calc.getProgram(),
                 exchange.getChildSplitCount());
+        // Adjust exchage's RelCollation trait
+        RelTraitSet exchangeTraits = exchange.getTraitSet();
+        RelTrait collationTrait = exchangeTraits.getTrait(RelCollationTraitDef.INSTANCE);
+        if (collationTrait instanceof RelCollation) {
+            RelCollation adjustedCollation = VoltDBRexUtil.adjustCollationForProgram(
+                    calc.getCluster().getRexBuilder(),
+                    calc.getProgram(), (RelCollation)collationTrait);
+            exchangeTraits = exchangeTraits.replace(adjustedCollation);
+        }
         AbstractVoltDBPExchange newExchange = exchange.copy(
-                exchange.getTraitSet(),
+                exchangeTraits,
                 newCalc,
                 exchange.getChildDistribution(),
                 exchange.getLevel() + 1);

@@ -24,6 +24,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.calciteadapter.converter.RexConverter;
@@ -80,6 +81,13 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
         String digest = super.computeDigest();
         digest += "_level_" + m_level;
         return digest;
+    }
+
+    @Override
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.item("level", m_level);
+        return pw;
     }
 
     @Override
