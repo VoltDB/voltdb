@@ -40,10 +40,10 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZooKeeperLock;
-import org.voltdb.iv2.MigratePartitionLeaderInfo;
-import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
+import org.voltdb.iv2.MpInitiator;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -502,7 +502,7 @@ public class VoltZK {
         }
 
         if (errorMsg != null) {
-            VoltZK.removeActionBlocker(zk, node, hostLog);
+            VoltZK.removeActionBlocker(zk, node, null);
             return "Can't do " + request + " " + errorMsg;
         }
 
@@ -525,7 +525,9 @@ public class VoltZK {
         } catch (InterruptedException e) {
             return false;
         }
-        log.info("Remove action blocker " + node + " successfully.");
+        if (log != null) {
+            log.info("Remove action blocker " + node + " successfully.");
+        }
         return true;
     }
 
