@@ -23,6 +23,7 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.HashMap;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -141,6 +142,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     // memoized offsets used when users iterate rows with fetchrow()
     private int m_memoizedRowOffset = NO_MEMOIZED_ROW_OFFSET;
     private int m_memoizedBufferOffset;
+
+    // cache column indexes for column names used for lookup
+    private HashMap<String,Integer> m_columnNameIndexMap;
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";
@@ -706,10 +710,22 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
     @Override
     public final int getColumnIndex(String name) {
+
+        if (m_columnNameIndexMap != null) {
+            Integer cachedIndex = m_columnNameIndexMap.get(name.toUpperCase());
+            if (cachedIndex != null) {
+                return cachedIndex;
+            }
+        } else {
+            m_columnNameIndexMap = new HashMap<String,Integer>(m_colCount);
+        }
+
         assert(verifyTableInvariants());
         for (int i = 0; i < m_colCount; i++) {
-            if (getColumnName(i).equalsIgnoreCase(name))
+            if (getColumnName(i).equalsIgnoreCase(name)) {
+                m_columnNameIndexMap.put(name.toUpperCase(), Integer.valueOf(i));
                 return i;
+            }
         }
         String msg = "No Column named '" + name + "'. Existing columns are:";
         for (int i = 0; i < m_colCount; i++) {
