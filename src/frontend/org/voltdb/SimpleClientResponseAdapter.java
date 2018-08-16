@@ -176,7 +176,12 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
             // in NIOWriteStream.enqueue().
             ByteBuffer buf = null;
             synchronized(this) {
-                buf = ByteBuffer.allocate(ds.getSerializedSize());
+                final int serializedSize = ds.getSerializedSize();
+                if (serializedSize <= 0) {
+                    return;
+                }
+
+                buf = ByteBuffer.allocate(serializedSize);
                 ds.serialize(buf);
             }
             if (buf == null) {
