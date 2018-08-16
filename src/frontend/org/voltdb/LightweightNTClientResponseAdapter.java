@@ -118,6 +118,7 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
             ByteBuffer buf = null;
             synchronized (this) {
                 final int serializedSize = ds.getSerializedSize();
+                assert(serializedSize != DeferredSerialization.EMPTY_MESSAGE_LENGTH);
                 if (serializedSize <= 0) {
                     //Bad ignored transacton.
                     return;
