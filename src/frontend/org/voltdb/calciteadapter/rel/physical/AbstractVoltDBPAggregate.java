@@ -135,7 +135,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
      * @param inputRowType
      * @return
      */
-    public AbstractPlanNode toPlanNode(RelDataType inputRowType) {
+    AbstractPlanNode toPlanNode(RelDataType inputRowType) {
         AggregatePlanNode apn = getAggregatePlanNode();
 
         // Generate output schema

@@ -70,6 +70,9 @@ public class VoltDBPAggregateRule extends RelOptRule {
         // Transform to a physical Serial Aggregate. To enforce a required ordering add a collation
         // that matches the aggreagte's GROUP BY columns (for now) to the aggregate's input.
         // Calcite will create a sort relation out of it
+        // The Serial Aggregate itself should not have a RelCollation trait even its output is sorted
+        // The presence of this trait would force Clacite to add a Sort on top of the aggregate
+        // which we don't need
         if (hasGroupBy(aggregate)) {
             RelCollation groupByCollation = buildGroupByCollation(aggregate);
             convertedInputTraits = convertedInputTraits.plus(groupByCollation);

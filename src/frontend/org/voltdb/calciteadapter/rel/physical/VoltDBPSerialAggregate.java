@@ -80,7 +80,6 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             RelMetadataQuery mq) {
         double rowCount = getInput().estimateRowCount(mq);
         // Give a discount to the Aggregate based on the number of the collation fields.
-        //  - Hash Aggregate - zero columns and zero discount
         //  - Serial Aggregate - the collation size is equal to the number of the GROUP BY columns
         //          and max discount 1 - 0.1 -  0.01 - 0.001 - ...
         //  - Partial Aggregate - anything in between
