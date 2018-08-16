@@ -63,7 +63,7 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
         assert(siteCount > 0);
         m_jarFileName = Configuration.getPathToCatalogForTest(jarFileName);
         m_siteCount = siteCount;
-        if (LocalCluster.isMemcheckDefined() && target.equals(BackendTarget.NATIVE_EE_JNI)) {
+        if (LocalCluster.isMemcheckDefined() && target.isValgrindable) {
             m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
         } else {
             m_target = target;
