@@ -84,6 +84,7 @@ public class SnapshotSave extends VoltSystemProcedure
         String hostname = CoreUtils.getHostnameOrAddress();
         if (fragmentId == SysProcFragmentId.PF_createSnapshotTargets)
         {
+            // Those plan fragments are created in performSnapshotCreationWork()
             VoltTable result = SnapshotUtil.constructNodeResultsTable();
 
             if (SnapshotSiteProcessor.isSnapshotInProgress()) {
@@ -95,7 +96,8 @@ public class SnapshotSave extends VoltSystemProcedure
                 return new DependencyPair.TableDependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
             }
 
-            // tell each site to quiesce
+            // Tell each site to quiesce - bring the Export and DR system to a steady state with
+            // no pending committed data.
             context.getSiteProcedureConnection().quiesce();
 
             assert(params.toArray()[0] != null);
@@ -168,6 +170,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String command) throws Exception
     {
+        // TRAIL [SnapSave:1] 1 [MPI] Check parameters and perform SnapshotCreationWork.
         final long startTime = System.currentTimeMillis();
         @SuppressWarnings("deprecation")
         final long txnId = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
@@ -259,6 +262,7 @@ public class SnapshotSave extends VoltSystemProcedure
                 SnapshotSaveAPI.createSnapshotCompletionNode(path, stype.toString(), nonce, txnId,
                         isTruncation, truncReqId);
 
+        // For snapshot targets creation, see executePlanFragment() in this file.
         VoltTable[] results = performSnapshotCreationWork(path, stype.toString(), nonce, txnId, perPartitionTxnIds,
                                               (byte)(block ? 1 : 0), format, data,
                                               serializationData);
@@ -323,7 +327,7 @@ public class SnapshotSave extends VoltSystemProcedure
             HashinatorSnapshotData hashinatorData)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
+        // TRAIL [SnapSave:2] 2 [MPI] Build & send create snapshot targets requests to all SP sites.
         // This fragment causes each execution node to create the files
         // that will be written to during the snapshot
         byte[] hashinatorBytes = (hashinatorData != null ? hashinatorData.m_serData : null);
