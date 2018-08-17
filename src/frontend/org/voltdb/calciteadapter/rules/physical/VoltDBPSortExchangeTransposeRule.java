@@ -17,11 +17,14 @@
 
 package org.voltdb.calciteadapter.rules.physical;
 
+import java.util.Map;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperandChildPolicy;
 import org.apache.calcite.plan.RelOptRuleOperandChildren;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
@@ -30,6 +33,7 @@ import org.voltdb.calciteadapter.rel.physical.VoltDBPSingletonExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPSort;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Transform Sort / Exchange rels into
@@ -69,7 +73,17 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
 
         RelNode result = transposeExchange(exchangeRel, newSortRel);
 
-        call.transformTo(result);
+        // Not only is newExchane equivalent to sort;
+        // newSort is equivalent to exchangeRel's input
+        Map<RelNode, RelNode> equiv;
+        if (newSortRel.getCluster().getPlanner().getRelTraitDefs()
+                .contains(RelCollationTraitDef.INSTANCE)) {
+            equiv = ImmutableMap.of((RelNode) newSortRel, exchangeRel.getInput());
+        } else {
+            equiv = ImmutableMap.of();
+        }
+
+        call.transformTo(result, equiv);
         // Ideally, this rule should work without the next line but...
         // If we don't set the impotence of the original Sort expression to 0
         // the compilation of the following simple SQL
@@ -87,7 +101,7 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
     private RelNode transposeExchange(AbstractVoltDBPExchange exchangeRel, VoltDBPSort sortRel) {
         // The new exchange that will be sitting above the Sort relation must have sort's collation trait
         // since the top relation is required to have collation matching the sort's one
-        RelTraitSet newExchangeTraits = exchangeRel.getTraitSet().plus(sortRel.getCollation());
+        RelTraitSet newExchangeTraits = exchangeRel.getTraitSet().replace(sortRel.getCollation());
         AbstractVoltDBPExchange newExchange = null;
         if (exchangeRel instanceof VoltDBPSingletonExchange) {
             newExchange = exchangeRel.copy(
@@ -105,7 +119,6 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
                     exchangeRel.getChildSplitCount(),
                     exchangeRel.getLevel() + 1,
                     sortRel.getChildExps());
-
             // Add a SingletonExchange on top of it to be propagated all the way to the root
             // The relations that will be transposed with the Singleton Exchange represent
             // the coordinator's nodes in the final VoltDB plan
