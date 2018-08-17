@@ -1102,12 +1102,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Export table " + getTableName() + " accepting mastership for partition " + getPartitionId());
                         }
-                        if (m_onMastership != null) {
-                            if (m_mastershipAccepted.compareAndSet(false, true)) {
-                                // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
-                                m_responseHSIds.clear();
-                                m_onMastership.run();
-                            }
+                        if (m_mastershipAccepted.compareAndSet(false, true)) {
+                            // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
+                            m_responseHSIds.clear();
+                            m_onMastership.run();
                         }
                     }
                 } catch (Exception e) {
