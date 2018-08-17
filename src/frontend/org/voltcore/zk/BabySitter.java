@@ -49,7 +49,7 @@ import org.voltdb.VoltDB;
  */
 public class BabySitter
 {
-    private static final VoltLogger tmLog = new VoltLogger("TM");
+    private static final VoltLogger repairLog = new VoltLogger("REPAIR");
 
     private final String m_dir; // the directory to monitor
     private final Callback m_cb; // the callback when children change
@@ -90,7 +90,7 @@ public class BabySitter
                 m_es.shutdown();
                 m_es.awaitTermination(365, TimeUnit.DAYS);
             } catch (InterruptedException e) {
-                tmLog.warn("Unexpected interrupted exception", e);
+                repairLog.warn("Unexpected interrupted exception", e);
             }
         }
     }
