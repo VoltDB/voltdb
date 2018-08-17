@@ -1216,7 +1216,7 @@ public class VoltDB {
 
         if (exitAfterMessage) {
             System.err.println(errMsg);
-            System.err.println(threadDump);
+            System.out.println(threadDump);
             VoltDB.exit(-1);
         }
         try {
