@@ -816,8 +816,6 @@ public class TestGroupBySuite extends RegressionSuite {
         if (TEST_HSQL) {
             configureTests(builder, project, BackendTarget.HSQLDB_BACKEND, 1, 1, 0);
         }
-        builder.addServerConfig(config);
-
         return builder;
     }
 
