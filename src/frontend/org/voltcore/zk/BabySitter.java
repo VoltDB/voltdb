@@ -55,7 +55,7 @@ public class BabySitter
     private final Callback m_cb; // the callback when children change
     private final ZooKeeper m_zk;
     private final ExecutorService m_es;
-    private boolean m_esShutdown = false;
+    private boolean m_isExecutorServiceLocal = false;
     private volatile List<String> m_children = ImmutableList.of();
     private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
@@ -85,10 +85,10 @@ public class BabySitter
     synchronized public void shutdown()
     {
         m_shutdown.set(true);
-        if (m_esShutdown) {
+        if (m_isExecutorServiceLocal) {
             try {
                 m_es.shutdown();
-                m_es.awaitTermination(356, TimeUnit.DAYS);
+                m_es.awaitTermination(365, TimeUnit.DAYS);
             } catch (InterruptedException e) {
                 tmLog.warn("Unexpected interrupted exception", e);
             }
@@ -111,7 +111,7 @@ public class BabySitter
     {
         ExecutorService es = CoreUtils.getCachedSingleThreadExecutor("Babysitter-" + dir, 15000);
         Pair<BabySitter, List<String>> babySitter = blockingFactory(zk, dir, cb, es);
-        babySitter.getFirst().m_esShutdown = true;
+        babySitter.getFirst().m_isExecutorServiceLocal = true;
         return babySitter;
     }
 
