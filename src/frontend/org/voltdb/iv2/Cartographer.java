@@ -967,4 +967,13 @@ public class Cartographer extends StatsSource
         }
         return t;
     }
+
+    public boolean hasPartitionMastersOnHosts(Set<Integer> hosts) {
+        for (Integer host : hosts) {
+            if (m_currentMastersByHost.containsKey(host)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
