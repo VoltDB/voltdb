@@ -22,6 +22,9 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
@@ -1207,8 +1210,13 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+
+        //collect thread dumps
+        String threadDump = generateThreadDump();
+
         if (exitAfterMessage) {
             System.err.println(errMsg);
+            System.err.println(threadDump);
             VoltDB.exit(-1);
         }
         try {
@@ -1336,6 +1344,7 @@ public class VoltDB {
             finally {
                 System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
                 System.err.println("The log may contain additional information.");
+                System.out.println(threadDump);
             }
         }
         finally {
@@ -1505,6 +1514,16 @@ public class VoltDB {
             throw new SimulatedExitException(status);
         }
         System.exit(status);
+    }
+
+    private static String generateThreadDump() {
+        StringBuilder threadDumps = new StringBuilder();
+        ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+        ThreadInfo[] threadInfos = threadMXBean.getThreadInfo(threadMXBean.getAllThreadIds(), 100);
+        for (ThreadInfo t : threadInfos) {
+            threadDumps.append(t);
+        }
+        return threadDumps.toString();
     }
 
     private static VoltDB.Configuration m_config = new VoltDB.Configuration();
