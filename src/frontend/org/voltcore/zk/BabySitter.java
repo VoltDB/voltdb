@@ -29,6 +29,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
@@ -48,10 +49,13 @@ import org.voltdb.VoltDB;
  */
 public class BabySitter
 {
+    private static final VoltLogger tmLog = new VoltLogger("TM");
+
     private final String m_dir; // the directory to monitor
     private final Callback m_cb; // the callback when children change
     private final ZooKeeper m_zk;
     private final ExecutorService m_es;
+    private boolean m_esShutdown = false;
     private volatile List<String> m_children = ImmutableList.of();
     private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
@@ -81,6 +85,14 @@ public class BabySitter
     synchronized public void shutdown()
     {
         m_shutdown.set(true);
+        if (m_esShutdown) {
+            try {
+                m_es.shutdown();
+                m_es.awaitTermination(356, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                tmLog.warn("Unexpected interrupted exception", e);
+            }
+        }
     }
 
     private BabySitter(ZooKeeper zk, String dir, Callback cb, ExecutorService es)
@@ -98,7 +110,9 @@ public class BabySitter
         throws InterruptedException, ExecutionException
     {
         ExecutorService es = CoreUtils.getCachedSingleThreadExecutor("Babysitter-" + dir, 15000);
-        return blockingFactory(zk, dir, cb, es);
+        Pair<BabySitter, List<String>> babySitter = blockingFactory(zk, dir, cb, es);
+        babySitter.getFirst().m_esShutdown = true;
+        return babySitter;
     }
 
     /**
