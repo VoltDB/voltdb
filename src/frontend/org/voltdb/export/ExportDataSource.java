@@ -1065,7 +1065,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug("Export table " + getTableName() + " for partition " + getPartitionId() + " mailbox hsid (" +
                     CoreUtils.hsIdToString(m_ackMailboxRefs.get().getFirst().getHSId()) + ") gave up export mastership");
         }
-        m_onMastership = null;
         m_mastershipAccepted.set(false);
         m_isInCatalog = false;
         m_eos = false;
