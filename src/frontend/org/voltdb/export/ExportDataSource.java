@@ -409,8 +409,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof ExportDataSource))
+        if (!(o instanceof ExportDataSource)) {
             return false;
+        }
 
         return compareTo((ExportDataSource)o) == 0;
     }
@@ -855,6 +856,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         m_es.submit(new Runnable() {
+            @Override
             public void run() {
                 Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
                 Mailbox mbx = p.getFirst();
@@ -954,6 +956,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
         m_es.submit(new Runnable() {
+            @Override
             public void run() {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Export table " + getTableName() + " mastership prepare to be demoted for partition " + getPartitionId());
@@ -1154,6 +1157,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         if (!m_mastershipAccepted.get()) {
             m_es.execute(new Runnable() {
+                @Override
                 public void run() {
                     // Query export membership if current stream is not the master
                     queryExportMembership();
@@ -1165,6 +1169,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void handleQueryMessage(final long newLeaderHSId) {
         if (m_mastershipAccepted.get()) {
             m_es.execute(new Runnable() {
+                @Override
                 public void run() {
                     m_newLeaderHostId = CoreUtils.getHostIdFromHSId(newLeaderHSId);
                     // memorize end USO of the most recently pushed buffer from EE
@@ -1178,6 +1183,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             });
         } else {
             m_es.execute(new Runnable() {
+                @Override
                 public void run() {
                     sendQueryResponse(newLeaderHSId);
                 }
@@ -1188,6 +1194,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void handleQueryResponse(VoltMessage message) {
         if (!m_mastershipAccepted.get()) {
             m_es.execute(new Runnable() {
+                @Override
                 public void run() {
                     m_responseHSIds.add(message.m_sourceHSId);
                     Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
