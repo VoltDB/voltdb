@@ -113,7 +113,8 @@ public class TinySexpSerializer extends TestCase {
                 final FunctionExpression expr = new FunctionExpression();
                 expr.setAttributes(m.group(1), null, 0);
                 expr.setArgs(getArgs(Integer.valueOf(m.group(2)), "Function call ", sexp));
-                expr.setValueType(VoltType.FLOAT);
+                //expr.setValueType(VoltType.FLOAT);
+                expr.setValueType(VoltType.INTEGER);
                 return expr;
             } else if (sexp.startsWith("(vec")) {
                 final Matcher m = Pattern.compile("^\\(vec-(\\d+)").matcher(sexp);
@@ -124,10 +125,15 @@ public class TinySexpSerializer extends TestCase {
                 expr.setArgs(getArgs(Integer.valueOf(m.group(1)), "VectorValueExpression ", sexp));
                 return expr;
             } else if (sexp.startsWith("C")) {    // columnXXX ==> TupleValueExpression
-                final int index = Integer.valueOf(sexp.substring(1, Math.max(sexp.indexOf(' '), sexp.length())));
+                final String colName = sexp.substring(1, Math.max(sexp.indexOf(' '), sexp.length()));
+                int index;
+                try {               // Prefer format C\d for setting column index
+                    index = Integer.valueOf(colName);
+                } catch (NumberFormatException e) {     // on non-digit column name, calculate its index
+                    index = Math.abs(colName.charAt(0) - 'a');
+                }
                 final TupleValueExpression e = new TupleValueExpression("foo"/* table name */,
-                        sexp.substring(0, Math.max(sexp.indexOf(' '), sexp.length()))/* column name */,
-                        index/* column index */);
+                        colName, index/* column index */);
                 e.setValueType(VoltType.INTEGER);   // NOTE: assume all columns are of INT type
                 return e;
             } else if (sexp.startsWith("P")) {      // PVE
@@ -168,7 +174,7 @@ public class TinySexpSerializer extends TestCase {
         } else if (e instanceof ConstantValueExpression) {
             return "c" + ((ConstantValueExpression) e).getValue();
         } else if (e instanceof TupleValueExpression) {
-            return ((TupleValueExpression) e).getColumnName();
+            return "C" + ((TupleValueExpression) e).getColumnName();
         } else if (e instanceof InComparisonExpression) {
             return "(in " + serialize(e.getLeft()) + " " + serialize(e.getRight()) + ")";
         } else if (e instanceof ComparisonExpression) {
@@ -317,10 +323,10 @@ public class TinySexpSerializer extends TestCase {
 
         assertEquals(((ConstantValueExpression) deserialize("(!= c1.0 c1)").getLeft()).getValue(), "1.0");
 
-        e = deserialize(" (> C5 P2) ");
+        e = deserialize(" (> Ca P2) ");
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, e.getExpressionType());
         assertTrue(e.getLeft() instanceof TupleValueExpression && e.getRight() instanceof ParameterValueExpression);
-        assertEquals(((TupleValueExpression)e.getLeft()).getColumnName(), "C5");
+        assertEquals(((TupleValueExpression)e.getLeft()).getColumnName(), "a");
         assertEquals(((ParameterValueExpression) e.getRight()).getOriginalValue().getValue(), "2");
 
         e = deserialize("(@- (- P? P-2.2))");

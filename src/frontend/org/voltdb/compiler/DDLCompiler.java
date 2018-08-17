@@ -85,6 +85,7 @@ import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.optimizer.ExpressionNormalizer;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -1656,7 +1657,7 @@ public class DDLCompiler {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<>();
                 for (VoltXMLElement exprNode : subNode.children) {
-                    AbstractExpression expr = dummy.parseExpressionTree(exprNode);
+                    AbstractExpression expr = ExpressionNormalizer.normalize(dummy.parseExpressionTree(exprNode));
                     expr.resolveForTable(table);
                     expr.finalizeValueTypes();
                     // string will be populated with an expression's details when
@@ -1672,6 +1673,7 @@ public class DDLCompiler {
                         throw compiler.new VoltCompilerException("Cannot create unique index \""+ name +
                                 "\" because it contains " + exprMsg + ", which is not supported.");
                     }
+
 
                     // rest of the validity guards will be evaluated after collecting all the expressions.
                     checkExpressions.add(expr);

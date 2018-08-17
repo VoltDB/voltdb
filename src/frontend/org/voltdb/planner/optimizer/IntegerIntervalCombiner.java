@@ -318,7 +318,7 @@ class IntegerIntervalCombiner {
      */
     static AbstractExpression combine(AbstractExpression e, ConjunctionRelation rel) {
         if (rel == ConjunctionRelation.ATOM) {
-            return e.getValueType().isNumber() ?        // Skip for non-number (i.e. string) comparisons.
+            return e.getLeft().getValueType().isNumber() ?        // Skip for non-number (i.e. string) comparisons.
                     new IntegerIntervalCombiner(
                     new ArrayList<AbstractExpression>() {{ add(e); }}, new ArrayList<>(),
                     ConjunctionRelation.AND).get() :

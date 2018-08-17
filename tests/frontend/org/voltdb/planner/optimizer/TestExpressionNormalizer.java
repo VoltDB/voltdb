@@ -116,6 +116,12 @@ public class TestExpressionNormalizer {
         // Test <term> + <value> cmp <term> + <value> (term/value on one side exchangeable)
         assertEquals("(= (- C1 C2) c1)",      // C1 + 2 = C2 + 3 ==> C1 - C2 = 1
                 serialize(OpExpressionBalancer.balance(deserialize("(= (+ C1 c2) (+ C2 c3))"))));
+        assertEquals("(> C0 P-1)",              // C0 + 1 > 0 ==> C0 > -1
+                serialize(OpExpressionBalancer.balance(deserialize("(> (+ C0 c1) P0)"))));
+        assertEquals("(> C0 P1)",              // C0 - 1 > 0 ==> C0 > 1
+                serialize(OpExpressionBalancer.balance(deserialize("(> (- C0 c1) P0)"))));
+        assertEquals("(< C0 P1)",              // 1 - C0 > 0 ==> C0 < 1
+                serialize(OpExpressionBalancer.balance(deserialize("(> (- c1 C0) P0)"))));
         assertEquals("(>= (- C1 C2) P1)",     // C1 + 2 >= C2 + 3 ==> C1 - C2 = 1
                 serialize(OpExpressionBalancer.balance(deserialize("(>= (+ C1 P2) (+ C2 P3))"))));
         assertEquals("(< (- C1 C2) P1)",      // 2 + C1 < 3 + C2 ==> C1 - C2 < 1
@@ -1055,14 +1061,17 @@ public class TestExpressionNormalizer {
             put("(&& (>= (+ C1 C0) (- C1 C2)) (<= (+ C0 C1) (- C1 C2)))", "(= (@- C0) C2)");
             put("(fn-foo-1 (+ C0 (- C1 C0)))", "(fn-foo-1 C1)");
             put("(fn-foo-2 (+ C1 P1) (/ c4 c2))", "(fn-foo-2 (+ C1 c1) c2)");
-            put("(>= (* P-5 C1) (* P10 C1))", "(<= C1 c0)");
+            put("(>= (* P-5 C1) (* P10 C1))", "(< C1 c1)");
             put("(!= (* P-5 C1) (* P10 C1))", "(!= C1 c0)");
             put("(!= (* P-5 (- C1 C2)) (* P10 (- C1 C2)))", "(!= C1 C2)");
             put("(!= (* P-5 (- C2 C1)) (* P10 (- C1 C2)))", "(!= C1 C2)");
+            put("(&& (> (fn-abs-1 C0) c0) (= (fn-abs-1 C1) c1))", "(&& (= (fn-abs-1 C1) c1) (>= (fn-abs-1 C0) c1))");
+            put("(> (fn-abs-1 C0) c0)", "(>= (fn-abs-1 C0) c1)");
+            put("(> (+ C0 c1) P0)", "(>= C0 c0)");
         }}.forEach((k, v) ->
                 assertEquals("Transform of form \"" + k + "\": expect \"" + v + "\".",
                         v, serialize(ExpressionNormalizer.normalize(deserialize(k)))));
-
+        ExpressionNormalizer.normalize(deserialize("(> (fn-abs-1 C0) c0)"));
         // complex ones, where join kicks in
         assertEquals("(+ (+ (* c2.0 C2) C1) c8)",
                 serialize(ExpressionNormalizer.normalize(deserialize("(- (+ (* c2 C1) C2) (- (+ C1 P1) (+ C2 c9)))"))));

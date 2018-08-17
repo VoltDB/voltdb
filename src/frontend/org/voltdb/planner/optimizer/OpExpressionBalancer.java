@@ -21,6 +21,8 @@ import com.google_voltpatches.common.base.Predicate;
 import org.voltdb.expressions.*;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.QuantifierType;
+
 import static org.voltdb.planner.optimizer.NormalizerUtil.ArithOpType;
 
 import java.util.function.Function;
@@ -104,6 +106,7 @@ final class OpExpressionBalancer {
         } else {
             // SetReorder takes care of left/right ordering
             final ExpressionType cmp = e.getExpressionType(), negatedCmp = ComparisonExpression.reverses.get(cmp);
+            final QuantifierType quantifier = e.getQuantifier();
             final AbstractExpression left = ridOfUnitOperator(e.getLeft()), right = ridOfUnitOperator(e.getRight());
             final boolean isLeftLiteralConstant = isLiteralConstant(left), isRightLiteralConstant = isLiteralConstant(right);
             if(left instanceof FunctionExpression || right instanceof FunctionExpression) {
@@ -122,11 +125,38 @@ final class OpExpressionBalancer {
                 } else if (! (right instanceof VectorValueExpression) &&    // Skipping the case like "expr in (expr1, expr2, ...)",
                         getNumberConstant(right).get() == 0 &&      // balance the special comparison: x + y cmp 0 or x - y cmp 0:
                         ArithOpType.get(left.getExpressionType()) == ArithOpType.PlusMinus) {
-                    // x + y cmp 0 ==> x cmp -y; x - y cmp 0 ==> x cmp y
-                    return balance(new ComparisonExpression(cmp, left.getLeft(),
-                            left.getExpressionType() == ExpressionType.OPERATOR_PLUS ?
-                                    new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, left.getRight(), null, 0) :
-                                    left.getRight()));
+                    if (isLiteralConstant(left.getLeft()) || isLiteralConstant(left.getRight())) {
+                        final float n1, n2 = getNumberConstant(right).get();
+                        final AbstractExpression expr;
+                        if (isLiteralConstant(left.getLeft())) {
+                            n1 = getNumberConstant(left.getLeft()).get();
+                            expr = left.getRight();
+                        } else {
+                            n1 = getNumberConstant(left.getRight()).get();
+                            expr = left.getLeft();
+                        }
+                        switch (left.getExpressionType()) {
+                            case OPERATOR_PLUS:         // num1 + expr cmp num2 ==> expr cmp num2 - num1
+                                return balance(new ComparisonExpression(cmp, expr, createConstant(right, n2 - n1)));
+                            case OPERATOR_MINUS:
+                                if (isLiteralConstant(left.getLeft())) {        // num1 - expr cmp num2 ==> expr <reverse cmp> num1 - num2
+                                    return balance(new ComparisonExpression(ComparisonExpression.reverses.get(cmp),
+                                            expr, createConstant(right, n1 - n2)));
+                                } else {                                        // expr - num1 cmp num2 ==> expr cmp num1 + num2
+                                    return balance(new ComparisonExpression(cmp, expr, createConstant(right, n1 + n2)));
+                                }
+                            default:
+                                assert(false) :
+                                        "constrain check failed for \"ArithOpType.get(left.getExpressionType()) == ArithOpType.PlusMinus\"";
+                                return null;
+                        }
+                    } else {
+                        // x + y cmp 0 ==> x cmp -y; x - y cmp 0 ==> x cmp y
+                        return balance(new ComparisonExpression(cmp, left.getLeft(),
+                                left.getExpressionType() == ExpressionType.OPERATOR_PLUS ?
+                                        new OperatorExpression(ExpressionType.OPERATOR_UNARY_MINUS, left.getRight(), null, 0) :
+                                        left.getRight()));
+                    }
                 } else if (left.getExpressionType() == ExpressionType.OPERATOR_UNARY_MINUS) {
                     // The caller for OpExpressionBalancer should ensure that unary minus is pushed down. Prefer simpler "expr" over "-expr",
                     // by transforming -expr cmp number ==> expr (reverse cmp) -number. No need to recurse because of that guarantee.
@@ -182,10 +212,10 @@ final class OpExpressionBalancer {
                 if (lhsBreaker.isBreakable() && rhsBreaker.isBreakable()) {
                     // When both sides of the comparison are calculations with a number constant, further simplify it.
                     // e.g. a + 3 > b + 5 or a * 3 > b - 5
-                    return mergeSimplify(arrangeTerms(new ComparisonExpression(cmp, left, right), lhsBreaker, rhsBreaker));
+                    return mergeSimplify(arrangeTerms(new ComparisonExpression(cmp, left, right, quantifier), lhsBreaker, rhsBreaker));
                 }
             }
-            return mergeSimplify(rearrange(new ComparisonExpression(cmp, left, right)));
+            return mergeSimplify(rearrange(new ComparisonExpression(cmp, left, right, quantifier)));
         }
     }
 

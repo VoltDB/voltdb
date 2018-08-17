@@ -74,7 +74,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable, Compa
     private String m_contentDeterminismMessage = null;
 
     static protected Comparator<List<AbstractExpression>> getArgComparator() {
-        return Comparator.nullsFirst(
+        return Comparator.nullsLast(
                 (a, b) -> {
                     final int len = a.size();
                     return len != b.size() ? Integer.compare(a.size(), b.size()) :
@@ -85,7 +85,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable, Compa
 
     @Override
     public int compareTo(AbstractExpression other) {
-        final Comparator<AbstractExpression> nullComparator = Comparator.nullsFirst(Comparator.naturalOrder());
+        final Comparator<AbstractExpression> nullComparator = Comparator.nullsLast(Comparator.naturalOrder());
         return equivalent(other) ? 0 :
                 Comparator.comparing(AbstractExpression::getExpressionType)
                         .thenComparing(AbstractExpression::getLeft, nullComparator)

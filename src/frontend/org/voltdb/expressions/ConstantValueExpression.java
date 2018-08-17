@@ -73,12 +73,15 @@ public class ConstantValueExpression extends AbstractValueExpression {
     @Override
     public int compareTo(AbstractExpression other) {
         if (other instanceof ConstantValueExpression) {
-            return Comparator.comparing(ConstantValueExpression::getValue)
+            return Comparator.comparing(ConstantValueExpression::getValue,
+                    Comparator.nullsLast(Comparator.naturalOrder()))
                     .compare(this, (ConstantValueExpression) other);
         } else if (other instanceof ParameterValueExpression) {
             final ConstantValueExpression o = ((ParameterValueExpression) other).getOriginalValue();
             return o == null ? 1 :
-                    Comparator.comparing(ConstantValueExpression::getValue).compare(this, o);
+                    Comparator.comparing(ConstantValueExpression::getValue,
+                            Comparator.nullsLast(Comparator.naturalOrder()))
+                            .compare(this, o);
         } else {
             return super.compareTo(other);
         }

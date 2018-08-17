@@ -395,8 +395,8 @@ public class TestIndexSelection extends PlannerTestCase {
 
         // CREATE INDEX a_partial_idx_not_null_d_e ON c (a+b) where (d + e) is not null;
         pn = compile("select * from c where a + b > 0 and 0 = abs(e + d);");
-        //checkScanUsesIndex(pn, "A_PARTIAL_IDX_NOT_NULL_D_E");
-        //checkIndexPredicateContains(pn, "E", "D");
+        checkScanUsesIndex(pn, "A_PARTIAL_IDX_NOT_NULL_D_E");
+        checkIndexPredicateContains(pn, "E", "D");
 
         // CREATE INDEX a_partial_idx_not_null_e ON c (a) where e is not null;
         pn = compile("select * from c where a > 0 and 0 = abs(e + b);");
@@ -416,8 +416,8 @@ public class TestIndexSelection extends PlannerTestCase {
 
         // CREATE INDEX partial_idx_or_expr ON c (f) where e > 0 or d < 5;
         pn = compile("select * from c where f > 0 and (e > 0 or d < 5);");
-        //checkScanUsesIndex(pn, "PARTIAL_IDX_OR_EXPR");
-        // checkIndexPredicateIsNull(pn);
+        checkScanUsesIndex(pn, "PARTIAL_IDX_OR_EXPR");
+        checkIndexPredicateIsNull(pn);
     }
 
     public void testPartialIndexComparisonPredicateExactMatch() {

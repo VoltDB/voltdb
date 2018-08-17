@@ -48,6 +48,11 @@ public class ComparisonExpression extends AbstractExpression {
         setValueType(VoltType.BOOLEAN);
     }
 
+    public ComparisonExpression(ExpressionType type, AbstractExpression left, AbstractExpression right, QuantifierType quantifier) {
+        this(type, left, right);
+        setQuantifier(quantifier);
+    }
+
     public ComparisonExpression() {
         //
         // This is needed for serialization
