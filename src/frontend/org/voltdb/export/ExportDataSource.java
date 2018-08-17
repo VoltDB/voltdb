@@ -1123,21 +1123,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     /**
      * set the runnable task that is to be executed on mastership designation
+     *
      * @param toBeRunOnMastership a {@link @Runnable} task
+     * @param runEveryWhere       Set if connector "replicated" property is set to true Like replicated table, every
+     *                            replicated export stream is its own master.
      */
-    public void setOnMastership(Runnable toBeRunOnMastership, boolean isRunEveryWhere) {
+    public void setOnMastership(Runnable toBeRunOnMastership, boolean runEveryWhere) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        if (isRunEveryWhere) {
-            acceptMastership();
-        }
+        setRunEveryWhere(runEveryWhere);
     }
 
     public ExportFormat getExportFormat() {
         return m_format;
     }
 
-    //Set it from client.
+    /**
+     * Set it from the client
+     *
+     * @param runEveryWhere Set if connector "replicated" property is set to true Like replicated table, every
+     *                      replicated export stream is its own master.
+     */
     public void setRunEveryWhere(boolean runEveryWhere) {
         m_runEveryWhere = runEveryWhere;
         if (m_runEveryWhere) {
