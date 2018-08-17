@@ -187,7 +187,7 @@ public class GuestProcessor implements ExportDataProcessor {
             }
 
             m_source.setClient(client);
-            m_source.setRunEveryWhere(m_client.isRunEverywhere());
+            m_source.runEveryWhere(m_client.isRunEverywhere());
         }
 
         @Override

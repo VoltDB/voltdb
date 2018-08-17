@@ -106,9 +106,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
-    // Set if connector "replicated" property is set to true
-    // Like replicated table, every replicated export stream is its own master.
-    private boolean m_runEveryWhere = false;
     private volatile ListeningExecutorService m_es;
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
     private volatile boolean m_isInCatalog;
@@ -940,12 +937,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-
-    //Is this a run everywhere source
-    public boolean isRunEveryWhere() {
-        return m_runEveryWhere;
-    }
-
     /**
      * indicate the partition leader has been migrated away
      * prepare to give up the mastership,
@@ -1131,7 +1122,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void setOnMastership(Runnable toBeRunOnMastership, boolean runEveryWhere) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        setRunEveryWhere(runEveryWhere);
+        runEveryWhere(runEveryWhere);
     }
 
     public ExportFormat getExportFormat() {
@@ -1139,14 +1130,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     /**
-     * Set it from the client
-     *
      * @param runEveryWhere Set if connector "replicated" property is set to true Like replicated table, every
      *                      replicated export stream is its own master.
      */
-    public void setRunEveryWhere(boolean runEveryWhere) {
-        m_runEveryWhere = runEveryWhere;
-        if (m_runEveryWhere) {
+    public void runEveryWhere(boolean runEveryWhere) {
+        if (runEveryWhere) {
             acceptMastership();
         }
     }
