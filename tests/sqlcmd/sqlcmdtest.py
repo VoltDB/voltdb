@@ -464,7 +464,7 @@ def do_main():
 
 
 def test_voltsql():
-    ret = subprocess.call('tox', cwd='../../lib/python/voltsql/', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ret = subprocess.call('./test_voltsql.sh', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if ret != 0:
         sys.exit("One or more voltsqltest script failures or errors was detected.")
 
