@@ -23,8 +23,6 @@
 
 package org.voltdb.regressionsuites;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -53,7 +51,6 @@ import java.util.zip.GZIPInputStream;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
@@ -68,14 +65,11 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.SnapshotRestoreResultSet;
@@ -97,7 +91,7 @@ import com.google_voltpatches.common.io.Files;
 public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     private final static VoltLogger LOG = new VoltLogger("CONSOLE");
     private final static int SITE_COUNT = 2;
-    private final static int TABLE_COUNT = 10;  // Must match schema used.
+    private final static int TABLE_COUNT = 11;  // Must match schema used.
 
     protected int getTableCount() {
         return TABLE_COUNT;
@@ -3851,7 +3845,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
     }
-
 
     public static class SnapshotResult {
         Long hostID;

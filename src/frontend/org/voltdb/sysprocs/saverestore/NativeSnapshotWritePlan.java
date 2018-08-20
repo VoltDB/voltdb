@@ -282,6 +282,19 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     txnId,
                     timestamp);
         }
+        else if (CatalogUtil.needsViewHiddenColumn(table)) {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO),
+                    txnId,
+                    timestamp);
+        }
         else {
             sdt = new DefaultSnapshotDataTarget(saveFilePath,
                     hostId,
