@@ -1216,7 +1216,7 @@ public class VoltDB {
 
         if (exitAfterMessage) {
             System.err.println(errMsg);
-            System.out.println(threadDump);
+            System.err.println(threadDump);
             VoltDB.exit(-1);
         }
         try {
@@ -1344,7 +1344,7 @@ public class VoltDB {
             finally {
                 System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
                 System.err.println("The log may contain additional information.");
-                System.out.println(threadDump);
+                System.err.println(threadDump);
             }
         }
         finally {
