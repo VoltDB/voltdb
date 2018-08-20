@@ -33,7 +33,6 @@ from voltexecutor import VoltExecutor
 from voltrefresher import VoltRefresher
 
 click.disable_unicode_literals_warning = True
-isatty = True
 
 style = Style.from_dict({
     'completion-menu.completion': 'bg:#008888 #ffffff',
@@ -210,7 +209,7 @@ class RegisterWriterCommand(click.Command):
                    'to the command prompt. Default: true.')
 def cli(server, port, user, password, credentials, kerberos, query_timeout, ssl, ssl_set,
         output_format, output_skip_metadata, stop_on_error):
-    if not isatty:
+    if not sys.stdin.isatty():
         # if pipe from stdin
         sql_cmd = sys.stdin.read()
         option_str = "--servers={server} --port={port_number}{user}{password}{credentials}" \
@@ -240,5 +239,4 @@ def cli(server, port, user, password, credentials, kerberos, query_timeout, ssl,
 
 
 if __name__ == '__main__':
-    isatty = sys.stdin.isatty()
     cli()
