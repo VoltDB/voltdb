@@ -29,7 +29,7 @@
 
 ret_val=0
 
-if [ ! -d ".apprunnerenv"  ]; then
+if [ ! -d ".voltsqlenv"  ]; then
     virtualenv .voltsqlenv
 fi
 
