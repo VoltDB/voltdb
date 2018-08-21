@@ -117,6 +117,7 @@ public class SnapshotSaveAPI
             final HashinatorSnapshotData hashinatorData,
             final long timestamp)
     {
+        // TRAIL [SnapSave:3] 3 [all SP] Start to execute create snapshot target requests.
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
         JSONObject jsData = null;
@@ -490,6 +491,8 @@ public class SnapshotSaveAPI
             HashinatorSnapshotData hashinatorData,
             long timestamp)
     {
+        // TRAIL [SnapSave:4]  - 3.1 [1 site/host] Create snapshot write plan.
+        // Normal @SnapshotSave calls should go with NativeSnapshotWritePlan.
         SnapshotWritePlan plan;
         if (format == SnapshotFormat.NATIVE) {
             plan = new NativeSnapshotWritePlan();

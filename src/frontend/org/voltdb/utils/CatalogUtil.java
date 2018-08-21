@@ -152,6 +152,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.ExpressionType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -187,6 +188,7 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_NONCE = "LOG";
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
+    public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
@@ -194,6 +196,8 @@ public abstract class CatalogUtil {
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+    public static final VoltTable.ColumnInfo VIEW_HIDDEN_COLUMN_INFO =
+            new VoltTable.ColumnInfo(VIEW_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
@@ -370,6 +374,33 @@ public abstract class CatalogUtil {
         }
 
         return jarfile;
+    }
+
+    /**
+     * Tell if a table is a single table view without a COUNT(*) column.
+     * In that case, the table will have a hidden COUNT(*) column which we need to
+     * include in the snapshot.
+     * @param table The table to check.
+     * @return true if we need to snapshot a hidden COUNT(*) column.
+     */
+    public static boolean needsViewHiddenColumn(Table table) {
+        // The table must be a view, and it can only have one source table.
+        // We do not care if the source table is persistent or streamed.
+
+        // If the table is not a materialized view, skip.
+        if (table.getMaterializer() == null) {
+            return false;
+        }
+
+        // If the table is a materialized view, then search if there is a COUNT(*) column.
+        // We only allow the users to omit the COUNT(*) column if the view is built on
+        // one single table. So we do not check again here.
+        for (Column c : table.getColumns()) {
+            if (ExpressionType.get(c.getAggregatetype()) == ExpressionType.AGGREGATE_COUNT_STAR) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

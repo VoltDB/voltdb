@@ -895,8 +895,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
             long cnt = 0;
             try {
                 final Table new_catalog_table = getCatalogTable(table_name);
-                final boolean shouldPreserveDRHiddenColumn =
-                    DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && new_catalog_table.getIsdred();
+                final boolean preserveDRHiddenColumn =
+                        DrRoleType.XDCR.value().equals(m_cluster.getDrrole())
+                        && new_catalog_table.getIsdred();
+                final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
 
                 Boolean needsConversion = null;
                 while (savefile.hasMoreChunks())
@@ -912,14 +914,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
                             VoltTable old_table =
                                     PrivateVoltTableFactory.createVoltTableFromBuffer(c.b().duplicate(), true);
                             needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
-                                                                                  shouldPreserveDRHiddenColumn);
+                                                                                  preserveDRHiddenColumn,
+                                                                                  preserveViewHiddenColumn);
                         }
 
                         if (needsConversion) {
                             VoltTable old_table =
                                     PrivateVoltTableFactory.createVoltTableFromBuffer(c.b() , true);
                             table = SavedTableConverter.convertTable(old_table, new_catalog_table,
-                                                                     shouldPreserveDRHiddenColumn);
+                                                                     preserveDRHiddenColumn,
+                                                                     preserveViewHiddenColumn);
                         } else {
                             ByteBuffer copy = ByteBuffer.allocate(c.b().remaining());
                             copy.put(c.b());
@@ -2351,8 +2355,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
         results[0].addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), tableName, -1,
                 "SUCCESS", "NO DATA TO DISTRIBUTE");
         final Table new_catalog_table = getCatalogTable(tableName);
-        final boolean shouldPreserveDRHiddenColumn =
+        final boolean preserveDRHiddenColumn =
             DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && new_catalog_table.getIsdred();
+        final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
         Boolean needsConversion = null;
         Map<Long, Integer> sites_to_partitions = null;
         int partitionCount = ctx.getNumberOfPartitions();
@@ -2385,14 +2390,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         VoltTable old_table =
                                 PrivateVoltTableFactory.createVoltTableFromBuffer(c.b().duplicate(), true);
                         needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
-                                                                              shouldPreserveDRHiddenColumn);
+                                                                              preserveDRHiddenColumn,
+                                                                              preserveViewHiddenColumn);
                     }
 
                     final VoltTable old_table = PrivateVoltTableFactory
                             .createVoltTableFromBuffer(c.b(), true);
                     if (needsConversion) {
                         table = SavedTableConverter.convertTable(old_table, new_catalog_table,
-                                                                 shouldPreserveDRHiddenColumn);
+                                                                 preserveDRHiddenColumn,
+                                                                 preserveViewHiddenColumn);
                     } else {
                         table = old_table;
                     }
@@ -2565,8 +2572,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         try {
             final Table new_catalog_table = getCatalogTable(tableName);
-            final boolean shouldPreserveDRHiddenColumn =
+            final boolean preserveDRHiddenColumn =
                 DrRoleType.XDCR.value().equals(m_cluster.getDrrole()) && new_catalog_table.getIsdred();
+            final boolean preserveViewHiddenColumn = CatalogUtil.needsViewHiddenColumn(new_catalog_table);
             while (hasMoreChunks()) {
                 VoltTable table = null;
 
@@ -2586,13 +2594,15 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     if (needsConversion == null) {
                         VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b().duplicate(), true);
                         needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table,
-                                                                              shouldPreserveDRHiddenColumn);
+                                                                              preserveDRHiddenColumn,
+                                                                              preserveViewHiddenColumn);
                     }
 
                     final VoltTable old_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b(), true);
                     if (needsConversion) {
                         table = SavedTableConverter.convertTable(old_table, new_catalog_table,
-                                                                 shouldPreserveDRHiddenColumn);
+                                                                 preserveDRHiddenColumn,
+                                                                 preserveViewHiddenColumn);
                     } else {
                         table = old_table;
                     }

@@ -391,6 +391,7 @@ public class SnapshotSiteProcessor {
             boolean isTruncation,
             ExtensibleSnapshotDigestData extraSnapshotData)
     {
+        // TRAIL [SnapSave:8] 4 [all SP] Initiate snapshot, build table streamers.
         ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
@@ -437,6 +438,7 @@ public class SnapshotSiteProcessor {
      */
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets, long now)
     {
+        // TRAIL [SnapSave:9] 5 [all SP] Start snapshot by putting task into the site queue.
         //Basically asserts that there are no tasks with null targets at this point
         //getTarget checks and crashes
         for (SnapshotTableTask t : m_snapshotTableTasks.values()) {
@@ -559,6 +561,7 @@ public class SnapshotSiteProcessor {
      * task from completeSnapshotWork. This avoids creating thousands of task objects.
      */
     public Future<?> doSnapshotWork(SystemProcedureExecutionContext context, boolean noSchedule) {
+        // TRAIL [SnapSave:10] 6 [all SP] Do work when the task gets its turn.
         ListenableFuture<?> retval = null;
 
         /*
@@ -680,6 +683,7 @@ public class SnapshotSiteProcessor {
                     new Thread("Snapshot terminator") {
                     @Override
                     public void run() {
+                        // TRAIL [SnapSave:11] 7 [1 site/host] The last finished site wlll close the targets.
                         boolean snapshotSucceeded = true;
                         try {
                             /*
