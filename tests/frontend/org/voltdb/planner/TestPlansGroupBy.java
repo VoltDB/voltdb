@@ -58,7 +58,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     // Set this to true to print the JSON string for the plan.
     private static boolean PRINT_JSON_PLAN = true;
     // Test normal sized temp tables.
-    private static boolean TEST_NORMAL_SIZE_QUERIES = true;
+    private static boolean TEST_NORMAL_SIZE_QUERIES = false;
     // Test large sized temp tables.
     private static boolean TEST_LARGE_QUERIES = true;
 
@@ -103,7 +103,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
     }
 
-    public void basicTestInlineSerialAgg_noGroupBy() {
+    private void basicTestInlineSerialAgg_noGroupBy() {
         //
         // Note: All these queries create a two-fragment plan
         //       with a single scan node in the distributed fragment,
@@ -255,7 +255,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
     }
 
-    public void basicTestAggregateOptimizationWithIndex() {
+    private void basicTestAggregateOptimizationWithIndex() {
         AbstractPlanNode p;
         List<AbstractPlanNode> pns;
         if (isPlanningForLargeQueries()) {
@@ -264,7 +264,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                          fragSpec(PlanNodeType.SEND,
                                   new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
                                                            ExpressionType.AGGREGATE_COUNT),
-                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.ORDERBY,                           // for serial aggregation.
                                   new PlanWithInlineNodes(PlanNodeType.INDEXSCAN, // Primary Key.
                                                           PlanNodeType.PROJECTION)));
         } else {
@@ -458,10 +458,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
      * this should work equally for large and normal plans.
      */
     public void testCountStar() {
-        planForLargeQueries(true);
-        basicTestCountStar();
-        planForLargeQueries(false);
-        basicTestCountStar();
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestCountStar();
+        }
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestCountStar();
+        }
     }
 
     private void basicTestCountStar() {
@@ -476,13 +480,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testCountDistinct() {
-        planForLargeQueries(false);
-        basicTestCountDistinct();
-        planForLargeQueries(true);
-        basicTestCountDistinct();
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestCountDistinct();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestCountDistinct();
+        }
     }
 
-    public void basicTestCountDistinct() {
+    private void basicTestCountDistinct() {
         AbstractPlanNode p;
         List<AbstractPlanNode> pns;
 
@@ -578,12 +586,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testDistinctA1() {
-        planForLargeQueries(false);
-        basicTestDistinctA1();
-        planForLargeQueries(true);
-        basicTestDistinctA1();
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestDistinctA1();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestDistinctA1();
+        }
     }
-    public void basicTestDistinctA1() {
+
+    private void basicTestDistinctA1() {
         if (isPlanningForLargeQueries()) {
             validatePlan("SELECT DISTINCT A1 FROM T1",
                     PRINT_JSON_PLAN,
@@ -610,13 +623,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testDistinctA1_Subquery() {
-        planForLargeQueries(false);
-        basicTestDistinctA1_Subquery();
-        planForLargeQueries(true);
-        basicTestDistinctA1_Subquery();
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestDistinctA1_Subquery();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestDistinctA1_Subquery();
+        }
     }
 
-    public void basicTestDistinctA1_Subquery() {
+    private void basicTestDistinctA1_Subquery() {
         AbstractPlanNode p;
         List<AbstractPlanNode> pns;
 
@@ -648,13 +665,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByA1() {
-        planForLargeQueries(false);
-        basicTestGroupByA1();
-        planForLargeQueries(true);
-        basicTestGroupByA1();
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByA1();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByA1();
+        }
     }
 
-    public void basicTestGroupByA1() {
+    private void basicTestGroupByA1() {
         AbstractPlanNode p;
         AggregatePlanNode aggNode;
         List<AbstractPlanNode> pns;
@@ -848,10 +869,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByPartitionKey() {
-        planForLargeQueries(false);
-        basicTestGroupByPartitionKey();
-        planForLargeQueries(true);
-        basicTestGroupByPartitionKey();
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByPartitionKey();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByPartitionKey();
+        }
     }
 
     private void basicTestGroupByPartitionKey() {
@@ -881,10 +906,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByPartitionKey_Negative() {
-        planForLargeQueries(false);
-        basicTestGroupByPartitionKey_Negative();
-        planForLargeQueries(true);
-        basicTestGroupByPartitionKey_Negative();
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByPartitionKey_Negative();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByPartitionKey_Negative();
+        }
     }
 
     private void basicTestGroupByPartitionKey_Negative() {
@@ -1147,6 +1176,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     // GROUP BY With LIMIT without ORDER BY
     public void testGroupByWithLimit() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByWithLimit();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByWithLimit();
+        }
+    }
+
+    private void basicTestGroupByWithLimit() {
         List<AbstractPlanNode> pns;
 
         // replicated table with serial aggregation and inlined limit
@@ -1201,6 +1241,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testEdgeComplexRelatedCases() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestEdgeComplexRelatedCases();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestEdgeComplexRelatedCases();
+        }
+    }
+
+    private void basicTestEdgeComplexRelatedCases() {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
@@ -1307,6 +1358,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testComplexAggwithLimit() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestComplexAggwithLimit();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestComplexAggwithLimit();
+        }
+    }
+
+    private void basicTestComplexAggwithLimit() {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
@@ -1331,6 +1393,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testComplexAggwithDistinct() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestComplexAggwithDistinct();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestComplexAggwithDistinct();
+        }
+    }
+
+    private void basicTestComplexAggwithDistinct() {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1");
@@ -1347,6 +1420,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testComplexAggwithLimitDistinct() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestComplexAggwithLimitDistinct();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestComplexAggwithLimitDistinct();
+        }
+    }
+
+    private void basicTestComplexAggwithLimitDistinct() {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
@@ -1364,6 +1448,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testComplexAggCase() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestComplexAggCase();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestComplexAggCase();
+        }
+    }
+
+    private void basicTestComplexAggCase() {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1");
@@ -1377,6 +1472,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testComplexAggCaseProjectPushdown() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestComplexAggCaseProjectPushdown();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestComplexAggCaseProjectPushdown();
+        }
+    }
+
+    private void basicTestComplexAggCaseProjectPushdown() {
         List<AbstractPlanNode> pns;
 
         // This complex aggregate case will push down ORDER BY LIMIT
@@ -1389,6 +1495,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testComplexGroupBy() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestComplexGroupBy();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestComplexGroupBy();
+        }
+    }
+
+    private void basicTestComplexGroupBy() {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments("SELECT A1, ABS(A1), ABS(A1)+1, sum(B1) FROM P1 GROUP BY A1, ABS(A1)");
@@ -1430,6 +1547,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testUnOptimizedAVG() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestUnOptimizedAVG();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestUnOptimizedAVG();
+        }
+    }
+
+    private void basicTestUnOptimizedAVG() {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments("SELECT AVG(A1) FROM R1");
@@ -1449,6 +1577,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testOptimizedAVG() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestOptimizedAVG();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestOptimizedAVG();
+        }
+    }
+
+    private void basicTestOptimizedAVG() {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments("SELECT AVG(A1) FROM P1");
@@ -1467,6 +1606,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByColsNotInDisplayCols() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByColsNotInDisplayCols();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByColsNotInDisplayCols();
+        }
+    }
+
+    private void basicTestGroupByColsNotInDisplayCols() {
         List<AbstractPlanNode> pns;
 
         pns = compileToFragments("SELECT sum(PKEY) FROM P1 GROUP BY A1");
@@ -1496,6 +1646,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByBooleanConstants() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByBooleanConstants();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByBooleanConstants();
+        }
+    }
+
+    private void basicTestGroupByBooleanConstants() {
         String[] conditions = {"1=1", "1=0", "TRUE", "FALSE", "1>2"};
         for (String condition : conditions) {
             failToCompile("SELECT count(P1.PKEY) FROM P1 GROUP BY " + condition,
@@ -1504,6 +1665,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByAliasENG9872() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByAliasENG9872();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByAliasENG9872();
+        }
+    }
+
+    private void basicTestGroupByAliasENG9872() {
         String sql;
         // If we have an alias in a group by clause, and
         // the alias is to an aggregate, we need to reject
@@ -1523,6 +1695,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByAliasNegativeCases() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByAliasNegativeCases();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByAliasNegativeCases();
+        }
+    }
+
+    private void basicTestGroupByAliasNegativeCases() {
         List<AbstractPlanNode> pns;
 
         // Group by aggregate expression
@@ -1601,6 +1784,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByAlias() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByAlias();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByAlias();
+        }
+    }
+
+    private void basicTestGroupByAlias() {
         String sql1, sql2;
 
         // group by alias for expression
@@ -1683,6 +1877,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testNoFix_MVBasedQuery() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestNoFix_MVBasedQuery();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestNoFix_MVBasedQuery();
+        }
+    }
+
+    private void basicTestNoFix_MVBasedQuery() {
         String sql;
         List<AbstractPlanNode> pns;
 
@@ -1760,6 +1965,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testMVBasedQuery_EdgeCases() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestMVBasedQuery_EdgeCases();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestMVBasedQuery_EdgeCases();
+        }
+    }
+
+    private void basicTestMVBasedQuery_EdgeCases() {
         String sql;
         List<AbstractPlanNode> pns;
 
@@ -1810,6 +2026,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testMVBasedQuery_NoAggQuery() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestMVBasedQuery_NoAggQuery();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestMVBasedQuery_NoAggQuery();
+        }
+    }
+
+    private void basicTestMVBasedQuery_NoAggQuery() {
         String sql;
         //        CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
         //        AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
@@ -1853,6 +2080,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testMVBasedQuery_AggQuery() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestMVBasedQuery_AggQuery();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestMVBasedQuery_AggQuery();
+        }
+    }
+
+    private void basicTestMVBasedQuery_AggQuery() {
         String sql;
         //      CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
         //      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
@@ -2005,6 +2243,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testMVBasedQuery_Where() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestMVBasedQuery_Where();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestMVBasedQuery_Where();
+        }
+    }
+
+    private void basicTestMVBasedQuery_Where() {
         String sql;
         //      CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
         //      AS SELECT A1, B1, COUNT(*), SUM(C1), COUNT(D1)
@@ -2059,6 +2308,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
      * Non-aggregation queries.
      */
     public void testMVBasedQuery_Join_NoAgg() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestMVBasedQuery_Join_NoAgg();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestMVBasedQuery_Join_NoAgg();
+        }
+    }
+
+    private void basicTestMVBasedQuery_Join_NoAgg() {
         boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         String sql = "";
 
@@ -2113,6 +2373,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
      * Aggregation queries.
      */
     public void testMVBasedQuery_Join_Agg() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestMVBasedQuery_Join_Agg();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestMVBasedQuery_Join_Agg();
+        }
+    }
+
+    private void basicTestMVBasedQuery_Join_Agg() {
         boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         String sql = "";
 
@@ -2188,6 +2459,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testENG5385() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestENG5385();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestENG5385();
+        }
+    }
+
+    private void basicTestENG5385() {
         boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         String sql = "";
 
@@ -2200,6 +2482,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testENG6962DistinctCases() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestENG6962DistinctCases();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestENG6962DistinctCases();
+        }
+    }
+
+    private void basicTestENG6962DistinctCases() {
         String sql;
         String sql_rewrote;
         sql = "select distinct A1, B1 from R1";
@@ -2212,6 +2505,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testENG389_Having() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestENG389_Having();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestENG389_Having();
+        }
+    }
+
+    private void basicTestENG389_Having() {
         String sql;
 
         boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
