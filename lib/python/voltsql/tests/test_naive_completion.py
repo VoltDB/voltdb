@@ -43,6 +43,7 @@ def test_empty_string_completion(completer, complete_event):
 
 
 def test_select_keyword_completion(completer, complete_event):
+    assert False
     text = 'SEL'
     position = len('SEL')
     result = completer.get_completions(
