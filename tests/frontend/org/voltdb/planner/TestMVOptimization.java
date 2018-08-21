@@ -73,6 +73,15 @@ public class TestMVOptimization extends PlannerTestCase {
         assertMatch("SELECT a, ABS(b), COUNT(*) FROM t1 WHERE b > 2 GROUP BY ABS(b), a;",
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" using \"TA\" " +
                 "(for optimized grouping only) filter by (B > 2) inline Partial AGGREGATION ops: COUNT(*)");
+        // Negative tests: with LIMIT or OFFSET - ENG-14415
+        assertMatch("SELECT a1 a1, COUNT(b) count_b, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1 LIMIT 2",
+                "RETURN RESULTS TO STORED PROCEDURE LIMIT 2 " +
+                        "INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" (for deterministic order only) " +
+                        "inline Hash AGGREGATION ops: COUNT(T1.B), SUM(T1.A), COUNT(*)");
+        assertMatch("SELECT a1 a1, COUNT(b) count_b, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1 OFFSET 5",
+                "RETURN RESULTS TO STORED PROCEDURE OFFSET 5 " +
+                        "INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" (for deterministic order only) " +
+                        "inline Hash AGGREGATION ops: COUNT(T1.B), SUM(T1.A), COUNT(*)");
     }
 
     public void testDistinct() {  // Test SELECT stmt that is "almost" same as view definition with exception of GBY column distinctiveness
@@ -209,8 +218,9 @@ public class TestMVOptimization extends PlannerTestCase {
         // But could match when parameter is somewhere else.
         assertMatch("SELECT distinct a1 distinct_a1, COUNT(b1) count_b1, SUM(a) sum_a, COUNT(*) counts " +
                 "FROM t1 WHERE b >= 2 OR b1 IN (3, 30, 300) GROUP BY a1 LIMIT ? OFFSET ?",
-                "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"V5_1\" " +
-                        "using its primary key index (for deterministic order only) inline LIMIT with parameter");
+                "RETURN RESULTS TO STORED PROCEDURE LIMIT with parameter INDEX SCAN of \"T1\" using " +
+                        "\"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" (for deterministic order only) filter by ((B >= 2) OR " +
+                        "(B1 IN ANY (3, 30, 300))) inline Hash AGGREGATION ops: COUNT(T1.B1), SUM(T1.A), COUNT(*)");
     }
 
     public void testUnionStmt() {

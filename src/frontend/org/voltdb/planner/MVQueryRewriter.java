@@ -53,7 +53,8 @@ final class MVQueryRewriter {
         m_selectStmt = stmt;
         // NOTE: a MV creation stmt can be without group-by, e.g. "SELECT min(c1), max(c2), COUNT(*) FROM FOO"
         if (m_selectStmt.m_tableList.size() == 1 &&                   // For now, support rewrite SELECT from a single table
-                !m_selectStmt.hasOrderByColumns() && m_selectStmt.getHavingPredicate() == null) {   // MVI has GBY, does not have OBY or HAVING clause
+                ! m_selectStmt.m_limitOffset.hasLimitOrOffset() &&    // SELECT with LIMIT xx or OFFSET xx do not match views
+                ! m_selectStmt.hasOrderByColumns() && m_selectStmt.getHavingPredicate() == null) {   // MVI has GBY, does not have OBY or HAVING clause
             final Optional<Pair<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>>>
                     any = getMviAndViews(m_selectStmt.m_tableList).entrySet().stream()          // Scan all MV associated with SEL source tables,
                     .flatMap(kv -> {
