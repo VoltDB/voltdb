@@ -2999,7 +2999,7 @@ public class PlanAssembler {
                      *
                      * If DISTINCT is specified, don't do push-down for
                      * count() and sum() when not group by partition column.
-                     * An exception is the aggregation arguments are the
+                     * An exception is when the aggregation arguments are the
                      * partition column (ENG-4980).
                      */
                     if (agg_expression_type == ExpressionType.AGGREGATE_COUNT_STAR ||
@@ -3358,6 +3358,28 @@ public class PlanAssembler {
     }
 
     /**
+     * There are three mutually exclusive cases:
+     * <ol>
+     *     <li>We may have plans in which we do all the aggregation on the
+     *         distributed fragment.  This will happen if the group by keys contain
+     *         a partition column.</li>
+     *     <li>We may have plans in which we do all the aggregation on the
+     *         coordinator fragment.  This happens if we have an aggregate distinct.</li>
+     *     <li>We may have plans in which we split the aggregations between the
+     *         two fragments.  This is the most frequent case.</li>
+     *     <li>We may have queries with no aggregate functions or group by keys.
+     *         But we will never see this case here, so we can ignore this case.</li>
+     * </ol>
+     *
+     * The point of this function is to distinguish between these three
+     * cases, and place the aggregate and order by nodes appropriately.
+     *
+     * The first and second cases are treated similarly here.  In this case
+     * there is only on aggregate node, which will be the distNode.  The
+     * coordNode will be ignored.  We will still add an order by node if
+     * necessary.
+     *
+     * Original Comment:
      * Push the given aggregate if the plan is distributed, then add the
      * coordinator node on top of the send/receive pair. If the plan
      * is not distributed, or coordNode is not provided, the distNode
@@ -3384,6 +3406,7 @@ public class PlanAssembler {
                                                       ParsedSelectStmt     selectStmt) {
         AggregatePlanNode coordNode   = aggNodes.getTopAggNode();
         AggregatePlanNode distNode    = aggNodes.getAggNode();
+
         OrderByPlanNode   topSortNode = aggNodes.getTopOrderByNode();
         AggregatePlanNode rootAggNode;
 
@@ -3449,6 +3472,10 @@ public class PlanAssembler {
             rootAggNode = coordNode;
         }
         else {
+            if (topSortNode != null) {
+                topSortNode.addAndLinkChild(root);
+                root = topSortNode;
+            }
             distNode.addAndLinkChild(root);
             rootAggNode = distNode;
         }

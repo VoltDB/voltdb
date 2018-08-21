@@ -54,8 +54,9 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
 public class TestPlansGroupBy extends PlannerTestCase {
+
     // Set this to true to print the JSON string for the plan.
-    private static boolean PRINT_JSON_PLAN = false;
+    private static boolean PRINT_JSON_PLAN = true;
     // Test normal sized temp tables.
     private static boolean TEST_NORMAL_SIZE_QUERIES = true;
     // Test large sized temp tables.
@@ -454,99 +455,207 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     /**
      * Check that we can use a tablecount plan node.
+     * this should work equally for large and normal plans.
      */
     public void testCountStar() {
+        planForLargeQueries(true);
+        basicTestCountStar();
+        planForLargeQueries(false);
+        basicTestCountStar();
+    }
+
+    private void basicTestCountStar() {
         validatePlan("SELECT count(*) FROM T1",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
-                                                       ExpressionType.AGGREGATE_SUM),
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              PlanNodeType.TABLECOUNT));
+                PRINT_JSON_PLAN,
+                fragSpec(PlanNodeType.SEND,
+                        new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                ExpressionType.AGGREGATE_SUM),
+                        PlanNodeType.RECEIVE),
+                fragSpec(PlanNodeType.SEND,
+                        PlanNodeType.TABLECOUNT));
     }
 
     public void testCountDistinct() {
+        planForLargeQueries(false);
+        basicTestCountDistinct();
+        planForLargeQueries(true);
+        basicTestCountDistinct();
+    }
+
+    public void basicTestCountDistinct() {
         AbstractPlanNode p;
         List<AbstractPlanNode> pns;
 
         // push down distinct because of group by partition column
-        validatePlan("SELECT A4, count(distinct B4) FROM T4 GROUP BY A4",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
-                                                      PlanNodeType.HASHAGGREGATE,
-                                                      PlanNodeType.PROJECTION)));
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT A4, count(distinct B4) FROM T4 GROUP BY A4",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             PlanNodeType.ORDERBY,
+                             AbstractScanPlanNodeMatcher));
+        } else {
+            validatePlan("SELECT A4, count(distinct B4) FROM T4 GROUP BY A4",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                    PlanNodeType.HASHAGGREGATE,
+                                    PlanNodeType.PROJECTION)));
+        }
 
         // group by multiple columns
-        validatePlan("SELECT C4, A4, count(distinct B4) FROM T4 GROUP BY C4, A4",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
-                                                      PlanNodeType.PROJECTION,
-                                                      new AggregateNodeMatcher(PlanNodeType.HASHAGGREGATE,
-                                                                               ExpressionType.AGGREGATE_COUNT))));
-
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT C4, A4, count(distinct B4) FROM T4 GROUP BY C4, A4",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                    ExpressionType.AGGREGATE_COUNT),
+                            PlanNodeType.ORDERBY,
+                            AbstractScanPlanNodeMatcher));
+        } else {
+            validatePlan("SELECT C4, A4, count(distinct B4) FROM T4 GROUP BY C4, A4",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                    PlanNodeType.PROJECTION,
+                                    new AggregateNodeMatcher(PlanNodeType.HASHAGGREGATE,
+                                            ExpressionType.AGGREGATE_COUNT))));
+        }
 
         // not push down distinct
-        validatePlan("SELECT ABS(A4), count(distinct B4) FROM T4 GROUP BY ABS(A4)",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              PlanNodeType.HASHAGGREGATE,
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
-                                                      // No HashAggregate node here.
-                                                      PlanNodeType.PROJECTION)));
-
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT ABS(A4), count(distinct B4) FROM T4 GROUP BY ABS(A4)",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE, // for count distinct.
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                             new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                                     // No Aggregate node here, since we
+                                                     // can't push the aggregate down.
+                                                     PlanNodeType.PROJECTION)));
+        } else {
+            validatePlan("SELECT ABS(A4), count(distinct B4) FROM T4 GROUP BY ABS(A4)",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.HASHAGGREGATE,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                             new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                                     // No HashAggregate node here.
+                                                     PlanNodeType.PROJECTION)));
+        }
         // test not group by partition column with index available
-        validatePlan("SELECT A.NUM, COUNT(DISTINCT A.ID ) AS Q58 FROM P2 A GROUP BY A.NUM; ",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              PlanNodeType.HASHAGGREGATE,
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              allOf(PlanNodeType.INDEXSCAN,
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT A.NUM, COUNT(DISTINCT A.ID ) AS Q58 FROM P2 A GROUP BY A.NUM; ",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            PlanNodeType.ORDERBY,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(PlanNodeType.INDEXSCAN,
                                     new ExplainStringMatcher("for deterministic order only"))));
 
+        } else {
+            validatePlan("SELECT A.NUM, COUNT(DISTINCT A.ID ) AS Q58 FROM P2 A GROUP BY A.NUM; ",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.HASHAGGREGATE,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(PlanNodeType.INDEXSCAN,
+                                    new ExplainStringMatcher("for deterministic order only"))));
+        }
     }
 
     public void testDistinctA1() {
-        validatePlan("SELECT DISTINCT A1 FROM T1",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              PlanNodeType.HASHAGGREGATE,
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              allOf(new IndexScanPlanMatcher("VOLTDB_AUTOGEN_IDX_PK_T1_PKEY"),
-                                    new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                                            PlanNodeType.PROJECTION,
-                                                            PlanNodeType.HASHAGGREGATE))));
+        planForLargeQueries(false);
+        basicTestDistinctA1();
+        planForLargeQueries(true);
+        basicTestDistinctA1();
+    }
+    public void basicTestDistinctA1() {
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT DISTINCT A1 FROM T1",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,  // Aggregate for distinct.
+                             new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
+                                                     PlanNodeType.ORDERBY)),
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,  // Aggregate for distinct.
+                             PlanNodeType.ORDERBY,
+                             new IndexScanPlanMatcher("VOLTDB_AUTOGEN_IDX_PK_T1_PKEY")));
+        } else {
+            validatePlan("SELECT DISTINCT A1 FROM T1",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.HASHAGGREGATE,
+                             PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                             allOf(new IndexScanPlanMatcher("VOLTDB_AUTOGEN_IDX_PK_T1_PKEY"),
+                                   new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                           PlanNodeType.PROJECTION,
+                                                           PlanNodeType.HASHAGGREGATE))));
+        }
     }
 
     public void testDistinctA1_Subquery() {
+        planForLargeQueries(false);
+        basicTestDistinctA1_Subquery();
+        planForLargeQueries(true);
+        basicTestDistinctA1_Subquery();
+    }
+
+    public void basicTestDistinctA1_Subquery() {
         AbstractPlanNode p;
         List<AbstractPlanNode> pns;
 
         // Distinct rewrote with group by
-        validatePlan("select * from (SELECT DISTINCT A1 FROM T1) temp",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              PlanNodeType.SEQSCAN,
-                              PlanNodeType.HASHAGGREGATE,
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
-                                                      PlanNodeType.HASHAGGREGATE,
-                                                      PlanNodeType.PROJECTION)));
-
+        if (isPlanningForLargeQueries()) {
+            validatePlan("select * from (SELECT DISTINCT A1 FROM T1) temp",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.SEQSCAN,
+                            PlanNodeType.AGGREGATE,
+                            new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
+                                                    PlanNodeType.ORDERBY)),
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             PlanNodeType.ORDERBY,
+                             AbstractScanPlanNodeMatcher));
+        } else {
+            validatePlan("select * from (SELECT DISTINCT A1 FROM T1) temp",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.SEQSCAN,
+                            PlanNodeType.HASHAGGREGATE,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                    PlanNodeType.HASHAGGREGATE,
+                                    PlanNodeType.PROJECTION)));
+        }
     }
 
     public void testGroupByA1() {
+        planForLargeQueries(false);
+        basicTestGroupByA1();
+        planForLargeQueries(true);
+        basicTestGroupByA1();
+    }
+
+    public void basicTestGroupByA1() {
         AbstractPlanNode p;
         AggregatePlanNode aggNode;
         List<AbstractPlanNode> pns;
@@ -562,13 +671,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
             validatePlan("SELECT A1 from T1 group by A1",
                          PRINT_JSON_PLAN,
                          fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.AGGREGATE,
                                   new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
-                                                          PlanNodeType.AGGREGATE)),
+                                                          PlanNodeType.ORDERBY)),
                          fragSpec(PlanNodeType.SEND,
                                   PlanNodeType.AGGREGATE,
                                   PlanNodeType.ORDERBY,
-                                  new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
-                                                          PlanNodeType.PROJECTION)));
+                                  AbstractScanPlanNodeMatcher));
         } else {
             validatePlan("SELECT A1 from T1 group by A1",
                          PRINT_JSON_PLAN,
@@ -582,117 +691,171 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
 
         // Having
-        validatePlan("SELECT A1, count(*) from T1 group by A1 Having count(*) > 3",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              allOf(new AggregateNodeMatcher(),
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT A1, count(*) from T1 group by A1 Having count(*) > 3",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(new AggregateNodeMatcher(),
                                     new NodeTestMatcher("has Post Predicate",
-                                                    (AbstractPlanNode n) -> {
-                                                       return ((AggregatePlanNode)n).getPostPredicate() != null;
-                                                    })),
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                                      PlanNodeType.PROJECTION,
-                                                      new AggregateNodeMatcher(PlanNodeType.HASHAGGREGATE,
-                                                                               ExpressionType.AGGREGATE_COUNT_STAR))));
+                                            (AbstractPlanNode n) -> {
+                                                return ((AggregatePlanNode)n).getPostPredicate() != null;
+                                            })),
+                            new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
+                                                    PlanNodeType.ORDERBY)),
+                    fragSpec(PlanNodeType.SEND,
+                            new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
+                                                     ExpressionType.AGGREGATE_COUNT_STAR),
+                            PlanNodeType.ORDERBY,
+                            PlanNodeType.INDEXSCAN));
+        } else {
+            validatePlan("SELECT A1, count(*) from T1 group by A1 Having count(*) > 3",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(new AggregateNodeMatcher(),
+                                    new NodeTestMatcher("has Post Predicate",
+                                            (AbstractPlanNode n) -> {
+                                                return ((AggregatePlanNode) n).getPostPredicate() != null;
+                                            })),
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                    PlanNodeType.PROJECTION,
+                                    new AggregateNodeMatcher(PlanNodeType.HASHAGGREGATE,
+                                            ExpressionType.AGGREGATE_COUNT_STAR))));
+        }
 
-        validatePlan("SELECT A1, count(*) from T1 group by A1 Having count(*) > 3",
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              allOf(new AggregateNodeMatcher(),
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT A1, count(*) from T1 group by A1 Having count(*) > 3",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(new AggregateNodeMatcher(),
                                     new NodeTestMatcher("has Post Predicate",
-                                                        (AbstractPlanNode n) -> {
-                                                            // We know n is an aggregate plan
-                                                            // node by the first test in allOf.
-                                                            return ((AggregatePlanNode)n).getPostPredicate() != null;
-                                                        })),
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(AbstractScanPlanNodeMatcher, // abstract plan node
-                                                      PlanNodeType.PROJECTION,     // With an inline projection node
-                                                                                   // and an inline agg node
-                                                                                   //    with no post predicate.
-                                                      new NodeTestMatcher("has inline agg node",
-                                                                          n-> {
-                                                                              // There is no index, so we need
-                                                                              // an inline hash aggregate.
-                                                                              // There is no post predicate here,
-                                                                              // since this is not yet post aggregation.
-                                                                              return (n.getPlanNodeType() == PlanNodeType.HASHAGGREGATE)
-                                                                                      && ((AggregatePlanNode)n).getPostPredicate() == null;
-                                                                          }))));
+                                            (AbstractPlanNode n) -> {
+                                                // We know n is an aggregate plan
+                                                // node by the first test in allOf.
+                                                return ((AggregatePlanNode)n).getPostPredicate() != null;
+                                            })),
+                            new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
+                                                    PlanNodeType.ORDERBY)),
+                    fragSpec(PlanNodeType.SEND,
+                             new NodeTestMatcher("agg node with no post predicate",
+                                                 n -> {
+                                                    return n.getPlanNodeType() == PlanNodeType.AGGREGATE
+                                                            && ((AggregatePlanNode)n).getPostPredicate() == null;
+                                                 }),
+                             PlanNodeType.ORDERBY,
+                             AbstractScanPlanNodeMatcher));
+
+        } else {
+            validatePlan("SELECT A1, count(*) from T1 group by A1 Having count(*) > 3",
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(new AggregateNodeMatcher(),
+                                    new NodeTestMatcher("has Post Predicate",
+                                            (AbstractPlanNode n) -> {
+                                                // We know n is an aggregate plan
+                                                // node by the first test in allOf.
+                                                return ((AggregatePlanNode) n).getPostPredicate() != null;
+                                            })),
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(AbstractScanPlanNodeMatcher, // abstract plan node
+                                    PlanNodeType.PROJECTION,     // With an inline projection node
+                                    // and an inline agg node
+                                    //    with no post predicate.
+                                    new NodeTestMatcher("has inline agg node",
+                                            n -> {
+                                                // There is no index, so we need
+                                                // an inline hash aggregate.
+                                                // There is no post predicate here,
+                                                // since this is not yet post aggregation.
+                                                return (n.getPlanNodeType() == PlanNodeType.HASHAGGREGATE)
+                                                        && ((AggregatePlanNode) n).getPostPredicate() == null;
+                                            }))));
+        }
     }
 
     private void checkGroupByPartitionKey(String SQL,
              final boolean topAgg, final boolean having) {
-
-        validatePlan(SQL,
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              new MatchIf(topAgg, // If topAgg is true
-                                          allOf(new AggregateNodeMatcher(), // Match an aggregate node,
-                                                new NodeTestMatcher("has aggregate",
-                                                              n->{
-                                                                if (having) {
-                                                                    // Also, if having is true
-                                                                    // then require a post predicate.
-                                                                    return ((AggregatePlanNode)n).getPostPredicate() != null;
-                                                                }
-                                                                return true;
-                                                              }))),
-                              PlanNodeType.RECEIVE),
-                     fragSpec(PlanNodeType.SEND,
-                              allOf(AbstractScanPlanNodeMatcher,
+        if (isPlanningForLargeQueries()) {
+            validatePlan(SQL,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            new MatchIf(topAgg, // If topAgg is true
+                                    allOf(new AggregateNodeMatcher(), // Match an aggregate node,
+                                            new NodeTestMatcher("has aggregate",
+                                                    n -> {
+                                                        if (having) {
+                                                            // Also, if having is true
+                                                            // then require a post predicate.
+                                                            return ((AggregatePlanNode) n).getPostPredicate() != null;
+                                                        }
+                                                        return true;
+                                                    }))),
+                            topAgg ? PlanNodeType.MERGERECEIVE : PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(AbstractScanPlanNodeMatcher,
                                     new NodeTestMatcher("Aggregate with possible post predicate",
-                                                        n->{
-                                                            // What kind of aggregate do we want?
-                                                            PlanNodeType aggType = PlanNodeType.HASHAGGREGATE;
-                                                            if (n instanceof IndexScanPlanNode &&
-                                                                    ((IndexScanPlanNode)n).isForGroupingOnly()) {
-                                                                aggType = PlanNodeType.AGGREGATE;
-                                                            }
-                                                            // Get the aggregate node.
-                                                            AbstractPlanNode aggNode = n.getInlinePlanNode(aggType);
-                                                            if (aggNode == null) {
-                                                                return false;
-                                                            }
-                                                            if (having && !topAgg) {
-                                                                return ((AggregatePlanNode)aggNode).getPostPredicate() != null;
-                                                            }
-                                                            return true;
-                                                        }))));
-        /*
-         * This was the original.
-        p = pns.get(0).getChild(0);
-        if (topAgg) {
-            assertTrue(p instanceof AggregatePlanNode);
-            if (having) {
-                aggNode = (AggregatePlanNode)p;
-                assertNotNull(aggNode.getPostPredicate());
-            }
-            p = p.getChild(0);
+                                            n -> {
+                                                // What kind of aggregate do we want?
+                                                PlanNodeType aggType = PlanNodeType.AGGREGATE;
+                                                // Get the aggregate node.
+                                                AbstractPlanNode aggNode = n.getInlinePlanNode(aggType);
+                                                if (aggNode == null) {
+                                                    return false;
+                                                }
+                                                if (having && !topAgg) {
+                                                    return ((AggregatePlanNode) aggNode).getPostPredicate() != null;
+                                                }
+                                                return true;
+                                            }))));
+        } else {
+            validatePlan(SQL,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            new MatchIf(topAgg, // If topAgg is true
+                                    allOf(new AggregateNodeMatcher(), // Match an aggregate node,
+                                            new NodeTestMatcher("has aggregate",
+                                                    n -> {
+                                                        if (having) {
+                                                            // Also, if having is true
+                                                            // then require a post predicate.
+                                                            return ((AggregatePlanNode) n).getPostPredicate() != null;
+                                                        }
+                                                        return true;
+                                                    }))),
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(AbstractScanPlanNodeMatcher,
+                                    new NodeTestMatcher("Aggregate with possible post predicate",
+                                            n -> {
+                                                // What kind of aggregate do we want?
+                                                PlanNodeType aggType = PlanNodeType.HASHAGGREGATE;
+                                                if (n instanceof IndexScanPlanNode &&
+                                                        ((IndexScanPlanNode) n).isForGroupingOnly()) {
+                                                    aggType = PlanNodeType.AGGREGATE;
+                                                }
+                                                // Get the aggregate node.
+                                                AbstractPlanNode aggNode = n.getInlinePlanNode(aggType);
+                                                if (aggNode == null) {
+                                                    return false;
+                                                }
+                                                if (having && !topAgg) {
+                                                    return ((AggregatePlanNode) aggNode).getPostPredicate() != null;
+                                                }
+                                                return true;
+                                            }))));
         }
-        assertTrue(p instanceof ReceivePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AbstractScanPlanNode);
-
-        PlanNodeType aggType = PlanNodeType.HASHAGGREGATE;
-        if (p instanceof IndexScanPlanNode &&
-                ((IndexScanPlanNode)p).isForGroupingOnly() ) {
-            aggType = PlanNodeType.AGGREGATE;
-        }
-        assertNotNull(p.getInlinePlanNode(aggType));
-
-        if (having && !topAgg) {
-            aggNode = (AggregatePlanNode)p.getInlinePlanNode(aggType);
-            assertNotNull(aggNode.getPostPredicate());
-        }
-        */
     }
 
     public void testGroupByPartitionKey() {
+        planForLargeQueries(false);
+        basicTestGroupByPartitionKey();
+        planForLargeQueries(true);
+        basicTestGroupByPartitionKey();
+    }
+
+    private void basicTestGroupByPartitionKey() {
         List<AbstractPlanNode> pns;
 
         // Primary key is equal to partition key
@@ -719,6 +882,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupByPartitionKey_Negative() {
+        planForLargeQueries(false);
+        basicTestGroupByPartitionKey_Negative();
+        planForLargeQueries(true);
+        basicTestGroupByPartitionKey_Negative();
+    }
+
+    private void basicTestGroupByPartitionKey_Negative() {
         List<AbstractPlanNode> pns;
 
         checkGroupByPartitionKey("SELECT ABS(PKEY), COUNT(*) from T1 group by ABS(PKEY)", true, false);
