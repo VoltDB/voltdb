@@ -571,7 +571,7 @@ BinaryLogSink::BinaryLogSink() {}
         }
         ConditionalExecuteWithMpMemory possiblyUseMpMemory(replicatedTableOperation && !skipCurrentRow);
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
-                txnStart, sequenceNumber, uniqueId, skipCurrentRow, replicatedTableOperation);
+                sequenceNumber, uniqueId, skipCurrentRow, replicatedTableOperation);
         int8_t rawType = taskInfo->readByte();
         type = static_cast<DRRecordType>(rawType & ~REPLICATED_TABLE_MASK);
         if (type == DR_RECORD_HASH_DELIMITER) {
@@ -597,7 +597,6 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
                              Pool *pool,
                              VoltDBEngine *engine,
                              int32_t remoteClusterId,
-                             const char *txnStart,
                              int64_t sequenceNumber,
                              int64_t uniqueId,
                              bool skipRow,
