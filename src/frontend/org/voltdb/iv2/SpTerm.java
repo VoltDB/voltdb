@@ -60,6 +60,12 @@ public class SpTerm implements Term
         @Override
         public void run(List<String> children)
         {
+            // Since we don't shutdown SpTerm when current site is no longer leader
+            // (see explanation at SpInitiator, m_leadersChangeHandler handler),
+            // ask non-leader (from scheduler perspective) to ignore replica list change.
+            if (!m_mailbox.m_scheduler.isLeader()) {
+                return;
+            }
             // remove the leader; convert to hsids; deal with the replica change.
             List<Long> replicas = VoltZK.childrenToReplicaHSIds(children);
             if (tmLog.isDebugEnabled()) {
