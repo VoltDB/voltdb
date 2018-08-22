@@ -244,9 +244,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // by default set the version to only be compatible with itself
     static final String m_defaultHotfixableRegexPattern = "^\\Q8.3\\E\\z";
 
-    protected static final String NODE_FAILURE_ON_REJOIN = "Another node failed before this node could finish rejoining. " +
-                                                "As a result, the rejoin operation has been canceled. Please try again.";
-
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -293,9 +290,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // by the CL when the truncation snapshot completes
     // and this node is viable for replay
     volatile boolean m_rejoining = false;
-
-    // count down to determine start action
-    private final CountDownLatch m_meshDeterminationLatch = new CountDownLatch(1);
 
     // Need to separate the concepts of rejoin data transfer and rejoin
     // completion.  This boolean tracks whether or not the data transfer
@@ -1068,7 +1062,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // (used for license check and later the actual rejoin)
             m_rejoining = m_config.m_startAction.doesRejoin();
             m_rejoinDataPending = m_config.m_startAction.doesJoin();
-            m_meshDeterminationLatch.countDown();
 
             m_joining = m_config.m_startAction == StartAction.JOIN;
 
@@ -1721,17 +1714,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         m_messenger.removeStopNodeNotice(hostId);
                     }
 
-                    // If the current node hasn't finished rejoin when another
-                    // node fails, fail this node to prevent locking up the system.
-                    // Wait for the mesh determination to make sure it is rejoining.
-                    try {
-                        m_meshDeterminationLatch.await();
-                    } catch (InterruptedException e) {
-                        hostLog.warn("Rejoin determination interrupted.");
-                    }
-                    if (m_rejoining) {
-                        VoltDB.crashLocalVoltDB(NODE_FAILURE_ON_REJOIN);
-                    }
+                    stopRejoiningHost(failedHosts);
 
                     //create a blocker for repair if this is a MP leader and partition leaders change
                     if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
@@ -1742,6 +1725,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_clientInterface.handleFailedHosts(failedHosts);
                 }
             });
+        }
+    }
+
+    // If the current node hasn't finished rejoin when another node fails, fail this node to prevent locking up.
+    private void stopRejoiningHost(Set<Integer> failedHosts) {
+
+        // if host is already running or in elastic joining
+        if (isRunning() || VoltZK.zkNodeExists(m_messenger.getZK(), VoltZK.elasticJoinInProgress)) {
+            return;
+        }
+
+        // The host failure notification could come before mesh determination, m_rejoining is still false for rejoining.
+        // In this case, compare the configured host count and the cluster host count to determine node rejoining.
+        Set<Integer> allHosts = Sets.newHashSet();
+        allHosts.addAll(failedHosts);
+        allHosts.addAll(m_messenger.getLiveHostIds());
+        if (m_rejoining || (m_config.m_hostCount >= allHosts.size())) {
+            VoltDB.crashLocalVoltDB("Another node failed before this node could finish rejoining. " +
+                    "As a result, the rejoin operation has been canceled. Please try again.");
         }
     }
 
