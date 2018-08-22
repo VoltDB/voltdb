@@ -75,6 +75,7 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_COUNT:
         case AGGREGATE_WINDOWED_RANK:
         case AGGREGATE_WINDOWED_DENSE_RANK:
+        case AGGREGATE_WINDOWED_ROW_NUMBER:
         case AGGREGATE_WINDOWED_COUNT:
         case AGGREGATE_COUNT_STAR:
         case AGGREGATE_APPROX_COUNT_DISTINCT:

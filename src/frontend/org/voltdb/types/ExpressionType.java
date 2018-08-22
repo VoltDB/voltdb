@@ -144,6 +144,7 @@ public enum ExpressionType {
     AGGREGATE_WINDOWED_MAX        (WindowFunctionExpression.class,  73, "MAX"),
     AGGREGATE_WINDOWED_MIN        (WindowFunctionExpression.class,  74, "MIN"),
     AGGREGATE_WINDOWED_SUM        (WindowFunctionExpression.class,  75, "SUM"),
+    AGGREGATE_WINDOWED_ROW_NUMBER (WindowFunctionExpression.class,  76, "ROW_NUMBER"),
     // No support for PERCENT_RANK yet.
     // AGGREGATE_WINDOWED_PERCENT_RANK(WindowFunctionExpression.class, 73, "PERCENT_RANK"),
     // No support for CUME_DIST yet.
@@ -284,6 +285,7 @@ public enum ExpressionType {
         m_windowedAggName = new HashMap<>();
         m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_RANK, "RANK");
         m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK, "DENSE_RANK");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_ROW_NUMBER, "ROW_NUMBER");
         m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_COUNT, "COUNT");
         m_windowedAggName.put(ExpressionType.AGGREGATE_MAX, "MAX");
         m_windowedAggName.put(ExpressionType.AGGREGATE_MIN, "MIN");

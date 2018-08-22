@@ -1560,6 +1560,7 @@ public class Expression {
         prototypes.put(OpTypes.WINDOWED_MAX,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_max"));
         prototypes.put(OpTypes.WINDOWED_MIN,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_min"));
         prototypes.put(OpTypes.WINDOWED_SUM,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_sum"));
+        prototypes.put(OpTypes.WINDOWED_ROW_NUMBER,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_row_number"));
 
         // other operations
         prototypes.put(OpTypes.CAST,          (new VoltXMLElement("operation")).withValue("optype", "cast"));
@@ -1822,6 +1823,7 @@ public class Expression {
 
         case OpTypes.WINDOWED_RANK:
         case OpTypes.WINDOWED_DENSE_RANK:
+        case OpTypes.WINDOWED_ROW_NUMBER:
         case OpTypes.WINDOWED_COUNT:
         case OpTypes.WINDOWED_MIN:
         case OpTypes.WINDOWED_MAX:

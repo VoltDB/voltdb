@@ -1660,6 +1660,7 @@ public class ParserDQL extends ParserBase {
         switch (tokenT) {
         case Tokens.RANK:
         case Tokens.DENSE_RANK:
+        case Tokens.ROW_NUMBER:
         // No current support for WINDOWED_PERCENT_RANK or WINDOWED_CUME_DIST.
         // case Tokens.PERCENT_RANK:
         // case Tokens.CUME_DIST:
@@ -2135,6 +2136,7 @@ public class ParserDQL extends ParserBase {
             case Tokens.VAR_SAMP :
             case Tokens.RANK :
             case Tokens.DENSE_RANK:
+            case Tokens.ROW_NUMBER:
                 return readAggregate();
 
             case Tokens.NEXT :

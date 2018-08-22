@@ -321,6 +321,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX                    = 73,
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN                    = 74,
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM                    = 75,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_ROW_NUMBER             = 76,
     // -----------------------------
     // Functions
     // -----------------------------
