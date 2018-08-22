@@ -61,6 +61,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -242,7 +243,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     static final String m_defaultVersionString = "8.3";
     // by default set the version to only be compatible with itself
     static final String m_defaultHotfixableRegexPattern = "^\\Q8.3\\E\\z";
-
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -289,7 +289,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // by the CL when the truncation snapshot completes
     // and this node is viable for replay
     volatile boolean m_rejoining = false;
-
     // Need to separate the concepts of rejoin data transfer and rejoin
     // completion.  This boolean tracks whether or not the data transfer
     // process is done.  CL truncation snapshots will not flip the all-complete
@@ -302,6 +301,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // m_safeMpTxnId to prevent the race. The m_safeMpTxnId is updated once in the
     // lifetime of the node to reflect the first MP txn that witnessed the flip of
     // m_rejoinDataPending.
+
+    CountDownLatch m_meshDeterminationLatch = new CountDownLatch(1);
     private final Object m_safeMpTxnIdLock = new Object();
     private long m_lastSeenMpTxnId = Long.MIN_VALUE;
     private long m_safeMpTxnId = Long.MAX_VALUE;
@@ -1061,7 +1062,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // (used for license check and later the actual rejoin)
             m_rejoining = m_config.m_startAction.doesRejoin();
             m_rejoinDataPending = m_config.m_startAction.doesJoin();
-
+            m_meshDeterminationLatch.countDown();
             m_joining = m_config.m_startAction == StartAction.JOIN;
 
             if (m_rejoining || m_joining) {
@@ -1726,17 +1727,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // If the current node hasn't finished rejoin when another node fails, fail this node to prevent locking up.
     private void stopRejoiningHost(Set<Integer> failedHosts) {
 
-        // if host is already running or in elastic joining
-        if (isRunning() || VoltZK.zkNodeExists(m_messenger.getZK(), VoltZK.elasticJoinInProgress)) {
-            return;
+        // The host failure notification could come before mesh determination, wait for the determination
+        try {
+            m_meshDeterminationLatch.await();
+        } catch (InterruptedException e) {
         }
 
-        // The host failure notification could come before mesh determination, m_rejoining is still false for rejoining.
-        // In this case, compare the configured host count and the cluster host count to determine node rejoining.
-        Set<Integer> allHosts = Sets.newHashSet();
-        allHosts.addAll(failedHosts);
-        allHosts.addAll(m_messenger.getLiveHostIds());
-        if (m_rejoining || (m_config.m_hostCount >= allHosts.size())) {
+        if (m_rejoining) {
             VoltDB.crashLocalVoltDB("Another node failed before this node could finish rejoining. " +
                     "As a result, the rejoin operation has been canceled. Please try again.");
         }
