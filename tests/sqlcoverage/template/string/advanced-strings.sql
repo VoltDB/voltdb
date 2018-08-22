@@ -83,17 +83,17 @@
 {_patterns6 |= "'abc__!_z'"}
 
 
+-- Tests of the SUBSTRING function
+SELECT SUBSTRING ( VCHAR FROM _value[int:1,10] FOR _value[int:1,10] ) substrQ1 FROM @fromtables ORDER BY VCHAR
+SELECT VCHAR substrQ3 FROM @fromtables ORDER BY SUBSTRING ( VCHAR FROM _value[int:1,10] ), VCHAR
+
+
 -- Insert some extra rows that will have interesting, non-empty STARTS WITH results
 INSERT INTO @dmltable VALUES (_id, 'abc!dez', _value[string null20], _value[string null20], _value[float])
 INSERT INTO @dmltable VALUES (_id, 'abc%',    'abc',                 'a',                   _value[float])
 -- Uncomment these 2 after ENG-14485 is fixed:
 --INSERT INTO @dmltable VALUES (_id, 'abc%%',   'abc',                 'a',                   _value[float])
 --INSERT INTO @dmltable VALUES (_id, 'abc!',    'abc_',                'abc',                 _value[float])
-
-
--- Tests of SUBSTRING function
-SELECT SUBSTRING ( VCHAR FROM _value[int:1,10] FOR _value[int:1,10] ) substrQ1 FROM @fromtables ORDER BY VCHAR
-SELECT VCHAR substrQ3 FROM @fromtables ORDER BY SUBSTRING ( VCHAR FROM _value[int:1,10] ), VCHAR
 
 
 -- Tests of LIKE operator
@@ -129,16 +129,12 @@ SELECT VCHAR startsW16 FROM @fromtables WHERE VCHAR _maybe STARTS WITH _patterns
 SELECT _variable[#col1 string], _variable[#col2 string] FROM @fromtables startsW29 WHERE __[#col1] _maybe STARTS WITH __[#col2]
 
 
--- Tests of STARTS WITH in DML: INSERT, UPSERT, UPDATE, DELETE
+-- Tests of STARTS WITH in DML: INSERT, UPDATE, DELETE (but not UPSERT, which only
+-- works testing against PostgreSQL, not HSQL: see advanced-starts-with.sql for that)
 INSERT INTO @dmltable SELECT @insertselectcols FROM @fromtables startsW30 WHERE VCHAR _maybe STARTS WITH 'abc'
 INSERT INTO @dmltable SELECT @insertselectcols FROM @fromtables startsW31 WHERE VCHAR _maybe STARTS WITH _variable[string]
 -- Confirm the values that were inserted
 SELECT * FROM @fromtables startsW32 ORDER BY @idcol
-
-UPSERT INTO @dmltable SELECT @upsertselectcols FROM @fromtables           WHERE VCHAR _maybe STARTS WITH 'abc'             ORDER BY @idcol
-UPSERT INTO @dmltable SELECT @upsertselectcols FROM @fromtables           WHERE VCHAR _maybe STARTS WITH _variable[string] ORDER BY @idcol
--- Confirm the values that were "upserted"
-SELECT * FROM @fromtables startsW35 ORDER BY @idcol
 
 -- Uncomment these 2 after ENG-14478 is fixed (and delete the next 2??):
 --UPDATE @dmltable startsW36 SET VCHAR_INLINE_MAX = VCHAR_INLINE WHERE VCHAR _maybe STARTS WITH 'abc'
