@@ -1254,6 +1254,26 @@ public class PlannerTestCase extends TestCase {
                     }
                 };
 
+    protected final static PlanMatcher AbstractReceivePlanMatcher
+            = new PlanMatcher() {
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            if (node instanceof AbstractReceivePlanNode) {
+                return null;
+            }
+            return String.format("Expected AbstractReceivePlanNode, not %s: fragment %d/%d",
+                                 node.getPlanNodeType(), fragmentNo, numFragments);
+        }
+
+        @Override
+        public String matchName() {
+            return "AbstractReceivePlanMatcher";
+        }
+    };
+
     protected static class FragmentSpec implements PlanMatcher {
         private List<PlanMatcher> m_nodeSpecs = new ArrayList<>();
 

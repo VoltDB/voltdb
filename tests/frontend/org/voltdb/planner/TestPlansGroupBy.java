@@ -58,7 +58,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     // Set this to true to print the JSON string for the plan.
     private static boolean PRINT_JSON_PLAN = true;
     // Test normal sized temp tables.
-    private static boolean TEST_NORMAL_SIZE_QUERIES = false;
+    private static boolean TEST_NORMAL_SIZE_QUERIES = true;
     // Test large sized temp tables.
     private static boolean TEST_LARGE_QUERIES = true;
 
@@ -946,11 +946,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 coordSpec = fragSpec(PlanNodeType.SEND,
                                      PlanNodeType.AGGREGATE,
                                      PlanNodeType.ORDERBY,
-                                     PlanNodeType.RECEIVE);
+                                     AbstractReceivePlanMatcher);
             } else {
                 coordSpec = fragSpec(PlanNodeType.SEND,
                                      PlanNodeType.HASHAGGREGATE,
-                                     PlanNodeType.RECEIVE);
+                                     AbstractReceivePlanMatcher);
             }
             validatePlan(SQL,
                          PRINT_JSON_PLAN,
@@ -968,6 +968,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
     PlanNodeType P_AGG = PlanNodeType.PARTIALAGGREGATE;
 
     public void testGroupByOnly() {
+        if (TEST_NORMAL_SIZE_QUERIES) {
+            planForLargeQueries(false);
+            basicTestGroupByOnly();
+        }
+        if (TEST_LARGE_QUERIES) {
+            planForLargeQueries(true);
+            basicTestGroupByOnly();
+        }
+    }
+    private void basicTestGroupByOnly() {
         System.out.println("Starting testGroupByOnly");
 
         /**
@@ -1369,27 +1379,38 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void basicTestComplexAggwithLimit() {
-        List<AbstractPlanNode> pns;
-
-        pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
-        checkHasComplexAgg(pns);
-
-        // Test limit is not pushed down
-        AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof OrderByPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
-        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
-
-        p = pns.get(1).getChild(0);
-        // inline limit with order by
-        assertTrue(p instanceof OrderByPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
-        p = p.getChild(0);
-        // inline aggregate
-        assertTrue(p instanceof AbstractScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.ORDERBY,
+                                                          PlanNodeType.LIMIT),
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.AGGREGATE,
+                                  new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
+                                                          PlanNodeType.ORDERBY)),
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.ORDERBY,
+                                                          PlanNodeType.LIMIT),
+                                  PlanNodeType.AGGREGATE,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.SEQSCAN));
+        } else {
+            validatePlan("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.ORDERBY,
+                                                          PlanNodeType.LIMIT),
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.HASHAGGREGATE,
+                                  new AnyFragment()),
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.ORDERBY,
+                                                          PlanNodeType.LIMIT),
+                                  new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                                          PlanNodeType.PROJECTION,
+                                                          PlanNodeType.HASHAGGREGATE)));
+        }
     }
 
     public void testComplexAggwithDistinct() {
@@ -1404,19 +1425,28 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void basicTestComplexAggwithDistinct() {
-        List<AbstractPlanNode> pns;
-
-        pns = compileToFragments("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1");
-        checkHasComplexAgg(pns);
-
-        // Test aggregation node not push down with distinct
-        AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof OrderByPlanNode);
-        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AbstractScanPlanNode);
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.AGGREGATE, // Aggregation not pushed down with distinct.
+                                  PlanNodeType.MERGERECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY,
+                                  AbstractScanPlanNodeMatcher));
+        } else {
+            validatePlan("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY,
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.HASHAGGREGATE, // Aggregation not pushed down with distinct.
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  AbstractScanPlanNodeMatcher));
+        }
     }
 
     public void testComplexAggwithLimitDistinct() {
@@ -1431,20 +1461,30 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void basicTestComplexAggwithLimitDistinct() {
-        List<AbstractPlanNode> pns;
-
-        pns = compileToFragments("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
-        checkHasComplexAgg(pns);
-
-        // Test no limit push down
-        AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof OrderByPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
-        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
-
-        p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AbstractScanPlanNode);
+        if (isPlanningForLargeQueries()) {
+            validatePlan("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.ORDERBY,
+                                                          PlanNodeType.LIMIT),
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.AGGREGATE,
+                                  PlanNodeType.MERGERECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.ORDERBY,
+                                  AbstractScanPlanNodeMatcher));
+        } else {
+            validatePlan("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2",
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.ORDERBY,
+                                                          PlanNodeType.LIMIT),
+                                  PlanNodeType.PROJECTION,
+                                  PlanNodeType.HASHAGGREGATE,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  AbstractScanPlanNodeMatcher));
+        }
     }
 
     public void testComplexAggCase() {

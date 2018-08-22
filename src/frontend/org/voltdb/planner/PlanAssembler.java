@@ -2367,11 +2367,6 @@ public class PlanAssembler {
         // order by node.
         AbstractPlanNode m_indexAccess = null;
 
-        // This is set to true if we determine that we will need a
-        // top order by node.  This happens if we have forced a switch
-        // to serial aggregation for large temp table queries.
-        boolean m_needTopOrderByNode;
-
         public IndexGroupByInfo(boolean isLargeQuery) {
             m_isLargeQuery = isLargeQuery;
         }
@@ -2572,13 +2567,6 @@ public class PlanAssembler {
                     return false;
                 }
             }
-            // So, either no index is useful or else the best index
-            // is only only partially useful in a large temp table query.
-            // If this is a large temp table query then force it to be
-            // serial aggregation by adding an order by node.
-            if (isLargeQuery()) {
-                return convertToSerialAggregation(candidate, gbInfo);
-            }
             // No index is useful for normal size temp tables.
             // So this entire venture is a failure.  Don't think
             // about changing the index node to something else,
@@ -2605,12 +2593,6 @@ public class PlanAssembler {
         // group by keys.  If we can't find one, then what we do depends
         // on whether this is a large or normal temp table query.
         if ( ! indexAccessForGroupByExprs((SeqScanPlanNode)sourceSeqScan, gbInfo)) {
-            // If it's a large temp table query, then we need to convert
-            // it to be sorted.  So put an order by node here and remember it.
-            // in gbInfo.  Return whether we changed the tree or not.
-            if (isLargeQuery()) {
-                return convertToSerialAggregation(candidate, gbInfo);
-            }
             // If we have no useful index, and it's not a large query,
             // then we haven't done anything.  We will use hash aggregation,
             // but that's ok.
@@ -2792,21 +2774,26 @@ public class PlanAssembler {
     }
 
     private static class AggregatePlanNodesForGroupBy {
+        // These are the agg nodes we will put in the tree.
         private AggregatePlanNode m_topAggNode;
         private AggregatePlanNode m_aggNode;
+        // These are the order by nodes if we need them.
         private OrderByPlanNode   m_topOrderByNode;
+        private OrderByPlanNode   m_aggOrderByNode;
 
         public AggregatePlanNodesForGroupBy(AggregatePlanNode topAggNode,
                                             AggregatePlanNode aggNode,
-                                            OrderByPlanNode   topOrderByNode) {
+                                            OrderByPlanNode   topOrderByNode,
+                                            OrderByPlanNode   aggOrderByNode) {
             m_topAggNode     = topAggNode;
             m_aggNode        = aggNode;
             m_topOrderByNode = topOrderByNode;
+            m_aggOrderByNode = aggOrderByNode;
         }
 
         public AggregatePlanNodesForGroupBy(AggregatePlanNode topAggNode,
                                             AggregatePlanNode aggNode) {
-            this(topAggNode, aggNode, null);
+            this(topAggNode, aggNode, null, null);
 
         }
 
@@ -2822,8 +2809,119 @@ public class PlanAssembler {
             return m_topOrderByNode;
         }
 
+        public OrderByPlanNode getAggOrderByNode() {
+            return m_aggOrderByNode;
+        }
+
+        public void setTopAggNode(AggregatePlanNode topAggNode) {
+            m_topAggNode = topAggNode;
+        }
+
+        public void setAggNode(AggregatePlanNode aggNode) {
+            m_aggNode = aggNode;
+        }
+
+        public void setTopOrderByNode(OrderByPlanNode topOrderByNode) {
+            m_topOrderByNode = topOrderByNode;
+        }
+
+        public void setAggOrderByNode(OrderByPlanNode aggOrderByNode) {
+            m_aggOrderByNode = aggOrderByNode;
+        }
     }
 
+    /**
+     * Given a root tree, manipulate it so that aggregation and group by
+     * operations are calculated.  Do some other related optimizations.
+     *
+     * This is the theory of operation of this method.
+     *
+     * We start with a description of the input, and what we want to accomplish.
+     * <ol>
+     *     <li>
+     *         The input tree will be a subplan.  It is either a
+     *         scan node or a join node, with a possible receive/send
+     *         pair at the top for distributed plans.  The subplan assembler will
+     *         have chosen it.  If it has only a scan node it's either a sequential
+     *         scan or an index scan.  If it's an index scan the index
+     *         has been selected for deterministic scanning or because
+     *         the index matches an order by or window function partition by
+     *         clause.
+     *      </li>
+     *      <li>
+     *          We can apply three kinds of aggregation, in order of
+     *          preference.
+     *          <ol>
+     *              <li>
+     *                  <em>Serial Aggregation</em> is applied when the input
+     *                  table is some how naturally sorted on the group by keys.
+     *                  This can happen if the scan node scans an index whose
+     *                  expressions are equal to the group by keys, or if there
+     *                  is an order by node in the tree for some other reason.
+     *                  In this case the rows in a group will be adjacent in the
+     *                  input table, so they are naturally grouped.
+     *                  Large temp tables always use serial aggregation.
+     *              </li>
+     *              <li>
+     *                  <em>Partial Aggregation.</em> happens when the input table
+     *                  has an order which covers some of the group by keys but not
+     *                  all of them.  This happens when an index covers part of the
+     *                  group by keys.  This is a variant of hash aggregation.  We
+     *                  aggregate rows with the same values for the group by keys
+     *                  which are ordered, and use a hash table to aggregate the
+     *                  rest.  This has the same complexity as hash aggregation,
+     *                  but they keys can be smaller.  Large temp tables can never
+     *                  use this method.
+     *              </li>
+     *              <li>
+     *                  <em>Hash Aggregation</em> happens when the input table
+     *                  has no useful order.  We just hash the group by keys and
+     *                  calculate the aggregate values in the hash elements.  Large
+     *                  temp tables can never use this method.
+     *              </li>
+     *          </ol>
+     *      </li>
+     * </ol>
+     *
+     * Given this input we want to aggregate the input rows according to the
+     * group by keys, and calculate the aggregate functions.  Polynomials in
+     * the aggregate functions, such as max(x)/max(b), will have been broken
+     * up into columns &lt;..., max(x), max(y), ...&gt;, so that a projection
+     * node can calculate them.  So only the aggregate functions and group by
+     * keys are useful as columns, and we only need to calculate them.
+     *
+     * If there are group by expressions or else aggregate functions we try
+     * to create aggregate nodes for these.  See pushDownAggregate for a larger
+     * discussion of what goes on here, but remember that we may add an aggregate
+     * with an order by child if the input table has no useful ordering and we
+     * need to force serial aggregation.
+     * <ol>
+     *     <li>
+     *         We first start by trying to convert to serial aggregation.  We
+     *         do this by either using an existing index scan node for the
+     *         group by keys, or else replacing a scan node with an index scan
+     *         node.  If there is already an index scan node but it's not useful,
+     *         then we leave it be.  If we are given a receive/send pair above
+     *         the subplan, we will replace a sequential scan node with an index
+     *         scan node if possible, and paste it into the tree.  We don't
+     *         convert to serial aggregation for large temp tables here.  We
+     *         will do that in another phase of this function.
+     *     </li>
+     *     <li>
+     *         We then make the aggregate nodes and fill in their output schemas.
+     *         We also create order by nodes for the top and bottom schemas.  We
+     *         may not use them, but it simplifies things to create them always.
+     *     </li>
+     *     <li>
+     *         Finally we try to push down the aggregate calculations.
+     *     </li>
+     * </ol>
+     *
+     * Finally we handle distinct in the select list with group by expressions.
+     *
+     * @param root
+     * @return
+     */
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
@@ -2892,14 +2990,21 @@ public class PlanAssembler {
         return handleDistinctWithGroupby(root);
     }
 
-    private AggregatePlanNodesForGroupBy calculateAggregateSchemasAndOperators(AggregatePlanNodesForGroupBy aggNodes) {
+    private AggregatePlanNodesForGroupBy calculateAggregateSchemasAndOperators(AggregatePlanNodesForGroupBy aggNodes,
+                                                                               IndexGroupByInfo gbInfo) {
         AggregatePlanNode topAggNode      = aggNodes.getTopAggNode();
         AggregatePlanNode aggNode         = aggNodes.getAggNode();
-        // We haven't filled this in in aggNodes yet.
-        OrderByPlanNode   topOrderByNode  = null;
-        NodeSchema        agg_schema      = new NodeSchema();
-        NodeSchema        top_agg_schema  = new NodeSchema();
 
+        // We haven't created the order by nodes in aggNodes yet.
+        //
+        // We need an order by for the agg node if this is a large
+        // query but it has not been fully serialized.  If it is
+        // a normal sized query the aggregate can be a hash or
+        // partial aggregate.  If it is a large query but it can
+        // be fully serialized, then we can just use a (serial)
+        // aggregate node.
+        boolean needAggOrderBy
+                = isLargeQuery() && ( ! gbInfo.m_canBeFullySerialized );
         // We will need an order by node on top iff we have group keys,
         // and there is not a partition column among the group by keys
         // and it's a large query.
@@ -2915,23 +3020,15 @@ public class PlanAssembler {
         // Note that if m_multiPartitionAggregation is false we will need
         // a top order by node.  But this is implied by the partition in
         // group by requirement, so we are ok.
-        boolean needTopOrderby
+        boolean needTopOrderBy
                 = isLargeQuery()
                     && m_parsedSelect.isGrouped()
                     && (! m_parsedSelect.hasPartitionColumnInGroupby());
 
-        // Calculate the order by node if we need one.
-        if (needTopOrderby && topAggNode != null) {
-            topOrderByNode = new OrderByPlanNode();
-        }
-        // If we don't have a top order by node we must have
-        // some kind of hash aggregation.  This includes partial
-        // aggregation.
-        /*
-        assert( ( topOrderByNode == null)
-                ? true
-                : (topAggNode instanceof HashAggregatePlanNode) || (topAggNode instanceof PartialAggregatePlanNode));
-        */
+        OrderByPlanNode   topOrderByNode  = needTopOrderBy ? new OrderByPlanNode() : null;
+        OrderByPlanNode   aggOrderByNode  = needAggOrderBy ? new OrderByPlanNode() : null;
+        NodeSchema        agg_schema      = new NodeSchema();
+        NodeSchema        top_agg_schema  = new NodeSchema();
 
         // Build the output schemas for the aggregate nodes.
         // If we are building a top order by node we add the
@@ -3009,6 +3106,7 @@ public class PlanAssembler {
                                 ! (m_parsedSelect.hasPartitionColumnInGroupby() ||
                                         canPushDownDistinctAggregation((AggregateExpression)rootExpr) ) ) {
                             topAggNode = null;
+                            topOrderByNode = null;
                         }
                         else {
                             // for aggregate distinct when group by
@@ -3078,14 +3176,6 @@ public class PlanAssembler {
                         col.m_tableName, col.m_tableAlias,
                         col.m_columnName, col.m_alias,
                         topExpr, outputColumnIndex);
-                // Sort by the indexes of the group by columns.
-                if (topOrderByNode != null && col.m_groupBy) {
-                    // Sort order doesn't really matter here,
-                    // but choose one.  These should all be
-                    // tuple value expressions.
-                    assert(topExpr instanceof TupleValueExpression);
-                    topOrderByNode.addSortExpression(topExpr.clone(), SortDirectionType.DESC);
-                }
             }
 
             agg_schema.addColumn(schema_col);
@@ -3094,9 +3184,15 @@ public class PlanAssembler {
 
         for (ParsedColInfo col : m_parsedSelect.groupByColumns()) {
             aggNode.addGroupByExpression(col.m_expression);
-
+            if (aggOrderByNode != null) {
+                aggOrderByNode.addSortExpression(col.m_expression.clone(), SortDirectionType.DESC);
+            }
             if (topAggNode != null) {
-                topAggNode.addGroupByExpression(m_parsedSelect.m_groupByExpressions.get(col.m_alias));
+                AbstractExpression topExpr = m_parsedSelect.m_groupByExpressions.get(col.m_alias);
+                topAggNode.addGroupByExpression(topExpr);
+                if (topOrderByNode != null) {
+                    topOrderByNode.addSortExpression(topExpr.clone(), SortDirectionType.DESC);
+                }
             }
         }
         aggNode.setOutputSchema(agg_schema);
@@ -3108,10 +3204,22 @@ public class PlanAssembler {
                 topAggNode.setOutputSchema(agg_schema);
             }
         }
-        return new AggregatePlanNodesForGroupBy(topAggNode, aggNode, topOrderByNode);
+        aggNodes.setTopAggNode(topAggNode);
+        aggNodes.setAggNode(aggNode);
+        aggNodes.setTopOrderByNode(topOrderByNode);
+        aggNodes.setAggOrderByNode(aggOrderByNode);
+        return aggNodes;
     }
 
-    public AggregatePlanNodesForGroupBy makeAggregateNodes(AbstractPlanNode root,
+    /**
+     * Make aggregate nodes, with output schemas.  Also make
+     * order by nodes to force serial aggregation if necessary.
+     *
+     * @param root The root of the plan.
+     * @param gbInfo Indexing and group by information.
+     * @return
+     */
+    private AggregatePlanNodesForGroupBy makeAggregateNodes(AbstractPlanNode root,
                                                            IndexGroupByInfo gbInfo) {
         // This is the distributed node.
         AggregatePlanNode aggNode;
@@ -3151,7 +3259,8 @@ public class PlanAssembler {
             }
         }
 
-        return calculateAggregateSchemasAndOperators(new AggregatePlanNodesForGroupBy(topAggNode, aggNode));
+        return calculateAggregateSchemasAndOperators(new AggregatePlanNodesForGroupBy(topAggNode, aggNode),
+                                                     gbInfo);
     }
 
     // Sets IndexGroupByInfo for an IndexScan
@@ -3404,10 +3513,11 @@ public class PlanAssembler {
     private static AbstractPlanNode pushDownAggregate(AbstractPlanNode     root,
                                                       AggregatePlanNodesForGroupBy aggNodes,
                                                       ParsedSelectStmt     selectStmt) {
-        AggregatePlanNode coordNode   = aggNodes.getTopAggNode();
-        AggregatePlanNode distNode    = aggNodes.getAggNode();
+        AggregatePlanNode coordNode    = aggNodes.getTopAggNode();
+        AggregatePlanNode distNode     = aggNodes.getAggNode();
 
-        OrderByPlanNode   topSortNode = aggNodes.getTopOrderByNode();
+        OrderByPlanNode   topSortNode  = aggNodes.getTopOrderByNode();
+        OrderByPlanNode   distSortNode = aggNodes.getAggOrderByNode();
         AggregatePlanNode rootAggNode;
 
         // remember that coordinating aggregation has a pushed-down
@@ -3422,12 +3532,19 @@ public class PlanAssembler {
          * the send/receive pair, add the node, then put the send/receive pair
          * back on top of the node, followed by another top node at the
          * coordinator.
+         *
+         * Note that we may have an order by node to put as a child of the
+         * dist node.
          */
         if (coordNode != null && root instanceof ReceivePlanNode) {
             AbstractPlanNode accessPlanTemp = root;
             root = accessPlanTemp.getChild(0).getChild(0);
             root.clearParents();
             accessPlanTemp.getChild(0).clearChildren();
+            if (distSortNode != null) {
+                distSortNode.addAndLinkChild(root);
+                root = distSortNode;
+            }
             distNode.addAndLinkChild(root);
 
             if (selectStmt.hasPartitionColumnInGroupby()) {
@@ -3472,9 +3589,12 @@ public class PlanAssembler {
             rootAggNode = coordNode;
         }
         else {
-            if (topSortNode != null) {
-                topSortNode.addAndLinkChild(root);
-                root = topSortNode;
+            // If we decided we needed a sort node
+            // to go with this aggregate node, then
+            // push it onto the tree here.
+            if (distSortNode != null) {
+                distSortNode.addAndLinkChild(root);
+                root = distSortNode;
             }
             distNode.addAndLinkChild(root);
             rootAggNode = distNode;
