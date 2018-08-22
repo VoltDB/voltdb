@@ -522,10 +522,11 @@ BinaryLogSink::BinaryLogSink() {}
     partitionHash = taskInfo->readInt();
     bool isLocalMpTxn = UniqueId::isMpUniqueId(localUniqueId);
     bool isLocalRegularSpTxn = !isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
-    bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
+    bool isLocalRegularMpTxn = isLocalMpTxn && !isCurrentTxnForReplicatedTable;
 
     // Read the whole txn since there is only one version number at the beginning
     type = static_cast<DRRecordType>(taskInfo->readByte());
+    assert(hashFlag != TXN_PAR_HASH_PLACEHOLDER || type == DR_RECORD_END_TXN);
     while (type != DR_RECORD_END_TXN) {
         // fast path for replicated table change, save calls to VoltDBEngine::isLocalSite()
         if (isCurrentTxnForReplicatedTable || isCurrentRecordForReplicatedTable) {
