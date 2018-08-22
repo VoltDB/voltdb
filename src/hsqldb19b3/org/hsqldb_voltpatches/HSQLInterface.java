@@ -346,7 +346,7 @@ public class HSQLInterface {
                         "SQL Syntax error in \"" + sql + "\" " + caught.getMessage(),
                         caught);
             default:
-                throw new HSQLParseException("Error in \"" + sql + "\" " + caught.getMessage(), caught);
+                throw new HSQLParseException("Error in \"" + sql + "\" - " + caught.getMessage(), caught);
             }
         }
         catch (StackOverflowError caught) {

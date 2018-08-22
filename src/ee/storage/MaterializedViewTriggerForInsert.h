@@ -22,6 +22,7 @@
 #include "catalog/materializedviewinfo.h"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
+#include "MaterializedViewHandler.h"
 
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
@@ -99,6 +100,8 @@ public:
         }
     }
 
+    // Attempt to enable/disable the view.
+    void setEnabled(bool value);
 
 protected:
     MaterializedViewTriggerForInsert(PersistentTable *destTable,
@@ -124,6 +127,8 @@ protected:
      * and use an index to find 0 or 1 rows in the view table
      */
     bool findExistingTuple(const TableTuple &oldTuple);
+    // Find the existing tuple using a tuple from the delta table.
+    bool findExistingTupleUsingDelta(const TableTuple &oldTuple);
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
@@ -162,6 +167,8 @@ private:
     // This MUST be declared/initialized AFTER m_groupByExprs/m_groupByColIndexes
     // but BEFORE m_searchKeyValues/m_searchKeyTuple/m_searchKeyBackingStore.
 
+    void mergeTupleForInsert(const TableTuple &deltaTuple);
+
 protected:
     std::size_t m_groupByColumnCount;
     std::vector<NValue> m_searchKeyValue;
@@ -178,7 +185,7 @@ protected:
     // This MUST be declared/initialized AFTER m_aggExprs/m_aggColIndexes/m_aggTypes.
     std::size_t m_aggColumnCount;
     // Store the index of last COUNT(*) for optimization
-    std::size_t m_countStarColumnIndex;
+    int m_countStarColumnIndex;
 
     // vector of target table indexes to update.
     // Ideally, these should be a subset of the target table indexes that
@@ -186,6 +193,13 @@ protected:
     // but there might be some other mostly harmless ones in there that are
     // based solely on the immutable primary key (GROUP BY columns).
     std::vector<TableIndex*> m_updatableIndexList;
+
+    // Indicates whether the view can included in a snapshot.
+    // If a view is partitioned but there is not an explicit partition column,
+    // then it cannot be included in a snapshot.
+    bool m_supportSnapshot;
+    // Indicates whether the view is enabled.
+    bool m_enabled;
 };
 
 /**
@@ -202,7 +216,7 @@ public:
                       catalog::MaterializedViewInfo *mvInfo);
 private:
     MaterializedViewTriggerForStreamInsert(PersistentTable *destTable,
-                                        catalog::MaterializedViewInfo *mvInfo)
+                                           catalog::MaterializedViewInfo *mvInfo)
         : MaterializedViewTriggerForInsert(destTable, mvInfo)
     { }
 };

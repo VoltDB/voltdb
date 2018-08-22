@@ -370,6 +370,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("InsertReplicated", 0);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertPartitioned", 10, 20);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
         client.close();
 
         client = ClientFactory.createClient(m_cconfig);
@@ -377,6 +379,10 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         response = client.callProcedure("InsertSinglePartition", 2);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 3);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 100);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertPartitioned", 45, 72);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         client.close();
 
@@ -432,6 +438,21 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 9);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertReplicated", 68);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        response = client.callProcedure("InsertPartitioned", 34, 68);
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        // Verify the view content after the rejoin.
+        VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM vblah_replicated ORDER BY ival;").getResults()[0];
+        RegressionSuite.assertContentOfTable(new Object[][] { {0, 1}, {7, 1}, {68, 1}, {100, 1} }, result);
+        result = client.callProcedure("@AdHoc", "SELECT * FROM vpartitioned ORDER BY pkey;").getResults()[0];
+        RegressionSuite.assertContentOfTable(new Object[][] { {10, 1}, {34, 1}, {45, 1} }, result);
+        // This view is randomly partitioned.
+        result = client.callProcedure("@AdHoc", "SELECT * FROM vrpartitioned ORDER BY value;").getResults()[0];
+        RegressionSuite.assertContentOfTable(new Object[][] { {20, 1}, {68, 1}, {72, 1} }, result);
+        result = client.callProcedure("@AdHoc", "SELECT * FROM vjoin ORDER BY pkey;").getResults()[0];
+        RegressionSuite.assertContentOfTable(new Object[][] { {34, 1} }, result);
         client.close();
 
         localServer.shutdown();

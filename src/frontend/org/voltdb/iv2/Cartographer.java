@@ -58,6 +58,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
+import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -131,7 +132,7 @@ public class Cartographer extends StatsSource
             // Can be zero-length at startup
             if (cache.size() > 0) {
                 hostLog.info("[Cartographer MP] Sending leader change notification with new leader:");
-                sendLeaderChangeNotify(cache.get(pid).m_HSID, pid, false);
+                sendLeaderChangeNotify(cache.get(pid).m_HSId, pid, false);
             }
         }
     };
@@ -142,14 +143,16 @@ public class Cartographer extends StatsSource
         public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
             // We know there's a 1:1 mapping between partitions and HSIds in this map.
             // let's flip it
-            Map<Long, Integer> hsIdToPart = new HashMap<Long, Integer>();
+            // Map<Long, Integer> hsIdToPart = new HashMap<Long, Integer>();
             Set<LeaderCallBackInfo> newMasters = new HashSet<LeaderCallBackInfo>();
             Set<Long> newHSIDs = Sets.newHashSet();
             Map<Integer, Set<Long>> newMastersByHost = Maps.newTreeMap();
             for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
-                Long hsid = e.getValue().m_HSID;
+                LeaderCallBackInfo newMasterInfo = e.getValue();
+                Long hsid = newMasterInfo.m_HSId;
+                int partitionId = e.getKey();
                 newHSIDs.add(hsid);
-                hsIdToPart.put(hsid, e.getKey());
+                // hsIdToPart.put(hsid, partitionId);
                 int hostId = CoreUtils.getHostIdFromHSId(hsid);
                 Set<Long> masters = newMastersByHost.get(hostId);
                 if (masters == null) {
@@ -160,13 +163,31 @@ public class Cartographer extends StatsSource
                 if (!m_currentSPMasters.contains(hsid)) {
                     // we want to see items which are present in the new map but not in the old,
                     // these are newly promoted SPIs
-                    newMasters.add(e.getValue());
+                    newMasters.add(newMasterInfo);
+                    // send the messages indicating promotion from here for each new master
+                    sendLeaderChangeNotify(hsid, partitionId, newMasterInfo.m_isMigratePartitionLeaderRequested);
+
+                    // For Export Subsystem, demote the old leaders and promote new leaders
+                    // only target current host
+                    // In the rare case the spMasterCallbacks from MigratePartitionLeaderRequested could be trigger
+                    // before this node has finished init ExportManager.
+                    // This could happen for a previous sp leader Migration  on a fresh rejoined node.
+                    // Since this node would not be export master nor should be promoted from previous migration event,
+                    // we can ignore this sp leader change for export.
+                    if (newMasterInfo.m_isMigratePartitionLeaderRequested && ExportManager.instance() != null) {
+                        if (isHostIdLocal(hostId)) {
+                            // this is a host contain newly promoted partition
+                            // inform the export manager to prepare mastership promotion
+                            // Cartographer is initialized before ExportManager, ignore callbacks
+                            // before export is initialized
+                            ExportManager.instance().prepareAcceptMastership(partitionId);
+                        } else {
+                            // this host *could* contain old master
+                            // inform the export manager to prepare mastership migration (drain existing PBD and notify new leader)
+                            ExportManager.instance().prepareTransferMastership(partitionId, hostId);
+                        }
+                    }
                 }
-            }
-            // send the messages indicating promotion from here for each new master
-            for (LeaderCallBackInfo newMasterInfo : newMasters) {
-                Long newMaster = newMasterInfo.m_HSID;
-                sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster), newMasterInfo.m_isMigratePartitionLeaderRequested);
             }
 
             if (hostLog.isDebugEnabled()) {
@@ -177,7 +198,7 @@ public class Cartographer extends StatsSource
                 hostLog.debug("[Cartographer] SP masters:" + masters);
                 masters.clear();
                 cache.values().forEach((k) -> {
-                    masters.add(CoreUtils.hsIdToString(k.m_HSID));
+                    masters.add(CoreUtils.hsIdToString(k.m_HSId));
                 });
                 hostLog.debug("[Cartographer]Updated SP masters:" + masters + ". New masters:" + newMasters);
             }
@@ -237,7 +258,6 @@ public class Cartographer extends StatsSource
         columns.add(new ColumnInfo("Partition", VoltType.INTEGER));
         columns.add(new ColumnInfo("Sites", VoltType.STRING));
         columns.add(new ColumnInfo("Leader", VoltType.STRING));
-
     }
 
     @Override
@@ -302,6 +322,16 @@ public class Cartographer extends StatsSource
     }
 
     /**
+     * Checks whether this host is partition 0 'zero' leader
+     *
+     * @return result of the test
+     */
+    public boolean isHostIdLocal(int hostId)
+    {
+        return hostId == m_hostMessenger.getHostId();
+    }
+
+    /**
      * Get the HSID of the single partition master for the specified partition ID
      */
     public long getHSIdForSinglePartitionMaster(int partitionId)
@@ -319,7 +349,7 @@ public class Cartographer extends StatsSource
     }
 
     // This used to be the method to get this on SiteTracker
-    public long getHSIdForMultiPartitionInitiator()
+    public Long getHSIdForMultiPartitionInitiator()
     {
         return m_iv2Mpi.get(MpInitiator.MP_INIT_PID);
     }
@@ -964,5 +994,14 @@ public class Cartographer extends StatsSource
             t.addRow(rowKey, CoreUtils.hsIdCollectionToString(sites), CoreUtils.hsIdToString(leader));
         }
         return t;
+    }
+
+    public boolean hasPartitionMastersOnHosts(Set<Integer> hosts) {
+        for (Integer host : hosts) {
+            if (m_currentMastersByHost.containsKey(host)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

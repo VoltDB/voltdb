@@ -47,13 +47,10 @@
 
 #include "ExecutorVector.h"
 
-#include "catalog/catalog.h"
-#include "catalog/catalogmap.h"
 #include "catalog/cluster.h"
 #include "catalog/column.h"
 #include "catalog/columnref.h"
 #include "catalog/connector.h"
-#include "catalog/database.h"
 #include "catalog/function.h"
 #include "catalog/functionparameter.h"
 #include "catalog/index.h"
@@ -65,43 +62,32 @@
 
 #include "common/ElasticHashinator.h"
 #include "common/ExecuteWithMpMemory.h"
-#include "common/executorcontext.hpp"
-#include "common/FailureInjection.h"
-#include "common/FatalException.hpp"
 #include "common/InterruptException.h"
 #include "common/RecoveryProtoMessage.h"
-#include "common/SerializableEEException.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
-#include "common/types.h"
 
 #include "common/SynchronizedThreadLock.h"
 #include "executors/abstractexecutor.h"
+#include "expressions/functionexpression.h"
 
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
-
-#include "plannodes/abstractplannode.h"
-#include "plannodes/plannodefragment.h"
 
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
 #include "storage/ExecuteTaskUndoGenerateDREventAction.h"
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
-#include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
-#include "storage/ExportTupleStream.h"
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
 #include "storage/ConstraintFailureException.h"
+#include "storage/DRTupleStream.h"
 
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
-#include "boost/foreach.hpp"
-#include "boost/scoped_ptr.hpp"
-#include "boost/shared_ptr.hpp"
 // The next #define limits the number of features pulled into the build
 // We don't use those features.
 #define BOOST_MULTI_INDEX_DISABLE_SERIALIZATION
@@ -111,11 +97,7 @@
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 
-#include <sstream>
-#include <locale>
-#include <typeinfo>
 #include <chrono> // For measuring the execution time of each fragment.
-#include <pthread.h>
 #if __cplusplus >= 201103L
 #include <atomic>
 #else
@@ -159,6 +141,8 @@ typedef boost::multi_index::multi_index_container<
     >
 > PlanSet;
 
+  int32_t s_exportFlushTimeout=4000;  // export/tuple flush interval ms setting
+
 
 /// This class wrapper around a typedef allows forward declaration as in scoped_ptr<EnginePlanSet>.
 class EnginePlanSet : public PlanSet { };
@@ -186,6 +170,7 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
       m_drReplicatedStream(NULL),
       m_currExecutorVec(NULL)
 {
+    loadBuiltInJavaFunctions();
 }
 
 void
@@ -199,7 +184,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t defaultDrBufferSize,
                          int64_t tempTableMemoryLimit,
                          bool isLowestSiteId,
-                         int32_t compactionThreshold)
+                         int32_t compactionThreshold,
+                         int32_t exportFlushTimeout)
 {
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
@@ -207,6 +193,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
     m_compactionThreshold = compactionThreshold;
+    s_exportFlushTimeout = exportFlushTimeout;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog.reset(new catalog::Catalog());
@@ -441,7 +428,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                              uniqueId,
                                              traceOn);
 
-    m_executorContext->checkTransactionForDR();
+    bool hasDRBinaryLog = m_executorContext->checkTransactionForDR();
 
     // reset these at the start of each batch
     m_executorContext->m_progressStats.resetForNewBatch();
@@ -459,13 +446,22 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     // If the current procedure invocation is not sampled, all its batches will not be timed.
     bool perFragmentTimingEnabled = perFragmentStatsBufferIn.readByte() > 0;
 
+    /*
+    * Reserve space in the result output buffer for the number of
+    * result dependencies and for the dirty byte. Necessary for a
+    * plan fragment because the number of produced depenencies may
+    * not be known in advance.
+    * Also reserve space for counting DR Buffer used space
+    */
+    m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int8_t) + sizeof(int32_t) + sizeof(int32_t));
+    m_dirtyFragmentBatch = false;
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
         int usedParamcnt = serialInput.readShort();
         m_executorContext->setUsedParameterCount(usedParamcnt);
         if (usedParamcnt < 0) {
             throwFatalException("parameter count is negative: %d", usedParamcnt);
         }
-        assert (usedParamcnt < MAX_PARAM_COUNT);
+        assert (usedParamcnt <= MAX_PARAM_COUNT);
 
         for (int j = 0; j < usedParamcnt; ++j) {
             params[j].deserializeFromAllocateForStorage(serialInput, &m_stringPool);
@@ -474,11 +470,11 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         if (perFragmentTimingEnabled) {
             startTime = std::chrono::high_resolution_clock::now();
         }
+
+
         // success is 0 and error is 1.
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
-                                m_currentIndexInBatch == 0,
-                                m_currentIndexInBatch == (numFragments - 1),
                                 traceOn)) {
             ++failures;
         }
@@ -497,10 +493,34 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
         m_stringPool.purge();
     }
+
+    if (failures == 0) {
+        // write dirty-ness of the batch and number of dependencies output to the FRONT of
+        // the result buffer
+        m_resultOutput.writeBoolAt(m_startOfResultBuffer, m_dirtyFragmentBatch);
+        size_t drBufferChange = size_t(0);
+        if (hasDRBinaryLog) {
+            if (m_drStream) {
+                drBufferChange = m_drStream->m_uso - m_drStream->m_committedUso;
+                assert(drBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
+                drBufferChange -= DRTupleStream::BEGIN_RECORD_SIZE;
+            }
+            if (m_drReplicatedStream) {
+                size_t drReplicatedStreamBufferChange = m_drReplicatedStream->m_uso - m_drReplicatedStream->m_committedUso;
+                assert(drReplicatedStreamBufferChange >= DRTupleStream::BEGIN_RECORD_SIZE);
+                drBufferChange += drReplicatedStreamBufferChange- DRTupleStream::BEGIN_RECORD_SIZE;
+            }
+        }
+        m_resultOutput.writeIntAt(m_startOfResultBuffer + 1, static_cast<int32_t> (drBufferChange));
+        VOLT_DEBUG("executePlanFragments : hasDRBinaryLog %d, drBufferChange %d", hasDRBinaryLog,
+                   static_cast<int32_t> (drBufferChange));
+        m_resultOutput.writeIntAt(m_startOfResultBuffer + 5,
+                                  static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) -
+                                  sizeof(int32_t) - sizeof(int32_t) - sizeof(int8_t));
+
+    }
     m_perFragmentStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
-
     m_currentIndexInBatch = -1;
-
     // If we were expanding the UDF buffer too much, shrink it back a little bit.
     // We check this at the end of every batch execution. So we won't resize the buffer
     // too frequently if most of the workload in the same batch requires a much larger buffer.
@@ -515,25 +535,11 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
 int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t inputDependencyId,
-                                      bool first,
-                                      bool last,
                                       bool traceOn)
 {
     assert(planfragmentId != 0);
 
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
-
-    /*
-     * Reserve space in the result output buffer for the number of
-     * result dependencies and for the dirty byte. Necessary for a
-     * plan fragment because the number of produced depenencies may
-     * not be known in advance.
-     */
-    if (first) {
-        m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int32_t)
-                                                            + sizeof(int8_t));
-        m_dirtyFragmentBatch = false;
-    }
 
     /*
      * Reserve space in the result output buffer for the number of
@@ -594,13 +600,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // if a fragment modifies any tuples, the whole batch is dirty
     if (tuplesModified > 0) {
         m_dirtyFragmentBatch = true;
-    }
-
-    // write dirty-ness of the batch and number of dependencies output to the FRONT of
-    // the result buffer
-    if (last) {
-        m_resultOutput.writeBoolAt(m_startOfResultBuffer, m_dirtyFragmentBatch);
-        m_resultOutput.writeIntAt(m_startOfResultBuffer+1, static_cast<int32_t>(m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t) - sizeof(int8_t));
     }
 
     return ENGINE_ERRORCODE_SUCCESS;
@@ -692,18 +691,28 @@ NValue VoltDBEngine::callJavaUserDefinedFunction(int32_t functionId, std::vector
     }
 }
 
-void VoltDBEngine::releaseUndoToken(int64_t undoToken) {
+void VoltDBEngine::releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn) {
     if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
         m_currentUndoQuantum = NULL;
         m_executorContext->setupForPlanFragments(NULL);
     }
     m_undoLog.release(undoToken);
 
-    if (m_executorContext->drStream()) {
-        m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
+    if (isEmptyDRTxn) {
+        if (m_executorContext->drStream()) {
+            m_executorContext->drStream()->rollbackTo(m_executorContext->drStream()->m_committedUso, SIZE_MAX);
+        }
+        if (m_executorContext->drReplicatedStream()) {
+            m_executorContext->drReplicatedStream()->rollbackTo(m_executorContext->drReplicatedStream()->m_committedUso, SIZE_MAX);
+        }
     }
-    if (m_executorContext->drReplicatedStream()) {
-        m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
+    else {
+        if (m_executorContext->drStream()) {
+            m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
+        }
+        if (m_executorContext->drReplicatedStream()) {
+            m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
+        }
     }
 }
 
@@ -1542,7 +1551,9 @@ void
 VoltDBEngine::markAllExportingStreamsNew() {
     //Mark all streams new so that schema is sent on next tuple.
     BOOST_FOREACH (LabeledStreamWrapper entry, m_exportingStreams) {
-        entry.second->setNew();
+        if (entry.second != NULL) {
+            entry.second->setNew();
+        }
     }
 }
 
@@ -1585,14 +1596,23 @@ VoltDBEngine::loadTable(int32_t tableId,
         return false;
     }
 
+    // If this is a paused non-empty single table view, load data into the delta table
+    // instead of the main table.
+    if (table->deltaTable() && table->materializedViewTrigger()) {
+        table = table->deltaTable();
+    }
+
     // When loading a replicated table, behavior should be:
-    //   ConstraintFailureExceptions may be thrown on the lowest site thread.
-    //   If throwUniqueViolations is true:
+    //   ConstraintFailureException may be thrown on the lowest site thread.
+    //   If returnConflictRows is false:
     //       Lowest site thread: throw the exception.
     //       Other site threads: throw replicated table exceptions.
-    //   else (throwUniqueViolations is false)
+    //   else (returnConflictRows is true)
     //       Lowest site thread: serialize the offending rows, return 1.
-    //       Other site thread: return 1.
+    //       Other site thread: copy the serialized buffer from lowest site, return 1.
+    //
+    //   SQLException may also be thrown on the loweset site thread (e.g. from the TableTuple.deserializeFrom())
+    //   will always re/throw from every sites
     //
     //   For all other kinds of exceptions, throw a FatalException.  This is legacy behavior.
     //   Perhaps we cannot be ensured of data integrity for other kinds of exceptions?
@@ -1621,9 +1641,13 @@ VoltDBEngine::loadTable(int32_t tableId,
                 return false;
             }
         }
+        catch (const SQLException &sqe) {
+            s_loadTableException = VOLT_EE_EXCEPTION_TYPE_SQL;
+            throw;
+        }
         catch (const SerializableEEException& serializableExc) {
-            // Exceptions that are not constraint failures are treated as fatal.   This is legacy
-            // behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
+            // Exceptions that are not constraint failures or sql exeception are treated as fatal.
+            // This is legacy behavior.  Perhaps we cannot be ensured of data integrity for some mysterious
             // other kind of exception?
             s_loadTableException = serializableExc.getType();
             throwFatalException("%s", serializableExc.message().c_str());
@@ -1649,14 +1673,21 @@ VoltDBEngine::loadTable(int32_t tableId,
         if (!returnConflictRows) {
             std::ostringstream oss;
             oss << "Replicated load table failed (constraint violation) on other thread for table \""
-                << table->name() << "\".";
+                << table->name() << "\".\n";
             VOLT_DEBUG("%s", oss.str().c_str());
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
         }
-        else {
-            // Offending rows will be serialized on lowest site thread.
-            return false;
-        }
+        // Offending rows will be serialized on lowest site thread.
+        return false;
+    }
+    else if (s_loadTableException == VOLT_EE_EXCEPTION_TYPE_SQL) {
+        // An sql exception was thrown on the lowest site thread and
+        // handle it on the other threads too.
+        std::ostringstream oss;
+        oss << "Replicated load table failed (sql exception) on other thread for table \""
+            << table->name() << "\".\n";
+        VOLT_DEBUG("%s", oss.str().c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, oss.str().c_str());
     }
     else if (s_loadTableException != VOLT_EE_EXCEPTION_TYPE_NONE) { // some other kind of exception occurred on lowest site thread
         // This is fatal.
@@ -2723,6 +2754,84 @@ void TempTableTupleDeleter::operator()(AbstractTempTable* tbl) const {
     if (tbl != NULL) {
         tbl->deleteAllTempTuples();
     }
+}
+
+/* (Ethan): During snapshot restore, all replicated persistent table views and explicitly partitioned
+ * persistent table views will be put into paused mode, meaning that we are not going to
+ * maintain the data in them while table data is being imported from the snapshot.
+
+ * What is an implicitly partitioned view?
+ * * If any of the source tables of a view is partitioned, the view is partitioned.
+ * * If the partition column of any view source tables is present in the view group-by columns,
+ *   the view will use the first-found such column as the partition column.
+ *   In this case, the view is **explicitly partitioned**.
+ * * If none of the partition column of any view source tables is included in the view group-by columns,
+ *   the view is still partitioned, but the partition column is set to null.
+ *   We call it **implicitly partitioned** because given any row in the view table, we have no way to
+ *   infer which partition it should go to using the hashinator.
+
+ * Why do we need to know the viewNames?
+ * In the node rejoin case, all the tables in the database will be streamed to the rejoining node.
+ * Knowing the name of the views we are pausing/resuming is not necessary.
+ * However, because we allow partial snapshots for normal snapshots, and the database catalog may have
+ * changed before a @SnapshotRestore, we need to precisely control which views to pause/resume and which
+ * views to keep untouched.
+ */
+void VoltDBEngine::setViewsEnabled(const std::string& viewNames, bool value) {
+    // We need to update the statuses of replicated views and partitioned views separately to consolidate
+    // the use of the count-down latch which is required when updating replicated views.
+    VOLT_TRACE("[Partition %d] VoltDBEngine::setViewsEnabled(%s, %s)\n", m_partitionId, viewNames.c_str(), value?"true":"false");
+    bool updateReplicated = false;
+    // The loop below is executed exactly twice. The first iteration has updateReplicated = false, where we
+    // update the partitioned views. The updateReplicated flag is flipped to true at the end of the iteration,
+    // which allows the loop to execute for a second round to update replicated views.
+    do {
+        VOLT_TRACE("[Partition %d] updateReplicated = %s\n", m_partitionId, updateReplicated?"true":"false");
+        // Update all the partitioned table views first, then update all the replicated table views.
+        int64_t dummyExceptionTracker = 0;
+        ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(updateReplicated, m_isLowestSite, &dummyExceptionTracker, int64_t(-1));
+        if (possiblySynchronizedUseMpMemory.okToExecute()) {
+            // This loop just split the viewNames by commas and process each view individually.
+            for (size_t pstart = 0, pend = 0; pstart != std::string::npos; pstart = pend) {
+                std::string viewName = viewNames.substr(pstart+(pstart!=0), (pend=viewNames.find(',',pstart+1))-pstart-(pstart!=0));
+                Table *table = getTableByName(viewName);
+                PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
+                if (! persistentTable) {
+                    // We do not look at export tables.
+                    // We should have prevented this in the Java layer.
+                    continue;
+                }
+                if (persistentTable->isCatalogTableReplicated() != updateReplicated) {
+                    VOLT_TRACE("[Partition %d] skip %s\n", m_partitionId, persistentTable->name().c_str());
+                    continue;
+                }
+                if (persistentTable->materializedViewTrigger()) {
+                    VOLT_TRACE("[Partition %d] %s->materializedViewTrigger()->setEnabled(%s)\n",
+                               m_partitionId, persistentTable->name().c_str(), value?"true":"false");
+                    // Single table view
+                    persistentTable->materializedViewTrigger()->setEnabled(value);
+                }
+                else if (persistentTable->materializedViewHandler()) {
+                    VOLT_TRACE("[Partition %d] %s->materializedViewHandler()->setEnabled(%s)\n",
+                               m_partitionId, persistentTable->name().c_str(), value?"true":"false");
+                    // Joined view.
+                    persistentTable->materializedViewHandler()->setEnabled(value);
+                }
+            }
+        }
+        updateReplicated = ! updateReplicated;
+    } while (updateReplicated);
+}
+
+void VoltDBEngine::loadBuiltInJavaFunctions() {
+    // Hard code the info of format_timestamp function
+    UserDefinedFunctionInfo *info = new UserDefinedFunctionInfo();
+    info->returnType = VALUE_TYPE_VARCHAR;
+    info->paramTypes.resize(2);
+    info->paramTypes.at(0) = VALUE_TYPE_TIMESTAMP;
+    info->paramTypes.at(1) = VALUE_TYPE_VARCHAR;
+
+    m_functionInfo[FUNC_VOLT_FORMAT_TIMESTAMP] = info;
 }
 
 } // namespace voltdb

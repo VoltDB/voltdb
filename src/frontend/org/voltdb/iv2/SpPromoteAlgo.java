@@ -26,7 +26,6 @@ import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
@@ -36,12 +35,12 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class SpPromoteAlgo implements RepairAlgo
 {
-    VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
+    private final int m_deadHost;
     private long m_maxSeenTxnId;
     private final boolean m_isMigratePartitionLeader;
     // Each Term can process at most one promotion; if promotion fails, make
@@ -109,11 +108,12 @@ public class SpPromoteAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public SpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+    public SpPromoteAlgo(List<Long> survivors, int deadHost, InitiatorMailbox mailbox,
             String whoami, int partitionId, boolean isMigratePartitionLeader)
     {
         m_mailbox = mailbox;
         m_survivors = survivors;
+        m_deadHost = deadHost;
 
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
@@ -126,7 +126,7 @@ public class SpPromoteAlgo implements RepairAlgo
         try {
             prepareForFaultRecovery();
         } catch (Exception e) {
-            tmLog.error(m_whoami + "failed leader promotion:", e);
+            repairLogger.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
         }
         return m_promotionResult;
@@ -145,11 +145,11 @@ public class SpPromoteAlgo implements RepairAlgo
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
 
-        tmLog.info(m_whoami + "found (including self) " + m_survivors.size()
+        repairLogger.info(m_whoami + "found (including self) " + m_survivors.size()
                  + " surviving replicas to repair. "
                  + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest =
-            new Iv2RepairLogRequestMessage(m_requestId, Iv2RepairLogRequestMessage.SPREQUEST);
+            new Iv2RepairLogRequestMessage(m_requestId, m_deadHost, Iv2RepairLogRequestMessage.SPREQUEST);
         m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_survivors), logRequest);
     }
 
@@ -162,8 +162,8 @@ public class SpPromoteAlgo implements RepairAlgo
         }
         Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
         if (response.getRequestId() != m_requestId) {
-            if (tmLog.isTraceEnabled()) {
-                tmLog.trace(m_whoami + "rejecting stale repair response."
+            if (repairLogger.isTraceEnabled()) {
+                repairLogger.trace(m_whoami + "rejecting stale repair response."
                         + " Current request id is: " + m_requestId
                         + " Received response for request id: " + response.getRequestId());
             }
@@ -172,8 +172,8 @@ public class SpPromoteAlgo implements RepairAlgo
 
         ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
         if (rrs.m_expectedResponses < 0 ) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(m_whoami + "collecting " + response.getOfTotal()
+            if (repairLogger.isDebugEnabled()) {
+                repairLogger.debug(m_whoami + "collecting " + response.getOfTotal()
                 + " repair log entries from "
                 + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
@@ -185,14 +185,14 @@ public class SpPromoteAlgo implements RepairAlgo
 
         if (response.getPayload() != null) {
             m_repairLogUnion.add(response);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
+            if (repairLogger.isDebugEnabled()) {
+                repairLogger.debug(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
                         ", message: " + response.getPayload());
             }
         }
         if (rrs.update(response)) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
+            if (repairLogger.isDebugEnabled()) {
+                repairLogger.debug(m_whoami + "collected " + rrs.m_receivedResponses
                         + " responses for " + rrs.m_expectedResponses
                         + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
@@ -226,24 +226,24 @@ public class SpPromoteAlgo implements RepairAlgo
         // currently). If cancelled and the last repair message arrives, don't send
         // out corrections!
         if (this.m_promotionResult.isCancelled()) {
-            tmLog.debug(m_whoami + "Skipping repair message creation for cancelled Term.");
+            repairLogger.debug(m_whoami + "Skipping repair message creation for cancelled Term.");
             return;
         }
 
         int queued = 0;
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
+        if (repairLogger.isDebugEnabled()) {
+            repairLogger.debug(m_whoami + "received all repair logs and is repairing surviving replicas.");
         }
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(m_whoami + "RespairResponse:\n" + li);
+            if (repairLogger.isDebugEnabled()) {
+                repairLogger.debug(m_whoami + "RespairResponse:\n" + li);
             }
             List<Long> needsRepair = new ArrayList<Long>(5);
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
                 if  (entry.getValue().needs(li.getHandle())) {
                     ++queued;
-                    if (tmLog.isDebugEnabled()) {
-                        tmLog.debug(m_whoami + "repairing " + CoreUtils.hsIdToString(entry.getKey()) +
+                    if (repairLogger.isDebugEnabled()) {
+                        repairLogger.debug(m_whoami + "repairing " + CoreUtils.hsIdToString(entry.getKey()) +
                                 ". Max seen " + entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
                                 li.getHandle());
                     }
@@ -251,15 +251,15 @@ public class SpPromoteAlgo implements RepairAlgo
                 }
             }
             if (!needsRepair.isEmpty()) {
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(needsRepair) +
+                if (repairLogger.isDebugEnabled()) {
+                    repairLogger.debug(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(needsRepair) +
                             " with message: " + li.getPayload());
                 }
                 m_mailbox.repairReplicasWith(needsRepair, li.getPayload());
             }
         }
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
+        if (repairLogger.isDebugEnabled()) {
+            repairLogger.debug(m_whoami + "finished queuing " + queued + " replica repair messages.");
         }
 
         m_promotionResult.set(new RepairResult(m_maxSeenTxnId));

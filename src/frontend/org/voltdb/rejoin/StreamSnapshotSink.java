@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SiteProcedureConnection;
@@ -133,7 +133,9 @@ public class StreamSnapshotSink {
 
         @Override
         public void restore(SiteProcedureConnection connection) {
-            rejoinLog.info("remaining bytes for table " + tableId + " is " + tableBlock.remaining());
+            if (rejoinLog.isDebugEnabled()) {
+                rejoinLog.debug("remaining bytes for table " + tableId + " is " + tableBlock.remaining());
+            }
             VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBlock.duplicate(), true);
 
             // Currently, only export cares about this TXN ID.  Since we don't have one handy,

@@ -850,7 +850,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public Cartographer getCartograhper() {
+    public Cartographer getCartographer() {
         return null;
     }
 
@@ -886,4 +886,7 @@ public class MockVoltDB implements VoltDBInterface
     public void setKFactor(int kfactor) {
         m_kfactor = kfactor;
     }
+
+    @Override
+    public boolean isJoining() {return false;}
 }

@@ -69,19 +69,17 @@ public abstract class ProcedureCompiler {
                         DatabaseEstimates estimates,
                         Database db,
                         ProcedureDescriptor procedureDescriptor,
-                        InMemoryJarfile jarOutput)
-                                throws VoltCompiler.VoltCompilerException
-    {
+                        InMemoryJarfile jarOutput) throws VoltCompiler.VoltCompilerException {
 
         assert(compiler != null);
         assert(hsql != null);
         assert(estimates != null);
 
-        if (procedureDescriptor.m_singleStmt == null) {
+        if (procedureDescriptor.m_stmtLiterals == null) {
             compileJavaProcedure(compiler, hsql, estimates, db, procedureDescriptor, jarOutput);
         }
         else {
-            compileSingleStmtProcedure(compiler, hsql, estimates, db, procedureDescriptor);
+            compileDDLProcedure(compiler, hsql, estimates, db, procedureDescriptor);
         }
     }
 
@@ -239,7 +237,7 @@ public abstract class ProcedureCompiler {
         String exampleSPstatement = null;
         Object exampleSPvalue = null;
 
-        // determine if proc is read or read-write by checking if the proc contains any write sql stmts
+        // Determine if the procedure is read-only or read-write by checking if the procedure contains any write SQL statements.
         boolean readWrite = false;
         for (Object field : fields.values()) {
             if (!(field instanceof SQLStmt)) continue;
@@ -467,18 +465,16 @@ public abstract class ProcedureCompiler {
                                      DatabaseEstimates estimates,
                                      Database db,
                                      ProcedureDescriptor procedureDescriptor,
-                                     InMemoryJarfile jarOutput)
-                                             throws VoltCompiler.VoltCompilerException
-    {
+                                     InMemoryJarfile jarOutput) throws VoltCompiler.VoltCompilerException {
         final String className = procedureDescriptor.m_className;
 
         // Load the class given the class name
         Class<?> procClass = procedureDescriptor.m_class;
 
-        // get the short name of the class (no package)
+        // Get the short name of the class (no package)
         String shortName = deriveShortProcedureName(className);
 
-        // add an entry to the catalog
+        // Add an entry to the catalog
         final Procedure procedure = db.getProcedures().add(shortName);
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
@@ -489,7 +485,7 @@ public abstract class ProcedureCompiler {
             groupRef.setGroup(group);
         }
         procedure.setClassname(className);
-        // sysprocs don't use the procedure compiler
+        // System procedures don't use the procedure compiler
         procedure.setSystemproc(false);
         procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(true);
@@ -698,31 +694,29 @@ public abstract class ProcedureCompiler {
         }
     }
 
-    static void compileSingleStmtProcedure(VoltCompiler compiler,
-                                           HSQLInterface hsql,
-                                           DatabaseEstimates estimates,
-                                           Database db,
-                                           ProcedureDescriptor procedureDescriptor)
-                                                   throws VoltCompiler.VoltCompilerException
-    {
+    static void compileDDLProcedure(VoltCompiler compiler,
+                                    HSQLInterface hsql,
+                                    DatabaseEstimates estimates,
+                                    Database db,
+                                    ProcedureDescriptor procedureDescriptor) throws VoltCompiler.VoltCompilerException {
         final String className = procedureDescriptor.m_className;
+
         if (className.indexOf('@') != -1) {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
         }
 
-        // if there are multiple statements,
-        // all the statements are stored in m_singleStmt as a single string
-        String stmtsStr = procedureDescriptor.m_singleStmt;
+        // If there are multiple statements, all the statements are concatenated and stored in m_stmtLiterals.
+        String stmtsStr = procedureDescriptor.m_stmtLiterals;
 
-        // get the short name of the class (no package if a user procedure)
-        // use the Table.<builtin> name (allowing the period) if builtin.
+        // Get the short name of the class (no package if a user procedure)
+        // use the Table.<built-in name> (allowing the period) if it is built-in.
         String shortName = className;
         if (procedureDescriptor.m_builtInStmt == false) {
             String[] parts = className.split("\\.");
             shortName = parts[parts.length - 1];
         }
 
-        // add an entry to the catalog (using the full className)
+        // Add an entry to the catalog (using the full className)
         final Procedure procedure = db.getProcedures().add(shortName);
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
@@ -733,7 +727,7 @@ public abstract class ProcedureCompiler {
             groupRef.setGroup(group);
         }
         procedure.setClassname(className);
-        // sysprocs don't use the procedure compiler
+        // System procedures don't use the procedure compiler
         procedure.setSystemproc(false);
         procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(false);
@@ -745,30 +739,28 @@ public abstract class ProcedureCompiler {
         }
         String[] stmts = SQLLexer.splitStatements(stmtsStr).getCompletelyParsedStmts().toArray(new String[0]);
 
-        // ADD THE STATEMENTS in a loop
         int stmtNum = 0;
-        // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
+        // Track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
         boolean procHasWriteStmts = false;
         boolean procHasSeqScans = false;
 
         StatementPartitioning partitioning = info.isSinglePartition() ?
                 StatementPartitioning.forceSP() : StatementPartitioning.forceMP();
 
-        for (String curStmt: stmts) {
-            // skip processing 'END' statement in multi statement procedures
+        for (String curStmt : stmts) {
+            // Skip processing 'END' statement in multi-statement procedures
             if (curStmt.equalsIgnoreCase("end")) continue;
 
-            // add the statement to the catalog
+            // Add the statement to the catalog
             Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME + String.valueOf(stmtNum));
             stmtNum++;
 
-            // compile the statement
-            // default to FASTER detmode because stmt procs can't feed read output into writes
-            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
-                    estimates, catalogStmt, curStmt,//procedureDescriptor.m_singleStmt,
-                    procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
+            // Compile the statement
+            // Default to FASTER determinism mode because statement procedures can't feed read output into writes.
+            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db, estimates,
+                    catalogStmt, curStmt, procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 
-            // if a single stmt is not read only, then the proc is not read only
+            // If any statement is not read-only, then the procedure is not read-only.
             if (catalogStmt.getReadonly() == false) {
                 procHasWriteStmts = true;
             }
@@ -777,11 +769,11 @@ public abstract class ProcedureCompiler {
                 procHasSeqScans = true;
             }
 
-            // set procedure parameter types
+            // Set procedure parameter types
             CatalogMap<ProcParameter> params = procedure.getParameters();
             CatalogMap<StmtParameter> stmtParams = catalogStmt.getParameters();
 
-            // set the procedure parameter types from the statement parameter types
+            // Set the procedure parameter types from the statement parameter types
             int paramCount = params.size();
             for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmtParams, "index")) {
                 // name each parameter "param1", "param2", etc...
@@ -849,7 +841,7 @@ public abstract class ProcedureCompiler {
             }
         }
 
-        // set the read onlyness of a proc
+        // set the read-only property of a procedure.
         procedure.setReadonly(procHasWriteStmts == false);
 
         procedure.setHasseqscans(procHasSeqScans);

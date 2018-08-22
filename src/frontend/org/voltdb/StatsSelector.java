@@ -54,6 +54,7 @@ public enum StatsSelector {
     DRROLE,
 
     TOPO,           // return leader and site info for iv2
+    TTL,            // return time to live info
     REBALANCE,      // return elastic rebalance progress
     KSAFETY,        // return ksafety coverage information
     CPU,            // return CPU Stats

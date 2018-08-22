@@ -23,9 +23,12 @@
 
 package org.voltdb.export;
 
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.argThat;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.voltdb.export.ExportMatchers.ackPayloadIs;
 
 import java.io.File;
@@ -33,6 +36,7 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +47,7 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -56,13 +61,8 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import java.util.Map;
 
 import junit.framework.TestCase;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.verify;
-import org.voltcore.messaging.HostMessenger;
 
 public class TestExportDataSource extends TestCase {
 
@@ -95,7 +95,7 @@ public class TestExportDataSource extends TestCase {
     class TestGeneration implements Generation {
 
         @Override
-        public void acceptMastershipTask(int partitionId) {
+        public void acceptMastership(int partitionId) {
         }
 
         @Override
@@ -127,7 +127,6 @@ public class TestExportDataSource extends TestCase {
         public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
-
     }
 
     @Override
@@ -393,7 +392,7 @@ public class TestExportDataSource extends TestCase {
         try {
 
             //Ack before push
-            s.ack(100, false);
+            s.ack(100);
             TreeSet<String> listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
@@ -407,7 +406,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(listing.size(), 1);
 
             //Ack after push beyond size...last segment kept.
-            s.ack(1000, false);
+            s.ack(1000);
             sz = s.sizeInBytes();
             assertEquals(sz, 0);
             listing = getSortedDirectoryListingSegments();
@@ -423,7 +422,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(listing.size(), 1);
 
             //Low ack should have no effect.
-            s.ack(100, false);
+            s.ack(100);
             sz = s.sizeInBytes();
             assertEquals(sz, 802);
             listing = getSortedDirectoryListingSegments();
@@ -438,7 +437,7 @@ public class TestExportDataSource extends TestCase {
             assertEquals(listing.size(), 1);
 
             //Last segment is always kept.
-            s.ack(2000, false);
+            s.ack(2000);
             sz = s.sizeInBytes();
             assertEquals(sz, 0);
             listing = getSortedDirectoryListingSegments();

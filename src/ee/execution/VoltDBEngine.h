@@ -121,6 +121,9 @@ typedef std::unique_ptr<AbstractTempTable, TempTableTupleDeleter> UniqueTempTabl
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
+ extern int32_t s_exportFlushTimeout;
+
+
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
  * plans on the objects. Every operation starts from this object.
@@ -142,7 +145,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t defaultDrBufferSize,
                         int64_t tempTableMemoryLimit,
                         bool createDrReplicatedStream,
-                        int32_t compactionThreshold = 95);
+                        int32_t compactionThreshold = 95,
+                        int32_t exportFlushTimeout = 4*1000);
         virtual ~VoltDBEngine();
 
         // ------------------------------------------------------------------
@@ -435,7 +439,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
 
-        void releaseUndoToken(int64_t undoToken);
+        void releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn);
 
         void undoUndoToken(int64_t undoToken);
 
@@ -531,6 +535,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setPartitionIdForTest(int32_t partitionId) { m_partitionId = partitionId; }
         int32_t getPartitionId() const { return m_partitionId; }
 
+        void setViewsEnabled(const std::string& viewNames, bool value);
+
     protected:
         void setHashinator(TheHashinator* hashinator);
 
@@ -570,8 +576,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
-                                bool first,
-                                bool last,
                                 bool traceOn);
 
         /**
@@ -583,6 +587,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setExecutorVectorForFragmentId(int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector* execsForFrag);
+
+        void loadBuiltInJavaFunctions();
 
         // -------------------------------------------------
         // Data Members
@@ -752,16 +758,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         char* m_templateSingleLongTable;
 
         const static int m_templateSingleLongTableSize =
-            4 + // depid
-            4 + // table size
-            1 + // status code
-            4 + // header size
-            2 + // column count
-            1 + // column type
-            4 + 15 + // column name (length + modified_tuples)
-            4 + // tuple count
-            4 + // first row size
-            8;// modified tuples
+                4 + // depid
+                4 + // table size
+                4 + // header size
+                2 + // status code
+                1 + // column count
+                1 + // column type
+                4 + 15 + // column name (length + modified_tuples)
+                4 + // tuple count
+                4 + // first row size
+                8;// modified tuples
 
         Topend* m_topend;
 

@@ -47,8 +47,8 @@ import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.SerializationHelper;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
@@ -106,32 +106,34 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** Commands are serialized over the connection */
     private enum Commands {
-        Initialize(0),
-        LoadCatalog(2),
-        ToggleProfiler(3),
-        Tick(4),
-        GetStats(5),
-        QueryPlanFragments(6),
-        PlanFragment(7),
-        LoadTable(9),
-        releaseUndoToken(10),
-        undoUndoToken(11),
-        CustomPlanFragment(12),
-        SetLogLevels(13),
-        Quiesce(16),
-        ActivateTableStream(17),
-        TableStreamSerializeMore(18),
-        UpdateCatalog(19),
-        ExportAction(20),
-        RecoveryMessage(21),
-        TableHashCode(22),
-        Hashinate(23),
-        GetPoolAllocations(24),
-        GetUSOs(25),
-        UpdateHashinator(27),
-        ExecuteTask(28),
-        ApplyBinaryLog(29),
-        ShutDown(30);
+        Initialize(0)
+        , LoadCatalog(2)
+        , ToggleProfiler(3)
+        , Tick(4)
+        , GetStats(5)
+        , QueryPlanFragments(6)
+        , PlanFragment(7)
+        , LoadTable(9)
+        , releaseUndoToken(10)
+        , undoUndoToken(11)
+        , CustomPlanFragment(12)
+        , SetLogLevels(13)
+        , Quiesce(16)
+        , ActivateTableStream(17)
+        , TableStreamSerializeMore(18)
+        , UpdateCatalog(19)
+        , ExportAction(20)
+        , RecoveryMessage(21)
+        , TableHashCode(22)
+        , Hashinate(23)
+        , GetPoolAllocations(24)
+        , GetUSOs(25)
+        , UpdateHashinator(27)
+        , ExecuteTask(28)
+        , ApplyBinaryLog(29)
+        , ShutDown(30)
+        , SetViewsEnabled(31);
+
         Commands(final int id) {
             m_id = id;
         }
@@ -646,6 +648,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             // check if anything was changed
             m_dirty |= dirtyBytes.get() > 0;
 
+            final ByteBuffer drBufferSizeBytes = ByteBuffer.allocate(4);
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (drBufferSizeBytes.hasRemaining()) {
+                int read = m_socketChannel.read(drBufferSizeBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            drBufferSizeBytes.flip();
+            final int drBufferSize = drBufferSizeBytes.getInt();
+
             final ByteBuffer resultTablesLengthBytes = ByteBuffer.allocate(4);
             //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
             while (resultTablesLengthBytes.hasRemaining()) {
@@ -661,8 +674,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 return resultTablesLengthBytes;
 
             final ByteBuffer resultTablesBuffer = ByteBuffer
-                    .allocate(resultTablesLength+4);
+                    .allocate(resultTablesLength+8);
             //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            resultTablesBuffer.putInt(drBufferSize);
             resultTablesBuffer.putInt(resultTablesLength);
             while (resultTablesBuffer.hasRemaining()) {
                 int read = m_socketChannel.read(resultTablesBuffer);
@@ -834,7 +848,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorConfig hashinatorConfig,
-            final boolean isLowestSiteId) {
+            final boolean isLowestSiteId,
+            final long exportFlushTimeout) {
         super(siteId, partitionId);
 
         // m_counter = 0;
@@ -864,7 +879,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 defaultDrBufferSize,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
-                isLowestSiteId);
+                isLowestSiteId,
+                exportFlushTimeout);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -919,7 +935,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int defaultDrBufferSize,
             final long tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream)
+            final boolean createDrReplicatedStream,
+            final long exportFlushTimeout)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
@@ -1331,10 +1348,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
+    public boolean releaseUndoToken(final long undoToken, boolean isEmptyDRTxn) {
         m_data.clear();
         m_data.putInt(Commands.releaseUndoToken.m_id);
         m_data.putLong(undoToken);
+        m_data.put((byte) (isEmptyDRTxn ? 1 : 0));
 
         try {
             m_data.flip();
@@ -1824,5 +1842,31 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
         }
         return m_succeededFragmentsCount;
+    }
+
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        if (viewNames.equals("")) {
+            return;
+        }
+        if (enabled) {
+            System.out.println("The maintenance of the following views is restarting: " + viewNames);
+        }
+        else {
+            System.out.println("The maintenance of the following views will be paused to accelerate the restoration: " + viewNames);
+        }
+        m_data.clear();
+        m_data.putInt(Commands.SetViewsEnabled.m_id);
+        try {
+            final byte viewNameBytes[] = viewNames.getBytes("UTF-8");
+            m_data.put(enabled ? (byte)1 : (byte)0);
+            m_data.put(viewNameBytes);
+            m_data.put((byte)'\0');
+            m_data.flip();
+            m_connection.write();
+        } catch (final IOException e) {
+            System.out.println("Excpeption: " + e.getMessage());
+            throw new RuntimeException();
+        }
     }
 }

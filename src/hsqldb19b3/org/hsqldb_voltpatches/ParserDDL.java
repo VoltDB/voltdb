@@ -225,7 +225,6 @@ public class ParserDDL extends ParserRoutine {
             case Tokens.FUNCTION :
             case Tokens.PROCEDURE :
                 return compileCreateProcedureOrFunction();
-
             default : {
                 throw unexpectedToken();
             }
@@ -480,7 +479,6 @@ public class ParserDDL extends ParserRoutine {
                 canCascade    = true;
                 useIfExists   = true;
                 break;
-
             default :
                 throw unexpectedToken();
         }
@@ -941,9 +939,11 @@ public class ParserDDL extends ParserRoutine {
 
                         return compileAlterTableDropConstraint(t);
                     }
+                    case Tokens.TTL :
+                        read();
+                        return compileAlterTableDropTTL(t);
                     case Tokens.COLUMN :
                         read();
-
                     // $FALL-THROUGH$
                     default : {
                         checkIsSimpleName();
@@ -979,11 +979,135 @@ public class ParserDDL extends ParserRoutine {
 
                 return compileAlterColumn(t, column, columnIndex);
             }
+            case Tokens.USING : {
+                return readTimeToLive(t, true);
+            }
             default : {
                 throw unexpectedToken();
             }
         }
     }
+
+    //VoltDB extension, drop TTL
+    private Statement compileAlterTableDropTTL(Table t) {
+        if (t.getTTL() == null) {
+            throw Error.error(ErrorCode.X_42501);
+        }
+        Object[] args = new Object[] {
+            t.getName(),
+            Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
+            Boolean.valueOf(false)
+        };
+        return new StatementSchema(null, StatementTypes.DROP_TTL, args,
+                                   null, t.getName());
+    }
+
+    private Statement readTimeToLive(Table table, boolean alter) {
+
+        //syntax: USING TTL 10 SECONDS ON COLUMN a MAX_FREQUENCY 1 BATCH_SIZE 1000 CANCELABLE
+        if (!alter && token.tokenType != Tokens.USING) {
+            return null;
+        }
+        int timeLiveValue = 0;
+        String ttlUnit = "SECONDS";
+        String ttlColumn = "";
+        int batchSize = 1000;
+        int maxFrequency = 1;
+
+        read();
+        if (token.tokenType != Tokens.TTL) {
+            throw unexpectedToken();
+        }
+
+        read();
+        if (token.tokenType != Tokens.X_VALUE) {
+            throw unexpectedToken();
+        }
+        timeLiveValue = (Integer)(token.tokenValue);
+
+        read();
+        if (token.tokenType == Tokens.SECONDS || token.tokenType == Tokens.MINUTES ||
+             token.tokenType == Tokens.HOURS || token.tokenType == Tokens.DAYS) {
+            ttlUnit = token.tokenString;
+            read();
+        }
+
+        if (token.tokenType == Tokens.ON) {
+            read();
+            if (token.tokenType != Tokens.COLUMN) {
+                throw unexpectedToken();
+            }
+            read();
+            if (token.tokenType != Tokens.X_IDENTIFIER) {
+                throw unexpectedToken();
+            }
+            ttlColumn = token.tokenString;
+            int index = table.findColumn(ttlColumn);
+            if (index < 0) {
+                throw unexpectedToken();
+            }
+            ColumnSchema col = table.getColumn(index);
+            //TIMESTAMP, INTEGER, BIGINT
+            int colType = col.getDataType().typeCode;
+            if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
+                throw unexpectedToken();
+            }
+        } else {
+            throw unexpectedToken();
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        }
+        if (token.tokenType == Tokens.BATCH_SIZE) {
+            read();
+            if (token.tokenType != Tokens.X_VALUE) {
+                throw unexpectedToken();
+            }
+            batchSize = (Integer)(token.tokenValue);
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        }
+        if (token.tokenType == Tokens.MAX_FREQUENCY) {
+            read();
+            if (token.tokenType != Tokens.X_VALUE) {
+                throw unexpectedToken();
+            }
+            maxFrequency = (Integer)(token.tokenValue);
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        } else {
+            throw unexpectedToken();
+        }
+    }
+
+    private Statement createTimeToLive(Table table, boolean alter,int value, String unit, String column,
+            int batchSize, int maxFrequency) {
+        if (!alter) {
+            table.addTTL(value, unit, column, batchSize, maxFrequency);
+        }
+
+        Object[] args = new Object[] {
+                table.getName(),
+                value,
+                unit,
+                column,
+                batchSize,
+                maxFrequency,
+                Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
+                Boolean.valueOf(false)
+            };
+        return new StatementSchema(null, StatementTypes.ALTER_TTL, args,
+                                       null, table.getName());
+    }
+    //End of VoltDB extension
 
     private Statement compileAlterTableDropConstraint(Table t) {
 
@@ -1128,6 +1252,9 @@ public class ParserDDL extends ParserRoutine {
                 case Tokens.CLOSEBRACKET :
                     read();
 
+                    // A VoltDB extension to support TTL
+                    readTimeToLive(table, false);
+                    // End of VoltDB extension
                     end = true;
                     break;
 
@@ -4012,6 +4139,11 @@ public class ParserDDL extends ParserRoutine {
         TableWorks tableWorks = new TableWorks(session, table);
 
         tableWorks.dropColumn(colindex, cascade);
+
+        //VoltDB extension to support Time to live
+        if (table.getTTL() != null && colName.equalsIgnoreCase(table.getTTL().ttlColumn.getName().name)) {
+            table.dropTTL();
+        }
     }
 
     Statement compileAlterTableDropColumn(Table table, String colName,

@@ -150,7 +150,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int defaultDrBufferSize,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean isLowestSiteId)
+            final boolean isLowestSiteId,
+            final int exportFlushTimeout)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -180,7 +181,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     defaultDrBufferSize,
                     tempTableMemory * 1024 * 1024,
                     isLowestSiteId,
-                    EE_COMPACTION_THRESHOLD);
+                    EE_COMPACTION_THRESHOLD,
+                    exportFlushTimeout);
         checkErrorCode(errorCode);
 
         setupPsetBuffer(smallBufferSize);
@@ -598,8 +600,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
-        return nativeReleaseUndoToken(pointer, undoToken);
+    public boolean releaseUndoToken(final long undoToken, boolean isEmptyDRTxn) {
+        return nativeReleaseUndoToken(pointer, undoToken, isEmptyDRTxn);
     }
 
     @Override
@@ -897,5 +899,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         clearPsetAndEnsureCapacity(8 + requiredCapacity);
         m_psetBuffer.position(8);
         return m_psetBuffer;
+    }
+
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        if (viewNames.equals("")) {
+            return;
+        }
+        if (enabled) {
+            LOG.info("The maintenance of the following views is restarting: " + viewNames);
+        }
+        else {
+            LOG.info("The maintenance of the following views will be paused to accelerate the restoration: " + viewNames);
+        }
+        nativeSetViewsEnabled(pointer, getStringBytes(viewNames), enabled);
     }
 }

@@ -37,27 +37,33 @@ public abstract class SavedTableConverter
 
     public static Boolean needsConversion(VoltTable inputTable,
                                           Table outputTableSchema,
-                                          boolean shouldPreserveDRHiddenColumn) {
-        int columnsToMatch;
-        if (shouldPreserveDRHiddenColumn) {
-            // We are expecting the hidden column in inputTable
-            columnsToMatch = inputTable.getColumnCount() - 1;
-            if (columnsToMatch != outputTableSchema.getColumns().size()) {
-                return true;
-            }
-            if (!inputTable.getColumnName(columnsToMatch).equalsIgnoreCase(CatalogUtil.DR_HIDDEN_COLUMN_NAME) ||
-                    inputTable.getColumnType(columnsToMatch) != VoltType.BIGINT) {
-                // Make sure input isn't using the reserved column name of the hidden column
-                // passive DR table to active DR table, must be converted
-                return true;
-            }
+                                          boolean preserveDRHiddenColumn,
+                                          boolean preserveViewHiddenColumn) {
+        int columnsToMatch = inputTable.getColumnCount()
+                - (preserveDRHiddenColumn ? 1 : 0)
+                - (preserveViewHiddenColumn ? 1 : 0);
+        // Cannot DR views! Those two flags must not be true at the same time!
+        assert((preserveDRHiddenColumn && preserveViewHiddenColumn) == false);
+        // We are expecting the hidden column in inputTable
+        if (columnsToMatch != outputTableSchema.getColumns().size()) {
+            return true;
         }
-        else {
-            columnsToMatch = inputTable.getColumnCount();
-            if (columnsToMatch != outputTableSchema.getColumns().size()) {
-                return true;
-            }
+        if ((preserveDRHiddenColumn || preserveViewHiddenColumn)
+                && inputTable.getColumnType(columnsToMatch) != VoltType.BIGINT) {
+            // The hidden column, in either use case, must be BIGINT type.
+            return true;
         }
+        // Make sure input is using the reserved column name of the hidden column
+        if (preserveDRHiddenColumn
+                && ! inputTable.getColumnName(columnsToMatch).equalsIgnoreCase(CatalogUtil.DR_HIDDEN_COLUMN_NAME)) {
+            // passive DR table to active DR table, must be converted
+            return true;
+        }
+        if (preserveViewHiddenColumn
+                && ! inputTable.getColumnName(columnsToMatch).equalsIgnoreCase(CatalogUtil.VIEW_HIDDEN_COLUMN_NAME)) {
+            return true;
+        }
+
         for (int ii = 0; ii < columnsToMatch; ii++) {
             final String name = inputTable.getColumnName(ii);
             final VoltType type = inputTable.getColumnType(ii);
@@ -80,24 +86,30 @@ public abstract class SavedTableConverter
 
     public static VoltTable convertTable(VoltTable inputTable,
                                          Table outputTableSchema,
-                                         boolean shouldPreserveDRHiddenColumn)
-    throws VoltTypeException
-    {
-        VoltTable new_table;
+                                         boolean preserveDRHiddenColumn,
+                                         boolean preserveViewHiddenColumn) throws VoltTypeException {
+        VoltTable newTable;
 
-        if (shouldPreserveDRHiddenColumn) {
-            // if the DR hidden column should be preserved in conversion, append it to the end of target schema
-            new_table = CatalogUtil.getVoltTable(outputTableSchema, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+        // if the DR hidden column should be preserved in conversion, append it to the end of target schema
+        if (preserveDRHiddenColumn) {
+            newTable = CatalogUtil.getVoltTable(outputTableSchema, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
+        } else if (preserveViewHiddenColumn) {
+            newTable = CatalogUtil.getVoltTable(outputTableSchema, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO);
         } else {
-            new_table = CatalogUtil.getVoltTable(outputTableSchema);
+            newTable = CatalogUtil.getVoltTable(outputTableSchema);
         }
 
-        Map<Integer, Integer> column_copy_index_map =
-            computeColumnCopyIndexMap(inputTable, new_table);
+        Map<Integer, Integer> columnCopyIndexMap =
+            computeColumnCopyIndexMap(inputTable, newTable);
 
+        boolean addHiddenViewColumn = preserveViewHiddenColumn &&
+                ! columnCopyIndexMap.containsKey(newTable.getColumnCount() - 1);
+        if (addHiddenViewColumn) {
+            throw new RuntimeException("Cannot find internal group counts in the snapshot for view without a COUNT(*): " + outputTableSchema.getTypeName());
+        }
         // if original table does not have hidden column present, we need to add
-        boolean addDRHiddenColumn = shouldPreserveDRHiddenColumn &&
-                !column_copy_index_map.containsKey(new_table.getColumnCount() - 1);
+        boolean addDRHiddenColumn = preserveDRHiddenColumn &&
+                !columnCopyIndexMap.containsKey(newTable.getColumnCount() - 1);
         Column catalogColumnForHiddenColumn = null;
         if (addDRHiddenColumn) {
             catalogColumnForHiddenColumn = new Column();
@@ -112,34 +124,31 @@ public abstract class SavedTableConverter
         }
 
         // Copy all the old tuples into the new table
-        while (inputTable.advanceRow())
-        {
+        while (inputTable.advanceRow()) {
             Object[] coerced_values =
-                new Object[new_table.getColumnCount()];
+                new Object[newTable.getColumnCount()];
 
-            for (int i = 0; i < new_table.getColumnCount(); i++)
-            {
-                if (column_copy_index_map.containsKey(i))
-                {
-                    int orig_column_index = column_copy_index_map.get(i);
+            for (int i = 0; i < newTable.getColumnCount(); i++) {
+                if (columnCopyIndexMap.containsKey(i)) {
+                    int origColumnIndex = columnCopyIndexMap.get(i);
                     // For column we have in new table convert and make compatible value.
                     coerced_values[i] = ParameterConverter.tryToMakeCompatible(
-                            new_table.getColumnType(i).classFromType(),
-                            inputTable.get(orig_column_index,
-                                    inputTable.getColumnType(orig_column_index)));
+                            newTable.getColumnType(i).classFromType(),
+                            inputTable.get(origColumnIndex,
+                                    inputTable.getColumnType(origColumnIndex)));
                 }
                 else
                 {
                     // otherwise if it's nullable, insert null,
-                    Column catalog_column =
+                    Column catalogColumn =
                         outputTableSchema.getColumns().
-                        get(new_table.getColumnName(i));
+                        get(newTable.getColumnName(i));
                     // construct an artificial catalog column for dr hidden column
-                    if (shouldPreserveDRHiddenColumn && catalog_column == null) {
-                        catalog_column = catalogColumnForHiddenColumn;
+                    if (preserveDRHiddenColumn && catalogColumn == null) {
+                        catalogColumn = catalogColumnForHiddenColumn;
                     }
                     VoltType default_type =
-                        VoltType.get((byte)catalog_column.getDefaulttype());
+                        VoltType.get((byte)catalogColumn.getDefaulttype());
                     if (default_type != VoltType.INVALID)
                     {
                         // if there is a default value for this table/column
@@ -149,37 +158,37 @@ public abstract class SavedTableConverter
                             coerced_values[i] =
                                 VoltTypeUtil.
                                 getObjectFromString(default_type,
-                                                    catalog_column.getDefaultvalue());
+                                                    catalogColumn.getDefaultvalue());
                         }
                         catch (ParseException e)
                         {
                             String message = "Column: ";
-                            message += new_table.getColumnName(i);
+                            message += newTable.getColumnName(i);
                             message += " has an unparseable default: ";
-                            message += catalog_column.getDefaultvalue();
+                            message += catalogColumn.getDefaultvalue();
                             message += " for VoltType: ";
                             message += default_type.toString();
                             throw new VoltTypeException(message);
                         }
                     }
-                    else if (catalog_column.getNullable())
+                    else if (catalogColumn.getNullable())
                     {
                         coerced_values[i] = null;
                     }
                     else
                     {
                         throw new VoltTypeException("Column: " +
-                                                    new_table.getColumnName(i) +
+                                                    newTable.getColumnName(i) +
                                                     " has no default " +
                                                     "and null is not permitted");
                     }
                 }
             }
 
-            new_table.addRow(coerced_values);
+            newTable.addRow(coerced_values);
         }
 
-        return new_table;
+        return newTable;
     }
 
     /**

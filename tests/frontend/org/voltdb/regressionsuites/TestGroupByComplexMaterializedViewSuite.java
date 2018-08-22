@@ -835,6 +835,27 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
          * */
     }
 
+    private void loadTableForSVNoCountTest() throws Exception {
+        Client client = this.getClient();
+        VoltTable vt = null;
+
+        // empty the table first. check the view has no rows.
+        client.callProcedure("@AdHoc", "Delete from T_ENG10892");
+
+        vt = client.callProcedure("@AdHoc", "Select count(*) from V_ENG10892").getResults()[0];
+        assertEquals(0, vt.asScalarLong());
+
+        // Start to insert data into table tb.
+        // id, wage, dept, age, rent.
+            String insert = "T_ENG10892.insert";
+            client.callProcedure(insert, 1, 3);
+            client.callProcedure(insert, 1, 3);
+            client.callProcedure(insert, 1, 8);
+            client.callProcedure(insert, 2, 2);
+            client.callProcedure(insert, 2, 5);
+            client.callProcedure(insert, 3, 7);
+    }
+
     public void testPartitionedMVQueries() throws Exception {
         mvBasedP1_NoAgg();
         mvBasedP1_Agg();
@@ -1448,6 +1469,41 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
         fail("Failed to verify the dynamic calculated view column size for column MAX_USED_1");
     }
 
+    public void testSVWithoutCountStar() throws Exception {
+        VoltTable vt = null;
+        Client client = this.getClient();
+
+        // Load data
+        loadTableForSVNoCountTest();
+
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1,3}, {1,3}, {1,8}, {2,2}, {2,5}, {3,7}});
+
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1,14}, {2,7}, {3,7}});
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V2_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{10,2}});
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V3_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1,3},{1,8},{2,2},{2,5},{3,7}});
+
+        client.callProcedure("@AdHoc", "DELETE FROM T_ENG10892 WHERE A = 1 AND B = 3;");
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1,8}, {2,2}, {2,5}, {3,7}});
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1,8}, {2,7}, {3,7}});
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V2_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{8,2}});
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V3_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1,8},{2,2},{2,5},{3,7}});
+
+        // test if single table view will delete the row if its hidden count(*) = 0.
+        client.callProcedure("@AdHoc", "DELETE FROM T_ENG10892 WHERE A = 3 AND B = 7;");
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM T_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1,8}, {2,2}, {2,5}});
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG10892;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1,8}, {2,7}});
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -1546,7 +1602,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 "PRIMARY KEY (F_PKEY) ); " +
 
                 "CREATE VIEW V2 (V_D1_PKEY, V_D2_PKEY, V_D3_PKEY, V_F_PKEY, CNT, SUM_V1, SUM_V2, SUM_V3) " +
-                "AS SELECT F_D1, F_D2, F_D3, F_PKEY, MIN(F_VAL1), SUM(F_VAL1), SUM(F_VAL2), SUM(F_VAL3) " +
+                "AS SELECT F_D1, F_D2, F_D3, F_PKEY, COUNT(*), SUM(F_VAL1), SUM(F_VAL2), SUM(F_VAL3) " +
                 "FROM F  GROUP BY F_D1, F_D2, F_D3, F_PKEY;"
                 ;
         try {
@@ -1557,12 +1613,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project2);
-        assertFalse(success);
-        captured = capturer.toString("UTF-8");
-        lines = captured.split("\n");
-
-        assertTrue(foundLineMatching(lines,
-                ".*V2.*must have count(.*) after the GROUP BY columns \\(if any\\)*"));
+        assertTrue(success);
 
         // Real config for tests
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -1725,7 +1776,17 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                 "CREATE VIEW V2_R4 (V2_R4_G1, V2_R4_G2, V2_R4_CNT, V2_R4_sum_wage) " +
                 "AS SELECT dept*dept, dept+dept, count(*), SUM(wage) " +
                 "FROM R4 GROUP BY dept*dept, dept+dept;" +
-                "";
+                "" +
+
+                "CREATE TABLE T_ENG10892 (" +
+                "A INTEGER NOT NULL, " +
+                "B INTEGER NOT NULL);" +
+
+                "CREATE VIEW V_ENG10892 (X,Y) AS SELECT A, SUM(B) FROM T_ENG10892 GROUP BY A;" +
+
+                "CREATE VIEW V2_ENG10892 AS SELECT SUM(A), MIN(B) FROM T_ENG10892;" +
+
+                "CREATE VIEW V3_ENG10892 AS SELECT A, B FROM T_ENG10892 GROUP BY A, B;";
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {

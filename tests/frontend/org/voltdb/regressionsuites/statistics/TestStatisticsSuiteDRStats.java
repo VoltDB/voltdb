@@ -38,6 +38,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dr2.DRProtocol;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
@@ -158,7 +159,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
             int CONSUMER_CLUSTER_COUNT = 2;
             for (int n = 1; n <= CONSUMER_CLUSTER_COUNT; n++) {
                 LocalCluster consumerCluster = LocalCluster.createLocalCluster(drSchema, SITES, HOSTS, KFACTOR, n,
-                        REPLICATION_PORT + 100 * n, REPLICATION_PORT, secondaryRoot, jarName, true);
+                        REPLICATION_PORT + 100 * n, REPLICATION_PORT, secondaryRoot, jarName, DrRoleType.REPLICA, false);
                 ClientConfig clientConfig = new ClientConfig();
                 clientConfig.setProcedureCallTimeout(10 * 60 * 1000);
                 Client consumerClient = createClient(clientConfig, consumerCluster);

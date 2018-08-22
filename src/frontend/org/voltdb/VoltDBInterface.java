@@ -130,7 +130,7 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();
-    public Cartographer getCartograhper();
+    public Cartographer getCartographer();
     public void loadLegacyPathProperties(DeploymentType deployment) throws IOException;
 
     /**
@@ -337,4 +337,9 @@ public interface VoltDBInterface
     int getLowestPartitionId();
 
     public int getKFactor();
+
+    /**
+     * @return true if current node is joining and haven't finished the snapshot
+     */
+    public boolean isJoining();
 }

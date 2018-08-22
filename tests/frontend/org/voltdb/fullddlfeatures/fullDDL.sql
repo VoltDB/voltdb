@@ -378,6 +378,18 @@ AS
           ,  C2
 ;
 
+CREATE VIEW VT1b
+(
+    C1
+,   TOTAL
+)
+AS
+    SELECT C1
+        ,  SUM(C2)
+    FROM T24
+    GROUP BY C1
+;
+
 CREATE VIEW VT2
 (
     C1
@@ -1062,6 +1074,17 @@ CREATE INDEX partial_idx_3 ON T62 (C2) WHERE C1 IS NOT NULL;
 CREATE INDEX partial_idx_4 ON T62 (C1) WHERE ABS(C1) > 5;
 CREATE INDEX partial_idx_5 ON T62 (C1,C2) WHERE ABS(C3) = 5;
 CREATE INDEX partial_idx_6 ON T62 (C1) WHERE C2 > 5 and C2 < 100;
+
+-- TTL
+CREATE TABLE T63
+(
+   C1 INTEGER,
+   C2 INTEGER,
+   C3 INTEGER NOT NULL,
+   PRIMARY KEY (C3)
+) USING TTL 10 ON COLUMN C3;
+PARTITION TABLE T63 ON COLUMN C3;
+CREATE INDEX ttl_idx ON T63 (C3);
 
 -- These statements were added when use of some Volt-specific functions or ||
 -- or NULL in indexed expressions was discovered to be mishandled (ENG-7792).

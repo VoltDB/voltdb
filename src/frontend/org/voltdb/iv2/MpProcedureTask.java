@@ -164,6 +164,7 @@ public class MpProcedureTask extends ProcedureTask
                     true,   // Don't clear/flush the txn because we are restarting it
                     m_msg.isForReplay(),
                     txn.isNPartTxn(),
+                    false,
                     false);
             // TransactionTaskQueue uses it to find matching CompleteTransactionMessage
             long ts = m_restartSeqGenerator.getNextSeqNum();
@@ -268,7 +269,8 @@ public class MpProcedureTask extends ProcedureTask
                     false,
                     m_msg.isForReplay(),
                     txnState.isNPartTxn(),
-                    false);
+                    false,
+                    txnState.drTxnDataCanBeRolledBack());
             complete.setTruncationHandle(m_msg.getTruncationHandle());
 
             //If there are misrouted fragments, send message to current masters.

@@ -57,6 +57,8 @@ public class InitiateResponseMessage extends VoltMessage {
     //The flag used for MigratePartitionLeader operation, indicating that the task was created
     //when the site was leader partition
     boolean m_isForOldLeader = false;
+    int m_hashMismatchPos = -1;
+
 
     // No need to serialize it
     public boolean m_isFromNonRestartableSysproc = false;
@@ -221,6 +223,11 @@ public class InitiateResponseMessage extends VoltMessage {
         m_response = r;
     }
 
+    public void setMismatchPos(int pos) {
+        m_hashMismatchPos = pos;
+    }
+
+
     public boolean isReadOnly() {
         return m_readOnly;
     }
@@ -323,7 +330,7 @@ public class InitiateResponseMessage extends VoltMessage {
             sb.append("\n  ROLLBACK/ABORT, ");
         int[] hashes = m_response.getHashes();
         if (hashes != null) {
-            sb.append("\n RESPONSE HASH: ").append(DeterminismHash.description(hashes));
+            sb.append("\n RESPONSE HASH: ").append(DeterminismHash.description(hashes, m_hashMismatchPos));
         }
         sb.append("\n CLIENT RESPONSE: \n");
         if (m_response == null) {

@@ -52,7 +52,7 @@ import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.UpdatePlanNode;
-import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -172,9 +172,8 @@ public abstract class StatementCompiler {
 
 
         if (m_logger.isDebugEnabled()) {
-            Procedure procedure = (Procedure)catalogStmt.getParent();
             m_logger.debug(String.format("Compiling %s.%s: sql = \"%s\"\n",
-                                         procedure.getTypeName(),
+                                         catalogStmt.getParent().getTypeName(),
                                          catalogStmt.getTypeName(),
                                          catalogStmt.getSqltext()));
         }

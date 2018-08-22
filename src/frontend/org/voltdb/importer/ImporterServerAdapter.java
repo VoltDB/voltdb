@@ -68,4 +68,11 @@ public interface ImporterServerAdapter {
      * @param procName the name of the procedure that the importer was trying to execute
      */
     public void reportQueued(String importerName, String procName);
+
+    /** This should be used by importer to report that the importer was successfully initialized.
+     *
+     * @param importerName the name of the importer
+     * @param procName the name of the procedure that the importer was trying to execute
+     */
+    public void reportInitialized(String importerName, String procName);
 }

@@ -37,7 +37,6 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
@@ -91,13 +90,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                     int newPartitionCount)
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
-
         if (hashinatorData == null) {
             throw new RuntimeException("No hashinator data provided for elastic hashinator type.");
         }
 
         final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
         final Table[] tableArray;
+        // TRAIL [SnapSave:5]  - 3.2 [1 site/host] Get list of tables to save and create tasks for them.
         if (config.tables.length == 0 && (jsData == null || !jsData.has("tables"))) {
             tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
         } else {
@@ -184,6 +183,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             @Override
             public Boolean call() throws Exception
             {
+                // TRAIL [SnapSave:6]  - 3.3 [1 site/host] Create completion tasks
                 final AtomicInteger numTables = new AtomicInteger(tables.length);
 
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, pathType, file_nonce,
@@ -260,6 +260,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
     {
         SnapshotDataTarget sdt;
 
+        // TRAIL [SnapSave:7]  - 3.4 [1 site/host] Create file and snapshot target for tables
+
         File saveFilePath = SnapshotUtil.constructFileForTable(
                 table,
                 file_path,
@@ -277,6 +279,19 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     table.getIsreplicated(),
                     tracker.getPartitionsForHost(hostId),
                     CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO),
+                    txnId,
+                    timestamp);
+        }
+        else if (CatalogUtil.needsViewHiddenColumn(table)) {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table, CatalogUtil.VIEW_HIDDEN_COLUMN_INFO),
                     txnId,
                     timestamp);
         }

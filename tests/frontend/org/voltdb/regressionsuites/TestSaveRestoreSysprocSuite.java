@@ -55,7 +55,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -92,7 +91,11 @@ import com.google_voltpatches.common.io.Files;
 public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     private final static VoltLogger LOG = new VoltLogger("CONSOLE");
     private final static int SITE_COUNT = 2;
-    private final static int TABLE_COUNT = 9;  // Must match schema used.
+    private final static int TABLE_COUNT = 11;  // Must match schema used.
+
+    protected int getTableCount() {
+        return TABLE_COUNT;
+    }
 
     public TestSaveRestoreSysprocSuite(String name) {
         super(name);
@@ -140,13 +143,13 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         raf.close();
     }
 
-    private VoltTable createReplicatedTable(int numberOfItems,
+    static VoltTable createReplicatedTable(int numberOfItems,
             int indexBase,
             Set<String> expectedText) {
         return createReplicatedTable(numberOfItems, indexBase, expectedText, false);
     }
 
-    private VoltTable createReplicatedTable(int numberOfItems,
+    static VoltTable createReplicatedTable(int numberOfItems,
                                             int indexBase,
                                             Set<String> expectedText,
                                             boolean generateCSV)
@@ -227,7 +230,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return repl_table;
     }
 
-    private VoltTable createPartitionedTable(int numberOfItems,
+    static VoltTable createPartitionedTable(int numberOfItems,
                                              int indexBase)
     {
         VoltTable partition_table =
@@ -252,7 +255,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return partition_table;
     }
 
-    private VoltTable[] loadTable(Client client, String tableName, boolean replicated,
+    static VoltTable[] loadTable(Client client, String tableName, boolean replicated,
                                   VoltTable table)
     {
         VoltTable[] results = null;
@@ -313,7 +316,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-    private VoltTable[] saveTablesWithDefaultOptions(Client client, String nonce)
+    static VoltTable[] saveTablesWithDefaultOptions(Client client, String nonce)
     {
         return saveTables(client, TMPDIR, nonce, null, null, true, false);
     }
@@ -334,7 +337,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return results;
     }
 
-    private VoltTable[] saveTables(Client client, String dir, String nonce, String[] tables, String[] skiptables,
+    public static VoltTable[] saveTables(Client client, String dir, String nonce, String[] tables, String[] skiptables,
             boolean block, boolean csv)
     {
         VoltTable[] results = null;
@@ -415,11 +418,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-    private void validateSnapshot(boolean expectSuccess, String nonce) {
+    static void validateSnapshot(boolean expectSuccess, String nonce) {
         validateSnapshot(expectSuccess, false, nonce);
     }
 
-    private boolean validateSnapshot(boolean expectSuccess,
+    static boolean validateSnapshot(boolean expectSuccess,
             boolean onlyReportSuccess,String nonce) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
@@ -710,9 +713,12 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                     VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
                     VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
 
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Load REPLICATED_TESTER and PARTITION_TESTER");
                     loadTable(client, "REPLICATED_TESTER", true, repl_table);
                     loadTable(client, "PARTITION_TESTER", false, partition_table);
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Save snapshot");
                     saveTablesWithDefaultOptions(client, TESTNONCE);
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Validate snapshot");
                     validateSnapshot(true, true, TESTNONCE);
                 }
                 finally {
@@ -724,6 +730,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
 
+        System.out.println("testRestoreWithGhostPartitionAndJoin - Copy over snapshot data from removed node");
         //Copy over snapshot data from removed node
         for (File f : lc.getPathInSubroots(new File(TMPDIR))[1].listFiles()) {
             if (f.getName().startsWith(TESTNONCE)) {
@@ -734,6 +741,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
 
         // Restore snapshot to 1 nodes 1 sites/host cluster.
+        System.out.println("testRestoreWithGhostPartitionAndJoin - Restore snapshot to 1 nodes 1 sites/host cluster.");
         {
             lc.setHostCount(1);
             lc.compile(project);
@@ -753,6 +761,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
                     assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
 
+                    System.out.println("testRestoreWithGhostPartitionAndJoin - Join the second node.");
                     // Join the second node
                     lc.joinOne(1);
                     Thread.sleep(1000);
@@ -1764,14 +1773,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         for (Table table : tables)
         {
-            // Ignore materialized tables
-            if (table.getMaterializer() == null)
+            if (table.getMaterializer() != null
+                    && ! table.getIsreplicated()
+                    && table.getPartitioncolumn() == null) {
+                continue;
+            }
+            total_tables++;
+            if (table.getIsreplicated())
             {
-                total_tables++;
-                if (table.getIsreplicated())
-                {
-                    replicated++;
-                }
+                replicated++;
             }
         }
         //Make this failing test debuggable, why do we get the wrong number sometimes?
@@ -2144,7 +2154,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         try
         {
-            checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", TABLE_COUNT);
+            checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", getTableCount());
         }
         catch (Exception ex)
         {

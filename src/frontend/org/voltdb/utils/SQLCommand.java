@@ -39,16 +39,20 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -417,6 +421,138 @@ public class SQLCommand
         String echoErrorArgs = SQLParser.parseEchoErrorStatement(line);
         if (echoErrorArgs != null) {
             System.err.println(echoErrorArgs);
+            return true;
+        }
+
+        // DESCRIBE table
+        String describeArgs = SQLParser.parseDescribeStatement(line);
+        if (describeArgs != null) {
+
+            // Check if table exists
+            String tableName = "";
+            String type = "";
+            VoltTable tableData = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+            while (tableData.advanceRow()) {
+                String t = tableData.getString(2);
+                if (t.equalsIgnoreCase(describeArgs)) {
+                    tableName = t;
+                    type = tableData.getString(3);
+                    break;
+                }
+            }
+            if (tableName.equals("")) {
+                System.err.println("Table does not exist");
+                return true;
+            }
+
+            // Class to temporarily store and sort column attributes
+            class Column implements Comparable {
+                String name;
+                String type;
+                long size;
+                String remarks;
+                long position;
+                String notNull;
+
+                @Override
+                public String toString() {return "";}
+
+                @Override
+                public int compareTo(Object obj) {
+                    Column col = (Column) obj;
+                    return (int)(this.position - col.position);
+                }
+            }
+
+            // sort the columns as they are inserted
+            SortedSet set = new TreeSet();
+
+            // Retrieve Column attributes
+            VoltTable columnData = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
+            int maxNameWidth = 10;
+            while (columnData.advanceRow()) {
+                if (tableName.equalsIgnoreCase(columnData.getString(2))) {
+
+                    Column c = new Column();
+                    c.name = columnData.getString(3);
+                    if (c.name.length() > maxNameWidth) {
+                        maxNameWidth = c.name.length();
+                    }
+
+                    c.type = columnData.getString(5);
+
+                    c.size = columnData.getLong(6);
+                    if (columnData.wasNull()) {
+                        if (c.type.equals("GEOGRAPHY")) {
+                            c.size = 32768;
+                        }
+                        if (c.type.equals("GEOGRAPHY_POINT")) {
+                            c.size = 16;
+                        }
+                    } else if (c.type.equals("TINYINT")) {
+                        c.size = 1;
+                    } else if (c.type.equals("SMALLINT")) {
+                        c.size = 2;
+                    } else if (c.type.equals("INTEGER")) {
+                        c.size = 4;
+                    } else if (c.type.equals("BIGINT")) {
+                        c.size = 8;
+                    } else if (c.type.equals("FLOAT")) {
+                        c.size = 8;
+                    } else if (c.type.equals("DECIMAL")) {
+                        c.size = 16;
+                    } else if (c.type.equals("TIMESTAMP")) {
+                        c.size = 8;
+                    }
+
+                    c.remarks = columnData.getString(11);
+                    if (columnData.wasNull()) {
+                        c.remarks = "";
+                    }
+
+                    c.position = columnData.getLong(16);
+
+                    String nullableYesNo = columnData.getString(17);
+                    c.notNull = "";
+                    if (nullableYesNo.equals("NO")) {
+                        c.notNull = "NOT NULL";
+                    }
+
+                    set.add(c);
+                }
+            }
+
+            // print output
+            String headerFormat = "%-" + maxNameWidth + "s|%-16s|%-11s|%-9s|%-16s\n";
+            String rowFormat = "%-" + maxNameWidth + "s|%-16s|%11d|%-9s|%-16s\n";
+            System.out.printf(headerFormat,"COLUMN","DATATYPE","SIZE","NULLABLE","REMARKS");
+            String DASHES = new String(new char[56+maxNameWidth]).replace("\0", "-");
+            System.out.println(DASHES);
+
+            Iterator it = set.iterator();
+            while (it.hasNext()) {
+                Column c = (Column)it.next();
+                System.out.printf(rowFormat,c.name,c.type,c.size,c.notNull,c.remarks);
+            }
+            System.out.println(DASHES);
+
+            // primary key
+            String primaryKey = "";
+            VoltTable keyData = m_client.callProcedure("@SystemCatalog", "PRIMARYKEYS").getResults()[0];
+            while (keyData.advanceRow()) {
+                if (tableName.equalsIgnoreCase(keyData.getString(2))) {
+                    String colName = keyData.getString(3);
+                    if (!primaryKey.equals("")) {
+                        primaryKey += ",";
+                    }
+                    primaryKey += colName;
+                }
+            }
+            if (!primaryKey.equals("")) {
+                System.out.println("Type: " + type + ", Primary Key (" + primaryKey + ")");
+            } else {
+                System.out.println("Type: " + type);
+            }
             return true;
         }
 
@@ -921,6 +1057,12 @@ public class SQLCommand
                 return;
             }
 
+            // explaincatalog => @ExplainCatalog
+            if (SQLParser.parseExplainCatalogCall(statement)) {
+                printResponse(m_client.callProcedure("@ExplainCatalog"), false);
+                return;
+            }
+
             String explainProcName = SQLParser.parseExplainProcCall(statement);
             if (explainProcName != null) {
                 // We've got a statement that starts with "explainproc", send the statement to
@@ -1153,6 +1295,7 @@ public class SQLCommand
         + "              [--port=port_number]\n"
         + "              [--user=user]\n"
         + "              [--password=password]\n"
+        + "              [--credentials=file_spec]\n"
         + "              [--kerberos=jaas_login_configuration_entry_key]\n"
         + "              [--ssl or --ssl=ssl-configuration-file]\n"
         + "              [--query=query]\n"
@@ -1175,6 +1318,10 @@ public class SQLCommand
         + "\n"
         + "[--password=password]\n"
         + "  Password of the user for database login.\n"
+        + "  Default: (not defined - connection made without credentials).\n"
+        + "\n"
+        + "[--credentials=credentials]\n"
+        + "  File that contains username and password information.\n"
         + "  Default: (not defined - connection made without credentials).\n"
         + "\n"
         + "[--kerberos=jaas_login_configuration_entry_key]\n"
@@ -1393,7 +1540,9 @@ public class SQLCommand
         int port = 21212;
         String user = "";
         String password = "";
+        String credentials = "";
         String kerberos = "";
+        FileReader fr = null;
         List<String> queries = null;
         String ddlFileText = "";
         String sslConfigFile = null;
@@ -1418,6 +1567,10 @@ public class SQLCommand
             else if (arg.startsWith("--password=")) {
                 password = extractArgInput(arg);
                 if (password == null) return -1;
+            }
+            else if (arg.startsWith("--credentials")) {
+                credentials = extractArgInput(arg);
+                if (credentials == null) return -1;
             }
             else if (arg.startsWith("--kerberos=")) {
                 kerberos = extractArgInput(arg);
@@ -1533,6 +1686,13 @@ public class SQLCommand
             openURLAsync();
         }
 
+        // read username and password from txt file
+        if (credentials != null && !credentials.trim().isEmpty()) {
+            Properties props = MiscUtils.readPropertiesFromCredentials(credentials);
+            user = props.getProperty("username");
+            password = props.getProperty("password");
+        }
+
         try
         {
             // If we need to prompt the user for a password, do so.
@@ -1545,8 +1705,12 @@ public class SQLCommand
 
         // Create connection
         ClientConfig config = new ClientConfig(user, password, null);
-        if (enableSSL && sslConfigFile != null && !sslConfigFile.trim().isEmpty()) {
-            config.setTrustStoreConfigFromPropertyFile(sslConfigFile);
+        if (enableSSL) {
+            if (sslConfigFile != null && !sslConfigFile.trim().isEmpty()) {
+                config.setTrustStoreConfigFromPropertyFile(sslConfigFile);
+            } else {
+                config.setTrustStoreConfigFromDefault();
+            }
             config.enableSSL();
         }
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670

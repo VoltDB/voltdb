@@ -215,6 +215,8 @@ getGeneral(ExpressionType c,
         return new ComparisonExpression<CmpGte>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new ComparisonExpression<CmpLike>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_STARTSWITH):
+        return new ComparisonExpression<CmpStartsWith>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new ComparisonExpression<CmpIn>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
@@ -250,6 +252,8 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         return new InlinedComparisonExpression<CmpGte, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new InlinedComparisonExpression<CmpLike, L, R>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_STARTSWITH):
+        return new InlinedComparisonExpression<CmpStartsWith, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new InlinedComparisonExpression<CmpIn, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
@@ -564,6 +568,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_LIKE):
+    case (EXPRESSION_TYPE_COMPARE_STARTSWITH):
     case (EXPRESSION_TYPE_COMPARE_IN):
     case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
         ret = comparisonFactory(obj, et, lc, rc);

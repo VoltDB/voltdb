@@ -148,7 +148,7 @@ public class Table extends TableBase implements SchemaObject {
     Expression[]    colDefaults;               // fredt - expressions of DEFAULT values
     protected int[] defaultColumnMap;          // fred - holding 0,1,2,3,...
     private boolean hasDefaultValues;          //fredt - shortcut for above
-
+    TimeToLiveVoltDB      timeToLive;          //time to live (VOLTDB)
     //
     public Table(Database database, HsqlName name, int type) {
 
@@ -2726,6 +2726,16 @@ public class Table extends TableBase implements SchemaObject {
         table.children.add(indexes);
         table.children.add(constraints);
 
+        if (timeToLive != null) {
+            VoltXMLElement ttl = new VoltXMLElement(TimeToLiveVoltDB.TTL_NAME);
+            ttl.attributes.put("name", TimeToLiveVoltDB.TTL_NAME);
+            ttl.attributes.put("value", Integer.toString(timeToLive.ttlValue));
+            ttl.attributes.put("unit",  timeToLive.ttlUnit);
+            ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
+            ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
+            ttl.attributes.put("maxFrequency", Integer.toString(timeToLive.maxFrequency));
+            table.children.add(ttl);
+        }
         assert(indexConstraintMap.isEmpty());
 
         return table;
@@ -2751,6 +2761,25 @@ public class Table extends TableBase implements SchemaObject {
             }
         }
         return result;
+    }
+    // End of VoltDB extension
+
+    // A VoltDB extension to support TTL
+    public void addTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency) {
+        dropTTL();
+        timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, getColumn(findColumn(ttlColumn)), batchSize, maxFrequency);
+    }
+
+    public TimeToLiveVoltDB getTTL() {
+        return timeToLive;
+    }
+
+    public void alterTTL(int ttlValue, String ttlUnit, String ttlColumn, int batchSize, int maxFrequency) {
+        addTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+    }
+
+    public void dropTTL() {
+        timeToLive = null;
     }
     // End of VoltDB extension
 

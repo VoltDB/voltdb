@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 public class Dr2MultipartResponseMessage extends VoltMessage {
 
     private boolean m_drain;
+    private boolean m_reneg;
     private byte m_producerClusterId;
     private int m_producerPID;
     private ClientResponseImpl m_response;
@@ -36,14 +37,17 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
 
     public Dr2MultipartResponseMessage(byte producerClusterId, int producerPID, ClientResponseImpl response)  {
         m_drain = false;
+        m_reneg = false;
         m_producerClusterId = producerClusterId;
         m_producerPID = producerPID;
         m_response = response;
     }
 
-    public static Dr2MultipartResponseMessage createDrainMessage(byte producerClusterId, int producerPID) {
+    public static Dr2MultipartResponseMessage createDrainOrRenegMessage(byte producerClusterId, int producerPID,
+            boolean withDrainFlag, boolean withRenegFlag) {
         final Dr2MultipartResponseMessage msg = new Dr2MultipartResponseMessage();
-        msg.m_drain = true;
+        msg.m_drain = withDrainFlag;
+        msg.m_reneg = withRenegFlag;
         msg.m_producerClusterId = producerClusterId;
         msg.m_producerPID = producerPID;
         msg.m_response = null;
@@ -66,9 +70,14 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
         return m_drain;
     }
 
+    public boolean isReneg() {
+        return m_reneg;
+    }
+
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
         m_drain = buf.get() == 1;
+        m_reneg = buf.get() == 1;
         m_producerClusterId = buf.get();
         m_producerPID = buf.getInt();
         if (buf.remaining() > 0) {
@@ -81,10 +90,11 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.DR2_MULTIPART_RESPONSE_ID);
         buf.put((byte) (m_drain ? 1 : 0));
+        buf.put((byte) (m_reneg ? 1 : 0));
         buf.put(m_producerClusterId);
         buf.putInt(m_producerPID);
 
-        if (!m_drain) {
+        if (!m_drain && !m_reneg) {
             m_response.flattenToBuffer(buf);
         }
 
@@ -96,9 +106,10 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
     public int getSerializedSize() {
         int size = super.getSerializedSize()
                    + 1  // drain or not
+                   + 1  // reneg or not
                    + 1  // producer cluster ID
                    + 4; // producer partition ID
-        if (!m_drain) {
+        if (!m_drain && !m_reneg) {
             size += m_response.getSerializedSize();
         }
         return size;

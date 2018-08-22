@@ -107,19 +107,29 @@ public class DeterminismHash {
      *
      * For now, just compares first integer value in array.
      */
-    public static boolean compareHashes(int[] leftHashes, int[] rightHashes) {
+    public static int compareHashes(int[] leftHashes, int[] rightHashes) {
         assert(leftHashes != null);
         assert(rightHashes != null);
         assert(leftHashes.length >= 3);
         assert(rightHashes.length >= 3);
 
-        return leftHashes[0] == rightHashes[0];
+        int includedHashLeft = Math.min(leftHashes[2], MAX_HASHES_COUNT);
+        int includedHashRight = Math.min(rightHashes[2], MAX_HASHES_COUNT);
+        int includedHashMin = Math.min(includedHashLeft, includedHashRight);
+        int pos = 0;
+        for(int i = HEADER_OFFSET ; i < HEADER_OFFSET + includedHashMin; i += 2) {
+            if(leftHashes[i] != rightHashes[i] || leftHashes[i + 1] != rightHashes[i + 1]) {
+                return pos;
+            }
+            pos++;
+        }
+        return -1;
     }
 
     /**
      * Log the contents of the hash array
      */
-    public static String description(int[] hashes) {
+    public static String description(int[] hashes, int m_hashMismatchPos) {
         assert(hashes != null);
         assert(hashes.length >= 3);
         StringBuilder sb = new StringBuilder();
@@ -129,9 +139,14 @@ public class DeterminismHash {
         sb.append(", Statement Count ").append(hashes[2] / 2);
 
         int includedHashes = Math.min(hashes[2], MAX_HASHES_COUNT);
+        int pos = 0;
         for (int i = HEADER_OFFSET; i < HEADER_OFFSET + includedHashes; i += 2) {
             sb.append("\n  Ran Statement ").append(hashes[i]);
             sb.append(" with Parameters ").append(hashes[i + 1]);
+            if(pos == m_hashMismatchPos) {
+                sb.append(" <--- ALERT: Hash mismatch starts from here!");
+            }
+            pos++;
         }
         if (hashes[2] > MAX_HASHES_COUNT) {
             sb.append("\n  Additional SQL statements truncated");

@@ -36,7 +36,7 @@ public class CompleteTransactionTask extends TransactionTask
     final private Mailbox m_initiator;
     final private CompleteTransactionMessage m_completeMsg;
     private boolean m_fragmentNotExecuted = false;
-
+    private boolean m_repairCompletionMatched = false;
     public CompleteTransactionTask(Mailbox initiator,
                                    TransactionState txnState,
                                    TransactionTaskQueue queue,
@@ -52,9 +52,24 @@ public class CompleteTransactionTask extends TransactionTask
         m_fragmentNotExecuted = true;
     }
 
+    public void setRepairCompletionMatched() {
+        // When CompleteTransactionTask is released from Scorboard, all the sites will process it and forward it to its
+        // replica. After a site has received CompleteTransactionResponseMessage from itself and its replica, the transaction state will be
+        // removed from its duplicate counter and outstanding transaction list, i.e. the transaction state is removed.
+        // When a repair process kicks in upon node failure or joining, some sites have cleaned up transaction state
+        // and some have not. A repair CompleteTransactionMessage is collected and is broadcasted to all the partition leaders.
+        // Then a repair CompelteTransactionTask is placed onto Scoreboard as unmatched (missing) from sites where the transaction state has been cleaned, and
+        // as matched from sites where the transaction state is still available.
+        // After Scoreboard has again collected all repair CompleteTransactionTask, CompleteTransactionTask is released.
+        // If a site still has the transaction state, then the CompleteTransactionTask should flush its TransactionTaskQueue to unblock the site.
+        // The flag is created for this purpose.
+        m_repairCompletionMatched = true;
+    }
     private void doUnexecutedFragmentCleanup()
     {
-        if (m_completeMsg.isAbortDuringRepair()) {
+        // If the task is for restart, FragmentTasks could be at head of the TransactionTaskQueue.
+        // The transaction should not be flushed at this moment.
+        if (m_completeMsg.isAbortDuringRepair() || (m_repairCompletionMatched && !m_completeMsg.isRestart())) {
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(getTxnId()));
             }
@@ -74,11 +89,15 @@ public class CompleteTransactionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         if (m_fragmentNotExecuted) {
-            hostLog.debug("SKIPPING (Never Executed): " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("SKIPPING (Never Executed): " + this);
+            }
             doUnexecutedFragmentCleanup();
         }
         else {
-            hostLog.debug("STARTING: " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("STARTING: " + this);
+            }
             final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
             if (traceLog != null) {
                 traceLog.add(() -> VoltTrace.beginDuration("execcompletetxn",
@@ -92,6 +111,7 @@ public class CompleteTransactionTask extends TransactionTask
                 // ownership yet. But truncateUndoLog is written assuming the right
                 // eventual encapsulation.
                 siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
+                        m_completeMsg.isEmptyDRTxn(),
                         m_txnState.getBeginUndoToken(),
                         m_txnState.m_spHandle,
                         m_txnState.getUndoLog());
@@ -101,7 +121,9 @@ public class CompleteTransactionTask extends TransactionTask
 
                 // Log invocation to DR
                 logToDR(siteConnection.getDRGateway());
-                hostLog.debug("COMPLETE: " + this);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("COMPLETE: " + this);
+                }
             }
             else
             {
@@ -110,7 +132,9 @@ public class CompleteTransactionTask extends TransactionTask
                 // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
                 // for the restarted fragments.
                 m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
-                hostLog.debug("RESTART: " + this);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("RESTART: " + this);
+                }
             }
 
             if (traceLog != null) {
@@ -193,10 +217,11 @@ public class CompleteTransactionTask extends TransactionTask
         }
         if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
-            // legacy interaces don't work this way and IV2 hasn't changed this
+            // legacy interfaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
+                    m_completeMsg.isEmptyDRTxn(),
                     m_txnState.getBeginUndoToken(),
                     m_txnState.m_spHandle,
                     m_txnState.getUndoLog());

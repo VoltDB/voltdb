@@ -42,9 +42,11 @@
 -------------- REPLICATED TABLES ------------------------------------------------
 
 CREATE TABLE inventory (
-  inventory_id           INTEGER        NOT NULL,
+  inventory_id           INTEGER       NOT NULL,
   site_id                INTEGER       NOT NULL,
   page_id                INTEGER       NOT NULL,
+  site_directory         VARCHAR(256)  NOT NULL,
+  page_url               VARCHAR(2000 BYTES)     NOT NULL,
   CONSTRAINT pk_inventory PRIMARY KEY (inventory_id)
 );
 
@@ -52,6 +54,9 @@ CREATE TABLE creatives (
   creative_id            INTEGER       NOT NULL,
   campaign_id            INTEGER       NOT NULL,
   advertiser_id          INTEGER       NOT NULL,
+  creative_image_url     VARCHAR(2000 BYTES)     NOT NULL,
+  creative_name          VARCHAR(256)  NOT NULL,
+  creative_description   VARCHAR(256)  NOT NULL,
   CONSTRAINT pk_creatives PRIMARY KEY (creative_id)
 );
 
@@ -76,6 +81,8 @@ CREATE TABLE event_data (
   is_clickthrough        INTEGER       NOT NULL,
   is_conversion          INTEGER       NOT NULL
 );
+CREATE INDEX ttl ON event_data (utc_time);
+ALTER TABLE event_data USING TTL 1 MINUTES ON COLUMN utc_time;
 PARTITION TABLE event_data ON COLUMN creative_id;
 
 -------------- VIEWS ----------------------------------------------

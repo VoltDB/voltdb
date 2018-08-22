@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertEquals;
+
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
@@ -30,12 +32,14 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-import junit.framework.TestCase;
-
-public class TestAdHocLargeFallback extends TestCase {
+public class TestAdHocLargeFallback extends JUnit4LocalClusterTest {
 
     @Test
     public void testAdHocLargeFallbackLogMessage() throws Exception {
+        if (LocalCluster.isMemcheckDefined()) {
+            // don't run this test under valgrind, as it needs IPC support.
+            return;
+        }
         System.out.println("testAdHocLargeFallbackLogMessage");
         String testSchema = "create table t (i integer not null, "
                 + "inl_vc00 varchar(63 bytes), "

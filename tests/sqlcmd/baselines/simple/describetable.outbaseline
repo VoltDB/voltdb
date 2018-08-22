@@ -1,0 +1,78 @@
+
+CREATE TABLE t1 (
+  id       bigint not null,
+  col1     tinyint,
+  col2     smallint,
+  col3     integer,
+  col4     float,
+  col5     decimal,
+  col6     geography,
+  col7     geography_point,
+  col8     varchar(1),
+  col9     varchar(10),
+  col10    varchar(500),
+  col11    varbinary(1000),
+  col12    timestamp,
+  primary key (id)
+);
+Command succeeded.
+COLUMN    |DATATYPE        |SIZE       |NULLABLE |REMARKS         
+------------------------------------------------------------------
+ID        |BIGINT          |          8|NOT NULL |                
+COL1      |TINYINT         |          1|         |                
+COL2      |SMALLINT        |          2|         |                
+COL3      |INTEGER         |          4|         |                
+COL4      |FLOAT           |          8|         |                
+COL5      |DECIMAL         |         16|         |                
+COL6      |GEOGRAPHY       |      32768|         |                
+COL7      |GEOGRAPHY_POINT |         16|         |                
+COL8      |VARCHAR         |          1|         |                
+COL9      |VARCHAR         |         10|         |                
+COL10     |VARCHAR         |        500|         |                
+COL11     |VARBINARY       |       1000|         |                
+COL12     |TIMESTAMP       |          8|         |                
+------------------------------------------------------------------
+Type: TABLE, Primary Key (ID)
+
+PARTITION TABLE t1 ON COLUMN id;
+Command succeeded.
+COLUMN    |DATATYPE        |SIZE       |NULLABLE |REMARKS         
+------------------------------------------------------------------
+ID        |BIGINT          |          8|NOT NULL |PARTITION_COLUMN
+COL1      |TINYINT         |          1|         |                
+COL2      |SMALLINT        |          2|         |                
+COL3      |INTEGER         |          4|         |                
+COL4      |FLOAT           |          8|         |                
+COL5      |DECIMAL         |         16|         |                
+COL6      |GEOGRAPHY       |      32768|         |                
+COL7      |GEOGRAPHY_POINT |         16|         |                
+COL8      |VARCHAR         |          1|         |                
+COL9      |VARCHAR         |         10|         |                
+COL10     |VARCHAR         |        500|         |                
+COL11     |VARBINARY       |       1000|         |                
+COL12     |TIMESTAMP       |          8|         |                
+------------------------------------------------------------------
+Type: TABLE, Primary Key (ID)
+
+CREATE VIEW v1 (id, records,total) AS
+SELECT id, COUNT(*), SUM(col5) FROM t1 GROUP BY id;
+Command succeeded.
+COLUMN    |DATATYPE        |SIZE       |NULLABLE |REMARKS         
+------------------------------------------------------------------
+ID        |BIGINT          |          8|         |PARTITION_COLUMN
+RECORDS   |BIGINT          |          8|         |                
+TOTAL     |DECIMAL         |         16|         |                
+------------------------------------------------------------------
+Type: VIEW, Primary Key (ID)
+
+CREATE STREAM s1 PARTITION ON COLUMN id (
+    id BIGINT NOT NULL,
+    ts TIMESTAMP
+);
+Command succeeded.
+COLUMN    |DATATYPE        |SIZE       |NULLABLE |REMARKS         
+------------------------------------------------------------------
+ID        |BIGINT          |          8|NOT NULL |PARTITION_COLUMN
+TS        |TIMESTAMP       |          8|         |                
+------------------------------------------------------------------
+Type: EXPORT

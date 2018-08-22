@@ -44,6 +44,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -59,6 +60,7 @@ import com.google_voltpatches.common.collect.Sets;
 public class MpScheduler extends Scheduler
 {
     static VoltLogger tmLog = new VoltLogger("TM");
+    static final VoltLogger repairLogger = new VoltLogger("REPAIR");
 
     // null if running community, fallback to MpProcedureTask
     private static final Constructor<?> NpProcedureTaskConstructor = loadNpProcedureTaskClass();
@@ -173,6 +175,7 @@ public class MpScheduler extends Scheduler
             }
         }
 
+        // This is a non MPI Promotion (but SPI Promotion) path for repairing outstanding MP Txns
         MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI);
         m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
         return new long[0];
@@ -208,6 +211,9 @@ public class MpScheduler extends Scheduler
             handleEOLMessage();
         }
         else if (message instanceof DummyTransactionTaskMessage) {
+            // leave empty to ignore it on purpose
+        }
+        else if (message instanceof DumpMessage) {
             // leave empty to ignore it on purpose
         }
         else {
@@ -375,7 +381,7 @@ public class MpScheduler extends Scheduler
     public void handleMessageRepair(List<Long> needsRepair, VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
-            handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
+            handleIv2InitiateTaskMessageRepair((Iv2InitiateTaskMessage)message);
         }
         else {
             // MpInitiatorMailbox should throw RuntimeException for unhandled types before we could get here
@@ -384,7 +390,7 @@ public class MpScheduler extends Scheduler
         }
     }
 
-    private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)
+    private void handleIv2InitiateTaskMessageRepair(Iv2InitiateTaskMessage message)
     {
         // just reforward the Iv2InitiateTaskMessage for the txn being restarted
         // this copy may be unnecessary
@@ -414,7 +420,7 @@ public class MpScheduler extends Scheduler
 
                 task = instantiateNpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), true);
+                        m_buddyHSIds.get(m_nextBuddy), true, m_leaderNodeId);
             }
 
             // if cannot figure out the involved partitions, run it as an MP txn
@@ -429,6 +435,9 @@ public class MpScheduler extends Scheduler
         m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
+        if (repairLogger.isDebugEnabled()) {
+            repairLogger.debug("TXN repair:" + message );
+        }
     }
 
     // The MpScheduler will see InitiateResponseMessages from the Partition masters when
@@ -479,7 +488,8 @@ public class MpScheduler extends Scheduler
             // even if all the masters somehow die before forwarding Complete on to their replicas.
             CompleteTransactionMessage ctm = new CompleteTransactionMessage(m_mailbox.getHSId(),
                     message.m_sourceHSId, message.getTxnId(), message.isReadOnly(), 0,
-                    !message.shouldCommit(), false, false, false, txn.isNPartTxn(), message.m_isFromNonRestartableSysproc);
+                    !message.shouldCommit(), false, false, false, txn.isNPartTxn(),
+                    message.m_isFromNonRestartableSysproc, false);
             ctm.setTruncationHandle(m_repairLogTruncationHandle);
             // dump it in the repair log
             // hacky castage
@@ -600,5 +610,14 @@ public class MpScheduler extends Scheduler
 
     public int getLeaderNodeId() {
         return m_leaderNodeId;
+    }
+
+    @Override
+    public void dump()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[dump] current truncation handle: ").append(TxnEgo.txnIdToString(m_repairLogTruncationHandle)).append("\n");
+        m_pendingTasks.toString(sb);
+        hostLog.warn(sb.toString());
     }
 }

@@ -29,7 +29,6 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
-import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -50,7 +49,7 @@ public class SpTerm implements Term
     protected BabySitter m_babySitter;
     private ImmutableList<Long> m_replicas = ImmutableList.of();
     private boolean m_replicasUpdatedRequired = false;
-    private boolean m_initJoin = StartAction.JOIN.equals(VoltDB.instance().getConfig().m_startAction);
+    private boolean m_initJoin = VoltDB.instance().isJoining();
     private final int m_kFactor = VoltDB.instance().getKFactor();
 
     // runs on the babysitter thread when a replica changes.
@@ -88,7 +87,7 @@ public class SpTerm implements Term
                 m_replicasUpdatedRequired = false;
             }
             if (m_replicas.isEmpty() || replicas.size() <= m_replicas.size()) {
-                //The cases for startup or host failure/
+                //The cases for startup or host failure
                 m_mailbox.updateReplicas(replicas, null);
                 m_replicasUpdatedRequired = false;
             } else {

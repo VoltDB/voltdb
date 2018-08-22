@@ -58,7 +58,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     AtomicBoolean m_isDurable;
 
     /** Empty constructor for de-serialization */
-    Iv2InitiateTaskMessage() {
+    public Iv2InitiateTaskMessage() {
         super();
     }
 
@@ -216,8 +216,8 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_nPartitions;
     }
 
-    @Override
-    public int getSerializedSize()
+
+    public int getFixedHeaderSize()
     {
         int msgsize = super.getSerializedSize();
         msgsize += 8; // m_clientInterfaceHandle
@@ -228,9 +228,15 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         if (m_nPartitions != null) {
             msgsize += 2 + m_nPartitions.length * 4; // 2 for length prefix and 4 each
         }
-        msgsize += m_invocation.getSerializedSize();
         return msgsize;
     }
+
+    @Override
+    public int getSerializedSize()
+    {
+        return getFixedHeaderSize() + m_invocation.getSerializedSize();
+    }
+
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException

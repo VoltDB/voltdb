@@ -1,0 +1,113 @@
+
+CREATE TABLE EMPLOYEES (
+    LAST_NAME VARCHAR(20) NOT NULL,
+    EMP_ID INTEGER NOT NULL,
+    MANAGER_ID INTEGER NOT NULL
+);
+Command succeeded.
+
+explaincatalog;
+CATALOG                        
+-------------------------------
+add / clusters cluster
+set /clusters#cluster localepoch 1199145600
+set $PREV securityEnabled false
+set $PREV httpdportno 8080
+set $PREV jsonapi true
+set $PREV networkpartition true
+set $PREV heartbeatTimeout 90
+set $PREV useddlschema true
+set $PREV drConsumerEnabled false
+set $PREV drProducerEnabled false
+set $PREV drRole "none"
+set $PREV drClusterId 0
+set $PREV drProducerPort 0
+set $PREV drMasterHost ""
+set $PREV drConsumerSslPropertyFile ""
+set $PREV drFlushInterval 0
+set $PREV preferredSource 0
+add /clusters#cluster databases database
+set /clusters#cluster/databases#database schema "+QFUNDM1MjQ1NDE1NDQ1MjA1NDQxNDI0QwEMXDQ1NEQ1MDRDNEY1OTQ1NDU1MzIwMjgyMBECPDRDNDE1MzU0NUY0RTQxNEQBNCQ1NjQxNTI0MzQ4AQg8MjgzMjMwMjkyMDRFNEY1NAEIHDU1NEM0QzJDEUYEMjAJaBA1RjQ5NAEiMDk0RTU0NDU0NzQ1NTIBMgg0RjUBGE46AAhENDEFfAUsokIAFDAyOTNCCg=="
+set $PREV isActiveActiveDRed false
+set $PREV securityprovider "hash"
+add /clusters#cluster/databases#database groups administrator
+set /clusters#cluster/databases#database/groups#administrator admin true
+set $PREV defaultproc true
+set $PREV defaultprocread true
+set $PREV sql true
+set $PREV sqlread true
+set $PREV allproc true
+add /clusters#cluster/databases#database groups user
+set /clusters#cluster/databases#database/groups#user admin false
+set $PREV defaultproc true
+set $PREV defaultprocread true
+set $PREV sql true
+set $PREV sqlread true
+set $PREV allproc true
+add /clusters#cluster/databases#database tables EMPLOYEES
+set /clusters#cluster/databases#database/tables#EMPLOYEES isreplicated true
+set $PREV partitioncolumn null
+set $PREV estimatedtuplecount 0
+set $PREV materializer null
+set $PREV signature "EMPLOYEES|vii"
+set $PREV tuplelimit 2147483647
+set $PREV isDRed false
+add /clusters#cluster/databases#database/tables#EMPLOYEES columns EMP_ID
+set /clusters#cluster/databases#database/tables#EMPLOYEES/columns#EMP_ID index 1
+set $PREV type 5
+set $PREV size 4
+set $PREV nullable false
+set $PREV name "EMP_ID"
+set $PREV defaultvalue null
+set $PREV defaulttype 0
+set $PREV aggregatetype 0
+set $PREV matviewsource null
+set $PREV matview null
+set $PREV inbytes false
+add /clusters#cluster/databases#database/tables#EMPLOYEES columns LAST_NAME
+set /clusters#cluster/databases#database/tables#EMPLOYEES/columns#LAST_NAME index 0
+set $PREV type 9
+set $PREV size 20
+set $PREV nullable false
+set $PREV name "LAST_NAME"
+set $PREV defaultvalue null
+set $PREV defaulttype 0
+set $PREV aggregatetype 0
+set $PREV matviewsource null
+set $PREV matview null
+set $PREV inbytes false
+add /clusters#cluster/databases#database/tables#EMPLOYEES columns MANAGER_ID
+set /clusters#cluster/databases#database/tables#EMPLOYEES/columns#MANAGER_ID index 2
+set $PREV type 5
+set $PREV size 4
+set $PREV nullable false
+set $PREV name "MANAGER_ID"
+set $PREV defaultvalue null
+set $PREV defaulttype 0
+set $PREV aggregatetype 0
+set $PREV matviewsource null
+set $PREV matview null
+set $PREV inbytes false
+add /clusters#cluster/databases#database snapshotSchedule default
+set /clusters#cluster/databases#database/snapshotSchedule#default enabled false
+set $PREV frequencyUnit "h"
+set $PREV frequencyValue 24
+set $PREV retain 2
+set $PREV prefix "AUTOSNAP"
+add /clusters#cluster deployment deployment
+set /clusters#cluster/deployment#deployment kfactor 0
+add /clusters#cluster/deployment#deployment systemsettings systemsettings
+set /clusters#cluster/deployment#deployment/systemsettings#systemsettings temptablemaxsize 100
+set $PREV snapshotpriority 6
+set $PREV elasticduration 50
+set $PREV elasticthroughput 2
+set $PREV querytimeout 10000
+add /clusters#cluster logconfig log
+set /clusters#cluster/logconfig#log enabled false
+set $PREV synchronous false
+set $PREV fsyncInterval 200
+set $PREV maxTxns 2147483647
+set $PREV logSize 1024
+
+
+(Returned 1 rows in #.##s)

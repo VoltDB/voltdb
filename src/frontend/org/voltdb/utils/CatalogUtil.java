@@ -69,6 +69,7 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
@@ -151,6 +152,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.ExpressionType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -186,6 +188,7 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_NONCE = "LOG";
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
+    public static final String VIEW_HIDDEN_COLUMN_NAME = "count_star";
 
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
@@ -193,6 +196,8 @@ public abstract class CatalogUtil {
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+    public static final VoltTable.ColumnInfo VIEW_HIDDEN_COLUMN_INFO =
+            new VoltTable.ColumnInfo(VIEW_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
@@ -369,6 +374,89 @@ public abstract class CatalogUtil {
         }
 
         return jarfile;
+    }
+
+    /**
+     * Tell if a table is a single table view without a COUNT(*) column.
+     * In that case, the table will have a hidden COUNT(*) column which we need to
+     * include in the snapshot.
+     * @param table The table to check.
+     * @return true if we need to snapshot a hidden COUNT(*) column.
+     */
+    public static boolean needsViewHiddenColumn(Table table) {
+        // The table must be a view, and it can only have one source table.
+        // We do not care if the source table is persistent or streamed.
+
+        // If the table is not a materialized view, skip.
+        if (table.getMaterializer() == null) {
+            return false;
+        }
+
+        // If the table is a materialized view, then search if there is a COUNT(*) column.
+        // We only allow the users to omit the COUNT(*) column if the view is built on
+        // one single table. So we do not check again here.
+        for (Column c : table.getColumns()) {
+            if (ExpressionType.get(c.getAggregatetype()) == ExpressionType.AGGREGATE_COUNT_STAR) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Test if a table is a persistent table view and should be included in the snapshot.
+     * @param db The database catalog
+     * @param table The table to test.</br>
+     * @return If the table is a persistent table view that should be snapshotted.
+     */
+    public static boolean isSnapshotablePersistentTableView(Database db, Table table) {
+        Table materializer = table.getMaterializer();
+        if (materializer == null) {
+            // Return false if it is not a materialized view.
+            return false;
+        }
+        if (CatalogUtil.isTableExportOnly(db, materializer)) {
+            // The view source table should not be a streamed table.
+            return false;
+        }
+        if (! table.getIsreplicated() && table.getPartitioncolumn() == null) {
+            // If the view table is implicitly partitioned (maybe was not in snapshot),
+            // its maintenance is not turned off during the snapshot restore process.
+            // Let it take care of its own data by itself.
+            // Do not attempt to restore data for it.
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Test if a table is a streamed table view and should be included in the snapshot.
+     * @param db The database catalog
+     * @param table The table to test.</br>
+     * @return If the table is a streamed table view that should be snapshotted.
+     */
+    public static boolean isSnapshotableStreamedTableView(Database db, Table table) {
+        Table materializer = table.getMaterializer();
+        if (materializer == null) {
+            // Return false if it is not a materialized view.
+            return false;
+        }
+        if (! CatalogUtil.isTableExportOnly(db, materializer)) {
+            // Test if the view source table is a streamed table.
+            return false;
+        }
+        // Non-partitioned export table are not allowed so it should not get here.
+        Column sourcePartitionColumn = materializer.getPartitioncolumn();
+        if (sourcePartitionColumn == null) {
+            return false;
+        }
+        // Make sure the partition column is present in the view.
+        // Export table views are special, we use column names to match..
+        Column pc = table.getColumns().get(sourcePartitionColumn.getName());
+        if (pc == null) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -2519,23 +2607,73 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Get all normal table names from a in-memory catalog jar file.
-     * A normal table is one that's NOT a materialized view, nor an export table.
-     * @param InMemoryJarfile a in-memory catalog jar file
-     * @return A set of normal table names
+     * Get all snapshot-able table names from an in-memory catalog jar file.
+     * A snapshot-able table is one that's neither an export table nor an implicitly partitioned view.
+     * @param jarfile a in-memory catalog jar file
+     * @return A pair of two string sets.</br>
+     *         The first set contains a complete list of names of snapshot-able tables.</br>
+     *         The second set contains a list of names of optional
+     *         <strong>single persistent table views</strong> without which the snapshot
+     *         is still considered as complete (ENG-11578, ENG-14145).
      */
-    public static Set<String> getNormalTableNamesFromInMemoryJar(InMemoryJarfile jarfile) {
-        Set<String> tableNames = new HashSet<>();
+    public static Pair<Set<String>, Set<String>>
+    getSnapshotableTableNamesFromInMemoryJar(InMemoryJarfile jarfile) {
+        Set<String> fullTableNames = new HashSet<>();
+        Set<String> optionalTableNames = new HashSet<>();
         Catalog catalog = new Catalog();
         catalog.execute(getSerializedCatalogStringFromJar(jarfile));
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        for (Table table : getNormalTables(db, true)) {
-            tableNames.add(table.getTypeName());
+        Pair<List<Table>, Set<String>> ret;
+
+        ret = getSnapshotableTables(db, true);
+        ret.getFirst().forEach(table -> fullTableNames.add(table.getTypeName()));
+        optionalTableNames.addAll(ret.getSecond());
+
+        ret = getSnapshotableTables(db, false);
+        ret.getFirst().forEach(table -> fullTableNames.add(table.getTypeName()));
+        optionalTableNames.addAll(ret.getSecond());
+
+        return new Pair<Set<String>, Set<String>>(fullTableNames, optionalTableNames);
+    }
+
+    /**
+     * Get all snapshot-able tables from the catalog. A snapshot-able table is one
+     * that's neither an export table nor an implicitly partitioned view.
+     * @param catalog         Catalog database
+     * @param isReplicated    true to return only replicated tables,
+     *                        false to return all partitioned tables
+     * @return A pair that contains a complete list of snapshot-able tables and a list
+     *         of names of optional <strong>single persistent table views</strong> without
+     *         which the snapshot is still considered as complete (ENG-11578, ENG-14145).
+     */
+    public static Pair<List<Table>, Set<String>>
+    getSnapshotableTables(Database catalog, boolean isReplicated) {
+        List<Table> tables = new ArrayList<>();
+        Set<String> optionalTableNames = new HashSet<>();
+        for (Table table : catalog.getTables()) {
+            if (table.getIsreplicated() != isReplicated) {
+                // We handle replicated tables and partitioned tables separately.
+                continue;
+            }
+            if (isTableExportOnly(catalog, table)) {
+                // Streamed tables are not considered as "normal" tables here.
+                continue;
+            }
+            if (table.getMaterializer() != null) {
+                if (isSnapshotablePersistentTableView(catalog, table)) {
+                    // Some persistent table views are added to the snapshot starting from
+                    // V8.2, they are since then considered as "normal" tables, too.
+                    // But their presence in the snapshot is not compulsory for backward
+                    // compatibility reasons.
+                    optionalTableNames.add(table.getTypeName());
+                }
+                else if (! isSnapshotableStreamedTableView(catalog, table)) {
+                    continue;
+                }
+            }
+            tables.add(table);
         }
-        for (Table table : getNormalTables(db, false)) {
-            tableNames.add(table.getTypeName());
-        }
-        return tableNames;
+        return new Pair<List<Table>, Set<String>>(tables, optionalTableNames);
     }
 
     /**
@@ -2550,8 +2688,8 @@ public abstract class CatalogUtil {
         List<Table> tables = new ArrayList<>();
         for (Table table : catalog.getTables()) {
             if ((table.getIsreplicated() == isReplicated) &&
-                table.getMaterializer() == null &&
-                !CatalogUtil.isTableExportOnly(catalog, table)) {
+                    table.getMaterializer() == null &&
+                    !CatalogUtil.isTableExportOnly(catalog, table)) {
                 tables.add(table);
                 continue;
             }
@@ -2678,8 +2816,8 @@ public abstract class CatalogUtil {
      */
     public static Pair<Long, String> calculateDrTableSignatureAndCrc(Database catalog) {
         SortedSet<Table> tables = Sets.newTreeSet();
-        tables.addAll(getNormalTables(catalog, true));
-        tables.addAll(getNormalTables(catalog, false));
+        tables.addAll(getSnapshotableTables(catalog, true).getFirst());
+        tables.addAll(getSnapshotableTables(catalog, false).getFirst());
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
         final StringBuilder sb = new StringBuilder();
@@ -3019,5 +3157,26 @@ public abstract class CatalogUtil {
      */
     public static boolean isProcedurePartitioned(Procedure proc) {
         return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
+    }
+
+    public static Map<String, Table> getTimeToLiveTables(Database db) {
+        Map<String, Table> ttls = Maps.newHashMap();
+        for (Table t : db.getTables()) {
+            if (t.getTimetolive() != null && t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME) != null) {
+                ttls.put(t.getTypeName(),t);
+            }
+        }
+        return ttls;
+    }
+
+    public static boolean isColumnIndexed(Table table, Column column) {
+        for (Index index : table.getIndexes()) {
+            for (ColumnRef colRef : index.getColumns()) {
+                if(column.equals(colRef.getColumn())){
+                 return true;
+                }
+            }
+        }
+        return false;
     }
 }

@@ -780,7 +780,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Release all undo actions up to and including the specified undo token
      * @param undoToken The undo token.
      */
-    public abstract boolean releaseUndoToken(long undoToken);
+    public abstract boolean releaseUndoToken(long undoToken, boolean isEmptyDRTxn);
 
     /**
      * Undo all undo actions back to and including the specified undo token
@@ -864,6 +864,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
+    /**
+     * Pause/resume the maintenance of materialized views specified in viewNames.
+     */
+    public abstract void setViewsEnabled(String viewNames, boolean enabled);
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
@@ -910,7 +915,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int defaultDrBufferSize,
             long tempTableMemory,
             boolean createDrReplicatedStream,
-            int compactionThreshold);
+            int compactionThreshold,
+            int exportFlushTimeout);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.
@@ -1069,7 +1075,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token to release
      * @return true for success false for failure
      */
-    protected native boolean nativeReleaseUndoToken(long pointer, long undoToken);
+    protected native boolean nativeReleaseUndoToken(long pointer, long undoToken, boolean isEmptyDRTxn);
 
     /**
      * @param undoToken The undo token to undo
@@ -1154,6 +1160,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long mAckOffset,
             long seqNo,
             byte mTableSignature[]);
+
+    protected native void nativeSetViewsEnabled(long pointer, byte[] viewNamesAsBytes, boolean enabled);
 
     /**
      * Get the USO for an export table. This is primarily used for recovery.

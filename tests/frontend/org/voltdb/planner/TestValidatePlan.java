@@ -47,41 +47,69 @@ import junit.framework.AssertionFailedError;
 
 public class TestValidatePlan extends PlannerTestCase {
     public void testAllSome() {
+        /*
+         * Test someOf.  Try a pass and then a fail.
+         */
         validatePlan("SELECT * FROM T3",
                      fragSpec(someOf("Expected SEND",
                                      PlanNodeType.AGGREGATE,
                                      PlanNodeType.COMMONTABLE,
-                                     PlanNodeType.SEND)));
+                                     PlanNodeType.SEND),
+                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                      PlanNodeType.PROJECTION)));
         try {
             validatePlan("SELECT * FROM T3",
                          fragSpec(someOf("Expected SEND",
                                          PlanNodeType.AGGREGATE,
                                          PlanNodeType.COMMONTABLE,
-                                         PlanNodeType.HASHAGGREGATE)));
+                                         PlanNodeType.HASHAGGREGATE),
+                                  new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                          PlanNodeType.PROJECTION)));
             fail("Unexpected success.");
         } catch (AssertionFailedError ex) {
             assertTrue(ex.getMessage().contains("Expected SEND"));
         }
+        /*
+         * Test allOf.  Try a pass and then a fail.
+         *
+         * The pass case is kind of goofy, since the matcher is
+         * all the same.  But it tests the allOf matcher.
+         */
+        validatePlan("SELECT * FROM T3",
+                     fragSpec(allOf( PlanNodeType.SEND,
+                                     PlanNodeType.SEND,
+                                     PlanNodeType.SEND),
+                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                      PlanNodeType.PROJECTION)));
         try {
             validatePlan("SELECT * FROM T3",
                          fragSpec(allOf(PlanNodeType.SEND,
                                         PlanNodeType.AGGREGATE,
-                                        PlanNodeType.PROJECTION)));
+                                        PlanNodeType.PROJECTION),
+                                  new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                          PlanNodeType.PROJECTION)));
             fail("Unexpected success.");
         } catch (AssertionFailedError ex) {
             assertTrue(ex.getMessage().contains("AGGREGATE"));
         }
+        /*
+         * Test noneOf.  First a pass and then a fail.
+         */
         validatePlan("SELECT * FROM T3",
                      fragSpec(noneOf("Expected None Here",
                                      PlanNodeType.COMMONTABLE,
                                      PlanNodeType.AGGREGATE,
-                                     PlanNodeType.PROJECTION)));
+                                     PlanNodeType.PROJECTION),
+                              new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                      PlanNodeType.PROJECTION)));
         try {
             validatePlan("SELECT * FROM T3",
                          fragSpec(noneOf("Expected None Here",
                                          PlanNodeType.AGGREGATE,
                                          PlanNodeType.COMMONTABLE,
-                                         PlanNodeType.SEND)));
+                                         PlanNodeType.SEND),
+                                  new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                                          PlanNodeType.PROJECTION)));
             fail("Unexpected success.");
         } catch (AssertionFailedError ex) {
             assertTrue(ex.getMessage().contains("Expected None Here"));

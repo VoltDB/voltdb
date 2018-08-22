@@ -77,13 +77,12 @@ public abstract class DependencyPair {
 
         public BufferDependencyPair(int depId, byte[] dependency, int startPosition, int totalLen) {
             super(depId);
-            assert(dependency != null);
-            assert(dependency.length >= 4);
+            assert (dependency != null);
+            assert (dependency.length >= 4);
             this.dependencyByteArray = dependency;
             this.startPosition = startPosition;
             this.totalLen = totalLen;
         }
-
 
         public ByteBuffer getBufferDependency() {
             return ByteBuffer.wrap(dependencyByteArray, startPosition, totalLen);

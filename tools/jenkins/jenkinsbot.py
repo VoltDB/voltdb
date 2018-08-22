@@ -18,6 +18,7 @@ from logging import handlers
 from mysql.connector.errors import Error as MySQLError
 from slackclient import SlackClient
 from tabulate import tabulate  # Used for pretty printing tables
+from urllib import urlretrieve
 
 # Get job names from environment variables
 COMMUNITY = os.environ.get('community', None)
@@ -41,7 +42,7 @@ JUNIT = os.environ.get('junit', None)
 # Jira credentials and info
 JIRA_USER = os.environ.get('jirauser', None)
 JIRA_PASS = os.environ.get('jirapass', None)
-JIRA_PROJECT = os.environ.get('jiraproject', None)
+JIRA_PROJECT = os.environ.get('jiraproject', 'ENG')
 
 # Queries
 
@@ -581,12 +582,10 @@ table {
     width: 100%;
     font-family: verdana,arial,sans-serif;
 }
-
 th, td {
     padding: 8px;
     border-bottom: 1px solid #ddd;
 }
-
 tr:hover{
     background-color:#f5f5f5
 }
@@ -737,8 +736,8 @@ tr:hover{
         else:
             self.response_html()
 
-    def create_bug_issue(self, channel, summary, description, component, version, labels,
-                         user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT):
+    def create_bug_issue(self, channel, summary, description, component, version, labels, attachments={},
+                         user=JIRA_USER, passwd=JIRA_PASS, project=JIRA_PROJECT, DRY_RUN=False):
         """
         Creates a bug issue on Jira
         :param channel: The channel to notify
@@ -751,9 +750,16 @@ tr:hover{
         :param passwd: Password
         :param project: Jira project
         """
+
+        def add_attachments(jira, ticketId, attachments):
+            for file in attachments:
+                urlretrieve(attachments[file], file)
+                jira.add_attachment(ticketId, os.getcwd() + '/' + file, file)
+                os.unlink(file)
+
         if user and passwd and project:
             try:
-                jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(user, passwd))
+                jira = JIRA(server='https://issues.voltdb.com/', basic_auth=(user, passwd), options=dict(verify=False))
             except:
                 self.logger.exception('Could not connect to Jira')
                 return
@@ -761,11 +767,27 @@ tr:hover{
             self.logger.error('Did not provide either a Jira user, a Jira password or a Jira project')
             return
 
-        # Check for existing bug with same summary
-        existing = jira.search_issues('summary ~ \'%s\'' % summary)
+        # Check for existing bugs for the same test case, if there are any, suppress filing another
+        test_case = summary.split(' ')[0]
+        existing = jira.search_issues('summary ~ \'%s\' and labels = automatic and status != Closed' % test_case)
         if len(existing) > 0:
-            # Already reported
-            self.logger.info('OLD: Already reported issue with summary "' + summary + '"')
+            self.logger.info('Found open issue(s) for "' + test_case + '" ' + ' '.join([k.key for k in existing]))
+
+            # Check if new failure is on different job than existing ticket, if so comments
+            job = summary.split()[-2]
+            existing_ticket = jira.issue(existing[0].id)
+            if job not in existing_ticket.fields.summary:
+                comments = jira.comments(existing[0].id)
+                for comment in comments:
+                    # Check for existing comment for same job, if there are any, suppress commenting another
+                    if job in comment.body:
+                        self.logger.info('Found existing comment(s) for "' + job + '" on open issue')
+                        return
+
+                self.logger.info('Commenting about separate job failure for %s on open issue' % test_case)
+                if not DRY_RUN:
+                    jira.add_comment(existing[0].id, summary + '\n\n' + description)
+                    add_attachments(jira, existing[0].id, attachments)
             return
 
         issue_dict = {
@@ -812,11 +834,23 @@ tr:hover{
         issue_dict['fixVersions'] = [{'name':'Backlog'}]
         issue_dict['priority'] = {'name': 'Blocker'}
 
-        new_issue = jira.create_issue(fields=issue_dict)
-        self.logger.info('NEW: Reported issue with summary "' + summary + '"')
+        self.logger.info("Filing ticket: %s" % summary)
+        if not DRY_RUN:
+            new_issue = jira.create_issue(fields=issue_dict)
+            add_attachments(jira, new_issue.id, attachments)
+            #self.logger.info('NEW: Reported issue with summary "' + summary + '"')
+            if self.connect_to_slack():
+                self.post_message(channel, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
+            suite = summary.split('.')[-3]
+            # Find all tickets within same test suite and link them
+            link_tickets = jira.search_issues('summary ~ \'%s\' and labels = automatic and status != Closed and reporter in (voltdbci)' % suite)
+            for ticket in link_tickets:
+                jira.create_issue_link('Related', new_issue.key, ticket)
+        else:
+            new_issue = None
 
-        if self.connect_to_slack():
-            self.post_message(channel, 'Opened issue at https://issues.voltdb.com/browse/' + new_issue.key)
+        return new_issue
+
 
 if __name__ == '__main__':
     jenkinsbot = JenkinsBot()

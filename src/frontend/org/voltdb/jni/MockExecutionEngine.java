@@ -154,7 +154,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
+    public boolean releaseUndoToken(final long undoToken, boolean isEmptyDRTxn) {
         return false;
     }
 
@@ -253,5 +253,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
         return 0;
+    }
+
+    @Override
+    public void setViewsEnabled(String viewNames, boolean enabled) {
+        return;
     }
 }

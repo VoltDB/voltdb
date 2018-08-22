@@ -1,2 +1,2 @@
-Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: TABLE object not found: NONEXISTENT_TABLE
-Unexpected Ad Hoc Planning Error: java.lang.RuntimeException: Error compiling query: org.voltdb.planner.PlanningErrorException: TABLE object not found: NONEXISTENT_TABLE
+SQL error while compiling query: TABLE object not found: NONEXISTENT_TABLE
+SQL error while compiling query: TABLE object not found: NONEXISTENT_TABLE

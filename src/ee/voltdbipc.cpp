@@ -208,6 +208,8 @@ private:
 
     int callJavaUserDefinedFunction();
 
+    void setViewsEnabled(struct ipc_command*);
+
     // We do not adjust the UDF buffer size in the IPC mode.
     // The buffer sizes are always MAX_MSG_SZ (10M)
     void resizeUDFBuffer(int32_t size) {
@@ -299,6 +301,7 @@ typedef struct {
 struct undo_token {
     struct ipc_command cmd;
     int64_t token;
+    char isEmptyDRTxn;
 }__attribute__((packed));
 
 /*
@@ -394,6 +397,12 @@ typedef struct {
     int32_t isStreamChange;
     char data[0];
 }__attribute__((packed)) update_catalog_cmd;
+
+typedef struct {
+    struct ipc_command cmd;
+    char enabled;
+    char viewNameBytes[0];
+}__attribute__((packed)) set_views_enabled;
 
 using namespace voltdb;
 
@@ -554,6 +563,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 30:
           result = shutDown();
+          break;
+      case 31:
+          setViewsEnabled(cmd);
+          result = kErrorCode_None;
           break;
       default:
         result = stub(cmd);
@@ -731,9 +744,10 @@ int8_t VoltDBIPC::releaseUndoToken(struct ipc_command *cmd) {
 
 
     struct undo_token * cs = (struct undo_token*) cmd;
+    bool isEmptyDRTxn = cs->isEmptyDRTxn > 0;
 
     try {
-        m_engine->releaseUndoToken(ntohll(cs->token));
+        m_engine->releaseUndoToken(ntohll(cs->token), isEmptyDRTxn);
     } catch (const FatalException &e) {
         crashVoltDB(e);
     }
@@ -878,6 +892,12 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     }
 }
 
+void VoltDBIPC::setViewsEnabled(struct ipc_command *cmd) {
+    set_views_enabled* setViewsEnabledCommand = (set_views_enabled*) cmd;
+    bool enabled = setViewsEnabledCommand->enabled > 0;
+    m_engine->setViewsEnabled(std::string(setViewsEnabledCommand->viewNameBytes), enabled);
+}
+
 void VoltDBIPC::sendPerFragmentStatsBuffer() {
     int8_t statusCode = static_cast<int8_t>(kErrorCode_pushPerFragmentStatsBuffer);
     writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
@@ -978,7 +998,10 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         } else {
             return kErrorCode_Error;
         }
-    } catch (const FatalException &e) {
+    } catch (const SerializableEEException &see) {
+        return kErrorCode_Error;
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;

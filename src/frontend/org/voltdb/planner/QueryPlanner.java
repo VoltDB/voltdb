@@ -17,30 +17,21 @@
 
 package org.voltdb.planner;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Constraint;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
+import org.voltdb.catalog.*;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractReceivePlanNode;
-import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.*;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -262,7 +253,7 @@ public class QueryPlanner implements AutoCloseable {
         return m_paramzInfo.getParamLiteralValues();
     }
 
-    public ParameterSet extractedParamValues(VoltType[] parameterTypes) throws Exception {
+    public ParameterSet extractedParamValues(VoltType[] parameterTypes) {
         if (m_paramzInfo == null) {
             return null;
         }
@@ -350,7 +341,7 @@ public class QueryPlanner implements AutoCloseable {
      * <li>
      *   Parse the VoltXMLElement to create an AbstractParsedStatement.  This has
      *   a second effect of loading lists of join orders and access paths for planning.
-     *   For us, and access path is a way of scanning something scannable.  It's a generalization
+     *   For us, an access path is a way of scanning something scannable.  It's a generalization
      *   of the notion of scanning a table or an index.
      * </li>
      * <li>
@@ -382,6 +373,8 @@ public class QueryPlanner implements AutoCloseable {
     private CompiledPlan compileFromXML(VoltXMLElement xmlSQL, String[] paramValues) {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
+        // Simple constant expressions (i.e. "1 + 1" or "(2 * 4 + 2)/3") are evaluated and substituted by HSQL;
+        // but expressions with functions (i.e. "cast(power(2, 3) to int)" are not.
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null, m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
         if (parsedStmt == null) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();
@@ -409,7 +402,17 @@ public class QueryPlanner implements AutoCloseable {
                 return null;
             }
         }
-
+        if(parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt) {
+            final MVQueryRewriter rewriter;
+            if (parsedStmt instanceof ParsedSelectStmt) {
+                rewriter = new MVQueryRewriter((ParsedSelectStmt) parsedStmt);
+            } else {
+                rewriter = new MVQueryRewriter((ParsedUnionStmt) parsedStmt);
+            }
+            if (rewriter.rewrite() && m_paramzInfo != null) { // if query is rewritten the #parameters is likely reduced.
+                m_paramzInfo.rewrite();
+            }
+        }
         m_planSelector.outputParsedStatement(parsedStmt);
 
         if (m_isLargeQuery) {

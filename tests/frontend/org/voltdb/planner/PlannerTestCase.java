@@ -24,11 +24,8 @@
 package org.voltdb.planner;
 
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.EmptyStackException;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -44,6 +41,7 @@ import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanMatcher;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
@@ -56,7 +54,6 @@ public class PlannerTestCase extends TestCase {
     private boolean m_byDefaultPlanForSinglePartition;
     final private int m_defaultParamCount = 0;
     private String m_noJoinOrder = null;
-
     /**
      * @param sql
      * @return
@@ -368,15 +365,19 @@ public class PlannerTestCase extends TestCase {
         return explain;
     }
 
-    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
-        String explainStr1, explainStr2;
-        List<AbstractPlanNode> pns = compileToFragments(sql1);
-        explainStr1 = buildExplainPlan(pns);
-        pns = compileToFragments(sql2);
-        explainStr2 = buildExplainPlan(pns);
-
-        assertEquals(explainStr1, explainStr2);
+    protected void checkQueriesPlansAreDifferent(String sql1, String sql2, String msg) {
+        assertFalse(msg, areQueryPlansEqual(sql1, sql2));
     }
+
+    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
+        assertEquals(buildExplainPlan(compileToFragments(sql1)), buildExplainPlan(compileToFragments(sql2)));
+    }
+
+    private boolean areQueryPlansEqual(String sql1, String sql2) {
+        return buildExplainPlan(compileToFragments(sql1))
+                .equals(buildExplainPlan(compileToFragments(sql2)));
+    }
+
 
     /**
      * Call this function to verify that an order by plan node has the
@@ -705,8 +706,15 @@ public class PlannerTestCase extends TestCase {
                 stack.isEmpty());
     }
 
-    protected interface PlanMatcher {
-        String match(AbstractPlanNode node);
+    private String planNodeListString(List<PlanNodeType> list) {
+        StringBuilder buf = new StringBuilder();
+        String sep = "";
+        for (PlanNodeType pnt : list) {
+            buf.append(sep)
+               .append(pnt.name());
+            sep = ", ";
+        }
+        return buf.toString();
     }
 
     protected static class PlanWithInlineNodes implements PlanMatcher {
@@ -724,18 +732,40 @@ public class PlannerTestCase extends TestCase {
         public String match(AbstractPlanNode node) {
             PlanNodeType mainNodeType = node.getPlanNodeType();
             if (m_type != mainNodeType) {
-                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s",
-                                     m_type, mainNodeType);
+                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s "
+                                     + "at plan node id %d.",
+                                     m_type, mainNodeType,
+                                     node.getPlanNodeId());
             }
             for (PlanNodeType nodeType : m_branches) {
                 AbstractPlanNode inlineNode = node.getInlinePlanNode(nodeType);
                 if (inlineNode == null) {
-                    return String.format("Expected inline node type %s but didn't find it.",
-                                         nodeType.name());
+                    return String.format("Expected inline node type %s but didn't find it "
+                                         + "at plan node id %d.",
+                                         nodeType.name(),
+                                         node.getPlanNodeId());
                 }
             }
             if (m_branches.size() != node.getInlinePlanNodes().size()) {
-                return String.format("Expected %d inline nodes, found %d", m_branches.size(), node.getInlinePlanNodes().size());
+                StringBuilder buf = new StringBuilder();
+                String sep = "";
+                for (PlanNodeType pnt : m_branches) {
+                    buf.append(sep).append(pnt.name());
+                }
+                String expected = buf.toString();
+                buf = new StringBuilder();
+                sep = "";
+                for (Map.Entry<PlanNodeType, AbstractPlanNode> entry : node.getInlinePlanNodes().entrySet()) {
+                    buf.append(sep).append(entry.getKey().name());
+                    sep = ", ";
+                }
+                String found = buf.toString();
+                return String.format("Expected %d inline nodes (%s), found %d (%s) at node id %d.",
+                                     m_branches.size(),
+                                     expected,
+                                     node.getInlinePlanNodes().size(),
+                                     found,
+                                     node.getPlanNodeId());
             }
             return null;
         }
@@ -760,9 +790,10 @@ public class PlannerTestCase extends TestCase {
             return (node) -> {
                         PlanNodeType pnt = (PlanNodeType)obj;
                         if (node.getPlanNodeType() != (PlanNodeType)obj) {
-                            return String.format("Expected Plan Node Type %s not %s",
+                            return String.format("Expected Plan Node Type %s not %s at node id %d",
                                                  pnt.name(),
-                                                 node.getPlanNodeType().name());
+                                                 node.getPlanNodeType().name(),
+                                                 node.getPlanNodeId());
                         }
                         return null;
                     };
@@ -786,20 +817,34 @@ public class PlannerTestCase extends TestCase {
 
         @Override
         public String match(AbstractPlanNode node) {
-            for (PlanMatcher pm : m_nodeSpecs) {
-                if (node == null) {
-                    return "Expected more nodes in plan.";
-                }
+            int idx;
+            for (idx = 0; node != null && idx < m_nodeSpecs.size(); idx += 1) {
+                PlanMatcher pm = m_nodeSpecs.get(idx);
                 String err = pm.match(node);
                 if (err != null) {
                     return err;
                 }
+                // Nodes with multiple children, such as join
+                // nodes, will have their own matchers, and will
+                // stop here.
                 if (node.getChildCount() > 0) {
                     node = node.getChild(0);
                 }
                 else {
                     node = null;
                 }
+            }
+            if (idx < m_nodeSpecs.size()) {
+                return "Expected "
+                       + (m_nodeSpecs.size() + 1)
+                       + " nodes in plan, not "
+                       + (idx+1) ;
+            }
+            if (node != null) {
+                return "Expected fewer nodes in plan at node "
+                       + (idx + 1)
+                       + ": "
+                       + node.getPlanNodeType();
             }
             return null;
         }
@@ -896,15 +941,15 @@ public class PlannerTestCase extends TestCase {
      * Match all the given node specifications.  Specifications
      * after the first failure are not evaluated.
      *
+     * Note that, unlike someOf or noneOf, there is no fail
+     * message.  The first failing specification is the error
+     * message.
+     *
      * @param nodeSpecs  The specifications.
      * @return
      */
     protected PlanMatcher allOf(PlanMatcher ... nodeSpecs) {
-        return new SomeOrNoneOrAllOf(true, true, "ShouldNeverHappen", (Object[])nodeSpecs);
-    }
-    // This is like the above, but make some expressions more convenient.
-    protected PlanMatcher allOf(Object ... nodeSpecs) {
-        return new SomeOrNoneOrAllOf(true, true, "ShouldNeverHappen", nodeSpecs);
+        return new SomeOrNoneOrAllOf(true, true, "This cannot happen.", (Object[])nodeSpecs);
     }
 
     /**
@@ -918,10 +963,6 @@ public class PlannerTestCase extends TestCase {
     protected PlanMatcher someOf(String failMessage, PlanMatcher ... nodeSpecs) {
         return new SomeOrNoneOrAllOf(false, true, failMessage, (Object[])nodeSpecs);
     }
-    // This is like the above, but make some expressions more convenient.
-    protected PlanMatcher someOf(String failMessage, Object ... nodeSpecs) {
-        return new SomeOrNoneOrAllOf(false, true, failMessage, nodeSpecs);
-    }
     /**
      * Ensure that no specification succeeds.
      *
@@ -932,10 +973,6 @@ public class PlannerTestCase extends TestCase {
      */
     protected PlanMatcher noneOf(String failMessage, PlanMatcher ... nodeSpecs) {
         return new SomeOrNoneOrAllOf(false, false, failMessage, (Object[])nodeSpecs);
-    }
-    // This is like the above, but make some expressions more convenient.
-    protected PlanMatcher noneOf(String failMessage, Object ... nodeSpecs) {
-        return new SomeOrNoneOrAllOf(false, false, failMessage, nodeSpecs);
     }
     /**
      * Validate a plan.  This is kind of like
@@ -958,7 +995,21 @@ public class PlannerTestCase extends TestCase {
      */
     protected void validatePlan(String SQL,
                                 FragmentSpec ... spec) {
-        List<AbstractPlanNode> fragments = compileToFragments(SQL);
+        // All this System.out.printf nonsense should be changed
+        // to a log message somehow.
+        List<AbstractPlanNode> fragments;
+        if (spec.length > 1) {
+            fragments = compileToFragments(SQL);
+        } else {
+            fragments = new ArrayList<>();
+            fragments.add(compileForSinglePartition(SQL));
+        }
+        System.out.printf("SQL: %s\n", SQL);
+        for (int idx = 0; idx < fragments.size(); idx += 1) {
+            AbstractPlanNode node = fragments.get(idx);
+            System.out.printf("Node %d/%d:\n%s\n", idx + 1, fragments.size(), node.toExplainPlanString());
+            printJSONString(node);
+        }
         assertEquals(String.format("Expected %d fragments, not %d",
                                    spec.length,
                                    fragments.size()),
@@ -967,6 +1018,15 @@ public class PlannerTestCase extends TestCase {
         for (int idx = 0; idx < fragments.size(); idx += 1) {
             String error = spec[idx].match(fragments.get(idx));
             assertNull(error, error);
+        }
+    }
+
+    private void printJSONString(AbstractPlanNode node) {
+        try {
+            String jsonString = PlanSelector.outputPlanDebugString(node);
+            System.out.printf("Json:\n%s\n", jsonString);
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
     }
 }
