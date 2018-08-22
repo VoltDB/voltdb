@@ -79,7 +79,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything
-        if ((backend == BackendTarget.NATIVE_EE_IPC) || (backend == BackendTarget.NATIVE_EE_VALGRIND_IPC)) {
+        if (backend.isValgrindTarget) {
             backend = BackendTarget.NATIVE_EE_JNI;
         }
 

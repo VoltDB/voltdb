@@ -410,7 +410,7 @@ public class LocalCluster extends VoltServerConfig {
 
         // if the user wants valgrind and it makes sense, give it to 'em
         // For now only one host works.
-        if (isMemcheckDefined() && (target == BackendTarget.NATIVE_EE_JNI) && m_hostCount == 1) {
+        if (isMemcheckDefined() && target.isValgrindable && m_hostCount == 1) {
             m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
         }
         else {
@@ -504,7 +504,7 @@ public class LocalCluster extends VoltServerConfig {
      * Called after a constructor but before startup.
      */
     public void overrideAnyRequestForValgrind() {
-        if (templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+        if (templateCmdLine.m_backend.isValgrindTarget) {
             m_target = BackendTarget.NATIVE_EE_JNI;
             templateCmdLine.m_backend = BackendTarget.NATIVE_EE_JNI;
         }
