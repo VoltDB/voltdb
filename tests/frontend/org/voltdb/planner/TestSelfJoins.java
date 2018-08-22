@@ -65,7 +65,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         ss = (SeqScanPlanNode) c;
         assertEquals("R1", ss.getTargetTableName());
         assertEquals("B", ss.getTargetTableAlias());
-        assertEquals(ExpressionType.COMPARE_GREATERTHAN, ss.getPredicate().getExpressionType());
+        assertEquals(ExpressionType.COMPARE_GREATERTHANOREQUALTO, ss.getPredicate().getExpressionType());   // expression normalizer kicks in
 
         pn = compile("select * FROM R1 JOIN R1 B ON R1.C = B.C");
         pn = pn.getChild(0);
@@ -186,7 +186,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, nlij.getChildCount());
         c = (IndexScanPlanNode) nlij.getChild(0);
         assertNull(c.getPredicate());
-        assertEquals(IndexLookupType.GT, c.getLookupType());
+        assertEquals(IndexLookupType.GTE, c.getLookupType());       // expression normalizer kicks in
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
@@ -214,7 +214,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, nlij.getChildCount());
         c = (IndexScanPlanNode) nlij.getChild(0);
         assertNull(c.getPredicate());
-        assertEquals(IndexLookupType.GT, c.getLookupType());
+        assertEquals(IndexLookupType.GTE, c.getLookupType());       // expression normalizer kicks in
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
@@ -240,7 +240,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, nlij.getChildCount());
         assertTrue(nlij.getChild(0) instanceof IndexScanPlanNode);
         c = (IndexScanPlanNode) nlij.getChild(0);
-        assertEquals(IndexLookupType.GT, c.getLookupType());
+        assertEquals(IndexLookupType.GTE, c.getLookupType());       // expression normalizer kicks in
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
@@ -264,7 +264,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, nlij.getChildCount());
         c = (IndexScanPlanNode) nlij.getChild(0);
         assertNull(c.getPredicate());
-        assertEquals(IndexLookupType.GT, c.getLookupType());
+        assertEquals(IndexLookupType.GTE, c.getLookupType());       // expression normalizer kicks in
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
@@ -293,7 +293,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, nlij.getChildCount());
         c = (IndexScanPlanNode) nlij.getChild(0);
         assertNull(c.getPredicate());
-        assertEquals(IndexLookupType.GT, c.getLookupType());
+        assertEquals(IndexLookupType.GTE, c.getLookupType());       // expression normalizer kicks in
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
@@ -316,7 +316,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, nlij.getChildCount());
         assertTrue(nlij.getChild(0) instanceof IndexScanPlanNode);
         c = (IndexScanPlanNode) nlij.getChild(0);
-        assertEquals(IndexLookupType.GT, c.getLookupType());
+        assertEquals(IndexLookupType.GTE, c.getLookupType());       // expression normalizer kicks in
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
@@ -346,7 +346,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, nlij.getChildCount());
         c = (IndexScanPlanNode) nlij.getChild(0);
         assertNull(c.getPredicate());
-        assertEquals(IndexLookupType.GT, c.getLookupType());
+        assertEquals(IndexLookupType.GTE, c.getLookupType());       // expression normalizer kicks in
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
@@ -378,7 +378,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, nlij.getChildCount());
         c = (IndexScanPlanNode) nlij.getChild(0);
         assertNull(c.getPredicate());
-        assertEquals(IndexLookupType.GT, c.getLookupType());
+        assertEquals(IndexLookupType.GTE, c.getLookupType());      // expression normalizer kicks in;
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);
@@ -404,7 +404,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertEquals(1, nlij.getChildCount());
         assertTrue(nlij.getChild(0) instanceof IndexScanPlanNode);
         c = (IndexScanPlanNode) nlij.getChild(0);
-        assertEquals(IndexLookupType.GT, c.getLookupType());
+        assertEquals(IndexLookupType.GTE, c.getLookupType());       // expression normalizer kicks in
         searchKeys = c.getSearchKeyExpressions();
         assertEquals(1, searchKeys.size());
         assertTrue(searchKeys.get(0) instanceof ConstantValueExpression);

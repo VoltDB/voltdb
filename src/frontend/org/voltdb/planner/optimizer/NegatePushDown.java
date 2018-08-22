@@ -43,7 +43,8 @@ final class NegatePushDown {
                     new NegatePushDown(expr.getLeft()).get(), new NegatePushDown(expr.getRight()).get()));
         } else if (expr instanceof ComparisonExpression && ! (expr instanceof InComparisonExpression) &&
                 ComparisonTypeMerger.reversible(type)) {
-            m_expr = new ComparisonExpression(reverseCmpOperator(type), expr.getLeft(), expr.getRight());
+            m_expr = new ComparisonExpression(reverseCmpOperator(type), expr.getLeft(), expr.getRight(),
+                    ((ComparisonExpression) expr).getQuantifier());
         } else {    // other types of terminal node
             m_expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr, null, 0);
         }

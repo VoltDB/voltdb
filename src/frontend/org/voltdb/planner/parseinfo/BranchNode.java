@@ -59,6 +59,16 @@ public class BranchNode extends JoinNode {
         updateContentDeterminismMessage(rightNode.getContentDeterminismMessage());
     }
 
+    @Override
+    public void normalizeExpressions() {
+        super.normalizeExpressions();
+        if (m_leftNode != null) {
+            m_leftNode.normalizeExpressions();
+        }
+        if (m_rightNode != null) {
+            m_rightNode.normalizeExpressions();
+        }
+    }
     /**
      * Deep clone
      */

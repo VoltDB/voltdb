@@ -84,7 +84,8 @@ public class ExpressionNormalizer {
                 return e instanceof ComparisonExpression && ! (e instanceof InComparisonExpression) ?
                         new ComparisonExpression(e.getExpressionType(),
                                 ArithmeticSimplifier.of(op, e.getLeft()),
-                                ArithmeticSimplifier.of(op, e.getRight())) :
+                                ArithmeticSimplifier.of(op, e.getRight()),
+                                ((ComparisonExpression) e).getQuantifier()) :
                         e;
         }
     }

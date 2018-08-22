@@ -274,11 +274,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         }
         m_joinOrderList.forEach(JoinNode::normalizeExpressions);
-        if (m_joinTree != null && ConstantValueExpression.isBooleanValue(m_joinTree.getJoinExpression())) {
-            if (ConstantValueExpression.isBooleanFalse(m_joinTree.getJoinExpression())) {
-                m_limitOffset.setFalse();
+        if (m_joinTree != null) {
+            m_joinTree.normalizeExpressions();
+            if (ConstantValueExpression.isBooleanValue(m_joinTree.getJoinExpression())) {
+                if (ConstantValueExpression.isBooleanFalse(m_joinTree.getJoinExpression())) {
+                    m_limitOffset.setFalse();
+                }
+                m_joinTree.setJoinExpression(null);
             }
-            m_joinTree.setJoinExpression(null);
         }
     }
 

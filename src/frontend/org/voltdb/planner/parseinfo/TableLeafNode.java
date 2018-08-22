@@ -44,6 +44,12 @@ public class TableLeafNode extends JoinNode {
         m_tableScan = tableScan;
     }
 
+    @Override
+    public void normalizeExpressions() {
+        super.normalizeExpressions();
+        getTableScan().normalizeExpressions();
+    }
+
     /**
      * Deep clone
      */

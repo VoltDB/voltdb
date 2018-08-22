@@ -56,11 +56,17 @@ public class CommonTableLeafNode extends JoinNode {
     }
 
     @Override
+    public void normalizeExpressions() {
+        super.normalizeExpressions();
+        m_commonTableScan.normalizeExpressions();
+    }
+
+    @Override
     public Object clone() {
         AbstractExpression joinExpr = (m_joinExpr != null) ?
-                (AbstractExpression) m_joinExpr.clone() : null;
+                m_joinExpr.clone() : null;
         AbstractExpression whereExpr = (m_whereExpr != null) ?
-                (AbstractExpression) m_whereExpr.clone() : null;
+                m_whereExpr.clone() : null;
         JoinNode newNode = new CommonTableLeafNode(m_id, joinExpr, whereExpr, m_commonTableScan);
         return newNode;
     }

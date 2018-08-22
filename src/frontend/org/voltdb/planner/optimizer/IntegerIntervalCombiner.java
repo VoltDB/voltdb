@@ -213,8 +213,9 @@ class IntegerIntervalCombiner {
     private static List<AbstractExpression> compactNumberComparisons(List<AbstractExpression> src) {
         // collect LHS of comparison expressions
         final List<AbstractExpression> lefts = new ArrayList<>(
-                src.stream()        // At this point, it might contain string comparisons like c1 = 'foo',
-                        .filter(e -> e instanceof ComparisonExpression && e.getLeft().getValueType().isNumber())
+                src.stream()        // At this point, it might contain string comparisons like c1 = 'foo', or row-subquery = any select-subquery comparisons.
+                        .filter(e -> e instanceof ComparisonExpression && e.getLeft().getValueType().isNumber() &&
+                                ! (e.getRight() instanceof SelectSubqueryExpression))
                         .map(AbstractExpression::getLeft)   // certainly they cannot be minus-ed.
                         .collect(Collectors.toSet()));
         // filter on those LHS expressions whose -{expression} is equivalent to some entry in the collection:
@@ -318,8 +319,9 @@ class IntegerIntervalCombiner {
      */
     static AbstractExpression combine(AbstractExpression e, ConjunctionRelation rel) {
         if (rel == ConjunctionRelation.ATOM) {
-            return e.getLeft().getValueType().isNumber() ?        // Skip for non-number (i.e. string) comparisons.
-                    new IntegerIntervalCombiner(
+            return e.getLeft().getValueType().isNumber() &&
+                    ! (e.getRight() instanceof SelectSubqueryExpression) ?        // Skip for non-number (i.e. string) or
+                    new IntegerIntervalCombiner(                                  // row-subquery = any select-subquery comparisons.
                     new ArrayList<AbstractExpression>() {{ add(e); }}, new ArrayList<>(),
                     ConjunctionRelation.AND).get() :
                     e;
@@ -548,7 +550,7 @@ class IntegerIntervalCombiner {
                 if (init != null) {
                     init.getArgs().addAll(0, numerals);   // add concrete number before other expressions
                 } else {
-                    init = new VectorValueExpression(new ArrayList<>(numerals));
+                    init = new VectorValueExpression(new ArrayList<>(numerals), VoltType.INTEGER);
                 }
                 numerals.clear();
             }
@@ -621,8 +623,8 @@ class IntegerIntervalCombiner {
                 included = minus(included, commons);        // All inclusion expressions but those present in exclusion list
                 excluded = minus(excluded, commons);        // All exclusion expressions but those present in inclusion list
                 return new range_t(intervals,               // convert remaining lists to VVE
-                        included.isEmpty() ? null : new VectorValueExpression(included),
-                        excluded.isEmpty() ? null : new VectorValueExpression(excluded));
+                        included.isEmpty() ? null : new VectorValueExpression(included, VoltType.INTEGER),
+                        excluded.isEmpty() ? null : new VectorValueExpression(excluded, VoltType.INTEGER));
             }
         }
         private static range_t intersection(range_t lhs, range_t rhs) {
@@ -634,8 +636,8 @@ class IntegerIntervalCombiner {
                 return new range_t(new ArrayList<>(), null, null);
             } else {
                 return new range_t(IntegerInterval.Util.intersections(lhs.getIntervals(), rhs.getIntervals()),
-                        included.isEmpty() ? null : new VectorValueExpression(included),
-                        excluded.isEmpty() ? null : new VectorValueExpression(excluded));
+                        included.isEmpty() ? null : new VectorValueExpression(included, VoltType.INTEGER),
+                        excluded.isEmpty() ? null : new VectorValueExpression(excluded, VoltType.INTEGER));
             }
         }
     }
@@ -671,7 +673,7 @@ class IntegerIntervalCombiner {
             });
             return new range_t(IntegerInterval.Util.unions(                 // try combine discrete numbers into ranges
                     numbers.stream().map(IntegerInterval::of).collect(Collectors.toList())),
-                    parameters.isEmpty() ? null : new VectorValueExpression(parameters),
+                    parameters.isEmpty() ? null : new VectorValueExpression(parameters, VoltType.INTEGER),
                     null);
         } else {
             assert(isInt(right));                                           // RHS of ordered comparison must be literal integer:

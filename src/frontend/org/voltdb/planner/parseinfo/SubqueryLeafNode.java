@@ -46,6 +46,11 @@ public class SubqueryLeafNode extends JoinNode {
         m_subqueryScan = scan;
     }
 
+    @Override
+    public void normalizeExpressions() {
+        super.normalizeExpressions();
+        getSubqueryScan().normalizeExpressions();
+    }
     /**
      * Deep clone
      */

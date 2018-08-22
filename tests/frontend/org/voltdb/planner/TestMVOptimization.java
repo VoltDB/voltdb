@@ -72,7 +72,7 @@ public class TestMVOptimization extends PlannerTestCase {
         // Negative tests: GBY column mismatch -- V2_0 from testplans-materialized-view-optimization-ddl.sql gby column a1, not a
         assertMatch("SELECT a, ABS(b), COUNT(*) FROM t1 WHERE b > 2 GROUP BY ABS(b), a;",
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" using \"TA\" " +
-                "(for optimized grouping only) filter by (B > 2) inline Partial AGGREGATION ops: COUNT(*)");
+                "(for optimized grouping only) filter by (B >= 3) inline Partial AGGREGATION ops: COUNT(*)");
         // Negative tests: with LIMIT or OFFSET - ENG-14415
         assertMatch("SELECT a1 a1, COUNT(b) count_b, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1 LIMIT 2",
                 "RETURN RESULTS TO STORED PROCEDURE LIMIT 2 " +

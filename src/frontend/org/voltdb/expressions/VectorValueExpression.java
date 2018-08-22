@@ -17,6 +17,7 @@
 
 package org.voltdb.expressions;
 
+import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
 import java.util.Comparator;
@@ -37,6 +38,11 @@ public class VectorValueExpression extends AbstractExpression {
     public VectorValueExpression(List<AbstractExpression> args) {
         this();
         setArgs(args);
+    }
+
+    public VectorValueExpression(List<AbstractExpression> args, VoltType type) {
+        this(args);
+        setValueType(type);
     }
 
     @Override
