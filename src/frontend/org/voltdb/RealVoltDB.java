@@ -61,7 +61,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -351,7 +350,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     RestoreAgent m_restoreAgent = null;
 
     private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
-
+    private final ListeningExecutorService m_failedHostExecutorService = CoreUtils.getCachedSingleThreadExecutor("Failed Host monitor", 15000);
     private volatile boolean m_isRunning = false;
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
@@ -1656,76 +1655,72 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void hostsFailed(Set<Integer> failedHosts)
-    {
-        final ScheduledExecutorService es = getSES(true);
-        if (es != null && !es.isShutdown()) {
-            es.submit(new Runnable() {
-                @Override
-                public void run()
-                {
-                    // First check to make sure that the cluster still is viable before
-                    // before allowing the fault log to be updated by the notifications
-                    // generated below.
-                    if (!m_leaderAppointer.isClusterKSafe(failedHosts)) {
-                        VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
-                                false, null);
-                        return;
-                    }
-
-                    handleHostsFailedForMigratePartitionLeader(failedHosts);
-                    acceptExportStreamMastership(failedHosts);
-
-                    // Send KSafety trap - BTW the side effect of
-                    // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
-                    // creates the ksafety stats set
-                    if (m_cartographer.isPartitionZeroLeader() || isFirstZeroPartitionReplica(failedHosts)) {
-                        // Send hostDown traps
-                        for (int hostId : failedHosts) {
-                            m_snmp.hostDown(FaultLevel.ERROR, hostId, "Host left cluster mesh due to connection loss");
-                        }
-                        final int missing = m_leaderAppointer.getKSafetyStatsSet().stream()
-                                .max((s1,s2) -> s1.getMissingCount() - s2.getMissingCount())
-                                .map(s->s.getMissingCount()).orElse(failedHosts.size());
-                        final int expected = m_clusterSettings.getReference().hostcount();
-                        m_snmp.statistics(FaultFacility.CLUSTER,
-                                "Node lost. Cluster is down to " + (expected - missing)
-                              + " members out of original "+ expected + ".");
-                    }
-                    // Cleanup the rejoin blocker in case the rejoining node failed.
-                    // This has to run on a separate thread because the callback is
-                    // invoked on the ZooKeeper server thread.
-                    //
-                    // I'm trying to be defensive to have this cleanup code run on
-                    // all live nodes. One of them will succeed in cleaning up the
-                    // rejoin ZK nodes. The others will just do nothing if the ZK
-                    // nodes are already gone. If this node is still initializing
-                    // when a rejoining node fails, there must be a live node that
-                    // can clean things up. It's okay to skip this if the executor
-                    // services are not set up yet.
-                    //
-                    // Also be defensive to cleanup stop node indicator on all live
-                    // hosts.
-                    for (int hostId : failedHosts) {
-                        CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
-                        VoltZK.removeStopNodeIndicator(m_messenger.getZK(),
-                                ZKUtil.joinZKPath(VoltZK.host_ids_be_stopped, Integer.toString(hostId)),
-                                hostLog);
-                        m_messenger.removeStopNodeNotice(hostId);
-                    }
-
-                    stopRejoiningHost(failedHosts);
-
-                    //create a blocker for repair if this is a MP leader and partition leaders change
-                    if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
-                        VoltZK.createMpRepairBlocker(m_messenger.getZK());
-                    }
-                    // let the client interface know host(s) have failed to clean up any outstanding work
-                    // especially non-transactional work
-                    m_clientInterface.handleFailedHosts(failedHosts);
+    public void hostsFailed(Set<Integer> failedHosts) {
+        m_failedHostExecutorService.submit(new Runnable() {
+            @Override
+            public void run()
+            {
+                // First check to make sure that the cluster still is viable before
+                // before allowing the fault log to be updated by the notifications
+                // generated below.
+                if (!m_leaderAppointer.isClusterKSafe(failedHosts)) {
+                    VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                            false, null);
+                    return;
                 }
-            });
-        }
+
+                handleHostsFailedForMigratePartitionLeader(failedHosts);
+                acceptExportStreamMastership(failedHosts);
+
+                // Send KSafety trap - BTW the side effect of
+                // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
+                // creates the ksafety stats set
+                if (m_cartographer.isPartitionZeroLeader() || isFirstZeroPartitionReplica(failedHosts)) {
+                    // Send hostDown traps
+                    for (int hostId : failedHosts) {
+                        m_snmp.hostDown(FaultLevel.ERROR, hostId, "Host left cluster mesh due to connection loss");
+                    }
+                    final int missing = m_leaderAppointer.getKSafetyStatsSet().stream()
+                            .max((s1,s2) -> s1.getMissingCount() - s2.getMissingCount())
+                            .map(s->s.getMissingCount()).orElse(failedHosts.size());
+                    final int expected = m_clusterSettings.getReference().hostcount();
+                    m_snmp.statistics(FaultFacility.CLUSTER,
+                            "Node lost. Cluster is down to " + (expected - missing)
+                            + " members out of original "+ expected + ".");
+                }
+                // Cleanup the rejoin blocker in case the rejoining node failed.
+                // This has to run on a separate thread because the callback is
+                // invoked on the ZooKeeper server thread.
+                //
+                // I'm trying to be defensive to have this cleanup code run on
+                // all live nodes. One of them will succeed in cleaning up the
+                // rejoin ZK nodes. The others will just do nothing if the ZK
+                // nodes are already gone. If this node is still initializing
+                // when a rejoining node fails, there must be a live node that
+                // can clean things up. It's okay to skip this if the executor
+                // services are not set up yet.
+                //
+                // Also be defensive to cleanup stop node indicator on all live
+                // hosts.
+                for (int hostId : failedHosts) {
+                    CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), hostId);
+                    VoltZK.removeStopNodeIndicator(m_messenger.getZK(),
+                            ZKUtil.joinZKPath(VoltZK.host_ids_be_stopped, Integer.toString(hostId)),
+                            hostLog);
+                    m_messenger.removeStopNodeNotice(hostId);
+                }
+
+                stopRejoiningHost(failedHosts);
+
+                //create a blocker for repair if this is a MP leader and partition leaders change
+                if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
+                    VoltZK.createMpRepairBlocker(m_messenger.getZK());
+                }
+                // let the client interface know host(s) have failed to clean up any outstanding work
+                // especially non-transactional work
+                m_clientInterface.handleFailedHosts(failedHosts);
+            }
+        });
     }
 
     // If the current node hasn't finished rejoin when another node fails, fail this node to prevent locking up.
