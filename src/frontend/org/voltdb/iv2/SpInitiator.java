@@ -60,7 +60,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     final private LeaderCache m_leaderCache;
     private final TickProducer m_tickProducer;
     private boolean m_promoted = false;
-    private boolean m_hasTerm = false;
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
@@ -202,12 +201,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
         try {
             long startTime = System.currentTimeMillis();
             Boolean success = false;
-            if (!m_hasTerm) {
+            if (m_term == null) {
                 m_term = createTerm(m_messenger.getZK(),
                         m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                         m_whoami);
                 m_term.start();
-                m_hasTerm = true;
             }
             int deadSPIHost = lastLeaderHSId == Long.MAX_VALUE ?
                     Integer.MAX_VALUE : CoreUtils.getHostIdFromHSId(lastLeaderHSId);
