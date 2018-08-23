@@ -354,8 +354,8 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     final int colR_A        = 4;
     final int colR_AA       = 5;
     final int colR_dense    = 6;
-    final int colR_row1      = 7;
-    final int colR_row2      = 8;
+    final int colR_row1     = 7;
+    final int colR_row2     = 8;
 
     private void subtestRankWithString() throws Exception {
         Client client = getClient();
