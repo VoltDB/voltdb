@@ -502,12 +502,12 @@ BinaryLogSink::BinaryLogSink() {}
     int64_t      uniqueId;
     int64_t      sequenceNumber;
     int32_t      partitionHash;
+    int32_t      txnLen;
     bool         isCurrentTxnForReplicatedTable;
     bool         isCurrentRecordForReplicatedTable;
     bool         isForLocalPartition;
     bool         skipCurrentRow;
     bool         replicatedTableOperation = false;
-    bool         skipForReplicated = false;
 
     type = static_cast<DRRecordType>(taskInfo->readByte());
     assert(type == DR_RECORD_BEGIN_TXN);
@@ -518,14 +518,23 @@ BinaryLogSink::BinaryLogSink() {}
     isCurrentRecordForReplicatedTable = rawHashFlag & REPLICATED_TABLE_MASK;
     DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(rawHashFlag & ~REPLICATED_TABLE_MASK);
     isCurrentTxnForReplicatedTable = hashFlag == TXN_PAR_HASH_REPLICATED;
-    taskInfo->readInt();  // txnLength
+    txnLen = taskInfo->readInt();
     partitionHash = taskInfo->readInt();
     bool isLocalMpTxn = UniqueId::isMpUniqueId(localUniqueId);
     bool isLocalRegularSpTxn = !isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
     bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
 
+    if (isCurrentTxnForReplicatedTable && !engine->isLowestSite()) {
+        // The entire transaction is a replicated table so skip applying on non lowest site
+        taskInfo->getRawPointer(txnLen - (DRTupleStream::BEGIN_RECORD_SIZE + DRTupleStream::END_RECORD_SIZE));
+        type = static_cast<DRRecordType>(taskInfo->readByte());
+        assert(type == DR_RECORD_END_TXN);
+    } else {
+        type = static_cast<DRRecordType>(taskInfo->readByte());
+    }
+
+    assert(hashFlag != TXN_PAR_HASH_PLACEHOLDER || type == DR_RECORD_END_TXN);
     // Read the whole txn since there is only one version number at the beginning
-    type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
         // fast path for replicated table change, save calls to VoltDBEngine::isLocalSite()
         if (isCurrentTxnForReplicatedTable || isCurrentRecordForReplicatedTable) {
