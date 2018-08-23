@@ -1398,13 +1398,23 @@ public class TestPlansGroupBy extends PlannerTestCase {
             assertTrue(explainPlan.contains(expectedStr));
         }
 
-        // %%%
         sql = "SELECT A3, COUNT(*) FROM T3 GROUP BY A3 LIMIT 5";
         if (isPlanningForLargeQueries()) {
             validatePlan(sql,
                     PRINT_JSON_PLAN,
-                    fragSpec(PlanNodeType.SEND),
-                    fragSpec(PlanNodeType.SEND));
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.LIMIT,
+                             PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                             // Index scan of index named T3_TREE1
+                             // with inline Projection and inline aggregate.
+                             new PlanWithInlineNodes(new IndexScanPlanMatcher("T3_TREE1"),
+                                                     PlanNodeType.PROJECTION,
+                                                     // Serial Aggregate with inline limit.
+                                                     allOf(new PlanWithInlineNodes(PlanNodeType.AGGREGATE,
+                                                                                   PlanNodeType.LIMIT),
+                                                             // Which has an aggregate count(*) expression.
+                                                             new AggregateNodeMatcher(ExpressionType.AGGREGATE_COUNT_STAR)))));
         }
         else {
             pns = compileToFragments(sql);
@@ -1415,20 +1425,34 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (isPlanningForLargeQueries()) {
             validatePlan(sql,
                     PRINT_JSON_PLAN,
-                    fragSpec(PlanNodeType.SEND),
-                    fragSpec(PlanNodeType.SEND));
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.LIMIT,
+                             PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                             new PlanWithInlineNodes(new IndexScanPlanMatcher("T3_TREE1"),
+                                                     PlanNodeType.PROJECTION,
+                                                     allOf(new PlanWithInlineNodes(PlanNodeType.AGGREGATE,
+                                                                                   PlanNodeType.LIMIT),
+                                                             new AggregateNodeMatcher(ExpressionType.AGGREGATE_COUNT_STAR)))));
         }
         else {
             pns = compileToFragments(sql);
             checkGroupByOnlyPlanWithLimit(pns, true, false, true, true);
         }
 
-        sql = "SELECT A3, B3, COUNT(*) FROM T3 WHERE A3 > 1 GROUP BY A3, B3 LIMIT 5";
+        sql = "SELECT A3, B3, COUNT(*) FROM T3 WHERE A3 > 1 GROUP BY B3, A3 LIMIT 5";
         if (isPlanningForLargeQueries()) {
             validatePlan(sql,
                     PRINT_JSON_PLAN,
-                    fragSpec(PlanNodeType.SEND),
-                    fragSpec(PlanNodeType.SEND));
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.LIMIT,
+                             PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(new IndexScanPlanMatcher("T3_TREE1"),
+                                    PlanNodeType.PROJECTION,
+                                    allOf(new PlanWithInlineNodes(PlanNodeType.AGGREGATE,
+                                                    PlanNodeType.LIMIT),
+                                            new AggregateNodeMatcher(ExpressionType.AGGREGATE_COUNT_STAR)))));
         }
         else {
             pns = compileToFragments(sql);
@@ -1438,12 +1462,18 @@ public class TestPlansGroupBy extends PlannerTestCase {
         //
         // negative tests
         //
+        // RF is replicated and has no useful indexes for F_VAL2.
         sql = "SELECT F_VAL2 FROM RF GROUP BY F_VAL2 LIMIT 5";
         if (isPlanningForLargeQueries()) {
             validatePlan(sql,
                     PRINT_JSON_PLAN,
-                    fragSpec(PlanNodeType.SEND),
-                    fragSpec(PlanNodeType.SEND));
+                    // The distributed fragment needs an agg/order by
+                    // pair.  The index is for determinism, and is not
+                    // useful.
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.INDEXSCAN));
         }
         else {
             pns = compileToFragments(sql);
@@ -1466,9 +1496,21 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void basicTestEdgeComplexRelatedCases() {
+        String sql;
         List<AbstractPlanNode> pns;
+        AbstractPlanNode p;
 
-        pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
+        sql = "select PKEY+A1 from T1 Order by PKEY+A1";
+        validatePlan(sql,
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.PROJECTION,
+                              MergeReceivePlanMatcher),
+                     fragSpec(PlanNodeType.SEND,
+                              PlanNodeType.ORDERBY,
+                              AbstractScanPlanNodeMatcher));
+        /*
+        pns = compileToFragments(sql);
         AbstractPlanNode p = pns.get(0).getChild(0);
         assertTrue(p instanceof ProjectionPlanNode);
         assertTrue(p.getChild(0) instanceof MergeReceivePlanNode);
@@ -1477,34 +1519,63 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof OrderByPlanNode);
         assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        */
 
         // Useless order by clause.
-        pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
+        sql = "SELECT count(*)  FROM P1 order by PKEY";
+        validatePlan(sql,
+                PRINT_JSON_PLAN,
+                fragSpec(PlanNodeType.SEND,
+                         new AggregateNodeMatcher(),
+                         PlanNodeType.RECEIVE),
+                fragSpec(PlanNodeType.SEND,
+                         AbstractScanPlanNodeMatcher));
+        /*
+        pns = compileToFragments(sql);
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof ReceivePlanNode);
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AbstractScanPlanNode);
+        */
 
-        pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
-        p = pns.get(0).getChild(0);
-
-        // ENG-5066: now Limit is pushed under Projection
-        // Limit is also inlined with Orderby node
-        // ENG-12434 But maybe there is no projection node.
-        if (p instanceof ProjectionPlanNode) {
-            p = p.getChild(0);
+        sql = "SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.ORDERBY,  // Statement Level Order By (SLOB).
+                             allOf(PlanNodeType.AGGREGATE,
+                                     new AggregateNodeMatcher(ExpressionType.AGGREGATE_SUM)),
+                             MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             allOf(PlanNodeType.AGGREGATE,
+                                   new AggregateNodeMatcher(ExpressionType.AGGREGATE_COUNT_STAR)),
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.SEQSCAN));
         }
-        assertTrue(p instanceof OrderByPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
-        assertTrue(p.getChild(0) instanceof AggregatePlanNode);
+        else {
+            pns = compileToFragments(sql);
+            p = pns.get(0).getChild(0);
 
-        p = pns.get(1).getChild(0);
-        // inline aggregate
-        assertTrue(p instanceof AbstractScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+            // ENG-5066: now Limit is pushed under Projection
+            // Limit is also inlined with Orderby node
+            // ENG-12434 But maybe there is no projection node.
+            if (p instanceof ProjectionPlanNode) {
+                p = p.getChild(0);
+            }
+            assertTrue(p instanceof OrderByPlanNode);
+            assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+            assertTrue(p.getChild(0) instanceof AggregatePlanNode);
 
-        pns = compileToFragments("SELECT F_D1, count(*) as tag FROM RF group by F_D1 order by tag");
+            p = pns.get(1).getChild(0);
+            // inline aggregate
+            assertTrue(p instanceof AbstractScanPlanNode);
+            assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        }
+
+        sql = "SELECT F_D1, count(*) as tag FROM RF group by F_D1 order by tag";
+        pns = compileToFragments(sql);
         p = pns.get(0).getChild(0);
 
         if (p instanceof ProjectionPlanNode) {
@@ -1515,7 +1586,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p instanceof IndexScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
 
-        pns = compileToFragments("SELECT F_D1, count(*) FROM RF group by F_D1 order by 2");
+        sql = "SELECT F_D1, count(*) FROM RF group by F_D1 order by 2";
+        pns = compileToFragments(sql);
         p = pns.get(0).getChild(0);
 
         if (p instanceof ProjectionPlanNode) {
@@ -1926,8 +1998,18 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (isPlanningForLargeQueries()) {
             validatePlan(sql,
                     PRINT_JSON_PLAN,
-                    fragSpec(PlanNodeType.SEND),
-                    fragSpec(PlanNodeType.SEND));
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.PROJECTION,      // Compute the quotient.
+                             allOf(PlanNodeType.AGGREGATE, // Compute the total sum and count.
+                                     new AggregateNodeMatcher(ExpressionType.AGGREGATE_SUM,
+                                                              ExpressionType.AGGREGATE_SUM)),
+                             MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             allOf(PlanNodeType.AGGREGATE,
+                                   new AggregateNodeMatcher(ExpressionType.AGGREGATE_COUNT, // Compute the group counts.
+                                                            ExpressionType.AGGREGATE_SUM)), // Compute the group sums.
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.INDEXSCAN));
         }
         else {
             printJSONPlan(PRINT_JSON_PLAN, sql);
@@ -1940,8 +2022,18 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql = "SELECT A1, AVG(PKEY)+1 FROM P1 GROUP BY A1";
         if (isPlanningForLargeQueries()) {
             validatePlan(sql, PRINT_JSON_PLAN,
-                    fragSpec(PlanNodeType.SEND),
-                    fragSpec(PlanNodeType.SEND));
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.PROJECTION,  // Compute the quotient.
+                             allOf(PlanNodeType.AGGREGATE,
+                                     new AggregateNodeMatcher(ExpressionType.AGGREGATE_SUM,
+                                                              ExpressionType.AGGREGATE_SUM)),
+                             MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             allOf(PlanNodeType.AGGREGATE,
+                                     new AggregateNodeMatcher(ExpressionType.AGGREGATE_SUM,
+                                                              ExpressionType.AGGREGATE_COUNT)),
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.INDEXSCAN));
         }
         else {
             printJSONPlan(PRINT_JSON_PLAN, sql);
@@ -2266,15 +2358,54 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Distributed distinct select query
         sql = "SELECT DISTINCT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED";
-        checkMVNoFix_NoAgg(sql, 1, 0, true, true);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.INDEXSCAN));
+        }
+        else {
+            checkMVNoFix_NoAgg(sql, 1, 0, true, true);
+        }
 
         // Distributed group by query
         sql = "SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED GROUP by V_SUM_C1";
-        checkMVNoFix_NoAgg(sql, 1, 0, true, true);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            PlanNodeType.ORDERBY,
+                            PlanNodeType.INDEXSCAN));
+        }
+        else {
+            checkMVNoFix_NoAgg(sql, 1, 0, true, true);
+        }
 
         sql = "SELECT V_SUM_C1, sum(V_CNT) FROM V_P1_NO_FIX_NEEDED " +
                 "GROUP by V_SUM_C1";
-        checkMVNoFix_NoAgg(sql, 1, 1, true, true);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            PlanNodeType.ORDERBY,
+                            PlanNodeType.INDEXSCAN));
+        }
+        else {
+            checkMVNoFix_NoAgg(sql, 1, 1, true, true);
+        }
 
         // (2) Table V_P1 and V_P1_NEW:
         pns = compileToFragments("SELECT SUM(V_SUM_C1) FROM V_P1");
@@ -2287,13 +2418,65 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVReaggregateFeature(pns, false, 0, 1, -1, -1, true, true);
 
         sql = "SELECT MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1";
-        checkMVNoFix_NoAgg(sql, 1, 1, true, true);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.PROJECTION,
+                            allOf(PlanNodeType.AGGREGATE,
+                                  new AggregateNodeMatcher(ExpressionType.AGGREGATE_MAX)),
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.ORDERBY, // Pushed down from the coordinator.
+                            new PlanWithInlineNodes(
+                                    new IndexScanPlanMatcher("MATVIEW_PK_INDEX"),
+                                    PlanNodeType.PROJECTION,
+                                    allOf(PlanNodeType.AGGREGATE,
+                                            new AggregateNodeMatcher(ExpressionType.AGGREGATE_MAX)))));
+        }
+        else {
+            checkMVNoFix_NoAgg(sql, 1, 1, true, true);
+        }
 
         sql = "SELECT V_A1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1";
-        checkMVNoFix_NoAgg(sql, 1, 1, true, true);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(PlanNodeType.AGGREGATE,
+                                    new AggregateNodeMatcher(ExpressionType.AGGREGATE_MAX)),
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.ORDERBY, // Pushed down from the coordinator.
+                            new PlanWithInlineNodes(
+                                    new IndexScanPlanMatcher("MATVIEW_PK_INDEX"),
+                                    PlanNodeType.PROJECTION,
+                                    allOf(PlanNodeType.AGGREGATE,
+                                            new AggregateNodeMatcher(ExpressionType.AGGREGATE_MAX)))));
+        }
+        else {
+            checkMVNoFix_NoAgg(sql, 1, 1, true, true);
+        }
 
         sql = "SELECT V_A1,V_B1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1, V_B1";
-        checkMVNoFix_NoAgg(sql, 2, 1, true, true);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(PlanNodeType.AGGREGATE,
+                                    new AggregateNodeMatcher(ExpressionType.AGGREGATE_MAX)),
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.ORDERBY, // Pushed down from the coordinator.
+                            new PlanWithInlineNodes(
+                                    new IndexScanPlanMatcher("MATVIEW_PK_INDEX"),
+                                    PlanNodeType.PROJECTION,
+                                    allOf(PlanNodeType.AGGREGATE,
+                                            new AggregateNodeMatcher(ExpressionType.AGGREGATE_MAX)))));
+        }
+        else {
+            checkMVNoFix_NoAgg(sql, 2, 1, true, true);
+        }
 
         // (3) Join Query
         // Voter example query in 'Results' stored procedure.
@@ -2308,7 +2491,27 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 + " ORDER BY total_votes DESC"
                 + "        , contestant_number ASC"
                 + "        , contestant_name ASC;";
-        checkMVNoFix_NoAgg(sql, 2, 1, true, true);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.ORDERBY,
+                            allOf(PlanNodeType.AGGREGATE,
+                                    new AggregateNodeMatcher(ExpressionType.AGGREGATE_SUM)),
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             allOf(PlanNodeType.AGGREGATE,
+                                     new AggregateNodeMatcher(ExpressionType.AGGREGATE_SUM)),
+                             PlanNodeType.ORDERBY,
+                             // NESTLOOPINDEX has an index scan inline node.
+                             new PlanWithInlineNodes(PlanNodeType.NESTLOOPINDEX,
+                                 new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                         PlanNodeType.PROJECTION)),
+                             PlanNodeType.SEQSCAN));
+        }
+        else {
+            checkMVNoFix_NoAgg(sql, 2, 1, true, true);
+        }
 
 
         sql = "select sum(v_p1.v_cnt) " +
@@ -2318,7 +2521,26 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql = "select v_p1.v_b1, sum(v_p1.v_sum_d1) " +
                 "from v_p1 INNER JOIN v_r1 on v_p1.v_a1 > v_r1.v_a1 " +
                 "group by v_p1.v_b1;";
-        checkMVNoFix_NoAgg(sql, 1, 1, true, true);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(PlanNodeType.AGGREGATE,
+                                    new AggregateNodeMatcher(ExpressionType.AGGREGATE_SUM)),
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                            allOf(PlanNodeType.AGGREGATE,
+                                    new AggregateNodeMatcher(ExpressionType.AGGREGATE_SUM)),
+                            PlanNodeType.ORDERBY,
+                            // NESTLOOPINDEX has an index scan inline node.
+                            new PlanWithInlineNodes(PlanNodeType.NESTLOOPINDEX,
+                                    new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                            PlanNodeType.PROJECTION)),
+                            new IndexScanPlanMatcher("MATVIEW_PK_INDEX")));
+        }
+        else {
+            checkMVNoFix_NoAgg(sql, 1, 1, true, true);
+        }
 
         sql = "select MAX(v_r1.v_a1) " +
                 "from v_p1 INNER JOIN v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
@@ -2375,10 +2597,38 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // distinct on the v_a1 (part of the group by columns in the view)
         // aggregate pushed down for optimization
         sql = "SELECT distinct v_a1 FROM V_P1";
-        checkMVFix_TopAgg_ReAgg(sql, 1, 0, 1, 0);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.ORDERBY, // Pushed down from coordinator.
+                             new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                     PlanNodeType.PROJECTION,
+                                     PlanNodeType.AGGREGATE)));
+        }
+        else {
+            checkMVFix_TopAgg_ReAgg(sql, 1, 0, 1, 0);
+        }
 
         sql = "SELECT v_a1 FROM V_P1 group by v_a1";
-        checkMVFix_TopAgg_ReAgg(sql, 1, 0, 1, 0);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.ORDERBY, // Pushed down from coordinator.
+                            new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                    PlanNodeType.PROJECTION,
+                                    PlanNodeType.AGGREGATE)));
+        }
+        else {
+            checkMVFix_TopAgg_ReAgg(sql, 1, 0, 1, 0);
+        }
 
         sql = "SELECT distinct v_cnt FROM V_P1";
         checkMVFix_TopAgg_ReAgg(sql, 1, 0, 2, 1);
@@ -2645,6 +2895,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 aggFilter, scanFilter);
     }
 
+    private void checkMVFixWithJoinLarge(String sqlPattern) {
+        String[] joinTypes = {"inner join", "left join", "right join"};
+        for (String joinType : joinTypes) {
+            String sql = sqlPattern.replace("@joinType", joinType);
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND),
+                    fragSpec(PlanNodeType.SEND));
+        }
+    }
+
     private void checkMVFixWithJoin(String sql,
             int numGroupByOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupByOfReaggNode, int numAggsOfReaggNode,
@@ -2760,31 +3021,66 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
 
         sql = "select v_p1.v_b1, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) group by v_p1.v_b1;";
-        checkMVFixWithJoin(sql, 1, 1, 2, 0, null, null);
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 1, 1, 2, 0, null, null);
+        }
 
         sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) " +
                 "group by v_p1.v_b1, v_p1.v_cnt;";
-        checkMVFixWithJoin(sql, 2, 1, 2, 1, null, null);
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 2, 1, 2, 1, null, null);
+        }
 
         sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_p1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
                 "where v_p1.v_a1 > 1 AND v_p1.v_cnt < 8 group by v_p1.v_b1, v_p1.v_cnt;";
-        checkMVFixWithJoin(sql, 2, 1, 2, 1, "v_cnt < 8", "v_a1 > 1");
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 2, 1, 2, 1, "v_cnt < 8", "v_a1 > 1");
+        }
 
         sql = "select v_p1.v_b1, v_p1.v_cnt, sum(v_p1.v_a1), max(v_p1.v_sum_c1) from v_p1 @joinType v_r1 " +
                 "on v_p1.v_a1 = v_r1.v_a1 " +
                 "where v_p1.v_a1 > 1 AND v_p1.v_cnt < 8 group by v_p1.v_b1, v_p1.v_cnt;";
-        checkMVFixWithJoin(sql, 2, 2, 2, 2, "v_cnt < 8", "v_a1 > 1");
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 2, 2, 2, 2, "v_cnt < 8", "v_a1 > 1");
+        }
 
         sql = "select v_r1.v_b1, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) group by v_r1.v_b1;";
-        checkMVFixWithJoin(sql, 1, 1, 2, 0, null, null);
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 1, 1, 2, 0, null, null);
+        }
 
         sql = "select v_r1.v_b1, v_r1.v_cnt, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) " +
                 "group by v_r1.v_b1, v_r1.v_cnt;";
-        checkMVFixWithJoin(sql, 2, 1, 2, 0, null, null);
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 2, 1, 2, 0, null, null);
+        }
 
         sql = "select v_r1.v_b1, v_p1.v_cnt, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) " +
                 "group by v_r1.v_b1, v_p1.v_cnt;";
-        checkMVFixWithJoin(sql, 2, 1, 2, 1, null, null);
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 2, 1, 2, 1, null, null);
+        }
 
 
         // Three tables joins.
@@ -2805,18 +3101,33 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql = "select v_p1.v_cnt, v_p1.v_b1, SUM(v_p1.v_sum_d1) " +
                 "from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt @joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "group by v_p1.v_cnt, v_p1.v_b1";
-        checkMVFixWithJoin(sql, 2, 1, 2, 2, null, null);
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 2, 1, 2, 2, null, null);
+        }
 
         sql = "select v_p1.v_cnt, v_p1.v_b1, SUM(v_p1.v_sum_d1), MAX(v_r1.v_a1)  " +
                 "from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt @joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "group by v_p1.v_cnt, v_p1.v_b1";
-        checkMVFixWithJoin(sql, 2, 2, 2, 2, null, null);
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 2, 2, 2, 2, null, null);
+        }
 
         sql = "select v_p1.v_cnt, v_p1.v_b1, SUM(v_p1.v_sum_d1) " +
                 "from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt @joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 " +
                 "group by v_p1.v_cnt, v_p1.v_b1 ";
-        checkMVFixWithJoin(sql, 2, 1, 2, 3, new String[] { "v_sum_c1 < 3)", "v_cnt > 1)" }, "v_a1 > 2");
+        if (isPlanningForLargeQueries()) {
+            checkMVFixWithJoinLarge(sql);
+        }
+        else {
+            checkMVFixWithJoin(sql, 2, 1, 2, 3, new String[]{"v_sum_c1 < 3)", "v_cnt > 1)"}, "v_a1 > 2");
+        }
         AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
@@ -3035,9 +3346,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
             int numGroupByOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupByOfReaggNode, int numAggsOfReaggNode,
             boolean aggPushdown, boolean aggInline) {
+        String sql;
+        AbstractPlanNode p;
 
         assertEquals(2, pns.size());
-        AbstractPlanNode p = pns.get(0);
+        p = pns.get(0);
         assertTrue(p instanceof SendPlanNode);
         p = p.getChild(0);
 
