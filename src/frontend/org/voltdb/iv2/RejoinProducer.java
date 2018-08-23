@@ -108,9 +108,11 @@ public class RejoinProducer extends JoinProducerBase {
         @Override
         public void run()
         {
-            REJOINLOG.debug(m_whoami + "informing rejoinCoordinator "
-                    + CoreUtils.hsIdToString(m_coordinatorHsId)
-                    + " of REPLAY_FINISHED");
+            if (REJOINLOG.isDebugEnabled()) {
+                REJOINLOG.debug(m_whoami + "informing rejoinCoordinator "
+                        + CoreUtils.hsIdToString(m_coordinatorHsId)
+                        + " of REPLAY_FINISHED");
+            }
             RejoinMessage replay_complete = new RejoinMessage(
                     m_mailbox.getHSId(), RejoinMessage.Type.REPLAY_FINISHED);
             m_mailbox.send(m_coordinatorHsId, replay_complete);
@@ -228,14 +230,16 @@ public class RejoinProducer extends JoinProducerBase {
                                                            message.getSnapshotCompressedDataBufferPool())
                         : Long.MIN_VALUE);
 
-        REJOINLOG.debug(m_whoami
-                + "received INITIATION message. Doing rejoin"
-                + ". Source site is: "
-                + CoreUtils.hsIdToString(sourceSite)
-                + " and destination rejoin processor is: "
-                + CoreUtils.hsIdToString(hsId)
-                + " and snapshot nonce is: "
-                + message.getSnapshotNonce());
+        if (REJOINLOG.isDebugEnabled()) {
+            REJOINLOG.debug(m_whoami
+                    + "received INITIATION message. Doing rejoin"
+                    + ". Source site is: "
+                    + CoreUtils.hsIdToString(sourceSite)
+                    + " and destination rejoin processor is: "
+                    + CoreUtils.hsIdToString(hsId)
+                    + " and snapshot nonce is: "
+                    + message.getSnapshotNonce());
+        }
 
         registerSnapshotMonitor(message.getSnapshotNonce());
         // Tell the RejoinCoordinator everything it will need to know to get us our snapshot stream.
@@ -306,7 +310,9 @@ public class RejoinProducer extends JoinProducerBase {
             if (m_rejoinSiteProcessor.isEOF() == false) {
                 returnToTaskQueue(sourcesReady);
             } else {
-                REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
+                if (REJOINLOG.isDebugEnabled()) {
+                    REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
+                }
                 m_rejoinSiteProcessor.close();
 
                 if (m_streamSnapshotMb != null) {
@@ -357,9 +363,11 @@ public class RejoinProducer extends JoinProducerBase {
                 Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers = null;
                 long clusterCreateTime = -1;
                 try {
+                    if (REJOINLOG.isDebugEnabled()) {
+                        REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
+                    }
                     event = m_snapshotCompletionMonitor.get();
                     if (!m_schemaHasNoTables) {
-                        REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
                         exportSequenceNumbers = event.exportSequenceNumbers;
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
 
@@ -371,8 +379,10 @@ public class RejoinProducer extends JoinProducerBase {
                         siteConnection.setDRProtocolVersion(event.drVersion);
                     }
 
-                    REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
-                            + "and handing off to site.");
+                    if (REJOINLOG.isDebugEnabled()) {
+                        REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
+                                + "and handing off to site.");
+                    }
                     RejoinMessage snap_complete = new RejoinMessage(
                             m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
                     m_mailbox.send(m_coordinatorHsId, snap_complete);

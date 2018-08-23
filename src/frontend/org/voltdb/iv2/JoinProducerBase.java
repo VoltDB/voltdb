@@ -70,13 +70,17 @@ public abstract class JoinProducerBase extends SiteTasker {
 
         protected void register()
         {
-            getLogger().debug(m_whoami + "registering snapshot completion action");
+            if (getLogger().isDebugEnabled()) {
+                getLogger().debug(m_whoami + "registering snapshot completion action");
+            }
             VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
         }
 
         private void deregister()
         {
-            getLogger().debug(m_whoami + "deregistering snapshot completion action");
+            if (getLogger().isDebugEnabled()) {
+                getLogger().debug(m_whoami + "deregistering snapshot completion action");
+            }
             VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
         }
 
@@ -84,8 +88,10 @@ public abstract class JoinProducerBase extends SiteTasker {
         public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
         {
             if (event.nonce.equals(m_snapshotNonce) && event.didSucceed) {
-                getLogger().debug(m_whoami + "counting down snapshot monitor completion. "
-                            + "Snapshot txnId is: " + event.multipartTxnId);
+                if (getLogger().isDebugEnabled()) {
+                    getLogger().debug(m_whoami + "counting down snapshot monitor completion. "
+                                + "Snapshot txnId is: " + event.multipartTxnId);
+                }
                 deregister();
 
                 // Do not re-arm the watchdog.
@@ -96,11 +102,13 @@ public abstract class JoinProducerBase extends SiteTasker {
 
                 m_future.set(event);
             } else {
-                getLogger().debug(m_whoami
-                        + " observed completion of "
-                        + (event.didSucceed ? "succeeded" : "failed")
-                        + " snapshot: "
-                        + event.nonce);
+                if (getLogger().isDebugEnabled()) {
+                    getLogger().debug(m_whoami
+                            + " observed completion of "
+                            + (event.didSucceed ? "succeeded" : "failed")
+                            + " snapshot: "
+                            + event.nonce);
+                }
             }
             return null;
         }
@@ -201,7 +209,9 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         if (nonce.equals(m_snapshotNonce)) {
-            getLogger().debug("Started recording transactions after snapshot nonce " + nonce);
+            if (getLogger().isDebugEnabled()) {
+                getLogger().debug("Started recording transactions after snapshot nonce " + nonce);
+            }
             if (m_taskLog != null) {
                 m_taskLog.enableRecording(snapshotSpHandle);
             }
