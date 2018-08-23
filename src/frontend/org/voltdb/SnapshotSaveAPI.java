@@ -476,6 +476,11 @@ public class SnapshotSaveAPI
                 jsonObj.put("hostCount", hostCount + participantCount + 1);
                 zk.setData(snapshotPath, jsonObj.toString(4).getBytes(Charsets.UTF_8),
                         stat.getVersion());
+                if (SNAP_LOG.isDebugEnabled()) {
+                    SNAP_LOG.debug("Partition " + TxnEgo.getPartitionId(txnId) +
+                            " set participant host count: " + (hostCount + participantCount + 1) +
+                            " , the old host count is " + hostCount);
+                }
             } catch (KeeperException.BadVersionException e) {
                 continue;
             } catch (Exception e) {

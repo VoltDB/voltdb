@@ -39,10 +39,11 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
+import org.voltdb.iv2.TxnEgo;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 public class SnapshotCompletionMonitor {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
@@ -171,7 +172,15 @@ public class SnapshotCompletionMonitor {
         // triggerer can recognize the snapshot when it finishes.
         String truncReqId = jsonObj.optString("truncReqId");
 
+        if (SNAP_LOG.isDebugEnabled()) {
+            SNAP_LOG.debug("Partition " + TxnEgo.getPartitionId(txnId) + " finished snapshot, " +
+                   " number of remaining host is " + hostCount);
+        }
+
         if (hostCount == 0) {
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("All sites complete snapshot, starting to invoke completion interests.");
+            }
             /*
              * Convert the JSON object containing the export sequence numbers for each
              * table and partition to a regular map
@@ -238,6 +247,9 @@ public class SnapshotCompletionMonitor {
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
+                if (SNAP_LOG.isDebugEnabled()) {
+                    SNAP_LOG.debug("Invoke completion interests " + interest.toString());
+                }
                 try {
                     interest.snapshotCompleted(
                             new SnapshotCompletionEvent(
