@@ -3058,6 +3058,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         try {
             m_messenger.start();
+        } catch (CoreUtils.RetryException e) {
+
+            // do not log as fatal in this case
+            boolean printStackTrace = true;
+            if (e.getMessage() != null  && e.getMessage().indexOf(MeshProber.MESH_ONE_REJOIN_MSG )> -1) {
+                printStackTrace = false;
+            }
+            VoltDB.crashLocalVoltDB(e.getMessage(), printStackTrace, e);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }

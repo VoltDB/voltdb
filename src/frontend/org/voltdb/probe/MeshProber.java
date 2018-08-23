@@ -94,7 +94,7 @@ public class MeshProber implements JoinAcceptor {
     private static final String MISSING_HOST_COUNT = "missingHostCount";
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
-
+    public static final String MESH_ONE_REJOIN_MSG = "Only one host can rejoin at a time. Host";
     /**
      * Helper method that takes a comma delimited list of host specs, validates it,
      * and converts it to a set of valid coordinators
@@ -453,8 +453,7 @@ public class MeshProber implements JoinAcceptor {
             if (rejoiningHost == -1) {
                 return new JoinAcceptor.PleaDecision(null, true, false);
             } else {
-                String msg = "Only one host can rejoin at a time. Host "
-                      + rejoiningHost + " is still rejoining.";
+                String msg = MESH_ONE_REJOIN_MSG + rejoiningHost + " is still rejoining.";
                 return new JoinAcceptor.PleaDecision(msg, false, true);
             }
         }
