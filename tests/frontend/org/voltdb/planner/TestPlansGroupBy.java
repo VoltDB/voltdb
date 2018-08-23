@@ -58,7 +58,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     // Set this to true to print the JSON string for the plan.
     private static boolean PRINT_JSON_PLAN = true;
     // Test normal sized temp tables.
-    private static boolean TEST_NORMAL_SIZE_QUERIES = true;
+    private static boolean TEST_NORMAL_SIZE_QUERIES = false;
     // Test large sized temp tables.
     private static boolean TEST_LARGE_QUERIES = true;
 
@@ -116,10 +116,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         //       large temp tables or not.  Since there are no
         //       group by keys we can always do serial aggregation.
         //
-        String sql;
-        sql = "SELECT SUM(A1) from T1";
-
-        checkSimpleTableInlineAgg(sql,
+        checkSimpleTableInlineAgg("SELECT SUM(A1) from T1",
                                   PlanNodeType.SEQSCAN,
                                   new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
                                                            ExpressionType.AGGREGATE_SUM),
@@ -925,6 +922,15 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     // Group by with index
+    private void checkGroupByOnlyPlanOneFragmentIndexScan(String SQL) {
+        validatePlan(SQL,
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                      PlanNodeType.PROJECTION,
+                                                      PlanNodeType.AGGREGATE)));
+    }
+
     private void checkGroupByOnlyPlan(String SQL,
             boolean twoFragments, PlanNodeType type, boolean isIndexScan) {
         // The distributed fragment always has this shape.
@@ -932,7 +938,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                              new PlanWithInlineNodes((isIndexScan
                                                                          ? PlanNodeType.INDEXSCAN
                                                                          : PlanNodeType.SEQSCAN),
-                                                                     PlanNodeType.PROJECTION,
+                                                            PlanNodeType.PROJECTION,
                                                                      type));
         if (twoFragments) {
             FragmentSpec coordSpec;
@@ -979,48 +985,59 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
     private void basicTestGroupByOnly() {
         System.out.println("Starting testGroupByOnly");
-
+        String sql;
         /**
          * Serial Aggregate cases
          */
         // Replicated Table
 
         // only GROUP BY cols in SELECT clause
-        checkGroupByOnlyPlan("SELECT F_D1 FROM RF GROUP BY F_D1", false, S_AGG, true);
+        sql = "SELECT F_D1 FROM RF GROUP BY F_D1";
+        checkGroupByOnlyPlanOneFragment(sql, PlanNodeTy);
 
         // SELECT cols in GROUP BY and other aggregate cols
-        checkGroupByOnlyPlan("SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1", false, S_AGG, true);
+        sql = "SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1";
+        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
 
         // aggregate cols are part of keys of used index
-        checkGroupByOnlyPlan("SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1", false, S_AGG, true);
+        sql = "SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1";
+        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
 
         // expr index, full indexed case
-        checkGroupByOnlyPlan("SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2", false, S_AGG, true);
+        sql = "SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2";
+        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
 
         // function index, prefix indexed case
-        checkGroupByOnlyPlan("SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)", false, S_AGG, true);
+        sql = "SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)";
+        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
 
         // order of GROUP BY cols is different of them in index definition
         // index on (ABS(F_D1), F_D2 - F_D3), GROUP BY on (F_D2 - F_D3, ABS(F_D1))
-        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)", false, S_AGG, true);
-
+        sql = "SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)";
+        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
         //* enable to debug */ System.out.println(pns, "DEBUG: " + pns.get(0).toExplainPlanString());
-        checkGroupByOnlyPlan("SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1", false, S_AGG, true);
+        sql = "SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1";
+        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
 
         // Partitioned Table
         // index scan for group by only, no need using hash aggregate
-        checkGroupByOnlyPlan("SELECT F_D1 FROM F GROUP BY F_D1", true, S_AGG, true);
+        sql = "SELECT F_D1 FROM F GROUP BY F_D1";
+        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
 
-        checkGroupByOnlyPlan("SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1", true, S_AGG, true);
+        sql = "SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1";
+        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
 
-        checkGroupByOnlyPlan("SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1", true, S_AGG, true);
+        sql = "SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1";
+        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
 
-        checkGroupByOnlyPlan("SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2", true, S_AGG, true);
+        sql = "SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2";
+        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
 
-        checkGroupByOnlyPlan("SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)", true, S_AGG, true);
+        sql = "SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)";
+        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
 
-        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)", true, S_AGG, true);
-
+        sql = "SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)";
+        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
 
         /**
          * Hash Aggregate cases
@@ -1028,37 +1045,55 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // unoptimized case (only use second col of the index), but will be replaced in
         // SeqScanToIndexScan optimization for deterministic reason
         // use EXPR_RF_TREE1 not EXPR_RF_TREE2
-        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3", false, H_AGG, true);
+        sql = "SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3";
+        // checkGroupByOnlyPlan(sql, false, H_AGG, true);
+        checkGroupByOnlyPlanOneFragmentHashAggIndexScan(sql);
 
         // unoptimized case: index is not scannable
-        checkGroupByOnlyPlan("SELECT F_VAL3, COUNT(*) FROM RF GROUP BY F_VAL3", false, H_AGG, true);
+        sql = "SELECT F_VAL3, COUNT(*) FROM RF GROUP BY F_VAL3";
+        // checkGroupByOnlyPlan(sql, false, H_AGG, true);
+        checkGroupByOnlyPlanOneFragmentHashAggIndexScan(sql);
 
         // unoptimized case: F_D2 is not prefix indexable
-        checkGroupByOnlyPlan("SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2", false, H_AGG, true);
+        sql = "SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2";
+        // checkGroupByOnlyPlan(sql, false, H_AGG, true);
+        checkGroupByOnlyPlanOneFragmentHashAggIndexScan(sql);
 
         // unoptimized case (only uses second col of the index), will not be replaced in
         // SeqScanToIndexScan for determinism because of non-deterministic receive.
         // Use primary key index
-        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3", true, H_AGG, true);
+        sql = "SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3";
+        checkGroupByOnlyPlanTwoFragmentHashAggIndexScan(sql);
+        // checkGroupByOnlyPlan(sql, true, H_AGG, true);
 
         // unoptimized case (only uses second col of the index), will be replaced in
         // SeqScanToIndexScan for determinism.
         // use EXPR_F_TREE1 not EXPR_F_TREE2
         //* enable to debug */ System.out.println(pns, pns.get(0).toExplainPlanString());
-        checkGroupByOnlyPlan("SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3", false, H_AGG, true);
+        sql = "SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3";
+        checkGroupByOnlyPlanOneFragmentHashAggIndexScan(sql);
+        // checkGroupByOnlyPlan(sql, false, H_AGG, true);
 
         /**
          * Partial Aggregate cases
          */
         // unoptimized case: no prefix index found for (F_D1, F_D2)
-        checkGroupByOnlyPlan("SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2", false, P_AGG, true);
+        sql = "SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2";
+        checkGroupByOnlyPlanOneFragmentPartialAggIndexScan(sql);
+        // checkGroupByOnlyPlan(sql, false, P_AGG, true);
 
-        checkGroupByOnlyPlan("SELECT ABS(F_D1), F_D3, COUNT(*) FROM RF GROUP BY ABS(F_D1), F_D3", false, P_AGG, true);
+        sql = "SELECT ABS(F_D1), F_D3, COUNT(*) FROM RF GROUP BY ABS(F_D1), F_D3";
+        checkGroupByOnlyPlanOneFragmentPartialAggIndexScan(sql);
+        // checkGroupByOnlyPlan(sql, false, P_AGG, true);
 
         // partition table
-        checkGroupByOnlyPlan("SELECT F_D1, F_D2, COUNT(*) FROM F GROUP BY F_D1, F_D2", true, P_AGG, true);
+        sql = "SELECT F_D1, F_D2, COUNT(*) FROM F GROUP BY F_D1, F_D2";
+        checkGroupByOnlyPlanTwoFragmentPartialAggIndexScan(sql);
+        // checkGroupByOnlyPlan(sql, true, P_AGG, true);
 
-        checkGroupByOnlyPlan("SELECT ABS(F_D1), F_D3, COUNT(*) FROM F GROUP BY ABS(F_D1), F_D3", true, P_AGG, true);
+        sql = "SELECT ABS(F_D1), F_D3, COUNT(*) FROM F GROUP BY ABS(F_D1), F_D3";
+        checkGroupByOnlyPlanTwoFragmentPartialAggIndexScan(sql);
+        // checkGroupByOnlyPlan(sql, true, P_AGG, true);
 
         /**
          * Regression case
@@ -1088,6 +1123,34 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                         new OutputSchemaMatcher("C", VoltType.BIGINT, 1)),
                                                           PlanNodeType.PROJECTION));
         }
+    }
+
+    private void checkGroupByOnlyPlanTwoFragSerialAggIndexScan(String sql) {
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeSend.SEND,
+                                  PlanNodeType.AGGREGATE,
+                                  PlanNodeType.ORDERBY,
+                                  new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
+                                                          PlanNodeType.PROJECTION,
+                                                          PlanNodeType.ORDERBY)),
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                          PlanNodeType.PROJECTION,
+                                                          PlanNodeType.AGGREGATE)));
+        }
+        else {
+            validatePlan(sql,
+                         PRINT_JSON_PLAN,
+                         fragSpec(PlanNodeType.SEND,
+                                  PlanNodeType.HASHAGGREGATE,
+                                  PlanNodeType.RECEIVE),
+                         fragSpec(PlanNodeType.SEND,
+                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                          PlanNodeType.PROJECTION,
+                                                          PlanNodeType.AGGREGATE)));
+
     }
 
     private void checkPartialAggregate(String sql,
