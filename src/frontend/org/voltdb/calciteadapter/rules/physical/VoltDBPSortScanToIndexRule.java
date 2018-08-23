@@ -19,13 +19,18 @@ package org.voltdb.calciteadapter.rules.physical;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.rel.VoltDBTable;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPSort;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPTableIndexScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPTableSeqScan;
+import org.voltdb.calciteadapter.util.VoltDBRelUtil;
 import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -35,33 +40,53 @@ import org.voltdb.types.SortDirectionType;
 
 public class VoltDBPSortScanToIndexRule extends RelOptRule {
 
-    public static final VoltDBPSortScanToIndexRule INSTANCE = new VoltDBPSortScanToIndexRule();
+    public static final VoltDBPSortScanToIndexRule INSTANCE_1 =
+            new VoltDBPSortScanToIndexRule(operand(VoltDBPSort.class,
+                operand(VoltDBPTableSeqScan.class, none())),
+                    "SortScanToIndexRule_1");
 
-    private VoltDBPSortScanToIndexRule() {
-        super(operand(VoltDBPSort.class,
-                operand(VoltDBPTableSeqScan.class, none())));
+    public static final VoltDBPSortScanToIndexRule INSTANCE_2 =
+            new VoltDBPSortScanToIndexRule(operand(VoltDBPSort.class,
+                operand(VoltDBPCalc.class,
+                        operand(VoltDBPTableSeqScan.class, none()))),
+                    "SortScanToIndexRule_2");
+
+    private VoltDBPSortScanToIndexRule(RelOptRuleOperand operand, String desc) {
+        super(operand, desc);
     }
 
     @Override
     public boolean matches(RelOptRuleCall call) {
-        VoltDBPSort sort = call.rel(0);
-        VoltDBPTableSeqScan scan = call.rel(1);
+        VoltDBPTableSeqScan scan = (call.rels.length == 2) ?
+                call.rel(1) : call.rel(2);
         VoltDBTable table = scan.getVoltDBTable();
         assert(table != null);
-        boolean matches = !table.getCatTable().getIndexes().isEmpty() &&
-                !sort.getCollation().getFieldCollations().isEmpty() &&
-                sort.fetch == null &&
-                sort.offset == null;
-        return matches;
+        return !table.getCatTable().getIndexes().isEmpty();
     }
 
 
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltDBPSort sort = call.rel(0);
-        RelCollation sortCollation = sort.getCollation();
+        RelCollation origSortCollation = sort.getCollation();
+        assert(!RelCollations.EMPTY.equals(origSortCollation) &&
+                sort.fetch == null &&
+                sort.offset == null);
 
-        VoltDBPTableSeqScan scan = call.rel(1);
+        RelCollation scanSortCollation = null;
+        VoltDBPCalc calc = null;
+        VoltDBPTableSeqScan scan = null;
+        if (call.rels.length == 2) {
+            scan = call.rel(1);
+            scanSortCollation = origSortCollation;
+        } else {
+            calc = call.rel(1);
+            scanSortCollation = VoltDBRelUtil.sortCollationCalcTranspose(origSortCollation, calc);
+            if (RelCollations.EMPTY.equals(scanSortCollation)) {
+                return;
+            }
+            scan = call.rel(2);
+        }
         Table catTable = scan.getVoltDBTable().getCatTable();
 
         RexBuilder builder = scan.getCluster().getRexBuilder();
@@ -76,7 +101,7 @@ public class VoltDBPSortScanToIndexRule extends RelOptRule {
             RelCollation indexCollation =
                     VoltDBRexUtil.createIndexCollation(index, catTable, builder, program);
             SortDirectionType sortDirection =
-                    VoltDBRexUtil.areCollationsCompartible(sortCollation, indexCollation);
+                    VoltDBRexUtil.areCollationsCompartible(scanSortCollation, indexCollation);
             //@TODO Cutting corner here. Should probably use something similar to
             // the SubPlanAssembler.WindowFunctionScoreboard
             if (SortDirectionType.INVALID != sortDirection) {
@@ -90,7 +115,7 @@ public class VoltDBPSortScanToIndexRule extends RelOptRule {
                 VoltDBPTableIndexScan indexScan = new VoltDBPTableIndexScan(
                         scan.getCluster(),
                         // Need to add sort collation trait
-                        scan.getTraitSet().plus(sortCollation),
+                        scan.getTraitSet().replace(scanSortCollation),
                         scan.getTable(),
                         scan.getVoltDBTable(),
                         scan.getProgram(),
@@ -103,7 +128,18 @@ public class VoltDBPSortScanToIndexRule extends RelOptRule {
                         scan.getPreAggregateProgram(),
                         scan.getSplitCount());
 
-                call.transformTo(indexScan);
+                RelNode result = null;
+                if (calc == null) {
+                    result = indexScan;
+                } else {
+                    // The new Calc collation must match the original Sort collation
+                    result = calc.copy(
+                            calc.getTraitSet().replace(origSortCollation),
+                            indexScan,
+                            calc.getProgram(),
+                            calc.getSplitCount());
+                }
+                call.transformTo(result);
             }
         }
     }
