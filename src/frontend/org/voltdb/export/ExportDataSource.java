@@ -101,6 +101,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile boolean m_closed = false;
     private final StreamBlockQueue m_committedBuffers;
     private Runnable m_onMastership;
+    // m_pollFuture is used for a common case to improve efficiency, export decoder thread creates
+    // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
+    // is assigned to m_pollFuture. When site thread pushes buffer to EDS executor thread, m_pollFuture
+    // is reused to notify export decoder to stop waiting.
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
@@ -110,7 +114,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // Like replicated table, every replicated export stream is its own master.
     private boolean m_runEveryWhere = false;
     private volatile ListeningExecutorService m_es;
+    // A place to keep unfinished export buffer when processor shuts down.
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
+    // Is EDS from catalog or from disk pdb?
     private volatile boolean m_isInCatalog;
     private volatile boolean m_eos;
     private final Generation m_generation;
@@ -648,6 +654,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
+    // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.
     public void setPendingContainer(BBContainer container) {
         Preconditions.checkNotNull(m_pendingContainer.get() != null, "Pending container must be null.");
         m_pendingContainer.set(container);
@@ -1068,13 +1075,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_mastershipAccepted.set(false);
         m_isInCatalog = false;
         m_eos = false;
+        m_pollFuture = null;
 
-        // For case where the previous export processor had only row of the first block to process
-        // and it completed processing it, poll future is not set to null still. Set it to null to
-        // prepare for the new processor polling
-        if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
-            m_pollFuture = null;
-        }
     }
 
     /**

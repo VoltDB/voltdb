@@ -375,8 +375,12 @@ public class GuestProcessor implements ExportDataProcessor {
                                 if (row != null) {
                                     edb.onBlockCompletion(row);
                                 }
-                                //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
-                                if (cont != null) {
+                                // Make sure to discard after onBlockCompletion so that if completion
+                                // wants to retry we don't lose block.
+                                // Please note that if export manager is shutting down it's possible
+                                // that container isn't fully consumed. Discard the buffer prematurely
+                                // would cause missing rows in export stream.
+                                if (!m_shutdown && cont != null) {
                                     cont.discard();
                                     cont = null;
                                 }
@@ -400,7 +404,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                             }
                         }
-                        //Dont discard the block also set the start position to the begining.
+                        // Don't discard the block also set the start position to the begining.
+                        // TODO: it would be nice to keep the last position in the buffer so that
+                        //       next time connector can pick up from where it left last time and
+                        //       continue. It helps to reduce exporting duplicated rows.
                         if (m_shutdown && cont != null) {
                             if (m_logger.isDebugEnabled()) {
                                 // log message for debugging.
