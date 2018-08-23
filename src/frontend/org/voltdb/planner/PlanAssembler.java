@@ -3000,36 +3000,32 @@ public class PlanAssembler {
         //       before the call to this routine.
         // We haven't created the order by nodes in aggNodes yet.
         //
-        // We need an order by for the agg node if it is not grouped,
-        // or this is a large query but it has not been fully serialized.
-        // If it is not grouped serial aggregation is ok, as all rows are
-        // in the group.
-        // If it is a normal sized query the aggregate can be a hash or
-        // partial aggregate.  If it is a large query but it can
-        // be fully serialized, then we can just use a (serial)
-        // aggregate node.
+        // We need an order by for the agg node if it is grouped,
+        // and either this is a large query or it cannot be fully serialized.
+        //   1. If it is not grouped serial aggregation is ok with no sorting,
+        //      as all rows are in the group.
+        //   2. If it is grouped but it can be fully serialized by scanning
+        //      an index, then we don't need an order by.
+        //   3. If it is grouped and it can't be fully serialized, and it
+        //      is a large query then we need to sort by the group by keys,
+        //      so we need an agg order by.
         boolean needAggOrderBy
-                = !m_parsedSelect.isGrouped()
-                      || (isLargeQuery() && ( ! gbInfo.m_canBeFullySerialized ));
+                = m_parsedSelect.isGrouped()
+                      && ( ! gbInfo.m_canBeFullySerialized )
+                      && isLargeQuery();
         // We will need an order by node on top iff we have group keys,
         // and either it's a large query, or there is not a partition column among
-        // the group by keys.
-        //   1.) If we have no group by expressions we don't need anything
-        //       to do serial aggregation.
-        //   2.) If it's not a large query we will use hash or partial
-        //       aggregation, and that will not need an order by.
-        //   3.) If we have group by expressions and a partition column among the
-        //       group by keys then the groups are all on the partitions,
-        //       and the rows we read will be the grouped values already.
-        //       in this case we don't even need a top aggregate.
+        // the group by keys.  The argument is similar to needAggOrderBy, but
+        // here we care about whether the group by keys contain a partition
+        // key.
         //
         // Note that if m_multiPartitionAggregation is false we will need
         // a top order by node.  But this is implied by the partition in
         // group by requirement, so we are ok.
         boolean needTopOrderBy
-                = !m_parsedSelect.isGrouped()
-                  || (isLargeQuery()
-                        && (! m_parsedSelect.hasPartitionColumnInGroupby()));
+                = m_parsedSelect.isGrouped()
+                   &&  (! m_parsedSelect.hasPartitionColumnInGroupby())
+                   &&  isLargeQuery();
 
         OrderByPlanNode   topOrderByNode  = needTopOrderBy ? new OrderByPlanNode() : null;
         OrderByPlanNode   aggOrderByNode  = needAggOrderBy ? new OrderByPlanNode() : null;

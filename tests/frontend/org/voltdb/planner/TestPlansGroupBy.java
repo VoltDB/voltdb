@@ -25,13 +25,12 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
-import org.junit.Before;
-import org.junit.Ignore;
+import javassist.expr.Expr;
+import org.hsqldb_voltpatches.Expression;
+import org.voltdb.RateLimitedClientNotifier;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -41,13 +40,10 @@ import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
-import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanMatcher;
 import org.voltdb.types.PlanNodeType;
@@ -222,7 +218,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                               // especially when computing average.
                               new OptionalPlanNode(PlanNodeType.PROJECTION),
                               coordAggNode,
-                              PlanNodeType.RECEIVE),
+                              AbstractReceivePlanMatcher),
                      fragSpec(PlanNodeType.SEND,
                               new PlanWithInlineNodes(scanType,
                                                       PlanNodeType.PROJECTION,
@@ -488,12 +484,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void basicTestCountDistinct() {
-        AbstractPlanNode p;
-        List<AbstractPlanNode> pns;
+        String sql;
 
         // push down distinct because of group by partition column
+        sql = "SELECT A4, count(distinct B4) FROM T4 GROUP BY A4";
         if (isPlanningForLargeQueries()) {
-            validatePlan("SELECT A4, count(distinct B4) FROM T4 GROUP BY A4",
+            validatePlan(sql,
                     PRINT_JSON_PLAN,
                     fragSpec(PlanNodeType.SEND,
                             PlanNodeType.RECEIVE),
@@ -502,7 +498,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                              PlanNodeType.ORDERBY,
                              AbstractScanPlanNodeMatcher));
         } else {
-            validatePlan("SELECT A4, count(distinct B4) FROM T4 GROUP BY A4",
+            validatePlan(sql,
                     PRINT_JSON_PLAN,
                     fragSpec(PlanNodeType.SEND,
                             PlanNodeType.RECEIVE),
@@ -513,8 +509,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
 
         // group by multiple columns
+        sql = "SELECT C4, A4, count(distinct B4) FROM T4 GROUP BY C4, A4";
         if (isPlanningForLargeQueries()) {
-            validatePlan("SELECT C4, A4, count(distinct B4) FROM T4 GROUP BY C4, A4",
+            validatePlan(sql,
                     PRINT_JSON_PLAN,
                     fragSpec(PlanNodeType.SEND,
                             PlanNodeType.RECEIVE),
@@ -524,7 +521,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                             PlanNodeType.ORDERBY,
                             AbstractScanPlanNodeMatcher));
         } else {
-            validatePlan("SELECT C4, A4, count(distinct B4) FROM T4 GROUP BY C4, A4",
+            validatePlan(sql,
                     PRINT_JSON_PLAN,
                     fragSpec(PlanNodeType.SEND,
                             PlanNodeType.RECEIVE),
@@ -536,19 +533,20 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
 
         // not push down distinct
+        sql = "SELECT ABS(A4), count(distinct B4) FROM T4 GROUP BY ABS(A4)";
         if (isPlanningForLargeQueries()) {
-            validatePlan("SELECT ABS(A4), count(distinct B4) FROM T4 GROUP BY ABS(A4)",
+            validatePlan(sql,
                     PRINT_JSON_PLAN,
                     fragSpec(PlanNodeType.SEND,
                             PlanNodeType.AGGREGATE,
-                            PlanNodeType.ORDERBY,
-                            PlanNodeType.RECEIVE),
+                            MergeReceivePlanMatcher),
                     fragSpec(PlanNodeType.SEND,
-                            new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
-                                    // No HashAggregate node here.
-                                    PlanNodeType.PROJECTION)));
+                             PlanNodeType.ORDERBY, // pushed down from the coordinator.
+                             new PlanWithInlineNodes(AbstractScanPlanNodeMatcher,
+                                                     // No HashAggregate node here.
+                                                     PlanNodeType.PROJECTION)));
         } else {
-            validatePlan("SELECT ABS(A4), count(distinct B4) FROM T4 GROUP BY ABS(A4)",
+            validatePlan(sql,
                     PRINT_JSON_PLAN,
                     fragSpec(PlanNodeType.SEND,
                             PlanNodeType.HASHAGGREGATE,
@@ -559,25 +557,37 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                     PlanNodeType.PROJECTION)));
         }
         // test not group by partition column with index available
+        sql = "SELECT A.NUM, COUNT(DISTINCT A.ID ) AS Q58 FROM P2 A GROUP BY A.NUM; ";
         if (isPlanningForLargeQueries()) {
-            validatePlan("SELECT A.NUM, COUNT(DISTINCT A.ID ) AS Q58 FROM P2 A GROUP BY A.NUM; ",
+            // I think this is ok, though it looks kind of weird.
+            // Read from the bottom.
+            // 1. We scan the primary key index, but just for determinism.
+            // 2. We sort by the group by column.  Since we are doing
+            //    count(distinct a.id), we know that two rows in
+            //    group num = ? with the same value for a.id are on the
+            //    same partition.  So we can push the aggregate down.  But
+            //    we have to aggregate again on the coordinator, summing the
+            //    counts this time.
+            validatePlan(sql,
                     PRINT_JSON_PLAN,
                     fragSpec(PlanNodeType.SEND,
-                            PlanNodeType.AGGREGATE,
-                            PlanNodeType.ORDERBY,
-                            PlanNodeType.RECEIVE),
+                             allOf(PlanNodeType.AGGREGATE,
+                                     new AggregateNodeMatcher(ExpressionType.AGGREGATE_SUM)),
+                            MergeReceivePlanMatcher),
                     fragSpec(PlanNodeType.SEND,
-                            allOf(PlanNodeType.INDEXSCAN,
+                            allOf(PlanNodeType.AGGREGATE,
+                                    new AggregateNodeMatcher(ExpressionType.AGGREGATE_COUNT)),
+                            PlanNodeType.ORDERBY,
+                            allOf(new IndexScanPlanMatcher("VOLTDB_AUTOGEN_CONSTRAINT_IDX_P2_PK_TREE"),
                                     new ExplainStringMatcher("for deterministic order only"))));
-
         } else {
-            validatePlan("SELECT A.NUM, COUNT(DISTINCT A.ID ) AS Q58 FROM P2 A GROUP BY A.NUM; ",
+            validatePlan(sql,
                     PRINT_JSON_PLAN,
                     fragSpec(PlanNodeType.SEND,
                             PlanNodeType.HASHAGGREGATE,
                             PlanNodeType.RECEIVE),
                     fragSpec(PlanNodeType.SEND,
-                            allOf(PlanNodeType.INDEXSCAN,
+                            allOf(new IndexScanPlanMatcher("VOLTDB_AUTOGEN_CONSTRAINT_IDX_P2_PK_TREE"),
                                     new ExplainStringMatcher("for deterministic order only"))));
         }
     }
@@ -599,8 +609,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     PRINT_JSON_PLAN,
                     fragSpec(PlanNodeType.SEND,
                              PlanNodeType.AGGREGATE,  // Aggregate for distinct.
-                             new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
-                                                     PlanNodeType.ORDERBY)),
+                             MergeReceivePlanMatcher),
                     fragSpec(PlanNodeType.SEND,
                              PlanNodeType.AGGREGATE,  // Aggregate for distinct.
                              PlanNodeType.ORDERBY,
@@ -641,8 +650,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     fragSpec(PlanNodeType.SEND,
                             PlanNodeType.SEQSCAN,
                             PlanNodeType.AGGREGATE,
-                            new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
-                                                    PlanNodeType.ORDERBY)),
+                            MergeReceivePlanMatcher),
                     fragSpec(PlanNodeType.SEND,
                              PlanNodeType.AGGREGATE,
                              PlanNodeType.ORDERBY,
@@ -689,8 +697,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                          PRINT_JSON_PLAN,
                          fragSpec(PlanNodeType.SEND,
                                   PlanNodeType.AGGREGATE,
-                                  new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
-                                                          PlanNodeType.ORDERBY)),
+                                  MergeReceivePlanMatcher),
                          fragSpec(PlanNodeType.SEND,
                                   PlanNodeType.AGGREGATE,
                                   PlanNodeType.ORDERBY,
@@ -717,8 +724,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                             (AbstractPlanNode n) -> {
                                                 return ((AggregatePlanNode)n).getPostPredicate() != null;
                                             })),
-                            new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
-                                                    PlanNodeType.ORDERBY)),
+                            MergeReceivePlanMatcher),
                     fragSpec(PlanNodeType.SEND,
                             new AggregateNodeMatcher(PlanNodeType.AGGREGATE,
                                                      ExpressionType.AGGREGATE_COUNT_STAR),
@@ -752,8 +758,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                                 // node by the first test in allOf.
                                                 return ((AggregatePlanNode)n).getPostPredicate() != null;
                                             })),
-                            new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
-                                                    PlanNodeType.ORDERBY)),
+                            MergeReceivePlanMatcher),
                     fragSpec(PlanNodeType.SEND,
                              new NodeTestMatcher("agg node with no post predicate",
                                                  n -> {
@@ -809,7 +814,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                                         }
                                                         return true;
                                                     }))),
-                            topAgg ? PlanNodeType.MERGERECEIVE : PlanNodeType.RECEIVE),
+                            topAgg ? MergeReceivePlanMatcher : PlanNodeType.RECEIVE),
                     fragSpec(PlanNodeType.SEND,
                             allOf(AbstractScanPlanNodeMatcher,
                                     new NodeTestMatcher("Aggregate with possible post predicate",
@@ -914,64 +919,51 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void basicTestGroupByPartitionKey_Negative() {
+        String sql;
         List<AbstractPlanNode> pns;
 
-        checkGroupByPartitionKey("SELECT ABS(PKEY), COUNT(*) from T1 group by ABS(PKEY)", true, false);
+        sql = "SELECT ABS(PKEY), COUNT(*) from T1 group by ABS(PKEY)";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             PlanNodeType.ORDERBY,
+                             new IndexScanPlanMatcher("VOLTDB_AUTOGEN_IDX_PK_T1_PKEY")));
+        }
+        else {
+            checkGroupByPartitionKey(sql, true, false);
+        }
 
-        checkGroupByPartitionKey("SELECT ABS(PKEY), COUNT(*) from T1 group by ABS(PKEY) Having count(*) > 3", true, true);
-    }
-
-    // Group by with index
-    private void checkGroupByOnlyPlanOneFragmentIndexScan(String SQL) {
-        validatePlan(SQL,
-                     PRINT_JSON_PLAN,
-                     fragSpec(PlanNodeType.SEND,
-                              new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                                      PlanNodeType.PROJECTION,
-                                                      PlanNodeType.AGGREGATE)));
-    }
-
-    private void checkGroupByOnlyPlan(String SQL,
-            boolean twoFragments, PlanNodeType type, boolean isIndexScan) {
-        // The distributed fragment always has this shape.
-        FragmentSpec distFragSpec = fragSpec(PlanNodeType.SEND,
-                                             new PlanWithInlineNodes((isIndexScan
-                                                                         ? PlanNodeType.INDEXSCAN
-                                                                         : PlanNodeType.SEQSCAN),
-                                                            PlanNodeType.PROJECTION,
-                                                                     type));
-        if (twoFragments) {
-            FragmentSpec coordSpec;
-            if (isPlanningForLargeQueries()) {
-                // If this is a large query, then we
-                // need to use serial aggregation, and
-                // sort the distributed result.
-                // Note: This may actually be a merge receive
-                //       node, with an inline order by.  That
-                //       would be better.
-                coordSpec = fragSpec(PlanNodeType.SEND,
-                                     PlanNodeType.AGGREGATE,
-                                     PlanNodeType.ORDERBY,
-                                     AbstractReceivePlanMatcher);
-            } else {
-                coordSpec = fragSpec(PlanNodeType.SEND,
-                                     PlanNodeType.HASHAGGREGATE,
-                                     AbstractReceivePlanMatcher);
-            }
-            validatePlan(SQL,
-                         PRINT_JSON_PLAN,
-                         coordSpec,
-                         distFragSpec);
-        } else {
-            validatePlan(SQL,
-                         PRINT_JSON_PLAN,
-                         distFragSpec);
+        sql = "SELECT ABS(PKEY), COUNT(*) from T1 group by ABS(PKEY) Having count(*) > 3";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            PlanNodeType.ORDERBY,
+                            new IndexScanPlanMatcher("VOLTDB_AUTOGEN_IDX_PK_T1_PKEY")));
+        }
+        else {
+            checkGroupByPartitionKey(sql, true, true);
         }
     }
 
-    PlanNodeType H_AGG = PlanNodeType.HASHAGGREGATE;
-    PlanNodeType S_AGG = PlanNodeType.AGGREGATE;
-    PlanNodeType P_AGG = PlanNodeType.PARTIALAGGREGATE;
+    // Group by with index
+    private void checkGroupByOnlyPlanOneFragment(String SQL, PlanNodeType aggregate) {
+        validatePlan(SQL,
+                PRINT_JSON_PLAN,
+                fragSpec(PlanNodeType.SEND,
+                        new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                PlanNodeType.PROJECTION,
+                                aggregate)));
+    }
 
     public void testGroupByOnly() {
         if (TEST_NORMAL_SIZE_QUERIES) {
@@ -993,51 +985,51 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // only GROUP BY cols in SELECT clause
         sql = "SELECT F_D1 FROM RF GROUP BY F_D1";
-        checkGroupByOnlyPlanOneFragment(sql, PlanNodeTy);
+        checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.AGGREGATE);
 
         // SELECT cols in GROUP BY and other aggregate cols
         sql = "SELECT F_D1, COUNT(*) FROM RF GROUP BY F_D1";
-        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
+        checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.AGGREGATE);
 
         // aggregate cols are part of keys of used index
         sql = "SELECT F_VAL1, SUM(F_VAL2) FROM RF GROUP BY F_VAL1";
-        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
+        checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.AGGREGATE);
 
         // expr index, full indexed case
         sql = "SELECT F_D1 + F_D2, COUNT(*) FROM RF GROUP BY F_D1 + F_D2";
-        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
+        checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.AGGREGATE);
 
         // function index, prefix indexed case
         sql = "SELECT ABS(F_D1), COUNT(*) FROM RF GROUP BY ABS(F_D1)";
-        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
+        checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.AGGREGATE);
 
         // order of GROUP BY cols is different of them in index definition
         // index on (ABS(F_D1), F_D2 - F_D3), GROUP BY on (F_D2 - F_D3, ABS(F_D1))
         sql = "SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM RF GROUP BY F_D2 - F_D3, ABS(F_D1)";
-        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
-        //* enable to debug */ System.out.println(pns, "DEBUG: " + pns.get(0).toExplainPlanString());
+        checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.AGGREGATE);
+
         sql = "SELECT F_VAL1, F_VAL2, COUNT(*) FROM RF GROUP BY F_VAL2, F_VAL1";
-        checkGroupByOnlyPlanOneFragmentIndexScan(sql);
+        checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.AGGREGATE);
 
         // Partitioned Table
         // index scan for group by only, no need using hash aggregate
         sql = "SELECT F_D1 FROM F GROUP BY F_D1";
-        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
+        checkGroupByOnlyPlanTwoFragSerialAgg(sql);
 
         sql = "SELECT F_D1, COUNT(*) FROM F GROUP BY F_D1";
-        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
+        checkGroupByOnlyPlanTwoFragSerialAgg(sql);
 
         sql = "SELECT F_VAL1, SUM(F_VAL2) FROM F GROUP BY F_VAL1";
-        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
+        checkGroupByOnlyPlanTwoFragSerialAgg(sql);
 
         sql = "SELECT F_D1 + F_D2, COUNT(*) FROM F GROUP BY F_D1 + F_D2";
-        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
+        checkGroupByOnlyPlanTwoFragSerialAgg(sql);
 
         sql = "SELECT ABS(F_D1), COUNT(*) FROM F GROUP BY ABS(F_D1)";
-        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
+        checkGroupByOnlyPlanTwoFragSerialAgg(sql);
 
         sql = "SELECT F_D2 - F_D3, ABS(F_D1), COUNT(*) FROM F GROUP BY F_D2 - F_D3, ABS(F_D1)";
-        checkGroupByOnlyPlanTwoFragSerialAggIndexScan(sql);
+        checkGroupByOnlyPlanTwoFragSerialAgg(sql);
 
         /**
          * Hash Aggregate cases
@@ -1046,111 +1038,181 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // SeqScanToIndexScan optimization for deterministic reason
         // use EXPR_RF_TREE1 not EXPR_RF_TREE2
         sql = "SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3";
-        // checkGroupByOnlyPlan(sql, false, H_AGG, true);
-        checkGroupByOnlyPlanOneFragmentHashAggIndexScan(sql);
+        if (isPlanningForLargeQueries()) {
+            checkGroupByOnlyPlanOneFragmentLarge(sql, "EXPR_RF_TREE1");
+        }
+        else {
+            checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.HASHAGGREGATE);
+        }
 
         // unoptimized case: index is not scannable
         sql = "SELECT F_VAL3, COUNT(*) FROM RF GROUP BY F_VAL3";
-        // checkGroupByOnlyPlan(sql, false, H_AGG, true);
-        checkGroupByOnlyPlanOneFragmentHashAggIndexScan(sql);
+        if (isPlanningForLargeQueries()) {
+            checkGroupByOnlyPlanOneFragmentLarge(sql, "EXPR_RF_TREE1");
+        }
+        else {
+            checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.HASHAGGREGATE);
+        }
 
         // unoptimized case: F_D2 is not prefix indexable
         sql = "SELECT F_D2, COUNT(*) FROM RF GROUP BY F_D2";
-        // checkGroupByOnlyPlan(sql, false, H_AGG, true);
-        checkGroupByOnlyPlanOneFragmentHashAggIndexScan(sql);
+        if (isPlanningForLargeQueries()) {
+            checkGroupByOnlyPlanOneFragmentLarge(sql, "EXPR_RF_TREE1");
+        }
+        else {
+            checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.HASHAGGREGATE);
+        }
 
         // unoptimized case (only uses second col of the index), will not be replaced in
         // SeqScanToIndexScan for determinism because of non-deterministic receive.
         // Use primary key index
         sql = "SELECT F_D2 - F_D3, COUNT(*) FROM F GROUP BY F_D2 - F_D3";
-        checkGroupByOnlyPlanTwoFragmentHashAggIndexScan(sql);
-        // checkGroupByOnlyPlan(sql, true, H_AGG, true);
+        checkGroupByOnlyPlanTwoFragHashAgg(sql);
 
         // unoptimized case (only uses second col of the index), will be replaced in
         // SeqScanToIndexScan for determinism.
         // use EXPR_F_TREE1 not EXPR_F_TREE2
-        //* enable to debug */ System.out.println(pns, pns.get(0).toExplainPlanString());
         sql = "SELECT F_D2 - F_D3, COUNT(*) FROM RF GROUP BY F_D2 - F_D3";
-        checkGroupByOnlyPlanOneFragmentHashAggIndexScan(sql);
-        // checkGroupByOnlyPlan(sql, false, H_AGG, true);
+        if (isPlanningForLargeQueries()) {
+            checkGroupByOnlyPlanOneFragmentLarge(sql, "EXPR_RF_TREE1");
+        }
+        else {
+            checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.HASHAGGREGATE);
+        }
 
         /**
          * Partial Aggregate cases
          */
         // unoptimized case: no prefix index found for (F_D1, F_D2)
         sql = "SELECT F_D1, F_D2, COUNT(*) FROM RF GROUP BY F_D1, F_D2";
-        checkGroupByOnlyPlanOneFragmentPartialAggIndexScan(sql);
-        // checkGroupByOnlyPlan(sql, false, P_AGG, true);
+        if (isPlanningForLargeQueries()) {
+            checkGroupByOnlyPlanOneFragmentLarge(sql, "COL_RF_TREE1");
+        }
+        else {
+            checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.PARTIALAGGREGATE);
+        }
 
         sql = "SELECT ABS(F_D1), F_D3, COUNT(*) FROM RF GROUP BY ABS(F_D1), F_D3";
-        checkGroupByOnlyPlanOneFragmentPartialAggIndexScan(sql);
-        // checkGroupByOnlyPlan(sql, false, P_AGG, true);
+        if (isPlanningForLargeQueries()) {
+            checkGroupByOnlyPlanOneFragmentLarge(sql, "EXPR_RF_TREE2");
+        }
+        else {
+            checkGroupByOnlyPlanOneFragment(sql, PlanNodeType.PARTIALAGGREGATE);
+        }
 
         // partition table
         sql = "SELECT F_D1, F_D2, COUNT(*) FROM F GROUP BY F_D1, F_D2";
-        checkGroupByOnlyPlanTwoFragmentPartialAggIndexScan(sql);
-        // checkGroupByOnlyPlan(sql, true, P_AGG, true);
+        checkGroupByOnlyPlanTwoFragPartialAgg(sql);
 
         sql = "SELECT ABS(F_D1), F_D3, COUNT(*) FROM F GROUP BY ABS(F_D1), F_D3";
-        checkGroupByOnlyPlanTwoFragmentPartialAggIndexScan(sql);
-        // checkGroupByOnlyPlan(sql, true, P_AGG, true);
-
+        checkGroupByOnlyPlanTwoFragPartialAgg(sql);
         /**
          * Regression case
          */
         // ENG-9990 Repeating GROUP BY partition key in SELECT corrupts output schema.
-        //* enable to debug */ boolean was = AbstractPlanNode.enableVerboseExplainForDebugging();
-        if ( ! isPlanningForLargeQueries() ) {
-            validatePlan("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY",
-                         PRINT_JSON_PLAN,
-                         fragSpec(PlanNodeType.SEND,
-                                  PlanNodeType.RECEIVE),
-                         fragSpec(PlanNodeType.SEND,
-                                  allOf(PlanNodeType.PROJECTION,
-                                        new OutputSchemaMatcher("C", VoltType.BIGINT, 1)),
-                                  new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
-                                                          PlanNodeType.HASHAGGREGATE,
-                                                          PlanNodeType.PROJECTION)));
+        // We only test that the output schema is right.
+        validatePlan("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY",
+                     PRINT_JSON_PLAN,
+                     fragSpec(PlanNodeType.SEND,
+                              allOf(PlanNodeType.RECEIVE,
+                                    new OutputSchemaMatcher("C", VoltType.BIGINT, 1))),
+                     fragSpec(new AnyFragment()));
+    }
+
+    private void checkGroupByOnlyPlanOneFragmentLarge(String SQL, String indexName) {
+        validatePlan(SQL,
+                PRINT_JSON_PLAN,
+                fragSpec(PlanNodeType.SEND,
+                        PlanNodeType.AGGREGATE,
+                        PlanNodeType.ORDERBY,
+                        new PlanWithInlineNodes(new IndexScanPlanMatcher(indexName),
+                                PlanNodeType.PROJECTION)));
+
+    }
+
+    private void checkGroupByOnlyPlanTwoFragHashAgg(String sql) {
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             PlanNodeType.ORDERBY,
+                             // This index scan is for determinism, and
+                             // not to provide a useful order for group by.
+                             // So we need the aggregate/orderby pair.
+                             new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                     PlanNodeType.PROJECTION)));
         } else {
-            validatePlan("SELECT G_PKEY, COUNT(*) C, G_PKEY FROM G GROUP BY G_PKEY",
-                         PRINT_JSON_PLAN,
-                         fragSpec(PlanNodeType.SEND,
-                                  PlanNodeType.RECEIVE),
-                         fragSpec(PlanNodeType.SEND,
-                                  PlanNodeType.AGGREGATE,
-                                  PlanNodeType.ORDERBY,
-                                  allOf(PlanNodeType.PROJECTION,
-                                        new OutputSchemaMatcher("C", VoltType.BIGINT, 1)),
-                                                          PlanNodeType.PROJECTION));
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.HASHAGGREGATE,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                    PlanNodeType.PROJECTION,
+                                    PlanNodeType.HASHAGGREGATE)));
         }
     }
 
-    private void checkGroupByOnlyPlanTwoFragSerialAggIndexScan(String sql) {
+    /*
+     * The "Serial" in the name means the distributed fragment
+     * has an inline serial aggregation.  The coordinator node
+     * can still have a hash aggregate.
+     */
+    private void checkGroupByOnlyPlanTwoFragSerialAgg(String sql) {
         if (isPlanningForLargeQueries()) {
             validatePlan(sql,
-                         PRINT_JSON_PLAN,
-                         fragSpec(PlanNodeSend.SEND,
-                                  PlanNodeType.AGGREGATE,
-                                  PlanNodeType.ORDERBY,
-                                  new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
-                                                          PlanNodeType.PROJECTION,
-                                                          PlanNodeType.ORDERBY)),
-                         fragSpec(PlanNodeType.SEND,
-                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                                          PlanNodeType.PROJECTION,
-                                                          PlanNodeType.AGGREGATE)));
-        }
-        else {
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.ORDERBY, // Orderby pushed down
+                                                   // from coord fragment
+                                                   // to force serial aggregation.
+                             new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                    PlanNodeType.PROJECTION,
+                                    PlanNodeType.AGGREGATE)));
+        } else {
             validatePlan(sql,
-                         PRINT_JSON_PLAN,
-                         fragSpec(PlanNodeType.SEND,
-                                  PlanNodeType.HASHAGGREGATE,
-                                  PlanNodeType.RECEIVE),
-                         fragSpec(PlanNodeType.SEND,
-                                  new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
-                                                          PlanNodeType.PROJECTION,
-                                                          PlanNodeType.AGGREGATE)));
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.HASHAGGREGATE,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                    PlanNodeType.PROJECTION,
+                                    PlanNodeType.AGGREGATE)));
+        }
+    }
 
+    private void checkGroupByOnlyPlanTwoFragPartialAgg(String sql) {
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.AGGREGATE,
+                            PlanNodeType.ORDERBY,
+                            new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                    PlanNodeType.PROJECTION)));
+        } else {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            PlanNodeType.HASHAGGREGATE,
+                            PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                    PlanNodeType.PROJECTION,
+                                    PlanNodeType.PARTIALAGGREGATE)));
+        }
     }
 
     private void checkPartialAggregate(String sql,
@@ -1260,54 +1322,133 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void basicTestGroupByWithLimit() {
+        String sql;
         List<AbstractPlanNode> pns;
 
         // replicated table with serial aggregation and inlined limit
-        pns = compileToFragments("SELECT F_PKEY FROM RF GROUP BY F_PKEY LIMIT 5");
-        checkGroupByOnlyPlanWithLimit(pns, false, false, true, true);
+        sql = "SELECT F_PKEY FROM RF GROUP BY F_PKEY LIMIT 5";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             new PlanWithInlineNodes(
+                                     allOf(PlanNodeType.INDEXSCAN,
+                                           new IndexScanPlanMatcher("VOLTDB_AUTOGEN_IDX_PK_RF_F_PKEY")),
+                                     PlanNodeType.PROJECTION,
+                                     new PlanWithInlineNodes(PlanNodeType.AGGREGATE,
+                                                             PlanNodeType.LIMIT))));
+        }
+        else {
+            pns = compileToFragments(sql);
+            checkGroupByOnlyPlanWithLimit(pns, false, false, true, true);
+        }
 
-        pns = compileToFragments("SELECT F_D1 FROM RF GROUP BY F_D1 LIMIT 5");
-        checkGroupByOnlyPlanWithLimit(pns, false, false, true, true);
+        sql = "SELECT F_D1 FROM RF GROUP BY F_D1 LIMIT 5";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                    PlanNodeType.PROJECTION,
+                                    new PlanWithInlineNodes(PlanNodeType.AGGREGATE,
+                                            PlanNodeType.LIMIT))));
+        }
+        else {
+            pns = compileToFragments(sql);
+            checkGroupByOnlyPlanWithLimit(pns, false, false, true, true);
+        }
 
         // partitioned table with serial aggregation and inlined limit
         // group by columns contain the partition key is the only case allowed
-        pns = compileToFragments("SELECT F_PKEY FROM F GROUP BY F_PKEY LIMIT 5");
-        checkGroupByOnlyPlanWithLimit(pns, true, false, true, true);
-
-        // Explain plan for the above query
-        /*
-           RETURN RESULTS TO STORED PROCEDURE
-            LIMIT 5
-             RECEIVE FROM ALL PARTITIONS
-
-           RETURN RESULTS TO STORED PROCEDURE
-            INDEX SCAN of "F" using its primary key index (for optimized grouping only)
-             inline Serial AGGREGATION ops
-              inline LIMIT 5
-        */
-        String expectedStr = "  inline Serial AGGREGATION ops: \n" +
-                             "   inline LIMIT 5";
-        String explainPlan = "";
-        for (AbstractPlanNode apn: pns) {
-            explainPlan += apn.toExplainPlanString();
+        sql = "SELECT F_PKEY FROM F GROUP BY F_PKEY LIMIT 5";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.LIMIT,
+                             PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                             new PlanWithInlineNodes(
+                                     new IndexScanPlanMatcher("VOLTDB_AUTOGEN_IDX_PK_F_F_PKEY"),
+                                     PlanNodeType.PROJECTION,
+                                     new PlanWithInlineNodes(PlanNodeType.AGGREGATE,
+                                                             PlanNodeType.LIMIT))));
         }
-        assertTrue(explainPlan.contains(expectedStr));
+        else {
+            pns = compileToFragments(sql);
+            checkGroupByOnlyPlanWithLimit(pns, true, false, true, true);
 
-        pns = compileToFragments("SELECT A3, COUNT(*) FROM T3 GROUP BY A3 LIMIT 5");
-        checkGroupByOnlyPlanWithLimit(pns, true, false, true, true);
+            // Explain plan for the above query
+            /*
+               RETURN RESULTS TO STORED PROCEDURE
+                LIMIT 5
+                 RECEIVE FROM ALL PARTITIONS
 
-        pns = compileToFragments("SELECT A3, B3, COUNT(*) FROM T3 GROUP BY A3, B3 LIMIT 5");
-        checkGroupByOnlyPlanWithLimit(pns, true, false, true, true);
+               RETURN RESULTS TO STORED PROCEDURE
+                INDEX SCAN of "F" using its primary key index (for optimized grouping only)
+                 inline Serial AGGREGATION ops
+                  inline LIMIT 5
+            */
+            String expectedStr = "  inline Serial AGGREGATION ops: \n" +
+                    "   inline LIMIT 5";
+            String explainPlan = "";
+            for (AbstractPlanNode apn : pns) {
+                explainPlan += apn.toExplainPlanString();
+            }
+            assertTrue(explainPlan.contains(expectedStr));
+        }
 
-        pns = compileToFragments("SELECT A3, B3, COUNT(*) FROM T3 WHERE A3 > 1 GROUP BY A3, B3 LIMIT 5");
-        checkGroupByOnlyPlanWithLimit(pns, true, false, true, true);
+        // %%%
+        sql = "SELECT A3, COUNT(*) FROM T3 GROUP BY A3 LIMIT 5";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND),
+                    fragSpec(PlanNodeType.SEND));
+        }
+        else {
+            pns = compileToFragments(sql);
+            checkGroupByOnlyPlanWithLimit(pns, true, false, true, true);
+        }
+
+        sql = "SELECT A3, B3, COUNT(*) FROM T3 GROUP BY A3, B3 LIMIT 5";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND),
+                    fragSpec(PlanNodeType.SEND));
+        }
+        else {
+            pns = compileToFragments(sql);
+            checkGroupByOnlyPlanWithLimit(pns, true, false, true, true);
+        }
+
+        sql = "SELECT A3, B3, COUNT(*) FROM T3 WHERE A3 > 1 GROUP BY A3, B3 LIMIT 5";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND),
+                    fragSpec(PlanNodeType.SEND));
+        }
+        else {
+            pns = compileToFragments(sql);
+            checkGroupByOnlyPlanWithLimit(pns, true, false, true, true);
+        }
 
         //
         // negative tests
         //
-        pns = compileToFragments("SELECT F_VAL2 FROM RF GROUP BY F_VAL2 LIMIT 5");
-        checkGroupByOnlyPlanWithLimit(pns, false, true, true, false);
-
+        sql = "SELECT F_VAL2 FROM RF GROUP BY F_VAL2 LIMIT 5";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND),
+                    fragSpec(PlanNodeType.SEND));
+        }
+        else {
+            pns = compileToFragments(sql);
+            checkGroupByOnlyPlanWithLimit(pns, false, true, true, false);
+        }
         // Limit should not be pushed down for case like:
         // Group by non-partition without partition key and order by.
         // ENG-6485
@@ -1365,7 +1506,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         pns = compileToFragments("SELECT F_D1, count(*) as tag FROM RF group by F_D1 order by tag");
         p = pns.get(0).getChild(0);
-        //* enable to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
+
         if (p instanceof ProjectionPlanNode) {
             p = p.getChild(0);
         }
@@ -1376,7 +1517,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         pns = compileToFragments("SELECT F_D1, count(*) FROM RF group by F_D1 order by 2");
         p = pns.get(0).getChild(0);
-        //* enable to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
+
         if (p instanceof ProjectionPlanNode) {
             p = p.getChild(0);
         }
@@ -1393,7 +1534,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     private void checkHasComplexAgg(List<AbstractPlanNode> pns,
             boolean projectPushdown) {
         assertTrue(pns.size() > 0);
-        boolean isDistributed = pns.size() > 1 ? true: false;
+        boolean isDistributed = pns.size() > 1;
 
         if (projectPushdown) {
             assertTrue(isDistributed);
@@ -1450,8 +1591,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                                           PlanNodeType.LIMIT),
                                   PlanNodeType.PROJECTION,
                                   PlanNodeType.AGGREGATE,
-                                  new PlanWithInlineNodes(PlanNodeType.MERGERECEIVE,
-                                                          PlanNodeType.ORDERBY)),
+                                  MergeReceivePlanMatcher),
                          fragSpec(PlanNodeType.SEND,
                                   new PlanWithInlineNodes(PlanNodeType.ORDERBY,
                                                           PlanNodeType.LIMIT),
@@ -1495,7 +1635,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                   PlanNodeType.ORDERBY,
                                   PlanNodeType.PROJECTION,
                                   PlanNodeType.AGGREGATE, // Aggregation not pushed down with distinct.
-                                  PlanNodeType.MERGERECEIVE),
+                                  MergeReceivePlanMatcher),
                          fragSpec(PlanNodeType.SEND,
                                   PlanNodeType.ORDERBY,
                                   AbstractScanPlanNodeMatcher));
@@ -1532,7 +1672,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                                                           PlanNodeType.LIMIT),
                                   PlanNodeType.PROJECTION,
                                   PlanNodeType.AGGREGATE,
-                                  PlanNodeType.MERGERECEIVE),
+                                  MergeReceivePlanMatcher),
                          fragSpec(PlanNodeType.SEND,
                                   PlanNodeType.ORDERBY,
                                   AbstractScanPlanNodeMatcher));
@@ -1610,21 +1750,44 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     private void basicTestComplexGroupBy() {
         List<AbstractPlanNode> pns;
+        String sql;
 
-        pns = compileToFragments("SELECT A1, ABS(A1), ABS(A1)+1, sum(B1) FROM P1 GROUP BY A1, ABS(A1)");
+        sql = "SELECT A1, ABS(A1), ABS(A1)+1, sum(B1) FROM P1 GROUP BY A1, ABS(A1)";
+        // Just print the json plan, and don't really
+        // validate anything.
+        printJSONPlan(PRINT_JSON_PLAN, sql);
+
+        pns = compileToFragments(sql);
         checkHasComplexAgg(pns);
 
         // Check it can compile
-        pns = compileToFragments("SELECT ABS(A1), sum(B1) FROM P1 GROUP BY ABS(A1)");
-        AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof AggregatePlanNode);
+        sql = "SELECT ABS(A1), sum(B1) FROM P1 GROUP BY ABS(A1)";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.AGGREGATE,
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.INDEXSCAN));
+        }
+        else {
+            printJSONPlan(PRINT_JSON_PLAN, sql);
+            pns = compileToFragments(sql);
+            AbstractPlanNode p = pns.get(0).getChild(0);
+            assertTrue(p instanceof AggregatePlanNode);
 
-        p = pns.get(1).getChild(0);
-        // inline aggregate
-        assertTrue(p instanceof AbstractScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+            p = pns.get(1).getChild(0);
+            // inline aggregate
+            assertTrue(p instanceof AbstractScanPlanNode);
+            assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        }
 
-        pns = compileToFragments("SELECT A1+PKEY, avg(B1) as tag FROM P1 GROUP BY A1+PKEY ORDER BY ABS(tag), A1+PKEY");
+        sql = "SELECT A1+PKEY, avg(B1) as tag FROM P1 GROUP BY A1+PKEY ORDER BY ABS(tag), A1+PKEY";
+        printJSONPlan(PRINT_JSON_PLAN, sql);
+        pns = compileToFragments(sql);
         checkHasComplexAgg(pns);
     }
 
@@ -1662,21 +1825,59 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     private void basicTestUnOptimizedAVG() {
         List<AbstractPlanNode> pns;
+        String sql;
 
-        pns = compileToFragments("SELECT AVG(A1) FROM R1");
-        checkOptimizedAgg(pns, false);
+        sql = "SELECT AVG(A1) FROM R1";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                            new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                    PlanNodeType.PROJECTION,
+                                    PlanNodeType.AGGREGATE)));
+        }
+        else {
+            pns = compileToFragments(sql);
+            checkOptimizedAgg(pns, false);
+        }
 
-        pns = compileToFragments("SELECT A1, AVG(PKEY) FROM R1 GROUP BY A1");
-        checkOptimizedAgg(pns, false);
+        sql = "SELECT A1, AVG(PKEY) FROM R1 GROUP BY A1";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             allOf(PlanNodeType.AGGREGATE,
+                                   new AggregateNodeMatcher(ExpressionType.AGGREGATE_AVG)),
+                             PlanNodeType.ORDERBY,
+                             new PlanWithInlineNodes(PlanNodeType.INDEXSCAN,
+                                                     PlanNodeType.PROJECTION)));
+        }
+        else {
+            pns = compileToFragments(sql);
+            checkOptimizedAgg(pns, false);
+        }
 
-        pns = compileToFragments("SELECT A1, AVG(PKEY)+1 FROM R1 GROUP BY A1");
-        checkHasComplexAgg(pns);
-        AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        p = p.getChild(0);
-        assertTrue(p instanceof AbstractScanPlanNode);
-        assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
-                p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        sql = "SELECT A1, AVG(PKEY)+1 FROM R1 GROUP BY A1";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.PROJECTION,
+                             allOf(PlanNodeType.AGGREGATE,
+                                   new AggregateNodeMatcher(ExpressionType.AGGREGATE_AVG)),
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.INDEXSCAN));
+        }
+        else {
+            pns = compileToFragments(sql);
+            checkHasComplexAgg(pns);
+            AbstractPlanNode p = pns.get(0).getChild(0);
+            assertTrue(p instanceof ProjectionPlanNode);
+            p = p.getChild(0);
+            assertTrue(p instanceof AbstractScanPlanNode);
+            assertTrue(p.getInlinePlanNode(PlanNodeType.AGGREGATE) != null ||
+                    p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null);
+        }
     }
 
     public void testOptimizedAVG() {
@@ -1691,21 +1892,64 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void basicTestOptimizedAVG() {
+        String sql;
         List<AbstractPlanNode> pns;
 
-        pns = compileToFragments("SELECT AVG(A1) FROM P1");
-        checkHasComplexAgg(pns);
-        checkOptimizedAgg(pns, true);
+        sql = "SELECT AVG(A1) FROM P1";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.PROJECTION,
+                             allOf(PlanNodeType.AGGREGATE,
+                                     new AggregateNodeMatcher(
+                                             ExpressionType.AGGREGATE_SUM,
+                                             ExpressionType.AGGREGATE_SUM
+                                     )),
+                             PlanNodeType.RECEIVE),
+                    fragSpec(PlanNodeType.SEND,
+                             new PlanWithInlineNodes(PlanNodeType.SEQSCAN,
+                                     PlanNodeType.PROJECTION,
+                                     allOf(PlanNodeType.AGGREGATE,
+                                             new AggregateNodeMatcher(
+                                                     ExpressionType.AGGREGATE_SUM,
+                                                     ExpressionType.AGGREGATE_COUNT)))));
+        }
+        else {
+            printJSONPlan(PRINT_JSON_PLAN, sql);
+            pns = compileToFragments(sql);
+            checkHasComplexAgg(pns);
+            checkOptimizedAgg(pns, true);
+        }
 
-        pns = compileToFragments("SELECT A1, AVG(PKEY) FROM P1 GROUP BY A1");
-        checkHasComplexAgg(pns);
-        // Test avg pushed down by replacing it with sum, count
-        checkOptimizedAgg(pns, true);
+        sql = "SELECT A1, AVG(PKEY) FROM P1 GROUP BY A1";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND),
+                    fragSpec(PlanNodeType.SEND));
+        }
+        else {
+            printJSONPlan(PRINT_JSON_PLAN, sql);
+            pns = compileToFragments(sql);
+            checkHasComplexAgg(pns);
+            // Test avg pushed down by replacing it with sum, count
+            checkOptimizedAgg(pns, true);
+        }
 
-        pns = compileToFragments("SELECT A1, AVG(PKEY)+1 FROM P1 GROUP BY A1");
-        checkHasComplexAgg(pns);
-        // Test avg pushed down by replacing it with sum, count
-        checkOptimizedAgg(pns, true);
+        sql = "SELECT A1, AVG(PKEY)+1 FROM P1 GROUP BY A1";
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql, PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND),
+                    fragSpec(PlanNodeType.SEND));
+        }
+        else {
+            printJSONPlan(PRINT_JSON_PLAN, sql);
+            pns = compileToFragments(sql);
+            checkHasComplexAgg(pns);
+            // Test avg pushed down by replacing it with sum, count
+            checkOptimizedAgg(pns, true);
+        }
     }
 
     public void testGroupByColsNotInDisplayCols() {
@@ -1872,18 +2116,33 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     "object not found: P1.SP"));
         }
 
+        String sql;
+        sql = "SELECT ABS(A1) AS A1, count(*) as ct FROM P1 GROUP BY A1";
         //
         // ambiguous group by query because of A1 is a column name and a select alias
         //
-        pns = compileToFragments(
-                "SELECT ABS(A1) AS A1, count(*) as ct FROM P1 GROUP BY A1");
-        //* enable to debug */ printExplainPlan(pns);
-        AbstractPlanNode p = pns.get(1).getChild(0);
-        assertTrue(p instanceof AbstractScanPlanNode);
-        AggregatePlanNode agg = AggregatePlanNode.getInlineAggregationNode(p);
-        assertNotNull(agg);
-        // group by column, instead of the ABS(A1) expression
-        assertEquals(agg.getGroupByExpressions().get(0).getExpressionType(), ExpressionType.VALUE_TUPLE);
+        pns = compileToFragments(sql);
+        if (isPlanningForLargeQueries()) {
+            validatePlan(sql,
+                    PRINT_JSON_PLAN,
+                    fragSpec(PlanNodeType.SEND,
+                             PlanNodeType.PROJECTION,
+                             PlanNodeType.AGGREGATE,
+                             MergeReceivePlanMatcher),
+                    fragSpec(PlanNodeType.SEND,
+                             allOf(PlanNodeType.AGGREGATE,
+                                   new AggregateNodeMatcher(ExpressionType.AGGREGATE_COUNT_STAR)),
+                             PlanNodeType.ORDERBY,
+                             PlanNodeType.INDEXSCAN));
+        }
+        else {
+            AbstractPlanNode p = pns.get(1).getChild(0);
+            assertTrue(p instanceof AbstractScanPlanNode);
+            AggregatePlanNode agg = AggregatePlanNode.getInlineAggregationNode(p);
+            assertNotNull(agg);
+            // group by column, instead of the ABS(A1) expression
+            assertEquals(agg.getGroupByExpressions().get(0).getExpressionType(), ExpressionType.VALUE_TUPLE);
+        }
     }
 
     public void testGroupByAlias() {

@@ -740,7 +740,7 @@ public class PlannerTestCase extends TestCase {
         @Override
         public String match(AbstractPlanNode node, int fn, int nf) {
             if ( ! (node instanceof IndexScanPlanNode) ) {
-                return String.format("Expected IndexScanPlanNode, not %s: node %d/%d, id %d",
+                return String.format("Expected IndexScanPlanNode, not %s: fragment %d/%d, id %d",
                                      node.getPlanNodeType(),
                                      fn, nf, node.getPlanNodeId());
             }
@@ -748,8 +748,8 @@ public class PlannerTestCase extends TestCase {
             if (m_indexName != null) {
                 String idxName = ((IndexScanPlanNode) node).getTargetIndexName();
                 if (!m_indexName.equals(idxName)) {
-                    return String.format("Expected IndexScanPlanNode of index %s, not %s",
-                                         m_indexName, idxName);
+                    return String.format("Expected IndexScanPlanNode of index %s, not %s: fragment %d/%d, id %d",
+                                         m_indexName, idxName, fn, nf, node.getPlanNodeId());
                 }
             }
             return null;
@@ -839,7 +839,7 @@ public class PlannerTestCase extends TestCase {
                                          node.getPlanNodeId());
                 }
                 if (col.getValueType() != type) {
-                    return String.format("Expected schema type %s, found %s in column %d: fragment %d/%d, node id %d",
+                    return String.format("Expected schema type %s, found %s in column %d: fragment %d/%d, id %d",
                                          type,
                                          col.getValueType(),
                                          index,
@@ -875,7 +875,7 @@ public class PlannerTestCase extends TestCase {
             if (node.toExplainPlanString().contains(m_expected)) {
                 return null;
             }
-            return String.format("Expected \"%s\" in plan explain string at plan node %d/%d, id %d. ",
+            return String.format("Expected \"%s\" in plan explain string: fragment %d/%d, id %d. ",
                                  m_expected,
                                  fragmentNo,
                                  numFragments,
@@ -928,7 +928,7 @@ public class PlannerTestCase extends TestCase {
             // This is really a test failure.  The matcher
             // should be something like an AggregatePlanNode.
             assertTrue(String.format(
-                            "Expected an AggregatePlanNode, not %s at plan node %d/%d, id %d.",
+                            "Expected an AggregatePlanNode, not %s: fragment %d/%d, id %d.",
                             node.getPlanNodeType(),
                             fragmentNo,
                             numFragments,
@@ -945,7 +945,8 @@ public class PlannerTestCase extends TestCase {
             List<ExpressionType> expTypes = pn.getAggregateTypes();
             for (ExpressionType type : m_aggOps) {
                 if ( ! expTypes.contains(type)) {
-                    return String.format("Expected aggregate %s here", type);
+                    return String.format("Expected aggregate %s here: fragment %d/%d, id %d",
+                                         type, fragmentNo, numFragments, node.getPlanNodeId());
                 }
             }
             return null;
@@ -986,7 +987,7 @@ public class PlannerTestCase extends TestCase {
             if (m_tester.match(node)) {
                 return null;
             }
-            return String.format("NodeTest %s failed at %d/%d, id %d",
+            return String.format("NodeTest %s failed: fragment %d/%d, id %d",
                                  m_name,
                                  fragmentNo,
                                  numFragments,
@@ -1143,8 +1144,8 @@ public class PlannerTestCase extends TestCase {
                 AbstractPlanNode inlineNode = null;
                 PlanNodeType matchingType = findMatchingNode(node, branch, fragmentNo, numberFragments);
                 if (matchingType == null) {
-                    return String.format("Expected inline node type %s but didn't find it "
-                                                 + "at plan node %d/%d, id %d.",
+                    return String.format("Expected inline node type %s but didn't find it: "
+                                                 + "fragment %d/%d, id %d.",
                                          branch.matchName(),
                                          fragmentNo,
                                          numberFragments,
@@ -1161,7 +1162,7 @@ public class PlannerTestCase extends TestCase {
                     sep = ", ";
                 }
                 String found = buf.toString();
-                return String.format("Expected %d inline nodes (%s), found %d (%s) at node %d/%d, id %d.",
+                return String.format("Expected %d inline nodes (%s), found %d (%s): fragment %d/%d, id %d",
                                      m_branches.size(),
                                      expected,
                                      node.getInlinePlanNodes().size(),
@@ -1199,7 +1200,7 @@ public class PlannerTestCase extends TestCase {
                 public String match(AbstractPlanNode node, int fragmentNo, int numberFragments) {
                     PlanNodeType pnt = (PlanNodeType)obj;
                     if (node.getPlanNodeType() != (PlanNodeType)obj) {
-                        return String.format("Expected Plan Node Type %s not %s at fragment %d/%d id %d",
+                        return String.format("Expected Plan Node Type %s not %s: fragment %d/%d, id %d",
                                              pnt.name(),
                                              node.getPlanNodeType().name(),
                                              fragmentNo,
@@ -1228,8 +1229,8 @@ public class PlannerTestCase extends TestCase {
                     if (p instanceof AbstractScanPlanNode) {
                         return null;
                     }
-                    return String.format("Expected AbstractScanPlanNode, not %s: fragment %d/%d",
-                                         p.getPlanNodeType(), fragmentNo, numFragments);
+                    return String.format("Expected AbstractScanPlanNode, not %s: fragment %d/%d, id %d",
+                                         p.getPlanNodeType(), fragmentNo, numFragments, p.getPlanNodeId());
                 }
 
                 public String matchName() {
@@ -1245,8 +1246,8 @@ public class PlannerTestCase extends TestCase {
                         if (p instanceof AbstractJoinPlanNode) {
                             return null;
                         }
-                        return String.format("Expected AbstractJoinPlanNode, not %s: fragment %d/%d",
-                                             p.getPlanNodeType(), fragmentNo, numFragments);
+                        return String.format("Expected AbstractJoinPlanNode, not %s: fragment %d/%d, id %d",
+                                             p.getPlanNodeType(), fragmentNo, numFragments, p.getPlanNodeId());
                     }
 
                     public String matchName() {
@@ -1254,6 +1255,9 @@ public class PlannerTestCase extends TestCase {
                     }
                 };
 
+    /**
+     * A matcher that matches any kind of receive node.
+     */
     protected final static PlanMatcher AbstractReceivePlanMatcher
             = new PlanMatcher() {
 
@@ -1261,16 +1265,53 @@ public class PlannerTestCase extends TestCase {
         public String match(AbstractPlanNode node,
                             int fragmentNo,
                             int numFragments) {
-            if (node instanceof AbstractReceivePlanNode) {
-                return null;
+            switch (node.getPlanNodeType()) {
+                case RECEIVE:
+                    return null;
+                case MERGERECEIVE:
+                    if (node.getInlinePlanNode(PlanNodeType.ORDERBY) == null) {
+                        return String.format("MERGERECEIVE node expects an inline ORDERBY: fragment %d/%d, id %d",
+                                             fragmentNo, numFragments, node.getPlanNodeId());
+                    }
+                    return null;
+                default:
+                    return String.format("Expected some kind of receive node, not %s: fragment %d/%d, id %d",
+                                         node.getPlanNodeType(),
+                                         fragmentNo,
+                                         numFragments,
+                                         node.getPlanNodeId());
             }
-            return String.format("Expected AbstractReceivePlanNode, not %s: fragment %d/%d",
-                                 node.getPlanNodeType(), fragmentNo, numFragments);
         }
 
         @Override
         public String matchName() {
             return "AbstractReceivePlanMatcher";
+        }
+    };
+
+    protected final PlanMatcher MergeReceivePlanMatcher = new PlanMatcher() {
+        @Override
+        public String match(AbstractPlanNode node, int fragmentNo, int numFragments) {
+            if (node.getPlanNodeType() != PlanNodeType.MERGERECEIVE) {
+                return String.format("Expected MERGERECEIVE node, not %s: fragment %d/d id %d",
+                        node.getPlanNodeType(),
+                        fragmentNo,
+                        numFragments,
+                        node.getPlanNodeId());
+            }
+            if (node.getInlinePlanNode(PlanNodeType.ORDERBY) == null) {
+                return String.format("MERGERECEIVE node expects an inline ORDERBY: fragment %d/%d, id %d",
+                        fragmentNo,
+                        numFragments,
+                        node.getPlanNodeId());
+            }
+            // Guess we are happy with this.
+            return null;
+        }
+
+        @Override
+        public String matchName() {
+            return "MergeReceivePlanMatcher";
         }
     };
 
@@ -1537,6 +1578,13 @@ public class PlannerTestCase extends TestCase {
         for (int idx = 0; idx < fragments.size(); idx += 1) {
             String error = spec[idx].match(fragments.get(idx), idx + 1, fragments.size());
             assertNull(error, error);
+        }
+    }
+
+    protected void printJSONPlan(boolean printPlan,
+                                 String SQL) {
+        if (printPlan) {
+            printJSONPlan(printPlan, SQL, compileToFragments(SQL));
         }
     }
 
