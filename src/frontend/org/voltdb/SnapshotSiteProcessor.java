@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
@@ -651,7 +652,10 @@ public class SnapshotSiteProcessor {
          * Check the AtomicInteger to find out if this is the last one.
          */
         if (m_snapshotTableTasks.isEmpty()) {
-            SNAP_LOG.debug("Finished with tasks");
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Finished with tasks, current snapshotting sites:" +
+                           Arrays.toString(ExecutionSitesCurrentlySnapshotting.toArray()));
+            }
             // In case this is a non-blocking snapshot, do the post-snapshot tasks here.
             runPostSnapshotTasks(context);
             final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
@@ -675,7 +679,9 @@ public class SnapshotSiteProcessor {
              * sync every file descriptor and that may block for a while.
              */
             if (IamLast) {
-                SNAP_LOG.debug("I AM LAST!");
+                if (SNAP_LOG.isDebugEnabled()) {
+                    SNAP_LOG.debug("I AM LAST!");
+                }
                 final long txnId = m_lastSnapshotTxnId;
                 final ExtensibleSnapshotDigestData snapshotDataForZookeeper = m_extraSnapshotData;
                 m_extraSnapshotData = null;
@@ -765,7 +771,9 @@ public class SnapshotSiteProcessor {
 
     public static void runPostSnapshotTasks(SystemProcedureExecutionContext context)
     {
-        SNAP_LOG.debug("Running post-snapshot tasks");
+        if (SNAP_LOG.isDebugEnabled()) {
+            SNAP_LOG.debug("Running post-snapshot tasks");
+        }
         PostSnapshotTask postSnapshotTask = m_siteTasksPostSnapshotting.remove(context.getPartitionId());
         if (postSnapshotTask != null) {
             postSnapshotTask.run(context);
@@ -821,6 +829,9 @@ public class SnapshotSiteProcessor {
                     SNAP_LOG.warn("ZooKeeper node for snapshot digest unexpectedly large: " + zkData.length);
                 }
                 zk.setData(snapshotPath, zkData, stat.getVersion());
+                if (SNAP_LOG.isDebugEnabled()) {
+                    SNAP_LOG.debug("Merge snapshot completion info into " + snapshotPath + ", remaining hosts " + remainingHosts);
+                }
             } catch (KeeperException.BadVersionException e) {
                 continue;
             } catch (Exception e) {
