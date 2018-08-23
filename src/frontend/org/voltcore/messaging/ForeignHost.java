@@ -17,12 +17,16 @@
 
 package org.voltcore.messaging;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,6 +50,7 @@ import com.google_voltpatches.common.base.Throwables;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger JSTACK_LOG = new VoltLogger("JSTACK");
     private static RateLimitedLogger rateLimitedLogger;
     private static long m_logRate;
 
@@ -77,6 +82,7 @@ public class ForeignHost {
     public static final int CRASH_ALL = 0;
     public static final int CRASH_ME = 1;
     public static final int CRASH_SPECIFIED = 2;
+    public static final int PRINT_STACKTRACE = 3;
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -376,6 +382,41 @@ public class ForeignHost {
                 VoltDB.instance().halt();
             } else if (cause == ForeignHost.CRASH_ALL || cause == ForeignHost.CRASH_SPECIFIED) {
                 org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
+            } else if (cause == ForeignHost.PRINT_STACKTRACE) {
+                //for debug
+                System.out.println("Start printing stacktrace.");
+
+                Process process = Runtime.getRuntime().exec("jps");
+                List<String> processList = new ArrayList<>();
+                BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String line = "";
+                while ((line = input.readLine()) != null) {
+                    processList.add(line);
+                }
+                input.close();
+                List<String> stackTrace = new ArrayList<>();
+                for (String cur : processList) {
+                    String[] ss = cur.split(" ");
+                    if(ss.length > 1 && ss[1].equals("VoltDB")) {
+                        int pid = Integer.parseInt(ss[0]);
+                        try {
+                            Process pcsStackTrace = Runtime.getRuntime().exec("jstack " + pid);
+                            BufferedReader bfReader = new BufferedReader(new InputStreamReader(pcsStackTrace.getInputStream()));
+                            stackTrace.add("--------------Stack trace for PID " + pid + "--------------");
+                            String s = "";
+                            while ((s = bfReader.readLine()) != null) {
+                                stackTrace.add(s);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+
+                for(String s : stackTrace) {
+                    JSTACK_LOG.info(s);
+                }
+
             } else {
                 //Should never come here.
                 hostLog.error("Invalid Cause in poison pill: " + cause);

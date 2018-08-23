@@ -1729,6 +1729,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
+    public void sendPoisonPillJStack(long[] hostIds, String err) {
+        System.out.println("Sending Poison Pill");
+        for (long hostId : hostIds) {
+            int id = new Long(hostId).intValue();
+            Iterator<ForeignHost> it = m_foreignHosts.get(id).iterator();
+            // No need to overdose the poison pill
+            if (it.hasNext()) {
+                ForeignHost fh = it.next();
+                if (fh.isUp()) {
+                    fh.sendPoisonPill(err, ForeignHost.PRINT_STACKTRACE);
+                }
+            }
+        }
+    }
+
     public void sendPoisonPill(String err) {
         for (int hostId : m_foreignHosts.keySet()) {
             Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
