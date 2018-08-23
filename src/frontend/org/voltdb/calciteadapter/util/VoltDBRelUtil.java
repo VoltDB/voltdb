@@ -17,11 +17,19 @@
 
 package org.voltdb.calciteadapter.util;
 
+import java.util.List;
+
+import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
+import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.TableFunctionScan;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalAggregate;
@@ -36,6 +44,18 @@ import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexCallBinding;
+import org.apache.calcite.rex.RexLocalRef;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.rex.RexUtil;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.validate.SqlMonotonicity;
+import org.apache.calcite.util.mapping.Mappings;
+import org.voltdb.calciteadapter.converter.RexConverter;
+
+import com.google.common.collect.ImmutableList;
 
 public class VoltDBRelUtil {
 
@@ -149,5 +169,46 @@ public class VoltDBRelUtil {
             return visitChildren(newExchange);
         }
 
+    }
+
+    /**
+     * Transform sort's collation pushing it through a Calc.
+     * If the collationsort relies on non-trivial expressions we can't transform and
+     * and return an empty collation
+     *
+     * @param sortRel
+     * @param calcRel
+     * @return
+     */
+    public static RelCollation sortCollationCalcTranspose(RelCollation collation, Calc calc) {
+        final RexProgram program = calc.getProgram();
+        final RelOptCluster cluster = calc.getCluster();
+
+        List<RexLocalRef> projectRefList = program.getProjectList();
+        List<RexNode> projectList = RexConverter.expandLocalRef(projectRefList, program);
+        final Mappings.TargetMapping map =
+                RelOptUtil.permutationIgnoreCast(
+                        projectList, calc.getInput().getRowType());
+        for (RelFieldCollation fc : collation.getFieldCollations()) {
+            if (map.getTargetOpt(fc.getFieldIndex()) < 0) {
+                return RelCollations.EMPTY;
+            }
+            final RexNode node = projectList.get(fc.getFieldIndex());
+            if (node.isA(SqlKind.CAST)) {
+                // Check whether it is a monotonic preserving cast, otherwise we cannot push
+                final RexCall cast = (RexCall) node;
+                final RexCallBinding binding =
+                        RexCallBinding.create(cluster.getTypeFactory(), cast,
+                                ImmutableList.of(RelCollations.of(RexUtil.apply(map, fc))));
+                if (cast.getOperator().getMonotonicity(binding) == SqlMonotonicity.NOT_MONOTONIC) {
+                    return RelCollations.EMPTY;
+                }
+            }
+        }
+
+        final RelCollation newCollation =
+                cluster.traitSet().canonize(
+                        RexUtil.apply(map, collation));
+        return newCollation;
     }
 }
