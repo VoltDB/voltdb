@@ -799,7 +799,7 @@ public class GenerateEETests extends EEPlanGenerator {
                                       rankDenseOutput));
 
         // row_number() with 'partition' and 'order by'
-        sqlStmt = "select A, B, C, row_number() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
+        sqlStmt = "select A, B, C, row_number() over (partition by A order by B) as R from T ORDER BY A;";
 
         rankDB.addTest(new TestConfig("test_row_number",
                 sqlStmt,
@@ -807,7 +807,7 @@ public class GenerateEETests extends EEPlanGenerator {
                 rowNumberOutput));
 
         // row_number() without 'order by'
-        sqlStmt = "select A, B, C, row_number() over (partition by A) as R from T ORDER BY A, B, C, R;";
+        sqlStmt = "select A, B, C, row_number() over (partition by A) as R from T ORDER BY A;";
 
         rankDB.addTest(new TestConfig("test_row_number_without_order_by",
                 sqlStmt,
@@ -815,7 +815,7 @@ public class GenerateEETests extends EEPlanGenerator {
                 rowNumberOutput));
 
         // row_number() without 'partition'
-        sqlStmt = "select A, B, C, row_number() over () as R from T ORDER BY A, B, C, R;";
+        sqlStmt = "select A, B, C, row_number() over () as R from T;";
 
         rankDB.addTest(new TestConfig("test_row_number_without_partition",
                 sqlStmt,
