@@ -17,8 +17,15 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableSet;
+import java.util.Set;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
@@ -29,7 +36,6 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
-
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -1540,7 +1546,6 @@ public class PlanAssembler {
             Column col = colEntry.getKey();
             String colName = col.getTypeName();
             AbstractExpression expr = colEntry.getValue();
-            expr.setInBytes(colEntry.getKey().getInbytes());
 
             proj_schema.addColumn(
                     AbstractParsedStmt.TEMP_TABLE_NAME,
