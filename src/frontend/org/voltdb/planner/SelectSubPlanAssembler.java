@@ -80,7 +80,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
             m_joinOrders = queueJoinOrders(m_parsedStmt.m_joinTree, true);
         }
-        m_joinOrders.forEach(JoinNode::normalizeExpressions);
     }
 
     /**

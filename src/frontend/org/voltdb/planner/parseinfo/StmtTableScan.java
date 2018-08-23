@@ -94,13 +94,6 @@ public abstract class StmtTableScan {
      */
     public abstract JoinNode makeLeafNode(int nodeId, AbstractExpression joinExpr, AbstractExpression whereExpr);
 
-    public void normalizeExpressions() {
-        getScanColumns().forEach(SchemaColumn::normalizeExpressions);
-        if (getPartitioningColumns() != null) {
-            getPartitioningColumns().forEach(SchemaColumn::normalizeExpressions);
-        }
-    }
-
     public String getTableAlias() {
         return m_tableAlias;
     }

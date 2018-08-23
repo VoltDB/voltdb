@@ -19,7 +19,6 @@ package org.voltdb.planner;
 
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.stream.Collectors;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
@@ -44,7 +43,6 @@ import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.expressions.WindowFunctionExpression;
-import org.voltdb.planner.optimizer.ExpressionNormalizer;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
@@ -133,31 +131,6 @@ public abstract class AbstractParsedStmt {
         m_parentStmt = parent;
         m_paramValues = paramValues;
         m_db = db;
-    }
-
-    public void normalizeExpressions() {
-        setParamsByIndex(getParamsByIndex().entrySet().stream().map(kv ->
-                new AbstractMap.SimpleEntry<>(kv.getKey(),
-                        (ParameterValueExpression) ExpressionNormalizer.normalize(kv.getValue())))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
-        m_paramsById = m_paramsById.entrySet().stream().map(kv ->
-                new AbstractMap.SimpleEntry<>(kv.getKey(),
-                        (ParameterValueExpression) ExpressionNormalizer.normalize(kv.getValue())))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        if (m_aggregationList != null) {
-            m_aggregationList = m_aggregationList.stream()
-                    .map(ExpressionNormalizer::normalize).collect(Collectors.toList());
-        }
-        m_noTableSelectionList = m_noTableSelectionList.stream()
-                .map(ExpressionNormalizer::normalize).collect(Collectors.toList());
-        m_parameterTveMap = m_parameterTveMap.entrySet().stream().map(kv ->
-                new AbstractMap.SimpleEntry<>(kv.getKey(),
-                        ExpressionNormalizer.normalize(kv.getValue())))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        m_tableAliasMap.forEach((k, v) -> v.normalizeExpressions());
-        if (m_joinTree != null)
-            m_joinTree.normalizeExpressions();
-        // do not change m_parentStmt
     }
 
     public void setDDLIndexedTable(Table tbl) {

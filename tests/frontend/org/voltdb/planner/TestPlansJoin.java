@@ -280,7 +280,7 @@ public class TestPlansJoin extends PlannerTestCase {
         seqScan = (SeqScanPlanNode) node.getChild(0);
         assertEquals("R1", seqScan.getTargetTableName());
         predicate = seqScan.getPredicate();
-        assertExprTopDownTree(predicate, ExpressionType.COMPARE_GREATERTHANOREQUALTO,   // expression normalizer kicks in
+        assertExprTopDownTree(predicate, ExpressionType.COMPARE_GREATERTHAN,
                 ExpressionType.VALUE_TUPLE, ExpressionType.VALUE_CONSTANT);
 
         query = "SELECT * FROM R1, R2 WHERE R1.A" +

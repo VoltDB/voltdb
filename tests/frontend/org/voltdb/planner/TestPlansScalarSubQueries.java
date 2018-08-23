@@ -153,8 +153,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractPlanNode subquery = subqueryExpr.getSubqueryNode();
         assertEquals(PlanNodeType.SEQSCAN, subquery.getPlanNodeType());
         AbstractExpression pred = ((SeqScanPlanNode) subquery).getPredicate();
-        // Expression normalization reordering changes r1.c = ? into ? = r1.c
-        assertEquals(ExpressionType.VALUE_PARAMETER, pred.getLeft().getExpressionType());
+        assertEquals(ExpressionType.VALUE_PARAMETER, pred.getRight().getExpressionType());
     }
 
     public void testMultiColumnSelect() {
@@ -334,9 +333,9 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
             pn = pn.getChild(0);
             assertTrue(pn instanceof IndexScanPlanNode);
             AbstractExpression pred = ((IndexScanPlanNode) pn).getPredicate();
-            assertEquals(ExpressionType.COMPARE_LESSTHANOREQUALTO, pred.getExpressionType());
-            assertEquals(ExpressionType.ROW_SUBQUERY, pred.getLeft().getExpressionType());
-            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
+            assertEquals(ExpressionType.COMPARE_GREATERTHANOREQUALTO, pred.getExpressionType());
+            assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getLeft().getExpressionType());
+            assertEquals(ExpressionType.ROW_SUBQUERY, pred.getRight().getExpressionType());
         }
         {
             AbstractPlanNode pn = compile("select * from r5 where (a,c) IN (select a, c from r1);");

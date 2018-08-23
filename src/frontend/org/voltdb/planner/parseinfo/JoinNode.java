@@ -83,30 +83,6 @@ public abstract class JoinNode implements Cloneable {
         m_id = id;
     }
 
-    public void normalizeExpressions() {
-        m_joinExpr = ExpressionNormalizer.normalize(m_joinExpr);
-        m_whereExpr = ExpressionNormalizer.normalize(m_whereExpr);
-        new ArrayList<List<AbstractExpression>>() {
-            void addAll(List<AbstractExpression>... args) {
-                for (List<AbstractExpression> arg : args) {
-                    add(arg);
-                }
-            }
-            {
-                addAll(m_joinOuterList, m_joinInnerList, m_joinInnerOuterList,
-                        m_whereInnerList, m_whereOuterList, m_whereInnerOuterList);
-            }
-        }.forEach(l -> {
-            for (int index = 0; index < l.size(); ++index) {
-                l.set(index, ExpressionNormalizer.normalize(l.get(index)));
-            }
-        });
-        if (m_currentAccessPath != null) {
-            m_currentAccessPath.normalizeExpressions();
-        }
-        m_accessPaths.forEach(AccessPath::normalizeExpressions);
-    }
-
     @SuppressWarnings("static-method")
     public JoinNode getLeftNode() {
         return null;

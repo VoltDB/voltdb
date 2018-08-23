@@ -222,9 +222,9 @@ public class TestReportMaker extends TestCase {
         // "Explain Plan" output should also be escaped:
         // (spaces in explain plan are replaced by &nbsp;)
         assertTrue(report.contains("filter&nbsp;by&nbsp;"));
-        assertTrue(report.contains("(?1&nbsp;&lt;&nbsp;I)"));
+        assertTrue(report.contains("(I&nbsp;&gt;&nbsp;?1)"));
         assertTrue(report.contains("&nbsp;AND&nbsp;"));
-        assertTrue(report.contains("(?0&nbsp;&gt;&nbsp;I)"));
+        assertTrue(report.contains("(I&nbsp;&lt;&nbsp;?0)"));
 
         // Warnings in the Overview tab should have escaped ", &, <, >, etc.
         assertTrue(report.contains("To eliminate this warning, specify &quot;VARCHAR(262145 BYTES)&quot;"));
@@ -267,10 +267,7 @@ public class TestReportMaker extends TestCase {
         String report = compileAndGenerateCatalogReport(ddl, false);
         assertTrue(report.contains("<thead><tr><th>View Task</th><th>Execution Plan</th></tr>"));
         assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MIN column \"MINIDX\"</td><td>Built-in&nbsp;index&nbsp;scan&nbsp;&quot;IDXG1&quot;.</td></tr>"));
-        assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MAX column \"MAXPLAN\"</td><td>RETURN&nbsp;RESULTS&nbsp;TO&nbsp;STORED&nbsp;PROCEDURE<br/>" +
-                "&nbsp;INDEX&nbsp;SCAN&nbsp;of&nbsp;&quot;VIEW_SOURCE&quot;&nbsp;using&nbsp;&quot;IDXG1&quot;<br/>&nbsp;range-scan&nbsp;on&nbsp;1&nbsp;of&nbsp;2&nbsp;" +
-                "cols&nbsp;from&nbsp;(GROUPBY1&nbsp;&gt;=&nbsp;?0)&nbsp;while&nbsp;(GROUPBY1&nbsp;=&nbsp;?0),&nbsp;filter&nbsp;by&nbsp;(?1&nbsp;&gt;=&nbsp;MAXCOL)<br/>" +
-                "&nbsp;&nbsp;inline&nbsp;Serial&nbsp;AGGREGATION&nbsp;ops:&nbsp;MAX(VIEW_SOURCE.MAXCOL)<br/></td></tr>"));
+        assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MAX column \"MAXPLAN\"</td><td>RETURN&nbsp;RESULTS&nbsp;TO&nbsp;STORED&nbsp;PROCEDURE<br/>&nbsp;INDEX&nbsp;SCAN&nbsp;of&nbsp;&quot;VIEW_SOURCE&quot;&nbsp;using&nbsp;&quot;IDXG1&quot;<br/>&nbsp;range-scan&nbsp;on&nbsp;1&nbsp;of&nbsp;2&nbsp;cols&nbsp;from&nbsp;(GROUPBY1&nbsp;&gt;=&nbsp;?0)&nbsp;while&nbsp;(GROUPBY1&nbsp;=&nbsp;?0),&nbsp;filter&nbsp;by&nbsp;(MAXCOL&nbsp;&lt;=&nbsp;?1)<br/>&nbsp;&nbsp;inline&nbsp;Serial&nbsp;AGGREGATION&nbsp;ops:&nbsp;MAX(VIEW_SOURCE.MAXCOL)<br/></td></tr>"));
         assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MIN column \"MINSEQ\"</td><td>Built-in&nbsp;sequential&nbsp;scan.</td></tr>"));
         assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MAX column \"MAXSEQ\"</td><td>Built-in&nbsp;sequential&nbsp;scan.</td></tr>"));
     }

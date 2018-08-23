@@ -18,7 +18,6 @@
 package org.voltdb.expressions;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.hsqldb_voltpatches.FunctionSQL;
@@ -30,7 +29,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.ParsedColInfo;
-import org.voltdb.planner.optimizer.ExpressionNormalizer;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.SortDirectionType;

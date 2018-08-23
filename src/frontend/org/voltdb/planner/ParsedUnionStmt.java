@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -68,13 +67,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     */
     public ParsedUnionStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
         super(parent, paramValues, db);
-    }
-
-    @Override
-    public void normalizeExpressions() {
-        super.normalizeExpressions();
-        m_orderColumns.forEach(ParsedColInfo::normalizeExpressions);
-        m_children.forEach(AbstractParsedStmt::normalizeExpressions);
     }
 
     @Override

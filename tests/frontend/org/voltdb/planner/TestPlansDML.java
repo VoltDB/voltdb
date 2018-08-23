@@ -261,7 +261,7 @@ public class TestPlansDML extends PlannerTestCase {
 
         pns = compileToFragments("DELETE FROM P1 WHERE A > 0");
         assertTrue(pns.size() == 2);
-        checkPredicate(pns.get(1).getChild(0).getChild(0), ExpressionType.COMPARE_GREATERTHANOREQUALTO);    // expression normalizer kicks in
+        checkPredicate(pns.get(1).getChild(0).getChild(0), ExpressionType.COMPARE_GREATERTHAN);
     }
 
     public void testDMLwithExpressionSubqueries() {

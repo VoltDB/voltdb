@@ -18,7 +18,6 @@
 package org.voltdb.planner;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import org.voltcore.utils.Pair;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -37,7 +36,6 @@ import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.WindowFunctionExpression;
-import org.voltdb.planner.optimizer.ExpressionNormalizer;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtCommonTableScanShared;
@@ -138,6 +136,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         /**
          * Set the limit node when the predicate evaluates to false.
+         * This is the remnant of expression normalizer that I want to keep around.
          */
         void setFalse() {
             m_limitNodeTop = new LimitPlanNode();
@@ -230,59 +229,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_displayColumns.forEach(ci -> st.resolveTVE((TupleValueExpression)(ci.m_expression)));
         defineTableScanByAlias(view.getTypeName(), st);
         return st;
-    }
-
-    @Override
-    public void normalizeExpressions() {
-        super.normalizeExpressions();
-        new ArrayList<ParsedColInfo>() {
-            void tryAdd(List<ParsedColInfo>... args) {
-                for (List<ParsedColInfo> arg : args) {
-                    if(arg != null) {
-                        addAll(arg);
-                    }
-                }
-            }
-            {
-                tryAdd(m_displayColumns,
-                        m_orderColumns,
-                        m_groupByColumns,
-                        m_distinctGroupByColumns,
-                        m_aggResultColumns,
-                        m_avgPushdownDisplayColumns,
-                        m_avgPushdownAggResultColumns);
-            }
-        }.forEach(ParsedColInfo::normalizeExpressions);
-        new ArrayList<NodeSchema>() {
-            void tryAdd(NodeSchema ns) {
-                if (ns != null)
-                    add(ns);
-            }
-            {
-                tryAdd(getFinalProjectionSchema());
-                tryAdd(getDistinctProjectionSchema());
-                tryAdd(m_avgPushdownProjectSchema);
-                tryAdd(m_avgPushdownFinalProjectSchema);
-            }
-        }.forEach(NodeSchema::normalizeExpressions);
-        m_having = ExpressionNormalizer.normalize(m_having);
-        m_avgPushdownHaving = ExpressionNormalizer.normalize(m_avgPushdownHaving);
-        if (m_groupByExpressions != null) {
-            m_groupByExpressions = m_groupByExpressions.entrySet().stream().map(kv ->
-                    new AbstractMap.SimpleEntry<>(kv.getKey(),
-                            ExpressionNormalizer.normalize(kv.getValue())))
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        }
-        m_joinOrderList.forEach(JoinNode::normalizeExpressions);
-        if (m_joinTree != null) {
-            m_joinTree.normalizeExpressions();
-            if (ConstantValueExpression.isBooleanValue(m_joinTree.getJoinExpression())) {
-                if (ConstantValueExpression.isBooleanFalse(m_joinTree.getJoinExpression())) {
-                    m_limitOffset.setFalse();
-                }
-                m_joinTree.setJoinExpression(null);
-            }
-        }
     }
 
     @Override

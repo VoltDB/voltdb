@@ -20,15 +20,12 @@ package org.voltdb.planner.parseinfo;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.optimizer.ExpressionNormalizer;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.utils.CatalogUtil;
 
@@ -60,51 +57,6 @@ public class StmtTargetTableScan extends StmtTableScan {
     @Override
     public String getTableName() {
         return m_table.getTypeName();
-    }
-
-    @Override
-    public void normalizeExpressions() {
-        super.normalizeExpressions();
-        getTargetTable().getIndexes().forEach(index -> {
-                index.setExpressionsjson(normalizeJsonExpression(index.getExpressionsjson(), this));
-                index.setPredicatejson(normalizeJsonExpression(index.getPredicatejson(), this));
-        });
-    }
-
-    /**
-     * Deserialize a JSON object (or object array), run expression normalizer on each expression, and serialize them
-     * back into JSON string.
-     * @param json source JSON string for a single JSON object or a JSON array
-     * @param tableScan table scan for deserialization
-     * @return converted JSON string
-     */
-    private static String normalizeJsonExpression(String json, StmtTableScan tableScan) {
-        if (json.isEmpty()) {
-            return json;
-        } else {
-            try {
-                switch (json.charAt(0)) {
-                    case '[':
-                        JSONStringer stringer = new JSONStringer();
-                        stringer.array();
-                        for (AbstractExpression e : AbstractExpression.fromJSONArrayString(json, tableScan)) {
-                            stringer.object();
-                            ExpressionNormalizer.normalize(e).toJSONString(stringer);
-                            stringer.endObject();
-                        }
-                        stringer.endArray();
-                        return stringer.toString();
-                    case '{':
-                        return ExpressionNormalizer.normalize(AbstractExpression.fromJSONString(json, tableScan))
-                                .toJSONString();
-                    default:
-                        assert (false) : "JSON string must start with '[' or '{': found " + json;
-                        return null;
-                }
-            } catch(JSONException e){
-                throw new RuntimeException("Unexpected error serializing predicate for index: " + e.toString());
-            }
-        }
     }
 
     public Table getTargetTable() {

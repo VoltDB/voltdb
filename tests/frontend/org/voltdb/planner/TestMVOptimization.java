@@ -72,7 +72,7 @@ public class TestMVOptimization extends PlannerTestCase {
         // Negative tests: GBY column mismatch -- V2_0 from testplans-materialized-view-optimization-ddl.sql gby column a1, not a
         assertMatch("SELECT a, ABS(b), COUNT(*) FROM t1 WHERE b > 2 GROUP BY ABS(b), a;",
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" using \"TA\" " +
-                "(for optimized grouping only) filter by (B >= 3) inline Partial AGGREGATION ops: COUNT(*)");
+                "(for optimized grouping only) filter by (B > 2) inline Partial AGGREGATION ops: COUNT(*)");
         // Negative tests: with LIMIT or OFFSET - ENG-14415
         assertMatch("SELECT a1 a1, COUNT(b) count_b, SUM(a) sum_a, COUNT(*) FROM t1 GROUP BY a1 LIMIT 2",
                 "RETURN RESULTS TO STORED PROCEDURE LIMIT 2 " +
@@ -164,7 +164,7 @@ public class TestMVOptimization extends PlannerTestCase {
     public void testComplexGbyExpr() {  // test complex GBY expressions
         checkQueriesPlansAreTheSame("SELECT a * 2 + a1, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a * 2 + a1, b - a;",
                 "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4");
-        // Now it could handle comparisons of equivalent but different expressions!
+        // equivalent but different GBY expression
         checkQueriesPlansAreTheSame("SELECT a1 + a * 2, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a1 + a * 2, b - a;",
                 "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4");
         // negative tests: SELECT stmt's display column contains aggregates on its group by column
@@ -212,7 +212,7 @@ public class TestMVOptimization extends PlannerTestCase {
         assertMatch("SELECT distinct a1 distinct_a1, COUNT(b1) count_b1, SUM(a) sum_a, COUNT(*) counts " +
                 "FROM t1 WHERE b >= ? OR b1 IN (3, 30, 300) GROUP BY a1",
                 "RETURN RESULTS TO STORED PROCEDURE INDEX SCAN of \"T1\" using \"VOLTDB_AUTOGEN_IDX_CT_T1_B1\" " +
-                        "(for deterministic order only) filter by ((?0 <= B) OR (B1 IN ANY (3, 30, 300))) " +
+                        "(for deterministic order only) filter by ((B >= ?0) OR (B1 IN ANY (3, 30, 300))) " +
                         "inline Hash AGGREGATION ops: COUNT(T1.B1), SUM(T1.A), COUNT(*)");
         // But could match when parameter is somewhere else.
         assertMatch("SELECT distinct a1 distinct_a1, COUNT(b1) count_b1, SUM(a) sum_a, COUNT(*) counts " +

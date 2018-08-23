@@ -1580,7 +1580,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql = "select v_p1.v_cnt from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
         checkMVFixWithJoin_ReAgg(sql, 2, 2,
-                new String[] { "v_sum_c1 < 3)", "v_cnt > 1)" }, "v_a1 >= 3");
+                new String[] { "v_sum_c1 < 3)", "v_cnt > 1)" }, "v_a1 > 2");
 
         // join on different columns.
         sql = "select v_p1.v_cnt from v_r1 @joinType v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 ";
@@ -1605,13 +1605,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 "@joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
         checkMVFixWithJoin(sql, -1, -1, 2, 2,
-                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, "v_a1 >= 3");
+                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, "v_a1 > 2");
 
         sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "@joinType r1v on v_p1.v_cnt = r1v.v_cnt where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and " +
                 "v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 and r1v.v_sum_c1 > 6";
         checkMVFixWithJoin(sql, -1, -1, 2, 2,
-                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, "v_a1 >= 3");
+                new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, "v_a1 > 2");
         AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
@@ -1733,13 +1733,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
         failToCompile(sql, "does not support HAVING clause without aggregation");
 
         sql = "select V_A1, count(v_cnt) from v_r1 group by v_a1 having count(v_cnt) > 1; ";
-        checkHavingClause(sql, true, ".v_cnt) having (c2 >= 2)");
+        checkHavingClause(sql, true, ".v_cnt) having (c2 > 1)");
 
         sql = "select sum(V_A1) from v_r1 having avg(v_cnt) > 3; ";
-        checkHavingClause(sql, true, ".v_cnt) having (column#1 >= 4)");
+        checkHavingClause(sql, true, ".v_cnt) having (column#1 > 3)");
 
         sql = "select avg(v_cnt) from v_r1 having avg(v_cnt) > 3; ";
-        checkHavingClause(sql, true, ".v_cnt) having (c1 >= 4)");
+        checkHavingClause(sql, true, ".v_cnt) having (c1 > 3)");
 
         AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }

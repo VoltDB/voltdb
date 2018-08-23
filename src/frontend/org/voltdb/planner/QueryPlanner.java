@@ -413,8 +413,9 @@ public class QueryPlanner implements AutoCloseable {
                 m_paramzInfo.rewrite();
             }
         }
-        // -- Single place to enable select/union stmt query normalization for all expressions --
-        parsedStmt.normalizeExpressions();
+        // -- Single place to enable select/union stmt query normalization for all expressions: ideally, this is the only
+        // place that need to be changed in the planning path. --
+        // parsedStmt.normalizeExpressions();
         // -- end of query normalization --
         m_planSelector.outputParsedStatement(parsedStmt);
 

@@ -18,7 +18,6 @@
 package org.voltdb.plannodes;
 
 import java.util.*;
-import java.util.stream.IntStream;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
@@ -152,11 +151,6 @@ public class NodeSchema implements Iterable<SchemaColumn> {
      */
     public int size() {
         return m_columns.size();
-    }
-
-    public void normalizeExpressions() {
-        getColumns().forEach(SchemaColumn::normalizeExpressions);
-        m_columnsMapHelper.forEach((k, v) -> k.normalizeExpressions());
     }
 
     /**

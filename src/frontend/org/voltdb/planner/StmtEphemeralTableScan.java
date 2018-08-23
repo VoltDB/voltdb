@@ -89,12 +89,6 @@ public abstract class StmtEphemeralTableScan extends StmtTableScan {
         return m_scanPartitioning;
     }
 
-    @Override
-    public void normalizeExpressions() {
-        super.normalizeExpressions();
-        m_outputColumnSchema.normalizeExpressions();
-    }
-
     public void addOutputColumn(SchemaColumn scol) {
         String colAlias = scol.getColumnAlias();
         int differentiator = scol.getDifferentiator();

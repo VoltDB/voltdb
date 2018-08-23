@@ -716,9 +716,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
             // Partition fragment
             pn = frags.get(1).getChild(0);
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
-            // NOTE: because of expression normalization, the P_D1 + 3 > 0 ==> P_D1 >= -2, and finds index on P_D1 (P_D1_IDX) rather than P_D1+3 (P_D1_PLUS3_IDX).
-            //IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
-            //assertEquals(SortDirectionType.ASC, ipn.getSortDirection());
+            IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
+            assertEquals(SortDirectionType.ASC, ipn.getSortDirection());
         }
         {
             // Coordinator HASH aggregate not convertible to Serial or Partial aggregation
