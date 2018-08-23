@@ -1503,6 +1503,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_messenger.waitForAllHostsToBeReady(expectedHosts);
             }
 
+            // @hostFailed() may not be triggered if there are host failures during mesh determination
+            // Fail this rejoining node here if it sees site failure
+            if (m_messenger.getFailedSiteCount() > 0) {
+                stopRejoiningHost();
+            }
+
             //The connections between peers in partition groups could be slow
             //The problem will be addressed.
             if (!(m_config.m_sslInternal)) {
@@ -1711,7 +1717,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_messenger.removeStopNodeNotice(hostId);
                 }
 
-                stopRejoiningHost(failedHosts);
+                stopRejoiningHost();
 
                 //create a blocker for repair if this is a MP leader and partition leaders change
                 if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
@@ -1725,7 +1731,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     // If the current node hasn't finished rejoin when another node fails, fail this node to prevent locking up.
-    private void stopRejoiningHost(Set<Integer> failedHosts) {
+    private void stopRejoiningHost() {
 
         // The host failure notification could come before mesh determination, wait for the determination
         try {
