@@ -30,9 +30,9 @@ public class VoltDBPUnionExchange extends AbstractVoltDBPExchange implements Vol
             RelTraitSet traitSet,
             RelNode input,
             RelDistribution childDistribution,
-            int childSplitCount,
-            int level) {
-        super(cluster, traitSet, input, childDistribution, childSplitCount, level);
+            int splitCount,
+            boolean isTopExchange) {
+        super(cluster, traitSet, input, childDistribution, splitCount, isTopExchange);
     }
 
     @Override
@@ -40,14 +40,14 @@ public class VoltDBPUnionExchange extends AbstractVoltDBPExchange implements Vol
             RelTraitSet traitSet,
             RelNode newInput,
             RelDistribution childDistribution,
-            int level) {
+            boolean isTopExchange) {
         VoltDBPUnionExchange exchange = new VoltDBPUnionExchange(
                 getCluster(),
                 traitSet,
                 newInput,
                 getChildDistribution(),
-                m_childSplitCount,
-                level);
+                m_splitCount,
+                isTopExchange);
         return exchange;
     }
 

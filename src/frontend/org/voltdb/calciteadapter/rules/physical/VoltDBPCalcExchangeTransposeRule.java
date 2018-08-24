@@ -71,13 +71,13 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
                 calcTraits.replace(exchange.getChildDistribution()),
                 exchange.getInput(),
                 calc.getProgram(),
-                exchange.getChildSplitCount());
+                exchange.getSplitCount());
 
         AbstractVoltDBPExchange newExchange = exchange.copy(
                 exchangeTraits,
                 newCalc,
                 exchange.getChildDistribution(),
-                exchange.getLevel() + 1);
+                exchange.isTopExchange());
 
         call.transformTo(newExchange);
     }

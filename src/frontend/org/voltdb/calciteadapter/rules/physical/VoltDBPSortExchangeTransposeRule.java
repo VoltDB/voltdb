@@ -69,7 +69,7 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
                 sortRel.getCollation(),
                 sortRel.offset,
                 sortRel.fetch,
-                exchangeRel.getChildSplitCount());
+                exchangeRel.getSplitCount());
 
         RelNode result = transposeExchange(exchangeRel, newSortRel);
 
@@ -98,36 +98,37 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
 
     }
 
-    private RelNode transposeExchange(AbstractVoltDBPExchange exchangeRel, VoltDBPSort sortRel) {
+    private RelNode transposeExchange(AbstractVoltDBPExchange origExchangeRel, VoltDBPSort newSortRel) {
         // The new exchange that will be sitting above the Sort relation must have sort's collation trait
         // since the top relation is required to have collation matching the sort's one
-        RelTraitSet newExchangeTraits = exchangeRel.getTraitSet().replace(sortRel.getCollation());
+        RelTraitSet newExchangeTraits = origExchangeRel.getTraitSet().replace(newSortRel.getCollation());
         AbstractVoltDBPExchange newExchange = null;
-        if (exchangeRel instanceof VoltDBPSingletonExchange) {
-            newExchange = exchangeRel.copy(
+        if (origExchangeRel instanceof VoltDBPSingletonExchange) {
+            newExchange = origExchangeRel.copy(
                     newExchangeTraits,
-                    sortRel,
-                    exchangeRel.getChildDistribution(),
-                    exchangeRel.getLevel() + 1);
+                    newSortRel,
+                    origExchangeRel.getChildDistribution(),
+                    origExchangeRel.isTopExchange());
             return newExchange;
         } else {
             VoltDBPMergeExchange mergeExchange = new VoltDBPMergeExchange(
-                    exchangeRel.getCluster(),
+                    origExchangeRel.getCluster(),
                     newExchangeTraits,
-                    sortRel,
-                    exchangeRel.getChildDistribution(),
-                    exchangeRel.getChildSplitCount(),
-                    exchangeRel.getLevel() + 1,
-                    sortRel.getChildExps());
+                    newSortRel,
+                    origExchangeRel.getChildDistribution(),
+                    origExchangeRel.getSplitCount(),
+                    false,
+                    newSortRel.getChildExps());
+
             // Add a SingletonExchange on top of it to be propagated all the way to the root
             // The relations that will be transposed with the Singleton Exchange represent
             // the coordinator's nodes in the final VoltDB plan
             // and can not / should not be pushed beyond the VoltDBPMergeExchange exchange
             newExchange = new VoltDBPSingletonExchange(
-                        exchangeRel.getCluster(),
-                        newExchangeTraits,
-                        mergeExchange,
-                        mergeExchange.getLevel() + 1);
+                    origExchangeRel.getCluster(),
+                    newExchangeTraits,
+                    mergeExchange,
+                    true);
             return newExchange;
         }
     }

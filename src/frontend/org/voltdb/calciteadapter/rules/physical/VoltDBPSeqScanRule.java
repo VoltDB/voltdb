@@ -62,7 +62,7 @@ public class VoltDBPSeqScanRule extends RelOptRule {
                     tableScan.getCluster(),
                     convertedTraits.plus(RelDistributions.SINGLETON),
                     scanRel,
-                    1);
+                    false);
         } else {
             exchangeRel = new VoltDBPUnionExchange(
                     tableScan.getCluster(),
@@ -71,7 +71,7 @@ public class VoltDBPSeqScanRule extends RelOptRule {
                     scanRel,
                     tableDist,
                     scanSplitCount,
-                    1);
+                    false);
         }
         call.transformTo(exchangeRel);
     }

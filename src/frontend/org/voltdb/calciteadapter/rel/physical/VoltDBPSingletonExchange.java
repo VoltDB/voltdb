@@ -30,8 +30,8 @@ public class VoltDBPSingletonExchange extends AbstractVoltDBPExchange implements
     public VoltDBPSingletonExchange(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
-            int level) {
-        super(cluster, traitSet, input, RelDistributions.SINGLETON, 1, level);
+            boolean isTopExchange) {
+        super(cluster, traitSet, input, RelDistributions.SINGLETON, 1, isTopExchange);
     }
 
     @Override
@@ -39,12 +39,12 @@ public class VoltDBPSingletonExchange extends AbstractVoltDBPExchange implements
             RelTraitSet traitSet,
             RelNode newInput,
             RelDistribution childDistribution,
-            int level) {
+            boolean isTopExchange) {
         VoltDBPSingletonExchange exchange = new VoltDBPSingletonExchange(
                 getCluster(),
                 traitSet,
                 newInput,
-                level);
+                isTopExchange);
         return exchange;
     }
 

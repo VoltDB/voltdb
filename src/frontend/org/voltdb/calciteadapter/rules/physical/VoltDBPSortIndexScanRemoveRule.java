@@ -82,9 +82,10 @@ public class VoltDBPSortIndexScanRemoveRule extends RelOptRule {
         if (SortDirectionType.INVALID != sortDirection) {
             // Update scan's sort direction
             AccessPath accessPath = scan.getAccessPath();
-            accessPath.setSortDirection(sortDirection);
 
             if (accessPath != null) {
+                accessPath.setSortDirection(sortDirection);
+
                 VoltDBPTableIndexScan newScan = new VoltDBPTableIndexScan(
                     scan.getCluster(),
                     // IndexScan already have a collation trait, so replace it

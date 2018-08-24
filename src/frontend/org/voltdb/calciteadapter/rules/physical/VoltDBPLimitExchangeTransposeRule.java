@@ -24,8 +24,12 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptRuleOperandChildPolicy;
 import org.apache.calcite.plan.RelOptRuleOperandChildren;
+import org.apache.calcite.plan.RelTrait;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistribution.Type;
+import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
@@ -112,23 +116,33 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
 
     private RelNode transposeSingletonExchange(VoltDBPSingletonExchange exchangeRel, VoltDBPLimit limitRel) {
         // Simply push the limit through the exchange
+        RelTraitSet exchangeTraits = exchangeRel.getTraitSet();
+        RelTrait collationTrait = exchangeTraits.getTrait(RelCollationTraitDef.INSTANCE);
+        RelDistribution distributionTrait = exchangeRel.getDistribution();
+        // Update Limit distribution's and collation's traits
+        RelTraitSet newLimitTraits = limitRel.getTraitSet()
+                .replace(collationTrait)
+                .replace(distributionTrait);
         VoltDBPLimit newLimitRel = limitRel.copy(
-                // Update Limit distribution's trait
-                limitRel.getTraitSet().plus(exchangeRel.getChildDistribution()),
+                newLimitTraits,
                 exchangeRel.getInput(),
                 limitRel.getOffset(),
                 limitRel.getLimit(),
-                exchangeRel.getChildSplitCount());
+                exchangeRel.getSplitCount());
 
         AbstractVoltDBPExchange newExchange = exchangeRel.copy(
-                exchangeRel.getTraitSet(),
+                exchangeTraits,
                 newLimitRel,
-                exchangeRel.getChildDistribution(),
-                exchangeRel.getLevel() + 1);
+                distributionTrait,
+                exchangeRel.isTopExchange());
         return newExchange;
     }
 
     private RelNode transposeDistributedExchange(AbstractVoltDBPExchange exchangeRel, VoltDBPLimit origLimitRel) {
+        RelTraitSet exchangeTraits = exchangeRel.getTraitSet();
+        RelTrait collationTrait = exchangeTraits.getTrait(RelCollationTraitDef.INSTANCE);
+        RelDistribution distributionTrait = exchangeRel.getDistribution();
+
         // We can not push just an OFFSET through a distributed exchange
         AbstractVoltDBPExchange newExchangeRel;
         if (origLimitRel.getLimit() == null) {
@@ -140,33 +154,40 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
             if (origLimitRel.getOffset() != null) {
                 fragmentLimit += RexLiteral.intValue(origLimitRel.getOffset());
             }
+            RelTraitSet fragmentLimitTraits = origLimitRel.getTraitSet()
+                    .replace(collationTrait)
+                    .replace(distributionTrait);
+
             RexBuilder rexBuilder = origLimitRel.getCluster().getRexBuilder();
             RexNode fragmentLimitRex = rexBuilder.makeBigintLiteral(new BigDecimal(fragmentLimit));
             RelNode fragmentLimitRel = origLimitRel.copy(
-                    // Update Limit distribution's trait
-                    origLimitRel.getTraitSet().plus(exchangeRel.getChildDistribution()),
+                    fragmentLimitTraits,
                     exchangeRel.getInput(),
                     null,
                     fragmentLimitRex,
-                    exchangeRel.getChildSplitCount());
+                    exchangeRel.getSplitCount());
             newExchangeRel = exchangeRel.copy(
-                    exchangeRel.getTraitSet(),
+                    exchangeTraits,
                     fragmentLimitRel,
-                    exchangeRel.getChildDistribution(),
-                    exchangeRel.getLevel() + 1);
+                    exchangeRel.getDistribution(),
+                    exchangeRel.isTopExchange());
         }
 
         // Coordinator's limit
+        RelTraitSet coordinatorLimitTraits = origLimitRel.getTraitSet()
+                                                .replace(collationTrait)
+                                                .replace(RelDistributions.SINGLETON);
+
         VoltDBPLimit coordinatorLimitRel = origLimitRel.copy(
-            origLimitRel.getTraitSet().replace(RelDistributions.SINGLETON),
-            newExchangeRel,
-            origLimitRel.getOffset(),
-            origLimitRel.getLimit(),
-            origLimitRel.getSplitCount());
+                coordinatorLimitTraits,
+                newExchangeRel,
+                origLimitRel.getOffset(),
+                origLimitRel.getLimit(),
+                origLimitRel.getSplitCount());
 
         RelNode result;
         RelDistribution limitDistribution =
-                (RelDistribution) origLimitRel.getTraitSet().getTrait(RelDistributions.ANY.getTraitDef());
+                origLimitRel.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
         if (limitDistribution.getType() == Type.ANY) {
             // Add a SingletonExchange on top of it to be propagated all the way to the root
             // The relations that will be transposed with the Singleton Exchange represent
@@ -177,7 +198,7 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
                     exchangeRel.getCluster(),
                     exchangeRel.getTraitSet(),
                     coordinatorLimitRel,
-                    newExchangeRel.getLevel() + 1);
+                    true);
         } else {
             // The ogiginal limit rel is already part of a coordinator's stack because it has
             // SINGLTON distribution trait. No need to add one more on top of it.

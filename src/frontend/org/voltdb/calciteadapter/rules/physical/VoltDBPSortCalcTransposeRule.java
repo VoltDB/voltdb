@@ -104,7 +104,8 @@ public class VoltDBPSortCalcTransposeRule extends RelOptRule {
         RelNode newCalc =
                 calc.copy(
                         sort.getTraitSet(),
-                        ImmutableList.<RelNode>of(newSort));
+                        newSort,
+                        calc.getProgram());
 
         // Not only is newProject equivalent to sort;
         // newSort is equivalent to project's input

@@ -51,11 +51,10 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
             RelTraitSet traitSet,
             RelNode input,
             RelDistribution childDistribution,
-            int childSplitCount,
-            int level,
+            int splitCount,
+            boolean isTopExchange,
             List<RexNode> collationFieldExprs) {
-        super(cluster, traitSet, input, childDistribution, childSplitCount, level);
-        assert(traitSet.getTrait(RelCollationTraitDef.INSTANCE) instanceof RelCollation);
+        super(cluster, traitSet, input, childDistribution, splitCount, isTopExchange);
         m_collationFieldExprs = ImmutableList.copyOf(collationFieldExprs);
     }
 
@@ -64,14 +63,14 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
             RelTraitSet traitSet,
             RelNode newInput,
             RelDistribution childDistribution,
-            int level) {
+            boolean isTopExchange) {
         VoltDBPMergeExchange exchange = new VoltDBPMergeExchange(
                 getCluster(),
                 traitSet,
                 newInput,
                 getChildDistribution(),
-                m_childSplitCount,
-                level,
+                m_splitCount,
+                isTopExchange,
                 m_collationFieldExprs);
         return exchange;
     }
