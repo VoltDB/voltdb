@@ -48,7 +48,6 @@ public class MpPromoteAlgo implements RepairAlgo
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
-    private final int m_deadHost;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private long m_maxSeenCompleteTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
@@ -113,11 +112,10 @@ public class MpPromoteAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(List<Long> survivors, int deadHost, InitiatorMailbox mailbox,
-            MpRestartSequenceGenerator seqGen, String whoami)
+    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox, MpRestartSequenceGenerator seqGen,
+            String whoami)
     {
         m_survivors = new ArrayList<Long>(survivors);
-        m_deadHost = deadHost;
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = false;
         m_whoami = whoami;
@@ -127,11 +125,10 @@ public class MpPromoteAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(List<Long> survivors, int deadHost, InitiatorMailbox mailbox,
-            MpRestartSequenceGenerator seqGen, String whoami, boolean migratePartitionLeader)
+    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox, MpRestartSequenceGenerator seqGen,
+            String whoami, boolean migratePartitionLeader)
     {
         m_survivors = new ArrayList<Long>(survivors);
-        m_deadHost = deadHost;
         m_mailbox = mailbox;
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
@@ -175,7 +172,7 @@ public class MpPromoteAlgo implements RepairAlgo
             + " surviving leaders to repair. "
             + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors) + " requested id:" + m_requestId);
         }
-        VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId, m_deadHost);
+        VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_survivors), logRequest);
         m_mailbox.send(m_mailbox.getHSId(), logRequest);
     }
@@ -305,9 +302,9 @@ public class MpPromoteAlgo implements RepairAlgo
     //  Specialization
     //
     //
-    VoltMessage makeRepairLogRequestMessage(long requestId, int deadHost)
+    VoltMessage makeRepairLogRequestMessage(long requestId)
     {
-        return new Iv2RepairLogRequestMessage(requestId, deadHost, Iv2RepairLogRequestMessage.MPIREQUEST);
+        return new Iv2RepairLogRequestMessage(requestId, Iv2RepairLogRequestMessage.MPIREQUEST);
     }
 
     // Always add the first message for a transaction id and always

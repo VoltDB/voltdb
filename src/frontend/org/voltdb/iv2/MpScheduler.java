@@ -174,8 +174,6 @@ public class MpScheduler extends Scheduler
                         "had no responses.  This should be impossible?");
             }
         }
-
-        // This is a non MPI Promotion (but SPI Promotion) path for repairing outstanding MP Txns
         MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI);
         m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
         return new long[0];

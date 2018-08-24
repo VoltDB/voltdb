@@ -132,7 +132,7 @@ public class Cartographer extends StatsSource
             // Can be zero-length at startup
             if (cache.size() > 0) {
                 hostLog.info("[Cartographer MP] Sending leader change notification with new leader:");
-                sendLeaderChangeNotify(cache.get(pid).m_HSId, pid, false);
+                sendLeaderChangeNotify(cache.get(pid).m_HSID, pid, false);
             }
         }
     };
@@ -149,7 +149,7 @@ public class Cartographer extends StatsSource
             Map<Integer, Set<Long>> newMastersByHost = Maps.newTreeMap();
             for (Entry<Integer, LeaderCallBackInfo> e : cache.entrySet()) {
                 LeaderCallBackInfo newMasterInfo = e.getValue();
-                Long hsid = newMasterInfo.m_HSId;
+                Long hsid = newMasterInfo.m_HSID;
                 int partitionId = e.getKey();
                 newHSIDs.add(hsid);
                 // hsIdToPart.put(hsid, partitionId);
@@ -198,7 +198,7 @@ public class Cartographer extends StatsSource
                 hostLog.debug("[Cartographer] SP masters:" + masters);
                 masters.clear();
                 cache.values().forEach((k) -> {
-                    masters.add(CoreUtils.hsIdToString(k.m_HSId));
+                    masters.add(CoreUtils.hsIdToString(k.m_HSID));
                 });
                 hostLog.debug("[Cartographer]Updated SP masters:" + masters + ". New masters:" + newMasters);
             }
@@ -349,7 +349,7 @@ public class Cartographer extends StatsSource
     }
 
     // This used to be the method to get this on SiteTracker
-    public Long getHSIdForMultiPartitionInitiator()
+    public long getHSIdForMultiPartitionInitiator()
     {
         return m_iv2Mpi.get(MpInitiator.MP_INIT_PID);
     }

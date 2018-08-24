@@ -110,7 +110,6 @@ public class ForeignHost {
                 }
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
-            m_hostMessenger.piconetworkThreadShutdown(m_hostId, ForeignHost.this);
         }
 
         @Override

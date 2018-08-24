@@ -35,7 +35,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,7 +86,7 @@ public class TestSpPromoteAlgo
     @Test
     public void testUnion() throws Exception
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, 0, null, "Test", 1, false);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1, false);
 
         // returned sphandles in a non-trivial order, with duplicates.
         long returnedSpHandles[] = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
@@ -109,7 +108,7 @@ public class TestSpPromoteAlgo
     @Test
     public void testStaleResponse() throws Exception
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, 0, null, "Test", 1, false);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1, false);
         term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
         assertEquals(0L, term.m_repairLogUnion.size());
     }
@@ -120,7 +119,7 @@ public class TestSpPromoteAlgo
     @Test
     public void testRepairLogsAreComplete()
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, 0, null, "Test", 1, false);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test", 1, false);
         SpPromoteAlgo.ReplicaRepairStruct notDone1 = new SpPromoteAlgo.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
@@ -165,7 +164,7 @@ public class TestSpPromoteAlgo
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        SpPromoteAlgo term = new SpPromoteAlgo(null, 0, mailbox, "Test", 1, false);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1, false);
 
         // missing 4, 5
         SpPromoteAlgo.ReplicaRepairStruct r1 = new SpPromoteAlgo.ReplicaRepairStruct();
@@ -218,7 +217,7 @@ public class TestSpPromoteAlgo
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        SpPromoteAlgo term = new SpPromoteAlgo(null, 0, mailbox, "Test", 1, false);
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1, false);
 
         // missing 3, 4, 5
         SpPromoteAlgo.ReplicaRepairStruct r3 = new SpPromoteAlgo.ReplicaRepairStruct();
@@ -258,7 +257,7 @@ public class TestSpPromoteAlgo
 
         // Stub some portions of a concrete Term instance - this is the
         // object being tested.
-        final SpPromoteAlgo term = new SpPromoteAlgo(null, 0, mailbox, "Test", 1, false) {
+        final SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test", 1, false) {
             // there aren't replicas to ask for repair logs
             @Override
             void prepareForFaultRecovery() {
@@ -352,7 +351,7 @@ public class TestSpPromoteAlgo
         survivors.add(0l);
         survivors.add(1l);
         survivors.add(2l);
-        SpPromoteAlgo dut = new SpPromoteAlgo(survivors, 5, mbox, "bleh ", 0, false);
+        SpPromoteAlgo dut = new SpPromoteAlgo(survivors, mbox, "bleh ", 0, false);
         Future<RepairResult> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), false);
