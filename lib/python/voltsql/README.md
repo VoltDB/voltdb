@@ -4,7 +4,7 @@ voltcli
 Install Requirements
 ----------------
 
-- Install Python 2
+- We require Python 2.6+, we don't support Python 3 currently.
 
 - Open a terminal, go to the project folder, and run this command to install all project dependencies:
 
@@ -28,6 +28,10 @@ $ python voltsql/voltsql.py
 Or
 ```
 $ ./voltsql.sh
+```
+Or in the voltdb/bin folder, run:
+```
+voltsql
 ```
 
 Test

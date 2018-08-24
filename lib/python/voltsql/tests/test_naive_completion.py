@@ -86,10 +86,8 @@ def test_function_name_completion(completer, complete_event):
         complete_event))
     print(result)
     assert result == {Completion(text=u'MAKEVALIDPOLYGON', start_position=-2),
-                      Completion(text=u'MAXEXTENTS', start_position=-2),
                       Completion(text=u'MAX_VALID_TIMESTAMP()', start_position=-2),
-                      Completion(text=u'MAX', start_position=-2),
-                      Completion(text=u'MATERIALIZED VIEW', start_position=-2)}
+                      Completion(text=u'MAX', start_position=-2)}
 
 
 def test_column_name_completion(completer, complete_event):

@@ -100,8 +100,6 @@
         "LOAD": ["CLASSES"],
         "LOCK": [],
         "LONG": [],
-        "MATERIALIZED VIEW": [],
-        "MAXEXTENTS": [],
         "MINUS": [],
         "MLSLABEL": [],
         "MODE": [],

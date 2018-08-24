@@ -45,6 +45,7 @@ try:
                 if os.path.exists(path):
                     print 'Re-running with %s...' % path
                     os.execv(path, [path] + sys.argv)
+                    break
         sys.stderr.write("This script requires Python 2.6 or newer. Please install " +
                          "a more recent Python release and retry.\n")
         sys.exit(-1)
@@ -57,12 +58,9 @@ try:
     standalone  = True
     # Tweak the Python library path to call voltcli.runner.main().
     # Possible installed library locations.
-    if os.path.isdir('/opt/lib/voltdb/python/voltsql'):
-        sys.path.insert(0, '/opt/lib/voltdb/python/voltsql')
-    if os.path.isdir('/usr/share/lib/voltdb/python/voltsql'):
-        sys.path.insert(0, '/usr/share/lib/voltdb/python/voltsql')
-    if os.path.isdir('/usr/lib/voltdb/python/voltsql'):
-        sys.path.insert(0, '/usr/lib/voltdb/python/voltsql')
+    for path in filter(os.path.isdir, ['/opt/lib/voltdb/python/voltsql', '/usr/share/lib/voltdb/python/voltsql',
+                 '/usr/lib/voltdb/python/voltsql']):
+        sys.path.insert(0, path)
     # Library location relative to script.
     sys.path.insert(0, os.path.join(base_dir, 'lib', 'python', 'voltsql'))
     from voltsql import voltsql

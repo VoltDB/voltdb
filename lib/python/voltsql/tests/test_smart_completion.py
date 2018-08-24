@@ -145,8 +145,7 @@ def test_select_keyword_completion(completer):
 @parametrize('completer', completers)
 def test_builtin_function_name_completion(completer):
     result = result_set(completer, 'SELECT MAX')
-    assert result == {function('MAX', -3), function('MAX_VALID_TIMESTAMP()', -3),
-                      keyword('MAXEXTENTS', -3)}
+    assert result == {function('MAX', -3), function('MAX_VALID_TIMESTAMP()', -3)}
 
 
 @parametrize('completer', completers)
