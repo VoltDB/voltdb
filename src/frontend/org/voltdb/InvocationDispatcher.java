@@ -44,6 +44,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
@@ -458,6 +459,9 @@ public final class InvocationDispatcher {
             else if ("@UpdateLogging".equals(procName)) {
                 task = appendAuditParams(task, ccxn, user);
             }
+            else if ("@JStack".equals(procName)) {
+                return dispatchJstack(task);
+            }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
@@ -621,6 +625,44 @@ public final class InvocationDispatcher {
                     task.clientHandle);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { partitionKeys }, null, task.clientHandle);
+    }
+
+    private static ClientResponseImpl dispatchJstack(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length != 1 || params[0] == null) {
+            return gracefulFailureResponse(
+                    "@JStack must provide hostId",
+                    task.clientHandle);
+        }
+        if (!(params[0] instanceof Integer)) {
+            return gracefulFailureResponse(
+                    "@JStack must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
+                    task.clientHandle);
+        }
+        int ihid = (Integer) params[0];
+        final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+        if (ihid >=0 && !liveHids.contains(ihid)) {
+            return gracefulFailureResponse(
+                    "Invalid Host Id or Host Id not member of cluster: " + ihid,
+                    task.clientHandle);
+        }
+
+        if (ihid < 0) { // all hosts
+            //collect thread dumps
+            String threadDump = VoltDB.generateThreadDump();
+            System.err.println("Taking Thread Dump for Host Id:" + hostMessenger.getHostId());
+            System.err.println(threadDump);
+            hostMessenger.sendPoisonPill(liveHids, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
+        } else if (ihid == hostMessenger.getHostId()) { // only local
+            //collect thread dumps
+            String threadDump = VoltDB.generateThreadDump();
+            System.err.println("Taking Thread Dump for Host Id:" + hostMessenger.getHostId());
+            System.err.println(threadDump);
+        } else { // only remote
+            hostMessenger.sendPoisonPill(ihid, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
+        }
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
     private final ClientResponseImpl dispatchSubscribe(InvocationClientHandler handler, StoredProcedureInvocation task) {

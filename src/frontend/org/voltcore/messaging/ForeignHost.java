@@ -383,40 +383,10 @@ public class ForeignHost {
             } else if (cause == ForeignHost.CRASH_ALL || cause == ForeignHost.CRASH_SPECIFIED) {
                 org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
             } else if (cause == ForeignHost.PRINT_STACKTRACE) {
-                //for debug
-                System.out.println("Start printing stacktrace.");
-
-                Process process = Runtime.getRuntime().exec("jps");
-                List<String> processList = new ArrayList<>();
-                BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                String line = "";
-                while ((line = input.readLine()) != null) {
-                    processList.add(line);
-                }
-                input.close();
-                List<String> stackTrace = new ArrayList<>();
-                for (String cur : processList) {
-                    String[] ss = cur.split(" ");
-                    if(ss.length > 1 && ss[1].equals("VoltDB")) {
-                        int pid = Integer.parseInt(ss[0]);
-                        try {
-                            Process pcsStackTrace = Runtime.getRuntime().exec("jstack " + pid);
-                            BufferedReader bfReader = new BufferedReader(new InputStreamReader(pcsStackTrace.getInputStream()));
-                            stackTrace.add("--------------Stack trace for PID " + pid + "--------------");
-                            String s = "";
-                            while ((s = bfReader.readLine()) != null) {
-                                stackTrace.add(s);
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-
-                for(String s : stackTrace) {
-                    JSTACK_LOG.info(s);
-                }
-
+                //collect thread dumps
+                String threadDump = VoltDB.generateThreadDump();
+                System.err.println("Taking Thread Dump for Host Id" + m_hostId);
+                System.err.println(threadDump);
             } else {
                 //Should never come here.
                 hostLog.error("Invalid Cause in poison pill: " + cause);

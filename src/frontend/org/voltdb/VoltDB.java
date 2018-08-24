@@ -1516,7 +1516,7 @@ public class VoltDB {
         System.exit(status);
     }
 
-    private static String generateThreadDump() {
+    public static String generateThreadDump() {
         StringBuilder threadDumps = new StringBuilder();
         ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
         ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(true, true);

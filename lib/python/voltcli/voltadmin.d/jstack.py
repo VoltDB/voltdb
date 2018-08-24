@@ -21,20 +21,28 @@ from voltcli import utility
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
-    description = 'Print out stacktrace using jstack for all clusters.',
+    description = 'Dumping stacktrace for one or all hosts of a running VoltDB Cluster.',
     options = (
-        VOLT.StringOption(None, '--hsIds', 'hsIds',
-                              'Specify the host you want to dump stack trace.',
-                              default = '0')
+        VOLT.IntegerOption(None, '--hsId', 'hsId',
+                              'Specify the hostId you want to dump, or -1 for all hosts.',
+                              default = '-1')
     ),
 )
 
 def jstack(runner):
-    if not runner.opts.hsIds:
-        print "Must provide site IDs for dumping stack traces."
-        return
-    json_opts = ['{hsIds: "%s"}' % (runner.opts.hsIds)]
-    runner.verbose_info('@JStack "%s"' % json_opts)
-    columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
-    print 'voltadmin: JStack command has been executed. Check the server logs for results.'
-    response = runner.call_proc('@JStack', columns, json_opts)
+    if  (runner.opts.hsId < -1):
+        runner.abort_with_help("Must provide valid host id for dumping stack traces.")
+
+    # take the jstack using exec @JStack HOST_ID
+    if runner.opts.hsId < 0:
+        runner.info('Taking jstack of all hosts.')
+    else:
+        runner.info('Taking jstack of host %d: ' % (runner.opts.hsId))
+
+    if not runner.opts.dryrun:
+        response = runner.call_proc('@JStack',
+                                    [VOLT.FastSerializer.VOLTTYPE_INTEGER],
+                                    [runner.opts.hsId])
+        print response
+        if response.status() != 1:  # not SUCCESS
+            sys.exit(1)

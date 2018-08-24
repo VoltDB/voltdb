@@ -1723,22 +1723,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             if (it.hasNext()) {
                 ForeignHost fh = it.next();
                 if (fh.isUp()) {
-                    fh.sendPoisonPill(err, ForeignHost.CRASH_SPECIFIED);
-                }
-            }
-        }
-    }
-
-    public void sendPoisonPillJStack(long[] hostIds, String err) {
-        System.out.println("Sending Poison Pill");
-        for (long hostId : hostIds) {
-            int id = new Long(hostId).intValue();
-            Iterator<ForeignHost> it = m_foreignHosts.get(id).iterator();
-            // No need to overdose the poison pill
-            if (it.hasNext()) {
-                ForeignHost fh = it.next();
-                if (fh.isUp()) {
-                    fh.sendPoisonPill(err, ForeignHost.PRINT_STACKTRACE);
+                    fh.sendPoisonPill(err, cause);
                 }
             }
         }
@@ -1756,7 +1741,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    public void sendPoisonPill(String err, int targetHostId, int cause) {
+    public void sendPoisonPill(int targetHostId, String err, int cause) {
         Iterator<ForeignHost> it = m_foreignHosts.get(targetHostId).iterator();
         if (it.hasNext()) {
             ForeignHost fh = it.next();
