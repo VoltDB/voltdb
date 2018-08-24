@@ -17,16 +17,12 @@
 
 package org.voltcore.messaging;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -50,7 +46,6 @@ import com.google_voltpatches.common.base.Throwables;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static final VoltLogger JSTACK_LOG = new VoltLogger("JSTACK");
     private static RateLimitedLogger rateLimitedLogger;
     private static long m_logRate;
 
