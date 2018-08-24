@@ -201,12 +201,18 @@ public class SpInitiator extends BaseInitiator implements Promotable
         try {
             long startTime = System.currentTimeMillis();
             Boolean success = false;
-            if (m_term == null) {
-                m_term = createTerm(m_messenger.getZK(),
-                        m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
-                        m_whoami);
-                m_term.start();
+            if (m_term != null) {
+                m_term.shutdown();
             }
+
+            // When the leader is migrated away from this site, the term is still active
+            // If the leader is moved back to the site, recreate the term to ensure no-missed
+            // update.
+            m_term = createTerm(m_messenger.getZK(),
+                    m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
+                    m_whoami);
+            m_term.start();
+
             int deadSPIHost = lastLeaderHSId == Long.MAX_VALUE ?
                     Integer.MAX_VALUE : CoreUtils.getHostIdFromHSId(lastLeaderHSId);
             while (!success) {
@@ -253,7 +259,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     } else {
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
-
                     m_initiatorMailbox.setMigratePartitionLeaderStatus(migratePartitionLeader);
                 }
                 else {

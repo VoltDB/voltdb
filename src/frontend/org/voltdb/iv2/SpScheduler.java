@@ -209,6 +209,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         super.setLeaderState(isLeader);
         m_snapMonitor.addInterest(this);
+        if (isLeader) {
+            SpInitiator init = (SpInitiator)((RealVoltDB)VoltDB.instance()).getInitiator(m_partitionId);
+            if (init.m_term != null) {
+                ((SpTerm)init.m_term).setPromoting(false);
+            }
+        }
     }
 
     @Override
