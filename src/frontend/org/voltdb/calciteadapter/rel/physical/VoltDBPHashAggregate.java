@@ -41,7 +41,8 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode postPredicate,
-            int splitCount) {
+            int splitCount,
+            boolean isCoordinatorAggr) {
       super(cluster,
             traitSet,
             child,
@@ -50,7 +51,8 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
             groupSets,
             aggCalls,
             postPredicate,
-            splitCount);
+            splitCount,
+            isCoordinatorAggr);
     }
 
     public VoltDBPHashAggregate(
@@ -61,7 +63,8 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate) {
+            RexNode postPredicate,
+            boolean isCoordinatorAggr) {
         this(cluster,
                 traitSet,
                 child,
@@ -70,7 +73,8 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 groupSets,
                 aggCalls,
                 postPredicate,
-                1);
+                1,
+                isCoordinatorAggr);
     }
 
     @Override
@@ -93,13 +97,19 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 groupSets,
                 aggCalls,
                 m_postPredicate,
-                m_splitCount);
+                m_splitCount,
+                m_isCoordinatorAggr);
     }
 
-    public VoltDBPHashAggregate copy(RelTraitSet traitSet, RelNode input,
-            boolean indicator, ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls,
-            int splitCount) {
+    public VoltDBPHashAggregate copy(RelTraitSet traitSet,
+            RelNode input,
+            boolean indicator,
+            ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets,
+            List<AggregateCall> aggCalls,
+            int splitCount,
+            boolean isCoordinatorAggr
+            ) {
         return new VoltDBPHashAggregate(
                 getCluster(),
                 traitSet,
@@ -109,7 +119,8 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 groupSets,
                 aggCalls,
                 m_postPredicate,
-                splitCount);
+                splitCount,
+                isCoordinatorAggr);
     }
 
 
@@ -123,7 +134,8 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode postPredicate,
-            int splitCount) {
+            int splitCount,
+            boolean isCoordinatorAggr) {
         return new VoltDBPHashAggregate(
                 cluster,
                 traitSet,
@@ -133,7 +145,8 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 groupSets,
                 aggCalls,
                 postPredicate,
-                splitCount);
+                splitCount,
+                isCoordinatorAggr);
 
     }
 

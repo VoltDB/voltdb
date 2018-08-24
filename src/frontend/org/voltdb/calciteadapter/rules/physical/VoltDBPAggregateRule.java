@@ -19,11 +19,13 @@ package org.voltdb.calciteadapter.rules.physical;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
@@ -34,6 +36,9 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPHashAggregate;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPSerialAggregate;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPSort;
+
+import com.google.common.collect.ImmutableMap;
 
 
 public class VoltDBPAggregateRule extends RelOptRule {
@@ -63,19 +68,20 @@ public class VoltDBPAggregateRule extends RelOptRule {
                     aggregate.getGroupSet(),
                     aggregate.getGroupSets(),
                     aggregate.getAggCallList(),
-                    null);
+                    null,
+                    false);
             call.transformTo(hashAggr);
         }
 
         // Transform to a physical Serial Aggregate. To enforce a required ordering add a collation
         // that matches the aggreagte's GROUP BY columns (for now) to the aggregate's input.
-        // Calcite will create a sort relation out of it
-        // The Serial Aggregate itself should not have a RelCollation trait even its output is sorted
-        // The presence of this trait would force Clacite to add a Sort on top of the aggregate
-        // which we don't need
+        // Calcite will create a sort relation out of it.
+        // The aggregate's output would also be effectively sorted by the same GROUP BY columns
+        // (either because of an existing index or a Sort relation added by Calcite)
         if (hasGroupBy(aggregate)) {
             RelCollation groupByCollation = buildGroupByCollation(aggregate);
             convertedInputTraits = convertedInputTraits.plus(groupByCollation);
+            convertedAggrTraits = convertedAggrTraits.plus(groupByCollation);
         }
         RelNode convertedSerialAggrInput = convert(input, convertedInputTraits);
         VoltDBPSerialAggregate serialAggr = new VoltDBPSerialAggregate(
@@ -86,8 +92,25 @@ public class VoltDBPAggregateRule extends RelOptRule {
                 aggregate.getGroupSet(),
                 aggregate.getGroupSets(),
                 aggregate.getAggCallList(),
-                null);
-        call.transformTo(serialAggr);
+                null,
+                false);
+        // The fact that the convertedAggrTraits does have non-empty collation would force Calcite to create
+        // a Sort relation on top of the aggregate. We can add the sort ourselves and also declare
+        // that both (a new sort and the serial aggregate) relations are equivalent to the original
+        // logical aggregate. This way Caclite will later eliminate the added sort because if would have
+        // higher processing cost
+        if (hasGroupBy(aggregate)) {
+            VoltDBPSort sort = new VoltDBPSort(
+              aggregate.getCluster(),
+              convertedAggrTraits,
+              serialAggr,
+              convertedAggrTraits.getTrait(RelCollationTraitDef.INSTANCE),
+              1);
+            Map<RelNode, RelNode> equiv = ImmutableMap.of(serialAggr, aggregate);
+            call.transformTo(sort, equiv);
+        } else {
+            call.transformTo(serialAggr);
+        }
 
     }
 

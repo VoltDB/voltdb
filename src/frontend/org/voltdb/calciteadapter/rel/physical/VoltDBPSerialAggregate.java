@@ -43,7 +43,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode postPredicate,
-            int splitCount) {
+            int splitCount,
+            boolean isCoordinatorAggr) {
       super(cluster,
             traitSet,
             child,
@@ -52,7 +53,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             groupSets,
             aggCalls,
             postPredicate,
-            splitCount);
+            splitCount,
+            isCoordinatorAggr);
     }
 
     public VoltDBPSerialAggregate(
@@ -63,7 +65,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate) {
+            RexNode postPredicate,
+            boolean isCoordinatorAggr) {
         this(cluster,
                 traitSet,
                 child,
@@ -72,7 +75,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 groupSets,
                 aggCalls,
                 postPredicate,
-                1);
+                1,
+                isCoordinatorAggr);
     }
 
     @Override
@@ -97,9 +101,12 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
     }
 
     @Override
-    public VoltDBPSerialAggregate copy(RelTraitSet traitSet, RelNode input,
-            boolean indicator, ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
+    public VoltDBPSerialAggregate copy(RelTraitSet traitSet,
+            RelNode input,
+            boolean indicator,
+            ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets,
+            List<AggregateCall> aggCalls) {
         return new VoltDBPSerialAggregate(
                 getCluster(),
                 traitSet,
@@ -109,7 +116,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 groupSets,
                 aggCalls,
                 m_postPredicate,
-                m_splitCount);
+                m_splitCount,
+                m_isCoordinatorAggr);
     }
 
     @Override
@@ -122,7 +130,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode postPredicate,
-            int splitCount) {
+            int splitCount,
+            boolean isCoordinatorAggr) {
         return new VoltDBPSerialAggregate(
                 cluster,
                 traitSet,
@@ -132,7 +141,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 groupSets,
                 aggCalls,
                 postPredicate,
-                splitCount);
+                splitCount,
+                isCoordinatorAggr);
     }
 
     @Override

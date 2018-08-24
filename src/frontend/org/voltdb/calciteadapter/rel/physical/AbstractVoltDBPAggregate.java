@@ -49,6 +49,11 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
 
     final protected int m_splitCount;
 
+    // TRUE if this aggregate relation is part of a coordinator tree.
+    // The indicator may be useful during the Exchange Transform rule when a coordinator aggregate
+    // differs from a fragment one
+    final protected boolean m_isCoordinatorAggr;
+
     /** Constructor */
     protected AbstractVoltDBPAggregate(
             RelOptCluster cluster,
@@ -59,16 +64,19 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode postPredicate,
-            int splitCount) {
+            int splitCount,
+            boolean isCoordinatorAggr) {
       super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
       m_postPredicate = postPredicate;
       m_splitCount = splitCount;
+      m_isCoordinatorAggr = isCoordinatorAggr;
     }
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
         pw.item("split", m_splitCount);
+        pw.item("coorinator", m_isCoordinatorAggr);
         if (m_postPredicate != null) {
             pw.item("having", m_postPredicate);
         }
@@ -79,6 +87,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
     protected String computeDigest() {
         String digest = super.computeDigest();
         digest += "_split_" + m_splitCount;
+        digest += "_coordinator_" + m_isCoordinatorAggr;
         if (m_postPredicate != null) {
             digest += m_postPredicate.toString();
         }
@@ -114,7 +123,8 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
             RexNode postPredicate,
-            int splitCount);
+            int splitCount,
+            boolean isCoordinatorAggr);
 
     protected abstract AggregatePlanNode getAggregatePlanNode();
 
@@ -201,6 +211,10 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
 
     public RexNode getPostPredicate() {
         return m_postPredicate;
+    }
+
+    public boolean isCoordinatorAggr() {
+        return m_isCoordinatorAggr;
     }
 
     @Override
