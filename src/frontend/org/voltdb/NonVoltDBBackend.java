@@ -184,6 +184,7 @@ public abstract class NonVoltDBBackend {
         private Integer m_minimum = null;
         private List<String> m_groups = new ArrayList<String>();
         private List<String> m_groupReplacementTexts = new ArrayList<String>();
+        private boolean m_groupReplaceAll = false;
         private List<String> m_exclude = new ArrayList<String>();
         private boolean m_debugPrint = false;
 
@@ -283,6 +284,22 @@ public abstract class NonVoltDBBackend {
             return this;
         }
 
+        /** Specifies whether or not, when replacing groups within the whole
+         *  match (see "groupReplacementText" above), to replace all instances
+         *  of each group, rather than just the first instance of each group;
+         *  default is <b>false</b>. */
+        protected QueryTransformer groupReplaceAll(boolean groupReplaceAll) {
+            this.m_groupReplaceAll = groupReplaceAll;
+            return this;
+        }
+
+        /** Specifies, when replacing groups within the whole match (see
+         *  "groupReplacementText" above), to replace all instances of each
+         *  group, rather than just the first instance of each group. */
+        protected QueryTransformer groupReplaceAll() {
+            return groupReplaceAll(true);
+        }
+
         /** Specifies a ColumnType to which this QueryTransformer should be
          *  applied, i.e., a query will only be modified if the <i>group</i>
          *  is a column of the specified type; default is <b>null</b>, in which
@@ -360,6 +377,8 @@ public abstract class NonVoltDBBackend {
         private String getNonEmptyValue(String name, Object value) {
             if (value == null) {
                 return "";
+            } else if (value instanceof Boolean && !(Boolean)value) {
+                return "";
             } else if (value instanceof Collection && ((Collection<?>)value).isEmpty()) {
                 return "";
             } else if (value.toString().isEmpty()) {
@@ -386,8 +405,9 @@ public abstract class NonVoltDBBackend {
                     + getNonEmptyValue("exclude",  m_exclude)
                     + getNonEmptyValue("groups",  m_groups)
                     + getNonEmptyValue("groupReplacementTexts", m_groupReplacementTexts)
-                    + getNonEmptyValue("useWholeMatch", (m_useWholeMatch ? "true" : ""))
-                    + getNonEmptyValue("debugPrint",    (m_debugPrint    ? "true" : ""));
+                    + getNonEmptyValue("groupReplaceAll", m_groupReplaceAll)
+                    + getNonEmptyValue("useWholeMatch",   m_useWholeMatch)
+                    + getNonEmptyValue("debugPrint",      m_debugPrint);
             return result;
         }
 
@@ -609,12 +629,12 @@ public abstract class NonVoltDBBackend {
         }
 
         if (debugPrint) {
-            System.out.println("  In NonVoltDBBackend.columnTypeMatches (1):");
-            System.out.println("    columnType: " + columnType);
-            System.out.println("    groups/col: " + Arrays.toString(groups));
-            System.out.println("    query     : " + query);
-            System.out.println("    tableNames: " + tableNames);
-            System.out.println("    allColumnsShouldMatchType: " + allColumnsShouldMatchType);
+            System.out.println("    In NonVoltDBBackend.columnTypeMatches (1):");
+            System.out.println("      columnType: " + columnType);
+            System.out.println("      groups/col: " + Arrays.toString(groups));
+            System.out.println("      query     : " + query);
+            System.out.println("      tableNames: " + tableNames);
+            System.out.println("      allColumnsShouldMatchType: " + allColumnsShouldMatchType);
         }
 
         boolean allMatch = true;
@@ -663,10 +683,10 @@ public abstract class NonVoltDBBackend {
         }
 
         if (debugPrint) {
-            System.out.println("  In NonVoltDBBackend.columnTypeMatches (2):");
-            System.out.println("    allMatch       : " + allMatch);
-            System.out.println("    atLeastOneMatch: " + atLeastOneMatch);
-            System.out.println("    returning      : " + (allColumnsShouldMatchType ? allMatch: atLeastOneMatch));
+            System.out.println("    In NonVoltDBBackend.columnTypeMatches (2):");
+            System.out.println("      allMatch       : " + allMatch);
+            System.out.println("      atLeastOneMatch: " + atLeastOneMatch);
+            System.out.println("      returning      : " + (allColumnsShouldMatchType ? allMatch: atLeastOneMatch));
         }
 
         if (allColumnsShouldMatchType) {
@@ -695,6 +715,21 @@ public abstract class NonVoltDBBackend {
     protected String replaceGroupNameVariables(String str,
             List<String> groupNames, List<String> groupValues, boolean debugPrint) {
         return str;
+    }
+
+    /** Convenience method: certain methods (e.g. String.replace(...),
+     *  String.replaceFirst(...), Matcher.appendReplacement(...)) will remove
+     *  certain special characters (e.g., '\', '$'); this method adds additional
+     *  backslash characters (\) so that the special characters will be retained
+     *  in the end result, as they originally appeared. */
+    protected String protectSpecialChars(String str, boolean debugPrint) {
+        String result = str.replace("\\", "\\\\").replace("$", "\\$");
+        if (debugPrint) {
+            System.out.println("    In NonVoltDBBackend.protectSpecialChars:");
+            System.out.println("      str   : " + str);
+            System.out.println("      result: " + result);
+        }
+        return result;
     }
 
     /**
@@ -775,6 +810,12 @@ public abstract class NonVoltDBBackend {
                     for (String excl : qt.m_exclude) {
                         if (wholeMatch.contains(excl)) {
                             noChangesNeeded = true;
+                            if (qt.m_debugPrint) {
+                                System.out.println("    noChangesNeeded, because wholeMatch contains excl:");
+                                System.out.println("      wholeMatch: " + wholeMatch);
+                                System.out.println("      m_exclude : " + qt.m_exclude);
+                                System.out.println("      excl      : " + excl);
+                            }
                         }
                     }
                 }
@@ -787,6 +828,9 @@ public abstract class NonVoltDBBackend {
                     if (!columnTypeMatches(qt.m_columnType, qt.m_allColumnsShouldMatchType,
                             query, qt.m_debugPrint, groupsArray)) {
                         noChangesNeeded = true;
+                        if (qt.m_debugPrint) {
+                            System.out.println("    noChangesNeeded, because columnType(s) do not Match");
+                        }
                     }
                 }
                 if (noChangesNeeded) {
@@ -803,8 +847,28 @@ public abstract class NonVoltDBBackend {
                     if (qt.m_groupReplacementTexts != null && !qt.m_groupReplacementTexts.isEmpty()) {
                         for (int i=0; i < Math.min(groups.size(), qt.m_groupReplacementTexts.size()); i++) {
                             if (groups.get(i) != null && qt.m_groupReplacementTexts.get(i) != null) {
-                                wholeMatch = wholeMatch.replaceFirst(groups.get(i), qt.m_groupReplacementTexts.get(i));
+                                if (qt.m_debugPrint) {
+                                    String instances = (qt.m_groupReplaceAll ? "all instances" : "first instance");
+                                    System.out.println("    replacing "+instances+" of groups(i) "
+                                                      + "with groupReplacementTexts(i).");
+                                    System.out.println("      wholeMatch: " + wholeMatch);
+                                    System.out.println("      i         : " + i);
+                                    System.out.println("      groups [i]: " + groups.get(i));
+                                    System.out.println("      gRepTxt[i]: " + qt.m_groupReplacementTexts.get(i));
+                                }
+                                if (qt.m_groupReplaceAll) {
+                                    // Extra escaping to make sure that "\" remains as "\" and "$"
+                                    // remains "$", despite replace's efforts to change them
+                                    wholeMatch = wholeMatch.replace ( groups.get(i), protectSpecialChars (
+                                                     qt.m_groupReplacementTexts.get(i), qt.m_debugPrint ));
+                                } else {
+                                    wholeMatch = wholeMatch.replaceFirst ( groups.get(i), protectSpecialChars (
+                                                     qt.m_groupReplacementTexts.get(i), qt.m_debugPrint ));
+                                }
                             }
+                        }
+                        if (qt.m_debugPrint) {
+                            System.out.println("    wholeMatch  : " + wholeMatch);
                         }
                     }
                     // Make sure not to swallow up extra ')', in whole match; and
@@ -817,10 +881,10 @@ public abstract class NonVoltDBBackend {
             if (qt.m_debugPrint) {
                 System.out.println("  replaceText : " + replaceText);
             }
-            // Extra escaping to make sure that "\\" remains as "\\" and "$"
+            // Extra escaping to make sure that "\" remains as "\" and "$"
             // remains "$", despite appendReplacement's efforts to change them
-            matcher.appendReplacement(modified_query,
-                    replaceText.toString().replace("\\\\", "\\\\\\\\").replace("$", "\\$"));
+            matcher.appendReplacement ( modified_query,
+                  protectSpecialChars ( replaceText.toString(), qt.m_debugPrint ));
         }
         matcher.appendTail(modified_query);
         if ((DEBUG || qt.m_debugPrint) && !query.equalsIgnoreCase(modified_query.toString())) {
