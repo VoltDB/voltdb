@@ -108,6 +108,8 @@ public class VoltDBRexUtil {
             final int source = fieldCollation.getFieldIndex();
             if (source < sourceCount) {
                 final int target = targets[source];
+                // @TODO Handle collation fields that are expressions based on project fields.
+                // At the moment, the conversion stops at the first expression
                 if (target < 0) {
                     // Stop at the first mismatched field
                     return RelCollations.of(fieldCollations);

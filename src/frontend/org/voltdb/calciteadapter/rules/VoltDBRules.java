@@ -96,8 +96,7 @@ public class VoltDBRules {
 
             // Exchage Rules
             , VoltDBPCalcExchangeTransposeRule.INSTANCE
-            , VoltDBPLimitExchangeTransposeRule.INSTANCE_DISTRIBUTION_ANY
-            , VoltDBPLimitExchangeTransposeRule.INSTANCE_DISTRIBUTION_SINGLE
+            , VoltDBPLimitExchangeTransposeRule.INSTANCE
             , VoltDBPSortExchangeTransposeRule.INSTANCE
             , VoltDBPAggregateExchangeTransposeRule.INSTANCE_1
             , VoltDBPAggregateExchangeTransposeRule.INSTANCE_2

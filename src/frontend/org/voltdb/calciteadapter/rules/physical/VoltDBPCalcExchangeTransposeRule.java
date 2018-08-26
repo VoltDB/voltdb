@@ -21,7 +21,6 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperandChildPolicy;
 import org.apache.calcite.plan.RelOptRuleOperandChildren;
-import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
@@ -29,6 +28,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.core.Calc;
 import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPMergeExchange;
 import org.voltdb.calciteadapter.util.VoltDBRexUtil;
 
 import com.google.common.collect.ImmutableList;
@@ -57,27 +57,54 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
         // Adjust exchage's RelCollation trait
         RelTraitSet exchangeTraits = exchange.getTraitSet();
         RelTraitSet calcTraits = calc.getTraitSet();
-        RelTrait collationTrait = exchangeTraits.getTrait(RelCollationTraitDef.INSTANCE);
-        if (collationTrait instanceof RelCollation) {
-            RelCollation adjustedCollation = VoltDBRexUtil.adjustCollationForProgram(
-                    calc.getCluster().getRexBuilder(),
-                    calc.getProgram(), (RelCollation)collationTrait);
-            exchangeTraits = exchangeTraits.replace(adjustedCollation);
-            calcTraits = calcTraits.replace(adjustedCollation);
+        RelCollation collationTrait = exchangeTraits.getTrait(RelCollationTraitDef.INSTANCE);
+
+        // Update Calc's collation trait
+        RelCollation adjustedCollation = VoltDBRexUtil.adjustCollationForProgram(
+                calc.getCluster().getRexBuilder(),
+                calc.getProgram(), collationTrait);
+
+        // @TODO Collations that use expressions can't be converted.
+        // Need to update VoltDBRexUtil.adjustCollationForProgram to handle expressions
+//        if (adjustedCollation.getFieldCollations().size() != collationTrait.getFieldCollations().size()) {
+//            return;
+//        }
+
+        exchangeTraits = exchangeTraits.replace(adjustedCollation);
+        calcTraits = calcTraits.replace(adjustedCollation);
+
+        // Update Calc's distribution trait
+        // Do not change distribution trait if this is a top exchange.
+        // The trait will be updated when a limit relation will be transposed with a bottom(fragment) exchange
+        if (!exchange.isTopExchange()) {
+            calcTraits = calcTraits.replace(exchange.getChildDistribution());
         }
 
         Calc newCalc = calc.copy(
-                // Update Calc distribution's trait
-                calcTraits.replace(exchange.getChildDistribution()),
+                calcTraits,
                 exchange.getInput(),
                 calc.getProgram(),
                 exchange.getSplitCount());
 
-        AbstractVoltDBPExchange newExchange = exchange.copy(
+        AbstractVoltDBPExchange newExchange;
+        if (exchange instanceof VoltDBPMergeExchange) {
+            // @TODO WIP VoltDBPMergeExchange's collationFieldExprs has to be adjusted properly
+            // similar to the collation itself
+            newExchange = new VoltDBPMergeExchange(
+                    exchange.getCluster(),
+                    exchangeTraits,
+                    newCalc,
+                    exchange.getChildDistribution(),
+                    exchange.getSplitCount(),
+                    exchange.isTopExchange(),
+                    calc.getProgram().getExprList());
+        } else {
+            newExchange = exchange.copy(
                 exchangeTraits,
                 newCalc,
                 exchange.getChildDistribution(),
                 exchange.isTopExchange());
+        }
 
         call.transformTo(newExchange);
     }
