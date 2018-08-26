@@ -20,10 +20,15 @@ package org.voltdb.calciteadapter.rel.physical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.SingleRel;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -116,6 +121,38 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
         String digest = super.computeDigest();
         digest += "_split_" + m_splitCount;
         return digest;
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        double limit = 0f;
+        if (m_limit != null) {
+            limit = RexLiteral.intValue(m_limit);
+        }
+        if (m_offset != null) {
+            limit += RexLiteral.intValue(m_offset);
+        }
+        double defaultLimit = super.estimateRowCount(mq);
+        if (limit == 0f || defaultLimit < limit) {
+            limit = defaultLimit;
+        }
+        return limit;
+    }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner,
+            RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+        // Hack. Discourage Calcite from picking a plan with a Limit that have a RelDistributions.ANY
+        // distribution trait. This would make a "correct"
+        // VoltDBPLimit (Single) / DistributedExchange / VoltDBPLimit (Hash) plan
+        // less expensive than an "incorrect" VoltDBPLimit (Any) / DistributedExchange one.
+        if (RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
+            rowCount *= 10000;
+        }
+
+        RelOptCost defaultCost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
     }
 
     @Override
