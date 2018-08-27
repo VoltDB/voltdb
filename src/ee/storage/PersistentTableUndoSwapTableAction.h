@@ -35,8 +35,8 @@ public:
         , m_otherIndexNames(otherIndexNames)
     { }
 
-private:
     virtual ~PersistentTableUndoSwapTableAction() {}
+private:
 
     /*
      * Undo whatever this undo action was created to undo.

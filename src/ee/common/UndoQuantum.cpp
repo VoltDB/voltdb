@@ -22,8 +22,9 @@
 namespace voltdb {
 
 Pool* UndoQuantum::undo() {
-   std::for_each(m_undoActions.rbegin(), m_undoActions.rend(),
-         [](voltdb::UndoReleaseAction* action) { action->undo(); delete action; });
+   for (auto iter = m_undoActions.rbegin(); iter != m_undoActions.rend(); ++iter) {    // TODO
+      (*iter)->undo();
+   }
    Pool * result = m_dataPool;
    delete this;
    // return the pool for recycling.
@@ -31,8 +32,9 @@ Pool* UndoQuantum::undo() {
 }
 
 Pool* UndoQuantum::release() {
-   std::for_each(m_undoActions.begin(), m_undoActions.end(),
-         [](voltdb::UndoReleaseAction* action) { action->release(); delete action; });
+   for (auto iter = m_undoActions.begin(); iter != m_undoActions.end(); ++iter) {
+      (*iter)->release();
+   }
    if (m_interests != nullptr) {
       for (int ii = 0; ii < m_numInterests; ii++) {
          m_interests[ii]->notifyQuantumRelease();
@@ -45,9 +47,9 @@ Pool* UndoQuantum::release() {
    return result;
 }
 
-void UndoQuantum::registerUndoAction(voltdb::UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest) {
+void UndoQuantum::registerUndoAction(std::unique_ptr<UndoReleaseAction>&& undoAction, UndoQuantumReleaseInterest *interest) {
    assert(undoAction);
-   m_undoActions.push_back(undoAction);
+   m_undoActions.emplace_back(std::move(undoAction));
    if (interest != NULL) {
       if (m_interests == NULL) {
          m_interests = reinterpret_cast<UndoQuantumReleaseInterest**>(m_dataPool->allocate(sizeof(void*) * 16));

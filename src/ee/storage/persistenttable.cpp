@@ -66,6 +66,7 @@
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 
+#include <memory>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace voltdb {
@@ -306,8 +307,9 @@ void PersistentTable::deleteAllTuples(bool, bool fallible) {
 
         UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
         if (uq && fallible) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark,
-                    rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE)));
+            uq->registerUndoAction(
+                  std::unique_ptr<UndoReleaseAction>(new (*uq) DRTupleStreamUndoAction(drStream, drMark,
+                    rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE))));
         }
     }
 
@@ -541,7 +543,9 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
                                                 currentSpHandle, currentUniqueId);
 
         if (uq && fallible) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE)));
+            uq->registerUndoAction(
+                  std::unique_ptr<UndoReleaseAction>(
+                     new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE))));
         }
     }
 
@@ -554,8 +558,9 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable);
-        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
+        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq,
+              std::unique_ptr<UndoReleaseAction>(
+                 new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable)));
     }
     else {
         if (fallible) {
@@ -656,9 +661,10 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
             uq->registerUndoAction(
-                    new (*uq) PersistentTableUndoSwapTableAction(this, otherTable,
+                    std::unique_ptr<UndoReleaseAction>(
+                       new (*uq) PersistentTableUndoSwapTableAction(this, otherTable,
                             theIndexNames,
-                            otherIndexNames));
+                            otherIndexNames)));
         }
     }
 
@@ -840,7 +846,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
 
         UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
         if (uq && fallible) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_INSERT)));
+            uq->registerUndoAction(std::unique_ptr<UndoReleaseAction>(
+                     new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_INSERT))));
         }
     }
 
@@ -889,8 +896,8 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
             //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
             //* enable for debug */           << " { " << target.debugNoHeader() << " } "
             //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-            UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon);
-            SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
+            SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq,
+                  std::unique_ptr<UndoReleaseAction>(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon)));
         }
     }
 
@@ -1010,7 +1017,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 
         UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
         if (uq && fallible) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_UPDATE)));
+            uq->registerUndoAction(
+                  std::unique_ptr<UndoReleaseAction>(
+                     new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_UPDATE))));
         }
     }
 
@@ -1096,10 +1105,11 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
          * and the "before" and "after" object pointers for non-inlined columns that changed.
          */
         char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
-        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
-                                                                           oldObjects, newObjects,
-                                                                           &m_surgeon, someIndexGotUpdated);
-        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
+        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq,
+              std::unique_ptr<UndoReleaseAction>(
+                 new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
+                    oldObjects, newObjects,
+                    &m_surgeon, someIndexGotUpdated)));
     }
     else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
@@ -1222,7 +1232,9 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
                                               currentUniqueId, target, DR_RECORD_DELETE);
 
         if (createUndoAction) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_DELETE)));
+            uq->registerUndoAction(
+                  std::unique_ptr<UndoReleaseAction>(
+                     new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_DELETE))));
         }
     }
 
@@ -1233,8 +1245,10 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
         target.setPendingDeleteOnUndoReleaseTrue();
         ++m_tuplesPinnedByUndo;
         ++m_invisibleTuplesPendingDeleteCount;
-        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon);
-        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction, this);
+        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq,
+              std::unique_ptr<UndoReleaseAction>(
+                 new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon)),
+              this);
     }
 
     // handle any materialized views, insert the tuple into delta table,

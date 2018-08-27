@@ -24,6 +24,7 @@
 
 #include "common/Pool.hpp"
 #include "boost/unordered_set.hpp"
+#include "UndoReleaseAction.h"
 
 class StreamedTableTest;
 
@@ -39,14 +40,14 @@ class UndoQuantum {
     friend class ::StreamedTableTest;
 
     const int64_t m_undoToken;
-    std::vector<UndoReleaseAction*> m_undoActions;
+    std::vector<std::unique_ptr<UndoReleaseAction>> m_undoActions;
     uint32_t m_numInterests = 0;
     uint32_t m_interestsCapacity = 0;
     UndoQuantumReleaseInterest **m_interests = nullptr;
     const bool m_forLowestSite;
 
 public:
-    virtual void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = nullptr);
+    virtual void registerUndoAction(std::unique_ptr<UndoReleaseAction>&& undoAction, UndoQuantumReleaseInterest *interest = nullptr);
     int64_t getUndoToken() const {
         return m_undoToken;
     }

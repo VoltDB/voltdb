@@ -224,7 +224,7 @@ void SynchronizedThreadLock::signalLowestSiteFinished() {
     pthread_mutex_unlock(&s_sharedEngineMutex);
 }
 
-void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, std::unique_ptr<UndoReleaseAction>&& action,
         PersistentTable *table) {
     if (synchronized) {
         assert(isInSingleThreadMode());
@@ -235,7 +235,7 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
         BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, s_enginesByPartitionId) {
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
-            UndoReleaseAction* undoAction;
+            std::unique_ptr<UndoReleaseAction> undoAction;
             UndoQuantumReleaseInterest *releaseInterest = NULL;
             if (uq == currUQ) {
                 undoAction = action->getSynchronizedUndoAction(currUQ);
@@ -248,10 +248,10 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
                     releaseInterest = table->getDummyReplicatedInterest();
                 }
             }
-            currUQ->registerUndoAction(undoAction, releaseInterest);
+            currUQ->registerUndoAction(std::move(undoAction), releaseInterest);
         }
     } else {
-        uq->registerUndoAction(action, table);
+        uq->registerUndoAction(std::move(action), table);
     }
 }
 

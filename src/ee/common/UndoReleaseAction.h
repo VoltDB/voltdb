@@ -19,138 +19,54 @@
 #pragma once
 #include <cstdlib>
 #include "common/UndoQuantum.h"
-#include "SynchronizedThreadLock.h"
 
 namespace voltdb {
+   class UndoQuantum;
+   /*
+    * Abstract base class for all classes generated to undo changes to the system.
+    * Always memory-managed by and registered with an undo quantum.
+    */
+   class UndoReleaseAction {
+      protected:
+         static void countDown(bool);
+      public:
+         void* operator new(std::size_t sz, UndoQuantum& uq);
+         void operator delete(void*, UndoQuantum&) { /* emergency deallocator does nothing */ }
+         void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
 
-/*
- * Abstract base class for all classes generated to undo changes to the system.
- * Always memory-managed by and registered with an undo quantum.
- */
-class UndoReleaseAction {
-protected:
-   static void countDown() {
-      assert(!SynchronizedThreadLock::isInSingleThreadMode());
-      SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-   }
-public:
-    void* operator new(std::size_t sz, UndoQuantum& uq);
-    void operator delete(void*, UndoQuantum&) { /* emergency deallocator does nothing */ }
-    void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
+         UndoReleaseAction() {}
+         virtual ~UndoReleaseAction() {}
 
-    UndoReleaseAction() {}
-    virtual ~UndoReleaseAction() {}
+         /*
+          * Undo whatever this undo action was created to undo
+          */
+         virtual void undo() {}
 
-    /*
-     * Undo whatever this undo action was created to undo
-     */
-    virtual void undo() = 0;
+         /*
+          * Release any resources held by the undo action. It will not need to be undone in the future.
+          */
+         virtual void release() {}
 
-    /*
-     * Release any resources held by the undo action. It will not need to be undone in the future.
-     */
-    virtual void release() = 0;
+         /*
+          * Generate a synchronized Version of UndoAction
+          */
+         virtual std::unique_ptr<UndoReleaseAction> getSynchronizedUndoAction(UndoQuantum* currUQ);
+         virtual std::unique_ptr<UndoReleaseAction> getDummySynchronizedUndoAction(UndoQuantum* currUQ);
+   };
 
-    /*
-     * Generate a synchronized Version of UndoAction
-     */
-    virtual UndoReleaseAction* getSynchronizedUndoAction(UndoQuantum* currUQ);
-    virtual UndoReleaseAction* getDummySynchronizedUndoAction(UndoQuantum* currUQ);
-};
+   class UndoOnlyAction : public UndoReleaseAction {
+      public:
+         UndoOnlyAction() {}
+         virtual ~UndoOnlyAction() {}
+         virtual std::unique_ptr<UndoReleaseAction> getSynchronizedUndoAction(UndoQuantum* currUQ);
+         virtual std::unique_ptr<UndoReleaseAction> getDummySynchronizedUndoAction(UndoQuantum* currUQ);
+   };
 
-class UndoOnlyAction : public UndoReleaseAction {
-public:
-    UndoOnlyAction() {}
-    virtual ~UndoOnlyAction() {}
-
-    /*
-     * Release any resources held by the undo action. It will not need to be undone in the future.
-     */
-    void release() {}
-
-    virtual UndoReleaseAction* getSynchronizedUndoAction(UndoQuantum* currUQ);
-    virtual UndoReleaseAction* getDummySynchronizedUndoAction(UndoQuantum* currUQ);
-};
-
-class ReleaseOnlyAction : public UndoReleaseAction {
-public:
-    ReleaseOnlyAction() {}
-    virtual ~ReleaseOnlyAction() {}
-
-    /*
-     * Undo whatever this undo action was created to undo. It will not need to be released in the future.
-     */
-    void undo() {}
-
-    virtual UndoReleaseAction* getSynchronizedUndoAction(UndoQuantum* currUQ);
-    virtual UndoReleaseAction* getDummySynchronizedUndoAction(UndoQuantum* currUQ);
-};
-
-class SynchronizedUndoReleaseAction : public UndoReleaseAction {
-public:
-    SynchronizedUndoReleaseAction(UndoReleaseAction *realAction) : m_realAction(realAction) {}
-    virtual ~SynchronizedUndoReleaseAction() {delete m_realAction;}
-
-    void undo();
-
-    void release();
-
-private:
-    UndoReleaseAction *m_realAction;
-};
-
-class SynchronizedUndoOnlyAction : public UndoOnlyAction {
-public:
-    SynchronizedUndoOnlyAction(UndoOnlyAction *realAction) : m_realAction(realAction) {}
-    virtual ~SynchronizedUndoOnlyAction() {delete m_realAction;}
-
-    void undo();
-
-private:
-    UndoOnlyAction *m_realAction;
-};
-
-class SynchronizedReleaseOnlyAction : public ReleaseOnlyAction {
-public:
-    SynchronizedReleaseOnlyAction(ReleaseOnlyAction *realAction) : m_realAction(realAction) {}
-    virtual ~SynchronizedReleaseOnlyAction() {delete m_realAction;}
-
-    void release();
-
-private:
-    ReleaseOnlyAction *m_realAction;
-};
-
-class SynchronizedDummyUndoReleaseAction : public UndoReleaseAction {
-public:
-    SynchronizedDummyUndoReleaseAction() { }
-    virtual ~SynchronizedDummyUndoReleaseAction() { }
-
-    void undo() {
-       countDown();
-    }
-
-    void release() {
-       countDown();
-    }
-};
-
-class SynchronizedDummyUndoOnlyAction : public UndoOnlyAction {
-public:
-    SynchronizedDummyUndoOnlyAction() { }
-    virtual ~SynchronizedDummyUndoOnlyAction() { }
-    void undo() {
-       countDown();
-    }
-};
-
-class SynchronizedDummyReleaseOnlyAction : public ReleaseOnlyAction {
-public:
-    SynchronizedDummyReleaseOnlyAction() { }
-    virtual ~SynchronizedDummyReleaseOnlyAction() { }
-    void release() {
-       countDown();
-    }
-};
-
+   class ReleaseOnlyAction : public UndoReleaseAction {
+      public:
+         ReleaseOnlyAction() {}
+         virtual ~ReleaseOnlyAction() {}
+         virtual std::unique_ptr<UndoReleaseAction> getSynchronizedUndoAction(UndoQuantum* currUQ);
+         virtual std::unique_ptr<UndoReleaseAction> getDummySynchronizedUndoAction(UndoQuantum* currUQ);
+   };
 }

@@ -2712,11 +2712,12 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         assert(uq);
         uq->registerUndoAction(
-                new (*uq) ExecuteTaskUndoGenerateDREventAction(
-                        m_executorContext->drStream(), m_executorContext->drReplicatedStream(),
-                        m_executorContext->m_partitionId,
-                        type, lastCommittedSpHandle,
-                        spHandle, uniqueId, payloads));
+              std::unique_ptr<UndoReleaseAction>(
+                 new (*uq) ExecuteTaskUndoGenerateDREventAction(
+                    m_executorContext->drStream(), m_executorContext->drReplicatedStream(),
+                    m_executorContext->m_partitionId,
+                    type, lastCommittedSpHandle,
+                    spHandle, uniqueId, payloads)));
         break;
     }
     default:

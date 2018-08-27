@@ -406,8 +406,8 @@ bool ExecutorContext::checkTransactionForDR() {
             if (m_drStream->transactionChecks(m_lastCommittedSpHandle,
                     m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
-                        new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
-                                m_drStream->m_committedUso, 0));
+                        std::unique_ptr<UndoReleaseAction>(new (*m_undoQuantum) DRTupleStreamUndoAction(m_drStream,
+                                m_drStream->m_committedUso, 0)));
             }
             result = true;
         }
@@ -415,9 +415,9 @@ bool ExecutorContext::checkTransactionForDR() {
             if (m_drReplicatedStream->transactionChecks(m_lastCommittedSpHandle,
                     m_spHandle, m_uniqueId)) {
                 m_undoQuantum->registerUndoAction(
-                        new (*m_undoQuantum) DRTupleStreamUndoAction(
+                        std::unique_ptr<UndoReleaseAction>(new (*m_undoQuantum) DRTupleStreamUndoAction(
                                 m_drReplicatedStream,
-                                m_drReplicatedStream->m_committedUso, 0));
+                                m_drReplicatedStream->m_committedUso, 0)));
             }
         }
     }

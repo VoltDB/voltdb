@@ -20,6 +20,7 @@
 
 #include <cassert>
 #include <map>
+#include <memory>
 #include <stack>
 #include <string>
 #include <vector>
@@ -83,7 +84,7 @@ public:
     static bool countDownGlobalTxnStartCount(bool lowestSite);
     static void signalLowestSiteFinished();
 
-    static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
+    static void addUndoAction(bool synchronized, UndoQuantum *uq, std::unique_ptr<UndoReleaseAction>&& action,
             PersistentTable *interest = NULL);
 
     static bool isInSingleThreadMode();

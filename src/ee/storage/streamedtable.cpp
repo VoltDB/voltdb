@@ -159,7 +159,8 @@ bool StreamedTable::insertTuple(TableTuple &source)
             // With no active UndoLog, there is no undo support.
             return true;
         }
-        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
+        uq->registerUndoAction(
+              std::unique_ptr<UndoReleaseAction>(new (*uq) StreamedTableUndoAction(this, mark)));
     }
     else {
         // handle any materialized views even though we dont have any connector.

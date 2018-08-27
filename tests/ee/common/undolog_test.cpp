@@ -80,7 +80,7 @@ public:
             for (int qq = 0; qq < numUndoActions; qq++) {
                 MockUndoActionHistory *history = new MockUndoActionHistory();
                 histories.push_back(history);
-                quantum->registerUndoAction(new (*quantum) MockUndoAction(history));
+                quantum->registerUndoAction(std::unique_ptr<MockUndoAction>(new (*quantum) MockUndoAction(history)));
             }
             m_undoActionHistoryByQuantum.push_back(histories);
         }
