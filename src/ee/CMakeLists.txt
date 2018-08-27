@@ -156,6 +156,7 @@ SET (VOLTDB_SRC
   common/UndoLog.cpp
   common/ValueFactory.cpp
   common/UndoReleaseAction.cpp
+  common/UndoQuantum.cpp
   execution/ExecutorVector.cpp
   execution/FragmentManager.cpp
   execution/JNITopend.cpp

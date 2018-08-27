@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
-//#include "common/UndoQuantum.h"
 #include "common/SynchronizedThreadLock.h"
+#include "common/UndoReleaseAction.h"
 
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"

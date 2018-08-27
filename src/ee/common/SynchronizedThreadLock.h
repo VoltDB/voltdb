@@ -18,9 +18,6 @@
 #ifndef SYNCHRONIZEDTHREADLOCK_H_
 #define SYNCHRONIZEDTHREADLOCK_H_
 
-//#include "boost/scoped_ptr.hpp"
-//#include "boost/unordered_map.hpp"
-
 #include <cassert>
 #include <map>
 #include <stack>

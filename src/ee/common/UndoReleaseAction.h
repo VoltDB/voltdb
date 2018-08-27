@@ -18,10 +18,10 @@
 
 #pragma once
 #include <cstdlib>
+#include "common/UndoQuantum.h"
 #include "SynchronizedThreadLock.h"
 
 namespace voltdb {
-class UndoQuantum;
 
 /*
  * Abstract base class for all classes generated to undo changes to the system.
@@ -34,11 +34,11 @@ protected:
       SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
    }
 public:
-    void* operator new(std::size_t sz, UndoQuantum& uq); // defined inline in UndoQuantum.h
+    void* operator new(std::size_t sz, UndoQuantum& uq);
     void operator delete(void*, UndoQuantum&) { /* emergency deallocator does nothing */ }
     void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
 
-    inline UndoReleaseAction() {}
+    UndoReleaseAction() {}
     virtual ~UndoReleaseAction() {}
 
     /*
@@ -60,7 +60,7 @@ public:
 
 class UndoOnlyAction : public UndoReleaseAction {
 public:
-    inline UndoOnlyAction() {}
+    UndoOnlyAction() {}
     virtual ~UndoOnlyAction() {}
 
     /*
@@ -74,7 +74,7 @@ public:
 
 class ReleaseOnlyAction : public UndoReleaseAction {
 public:
-    inline ReleaseOnlyAction() {}
+    ReleaseOnlyAction() {}
     virtual ~ReleaseOnlyAction() {}
 
     /*

@@ -21,6 +21,10 @@
 
 using namespace voltdb;
 
+void* UndoReleaseAction::operator new(std::size_t sz, UndoQuantum& uq) {
+   return uq.allocateAction(sz);
+}
+
 void SynchronizedUndoReleaseAction::undo() {
    assert(!SynchronizedThreadLock::isInSingleThreadMode());
    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);

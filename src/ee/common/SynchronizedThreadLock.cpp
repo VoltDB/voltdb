@@ -18,6 +18,7 @@
 #include "SynchronizedThreadLock.h"
 
 #include "common/debuglog.h"
+#include "common/UndoReleaseAction.h"
 #include "common/ExecuteWithMpMemory.h"
 #include "common/executorcontext.hpp"
 #include "common/ThreadLocalPool.h"
