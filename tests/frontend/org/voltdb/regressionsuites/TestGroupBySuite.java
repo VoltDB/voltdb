@@ -46,6 +46,9 @@ import org.voltdb.planner.TestPlansGroupBy;
  */
 
 public class TestGroupBySuite extends RegressionSuite {
+    private static final boolean TEST_NORMAL_TABLES = true;
+    private static final boolean TEST_LARGE_TABLES = false;
+    private static final boolean TEST_HSQL = true;
 
     static final Class<?>[] MP_PROCEDURES = {
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
@@ -800,22 +803,33 @@ public class TestGroupBySuite extends RegressionSuite {
         // config.compile(project);
         // builder.addServerConfig(config);
 
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (TEST_NORMAL_TABLES) {
+            configureTests(builder, project, BackendTarget.NATIVE_EE_JNI, 1, 1, 0);
+            // Cluster.
+            configureTests(builder, project, BackendTarget.NATIVE_EE_JNI, 2, 3, 1);
+        }
+        if (TEST_LARGE_TABLES) {
+            configureTests(builder, project, BackendTarget.NATIVE_EE_LARGE_JNI, 1, 1, 0);
+            // Cluster
+            configureTests(builder, project, BackendTarget.NATIVE_EE_LARGE_JNI, 1, 1, 0);
+        }
+        if (TEST_HSQL) {
+            configureTests(builder, project, BackendTarget.HSQLDB_BACKEND, 1, 1, 0);
+        }
+        return builder;
+    }
+
+    private static void configureTests(MultiConfigSuiteBuilder builder,
+                                       VoltProjectBuilder project,
+                                       BackendTarget jniTarget,
+                                       int hostCount,
+                                       int siteCount,
+                                       int kfactor) {
+        VoltServerConfig config;
+        config = new LocalCluster("plansgroupby-onesite.jar", hostCount, siteCount, kfactor, jniTarget);
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
-        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-
-        return builder;
     }
 
     public class VRowComparator<T> implements Comparator<VoltTableRow>

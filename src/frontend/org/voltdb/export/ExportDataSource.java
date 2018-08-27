@@ -101,16 +101,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile boolean m_closed = false;
     private final StreamBlockQueue m_committedBuffers;
     private Runnable m_onMastership;
+    // m_pollFuture is used for a common case to improve efficiency, export decoder thread creates
+    // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
+    // is assigned to m_pollFuture. When site thread pushes buffer to EDS executor thread, m_pollFuture
+    // is reused to notify export decoder to stop waiting.
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
-    // Set if connector "replicated" property is set to true
-    // Like replicated table, every replicated export stream is its own master.
-    private boolean m_runEveryWhere = false;
     private volatile ListeningExecutorService m_es;
+    // A place to keep unfinished export buffer when processor shuts down.
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
+    // Is EDS from catalog or from disk pdb?
     private volatile boolean m_isInCatalog;
     private volatile boolean m_eos;
     private final Generation m_generation;
@@ -409,8 +412,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof ExportDataSource))
+        if (!(o instanceof ExportDataSource)) {
             return false;
+        }
 
         return compareTo((ExportDataSource)o) == 0;
     }
@@ -648,6 +652,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
+    // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.
     public void setPendingContainer(BBContainer container) {
         Preconditions.checkNotNull(m_pendingContainer.get() != null, "Pending container must be null.");
         m_pendingContainer.set(container);
@@ -855,6 +860,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         m_es.submit(new Runnable() {
+            @Override
             public void run() {
                 Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
                 Mailbox mbx = p.getFirst();
@@ -938,12 +944,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-
-    //Is this a run everywhere source
-    public boolean isRunEveryWhere() {
-        return m_runEveryWhere;
-    }
-
     /**
      * indicate the partition leader has been migrated away
      * prepare to give up the mastership,
@@ -954,6 +954,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
         m_es.submit(new Runnable() {
+            @Override
             public void run() {
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Export table " + getTableName() + " mastership prepare to be demoted for partition " + getPartitionId());
@@ -1065,17 +1066,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug("Export table " + getTableName() + " for partition " + getPartitionId() + " mailbox hsid (" +
                     CoreUtils.hsIdToString(m_ackMailboxRefs.get().getFirst().getHSId()) + ") gave up export mastership");
         }
-        m_onMastership = null;
         m_mastershipAccepted.set(false);
         m_isInCatalog = false;
         m_eos = false;
+        m_pollFuture = null;
 
-        // For case where the previous export processor had only row of the first block to process
-        // and it completed processing it, poll future is not set to null still. Set it to null to
-        // prepare for the new processor polling
-        if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
-            m_pollFuture = null;
-        }
     }
 
     /**
@@ -1103,12 +1098,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Export table " + getTableName() + " accepting mastership for partition " + getPartitionId());
                         }
-                        if (m_onMastership != null) {
-                            if (m_mastershipAccepted.compareAndSet(false, true)) {
-                                // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
-                                m_responseHSIds.clear();
-                                m_onMastership.run();
-                            }
+                        if (m_mastershipAccepted.compareAndSet(false, true)) {
+                            // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
+                            m_responseHSIds.clear();
+                            m_onMastership.run();
                         }
                     }
                 } catch (Exception e) {
@@ -1120,24 +1113,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     /**
      * set the runnable task that is to be executed on mastership designation
+     *
      * @param toBeRunOnMastership a {@link @Runnable} task
+     * @param runEveryWhere       Set if connector "replicated" property is set to true Like replicated table, every
+     *                            replicated export stream is its own master.
      */
-    public void setOnMastership(Runnable toBeRunOnMastership, boolean isRunEveryWhere) {
+    public void setOnMastership(Runnable toBeRunOnMastership, boolean runEveryWhere) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        if (isRunEveryWhere) {
-            acceptMastership();
-        }
+        runEveryWhere(runEveryWhere);
     }
 
     public ExportFormat getExportFormat() {
         return m_format;
     }
 
-    //Set it from client.
-    public void setRunEveryWhere(boolean runEveryWhere) {
-        m_runEveryWhere = runEveryWhere;
-        if (m_runEveryWhere) {
+    /**
+     * @param runEveryWhere Set if connector "replicated" property is set to true Like replicated table, every
+     *                      replicated export stream is its own master.
+     */
+    public void runEveryWhere(boolean runEveryWhere) {
+        if (runEveryWhere) {
             acceptMastership();
         }
     }
@@ -1157,6 +1153,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         if (!m_mastershipAccepted.get()) {
             m_es.execute(new Runnable() {
+                @Override
                 public void run() {
                     // Query export membership if current stream is not the master
                     queryExportMembership();
@@ -1168,6 +1165,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void handleQueryMessage(final long newLeaderHSId) {
         if (m_mastershipAccepted.get()) {
             m_es.execute(new Runnable() {
+                @Override
                 public void run() {
                     m_newLeaderHostId = CoreUtils.getHostIdFromHSId(newLeaderHSId);
                     // memorize end USO of the most recently pushed buffer from EE
@@ -1181,6 +1179,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             });
         } else {
             m_es.execute(new Runnable() {
+                @Override
                 public void run() {
                     sendQueryResponse(newLeaderHSId);
                 }
@@ -1191,6 +1190,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void handleQueryResponse(VoltMessage message) {
         if (!m_mastershipAccepted.get()) {
             m_es.execute(new Runnable() {
+                @Override
                 public void run() {
                     m_responseHSIds.add(message.m_sourceHSId);
                     Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();

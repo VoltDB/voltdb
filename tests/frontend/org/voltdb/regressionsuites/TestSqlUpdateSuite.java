@@ -63,6 +63,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         subtestENG13926();
         subtestUpdateWithSubquery();
         subtestUpdateWithCaseWhen();
+        subtestENG14478();
     }
 
     private void subtestUpdateBasic() throws Exception {
@@ -272,6 +273,12 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         verifyStmtFails(client, "UPDATE ENG_13926 SET C = C - 1;",
                 "Type BIGINT with value -128 can't be cast as TINYINT "
                 + "because the value is out of range for the destination type \'C\'");
+    }
+
+    private void subtestENG14478() throws Exception {
+        Client client = getClient();
+        assertSuccessfulDML(client, "INSERT INTO ENG_14478 VALUES (0, 'abc', 'foo', 'gFbdVtLvw青βяvh', 0.0);");
+        assertSuccessfulDML(client, "UPDATE ENG_14478 SET VCHAR_INLINE_MAX = VCHAR_INLINE;");
     }
 
     //

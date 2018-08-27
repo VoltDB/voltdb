@@ -502,12 +502,12 @@ BinaryLogSink::BinaryLogSink() {}
     int64_t      uniqueId;
     int64_t      sequenceNumber;
     int32_t      partitionHash;
+    int32_t      txnLen;
     bool         isCurrentTxnForReplicatedTable;
     bool         isCurrentRecordForReplicatedTable;
     bool         isForLocalPartition;
-    bool         skipWrongHashRows;
+    bool         skipCurrentRow;
     bool         replicatedTableOperation = false;
-    bool         skipForReplicated = false;
 
     type = static_cast<DRRecordType>(taskInfo->readByte());
     assert(type == DR_RECORD_BEGIN_TXN);
@@ -518,14 +518,24 @@ BinaryLogSink::BinaryLogSink() {}
     isCurrentRecordForReplicatedTable = rawHashFlag & REPLICATED_TABLE_MASK;
     DRTxnPartitionHashFlag hashFlag = static_cast<DRTxnPartitionHashFlag>(rawHashFlag & ~REPLICATED_TABLE_MASK);
     isCurrentTxnForReplicatedTable = hashFlag == TXN_PAR_HASH_REPLICATED;
-    taskInfo->readInt();  // txnLength
+    txnLen = taskInfo->readInt();
     partitionHash = taskInfo->readInt();
     bool isLocalMpTxn = UniqueId::isMpUniqueId(localUniqueId);
     bool isLocalRegularSpTxn = !isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
-    bool isLocalRegularMpTxn = isLocalMpTxn && (hashFlag == TXN_PAR_HASH_SINGLE || hashFlag == TXN_PAR_HASH_MULTI);
+    bool isLocalRegularMpTxn = isLocalMpTxn && !isCurrentTxnForReplicatedTable;
 
+
+    if (isCurrentTxnForReplicatedTable && !engine->isLowestSite()) {
+        // The entire transaction is a replicated table so skip applying on non lowest site
+        taskInfo->getRawPointer(txnLen - (DRTupleStream::BEGIN_RECORD_SIZE + DRTupleStream::END_RECORD_SIZE));
+        type = static_cast<DRRecordType>(taskInfo->readByte());
+        assert(type == DR_RECORD_END_TXN);
+    } else {
+        type = static_cast<DRRecordType>(taskInfo->readByte());
+    }
+
+    assert(hashFlag != TXN_PAR_HASH_PLACEHOLDER || type == DR_RECORD_END_TXN);
     // Read the whole txn since there is only one version number at the beginning
-    type = static_cast<DRRecordType>(taskInfo->readByte());
     while (type != DR_RECORD_END_TXN) {
         // fast path for replicated table change, save calls to VoltDBEngine::isLocalSite()
         if (isCurrentTxnForReplicatedTable || isCurrentRecordForReplicatedTable) {
@@ -533,12 +543,8 @@ BinaryLogSink::BinaryLogSink() {}
             // with NO_REPLICATED_STREAM_PROTOCOL_VERSION, decide replicateTable changes with first bit of rawHashFlag (isCurrentRecordForReplicatedTable)
             // both cases will only operate replicated Table changes on lowest site
             // Coordinates with other sites handled in VoltDBEngine->applyBinaryLog()
-            if (engine->isLowestSite()) {
-                replicatedTableOperation = true;
-            } else {
-                skipForReplicated = true;
-            }
-            skipWrongHashRows = false;
+            skipCurrentRow = !engine->isLowestSite();
+            replicatedTableOperation = true;
         } else {
             isForLocalPartition = engine->isLocalSite(partitionHash);
             // - Remote MP txns are always executed as local MP txns. Skip hashes that don't match for these.
@@ -561,11 +567,11 @@ BinaryLogSink::BinaryLogSink() {}
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
                     "Binary log txns were sent to the wrong partition");
             }
-            skipWrongHashRows = (!isForLocalPartition && isLocalRegularMpTxn);
+            skipCurrentRow = (!isForLocalPartition && isLocalRegularMpTxn);
         }
-        ConditionalExecuteWithMpMemory possiblyUseMpMemory(replicatedTableOperation);
+        ConditionalExecuteWithMpMemory possiblyUseMpMemory(replicatedTableOperation && !skipCurrentRow);
         rowCount += apply(taskInfo, type, tables, pool, engine, remoteClusterId,
-                txnStart, sequenceNumber, uniqueId, skipWrongHashRows || skipForReplicated, replicatedTableOperation);
+                txnStart, sequenceNumber, uniqueId, skipCurrentRow, replicatedTableOperation);
         int8_t rawType = taskInfo->readByte();
         type = static_cast<DRRecordType>(rawType & ~REPLICATED_TABLE_MASK);
         if (type == DR_RECORD_HASH_DELIMITER) {
@@ -783,7 +789,10 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
     case DR_RECORD_TRUNCATE_TABLE: {
         int64_t tableHandle = taskInfo->readLong();
         std::string tableName = taskInfo->readTextString();
-        // ignore the value of skipRow for truncate table record
+        // ignore the value of skipRow for truncate table record unless this is a replicated table
+        if (skipRow && replicatedTableOperation) {
+            break;
+        }
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {

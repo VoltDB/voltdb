@@ -151,7 +151,7 @@ public class LocalCluster extends VoltServerConfig {
     //wait before next node is started up in millisecond
     //to help matching the host id on the real cluster with the host id on the local
     //cluster
-    private long m_deplayBetweenNodeStartupMS = 0;
+    private long m_delayBetweenNodeStartupMS = 0;
     private boolean m_httpPortEnabled = false;
     private final ArrayList<EEProcess> m_eeProcs = new ArrayList<>();
     //This is additional process invironment variables that can be passed.
@@ -410,7 +410,7 @@ public class LocalCluster extends VoltServerConfig {
 
         // if the user wants valgrind and it makes sense, give it to 'em
         // For now only one host works.
-        if (isMemcheckDefined() && (target == BackendTarget.NATIVE_EE_JNI) && m_hostCount == 1) {
+        if (isMemcheckDefined() && target.isValgrindable && m_hostCount == 1) {
             m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
         }
         else {
@@ -504,7 +504,7 @@ public class LocalCluster extends VoltServerConfig {
      * Called after a constructor but before startup.
      */
     public void overrideAnyRequestForValgrind() {
-        if (templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+        if (templateCmdLine.m_backend.isValgrindTarget) {
             m_target = BackendTarget.NATIVE_EE_JNI;
             templateCmdLine.m_backend = BackendTarget.NATIVE_EE_JNI;
         }
@@ -921,9 +921,9 @@ public class LocalCluster extends VoltServerConfig {
 
                 startOne(i, clearLocalDataDirectories, StartAction.CREATE, true, placementGroup);
                 //wait before next one
-                if (m_deplayBetweenNodeStartupMS > 0) {
+                if (m_delayBetweenNodeStartupMS > 0) {
                     try {
-                        Thread.sleep(m_deplayBetweenNodeStartupMS);
+                        Thread.sleep(m_delayBetweenNodeStartupMS);
                     } catch (InterruptedException e) {
                     }
                 }
@@ -1436,9 +1436,9 @@ public class LocalCluster extends VoltServerConfig {
                     initLocalServer(entry.getKey(), true);
                 }
                 startOne(entry.getKey(), true, StartAction.JOIN, false, entry.getValue());
-                if (m_deplayBetweenNodeStartupMS > 0) {
+                if (m_delayBetweenNodeStartupMS > 0) {
                     try {
-                        Thread.sleep(m_deplayBetweenNodeStartupMS);
+                        Thread.sleep(m_delayBetweenNodeStartupMS);
                     } catch (InterruptedException e) {
                     }
                 }
@@ -2359,8 +2359,8 @@ public class LocalCluster extends VoltServerConfig {
         return client;
     }
 
-    public void setDeplayBetweenNodeStartup(long deplayBetweenNodeStartup) {
-        m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
+    public void setDelayBetweenNodeStartup(long delayBetweenNodeStartup) {
+        m_delayBetweenNodeStartupMS = delayBetweenNodeStartup;
     }
 
     // Reset the message match result

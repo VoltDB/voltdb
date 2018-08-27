@@ -731,7 +731,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         try {
-            if (m_backend == BackendTarget.NATIVE_EE_JNI) {
+            // NATIVE_EE_JNI and NATIVE_EE_LARGE_JNI
+            if (m_backend.isDefaultJNITarget) {
                 eeTemp =
                     new ExecutionEngineJNI(
                         m_context.cluster.getRelativeIndex(),
@@ -765,7 +766,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         exportFlushTimeout);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
-            else {
+            else if (m_backend.isIPC) {
                 // set up the EE over IPC
                 eeTemp =
                     new ExecutionEngineIPC(
@@ -783,6 +784,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             hashinatorConfig,
                             m_isLowestSiteId,
                             exportFlushTimeout);
+            }
+            else {
+                /* This seems very bad. */
+                throw new VoltAbortException(
+                        String.format("Unexpected BackendTarget value %s", m_backend)
+                );
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializedCatalog);
             eeTemp.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
