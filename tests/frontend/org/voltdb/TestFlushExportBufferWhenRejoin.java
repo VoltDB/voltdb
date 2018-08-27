@@ -25,6 +25,7 @@ package org.voltdb;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import org.voltcore.logging.VoltLogger;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -38,7 +39,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,11 +46,9 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.Test;
-import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -74,13 +72,11 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
     private Map<Integer, TopoMapEntry> m_topoMap = new HashMap<Integer, TopoMapEntry>();
     private static final String SCHEMA =
             "CREATE STREAM t partition on column a (a integer not null, b integer not null);";
-    
-    //private static final String table_schema = "Create Table tt (a integer not null, b integer not null);" + "Partition table tt on column a;";
     private static int m_portCount = 5001;
     private static LocalCluster cluster = null;
     private static VoltProjectBuilder project = null;
-    private static Set<String> set = new HashSet<>();
-    
+    private static Set<String> set = null;
+
     public TestFlushEEBufferWhenExport(String name) {
         super(name);
     }
@@ -100,149 +96,93 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
     }
 
     @Test
-    public void testFlushEEBuffer() throws Exception {
+    public void testFlushEEBufferWithOutQuiesce() throws Exception {
         VoltFile.resetSubrootForThisProcess();
         Client client = null;
+        set = new HashSet<>();
         try {
-            //Map<String, String> additionalEnv = new HashMap<String, String>();
-            //VoltProjectBuilder builder = new VoltProjectBuilder();
- 
-            //builder.addLiteralSchema(SCHEMA);
-
-            //cluster.setDeplayBetweenNodeStartup(1000);
-
-            //builder.addPartitionInfo("P_TABLE", "a");										// what is this
-            //builder.addLiteralSchema(PROCEDURES);											// table (int a, int b)
-            //cluster.setCallingMethodName("testNewLeaderHostDown");							// what is this?
-            //builder.configureLogging(null, null, true, true, 200, Integer.MAX_VALUE, 300);
-            // should be consistent with host number ????
-            //builder.setSnapshotSettings( "1s", 2, "/tmp/snapshotdir1", "foo1");
-
-            //builder.setPartitionDetectionEnabled(true);
-            
-
             // config the export settings
             wireupExportTableToSocketExport("t");
 
-            // bind socket listener to system
-            
-        	//cluster.shutDown();
-            //cluster.startUp();		// a lot of things going on
-            System.out.println("The cluster starts up and host count is: " + cluster.getNodeCount());
-            
             ClientConfig config = new ClientConfig();
             config.setClientAffinity(true);
             config.setTopologyChangeAware(true);
             config.setConnectionResponseTimeout(4*60*1000);
             config.setProcedureCallTimeout(4*60*1000);
             client = ClientFactory.createClient(config);
-            //System.out.println("The port is: " + cluster.port(0));
             client.createConnection("", cluster.port(0));
 
             // create a table to enable rejoin
             client.callProcedure("@AdHoc", "create table test (a int);");
             client.callProcedure("@AdHoc", "insert into test values(1)");
-            
-            VoltTable[] results = client.callProcedure("@GetPartitionKeys", "Integer").getResults();
-			VoltTable keys = results[0];
-			for (int k=0;k<keys.getRowCount();k++) {
-			    long key = keys.fetchRow(k).getLong(1);
-			    System.out.println("The partition key is: " + key);
-			}
-            
+
             loadTopologyMap(client);
             cluster.killSingleHost(1);
             VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
             System.out.println("TOPO after kill:");
             System.out.println(vt.toFormattedString());
-            int pid = 1, rid = 0;	// partition id, random offset
+            int pid = 1, rid = 0;    // partition id, random offset
             HostSiteId newLeader = findNewLeader(pid, rid);
             assertEquals(newLeader.m_hostId, 0);
             assertEquals(newLeader.m_siteId, 1);
-            
+
             Thread insertThread = new Thread(new Runnable() {
-            	public void run() {
-            		System.out.println("we started the insert");
-            		Client client2 = ClientFactory.createClient(config);
+                public void run() {
+                    Client client2 = ClientFactory.createClient(config);
                     try {
-                    	Thread.sleep(2000);
-            		    client2.createConnection("", cluster.port(0));
-            		    Long t1 = System.currentTimeMillis();
-            		    for (int i=0; i < 20; i++) {
+                        client2.createConnection("", cluster.port(0));
+                        for (int i=0; i < 80; i++) {
+                            Thread.sleep(80);
                             //add data to stream table
-            		    	Thread.sleep(150);
-            		    	System.out.println("**********************We are doing " + i + "th insertion **********************");
-							client2.callProcedure("@AdHoc", "insert into t values(" + i + ", 1)");
-							if ((i+1) == 1) {
-								//VoltTable vt_tb = client2.callProcedure("@Statistics", "Table").getResults()[0];
-								//System.out.println(vt_tb.toFormattedString());
-							}
+                            client2.callProcedure("@AdHoc", "insert into t values(" + i + ", 1)");
                         }
-            		    System.out.println("we finished the insert");
-            		    Long t2 = System.currentTimeMillis();
-            		    System.out.println("The total time for insertion work is " + (t2-t1) + " milliseconds");
-                        //m_clients.get(0).stopClient();
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-            	}
-            }); 
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
 
             Thread rejoinThread = new Thread(new Runnable() {
-            	public void run() {
-            		Long t1 = System.currentTimeMillis();
-                    System.out.println("we started the rejoin");
-                    cluster.rejoinOne(1);
-        		    Long t2 = System.currentTimeMillis();
-        		    System.out.println("The total time for rejoin work is " + (t2-t1) + " milliseconds");
-            	}
-            });		
+                public void run() {
+                    try {
+                        Thread.sleep(50);
+                        cluster.rejoinOne(1);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
             insertThread.start();
             rejoinThread.start();
 
-            
-            //client.drain();
-            //client.callProcedure("@Quiesce");
-            //System.out.println("Called Quiesce");
-            
-            //TopoMapEntry entry = m_topoMap.get(pid);
-            //client.callProcedure(new NullCallback(),"TestMigratePartitionLeader$MigratePartitionLeaderNewLeaderFailureProc",
-            //        entry.m_partitionKey, pid, newLeader.m_hostId);
-            //Thread.sleep(1000);
-            //cluster.rejoinOne(1);
-            //System.out.println("Join finished");
-            Thread.sleep(5000);
+            Thread.sleep(6000);
             vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
             System.out.println("TOPO in the end:");
             System.out.println(vt.toFormattedString());
+            client.callProcedure("@Quisce");
+            assertTrue(set.size() == 80);
+
             vt.resetRowPosition();
             while(vt.advanceRow()) {
                 if (vt.getLong(0) == pid) {
                     break;
                 }
             }
-            String leaderStr = vt.getString(2).trim();
-            HostSiteId oldLeader = findNewLeader(pid, 0);
-            assertTrue(leaderStr.equals(oldLeader.toString()));
-            //verify the new host gets the message of clearing up the status
-            //assertTrue(cluster.verifyLogMessage(0, RESET_SPI_STATUS_MSG));
         } catch (Exception e){
-        	//e.printStackTrace();
         } finally {
-        	if (m_clients.size() > 0) m_clients.get(0).stopClient();
-        	m_serverSocket.close();
-        	m_clients.clear();
+            if (m_clients.size() > 0) m_clients.get(0).stopClient();
+            m_serverSocket.close();
+            m_clients.clear();
             cleanup(client, cluster);
         }
     }
-    
+
     public static void wireupExportTableToSocketExport(String tableName) {
         String streamName = tableName;
         Map<String, Integer> m_portForTable = new HashMap<String, Integer>();
         if (!m_portForTable.containsKey(streamName)) {
             m_portForTable.put(streamName, getNextPort());
         }
-        System.out.println("The binded port for stream table is: " + m_portForTable.get(streamName));
         Properties props = new Properties();
         boolean m_isExportReplicated = false;
         props.put("replicated", String.valueOf(m_isExportReplicated));
@@ -251,11 +191,11 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
         props.put("timezone", "GMT");
         project.addExport(true /* enabled */, "custom", props, streamName);
     }
-    
+
     private static Integer getNextPort() {
         return m_portCount++;
     }
-    
+
     private void loadTopologyMap(Client client) throws IOException, ProcCallException {
         m_topoMap.clear();
         VoltTable vt = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults()[0];
@@ -291,7 +231,7 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
         System.out.println("TOPO before:");
         System.out.println(vt1.toFormattedString());
     }
-    
+
     private void cleanup(Client client, LocalCluster cluster) {
         if ( client != null) {
             try {
@@ -310,7 +250,6 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
     }
 
     static public junit.framework.Test suite() throws Exception {
-
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestFlushEEBufferWhenExport.class);
         Map<String, String> additionalEnv = new HashMap<String, String>();
 
@@ -320,8 +259,6 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
 
         project = new VoltProjectBuilder();
         project.addLiteralSchema(SCHEMA);
-        //project.addSchema(ArbitraryDurationProc.class.getResource("clientfeatures.sql"));
-        //project.addProcedure(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
         project.setPartitionDetectionEnabled(true);
 
@@ -336,17 +273,17 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
         cluster.setNewCli(true);
         project.setDeadHostTimeout(4);
         cluster.setDeplayBetweenNodeStartup(1000);
-        cluster.setCallingMethodName("testJoinAndKill");	
+        cluster.setCallingMethodName("testJoinAndKill");
         cluster.overrideAnyRequestForValgrind();
         // Make sure to disable this STUPID CRAZY hasLocalServer() option
         cluster.setHasLocalServer(false);
-        cluster.setJavaProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false");
+        cluster.setJavaProperty("DISABLE_MIGRATE_PARTITION_LEADER", "true");
         boolean compile = cluster.compile(project);
         assertTrue(compile);
         builder.addServerConfig(cluster);
         return builder;
     }
-    
+
     class ServerListener extends Thread {
         private ServerSocket ssocket;
         private boolean shuttingDown = false;
@@ -367,17 +304,14 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
 
         @Override
         public void run() {
-        	System.out.println("****************************Are we running this?****************************");
             while (!shuttingDown) {
                 try {
-                	System.out.println("****************************We try accept client socket****************************");
                     Socket clientSocket = ssocket.accept();
-                	System.out.println("****************************We have accepted a client socket****************************");
                     ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket);
                     m_clients.add(ch);
                     ch.start();
                 } catch (IOException ex) {
-                	ex.printStackTrace();
+                    ex.printStackTrace();
                     break;
                 }
             }
@@ -390,7 +324,6 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
         final CSVParser m_parser = new CSVParser();
         public ClientConnectionHandler(Socket clientSocket) {
             m_clientSocket = clientSocket;
-            System.out.println("****************************We have a client socket****************************");
         }
 
         @Override
@@ -399,19 +332,14 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
                 while (true) {
                     BufferedReader in = new BufferedReader(
                             new InputStreamReader(m_clientSocket.getInputStream()));
-                    //List<String> list = new ArrayList<>();
                     while (true) {
                         String line = in.readLine();
                         //You should convert your data to params here.
                         if (line == null && m_closed) {
                             break;
                         }
-                        //print out line
                         if (line != null) {
-                        	//list.add(line);
-                        	set.add(line);
-                        	System.out.println(line);
-                        	System.out.println("Now the list length is " + set.size());
+                            set.add(line);
                         }
                         String parts[] = m_parser.parseLine(line);
                         if (parts == null) {
@@ -424,18 +352,17 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
                             }
                         }
                     }
-                    //System.out.println("Socket have read " + list.size() + " lines");
                     m_clientSocket.close();
                 }
             } catch (IOException ioe) {
-            } 
+            }
         }
 
         public void stopClient() {
             m_closed = true;
         }
     }
-    
+
     private HostSiteId findNewLeader(int pid, int randomOffset) {
         return m_topoMap.get(pid).m_hsIds.get(randomOffset);
     }
@@ -445,7 +372,7 @@ public class TestFlushEEBufferWhenExport extends TestExportBase
         ArrayList<HostSiteId> m_hsIds = new ArrayList<>();
         HostSiteId m_hsLeader;
     }
-    
+
     private static class HostSiteId implements Comparable<HostSiteId> {
         int m_hostId;
         int m_siteId;
