@@ -17,11 +17,7 @@
 
 package org.voltdb;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
@@ -1524,6 +1520,29 @@ public class VoltDB {
             threadDumps.append(t);
         }
         return threadDumps.toString();
+    }
+
+    public static boolean dumpThreadTraceToFile(String dumpDir, String fileName) {
+        final File dir = new File(dumpDir);
+        if (!dir.getParentFile().canWrite() || !dir.getParentFile().canExecute()) {
+            System.err.println("Parent directory " + dir.getParentFile().getAbsolutePath() +
+                    " is not writable");
+            return false;
+        }
+        if (!dir.exists()) {
+            if (!dir.mkdir()) {
+                System.err.println("Failed to create directory " + dir.getAbsolutePath());
+                return false;
+            }
+        }
+        File file = new File(dumpDir, fileName);
+        try (FileWriter writer = new FileWriter(file); PrintWriter out = new PrintWriter(writer)) {
+            out.println(generateThreadDump());
+        } catch (IOException e) {
+            System.err.println("Failed to write to file " + file.getAbsolutePath());
+            return false;
+        }
+        return true;
     }
 
     private static VoltDB.Configuration m_config = new VoltDB.Configuration();

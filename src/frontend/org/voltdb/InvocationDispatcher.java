@@ -648,21 +648,27 @@ public final class InvocationDispatcher {
                     task.clientHandle);
         }
 
+        boolean success = true;
         if (ihid < 0) { // all hosts
             //collect thread dumps
-            String threadDump = VoltDB.generateThreadDump();
-            System.err.println("Taking Thread Dump for Host Id:" + hostMessenger.getHostId());
-            System.err.println(threadDump);
+            String dumpDir = new File(VoltDB.instance().getVoltDBRootPath(), "thread_dumps").getAbsolutePath();
+            String fileName =  hostMessenger.getHostname() + "_host-" + hostMessenger.getHostId() + "_" + System.currentTimeMillis()+".jstack";
+            success = VoltDB.dumpThreadTraceToFile(dumpDir, fileName );
             hostMessenger.sendPoisonPill(liveHids, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
         } else if (ihid == hostMessenger.getHostId()) { // only local
             //collect thread dumps
-            String threadDump = VoltDB.generateThreadDump();
-            System.err.println("Taking Thread Dump for Host Id:" + hostMessenger.getHostId());
-            System.err.println(threadDump);
+            String dumpDir = new File(VoltDB.instance().getVoltDBRootPath(), "thread_dumps").getAbsolutePath();
+            String fileName =  hostMessenger.getHostname() + "_host-" + hostMessenger.getHostId() + "_" + System.currentTimeMillis()+".jstack";
+            success = VoltDB.dumpThreadTraceToFile(dumpDir, fileName );
         } else { // only remote
             hostMessenger.sendPoisonPill(ihid, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
         }
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+        if (success) {
+            return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+        }
+        return gracefulFailureResponse(
+                "Failed to create the thread dump of localhost.",
+                task.clientHandle);
     }
 
     private final ClientResponseImpl dispatchSubscribe(InvocationClientHandler handler, StoredProcedureInvocation task) {

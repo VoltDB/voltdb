@@ -17,6 +17,7 @@
 
 package org.voltcore.messaging;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
@@ -379,9 +380,9 @@ public class ForeignHost {
                 org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
             } else if (cause == ForeignHost.PRINT_STACKTRACE) {
                 //collect thread dumps
-                String threadDump = VoltDB.generateThreadDump();
-                System.err.println("Taking Thread Dump for Host Id" + m_hostId);
-                System.err.println(threadDump);
+                String dumpDir = new File(VoltDB.instance().getVoltDBRootPath(), "thread_dumps").getAbsolutePath();
+                String fileName =  m_hostMessenger.getHostname() + "_host-" + m_hostId + "_" + System.currentTimeMillis()+".jstack";
+                VoltDB.dumpThreadTraceToFile(dumpDir, fileName );
             } else {
                 //Should never come here.
                 hostLog.error("Invalid Cause in poison pill: " + cause);
