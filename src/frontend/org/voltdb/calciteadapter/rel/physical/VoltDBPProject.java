@@ -18,6 +18,7 @@
 package org.voltdb.calciteadapter.rel.physical;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -34,8 +35,6 @@ import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
-
-import com.google.common.base.Supplier;
 
 public class VoltDBPProject extends Project implements VoltDBPRel {
 
