@@ -17,30 +17,3 @@
 
 #include <common/UndoLog.h>
 
-namespace voltdb {
-
-UndoLog::UndoLog()
-  : m_lastUndoToken(INT64_MIN), m_lastReleaseToken(INT64_MIN), m_undoLogForLowestSite(false)
-{
-}
-
-void UndoLog::clear()
-{
-    if (m_undoQuantums.size() > 0) {
-        release(m_lastUndoToken);
-    }
-    for (std::vector<Pool*>::iterator i = m_undoDataPools.begin();
-         i != m_undoDataPools.end();
-         i++) {
-        delete *i;
-    }
-    m_undoDataPools.clear();
-    m_undoQuantums.clear();
-}
-
-UndoLog::~UndoLog()
-{
-    clear();
-}
-
-}

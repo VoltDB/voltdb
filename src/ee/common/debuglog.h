@@ -58,6 +58,7 @@
 #include <ctime>
 #include <cstdio>
 #include <vector>
+
 namespace voltdb {
 
 // Log levels.

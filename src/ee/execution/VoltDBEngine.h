@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VOLTDBENGINE_H
-#define VOLTDBENGINE_H
+#pragma once
 
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
@@ -424,21 +423,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         LogManager* getLogManager() { return &m_logManager; }
 
-        void setUndoToken(int64_t nextUndoToken) {
-            if (nextUndoToken == INT64_MAX) {
-                return;
-            }
-
-            if (m_currentUndoQuantum != NULL) {
-                if (m_currentUndoQuantum->getUndoToken() == nextUndoToken) {
-                    return;
-                }
-
-                assert(nextUndoToken > m_currentUndoQuantum->getUndoToken());
-            }
-            setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
-        }
-
         void releaseUndoToken(int64_t undoToken, bool isEmptyDRTxn);
 
         void undoUndoToken(int64_t undoToken);
@@ -536,6 +520,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int32_t getPartitionId() const { return m_partitionId; }
 
         void setViewsEnabled(const std::string& viewNames, bool value);
+        void setUndoToken(int64_t nextUndoToken) {
+            if (nextUndoToken == INT64_MAX) {     // TODO: what should be the correct behavior in case of overflow?
+                return;   // Hopefully the memory will never be sufficient to hold all UndoQuantums before we can reach that.
+            } else if (m_currentUndoQuantum != nullptr && m_currentUndoQuantum->getUndoToken() == nextUndoToken) {
+               return;
+            } else {
+               assert(m_currentUndoQuantum == nullptr || nextUndoToken > m_currentUndoQuantum->getUndoToken());
+               setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
+            }
+        }
 
     protected:
         void setHashinator(TheHashinator* hashinator);
@@ -811,4 +805,3 @@ inline bool startsWith(const string& s1, const string& s2) {
 
 } // namespace voltdb
 
-#endif // VOLTDBENGINE_H

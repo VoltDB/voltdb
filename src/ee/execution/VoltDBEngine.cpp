@@ -417,7 +417,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 {
     // count failures
     int failures = 0;
-
+    fprintf(stderr, "Set undo token %lu in executePlanFragments\n", undoToken);
     setUndoToken(undoToken);
 
     // configure the execution context.
@@ -1569,6 +1569,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     //The spHandle and lastCommittedSpHandle aren't really used in load table
     //since their only purpose as of writing this (1/2013) they are only used
     //for export data and we don't technically support loading into an export table
+   fputs("H2\n", stderr);
     setUndoToken(undoToken);
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,
@@ -2316,6 +2317,7 @@ bool VoltDBEngine::activateTableStream(
         assert(table != NULL);
         return false;
     }
+    fputs("h3\n", stderr);
     setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
@@ -2621,6 +2623,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int64_t undoToken,
                                   const char *log) {
     DRTupleStreamDisableGuard guard(m_executorContext, !m_isActiveActiveDREnabled);
+    fputs("h4\n", stderr);
     setUndoToken(undoToken);
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,
@@ -2654,6 +2657,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &taskInfo) {
+   fputs("Entry\n", stderr);
     switch (taskType) {
     case TASK_TYPE_VALIDATE_PARTITIONING:
         dispatchValidatePartitioningTask(taskInfo);
@@ -2700,6 +2704,7 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         int64_t undoToken = taskInfo.readLong();
         ByteArray payloads = taskInfo.readBinaryString();
 
+        fprintf(stderr, "Set undo token %lu\n", undoToken);
         setUndoToken(undoToken);
         m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(), txnId,
                 spHandle, lastCommittedSpHandle, uniqueId, false);

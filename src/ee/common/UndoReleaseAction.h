@@ -16,10 +16,9 @@
  */
 
 
-#ifndef UNDORELEASEACTION_H_
-#define UNDORELEASEACTION_H_
-
+#pragma once
 #include <cstdlib>
+#include "SynchronizedThreadLock.h"
 
 namespace voltdb {
 class UndoQuantum;
@@ -29,6 +28,11 @@ class UndoQuantum;
  * Always memory-managed by and registered with an undo quantum.
  */
 class UndoReleaseAction {
+protected:
+   static void countDown() {
+      assert(!SynchronizedThreadLock::isInSingleThreadMode());
+      SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+   }
 public:
     void* operator new(std::size_t sz, UndoQuantum& uq); // defined inline in UndoQuantum.h
     void operator delete(void*, UndoQuantum&) { /* emergency deallocator does nothing */ }
@@ -122,26 +126,31 @@ public:
     SynchronizedDummyUndoReleaseAction() { }
     virtual ~SynchronizedDummyUndoReleaseAction() { }
 
-    void undo();
+    void undo() {
+       countDown();
+    }
 
-    void release();
+    void release() {
+       countDown();
+    }
 };
 
 class SynchronizedDummyUndoOnlyAction : public UndoOnlyAction {
 public:
     SynchronizedDummyUndoOnlyAction() { }
     virtual ~SynchronizedDummyUndoOnlyAction() { }
-
-    void undo();
+    void undo() {
+       countDown();
+    }
 };
 
 class SynchronizedDummyReleaseOnlyAction : public ReleaseOnlyAction {
 public:
     SynchronizedDummyReleaseOnlyAction() { }
     virtual ~SynchronizedDummyReleaseOnlyAction() { }
-
-    void release();
+    void release() {
+       countDown();
+    }
 };
 
 }
-#endif /* UNDORELEASEACTION_H_ */

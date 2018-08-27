@@ -15,14 +15,14 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef POOL_HPP_
-#define POOL_HPP_
+#pragma once
 #include <vector>
 #include <iostream>
 #include <stdint.h>
 #include <sys/mman.h>
 #include <errno.h>
 #include <climits>
+#include <numeric>
 #include <string.h>
 #include "common/FatalException.hpp"
 
@@ -264,15 +264,11 @@ public:
         }
     }
 
-    int64_t getAllocatedMemory()
+    int64_t getAllocatedMemory() const
     {
-        int64_t total = 0;
-        total += m_chunks.size() * m_allocationSize;
-        for (int i = 0; i < m_oversizeChunks.size(); i++)
-        {
-            total += m_oversizeChunks[i].getSize();
-        }
-        return total;
+       return std::accumulate(m_oversizeChunks.cbegin(), m_oversizeChunks.cend(),
+             m_chunks.size() * m_allocationSize,
+             [](int64_t acc, Chunk const& cur) { return acc + cur.getSize(); });
     }
 
 private:
@@ -347,4 +343,3 @@ private:
 };
 #endif
 }
-#endif /* POOL_HPP_ */

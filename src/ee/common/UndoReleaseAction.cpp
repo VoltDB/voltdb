@@ -17,95 +17,72 @@
 
 #include "UndoReleaseAction.h"
 #include "UndoQuantum.h"
-#include "SynchronizedThreadLock.h"
 #include "ExecuteWithMpMemory.h"
 
-namespace voltdb {
+using namespace voltdb;
 
 void SynchronizedUndoReleaseAction::undo() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-    {
-        ExecuteWithMpMemory usingMpMemory;
-        m_realAction->undo();
-    }
-    SynchronizedThreadLock::signalLowestSiteFinished();
+   assert(!SynchronizedThreadLock::isInSingleThreadMode());
+   SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+   {    // NOTE: DO NOT remove these brackets. Doing so will faile EECheck.DRBinaryLog_test.
+      ExecuteWithMpMemory usingMpMemory;
+      m_realAction->undo();
+   }
+   SynchronizedThreadLock::signalLowestSiteFinished();
 }
 
 void SynchronizedUndoReleaseAction::release() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-    {
-        ExecuteWithMpMemory usingMpMemory;
-        m_realAction->release();
-    }
-    SynchronizedThreadLock::signalLowestSiteFinished();
+   assert(!SynchronizedThreadLock::isInSingleThreadMode());
+   SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+   {
+      ExecuteWithMpMemory usingMpMemory;
+      m_realAction->release();
+   }
+   SynchronizedThreadLock::signalLowestSiteFinished();
 }
 
 void SynchronizedUndoOnlyAction::undo() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-    {
-        ExecuteWithMpMemory usingMpMemory;
-        m_realAction->undo();
-    }
-    SynchronizedThreadLock::signalLowestSiteFinished();
+   assert(!SynchronizedThreadLock::isInSingleThreadMode());
+   SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+   {
+      ExecuteWithMpMemory usingMpMemory;
+      m_realAction->undo();
+   }
+   SynchronizedThreadLock::signalLowestSiteFinished();
 
 }
 
 void SynchronizedReleaseOnlyAction::release() {
-    assert (!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
-    {
-        ExecuteWithMpMemory usingMpMemory;
-        m_realAction->release();
-    }
-    SynchronizedThreadLock::signalLowestSiteFinished();
-}
-
-void SynchronizedDummyUndoReleaseAction::undo() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-
-}
-
-void SynchronizedDummyUndoReleaseAction::release() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-}
-
-void SynchronizedDummyUndoOnlyAction::undo() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
-}
-
-void SynchronizedDummyReleaseOnlyAction::release() {
-    assert(!SynchronizedThreadLock::isInSingleThreadMode());
-    SynchronizedThreadLock::countDownGlobalTxnStartCount(false);
+   assert(!SynchronizedThreadLock::isInSingleThreadMode());
+   SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
+   {
+      ExecuteWithMpMemory usingMpMemory;
+      m_realAction->release();
+   }
+   SynchronizedThreadLock::signalLowestSiteFinished();
 }
 
 UndoReleaseAction* UndoReleaseAction::getSynchronizedUndoAction(UndoQuantum* currUQ) {
-    return (new (*currUQ) SynchronizedUndoReleaseAction(this));
+   return (new (*currUQ) SynchronizedUndoReleaseAction(this));
 }
 
 UndoReleaseAction* UndoReleaseAction::getDummySynchronizedUndoAction(UndoQuantum* currUQ) {
-    return (new (*currUQ) SynchronizedDummyUndoReleaseAction());
+   return (new (*currUQ) SynchronizedDummyUndoReleaseAction());
 }
 
 UndoReleaseAction* UndoOnlyAction::getSynchronizedUndoAction(UndoQuantum* currUQ) {
-    return (new (*currUQ) SynchronizedUndoOnlyAction(this));
+   return (new (*currUQ) SynchronizedUndoOnlyAction(this));
 }
 
 UndoReleaseAction* UndoOnlyAction::getDummySynchronizedUndoAction(UndoQuantum* currUQ) {
-    return (new (*currUQ) SynchronizedDummyUndoOnlyAction());
+   return (new (*currUQ) SynchronizedDummyUndoOnlyAction());
 }
 
 UndoReleaseAction* ReleaseOnlyAction::getSynchronizedUndoAction(UndoQuantum* currUQ) {
-    return (new (*currUQ) SynchronizedReleaseOnlyAction(this));
+   return (new (*currUQ) SynchronizedReleaseOnlyAction(this));
 }
 
 UndoReleaseAction* ReleaseOnlyAction::getDummySynchronizedUndoAction(UndoQuantum* currUQ) {
-    return (new (*currUQ) SynchronizedDummyReleaseOnlyAction());
+   return (new (*currUQ) SynchronizedDummyReleaseOnlyAction());
 }
 
-}

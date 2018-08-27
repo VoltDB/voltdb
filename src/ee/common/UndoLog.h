@@ -15,39 +15,81 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef UNDOLOG_H_
-#define UNDOLOG_H_
+#pragma once
 
 #include <vector>
 #include <deque>
-#include <stdint.h>
+#include <numeric>
+#include <cstdint>
 #include <iostream>
 #include <cassert>
+#include <chrono> // For measuring the execution time of each fragment.
 
 #include "common/Pool.hpp"
 #include "common/UndoQuantum.h"
 
-namespace voltdb
-{
-    static const size_t MAX_CACHED_POOLS = 192;
-
+namespace voltdb {
     class UndoLog
     {
+       static const size_t MAX_CACHED_POOLS = 192;
+        // These two values serve no real purpose except to provide
+        // the capability to assert various properties about the undo tokens
+        // handed to the UndoLog.  Currently, this makes the following
+        // assumptions about how the Java side is managing undo tokens:
+        //
+        // 1. Java is generating monotonically increasing undo tokens.
+        // There may be gaps, but every new token to generateUndoQuantum is
+        // larger than every other token previously seen by generateUndoQuantum
+        //
+        // 2. Right now, the ExecutionSite _always_ releases the
+        // largest token generated during a transaction at the end of the
+        // transaction, even if the entire transaction was rolled back.  This
+        // means that release may get called even if there are no undo quanta
+        // present.
+
+        // m_lastUndoToken is the largest token that could possibly be called
+        // for real undo; any larger token is either undone or has
+        // never existed
+        int64_t m_lastUndoToken = INT64_MIN;
+
+        // m_lastReleaseToken is the largest token that definitely
+        // doesn't exist; any smaller value has already been released,
+        // any larger value might exist (gaps are possible)
+        int64_t m_lastReleaseToken = INT64_MIN;
+
+        bool m_undoLogForLowestSite = false;
+        std::vector<Pool*> m_undoDataPools;
+        std::deque<UndoQuantum*> m_undoQuantums;
     public:
-        UndoLog();
-        virtual ~UndoLog();
+        virtual ~UndoLog() {
+           clear();
+        }
         /**
          * Clean up all outstanding state in the UndoLog.  Essentially
          * contains all the work that should be performed by the
          * destructor.  Needed to work around a memory-free ordering
          * issue in VoltDBEngine's destructor.
          */
-        void clear();
+        void clear() throw() {
+           if (!m_undoQuantums.empty()) {
+              release(m_lastUndoToken);
+           }
+           std::for_each(m_undoDataPools.begin(), m_undoDataPools.end(), [](Pool* i) {delete i;});
+           m_undoDataPools.clear();
+           m_undoQuantums.clear();
+        }
 
-        inline void setUndoLogForLowestSite() { m_undoLogForLowestSite = true; }
+        void setUndoLogForLowestSite() { m_undoLogForLowestSite = true; }
 
-        inline UndoQuantum* generateUndoQuantum(int64_t nextUndoToken)
-        {
+        /**
+         * Retrieve the last undo quantum that caller can change.
+         */
+        UndoQuantum*& getLastUndoQuantum() {
+           assert(! m_undoQuantums.empty());
+           return m_undoQuantums.back();
+        }
+
+        UndoQuantum* generateUndoQuantum(int64_t nextUndoToken) {
             //std::cout << "Generating token " << nextUndoToken
             //          << " lastUndo: " << m_lastUndoToken
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
@@ -58,7 +100,7 @@ namespace voltdb
             assert(nextUndoToken > m_lastReleaseToken);
             m_lastUndoToken = nextUndoToken;
             Pool *pool = NULL;
-            if (m_undoDataPools.size() == 0) {
+            if (m_undoDataPools.empty()) {
                 pool = new Pool(TEMP_POOL_CHUNK_SIZE, 1);
             } else {
                 pool = m_undoDataPools.back();
@@ -74,7 +116,7 @@ namespace voltdb
          * Undo all undoable actions from the latest undo quantum back
          * until the undo quantum with the specified undo token.
          */
-        inline void undo(const int64_t undoToken) {
+        void undo(const int64_t undoToken) {
             //std::cout << "Undoing token " << undoToken
             //          << " lastUndo: " << m_lastUndoToken
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
@@ -98,30 +140,27 @@ namespace voltdb
                 // in user java code before executing any SQL.  Just
                 // return. There is no work to do here.
                 return;
-            }
-
-            m_lastUndoToken = undoToken - 1;
-            while (m_undoQuantums.size() > 0) {
-                UndoQuantum *undoQuantum = m_undoQuantums.back();
-                const int64_t undoQuantumToken = undoQuantum->getUndoToken();
-                if (undoQuantumToken < undoToken) {
-                    return;
-                }
-
-                m_undoQuantums.pop_back();
-                // Destroy the quantum, but possibly retain its pool for reuse.
-                Pool *pool = undoQuantum->undo();
-                pool->purge();
-                if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
-                    m_undoDataPools.push_back(pool);
-                }
-                else {
-                    delete pool; pool = NULL;
-                }
-
-                if(undoQuantumToken == undoToken) {
-                    return;
-                }
+            } else {
+               m_lastUndoToken = undoToken - 1;
+               while (! m_undoQuantums.empty()) {
+                  UndoQuantum *undoQuantum = m_undoQuantums.back();
+                  const int64_t undoQuantumToken = undoQuantum->getUndoToken();
+                  if (undoQuantumToken < undoToken) {
+                     break;
+                  }
+                  m_undoQuantums.pop_back();
+                  // Destroy the quantum, but possibly retain its pool for reuse.
+                  Pool *pool = undoQuantum->undo();
+                  pool->purge();
+                  if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
+                     m_undoDataPools.push_back(pool);
+                  } else {
+                     delete pool;
+                  }
+                  if(undoQuantumToken == undoToken) {
+                     break;
+                  }
+               }
             }
         }
 
@@ -130,17 +169,18 @@ namespace voltdb
          * including the quantum with the specified token. It will be
          * impossible to undo these actions in the future.
          */
-        inline void release(const int64_t undoToken) {
+        void release(const int64_t undoToken) {
             //std::cout << "Releasing token " << undoToken
             //          << " lastUndo: " << m_lastUndoToken
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             assert(m_lastReleaseToken < undoToken);
+            auto const startTime = std::chrono::high_resolution_clock::now();
             m_lastReleaseToken = undoToken;
-            while (m_undoQuantums.size() > 0) {
+            while (! m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.front();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
                 if (undoQuantumToken > undoToken) {
-                    return;
+                   goto CLEAN;
                 }
 
                 m_undoQuantums.pop_front();
@@ -149,59 +189,27 @@ namespace voltdb
                 pool->purge();
                 if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
                     m_undoDataPools.push_back(pool);
-                }
-                else {
+                } else {
                     delete pool; pool = NULL;
                 }
                 if(undoQuantumToken == undoToken) {
-                    return;
+                   goto CLEAN;
                 }
             }
+CLEAN:
+               fprintf(stderr, "%ld us\n",
+                     std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - startTime)
+                     .count()/1000);
         }
 
-        int64_t getSize() const
-        {
-            int64_t total = 0;
-            for (int i = 0; i < m_undoDataPools.size(); i++)
-            {
-                total += m_undoDataPools[i]->getAllocatedMemory();
-            }
-            for (int i = 0; i < m_undoQuantums.size(); i++)
-            {
-                total += m_undoQuantums[i]->getAllocatedMemory();
-            }
-            return total;
+        int64_t getSize() const {
+            return
+               std::accumulate(m_undoDataPools.cbegin(), m_undoDataPools.cend(), 0lu,
+                  [](size_t acc, Pool const* cur){ return acc + cur->getAllocatedMemory(); }) +
+               std::accumulate(m_undoQuantums.cbegin(), m_undoQuantums.cend(), 0lu,
+                     [](size_t acc, UndoQuantum const* cur) { return acc + cur->getAllocatedMemory(); });
         }
 
-    private:
-        // These two values serve no real purpose except to provide
-        // the capability to assert various properties about the undo tokens
-        // handed to the UndoLog.  Currently, this makes the following
-        // assumptions about how the Java side is managing undo tokens:
-        //
-        // 1. Java is generating monotonically increasing undo tokens.
-        // There may be gaps, but every new token to generateUndoQuantum is
-        // larger than every other token previously seen by generateUndoQuantum
-        //
-        // 2. Right now, the ExecutionSite _always_ releases the
-        // largest token generated during a transaction at the end of the
-        // transaction, even if the entire transaction was rolled back.  This
-        // means that release may get called even if there are no undo quanta
-        // present.
-
-        // m_lastUndoToken is the largest token that could possibly be called
-        // for real undo; any larger token is either undone or has
-        // never existed
-        int64_t m_lastUndoToken;
-
-        // m_lastReleaseToken is the largest token that definitely
-        // doesn't exist; any smaller value has already been released,
-        // any larger value might exist (gaps are possible)
-        int64_t m_lastReleaseToken;
-
-        std::vector<Pool*> m_undoDataPools;
-        std::deque<UndoQuantum*> m_undoQuantums;
-        bool m_undoLogForLowestSite;
     };
 }
-#endif /* UNDOLOG_H_ */
+
