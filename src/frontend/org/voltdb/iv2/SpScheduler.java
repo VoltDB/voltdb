@@ -49,6 +49,7 @@ import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
@@ -209,8 +210,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         super.setLeaderState(isLeader);
         m_snapMonitor.addInterest(this);
-        if (isLeader) {
-            SpInitiator init = (SpInitiator)((RealVoltDB)VoltDB.instance()).getInitiator(m_partitionId);
+        VoltDBInterface db = VoltDB.instance();
+        if (isLeader && db instanceof RealVoltDB ) {
+            SpInitiator init = (SpInitiator)((RealVoltDB)db).getInitiator(m_partitionId);
             if (init.m_term != null) {
                 ((SpTerm)init.m_term).setPromoting(false);
             }
