@@ -879,7 +879,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public synchronized boolean canCompleteRepair(int hostId) {
-        return !m_foreignHosts.containsKey(hostId) && !m_picoZombieForeignHosts.containsKey(hostId) && !m_zkZombieForeignHosts.containsKey(hostId);
+        return !m_foreignHosts.containsKey(hostId) && (m_knownFailedHosts.containsKey(hostId) ||
+                (!m_picoZombieForeignHosts.containsKey(hostId) && !m_zkZombieForeignHosts.containsKey(hostId)));
     }
 
     /**
