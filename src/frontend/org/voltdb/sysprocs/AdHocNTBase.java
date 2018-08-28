@@ -41,6 +41,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.newplanner.NonDdlBatch;
+import org.voltdb.newplanner.NonDdlBatchCompiler;
+import org.voltdb.newplanner.SqlBatch;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
@@ -247,6 +250,41 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
             adhocLog.error(msg + "\n" + stackTrace);
             throw new AdHocPlanningException(msg);
+        }
+    }
+
+    /**
+     * Plan and execute a batch of DML/DQL SQL. Any DDL has been filtered out at this point.
+     * @param batchIn the batch to run.
+     * @return the response for the client.
+     * @since 8.4
+     * @author Yiqun Zhang
+     */
+    protected CompletableFuture<ClientResponse> runNonDDLBatchThroughCalcite(SqlBatch batchIn) {
+        // TRAIL [Calcite:2] runNonDDLAdHocThroughCalcite
+        NonDdlBatch batch = new NonDdlBatch(batchIn);
+        NonDdlBatchCompiler compiler = new NonDdlBatchCompiler(batch);
+        AdHocPlannedStmtBatch plannedStmtBatch;
+        try {
+            plannedStmtBatch = compiler.compile();
+        } catch (AdHocPlanningException ex) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getLocalizedMessage());
+        }
+
+        if (adhocLog.isDebugEnabled()) {
+            logBatch(batch.m_catalogContext, plannedStmtBatch, batch.getUserParameters());
+        }
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endAsync("planadhoc", getClientHandle()));
+        }
+
+        // No explain mode and swap tables now.
+        try {
+            return createAdHocTransaction(plannedStmtBatch, false);
+        } catch (VoltTypeException vte) {
+            String msg = "Unable to execute AdHoc SQL statement(s): " + vte.getMessage();
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, msg);
         }
     }
 
