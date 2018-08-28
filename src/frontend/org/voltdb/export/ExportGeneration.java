@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -45,12 +46,12 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.LocalMailbox;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -115,25 +116,27 @@ public class ExportGeneration implements Generation {
             int hostId,
             CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
-            List<Integer> partitions,
+            List<Pair<Integer, Integer>> localPartitionsToSites,
             File exportOverflowDirectory)
     {
-        List<Integer> allLocalPartitions = new ArrayList<>(partitions);
+        List<Integer> allLocalPartitions = localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toList());
         File files[] = exportOverflowDirectory.listFiles();
+        List<Integer> onDiskPartitions = new ArrayList<Integer>();
         if (files != null) {
-            List<Integer> onDiskPartitions = initializeGenerationFromDisk(messenger);
+            onDiskPartitions = initializeGenerationFromDisk(messenger, localPartitionsToSites);
             // Add new unique partitions from on disk list.
             onDiskPartitions.removeAll(allLocalPartitions);
-            allLocalPartitions.addAll(onDiskPartitions);
         }
-        initializeGenerationFromCatalog(catalogContext, connectors, hostId, messenger, partitions);
+        initializeGenerationFromCatalog(catalogContext, connectors, hostId, messenger, localPartitionsToSites);
 
         // One export mailbox per node, since we only keep one generation
-        createAckMailboxesIfNeeded(messenger, allLocalPartitions);
+        if (!onDiskPartitions.isEmpty()) {
+            createAckMailboxesIfNeeded(messenger, onDiskPartitions);
+        }
     }
 
-    List<Integer> initializeGenerationFromDisk(HostMessenger messenger) {
-        List<Integer> partitions = new ArrayList<Integer>();
+    private List<Integer> initializeGenerationFromDisk(HostMessenger messenger, List<Pair<Integer, Integer>> localPartitionsToSites) {
+        List<Integer> foundPartitions = new ArrayList<Integer>();
 
         /*
          * Find all the data files. Once one is found, extract the nonce
@@ -154,7 +157,7 @@ public class ExportGeneration implements Generation {
                 File dataFile = dataFiles.get(nonce);
                 if (dataFile != null) {
                     try {
-                        addDataSource(ad, partitions);
+                        addDataSource(ad, localPartitionsToSites, foundPartitions);
                     } catch (IOException e) {
                         VoltDB.crashLocalVoltDB("Error intializing export datasource " + ad, true, e);
                     }
@@ -164,24 +167,33 @@ public class ExportGeneration implements Generation {
                 }
             }
         }
-        return partitions;
+        return foundPartitions;
     }
 
     void initializeGenerationFromCatalog(CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
             int hostId,
             HostMessenger messenger,
-            List<Integer> partitions)
+            List<Pair<Integer, Integer>> localPartitionsToSites)
     {
         // Now create datasources based on the catalog
+        boolean createdSources = false;
         for (Connector conn : connectors) {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
-                    addDataSources(table, hostId, partitions);
+                    addDataSources(table, hostId, localPartitionsToSites);
+                    createdSources = true;
                 }
             }
         }
+
+        //Only populate partitions in use if export is actually happening
+        List<Integer> partitionsInUse = createdSources ?
+                localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toList()) :
+                new ArrayList<Integer>();
+
+        createAckMailboxesIfNeeded(messenger, partitionsInUse);
     }
 
     /**
@@ -448,26 +460,24 @@ public class ExportGeneration implements Generation {
     }
 
     @Override
-    public long getQueuedExportBytes(int partitionId, String signature) {
-        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
-
-        if (sources == null) {
-            /*
-             * This is fine. If the table is dropped it won't have an entry in the generation created
-             * after the table was dropped.
-             */
-            return 0;
+    public List<ExportStatsRow> getStats(boolean interval) {
+        List<ListenableFuture<ExportStatsRow>> tasks = new ArrayList<ListenableFuture<ExportStatsRow>>();
+        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+            for (ExportDataSource source : dataSources.values()) {
+                ListenableFuture<ExportStatsRow> syncFuture = source.getImmutableStatsRow(interval);
+                if (syncFuture != null)
+                    tasks.add(syncFuture);
+            }
         }
 
-        ExportDataSource source = sources.get(signature);
-        if (source == null) {
-            /*
-             * This is fine. If the table is dropped it won't have an entry in the generation created
-             * after the table was dropped.
-             */
-            return 0;
+        try {
+            if (!tasks.isEmpty()) {
+                return Futures.allAsList(tasks).get();
+            }
+        } catch (Exception e) {
+            exportLog.error("Unexpected exception syncing export data during snapshot save.", e);
         }
-        return source.sizeInBytes();
+        return new ArrayList<>();
     }
 
     @Override
@@ -502,9 +512,10 @@ public class ExportGeneration implements Generation {
     /*
      * Create a datasource based on an ad file
      */
-    private void addDataSource(File adFile, List<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(this, adFile);
-        partitions.add(source.getPartitionId());
+    private void addDataSource(File adFile, List<Pair<Integer, Integer>> localPartitionsToSites,
+            List<Integer> adFilePartitions) throws IOException {
+        ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites);
+        adFilePartitions.add(source.getPartitionId());
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                     " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
@@ -524,14 +535,16 @@ public class ExportGeneration implements Generation {
     }
 
     // silly helper to add datasources for a table catalog object
-    private void addDataSources(Table table, int hostId, List<Integer> partitions)
+    private void addDataSources(Table table, int hostId, List<Pair<Integer, Integer>> localPartitionsToSites)
     {
-        for (Integer partition : partitions) {
+        for (Pair<Integer, Integer> partitionAndSiteId : localPartitionsToSites) {
 
             /*
              * IOException can occur if there is a problem
              * with the persistent aspects of the datasource storage
              */
+            int partition = partitionAndSiteId.getFirst();
+            int siteId = partitionAndSiteId.getSecond();
             try {
                 Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
                 if (dataSourcesForPartition == null) {
@@ -544,6 +557,7 @@ public class ExportGeneration implements Generation {
                             "database",
                             table.getTypeName(),
                             partition,
+                            siteId,
                             key,
                             table.getColumns(),
                             table.getPartitioncolumn(),
@@ -568,7 +582,8 @@ public class ExportGeneration implements Generation {
     }
 
     @Override
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, long tupleCount) {
+    public void pushExportBuffer(int partitionId, String signature,
+            long uso, ByteBuffer buffer, boolean sync, long tupleCount) {
         Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
@@ -590,7 +605,7 @@ public class ExportGeneration implements Generation {
             return;
         }
 
-        source.pushExportBuffer(uso, buffer, sync, tupleCount);
+        source.pushExportBuffer(uso, buffer, sync, (int)tupleCount);
     }
 
     @Override
@@ -635,40 +650,26 @@ public class ExportGeneration implements Generation {
     }
 
     @Override
-    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
-        // create an easy partitionId:txnId lookup.
-        HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
-        for (long tid : perPartitionTxnIds) {
-            partitionToTxnId.put(TxnEgo.getPartitionId(tid), tid);
-        }
-
-        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-
+    public void updateInitialExportStateToTxnId(int partitionId, String streamName,
+            boolean isRecover, long partitionsTxnId, long sequenceNumber) {
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
-        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
-            for (ExportDataSource source : dataSources.values()) {
-                Long truncationPoint = partitionToTxnId.get(source.getPartitionId());
-                if (truncationPoint == null) {
-                    exportLog.error("Snapshot " + txnId +
-                            " does not include truncation point for partition " +
-                            source.getPartitionId());
-                }
-                else {
-                    //If this was drained and closed we may not have truncation point and we dont want to reopen PBDs
-                    if (!source.isClosed()) {
-                        tasks.add(source.truncateExportToTxnId(truncationPoint));
-                    }
-                }
-            }
-        }
 
-        try {
-            Futures.allAsList(tasks).get();
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
-                                    "You can back up export overflow data and start the " +
-                                    "DB without it to get past this error", true, e);
+        Map<String, ExportDataSource> dataSource = m_dataSourcesByPartition.get(partitionId);
+        // It is possible that for restore the partitions have changed, in which case what we are doing is silly
+        if (dataSource != null) {
+            ExportDataSource source = dataSource.get(streamName);
+            if (source != null) {
+                ListenableFuture<?> task = source.truncateExportToTxnId(isRecover, partitionsTxnId, sequenceNumber);
+                try {
+                    task.get();
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
+                                            "You can back up export overflow data and start the " +
+                                            "DB without it to get past this error", true, e);
+                }
+
+            }
         }
     }
 

@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
@@ -48,13 +49,14 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.ExportStats;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -82,6 +84,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final String m_signature;
     private final byte [] m_signatureBytes;
     private final int m_partitionId;
+
+    // For stats
+    private final int m_siteId;
+    private String m_exportTargetName = "";
+    private long m_tupleCount = 0;
+    private long m_tuplesPending = 0;
+    private long m_averageLatency = 0; // for current counting-session
+    private long m_maxLatency = 0; // for current counting-session
+    private long m_blocksSentSinceClear = 0;
+    private long m_totalLatencySinceClearInMS = 0;
+    private long m_overallBlocksSent = 0;
+    private long m_overallLatencyInMS = 0;
+    private long m_overallMaxLatency = 0;
+
     private final ExportFormat m_format;
 
     private long m_firstUnpolledUso = 0;
@@ -106,14 +122,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
     // is assigned to m_pollFuture. When site thread pushes buffer to EDS executor thread, m_pollFuture
     // is reused to notify export decoder to stop waiting.
-    private SettableFuture<BBContainer> m_pollFuture;
+    private SettableFuture<AckingContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private volatile ListeningExecutorService m_es;
     // A place to keep unfinished export buffer when processor shuts down.
-    private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
+    private final AtomicReference<AckingContainer> m_pendingContainer = new AtomicReference<>();
     // Is EDS from catalog or from disk pdb?
     private volatile boolean m_isInCatalog;
     private volatile boolean m_eos;
@@ -127,7 +143,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
 
-    public ExportStats.ExportStatsRow m_exportStatsRow; // STAKUTIS; added member
 
     /**
      * Create a new data source.
@@ -140,6 +155,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             String db,
             String tableName,
             int partitionId,
+            int siteId,
             String signature,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
@@ -165,6 +181,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * catalog updates that add or drop tables.
          */
         m_partitionId = partitionId;
+
+        m_siteId = siteId;
 
         // Add the Export meta-data columns to the schema followed by the
         // catalog columns for this table.
@@ -227,12 +245,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = true;
         m_eos = false;
         m_client = null;
-        m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
-
-        m_exportStatsRow = ExportStats.get().addRow(tableName, "STAKUTIS", partitionId);
+        m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
+        m_tableName + " partition " + m_partitionId, 1);
     }
 
-    public ExportDataSource(Generation generation, File adFile) throws IOException {
+    public ExportDataSource(Generation generation, File adFile, List<Pair<Integer, Integer>> localPartitionsToSites) throws IOException {
         m_generation = generation;
         m_adFile = adFile;
         String overflowPath = adFile.getParent();
@@ -246,6 +263,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
             m_database = jsObj.getString("database");
             m_partitionId = jsObj.getInt("partitionId");
+            // SiteId is outside the valid range if it is no longer local
+            int partitionsLocalSite = 16384;
+            for (Pair<Integer, Integer> partition : localPartitionsToSites) {
+                if (partition.getFirst() == m_partitionId) {
+                    partitionsLocalSite = partition.getSecond();
+                    break;
+                }
+            }
+            m_siteId = partitionsLocalSite;
             m_signature = jsObj.getString("signature");
             m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
             m_tableName = jsObj.getString("tableName");
@@ -281,7 +307,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = false;
         m_eos = false;
         m_client = null;
-        m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " + m_tableName + " partition " + m_partitionId, 1);
+        m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
+                m_tableName + " partition " + m_partitionId, 1);
     }
 
     public void setReadyForPolling(boolean readyForPolling) {
@@ -301,7 +328,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void setClient(ExportClientBase client) {
-        //TODO prcondition?
+        //TODO precondition?
+        m_exportTargetName = client.getTargetName();
         m_client = client;
     }
 
@@ -340,7 +368,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         m_lastReleasedUso = releaseUso;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso+1);
-        m_exportStatsRow.m_tuplePending -= tuplesSent;
+        m_tuplesPending -= tuplesSent;
 
         return;
     }
@@ -465,12 +493,48 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
+    public ListenableFuture<ExportStatsRow> getImmutableStatsRow(boolean interval) {
+        return m_es.submit(new Callable<ExportStatsRow>() {
+            @Override
+            public ExportStatsRow call() throws Exception {
+                long avgLatency;
+                long maxLatency;
+                if (m_maxLatency > m_overallMaxLatency) {
+                    m_overallMaxLatency = m_maxLatency;
+                }
+                if (interval) {
+                    avgLatency = m_averageLatency;
+                    maxLatency = m_maxLatency;
+                    m_overallBlocksSent += m_blocksSentSinceClear;
+                    m_overallLatencyInMS += m_totalLatencySinceClearInMS;
+                    m_blocksSentSinceClear = 0;
+                    m_totalLatencySinceClearInMS = 0;
+                    m_maxLatency = 0;
+                    m_averageLatency = 0;
+                }
+                else {
+                    if (m_blocksSentSinceClear + m_overallBlocksSent > 0) {
+                        avgLatency = (m_totalLatencySinceClearInMS + m_overallLatencyInMS)
+                                        / (m_blocksSentSinceClear + m_overallBlocksSent);
+                    }
+                    else {
+                        avgLatency= 0;
+                    }
+                    maxLatency = m_overallMaxLatency;
+                }
+
+                return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
+                        m_tupleCount, m_tuplesPending, avgLatency, maxLatency);
+            }
+        });
+    }
+
     private void pushExportBufferImpl(
             long uso,
             ByteBuffer buffer,
             boolean sync,
             boolean poll,
-            long tuplesSent) throws Exception {
+            int tupleCount) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
@@ -483,10 +547,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 final BBContainer cont = DBBPool.wrapBB(buffer);
                 long bufferSize = (buffer.capacity() - 8) - 1;
                 if (m_lastReleasedUso > 0 && m_lastReleasedUso >= (uso + bufferSize)) {
-                    synchronized (m_exportStatsRow) {
-                        m_exportStatsRow.m_tupleCount += tuplesSent;
-                        m_exportStatsRow.m_tuplePending += tuplesSent;
-                    }
+                    m_tupleCount += tupleCount;
+                    m_tuplesPending += tupleCount;
                     //What ack from future is known?
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Dropping already acked USO: " + m_lastReleasedUso
@@ -496,25 +558,29 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     return;
                 }
 
-                StreamBlock sb = new StreamBlock(cont, uso, false);
-
-                // Mark release uso to partially acked buffer.
-                if (m_lastReleasedUso > 0 && m_lastReleasedUso >= sb.uso()) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Setting releaseUso as " + m_lastReleasedUso +
-                                " for sb with uso " + sb.uso() + " for partition " + m_partitionId);
-                    }
-                    sb.releaseUso(m_lastReleasedUso);
-                }
-
-                m_lastPushedUso = uso + bufferSize;
-
                 try {
-                    m_committedBuffers.offer(sb);
-                    m_exportStatsRow.m_tupleCount += tuplesSent;
-                    System.out.println("STAKUTIS ExportDataSource commited a tuple! "+m_tableName+m_partitionId+ " count:"+tuplesSent);
-                    m_exportStatsRow.m_tupleCount += tuplesSent;
-                    m_exportStatsRow.m_tuplePending += tuplesSent;
+                    StreamBlock sb = new StreamBlock(
+                            new BBContainer(buffer) {
+                                @Override
+                                public void discard() {
+                                    checkDoubleFree();
+                                    cont.discard();
+                                    deleted.set(true);
+                                }
+                            }, uso, tupleCount, false);
+                    // Mark release uso to partially acked buffer.
+                    if (m_lastReleasedUso > 0 && m_lastReleasedUso >= sb.uso()) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Setting releaseUso as " + m_lastReleasedUso +
+                                    " for sb with uso " + sb.uso() + " for partition " + m_partitionId);
+                        }
+                        sb.releaseUso(m_lastReleasedUso);
+                    }
+
+                    m_lastPushedUso = uso + bufferSize;
+
+                    m_tupleCount += tupleCount;
+                    m_tuplesPending += tupleCount;
                     m_committedBuffers.offer(sb);
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
@@ -546,7 +612,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         if (poll) {
             try {
-                pollImpl(m_pollFuture, tuplesSent);
+                pollImpl(m_pollFuture);
             } catch (RejectedExecutionException ex) {
                 //Its ok.
             }
@@ -555,8 +621,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
 
     public void pushEndOfStream() {
-        exportLog.info("End of stream for table: " + getTableName() + " partition: " + getPartitionId() + " signature: " + getSignature());
-        ExportStats.get().remove(m_exportStatsRow); // STAKUTIS
+        exportLog.info("End of stream for table: " + getTableName() +
+                " partition: " + getPartitionId() + " signature: " + getSignature());
         m_eos = true;
     }
 
@@ -564,7 +630,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             final long uso,
             final ByteBuffer buffer,
             final boolean sync,
-            final long tupleCount /*STAKUTIS added parameter*/) {
+            final int tupleCount) {
         try {
             m_bufferPushPermits.acquire();
         } catch (InterruptedException e) {
@@ -604,17 +670,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
+    public ListenableFuture<?> truncateExportToTxnId(boolean isRecover, long partitionsTxnId,
+            long sequenceNumber) {
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Truncating to txnId: " + txnId);
+                        exportLog.debug("Truncating to txnId: " + TxnEgo.txnIdToString(partitionsTxnId));
                     }
-                    m_committedBuffers.truncateToTxnId(txnId);
+                    m_tupleCount = sequenceNumber;
+                    if (isRecover) {
+                        m_committedBuffers.truncateToTxnId(partitionsTxnId);
+                    }
                 } catch (Throwable t) {
-                    VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, t);
+                    VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " +
+                TxnEgo.txnIdToString(partitionsTxnId), true, t);
                 }
             }
         });
@@ -682,17 +753,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.
-    public void setPendingContainer(BBContainer container) {
+    public void setPendingContainer(AckingContainer container) {
         Preconditions.checkNotNull(m_pendingContainer.get() != null, "Pending container must be null.");
         m_pendingContainer.set(container);
     }
 
-    public ListenableFuture<BBContainer> poll() {
-        return poll(-1);
-    }
-
-    public ListenableFuture<BBContainer> poll(long tuplesSent) {
-        final SettableFuture<BBContainer> fut = SettableFuture.create();
+    public ListenableFuture<AckingContainer> poll() {
+        final SettableFuture<AckingContainer> fut = SettableFuture.create();
         try {
             m_es.execute(new Runnable() {
                 @Override
@@ -736,7 +803,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             return;
                         }
                         if (!m_es.isShutdown()) {
-                            pollImpl(fut, tuplesSent);
+                            pollImpl(fut);
                         }
                     } catch (Exception e) {
                         exportLog.error("Exception polling export buffer", e);
@@ -757,7 +824,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_firstUnpolledUso;
     }
 
-    private synchronized void pollImpl(SettableFuture<BBContainer> fut, long tuplesSent) {
+    private synchronized void pollImpl(SettableFuture<AckingContainer> fut) {
         if (fut == null) {
             return;
         }
@@ -816,8 +883,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
             } else {
-                final AckingContainer ackingContainer = new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                                                            first_unpolled_block.uso() + first_unpolled_block.totalSize() - 1, tuplesSent);
+                final AckingContainer ackingContainer =
+                        new AckingContainer(first_unpolled_block.unreleasedContainer(),
+                                first_unpolled_block.uso() + first_unpolled_block.totalSize() - 1,
+                                first_unpolled_block.rowCount());
                 try {
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
@@ -830,14 +899,21 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    class AckingContainer extends BBContainer {
-        final long m_uso, m_tuplesSent;
+    public class AckingContainer extends BBContainer {
+        final long m_uso;
+        final int m_tuplesSent;
         final BBContainer m_backingCont;
-        public AckingContainer(BBContainer cont, long uso, long tuplesSent) {
+        long m_startTime = 0;
+
+        public AckingContainer(BBContainer cont, long uso, int tuplesSent) {
             super(cont.b());
             m_uso = uso;
             m_tuplesSent = tuplesSent;
             m_backingCont = cont;
+        }
+
+        public void updateStartTime(long startTime) {
+            m_startTime = startTime;
         }
 
         @Override
@@ -850,6 +926,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (exportLog.isTraceEnabled()) {
                             exportLog.trace("AckingContainer.discard with uso: " + m_uso);
                         }
+                        assert(m_tuplesSent == 0 || m_startTime != 0);
+                        long elapsedMS = System.currentTimeMillis() - m_startTime;
+                        m_blocksSentSinceClear += 1;
+                        m_totalLatencySinceClearInMS += elapsedMS;
+                        m_averageLatency = m_totalLatencySinceClearInMS / m_blocksSentSinceClear;
+                        if (m_averageLatency > m_maxLatency) {
+                            m_maxLatency = m_averageLatency;
+                        }
+
                         try {
                              m_backingCont.discard();
                             try {
@@ -874,13 +959,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void forwardAckToOtherReplicas(long uso, long tuplesSent) {
+    private void forwardAckToOtherReplicas(long uso, int tuplesSent) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
             // partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8) + 8 bytes for generation ID.
-            final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 8; // STAKUTIS +8
+            // signaturesBytes.length + ackUSO:long(8) + tuplesSent:int(4).
+            final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 4;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.put(ExportManager.RELEASE_BUFFER);
@@ -888,7 +973,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(uso);
-            buf.putLong(tuplesSent); // STAKUTIS
+            buf.putInt(tuplesSent);
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -917,8 +1002,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 Mailbox mbx = p.getFirst();
                 if (mbx != null && newReplicas.size() > 0) {
                  // msg type(1) + partition:int(4) + length:int(4) +
-                    // signaturesBytes.length + ackUSO:long(8).
-                    final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
+                    // signaturesBytes.length + ackUSO:long(8) + tuplesSent:int(4).
+                    final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 4;
 
                     ByteBuffer buf = ByteBuffer.allocate(msgLen);
                     buf.put(ExportManager.RELEASE_BUFFER);
@@ -926,6 +1011,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     buf.putInt(m_signatureBytes.length);
                     buf.put(m_signatureBytes);
                     buf.putLong(m_lastReleasedUso);
+                    buf.putInt(0);
 
                     BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 

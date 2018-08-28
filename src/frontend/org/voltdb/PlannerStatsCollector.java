@@ -58,7 +58,7 @@ public class PlannerStatsCollector extends StatsSource {
     /**
      * Site ID
      */
-    final long m_siteId;
+    final int m_siteId;
 
     /**
      * Partition ID
@@ -162,7 +162,7 @@ public class PlannerStatsCollector extends StatsSource {
      */
     public PlannerStatsCollector(long siteId) {
         super(false);
-        m_siteId = siteId;
+        m_siteId = CoreUtils.getSiteIdFromHSId(siteId);
     }
 
     /**
@@ -286,7 +286,7 @@ public class PlannerStatsCollector extends StatsSource {
             m_lastInvocations = m_invocations;
         }
 
-        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = CoreUtils.getSiteIdFromHSId(m_siteId);
+        rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = m_siteId;
         rowValues[columnNameToIndex.get("PARTITION_ID")] = m_partitionId;
         rowValues[columnNameToIndex.get("CACHE1_LEVEL")] = cache1Level;
         rowValues[columnNameToIndex.get("CACHE2_LEVEL")] = cache2Level;

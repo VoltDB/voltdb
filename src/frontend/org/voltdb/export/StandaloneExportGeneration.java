@@ -29,6 +29,7 @@ import java.util.Set;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.DBBPool;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -120,27 +121,24 @@ public class StandaloneExportGeneration implements Generation {
     }
 
     @Override
-    public long getQueuedExportBytes(int partitionId, String signature) {
-        //assert(m_dataSourcesByPartition.containsKey(partitionId));
-        //assert(m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
-        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+    public List<ExportStatsRow> getStats(boolean interval) {
+        List<ListenableFuture<ExportStatsRow>> tasks = new ArrayList<ListenableFuture<ExportStatsRow>>();
+        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+            for (ExportDataSource source : dataSources.values()) {
+                ListenableFuture<ExportStatsRow> syncFuture = source.getImmutableStatsRow(interval);
+                if (syncFuture != null)
+                    tasks.add(syncFuture);
+            }
+        }
 
-        if (sources == null) {
-            /*
-             * This is fine. If the table is dropped it won't have an entry in the generation created
-             * after the table was dropped.
-             */
-            //            exportLog.error("Could not find export data sources for generation " + m_timestamp + " partition "
-            //                    + partitionId);
-            return 0;
+        try {
+            if (!tasks.isEmpty()) {
+                return Futures.allAsList(tasks).get();
+            }
+        } catch (Exception e) {
+            exportLog.error("Unexpected exception syncing export data during snapshot save.", e);
         }
-        // FIXME - this behavior is different from ExportGeneration. Should it be?
-        long qb = 0;
-        for (ExportDataSource source : sources.values()) {
-            if (source == null) continue;
-            qb += source.sizeInBytes();
-        }
-        return qb;
+        return new ArrayList<>();
     }
 
     @Override
@@ -232,7 +230,7 @@ public class StandaloneExportGeneration implements Generation {
             return;
         }
 
-        source.pushExportBuffer(uso, buffer, sync, tupleCount);
+        source.pushExportBuffer(uso, buffer, sync, (int)tupleCount);
     }
 
     public void closeAndDelete() throws IOException {
@@ -251,7 +249,8 @@ public class StandaloneExportGeneration implements Generation {
     }
 
     @Override
-    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
+    public void updateInitialExportStateToTxnId(int partitionId, String streamName,
+            boolean isRecover, long partitionsTxnId, long sequenceNumber) {
     }
 
     @Override

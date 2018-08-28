@@ -63,13 +63,11 @@ class Topend {
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;
 
-    virtual int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) = 0;
     virtual void pushExportBuffer(
             int32_t partitionId,
             std::string signature,
             StreamBlock *block,
-            bool sync,
-            int64_t tupleCount) = 0;
+            bool sync) = 0;
     virtual void pushEndOfStream(
             int32_t partitionId,
             std::string signature) = 0;
@@ -134,9 +132,7 @@ public:
 
     void crashVoltDB(voltdb::FatalException e);
 
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-
-    virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync, int64_t tupleCount);
+    virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync);
     virtual void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);

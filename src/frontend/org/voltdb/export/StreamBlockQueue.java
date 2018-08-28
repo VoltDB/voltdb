@@ -99,10 +99,12 @@ public class StreamBlockQueue {
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
             long uso = cont.b().getLong(0);
+            int tupleCount = cont.b().getInt(8);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
             StreamBlock block = new StreamBlock( fcont,
                 uso,
+                tupleCount,
                 true);
 
             //Optionally store a reference to the block in the in memory deque
@@ -228,7 +230,7 @@ public class StreamBlockQueue {
             memoryBlockUsage += b.unreleasedSize();
         }
         //Subtract USO from on disk size
-        return memoryBlockUsage + m_reader.sizeInBytes() - (8 * m_reader.getNumObjects());
+        return memoryBlockUsage + m_reader.sizeInBytes() - (StreamBlock.HEADER_SIZE * m_reader.getNumObjects());
     }
 
     public void close() throws IOException {

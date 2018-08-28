@@ -39,10 +39,11 @@ const size_t ExportTupleStream::m_mdSchemaSize = (19 + 21 + 27 + 17 + 12 + 21 //
                                                                 + ExportTupleStream::METADATA_COL_CNT // Volt Type byte
                                                                 + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t)) // Int for column names string size
                                                                 + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t))); // column length colInfo->length
+const size_t EXPORT_BUFFER_HEADER_SIZE = 4; // Number of rows in the buffer
 
-ExportTupleStream::ExportTupleStream(CatalogId partitionId,
-                                       int64_t siteId, int64_t generation, std::string signature)
-    : TupleStreamBase(EL_BUFFER_SIZE),
+ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId,
+                                     int64_t generation, std::string signature)
+    : TupleStreamBase(EL_BUFFER_SIZE, EXPORT_BUFFER_HEADER_SIZE),
       m_partitionId(partitionId),
       m_siteId(siteId),
       m_signature(signature),
@@ -147,7 +148,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // write the tuple's data
     tuple.serializeToExport(io, METADATA_COL_CNT, nullArray);
 
-    m_tupleCount_uncommitted++;
+    m_uncommittedTupleCount++;
 
     // row size, generation, partition-index, column count and hasSchema flag (byte)
     ExportSerializeOutput hdr(m_currBlock->mutableDataPtr(), streamHeaderSz);
@@ -262,14 +263,11 @@ ExportTupleStream::computeOffsets(const TableTuple &tuple, size_t *streamHeaderS
 }
 
 void ExportTupleStream::pushStreamBuffer(StreamBlock *block, bool sync) {
-    m_tupleCount = m_tupleCount_uncommitted;
     ExecutorContext::getPhysicalTopend()->pushExportBuffer(
                     m_partitionId,
                     m_signature,
                     block,
-                    sync,
-                    m_tupleCount);
-    m_tupleCount=0; m_tupleCount_uncommitted=0;
+                    sync);
 }
 
 void ExportTupleStream::pushEndOfStream() {

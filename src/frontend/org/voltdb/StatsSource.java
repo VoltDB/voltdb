@@ -186,6 +186,14 @@ public abstract class StatsSource {
         rowValues[2] = m_hostname;
     }
 
+    public Integer getHostId() {
+        return m_hostId;
+    }
+
+    public String getHostname() {
+        return m_hostname;
+    }
+
     /**
      * Retrieve an iterator that iterates over the keys identifying all unique
      * stats rows available for retrieval from the stats source

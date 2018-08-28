@@ -148,7 +148,7 @@ public class UpdateCore extends VoltSystemProcedure {
             long tupleCount = stats.getLong("TUPLE_COUNT");
             String tableName = stats.getString("TABLE_NAME");
             boolean isEmpty = true;
-            if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
+            if (tupleCount > 0) {
                 isEmpty = false;
             }
             allTables.put(tableName.toUpperCase(), isEmpty);

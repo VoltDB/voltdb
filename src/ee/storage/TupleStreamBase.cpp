@@ -53,8 +53,7 @@ TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpa
       m_committedSpHandle(0), m_committedUso(0),
       m_committedUniqueId(0),
       m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace),
-      m_tupleCount(0),
-      m_tupleCount_uncommitted(0)
+      m_uncommittedTupleCount(0)
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -115,6 +114,9 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
                 "Received a new transaction, but with the same spHandle (%jd): old uniqueId is %jd, new uniqueId is %jd",
                 (intmax_t)m_openSpHandle, (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
     }
+
+    m_currBlock->updateRowCountForExport(m_uncommittedTupleCount);
+    m_uncommittedTupleCount = 0;
 
     // more data for an ongoing transaction with no new committed data
     if ((currentSpHandle == m_openSpHandle) &&
@@ -219,7 +221,7 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t)
 
     // back up the universal stream counter
     m_uso = mark;
-    m_tupleCount_uncommitted=0;
+    m_uncommittedTupleCount = 0;
 
     // working from newest to oldest block, throw
     // away blocks that are fully after mark; truncate

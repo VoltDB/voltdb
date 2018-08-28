@@ -44,11 +44,12 @@ import org.voltdb.VoltDB;
  */
 public class StreamBlock {
 
-    public static final int HEADER_SIZE = 8;
+    public static final int HEADER_SIZE = 12;
 
-    StreamBlock(BBContainer cont, long uso, boolean isPersisted) {
+    StreamBlock(BBContainer cont, long uso, int rowCount, boolean isPersisted) {
         m_buffer = cont;
         m_uso = uso;
+        m_rowCount = rowCount;
         //The first 8 bytes are space for us to store the USO if we end up persisting
         m_buffer.b().position(HEADER_SIZE);
         m_totalSize = m_buffer.b().remaining();
@@ -83,6 +84,10 @@ public class StreamBlock {
         return m_uso + m_releaseOffset + 1;
     }
 
+    int rowCount() {
+        return m_rowCount;
+    }
+
     /**
      * Returns the total amount of data in the USO stream
      * @return
@@ -115,6 +120,7 @@ public class StreamBlock {
     }
 
     private final long m_uso;
+    private final int m_rowCount;
     private final long m_totalSize;
     private BBContainer m_buffer;
     // index of the last byte that has been released.
@@ -147,6 +153,7 @@ public class StreamBlock {
      */
     BBContainer asBBContainer() {
         m_buffer.b().putLong(0, uso());
+        m_buffer.b().putInt(8, rowCount());
         m_buffer.b().position(0);
         return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());
     }

@@ -71,8 +71,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
-import org.voltdb.ExportStats;
-import org.voltdb.ExportStats.ExportStatsRow;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
@@ -1543,12 +1541,29 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         // Choose the lowest site ID on this host to truncate export data
         if (isRecover && context.isLowestSiteId()) {
-            ExportManager.instance().
-                    truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
+            final VoltLogger exportLog = new VoltLogger("EXPORT");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Truncating export data after snapshot txnId " +
+                        TxnEgo.txnIdSeqToString(snapshotTxnId));
+            }
+        }
+        HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
+        for (long tid : perPartitionTxnIds) {
+            partitionToTxnId.put(TxnEgo.getPartitionId(tid), tid);
         }
 
         Database db = context.getDatabase();
         Integer myPartitionId = context.getPartitionId();
+        long myPartitionTxnId = -1;
+            if (isRecover) {
+            for (long txnId : perPartitionTxnIds) {
+                if (TxnEgo.getPartitionId(txnId) == myPartitionId) {
+                    myPartitionTxnId = txnId;
+                    break;
+                }
+            }
+            assert(myPartitionTxnId != -1);
+        }
 
         //Iterate the export tables
         for (Table t : db.getTables()) {
@@ -1583,10 +1598,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
             long uso = pair.getFirst();
             long sequenceNumber = pair.getSecond();
 
-            // STAKUTIS  .. let the export stats know!
-            ExportStatsRow row = ExportStats.get().addRow(name, "SNAP", myPartitionId);
-            row.m_tupleCount = sequenceNumber;
-
             //Forward the sequence number to the EE
             context.getSiteProcedureConnection().exportAction(
                     true,
@@ -1594,6 +1605,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     sequenceNumber,
                     myPartitionId,
                     signature);
+            // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
+            ExportManager.instance().updateInitialExportStateToTxnId(myPartitionId, name,
+                    isRecover, partitionToTxnId.get(myPartitionId), sequenceNumber);
         }
     }
 

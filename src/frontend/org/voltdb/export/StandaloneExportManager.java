@@ -201,19 +201,4 @@ public class StandaloneExportManager
             generation.close(messenger);
         }
     }
-
-    public static long getQueuedExportBytes(int partitionId, String signature) {
-        StandaloneExportManager instance = instance();
-        try {
-            StandaloneExportGeneration generation = instance.m_generation.get();
-            if (generation != null) {
-                return 0;
-            }
-            return generation.getQueuedExportBytes( partitionId, signature);
-        } catch (Exception e) {
-            //Don't let anything take down the execution site thread
-            exportLog.error(e);
-        }
-        return 0;
-    }
 }

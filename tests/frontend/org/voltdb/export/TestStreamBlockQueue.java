@@ -66,7 +66,7 @@ public class TestStreamBlockQueue {
 
     private static StreamBlock getStreamBlockWithFill(byte fillValue) {
         g_uso += 1024 * 1024 * 2;
-        return new StreamBlock(DBBPool.wrapBB(getFilledBuffer(fillValue)), g_uso, false);
+        return new StreamBlock(DBBPool.wrapBB(getFilledBuffer(fillValue)), g_uso, 1, false);
     }
 
     @Test
