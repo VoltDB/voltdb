@@ -33,6 +33,7 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexVisitorImpl;
+import org.apache.calcite.sql.fun.SqlDatetimePlusOperator;
 import org.apache.calcite.sql.fun.SqlDatetimeSubtractionOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.IntervalSqlType;
@@ -224,7 +225,7 @@ public class RexConverter {
              // Arthimetic Operators
             case PLUS:
                 // Check for DATETIME + INTERVAL expression first
-                if (SqlStdOperatorTable.DATETIME_PLUS.getName().equals(call.op.getName())) {
+                if (call.op instanceof SqlDatetimePlusOperator) {
                     // At this point left and right operands are converted to MICROSECONDS
                     ae = RexConverterHelper.createToTimestampFunctionExpression(
                             call.getType(),
