@@ -825,4 +825,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_mailbox.deliver(lom);
         return cdl;
     }
+
+    public int getFailedSiteCount() {
+        return m_meshArbiter.getFailedSitesCount();
+    }
 }
