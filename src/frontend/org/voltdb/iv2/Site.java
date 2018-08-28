@@ -1486,7 +1486,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     catalogTable.getSignature());
             // assign the stats to the other partition's value
             ExportManager.instance().updateInitialExportStateToTxnId(m_partitionId, tableEntry.getKey(),
-                    false, -1, sequenceNumbers.getSecond());
+                    false, new Long(-1), sequenceNumbers.getSecond());
         }
 
         if (drSequenceNumbers != null) {

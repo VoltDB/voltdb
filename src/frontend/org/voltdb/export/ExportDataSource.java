@@ -670,22 +670,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public ListenableFuture<?> truncateExportToTxnId(boolean isRecover, long partitionsTxnId,
+    public ListenableFuture<?> truncateExportToTxnId(boolean isRecover, Long truncationPoint,
             long sequenceNumber) {
         return m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
                     if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Truncating to txnId: " + TxnEgo.txnIdToString(partitionsTxnId));
+                        exportLog.debug("Truncating to txnId: " + TxnEgo.txnIdToString(truncationPoint));
                     }
                     m_tupleCount = sequenceNumber;
                     if (isRecover) {
-                        m_committedBuffers.truncateToTxnId(partitionsTxnId);
+                        m_committedBuffers.truncateToTxnId(truncationPoint);
                     }
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " +
-                TxnEgo.txnIdToString(partitionsTxnId), true, t);
+                TxnEgo.txnIdToString(truncationPoint), true, t);
                 }
             }
         });
