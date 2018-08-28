@@ -3038,8 +3038,8 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         if (type != VALUE_TYPE_GEOGRAPHY) {
             // This advances input past the end of the string
             const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-            sref = StringRef::create(length, data, tempPool);
             checkTooWideForVariableLengthType(type, data, length, maxLength, isInBytes);
+            sref = StringRef::create(length, data, tempPool);
         }
         else {
             // This gets a pointer to the start of data without advancing
