@@ -180,7 +180,7 @@ namespace voltdb {
                 UndoQuantum *undoQuantum = m_undoQuantums.front();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
                 if (undoQuantumToken > undoToken) {
-                   goto CLEAN;
+                   return;
                 }
 
                 m_undoQuantums.pop_front();
@@ -193,13 +193,9 @@ namespace voltdb {
                     delete pool; pool = NULL;
                 }
                 if(undoQuantumToken == undoToken) {
-                   goto CLEAN;
+                   return;
                 }
             }
-CLEAN:
-               fprintf(stderr, "%ld us\n",
-                     std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - startTime)
-                     .count()/1000);
         }
 
         int64_t getSize() const {
