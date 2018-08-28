@@ -29,6 +29,8 @@ class PersistentTable;
 class Pool;
 class VoltDBEngine;
 
+class BinaryLog;
+
 /*
  * Responsible for applying binary logs to table data
  */
