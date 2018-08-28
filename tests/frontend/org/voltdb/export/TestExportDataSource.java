@@ -123,7 +123,7 @@ public class TestExportDataSource extends TestCase {
 
         @Override
         public void updateInitialExportStateToTxnId(int partitionId, String streamName,
-                boolean isRecover, long partitionsTxnId, long sequenceNumber) {
+                boolean isRecover, Long truncationPoint, long sequenceNumber) {
         }
 
         @Override
