@@ -56,12 +56,13 @@ public class PlannerTool {
     private byte[] m_catalogHash;
     private AdHocCompilerCache m_cache;
     private long m_adHocLargeFallbackCount = 0;
+    private long m_adHocLargeModeCount = 0;
 
     private final HSQLInterface m_hsql;
 
     private static PlannerStatsCollector m_plannerStats;
 
-    private static final double m_large_mode_ratio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
+    private final double m_large_mode_ratio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
 
     public PlannerTool(final Database database, byte[] catalogHash)
     {
@@ -120,6 +121,10 @@ public class PlannerTool {
 
     public long getAdHocLargeFallbackCount() {
         return m_adHocLargeFallbackCount;
+    }
+
+    public long getAdHocLargeModeCount() {
+        return m_adHocLargeModeCount;
     }
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
@@ -181,9 +186,9 @@ public class PlannerTool {
         if (m_large_mode_ratio > 0 && !isLargeQuery) {
             if (m_large_mode_ratio >= 1 || m_large_mode_ratio > ThreadLocalRandom.current().nextDouble()) {
                 isLargeQuery = true;
+                m_adHocLargeModeCount++;
             }
         }
-
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
