@@ -4946,5 +4946,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public boolean isJoining() {
         return m_joining;
     }
+
+    public Initiator getInitiator(int partition) {
+        return m_iv2Initiators.get(partition);
+    }
 }
 
