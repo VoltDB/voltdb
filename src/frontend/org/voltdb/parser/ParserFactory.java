@@ -29,9 +29,9 @@ public class ParserFactory {
 
     /**
      * Given a SQL statement (could be either a DDL or DQL/DML),
-     * create a {@link SqlParser} for it.
-     * @param sql the SQL statement to parse.
-     * @return a SQL parser created from the SQL statement.
+     * create a {@link org.apache.calcite.sql.parser.SqlParser} for it.
+     * @param sql The SQL statement to parse.
+     * @return The created SQL parser.
      */
     public static SqlParser create(String sql) {
         return SqlParser.create(sql, SqlParser.configBuilder()
