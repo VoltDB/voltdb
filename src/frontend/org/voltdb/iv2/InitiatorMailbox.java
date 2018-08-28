@@ -555,7 +555,7 @@ public class InitiatorMailbox implements Mailbox
                 deliver(message);
             }
             else {
-                if (req.getRepairRetryCount() > 100 && req.getRepairRetryCount() % 100 == 0) {
+                if (req.getRepairRetryCount() > 1000 && req.getRepairRetryCount() % 1000 == 0) {
                     hostLog.warn("Repair Request for dead host " + deadHostId +
                             " has not been processed yet because connection has not closed");
                 }

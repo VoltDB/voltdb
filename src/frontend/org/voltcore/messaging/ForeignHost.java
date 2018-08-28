@@ -310,7 +310,7 @@ public class ForeignHost {
     /** Deliver a deserialized message from the network to a local mailbox */
     private void deliverMessage(long destinationHSId, VoltMessage message) {
         if (!m_hostMessenger.validateForeignHostId(m_hostId)) {
-            hostLog.warn(String.format("Message (%s) sent to site id: %s @ (%s) at %d from %s "
+            hostLog.debug(String.format("Message (%s) sent to site id: %s @ (%s) at %d from %s "
                     + "which is a known failed host. The message will be dropped\n",
                     message.getClass().getSimpleName(),
                     CoreUtils.hsIdToString(destinationHSId),
