@@ -642,11 +642,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     m_tupleCount = sequenceNumber;
                     if (isRecover) {
-                        m_committedBuffers.truncateToTxnId(truncationPoint);
+                        if (truncationPoint == null) {
+                            exportLog.error("Snapshot does not include truncation point for partition " +
+                                    m_partitionId);
+                        }
+                        else {
+                            m_committedBuffers.truncateToTxnId(truncationPoint);
+                        }
                     }
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " +
-                TxnEgo.txnIdToString(truncationPoint), true, t);
+                            TxnEgo.txnIdToString(truncationPoint), true, t);
                 }
             }
         });

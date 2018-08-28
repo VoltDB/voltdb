@@ -219,7 +219,6 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
         checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
@@ -227,7 +226,6 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
         checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         //Resume will put flg on onserver export to start consuming.
