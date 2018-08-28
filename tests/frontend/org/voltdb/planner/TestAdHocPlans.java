@@ -92,6 +92,11 @@ public class TestAdHocPlans extends AdHocQueryTester {
         }
     }
 
+    @Test
+    public void testLargeModeRatio() {
+
+    }
+
     /**
      * For planner-only testing, most of the args are ignored.
      */

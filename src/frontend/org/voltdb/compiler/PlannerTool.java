@@ -18,6 +18,7 @@
 package org.voltdb.compiler;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -59,6 +60,8 @@ public class PlannerTool {
     private final HSQLInterface m_hsql;
 
     private static PlannerStatsCollector m_plannerStats;
+
+    private static final double m_large_mode_ratio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
 
     public PlannerTool(final Database database, byte[] catalogHash)
     {
@@ -173,6 +176,13 @@ public class PlannerTool {
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
             boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
+        // large_mode_ratio will force execution of SQL queries to use the "large" path (for read-only queries)
+        // a certain percentage of the time
+        if (m_large_mode_ratio > 0 && !isLargeQuery) {
+            if (m_large_mode_ratio >= 1 || m_large_mode_ratio > ThreadLocalRandom.current().nextDouble()) {
+                isLargeQuery = true;
+            }
+        }
 
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
