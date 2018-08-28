@@ -61,12 +61,6 @@ public class SpTerm implements Term
         @Override
         public void run(List<String> children)
         {
-            // Since we don't shutdown SpTerm when current site is no longer leader
-            // (see explanation at SpInitiator, m_leadersChangeHandler handler),
-            // ask non-leader (from scheduler perspective) to ignore replica list change.
-            if (!m_promoting && !m_mailbox.m_scheduler.isLeader()) {
-                return;
-            }
             // remove the leader; convert to hsids; deal with the replica change.
             List<Long> replicas = VoltZK.childrenToReplicaHSIds(children);
             if (tmLog.isDebugEnabled()) {
@@ -82,6 +76,14 @@ public class SpTerm implements Term
                 if (diff.isEmpty()) {
                     return;
                 }
+            }
+
+            // Since we don't shutdown SpTerm when current site is no longer leader
+            // (see explanation at SpInitiator, m_leadersChangeHandler handler),
+            // ask non-leader (from scheduler perspective) to ignore replica list change.
+            if (!m_promoting && !m_mailbox.m_scheduler.isLeader()) {
+                m_replicas = ImmutableList.copyOf(replicas);
+                return;
             }
 
             // for joining nodes that hasn't been fully initialized
@@ -132,7 +134,6 @@ public class SpTerm implements Term
                     LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                     m_replicasChangeHandler);
             m_babySitter = pair.getFirst();
-            m_promoting = false;
         }
         catch (ExecutionException ee) {
             VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, ee);
@@ -174,5 +175,9 @@ public class SpTerm implements Term
             m_replicasUpdatedRequired = false;
         }
         return replicasAdded;
+    }
+
+    public void setPromoting(boolean promoting) {
+        m_promoting = promoting;
     }
 }
