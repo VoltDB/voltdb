@@ -26,15 +26,95 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.sql.parser.SqlParser;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.parser.ParserFactory;
 import org.voltdb.parser.SQLLexer;
 
 public class AdHoc extends AdHocNTBase {
 
+    /**
+     * Turn this to true to enable the Calcite parser.
+     */
+    private final static boolean USE_CALCITE = true;
+
+    /**
+     * Run the AdHoc query through the Calcite parser & planner.
+     * @param params The user parameters. The first parameter is always the query text.
+     * The rest parameters are the ones used in the query.
+     * @return The client response.
+     */
+    public CompletableFuture<ClientResponse> runThroughCalcite(ParameterSet params) {
+        // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
+        Object[] paramArray = params.toArray();
+        String sqlBlock = (String) paramArray[0];
+        Object[] userParams = null;
+        // AdHoc query can have parameters, see TestAdHocQueries.testAdHocWithParams.
+        if (params.size() > 1) {
+            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
+        }
+
+        // We can process batches with either all DDL or all DML/DQL, no mixed batch can be accepted.
+        // Split the SQL statements, and run them through SqlParser.
+        // Currently (1.17.0), SqlParser only supports parsing single SQL statement.
+        // https://issues.apache.org/jira/browse/CALCITE-2310
+
+        // TODO: Calcite's error message will contain line and column numbers, this information is lost
+        // during the split. It will be helpful to develop a way to preserve that information.
+        List<String> sqlList = SQLLexer.splitStatements(sqlBlock).getCompletelyParsedStmts();
+        List<SqlNode> rootNodesOfParsedQueries = new ArrayList<>(sqlList.size());
+        // Are all the queries in this input batch DDL? (null means unknown)
+        Boolean isDDLBatch = null;
+
+        for (String sql : sqlList) {
+            SqlParser parser = ParserFactory.create(sql);
+            SqlNode sqlNode;
+            try {
+                sqlNode = parser.parseStmt();
+            } catch (SqlParseException e) {
+                // For now, let's just fail the batch if any parsing error happens.
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                        e.getLocalizedMessage());
+            }
+            boolean isDDL = sqlNode.isA(SqlKind.DDL);
+            if (isDDLBatch == null) {
+                isDDLBatch = isDDL;
+            } else if (isDDLBatch ^ isDDL) { // True if isDDLBatch is different from isDDL
+                // No mixing DDL and DML/DQL. Turn this into an error and return it to the client.
+                return makeQuickResponse(
+                        ClientResponse.GRACEFUL_FAILURE,
+                        "DDL mixed with DML and queries is unsupported.");
+            }
+            rootNodesOfParsedQueries.add(sqlNode);
+        }
+
+        if (isDDLBatch) {
+            // Should use runDDLBatchThroughCalcite when it's ready.
+            return runDDLBatch(sqlList);
+        } else {
+            // This is where we run non-DDL SQL statements
+            // Should use runNonDDLAdHocThroughCalcite when it's ready.
+            return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
+                                  sqlList,
+                                  true, // infer partitioning
+                                  null, // no partition key
+                                  ExplainMode.NONE,
+                                  m_backendTargetType.isLargeTempTableTarget, // back end dependent.
+                                  false, // is not swap tables
+                                  userParams);
+        }
+    }
+
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        if (USE_CALCITE) {
+            return runThroughCalcite(params);
+        }
         if (params.size() == 0) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "Adhoc system procedure requires at least the query parameter.");
@@ -80,6 +160,15 @@ public class AdHoc extends AdHocNTBase {
         // at this point assume all DDL
         assert(mix == AdHocSQLMix.ALL_DDL);
 
+        return runDDLBatch(sqlStatements);
+    }
+
+    private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(
+            List<String> sqlStatements, List<SqlNode> sqlNodes) {
+        return null;
+    }
+
+    private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements) {
         // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
         SortedSet<String> conflictTables = new TreeSet<String>();
         Set<String> createdTables = new HashSet<String>();
