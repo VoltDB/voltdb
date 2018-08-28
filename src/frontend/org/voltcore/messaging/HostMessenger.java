@@ -1937,4 +1937,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_stopNodeNotice.remove(targetHostId);
     }
 
+    public int getFailedSiteCount() {
+        return m_agreementSite.getFailedSiteCount();
+    }
 }

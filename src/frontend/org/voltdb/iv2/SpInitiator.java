@@ -223,7 +223,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 // state, it will respond REJOINING to new work which will break
                 // the MPI and/or be unexpected to external clients.
                 if (!migratePartitionLeader && !m_initiatorMailbox.acceptPromotion()) {
-                    tmLog.error(m_whoami
+                    tmLog.info(m_whoami
                             + "rejoining site can not be promoted to leader. Terminating.");
                     VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
                     return;
