@@ -113,6 +113,7 @@ public class ExportMatchers {
         int partitionId;
         String signature;
         long uso;
+        int tuplesSent;
 
         AckPayloadMessage(BinaryPayloadMessage p) {
             ByteBuffer buf = ByteBuffer.wrap(p.m_payload);
@@ -125,15 +126,17 @@ public class ExportMatchers {
             signature = new String( pSignatureBytes, Constants.UTF8ENCODING);
 
             uso = buf.getLong();
+            tuplesSent = buf.getInt();
         }
 
-        AckPayloadMessage(int partitionId, String signature, long uso) {
+        AckPayloadMessage(int partitionId, String signature, long uso, int tuplesSent) {
             Preconditions.checkArgument(signature != null && ! signature.trim().isEmpty());
             Preconditions.checkArgument(uso >= 0);
 
             this.partitionId = partitionId;
             this.signature = signature;
             this.uso = uso;
+            this.tuplesSent = tuplesSent;
         }
 
         int getPartitionId() {
@@ -148,14 +151,19 @@ public class ExportMatchers {
             return uso;
         }
 
+        int getTuplesSent() {
+            return tuplesSent;
+        }
+
         VoltMessage asVoltMessage() {
             byte [] signatureBytes = signature.getBytes(Constants.UTF8ENCODING);
-            ByteBuffer buf = ByteBuffer.allocate(18 + signatureBytes.length);
+            ByteBuffer buf = ByteBuffer.allocate(21 + signatureBytes.length);
             buf.putInt(partitionId);
             buf.putInt(signatureBytes.length);
             buf.put(signatureBytes);
             buf.putLong(uso);
-            buf.putShort((short )0);
+            buf.putInt(tuplesSent);
+            buf.put((byte)0);
 
             return new BinaryPayloadMessage(new byte[0], buf.array());
         }

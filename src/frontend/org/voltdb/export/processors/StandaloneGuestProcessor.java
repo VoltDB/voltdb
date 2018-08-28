@@ -33,6 +33,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataSource;
+import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.StandaloneExportDataProcessor;
 import org.voltdb.export.StandaloneExportGeneration;
 import org.voltdb.exportclient.ExportClientBase;
@@ -122,7 +123,7 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
                                             source.getExportFormat());
                             ExportDecoderBase edb = m_client.constructExportDecoder(ads);
                             m_decoders.add(Pair.of(edb, ads));
-                            final ListenableFuture<BBContainer> fut = source.poll();
+                            final ListenableFuture<AckingContainer> fut = source.poll();
                             constructListener(source, fut, edb);
                         }
                     }
@@ -133,7 +134,7 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
 
     private void constructListener(
             final ExportDataSource source,
-            final ListenableFuture<BBContainer> fut,
+            final ListenableFuture<AckingContainer> fut,
             final ExportDecoderBase edb) {
         /*
          * The listener runs in the thread specified by the EDB.

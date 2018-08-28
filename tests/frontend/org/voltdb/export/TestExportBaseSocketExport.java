@@ -306,7 +306,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         // Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0]; // STAKUTIS
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -322,8 +322,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             while (stats.advanceRow()) {
                 String debugStr=stats.toJSONString();
 
-               // String ttype = stats.getString("TABLE_TYPE"); STAKUTIS
-                String ttable = stats.getString("STREAM_NAME"); // STAKUTIS
+                String ttable = stats.getString("STREAM_NAME");
                 Long tts = stats.getLong("TIMESTAMP");
                 Long host = stats.getLong("HOST_ID");
                 Long pid = stats.getLong("PARTITION_ID");
@@ -331,8 +330,8 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 if (tts > ts) {
                     ts = tts;
                 }
-                if (true) { //ttype.equals("StreamedTable")) { // STAKUTIS
-                    long m = stats.getLong("TUPLE_PENDING"); // STAKUTIS
+                if (true) {
+                    long m = stats.getLong("TUPLE_PENDING");
                     if (0 != m) {
                         passedThisTime = false;
                         System.out.println("Partition Not Zero: " + ttable + ":" + m  + ":" + host + ":" + pid);

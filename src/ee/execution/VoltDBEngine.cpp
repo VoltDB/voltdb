@@ -2209,7 +2209,8 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
 
     for (int ii = 0; ii < numLocators; ii++) {
         CatalogId locator = static_cast<CatalogId>(locators[ii]);
-        if ( ! getTableById(locator)) {
+        Table* t = getTableById(locator);
+        if (!t) {
             char message[256];
             snprintf(message, 256,  "getStats() called with selector %d, and"
                     " an invalid locator %d that does not correspond to"
@@ -2217,7 +2218,11 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           message);
         }
-        locatorIds.push_back(locator);
+        auto streamTable = dynamic_cast<StreamedTable*>(t);
+        if (streamTable == NULL || streamTable->getWrapper() == NULL) {
+            // skip stats for stream tables with ExportTupleStreams
+            locatorIds.push_back(locator);
+        }
     }
     size_t lengthPosition = m_resultOutput.reserveBytes(sizeof(int32_t));
 

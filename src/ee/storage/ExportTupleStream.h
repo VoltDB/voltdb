@@ -48,7 +48,7 @@ public:
         assert(m_uso == 0);
         StreamBlock *sb = new StreamBlock(new char[1], 0, 0, count);
         ExecutorContext::getPhysicalTopend()->pushExportBuffer(
-                                m_partitionId, m_signature, sb, false, 1 /* STAKUTIS tupleCount?*/);
+                                m_partitionId, m_signature, sb, false);
         delete sb;
         m_uso = count;
         //Extend the buffer chain to replace any existing stream blocks with a new one
@@ -62,11 +62,6 @@ public:
 
     // compute # of bytes needed to serialize the meta data column names
     inline size_t getMDColumnNamesSerializedSize() const { return m_mdSchemaSize; }
-
-    int64_t allocatedByteCount() const {
-        return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
-                ExecutorContext::getPhysicalTopend()->getQueuedExportBytes(m_partitionId, m_signature);
-    }
 
     void pushStreamBuffer(StreamBlock *block, bool sync);
     void pushEndOfStream();

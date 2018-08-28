@@ -61,15 +61,7 @@ namespace voltdb {
     void DummyTopend::crashVoltDB(voltdb::FatalException e) {
     }
 
-    int64_t DummyTopend::getQueuedExportBytes(int32_t partitionId, std::string signature) {
-        int64_t bytes = 0;
-        for (int ii = 0; ii < blocks.size(); ii++) {
-            bytes += blocks[ii]->rawLength();
-        }
-        return bytes;
-    }
-
-    void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync, int64_t tupleCount) {
+    void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync) {
         if (sync) {
             return;
         }
@@ -102,7 +94,8 @@ namespace voltdb {
     }
 
 
-    int DummyTopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+    int DummyTopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId,
+            int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
             Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
             DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,

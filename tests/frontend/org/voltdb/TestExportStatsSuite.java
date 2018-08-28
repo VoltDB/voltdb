@@ -92,7 +92,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         //Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
-            stats = client.callProcedure("@Statistics", isPersistent ? "table" : "export", 0).getResults()[0];  // STAKUTIS
+            stats = client.callProcedure("@Statistics", isPersistent ? "table" : "export", 0).getResults()[0];
             boolean passedThisTime = false;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -105,12 +105,12 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
                 st = System.currentTimeMillis();
             }
             while (stats.advanceRow()) {
-                String memoryColumnName = isPersistent ? "TUPLE_ALLOCATED_MEMORY" : "TUPLE_PENDING"; // STAKUTIS
-                String tableColumnName = isPersistent ? "TABLE_NAME": "STREAM_NAME"; // STAKUTIS
+                String memoryColumnName = isPersistent ? "TUPLE_ALLOCATED_MEMORY" : "TUPLE_PENDING";
+                String tableColumnName = isPersistent ? "TABLE_NAME": "STREAM_NAME";
                 if (stats.getString(tableColumnName).equalsIgnoreCase(tableName)) {
                     if (stats.getLong("PARTITION_ID") == 0 && !zpassed) {
                         if (tuple1 == stats.getLong("TUPLE_COUNT")
-                                && ((mem1 == SKIP_MEMORY_CHECK) || (mem1 == stats.getLong(memoryColumnName)))) { // STAKUTIS
+                                && ((mem1 == SKIP_MEMORY_CHECK) || (mem1 == stats.getLong(memoryColumnName)))) {
                             zpassed = true;
                             System.out.println("Partition Zero passed.");
                         }
@@ -118,7 +118,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
                     }
                     if (stats.getLong("PARTITION_ID") == 1 && !opassed) {
                         if (tuple2 == stats.getLong("TUPLE_COUNT")
-                                && ((mem2 == SKIP_MEMORY_CHECK) || (mem2 == stats.getLong(memoryColumnName)))) { // STAKUTIS
+                                && ((mem2 == SKIP_MEMORY_CHECK) || (mem2 == stats.getLong(memoryColumnName)))) {
                             opassed = true;
                             System.out.println("Partition One passed.");
                         }
@@ -172,7 +172,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         waitForStreamedAllocatedMemoryZero(client);
 
         // Verify that table stats show both insertions.
-        checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, true);  // STAKUTIS
+        checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, true);
         checkForExpectedStats(client, "tuple_count_export", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, false);
 
         // Memory statistics need to show the persistent table but not the export.
@@ -219,7 +219,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-//        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false); STAKUTIS no longer byte-count units
+        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
         checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
@@ -227,7 +227,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        //checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false); STAKUTIS no longer byte-count units
+        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
         checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         //Resume will put flg on onserver export to start consuming.

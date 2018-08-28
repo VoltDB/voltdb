@@ -36,6 +36,7 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
@@ -52,6 +53,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
@@ -103,8 +105,8 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public long getQueuedExportBytes(int partitionId, String signature) {
-            return 0;
+        public List<ExportStatsRow> getStats(boolean interval) {
+            throw new UnsupportedOperationException("Not supported yet.");
         }
 
         @Override
@@ -120,14 +122,14 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
+        public void updateInitialExportStateToTxnId(int partitionId, String streamName,
+                boolean isRecover, long partitionsTxnId, long sequenceNumber) {
         }
 
         @Override
         public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
-
     }
 
     @Override
@@ -167,6 +169,7 @@ public class TestExportDataSource extends TestCase {
             ExportDataSource s = new ExportDataSource(null, "database",
                     table.getTypeName(),
                     m_part,
+                    CoreUtils.getSiteIdFromHSId(m_site),
                     table.getSignature(),
                     table.getColumns(),
                     table.getPartitioncolumn(),
@@ -189,6 +192,7 @@ public class TestExportDataSource extends TestCase {
         ExportDataSource s = new ExportDataSource(null, "database",
                 table.getTypeName(),
                 m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
                 table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
@@ -206,18 +210,19 @@ public class TestExportDataSource extends TestCase {
             s.acceptMastership();
             cdl.await();
 
-            ByteBuffer foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
             s.pushExportBuffer(23, foo, false, 1);
             assertEquals(s.sizeInBytes(), 20 );
 
             //Push it twice more to check stats calc
-            foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
             s.pushExportBuffer(43, foo, false, 1);
             assertEquals(s.sizeInBytes(), 40);
-            foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
             s.pushExportBuffer(63, foo, false, 1);
 
             assertEquals(s.sizeInBytes(), 60);
@@ -228,14 +233,15 @@ public class TestExportDataSource extends TestCase {
 
             assertEquals( 60, s.sizeInBytes());
 
-            AckingContainer cont = (AckingContainer)s.poll().get();
+            AckingContainer cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
             //No change in size because the buffers are flattened to disk, until the whole
             //file is polled/acked it won't shrink
             assertEquals( 60, s.sizeInBytes());
             assertEquals( 42, cont.m_uso);
 
-            foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
-            foo.duplicate().put(new byte[28]);
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
             foo.position(StreamBlock.HEADER_SIZE);
             foo = foo.slice();
             foo.order(ByteOrder.LITTLE_ENDIAN);
@@ -244,7 +250,8 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = (AckingContainer)s.poll().get();
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
 
             //Should lose 20 bytes for the stuff in memory
             assertEquals( 40, s.sizeInBytes());
@@ -255,7 +262,8 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = (AckingContainer)s.poll().get();
+            cont = s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
 
             //No more buffers on disk, so the + 8 is gone, just the last one pulled in memory
             assertEquals( 20, s.sizeInBytes());
@@ -265,9 +273,9 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            ListenableFuture<BBContainer> fut = s.poll();
+            ListenableFuture<AckingContainer> fut = s.poll();
             try {
-                cont = (AckingContainer)fut.get(100,TimeUnit.MILLISECONDS);
+                cont = fut.get(100,TimeUnit.MILLISECONDS);
                 fail("did not get expected timeout");
             }
             catch( TimeoutException ignoreIt) {}
@@ -285,6 +293,7 @@ public class TestExportDataSource extends TestCase {
         ExportDataSource s = new ExportDataSource(null, "database",
                 table.getTypeName(),
                 m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
                 table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
@@ -338,6 +347,7 @@ public class TestExportDataSource extends TestCase {
         assertEquals( 60, s.sizeInBytes());
 
         AckingContainer cont = (AckingContainer)s.poll().get();
+        cont.updateStartTime(System.currentTimeMillis());
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
         assertEquals( 60, s.sizeInBytes());
@@ -360,7 +370,9 @@ public class TestExportDataSource extends TestCase {
                 );
 
         // Poll and discard buffer 63, too
-        s.poll().get().discard();
+        cont = s.poll().get();
+        cont.updateStartTime(System.currentTimeMillis());
+        cont.discard();
 
         int i = 1000;
         while( i > 0 && s.sizeInBytes() > 32) {
@@ -370,6 +382,7 @@ public class TestExportDataSource extends TestCase {
         assertEquals( 20, s.sizeInBytes());
 
         cont = (AckingContainer)s.poll().get();
+        cont.updateStartTime(System.currentTimeMillis());
         assertEquals(s.sizeInBytes(), 20);
         assertEquals(82, cont.m_uso);
         cont.discard();
@@ -386,6 +399,7 @@ public class TestExportDataSource extends TestCase {
         ExportDataSource s = new ExportDataSource(null, "database",
                 table.getTypeName(),
                 m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
                 table.getSignature(),
                 table.getColumns(),
                 table.getPartitioncolumn(),
@@ -431,6 +445,7 @@ public class TestExportDataSource extends TestCase {
 
             //Poll and check before and after discard segment files.
             AckingContainer cont = (AckingContainer) s.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
             cont.discard();

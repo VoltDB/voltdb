@@ -44,8 +44,6 @@ import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExportStats;
-import org.voltdb.ExportStats.ExportStatsRow;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
@@ -90,6 +88,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.jni.ExecutionEngine.TaskType;
@@ -1315,13 +1314,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     if ("PersistentTable".equals(stats.getString(6)) && trackMemory){
                         tupleCount += stats.getLong(7);
                     }
-                    else {
-                        // STAKUTIS Fake it out!
-                        ExportStatsRow row = ExportStats.getRow(stats.getString(5),(int)stats.getLong(4));
-                        if (row != null) {
-                            stats.setLong("TUPLE_ALLOCATED_MEMORY",row.m_tuplePending * 1024);
-                        }
-                    }
                     assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     if (trackMemory) {
                         tupleAllocatedMem += stats.getLong(8);
@@ -1470,6 +1462,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     sequenceNumbers.getSecond(),
                     m_partitionId,
                     catalogTable.getSignature());
+            // assign the stats to the other partition's value
+            ExportManager.instance().updateInitialExportStateToTxnId(m_partitionId, tableEntry.getKey(),
+                    false, -1, sequenceNumbers.getSecond());
         }
 
         if (drSequenceNumbers != null) {

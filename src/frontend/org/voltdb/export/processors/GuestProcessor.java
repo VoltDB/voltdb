@@ -32,13 +32,13 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
+import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -87,7 +87,6 @@ public class GuestProcessor implements ExportDataProcessor {
                 tableName = tableName.toLowerCase();
                 assert(!m_targetsByTableName.containsKey(tableName));
                 m_targetsByTableName.put(tableName, targetName);
-                // STAKUTIS this would be a good place to set the ExportRow 'target'
             }
 
             String exportClientClass = properties.getProperty(EXPORT_TO_TYPE);
@@ -220,7 +219,7 @@ public class GuestProcessor implements ExportDataProcessor {
             detectDecoder(m_client, edb);
             Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
             m_decoders.add(pair);
-            final ListenableFuture<BBContainer> fut = m_source.poll();
+            final ListenableFuture<AckingContainer> fut = m_source.poll();
             addBlockListener(m_source, fut, edb);
         }
 
@@ -304,7 +303,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     private void addBlockListener(
             final ExportDataSource source,
-            final ListenableFuture<BBContainer> fut,
+            final ListenableFuture<AckingContainer> fut,
             final ExportDecoderBase edb) {
         /*
          * The listener runs in the thread specified by the EDB.
@@ -319,9 +318,8 @@ public class GuestProcessor implements ExportDataProcessor {
         fut.addListener(new Runnable() {
             @Override
             public void run() {
-                long tuplesSent=0;
                 try {
-                    BBContainer cont = fut.get();
+                    AckingContainer cont = fut.get();
                     if (cont == null) {
                         return;
                     }
@@ -338,8 +336,6 @@ public class GuestProcessor implements ExportDataProcessor {
                          * Also allow the decoder to request exponential backoff
                          */
                         while (!m_shutdown) {
-                            long startTime=0;
-                            tuplesSent=0;
                             try {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
@@ -356,8 +352,13 @@ public class GuestProcessor implements ExportDataProcessor {
                                     } else {
                                         //New style connector.
                                         try {
-                                            row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
-                                            startTime=(long)row.values[1]; // STAKUTIS
+                                            if (row == null) {
+                                                row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
+                                                cont.updateStartTime((long)row.values[1]);
+                                            }
+                                            else {
+                                                row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
+                                            }
                                             edb.setPreviousRow(row);
                                         } catch (IOException ioe) {
                                             m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
@@ -369,7 +370,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                             edb.onBlockStart(row);
                                         }
                                         edb.processRow(row);
-                                        tuplesSent++;
                                         if (generation != -1L && row.generation != generation) {
                                             edb.onBlockCompletion(row);
                                             edb.onBlockStart(row);
@@ -382,12 +382,6 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                                 if (row != null) {
                                     edb.onBlockCompletion(row);
-                                    long elapsedMS = System.currentTimeMillis() - startTime;
-                                    source.m_exportStatsRow.m_tuplesSentSinceClear += 1;
-                                    source.m_exportStatsRow.m_totalMSSentSinceClear += elapsedMS;
-                                    source.m_exportStatsRow.m_averageLatency = source.m_exportStatsRow.m_totalMSSentSinceClear / source.m_exportStatsRow.m_tuplesSentSinceClear;
-                                    if (source.m_exportStatsRow.m_averageLatency > source.m_exportStatsRow.m_maxLatency)
-                                        source.m_exportStatsRow.m_maxLatency = source.m_exportStatsRow.m_averageLatency;
                                 }
                                 //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
                                 if (cont != null) {
@@ -433,7 +427,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     m_logger.error("Error processing export block", e);
                 }
                 if (!m_shutdown) {
-                    addBlockListener(source, source.poll(tuplesSent), edb);
+                    addBlockListener(source, source.poll(), edb);
                 }
             }
         }, edb.getExecutor());

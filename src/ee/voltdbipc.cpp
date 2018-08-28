@@ -72,7 +72,7 @@ public:
         kErrorCode_DependencyNotFound = 102,           // Also response to 100
         kErrorCode_pushExportBuffer = 103,             // Indication that export buffer is next
         kErrorCode_CrashVoltDB = 104,                  // Crash with reason string
-        kErrorCode_getQueuedExportBytes = 105,         // Retrieve value for stats
+        //kErrorCode_getQueuedExportBytes = 105,         // Retrieve value for stats (DEPRECATED)
         kErrorCode_pushPerFragmentStatsBuffer = 106,   // Indication that per-fragment statistics buffer is next
         kErrorCode_callJavaUserDefinedFunction = 107,  // Notify the frontend to call a Java user-defined function.
         kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
@@ -144,7 +144,7 @@ public:
     void terminate();
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync, int64_t tupleCount);
+    void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync);
     void pushEndOfStream(int32_t partitionId, std::string signature);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
@@ -1600,26 +1600,11 @@ void VoltDBIPC::threadLocalPoolAllocations() {
     writeOrDie(m_fd, (unsigned char*)response, 9);
 }
 
-int64_t VoltDBIPC::getQueuedExportBytes(int32_t partitionId, std::string signature) {
-    m_reusedResultBuffer[0] = kErrorCode_getQueuedExportBytes;
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(partitionId);
-    *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[5]) = htonl(static_cast<int32_t>(signature.size()));
-    ::memcpy( &m_reusedResultBuffer[9], signature.c_str(), signature.size());
-    writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, 9 + signature.size());
-
-    int64_t netval;
-    ssize_t bytes = read(m_fd, &netval, sizeof(int64_t));
-    checkBytesRead(sizeof(int64_t), bytes, "queued export byte count");
-    int64_t retval = ntohll(netval);
-    return retval;
-}
-
 void VoltDBIPC::pushExportBuffer(
         int32_t partitionId,
         std::string signature,
         voltdb::StreamBlock *block,
-        bool sync,
-        int64_t tupleCount) {
+        bool sync) {
     int32_t index = 0;
     m_reusedResultBuffer[index++] = kErrorCode_pushExportBuffer;
     *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(partitionId);
@@ -1630,10 +1615,12 @@ void VoltDBIPC::pushExportBuffer(
     index += static_cast<int32_t>(signature.size());
     if (block != NULL) {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->uso());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = htonll(block->getRowCountforExport());
     } else {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = 0;
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = 0;
     }
-    index += 8;
+    index += 16;
     *reinterpret_cast<int8_t*>(&m_reusedResultBuffer[index++]) =
         sync ?
             static_cast<int8_t>(1) : static_cast<int8_t>(0);

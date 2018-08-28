@@ -176,16 +176,6 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_getQueuedExportBytesMID = m_jniEnv->GetStaticMethodID(
-            m_exportManagerClass,
-            "getQueuedExportBytes",
-            "(ILjava/lang/String;)J");
-    if (m_getQueuedExportBytesMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_getQueuedExportBytesMID != NULL);
-        throw std::exception();
-    }
-
     m_partitionDRGatewayClass = m_jniEnv->FindClass("org/voltdb/PartitionDRGateway");
     if (m_partitionDRGatewayClass == NULL) {
         m_jniEnv->ExceptionDescribe();
@@ -544,26 +534,11 @@ JNITopend::~JNITopend() {
 }
 
 
-int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
-    return 1024L*99999999;  // STAKUTIS; NOTE: Wont-be-seen because it is patched/hacked on the other end with a psuedo-new value
-    /*
-    jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
-    int64_t retval = m_jniEnv->CallStaticLongMethod(
-            m_exportManagerClass,
-            m_getQueuedExportBytesMID,
-            partitionId,
-            signatureString);
-    m_jniEnv->DeleteLocalRef(signatureString);
-    return retval;
-    **/
-}
-
 void JNITopend::pushExportBuffer(
         int32_t partitionId,
         string signature,
         StreamBlock *block,
-        bool sync,
-        int64_t tupleCount) {
+        bool sync) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
 
     if (block != NULL) {
@@ -582,20 +557,20 @@ void JNITopend::pushExportBuffer(
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
                 sync ? JNI_TRUE : JNI_FALSE,
-                        tupleCount);
+                block->getRowCountforExport());
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
 
         m_jniEnv->CallStaticVoidMethod(
-                        m_exportManagerClass,
-                        m_pushExportBufferMID,
-                        partitionId,
-                        signatureString,
-                        static_cast<int64_t>(0),
-                        NULL,
-                        NULL,
-                        sync ? JNI_TRUE : JNI_FALSE,
-                                tupleCount);
+                m_exportManagerClass,
+                m_pushExportBufferMID,
+                partitionId,
+                signatureString,
+                static_cast<int64_t>(0),
+                NULL,
+                NULL,
+                sync ? JNI_TRUE : JNI_FALSE,
+                static_cast<int64_t>(0));
     }
     m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {

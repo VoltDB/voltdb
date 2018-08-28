@@ -45,6 +45,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
@@ -141,7 +142,7 @@ public class TestExportGeneration {
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
                 m_connectors, m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
-                ImmutableList.of(m_part));
+                ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))));
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
             @Override
@@ -204,6 +205,7 @@ public class TestExportGeneration {
                     1
                     );
             AckingContainer cont = (AckingContainer)m_expDs.poll().get();
+            cont.updateStartTime(System.currentTimeMillis());
 
             m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_tableSignature, uso + foo.capacity() - StreamBlock.HEADER_SIZE - 1));
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));
@@ -250,7 +252,7 @@ public class TestExportGeneration {
 
         m_mbox.send(
                 hsid,
-                new AckPayloadMessage(m_part, m_tableSignature, foo.capacity()).asVoltMessage()
+                new AckPayloadMessage(m_part, m_tableSignature, foo.capacity(), 1).asVoltMessage()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
