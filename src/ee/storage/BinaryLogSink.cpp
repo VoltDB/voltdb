@@ -488,6 +488,137 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
 } //end of anonymous namespace
 
+/**
+ * Utility class to wrap a binary log.
+ */
+class BinaryLog {
+    friend BinaryLogSink;
+
+public:
+    /**
+     * @return a new BinaryLog * if len of log > 0 else returns null
+     */
+    static BinaryLog *create(const char *log) {
+        int32_t logLen = readRawInt(log);
+        if (logLen > 0) {
+            return new BinaryLog(log, logLen);
+        }
+        return NULL;
+    }
+
+    /**
+     * Construct a new BinaryLog.
+     *
+     * @param log array containing the binary log. Must not have a log of length 0.
+     */
+    BinaryLog(const char *log) :
+            BinaryLog(log, readRawInt(log)) {
+        assert(m_txnLen > 0);
+    }
+
+    /**
+     * Skip any remaining logs in a transaction and call BinaryLog::validateEndTxn
+     */
+    void skipRecordsAndValidateTxn() {
+        m_taskInfo.getRawPointer(
+                (m_txnStart + m_txnLen) - (m_taskInfo.getRawPointer() + DRTupleStream::END_RECORD_SIZE));
+        DRRecordType __attribute__ ((unused)) type = readRecordType();
+        assert(type = DR_RECORD_END_TXN);
+        validateEndTxn();
+    }
+
+    /**
+     * Validate that the sequence number and hash in the end transaction record match the rest of the transaction
+     *
+     * Note: DR_RECORD_END_TXN must already have been consumed prior to invoking this method
+     */
+    void validateEndTxn() {
+        int64_t tempSequenceNumber = m_taskInfo.readLong();
+        if (tempSequenceNumber != m_sequenceNumber) {
+            throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
+                    (intmax_t )m_sequenceNumber, (intmax_t )tempSequenceNumber);
+        }
+        uint32_t checksum = m_taskInfo.readInt();
+        assert(m_taskInfo.getRawPointer() == m_txnStart + m_txnLen);
+        validateChecksum(checksum, m_txnStart, m_taskInfo.getRawPointer());
+    }
+
+    /**
+     * Read the next transaction record from the log
+     *
+     * @return true if a new transaction record exists otherwise false
+     */
+    bool readNextTransaction() {
+        if (!m_taskInfo.hasRemaining()) {
+            return false;
+        }
+
+        m_txnStart = m_taskInfo.getRawPointer();
+
+        const uint8_t drVersion = m_taskInfo.readByte();
+        if (drVersion < DRTupleStream::COMPATIBLE_PROTOCOL_VERSION) {
+            throwFatalException("Unsupported DR version %d", drVersion);
+        }
+
+        DRRecordType __attribute__ ((unused)) type = readRecordType();
+        assert(type == DR_RECORD_BEGIN_TXN);
+
+        m_uniqueId = m_taskInfo.readLong();
+        m_sequenceNumber = m_taskInfo.readLong();
+
+        m_hashFlag = static_cast<DRTxnPartitionHashFlag>(m_taskInfo.readByte());
+        assert((m_hashFlag & REPLICATED_TABLE_MASK) != REPLICATED_TABLE_MASK);
+
+        m_txnLen = m_taskInfo.readInt();
+        assert(m_txnStart + m_txnLen <= m_logEnd);
+        m_partitionHash = m_taskInfo.readInt();
+
+        return true;
+    }
+
+    /**
+     * @return the next record type read from the log
+     */
+    DRRecordType readRecordType() {
+        DRRecordType type = static_cast<DRRecordType>(m_taskInfo.readByte());
+        if (type == DR_RECORD_HASH_DELIMITER) {
+            m_partitionHash = m_taskInfo.readInt();
+            type = static_cast<DRRecordType>(m_taskInfo.readByte());
+        }
+
+        return type;
+    }
+
+    bool isReplicatedTableLog() {
+        return m_hashFlag == TXN_PAR_HASH_REPLICATED;
+    }
+
+    ~BinaryLog() {
+    }
+
+private:
+    BinaryLog(const char *log, int32_t logLength) :
+            m_taskInfo(log + sizeof(int32_t), logLength),
+            m_logEnd(m_taskInfo.getRawPointer() + logLength) {
+
+        bool __attribute__ ((unused)) success = readNextTransaction();
+        assert(success);
+    }
+
+    static int32_t readRawInt(const char *log) {
+        return ntohl(*reinterpret_cast<const int32_t*>(log));
+    }
+
+    ReferenceSerializeInputLE m_taskInfo;
+    const char *m_txnStart;
+    int64_t m_uniqueId;
+    int64_t m_sequenceNumber;
+    DRTxnPartitionHashFlag m_hashFlag;
+    int32_t m_txnLen;
+    int32_t m_partitionHash;
+    const char *m_logEnd;
+};
+
 BinaryLogSink::BinaryLogSink() {}
 
     int64_t BinaryLogSink::applyTxn(ReferenceSerializeInputLE *taskInfo,
