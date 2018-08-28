@@ -681,17 +681,13 @@ public class ExportManager
         }
     }
 
-    public void updateInitialExportStateToTxnId(int partitionId, String streamName,
+    public void updateInitialExportStateToTxnId(int partitionId, String signature,
             boolean isRecover, Long truncationPoint, long sequenceNumber) {
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
-        if (truncationPoint == null) {
-            exportLog.error("Snapshot does not include truncation point for partition " +
-                    partitionId);
-        }
         ExportGeneration generation = m_generation.get();
         if (generation != null) {
-            generation.updateInitialExportStateToTxnId(partitionId, streamName,
+            generation.updateInitialExportStateToTxnId(partitionId, signature,
                     isRecover, truncationPoint, sequenceNumber);
         }
     }

@@ -122,7 +122,7 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void updateInitialExportStateToTxnId(int partitionId, String streamName,
+        public void updateInitialExportStateToTxnId(int partitionId, String signature,
                 boolean isRecover, Long truncationPoint, long sequenceNumber) {
         }
 

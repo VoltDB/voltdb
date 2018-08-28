@@ -650,7 +650,7 @@ public class ExportGeneration implements Generation {
     }
 
     @Override
-    public void updateInitialExportStateToTxnId(int partitionId, String streamName,
+    public void updateInitialExportStateToTxnId(int partitionId, String signature,
             boolean isRecover, Long truncationPoint, long sequenceNumber) {
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
@@ -658,7 +658,7 @@ public class ExportGeneration implements Generation {
         Map<String, ExportDataSource> dataSource = m_dataSourcesByPartition.get(partitionId);
         // It is possible that for restore the partitions have changed, in which case what we are doing is silly
         if (dataSource != null) {
-            ExportDataSource source = dataSource.get(streamName);
+            ExportDataSource source = dataSource.get(signature);
             if (source != null) {
                 ListenableFuture<?> task = source.truncateExportToTxnId(isRecover, truncationPoint, sequenceNumber);
                 try {
