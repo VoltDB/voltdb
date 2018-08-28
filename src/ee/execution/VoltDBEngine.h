@@ -506,14 +506,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void updateHashinator(char const* config,
                               int32_t* configPtr, uint32_t numTokens);
 
+        /**
+         * Apply multiple binary logs which can either be one log with multiple transactions to one partition or
+         * multiple logs which are one multi-partition transaction
+         */
         int64_t applyBinaryLog(int64_t txnId,
                             int64_t spHandle,
                             int64_t lastCommittedSpHandle,
                             int64_t uniqueId,
                             int32_t remoteClusterId,
-                            int32_t remotePartitionId,
                             int64_t undoToken,
-                            char const* log);
+                            char const* logs);
 
         /*
          * Execute an arbitrary task represented by the task id and serialized parameters.
