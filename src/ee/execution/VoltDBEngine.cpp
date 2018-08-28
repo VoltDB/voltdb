@@ -2613,13 +2613,12 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
 }
 
 int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
-                                  int64_t spHandle,
-                                  int64_t lastCommittedSpHandle,
-                                  int64_t uniqueId,
-                                  int32_t remoteClusterId,
-                                  int32_t remotePartitionId,
-                                  int64_t undoToken,
-                                  const char *log) {
+        int64_t spHandle,
+        int64_t lastCommittedSpHandle,
+        int64_t uniqueId,
+        int32_t remoteClusterId,
+        int64_t undoToken,
+        const char *logs) {
     DRTupleStreamDisableGuard guard(m_executorContext, !m_isActiveActiveDREnabled);
     setUndoToken(undoToken);
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
@@ -2628,29 +2627,13 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId,
                                              false);
-    // If using replicated stream (drProtocolVersion < NO_REPLICATED_STREAM_PROTOCOL_VERSION), coordinate on stream 16383
-    // If not using replicated stream (drProtocolVersion >= NO_REPLICATED_STREAM_PROTOCOL_VERSION), coordinate on stream 0
-    // Coordination is needed in both cases for replicate table.
-    // The stream with replicated table changes will be executed firstly on lowest side. Then other sites took other changes.
-    // The actual skip of replicated table DRRecord happens inside BinaryLogSink.
-
     // Notice: We now get the consumer drProtocolVersion from its producer side (m_drStream).
     // This assumes that all consumers use same protocol as its producer.
     // However, once we start supporting promote dr protocol (e.g. upgrade dr protocol via promote event from one coordinator cluster),
     // the coordinate cluster's consumer sides could operate in different protocols.
     // At that time, we need explicity pass in the consumer side protocol version for deciding weather
     // its corresponding remote producer has replicated stream or not.
-    bool onLowestSite = false;
-    int32_t replicatedTableStreamId = m_drStream->drProtocolVersion() < DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION ? 16383 : 0;
-    if (UniqueId::isMpUniqueId(uniqueId) && (remotePartitionId == replicatedTableStreamId)) {
-        VOLT_TRACE("applyBinaryLogMP for replicated table");
-        onLowestSite = SynchronizedThreadLock::countDownGlobalTxnStartCount(isLowestSite());
-    }
-    int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId, uniqueId);
-    if (onLowestSite) {
-        SynchronizedThreadLock::signalLowestSiteFinished();
-    }
-    return rowCount;
+    return m_wrapper.apply(logs, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId, uniqueId);
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &taskInfo) {
