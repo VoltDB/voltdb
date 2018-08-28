@@ -24,7 +24,6 @@ import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
@@ -50,11 +49,10 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
     public VoltDBPMergeExchange(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
-            RelDistribution childDistribution,
             int splitCount,
             boolean isTopExchange,
             List<RexNode> collationFieldExprs) {
-        super(cluster, traitSet, input, childDistribution, splitCount, isTopExchange);
+        super(cluster, traitSet, input, splitCount, isTopExchange);
         m_collationFieldExprs = ImmutableList.copyOf(collationFieldExprs);
     }
 
@@ -62,13 +60,11 @@ public class VoltDBPMergeExchange extends AbstractVoltDBPExchange implements Vol
     protected VoltDBPMergeExchange copyInternal(
             RelTraitSet traitSet,
             RelNode newInput,
-            RelDistribution childDistribution,
             boolean isTopExchange) {
         VoltDBPMergeExchange exchange = new VoltDBPMergeExchange(
                 getCluster(),
                 traitSet,
                 newInput,
-                getChildDistribution(),
                 m_splitCount,
                 isTopExchange,
                 m_collationFieldExprs);

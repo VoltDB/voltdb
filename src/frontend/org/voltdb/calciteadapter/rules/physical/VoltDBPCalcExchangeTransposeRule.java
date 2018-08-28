@@ -77,7 +77,7 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
         // Do not change distribution trait if this is a top exchange.
         // The trait will be updated when a limit relation will be transposed with a bottom(fragment) exchange
         if (!exchange.isTopExchange()) {
-            calcTraits = calcTraits.replace(exchange.getChildDistribution());
+            calcTraits = calcTraits.replace(exchange.getDistribution());
         }
 
         Calc newCalc = calc.copy(
@@ -94,7 +94,6 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
                     exchange.getCluster(),
                     exchangeTraits,
                     newCalc,
-                    exchange.getChildDistribution(),
                     exchange.getSplitCount(),
                     exchange.isTopExchange(),
                     calc.getProgram().getExprList());
@@ -102,7 +101,7 @@ public class VoltDBPCalcExchangeTransposeRule extends RelOptRule {
             newExchange = exchange.copy(
                 exchangeTraits,
                 newCalc,
-                exchange.getChildDistribution(),
+                exchange.getDistribution(),
                 exchange.isTopExchange());
         }
 

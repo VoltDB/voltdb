@@ -106,10 +106,8 @@ public class VoltDBPCalc extends Calc implements VoltDBPRel {
     public RelOptCost computeSelfCost(RelOptPlanner planner,
             RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-        // Hack. Discourage Calcite from picking a plan with a Limit that have a RelDistributions.ANY
-        // distribution trait. This would make a "correct"
-        // VoltDBPLimit (Single) / DistributedExchange / VoltDBPLimit (Hash) plan
-        // less expensive than an "incorrect" VoltDBPLimit (Any) / DistributedExchange one.
+        // Hack. Discourage Calcite from picking a plan with a Calc that have a RelDistributions.ANY
+        // distribution trait.
         if (RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
             rowCount *= 10000;
         }

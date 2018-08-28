@@ -18,11 +18,16 @@
 package org.voltdb.calciteadapter.rel.physical;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.voltdb.calciteadapter.util.VoltDBRexUtil;
@@ -138,6 +143,19 @@ public class VoltDBPSort extends Sort implements VoltDBPRel {
         super.explainTerms(pw);
         pw.item("split", m_splitCount);
         return pw;
+    }
+
+    @Override
+    public RelOptCost computeSelfCost(RelOptPlanner planner,
+            RelMetadataQuery mq) {
+        double rowCount = estimateRowCount(mq);
+        // Hack. Discourage Calcite from picking a plan with a Sort that have a RelDistributions.ANY
+        // distribution trait.
+        if (RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
+            rowCount *= 10000;
+        }
+        RelOptCost defaultCost = super.computeSelfCost(planner, mq);
+        return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
     }
 
 }

@@ -85,11 +85,8 @@ public class CalcitePlanner {
         RexConverter.resetParameterIndex();
 
         AbstractPlanNode root = rel.toPlanNode();
-        if (! (root instanceof SendPlanNode)) {
-            SendPlanNode sendNode = new SendPlanNode();
-            sendNode.addAndLinkChild(root);
-            root = sendNode;
-        }
+        assert(root instanceof SendPlanNode);
+
         compiledPlan.rootPlanGraph = root;
 
         PostBuildVisitor postPlannerVisitor = new PostBuildVisitor();

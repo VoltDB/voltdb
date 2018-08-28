@@ -20,6 +20,7 @@ package org.voltdb.calciteadapter.rel.physical;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
@@ -35,9 +36,6 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
     // Exchange's split count equals the count of physical nodes its input runs on
     protected final int m_splitCount;
 
-    // Exchange's input distribution type
-    protected final RelDistribution m_childDistribution;
-
     // An indicator to be set to TRUE only for a top(coordinator) exchange for a multi-partitioned queries
     // Other relations could take advantage of this flag during Exchange Transpose rules if a relation
     // behavior depends whether it's part of the coordinator or fragment stack
@@ -46,14 +44,11 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
     protected AbstractVoltDBPExchange(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
-            RelDistribution childDistribution,
             int splitCount,
             boolean topExchange) {
-        // Exchange own distribution type must be a SINGLETON - VoltDB supports only
-        // "many inputs, one output" exchange type
-        super(cluster, traitSet, input, RelDistributions.SINGLETON);
+        super(cluster, traitSet, input, traitSet.getTrait(RelDistributionTraitDef.INSTANCE));
+        assert(!RelDistributions.ANY.getType().equals(traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType()));
         m_splitCount = splitCount;
-        m_childDistribution = childDistribution;
         m_topExchange = topExchange;
     }
 
@@ -82,10 +77,6 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
         return m_splitCount;
     }
 
-    public RelDistribution getChildDistribution() {
-        return m_childDistribution;
-    }
-
     @Override
     public AbstractVoltDBPExchange copy(
             RelTraitSet traitSet,
@@ -94,7 +85,6 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
         return copyInternal(
                 traitSet,
                 newInput,
-                getChildDistribution(),
                 isTopExchange());
     }
 
@@ -106,14 +96,12 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
         return copyInternal(
                 traitSet,
                 newInput,
-                getChildDistribution(),
                 isTopExchange);
     }
 
     protected abstract AbstractVoltDBPExchange copyInternal(
             RelTraitSet traitSet,
             RelNode newInput,
-            RelDistribution childDistribution,
             boolean isTopExchang);
 
     public boolean isTopExchange() {

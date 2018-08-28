@@ -64,14 +64,19 @@ public class VoltDBPSeqScanRule extends RelOptRule {
                     scanRel,
                     false);
         } else {
+            // Fragment's exchange
             exchangeRel = new VoltDBPUnionExchange(
                     tableScan.getCluster(),
-                    // Exchange's  RelDistribution trait must match the one used to construct it
-                    convertedTraits.plus(RelDistributions.SINGLETON),
+                    convertedTraits.plus(tableDist),
                     scanRel,
-                    tableDist,
                     scanSplitCount,
                     false);
+            // Coordinator's exchange
+            exchangeRel = new VoltDBPSingletonExchange(
+                    tableScan.getCluster(),
+                    convertedTraits.plus(RelDistributions.SINGLETON),
+                    exchangeRel,
+                    true);
         }
         call.transformTo(exchangeRel);
     }

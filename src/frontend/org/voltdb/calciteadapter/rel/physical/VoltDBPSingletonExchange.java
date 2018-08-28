@@ -19,8 +19,6 @@ package org.voltdb.calciteadapter.rel.physical;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
@@ -31,14 +29,13 @@ public class VoltDBPSingletonExchange extends AbstractVoltDBPExchange implements
             RelTraitSet traitSet,
             RelNode input,
             boolean isTopExchange) {
-        super(cluster, traitSet, input, RelDistributions.SINGLETON, 1, isTopExchange);
+        super(cluster, traitSet, input, 1, isTopExchange);
     }
 
     @Override
     protected VoltDBPSingletonExchange copyInternal(
             RelTraitSet traitSet,
             RelNode newInput,
-            RelDistribution childDistribution,
             boolean isTopExchange) {
         VoltDBPSingletonExchange exchange = new VoltDBPSingletonExchange(
                 getCluster(),

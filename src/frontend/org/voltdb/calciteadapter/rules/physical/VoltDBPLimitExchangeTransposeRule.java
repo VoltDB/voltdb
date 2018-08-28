@@ -87,7 +87,7 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
         // Simply push the limit through the exchange
         RelTraitSet exchangeTraits = exchangeRel.getTraitSet();
         RelTrait collationTrait = exchangeTraits.getTrait(RelCollationTraitDef.INSTANCE);
-        RelDistribution distributionTrait = exchangeRel.getChildDistribution();
+        RelDistribution distributionTrait = exchangeRel.getDistribution();
         // Update Limit distribution's and collation's traits
         RelTraitSet newLimitTraits = limitRel.getTraitSet()
                 .replace(collationTrait);
@@ -114,7 +114,7 @@ public class VoltDBPLimitExchangeTransposeRule extends RelOptRule {
     private RelNode transposeDistributedExchange(AbstractVoltDBPExchange exchangeRel, VoltDBPLimit origLimitRel) {
         RelTraitSet exchangeTraits = exchangeRel.getTraitSet();
         RelTrait collationTrait = exchangeTraits.getTrait(RelCollationTraitDef.INSTANCE);
-        RelDistribution distributionTrait = exchangeRel.getChildDistribution();
+        RelDistribution distributionTrait = exchangeRel.getDistribution();
 
         // We can not push just an OFFSET through a distributed exchange
         AbstractVoltDBPExchange newExchangeRel;

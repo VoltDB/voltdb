@@ -62,9 +62,13 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
         assert(sortRel != null);
         AbstractVoltDBPExchange exchangeRel = call.rel(1);
 
+        RelTraitSet sortTraits = sortRel.getTraitSet();
+        if (!exchangeRel.isTopExchange()) {
+            // Update Sort distribution's trait
+            sortTraits = sortTraits.replace(exchangeRel.getDistribution());
+        }
         VoltDBPSort newSortRel = sortRel.copy(
-                // Update Limit distribution's trait
-                sortRel.getTraitSet().plus(exchangeRel.getChildDistribution()),
+                sortTraits,
                 exchangeRel.getInput(),
                 sortRel.getCollation(),
                 sortRel.offset,
@@ -107,30 +111,19 @@ public class VoltDBPSortExchangeTransposeRule extends RelOptRule {
             newExchange = origExchangeRel.copy(
                     newExchangeTraits,
                     newSortRel,
-                    origExchangeRel.getChildDistribution(),
+                    origExchangeRel.getDistribution(),
                     origExchangeRel.isTopExchange());
-            return newExchange;
         } else {
-            VoltDBPMergeExchange mergeExchange = new VoltDBPMergeExchange(
+            newExchange = new VoltDBPMergeExchange(
                     origExchangeRel.getCluster(),
                     newExchangeTraits,
                     newSortRel,
-                    origExchangeRel.getChildDistribution(),
                     origExchangeRel.getSplitCount(),
                     false,
                     newSortRel.getChildExps());
-
-            // Add a SingletonExchange on top of it to be propagated all the way to the root
-            // The relations that will be transposed with the Singleton Exchange represent
-            // the coordinator's nodes in the final VoltDB plan
-            // and can not / should not be pushed beyond the VoltDBPMergeExchange exchange
-            newExchange = new VoltDBPSingletonExchange(
-                    origExchangeRel.getCluster(),
-                    newExchangeTraits,
-                    mergeExchange,
-                    true);
-            return newExchange;
         }
+        return newExchange;
+
     }
 
 }
