@@ -51,6 +51,7 @@ public class SpTerm implements Term
     private boolean m_replicasUpdatedRequired = false;
     private boolean m_initJoin = VoltDB.instance().isJoining();
     private final int m_kFactor = VoltDB.instance().getKFactor();
+    private boolean m_promoting = false;
 
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
@@ -75,6 +76,14 @@ public class SpTerm implements Term
                 if (diff.isEmpty()) {
                     return;
                 }
+            }
+
+            // Since we don't shutdown SpTerm when current site is no longer leader
+            // (see explanation at SpInitiator, m_leadersChangeHandler handler),
+            // ask non-leader (from scheduler perspective) to ignore replica list change.
+            if (!m_promoting && !m_mailbox.m_scheduler.isLeader()) {
+                m_replicas = ImmutableList.copyOf(replicas);
+                return;
             }
 
             // for joining nodes that hasn't been fully initialized
@@ -120,6 +129,7 @@ public class SpTerm implements Term
     public void start()
     {
         try {
+            m_promoting = true;
             Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
                     LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                     m_replicasChangeHandler);
@@ -165,5 +175,9 @@ public class SpTerm implements Term
             m_replicasUpdatedRequired = false;
         }
         return replicasAdded;
+    }
+
+    public void setPromoting(boolean promoting) {
+        m_promoting = promoting;
     }
 }

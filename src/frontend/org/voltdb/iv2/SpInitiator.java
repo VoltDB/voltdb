@@ -89,10 +89,15 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
 
             if (!leaders.contains(getInitiatorHSId())) {
+                // We used to shutdown SpTerm when the site is no longer leader,
+                // however during leader migration there is a short window between
+                // the new leader fails before leader migration comes to finish and
+                // the old leader accepts promotion. If rejoin happens in this window,
+                // SpTerm will fail to add the new site id into the replica list, it
+                // can cause rejoin node hangs on receiving stream snapshot.
+                // Because of this reason we keep the SpTerm even if it's no longer the
+                // leader.
                 m_promoted = false;
-                if (m_term != null) {
-                    m_term.shutdown();
-                }
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug(CoreUtils.hsIdToString(getInitiatorHSId()) + " is not a partition leader.");
                 }
@@ -196,6 +201,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
         try {
             long startTime = System.currentTimeMillis();
             Boolean success = false;
+            if (m_term != null) {
+                m_term.shutdown();
+            }
+            // When the leader is migrated away from this site, the term is still active
+            // If the leader is moved back to the site, recreate the term to ensure no-missed
+            // update.
             m_term = createTerm(m_messenger.getZK(),
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
