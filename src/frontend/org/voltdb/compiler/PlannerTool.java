@@ -62,7 +62,7 @@ public class PlannerTool {
 
     private static PlannerStatsCollector m_plannerStats;
 
-    private final double m_large_mode_ratio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
+    private final double m_largeModeRatio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
 
     public PlannerTool(final Database database, byte[] catalogHash)
     {
@@ -183,8 +183,8 @@ public class PlannerTool {
             boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
         // large_mode_ratio will force execution of SQL queries to use the "large" path (for read-only queries)
         // a certain percentage of the time
-        if (m_large_mode_ratio > 0 && !isLargeQuery) {
-            if (m_large_mode_ratio >= 1 || m_large_mode_ratio > ThreadLocalRandom.current().nextDouble()) {
+        if (m_largeModeRatio > 0 && !isLargeQuery) {
+            if (m_largeModeRatio >= 1 || m_largeModeRatio > ThreadLocalRandom.current().nextDouble()) {
                 isLargeQuery = true;
                 m_adHocLargeModeCount++;
             }
