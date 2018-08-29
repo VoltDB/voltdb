@@ -101,13 +101,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile boolean m_closed = false;
     private final StreamBlockQueue m_committedBuffers;
     private Runnable m_onMastership;
+    // m_pollFuture is used for a common case to improve efficiency, export decoder thread creates
+    // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
+    // is assigned to m_pollFuture. When site thread pushes buffer to EDS executor thread, m_pollFuture
+    // is reused to notify export decoder to stop waiting.
     private SettableFuture<BBContainer> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private volatile ListeningExecutorService m_es;
+    // A place to keep unfinished export buffer when processor shuts down.
     private final AtomicReference<BBContainer> m_pendingContainer = new AtomicReference<>();
+    // Is EDS from catalog or from disk pdb?
     private volatile boolean m_isInCatalog;
     private volatile boolean m_eos;
     private final Generation m_generation;
@@ -646,12 +652,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
+    // Needs to be thread-safe, EDS executor, export decoder and site thread both touch m_pendingContainer.
     public void setPendingContainer(BBContainer container) {
         Preconditions.checkNotNull(m_pendingContainer.get() != null, "Pending container must be null.");
         m_pendingContainer.set(container);
     }
 
     public ListenableFuture<BBContainer> poll() {
+        // ENG-14488, it's possible to have the export master gives up mastership
+        // but still try to poll immediately after that, e.g. from Pico Network
+        // thread the master gives up mastership, from decoder thread it tries to
+        // poll periodically, they won't overlap but poll can happen after giving up
+        // mastership. If it happens m_pollFuture can be mistakingly set, and when
+        // the old master retakes mastership again it refuses to export because
+        // m_pollFuture should be false on a fresh master.
+        //
+        // Add following check to eliminate this window.
+        if (!m_mastershipAccepted.get()) {
+            return null;
+        }
+
         final SettableFuture<BBContainer> fut = SettableFuture.create();
         try {
             m_es.execute(new Runnable() {
@@ -677,6 +697,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (m_pollFuture != null) {
                             fut.setException(new RuntimeException("Should not poll more than once: InCat = " + m_isInCatalog +
                                     " ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId()));
+                            // Since it's not fatal exception, gives it second chance to poll again.
+                            m_pollFuture = null;
                             return;
                         }
                         if (!m_es.isShutdown()) {
@@ -1062,13 +1084,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_mastershipAccepted.set(false);
         m_isInCatalog = false;
         m_eos = false;
+        m_pollFuture = null;
 
-        // For case where the previous export processor had only row of the first block to process
-        // and it completed processing it, poll future is not set to null still. Set it to null to
-        // prepare for the new processor polling
-        if ((m_pollFuture != null) && (m_pendingContainer.get() == null)) {
-            m_pollFuture = null;
-        }
     }
 
     /**

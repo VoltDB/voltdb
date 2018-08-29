@@ -72,7 +72,7 @@ public class AdHoc extends AdHocNTBase {
                                   true, // infer partitioning
                                   null, // no partition key
                                   ExplainMode.NONE,
-                                  false, // is not a large query
+                                  m_backendTargetType.isLargeTempTableTarget, // back end dependent.
                                   false, // is not swap tables
                                   userParams);
         }

@@ -462,5 +462,19 @@ def do_main():
         if haddiffs:
             sys.exit("One or more sqlcmdtest script failures or errors was detected.")
 
+    test_voltsql(options.report_file)
+
+
+def test_voltsql(output_file):
+    ret = subprocess.call('./test_voltsql.sh')
+    with open(output_file, "w+") as report_file:
+        if ret == 0:
+            report_file.write("voltsql tests passed.")
+        else:
+            report_file.write("voltsql tests failed.")
+    if ret != 0:
+        sys.exit("One or more voltsqltest script failures or errors was detected.")
+
+
 if __name__ == "__main__":
     do_main()
