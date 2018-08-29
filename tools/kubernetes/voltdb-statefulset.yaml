@@ -64,8 +64,8 @@ spec:
           name: vmc
         resources:
           requests:
-#           cpu: --cpuCount--
-#           memory: --memorySize--
+           cpu: --cpuCount--
+           memory: --memorySize--
         # For liveness/readiness checks, if security is enabled, provide userid/password, see https://docs.voltdb.com/UsingVoltDB/ProgLangJson.php
         # For liveness probes, set the initialDelay to ensure the probe is not issued until all the pods are initialized, otherwise
         # k8s will restart your pod(s) during initialization. The time will vary with the number of nodes and your k8s system load.

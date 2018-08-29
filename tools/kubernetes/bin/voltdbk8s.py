@@ -167,8 +167,6 @@ if __name__ == "__main__":
     print hn
 
     ssname, ordinal, my_hostname, domain = hn
-    # TODO: (temp) send all connection requests to node-0, not ready nodes may be DNS registered when publishNotReadyAddresses=true.
-    host = ssname+"-0."+domain
 
     if len(hn) != 4 or not ordinal.isdigit():
         # TODO: need a better check for running with k8s statfulset???
@@ -187,24 +185,19 @@ if __name__ == "__main__":
     else:
         voltdbroot = fqhostname
 
-    # k8s starts one node at a time
-    # if DNS is empty, and we are node-0, we are the first node up
-    if len(my_cluster_members) == 0 and hn[1] == "0":
-        fork_voltdb(ssname+"-0."+domain, voltdbroot)
+    # nodes may be "published before they are ready to receive traffic"
+    for host in my_cluster_members:
+        print "Connecting to '%s'" % host
+        if try_to_connect(host, VOLTDB_INTERNAL_INTERFACE):
+            # we may have found a running node, get voltdb SYSTEMINFORMATION
+            if try_to_connect(host, VOLTDB_HTTP_PORT):
+                sys_info = None
+                try:
+                    sys_info = get_system_information(host, VOLTDB_HTTP_PORT)
+                except:
+                    raise
+                print "sysinfo: " + str(sys_info)
+            # try to connect to mesh
+            fork_voltdb(host, voltdbroot)
 
-    print "Connecting to '%s'" % host
-    if try_to_connect(host, VOLTDB_INTERNAL_INTERFACE):
-        # we may have found a running node, get voltdb SYSTEMINFORMATION
-        if try_to_connect(host, VOLTDB_HTTP_PORT):
-            sys_info = None
-            try:
-                sys_info = get_system_information(host, VOLTDB_HTTP_PORT)
-            except:
-                raise
-            print "sysinfo: " + str(sys_info)
-        # try to connect to mesh
-        fork_voltdb(host, voltdbroot)
-
-    fork_voltdb(host, voltdbroot)
-    #print "ERROR: unable to find a suitable leader node to form/rejoin/join cluster '%s'" % domain
-    #sys.exit(-1)
+    fork_voltdb(ssname+"-0."+domain, voltdbroot)

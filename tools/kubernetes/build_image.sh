@@ -40,7 +40,7 @@ TMP_DIR=.assets/$CLUSTER_NAME
 mkdir -p $TMP_DIR
 
 # copy VOLTDB Deployment file - this must exist
-if [ -f "${DEPLOYMENT_FILE}" ]; then
+if [ ! -f "${DEPLOYMENT_FILE}" ]; then
     echo "ERROR deployment file not specified or missing"
     exit 1
 fi
