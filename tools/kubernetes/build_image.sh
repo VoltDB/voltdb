@@ -21,7 +21,7 @@ CLUSTER_NAME=`basename $1 .cfg`
 source $1
 
 # use Cluster name as default image name
-: ${IMAGE_TAG:=$CLUSTER_NAME}
+: ${IMAGE_TAG:=${CLUSTER_NAME}}
 
 # customize the k8s statefulset
 MANIFEST=`basename $1 .cfg`.yaml
@@ -29,7 +29,7 @@ cp voltdb-statefulset.yaml                        $MANIFEST
 SED="sed -i"
 [[ "$OSTYPE" =~ "darwin" ]] && SED="sed -i ''"
 $SED "s:--clusterName--:$CLUSTER_NAME:g"          $MANIFEST
-$SED "s:--containerImage---:$REP/$IMAGE_TAG:g"    $MANIFEST
+$SED "s+--containerImage---+$REP/$IMAGE_TAG+g"    $MANIFEST
 $SED "s:--replicaCount--:$NODECOUNT:g"            $MANIFEST
 $SED "s:--pvolumeSize--:${PVOLUME_SIZE:-1Gi}:g"   $MANIFEST
 $SED "s:--memorySize--:${MEMORY_SIZE:-4Gi}:g"     $MANIFEST
@@ -40,6 +40,10 @@ TMP_DIR=.assets/$CLUSTER_NAME
 mkdir -p $TMP_DIR
 
 # copy VOLTDB Deployment file - this must exist
+if [ -f "${DEPLOYMENT_FILE}" ]; then
+    echo "ERROR deployment file not specified or missing"
+    exit 1
+fi
 cp ${DEPLOYMENT_FILE} $TMP_DIR/.deployment
 
 # COPY customer supplied assets to the Dockerfile directory
