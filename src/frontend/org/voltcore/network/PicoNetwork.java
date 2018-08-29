@@ -96,6 +96,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 {
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    protected static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     protected final Selector m_selector;
     protected final NetworkDBBPool m_pool = new NetworkDBBPool(64);
@@ -201,7 +202,13 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
                 m_hadWork = false;
                 Runnable task = null;
+                if (m_shouldStop && rejoinLog.isDebugEnabled()) {
+                    rejoinLog.debug("Stopping PicoNetwork...");
+                }
                 while ((task = m_tasks.poll()) != null) {
+                    if (m_shouldStop && rejoinLog.isDebugEnabled()) {
+                        rejoinLog.debug("executing runnable on task queue: " + task);
+                    }
                     m_hadWork = true;
                     task.run();
                 }
@@ -272,7 +279,13 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
             if (m_sc.socket().isConnected()) {
                 try {
+                    if (rejoinLog.isDebugEnabled()) {
+                        rejoinLog.debug("Trying to shutdown socket " + m_sc.socket().toString());
+                    }
                     m_sc.socket().shutdownInput();
+                    if (rejoinLog.isDebugEnabled()) {
+                        rejoinLog.debug("socket is closed: " + m_sc.socket().toString());
+                    }
                 } catch (SocketException e) {
                     //Safe to ignore to these
                 }
@@ -293,13 +306,25 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         /*
          * Drain the write stream
          */
+        if (m_shouldStop && rejoinLog.isDebugEnabled()) {
+            rejoinLog.debug("Shutting down pico network...serializeQueuedWrites");
+        }
         if (m_writeStream.serializeQueuedWrites(m_pool) != 0) m_hadWork = true;
+        if (m_shouldStop && rejoinLog.isDebugEnabled()) {
+            rejoinLog.debug("Shutting down pico network...drainTo");
+        }
         if (m_writeStream.drainTo(m_sc) > 0) m_hadWork = true;
         if (m_writeStream.isEmpty()) {
             disableWriteSelection();
 
             if (m_shouldStop) {
+                if (rejoinLog.isDebugEnabled()) {
+                    rejoinLog.debug("Shutting down pico network...m_sc.close()");
+                }
                 m_sc.close();
+                if (rejoinLog.isDebugEnabled()) {
+                    rejoinLog.debug("Shutting down pico network...unregistered");
+                }
                 unregistered();
             }
         } else {
@@ -319,6 +344,9 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     protected void safeStopping() {
         if (!m_alreadyStopping) {
             m_alreadyStopping = true;
+            if (rejoinLog.isDebugEnabled()) {
+                rejoinLog.debug("Stopping Foreign host handler " + m_ih.toString());
+            }
             m_ih.stopping(this);
         }
     }

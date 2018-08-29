@@ -35,6 +35,7 @@ public class VoltPort implements Connection
     protected final VoltNetwork m_network;
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    protected static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     public static final int MAX_MESSAGE_LENGTH = 52428800;
 
@@ -205,6 +206,9 @@ public class VoltPort implements Connection
         final int read = m_readStream.read(m_channel, maxBytes, m_pool);
 
         if (read == -1) {
+            if (rejoinLog.isDebugEnabled()) {
+                rejoinLog.debug("VoltPort reads EOF..." + toString());
+            }
             handleReadStreamEOF();
         }
         return read;
@@ -215,7 +219,13 @@ public class VoltPort implements Connection
 
         if (m_channel.socket().isConnected()) {
             try {
+                if (rejoinLog.isDebugEnabled()) {
+                    rejoinLog.debug("VoltPort trying to shutdown socket "+ m_channel.socket().toString());
+                }
                 m_channel.socket().shutdownInput();
+                if (rejoinLog.isDebugEnabled()) {
+                    rejoinLog.debug("Socket is closed "+ m_channel.socket().toString());
+                }
             } catch (SocketException e) {
                 //Safe to ignore to these
             }

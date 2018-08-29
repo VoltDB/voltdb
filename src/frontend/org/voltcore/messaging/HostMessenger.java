@@ -104,6 +104,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger tmLog = new VoltLogger("TM");
+    private static final VoltLogger rejoinLog = new VoltLogger("Rejoin");
 
     //VERBOTEN_THREADS is a set of threads that are not allowed to use ZK client.
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
@@ -847,6 +848,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             else {
                 zookeeperZombies.add(fh);
             }
+            if (rejoinLog.isDebugEnabled()) {
+                rejoinLog.debug("closing foreign host " + fh.hostname());
+            }
             fh.close();
         }
         if (picoNetworkZombies != null && picoNetworkZombies.isEmpty()) {
@@ -858,6 +862,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public synchronized void piconetworkThreadShutdown(int hostId, ForeignHost fh) {
+        if (rejoinLog.isDebugEnabled()) {
+            rejoinLog.debug("PicoNetwork thread is closed:" + fh.hostname());
+        }
         ArrayList<ForeignHost> zookeeperZombies = m_zkZombieForeignHosts.get(hostId);
         if (zookeeperZombies != null) {
             boolean removed = zookeeperZombies.remove(fh);
