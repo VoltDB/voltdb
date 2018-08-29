@@ -122,10 +122,13 @@ drivers.each { driver ->
         systemProperty "debugPrint", getProjectPropertyOrDefaultValue("debugPrint", false)
         systemProperty "windowWidth", getProjectPropertyOrDefaultValue("windowWidth", 1500)
         systemProperty "windowHeight", getProjectPropertyOrDefaultValue("windowHeight", 1000)
-        // System properties specific to SqlQueriesTest or FullDdlSqlTest
+        // System properties specific to NavigatePagesBasicTest
+        systemProperty "dr", getProjectPropertyOrDefaultValue("dr", false)
+        systemProperty "importer", getProjectPropertyOrDefaultValue("importer", false)
+        // System properties specific to SqlQueriesBasicTest or FullDdlSqlBasicTest
         systemProperty "sqlTests", getProjectPropertyOrDefaultValue("sqlTests", null)
         systemProperty "sleepSeconds", getProjectPropertyOrDefaultValue("sleepSeconds", 0)
-        // System properties specific to SqlQueriesTest
+        // System properties specific to SqlQueriesBasicTest
         systemProperty "numRowsToInsert", getProjectPropertyOrDefaultValue("numRowsToInsert", 3)
         systemProperty "testTables", getProjectPropertyOrDefaultValue("testTables", "PARTITIONED_TABLE,REPLICATED_TABLE")
         systemProperty "testViews", getProjectPropertyOrDefaultValue("testViews", null)

@@ -372,12 +372,18 @@ while [[ -n "$1" ]]; do
         while [[ -n "$2" ]] && [[ "$2" != "shutdown" ]] && [[ "$2" != "debug" ]]; do
             if [[ "$2" == -P* ]]; then
                 FIRST_ARGS="${FIRST_ARGS} $2"
-            elif [[ "$2" == "--debug" ]] || [[ "$2" == "-debug" ]]; then
-                # "--debug" is short for "-PdebugPrint=true"
-                FIRST_ARGS="${FIRST_ARGS} -PdebugPrint=true"
             elif [[ "$2" == "--basic" ]] || [[ "$2" == "-basic" ]]; then
                 # "--basic" is short for "--tests=*BasicTest*"
                 LAST_ARGS="${LAST_ARGS} --tests=*BasicTest*"
+            elif [[ "$2" == "--debug" ]] || [[ "$2" == "-debug" ]]; then
+                # "--debug" is short for "-PdebugPrint=true"
+                FIRST_ARGS="${FIRST_ARGS} -PdebugPrint=true"
+            elif [[ "$2" == "--dr" ]] || [[ "$2" == "-dr" ]]; then
+                # "--dr" is short for "-Pdr=true"
+                FIRST_ARGS="${FIRST_ARGS} -Pdr=true"
+            elif [[ "$2" == "--importer" ]] || [[ "$2" == "-importer" ]]; then
+                # "--importer" is short for "-Pimporter=true"
+                FIRST_ARGS="${FIRST_ARGS} -Pimporter=true"
             elif [[ "$2" == --* ]]; then
                 LAST_ARGS="${LAST_ARGS} $2"
                 if [[ "$item" == "--rerun-tasks" ]]; then

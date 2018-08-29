@@ -4,6 +4,14 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
+    <dr id="1" role="master"/>
+    <import>
+        <configuration type="kafka" format="csv" enabled="true">
+            <property name="brokers">kafkasvr:9092</property>
+            <property name="topics">employees</property>
+            <property name="procedure">EMPLOYEE.insert</property>
+        </configuration>
+    </import>
     <export>
         <configuration enabled="true" target="file">
             <property name="type">csv</property>
