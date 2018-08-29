@@ -51,19 +51,19 @@ Test
 
 Options
 -----
-- smart completion
+- **smart completion**
 
     If it's on, voltsql will read from voltdb catalog. It will enable voltsql to suggest the table name, column name and udf function.
     
     If it's off, voltsql will only suggest keywords.
     
-- multiline
+- **multiline**
 
     If it's on, press enter key will create a newline instead of execute the statements. To execute the statements, you have to press Meta+Enter (Or Escape followed by Enter).
     
     If it's off, press enter will execute the statements.
     
-- auto refresh
+- **auto refresh**
 
     If it's on, voltsql will fetch the voltdb catalog everytime you execute a statement from voltsql. 
     
