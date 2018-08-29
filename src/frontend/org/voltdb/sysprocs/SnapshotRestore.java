@@ -1527,22 +1527,17 @@ public class SnapshotRestore extends VoltSystemProcedure {
                         TxnEgo.txnIdSeqToString(snapshotTxnId));
             }
         }
-        HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
-        for (long tid : perPartitionTxnIds) {
-            partitionToTxnId.put(TxnEgo.getPartitionId(tid), tid);
-        }
 
         Database db = context.getDatabase();
         Integer myPartitionId = context.getPartitionId();
-        long myPartitionTxnId = -1;
-            if (isRecover) {
+        Long myPartitionTxnId = null;
+        if (isRecover) {
             for (long txnId : perPartitionTxnIds) {
                 if (TxnEgo.getPartitionId(txnId) == myPartitionId) {
                     myPartitionTxnId = txnId;
                     break;
                 }
             }
-            assert(myPartitionTxnId != -1);
         }
 
         //Iterate the export tables
@@ -1587,7 +1582,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     signature);
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
             ExportManager.instance().updateInitialExportStateToTxnId(myPartitionId, signature,
-                    isRecover, partitionToTxnId.get(myPartitionId), sequenceNumber);
+                    isRecover, myPartitionTxnId, sequenceNumber);
         }
     }
 
