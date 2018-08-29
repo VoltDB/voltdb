@@ -142,10 +142,12 @@ public class ExtensibleSnapshotDigestData {
                     JSONObject existingEntry = sequenceNumbers.getJSONObject(partitionIdString);
                     Long existingSequenceNumber = existingEntry.getLong("sequenceNumber");
                     if (!existingSequenceNumber.equals(partitionSequenceNumber)) {
-                        log.debug("Found a mismatch in export sequence numbers of export table " + tableName +
-                                " while recording snapshot metadata for partition " + partitionId +
-                                ". This is expected only on replicated, write-to-file export streams (remote node reported " +
-                                existingSequenceNumber + " and the local node reported " + partitionSequenceNumber + ")");
+                        if (log.isDebugEnabled()) {
+                            log.debug("Found a mismatch in export sequence numbers of export table " + tableName +
+                                    " while recording snapshot metadata for partition " + partitionId +
+                                    ". This is expected only on replicated, write-to-file export streams (remote node reported " +
+                                    existingSequenceNumber + " and the local node reported " + partitionSequenceNumber + ")");
+                        }
                     }
                     existingEntry.put(partitionIdString, Math.max(existingSequenceNumber, partitionSequenceNumber));
 
@@ -221,10 +223,12 @@ public class ExtensibleSnapshotDigestData {
                 if (partitionStateInfo.drId > existingStateInfo.getLong("sequenceNumber")) {
                     addEntry = true;
                 }
-                log.debug("Found a mismatch in dr sequence numbers for partition " + partitionId +
-                        " the DRId should be the same at all replicas, but one node had " +
-                        DRLogSegmentId.getDebugStringFromDRId(existingStateInfo.getLong("sequenceNumber")) +
-                        " and the local node reported " + DRLogSegmentId.getDebugStringFromDRId(partitionStateInfo.drId));
+                if (log.isDebugEnabled()) {
+                    log.debug("Found a mismatch in dr sequence numbers for partition " + partitionId +
+                            " the DRId should be the same at all replicas, but one node had " +
+                            DRLogSegmentId.getDebugStringFromDRId(existingStateInfo.getLong("sequenceNumber")) +
+                            " and the local node reported " + DRLogSegmentId.getDebugStringFromDRId(partitionStateInfo.drId));
+                }
             }
 
             if (addEntry) {

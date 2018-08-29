@@ -211,8 +211,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
             // Create data target for each source HSID in each stream
             for (StreamSnapshotRequestConfig.Stream stream : localStreams) {
-                SNAP_LOG.debug("Sites to stream from: " +
-                               CoreUtils.hsIdCollectionToString(stream.streamPairs.keySet()));
+                if (SNAP_LOG.isDebugEnabled()) {
+                    SNAP_LOG.debug("Sites to stream from: " +
+                                   CoreUtils.hsIdCollectionToString(stream.streamPairs.keySet()));
+                }
                 for (Entry<Long, Long> entry : stream.streamPairs.entries()) {
                     long srcHSId = entry.getKey();
                     long destHSId = entry.getValue();
@@ -368,7 +370,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             }
             final SnapshotTableTask task = createSingleTableTask(table, targetInfo, numTables, snapshotRecord);
 
-            SNAP_LOG.debug("ADDING TASK for streamSnapshot: " + task);
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("ADDING TASK for streamSnapshot: " + task);
+            }
             tasks.put(targetInfo.srcHSId, task);
         }
 
@@ -467,7 +471,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     @Override
     protected void placeReplicatedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids)
     {
-        SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));
+        if (SNAP_LOG.isDebugEnabled()) {
+            SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));
+        }
         // Round-robin the placement of replicated table tasks across the provided HSIds
         for (SnapshotTableTask task : tasks) {
             ArrayList<Long> robin = new ArrayList<Long>();
