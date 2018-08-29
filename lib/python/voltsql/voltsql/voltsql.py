@@ -167,6 +167,9 @@ class VoltCli(object):
                     # use "update" command to force a fresh
                     self.refresher.refresh(self.executor, self.completer, [])
                     continue
+                if sql_cmd.strip().lower() in ("quit", "quit;", "exit", "exit;"):
+                    # exit
+                    break
                 call(
                     "echo \"{sql_cmd}\" | sqlcmd {options}".format(
                         sql_cmd=sql_cmd, options=option_str),
