@@ -48,7 +48,6 @@ import org.junit.Test;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
@@ -57,11 +56,11 @@ import org.voltdb.utils.VoltFile;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
-public class TestFlushExportBufferWhenRejoin extends JUnit4LocalClusterTest
+public class TestExportSPIMigration extends JUnit4LocalClusterTest
 {
     private ServerListener m_serverSocket;
-    private final List<ClientConnectionHandler> m_clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
-    private final ConcurrentMap<Long, AtomicLong> m_seenIds = new ConcurrentHashMap<Long, AtomicLong>();
+    private final List<ClientConnectionHandler> clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
+    private final ConcurrentMap<Long, AtomicLong> seenIds = new ConcurrentHashMap<Long, AtomicLong>();
     private static final String SCHEMA = "CREATE STREAM t partition on column a (a integer not null, b integer not null);";
     private static int PORT = 5001;
     private volatile Set<String> exportMessageSet = null;
@@ -73,7 +72,7 @@ public class TestFlushExportBufferWhenRejoin extends JUnit4LocalClusterTest
     }
 
     @Test
-    public void testFlushEEBufferWithoutQuiesce() throws Exception {
+    public void testFlushEEBufferWhenRejoin() throws Exception {
         resetDir();
         m_serverSocket = new ServerListener(5001);
         m_serverSocket.start();
@@ -126,18 +125,15 @@ public class TestFlushExportBufferWhenRejoin extends JUnit4LocalClusterTest
             VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
             System.out.println("TOPO at the start:");
             System.out.println(vt.toFormattedString());
-            assertEquals("0:0", vt.fetchRow(0).get(2, VoltType.STRING));
-            assertEquals("1:1", vt.fetchRow(1).get(2, VoltType.STRING));
+            assertTrue(!vt.fetchRow(0).getString(2).split(":")[0].equals(vt.fetchRow(1).getString(2).split(":")[0]));
 
             cluster.killSingleHost(1);
             vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
             System.out.println("TOPO after kill:");
             System.out.println(vt.toFormattedString());
-            assertEquals("0:0", vt.fetchRow(0).get(2, VoltType.STRING));
-            assertEquals("0:1", vt.fetchRow(1).get(2, VoltType.STRING));
+            assertTrue(vt.fetchRow(0).getString(2).split(":")[0].equals(vt.fetchRow(1).getString(2).split(":")[0]));
 
             for (int i = 0; i < 5; i++) {
-                Thread.sleep(50);
                 //add data to stream table
                 client.callProcedure("@AdHoc", "insert into t values(" + i + ", 1)");
             }
@@ -146,33 +142,40 @@ public class TestFlushExportBufferWhenRejoin extends JUnit4LocalClusterTest
             long tss = System.currentTimeMillis();
             while (true) {
                 Thread.sleep(100);
-                // rejoin time limit (20s) reached, test marked as failed
-                if (System.currentTimeMillis() - tss > 20000) {
-                    assertTrue(false);
-                }
-                // rejoin has finished and partition leader migrated
-                else {
-                    vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
-                    if ("2:0".equals(vt.fetchRow(0).get(2, VoltType.STRING)) && "0:1".equals(vt.fetchRow(1).get(2, VoltType.STRING))) {
-                        break;
-                    }
+                assertTrue("Rejoin time has reached 20s limit, test failed", System.currentTimeMillis() - tss < 20000);
+                // rejoin has finished and partition leader balanced after migration
+                vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
+                if (!vt.fetchRow(0).getString(2).split(":")[0].equals(vt.fetchRow(1).getString(2).split(":")[0])) {
+                    break;
                 }
             }
 
             // all 5 export messages should be captured
             // because during rejoin a @Quiesce call will be triggered by @Snapshotsave
             assertEquals(exportMessageSet.size(), 5);
+
             vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
             System.out.println("TOPO in the end:");
             System.out.println(vt.toFormattedString());
-            assertEquals("2:0", vt.fetchRow(0).get(2, VoltType.STRING));
-            assertEquals("0:1", vt.fetchRow(1).get(2, VoltType.STRING));
+
+            for (int i = 5; i < 10; i++) {
+                client.callProcedure("@AdHoc", "insert into t values(" + i + ", 1)");
+            }
+            client.callProcedure("@Quiesce");
+            while (true) {
+                Thread.sleep(100);
+                assertTrue("Insertion time has reached 10s limit, test failed", System.currentTimeMillis() - tss < 10000);
+                // making sure all export message
+                if (exportMessageSet.size() == 10) {
+                    break;
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             m_serverSocket.close();
             cleanup(client, cluster);
-            m_clients.clear();
+            clients.clear();
             System.out.println("Everything shut down.");
         }
     }
@@ -194,18 +197,16 @@ public class TestFlushExportBufferWhenRejoin extends JUnit4LocalClusterTest
     }
 
     private void cleanup(Client client, LocalCluster cluster) {
-        if ( client != null) {
-            try {
-                client.drain();
-                client.close();
-            } catch (InterruptedException | NoConnectionsException e) {
-            }
-        }
         if (cluster != null) {
             try {
                 cluster.shutDown();
             } catch (InterruptedException e) {
-                //e.printStackTrace();
+            }
+        }
+        if ( client != null) {
+            try {
+                client.close();
+            } catch (InterruptedException e) {
             }
         }
     }
@@ -234,7 +235,7 @@ public class TestFlushExportBufferWhenRejoin extends JUnit4LocalClusterTest
                 try {
                     Socket clientSocket = ssocket.accept();
                     ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket);
-                    m_clients.add(ch);
+                    clients.add(ch);
                     ch.start();
                 } catch (IOException ex) {
                     //ex.printStackTrace();
@@ -272,8 +273,8 @@ public class TestFlushExportBufferWhenRejoin extends JUnit4LocalClusterTest
                             continue;
                         }
                         Long i = Long.parseLong(parts[0]);
-                        if (m_seenIds.putIfAbsent(i, new AtomicLong(1)) != null) {
-                            m_seenIds.get(i).incrementAndGet();
+                        if (seenIds.putIfAbsent(i, new AtomicLong(1)) != null) {
+                            seenIds.get(i).incrementAndGet();
                         }
                     }
                     m_clientSocket.close();
