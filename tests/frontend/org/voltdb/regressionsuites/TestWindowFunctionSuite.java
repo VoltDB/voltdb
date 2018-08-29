@@ -542,7 +542,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
 
     private void subtestRowNumber() throws Exception {
         // partition by
-        validateRankFunction("select A, B, C, row_number() over (partition by A order by B) as R from T ORDER BY A;",
+        validateRankFunction("select A, B, C, row_number() over (partition by A order by B) as R from T ORDER BY A, B, C;",
                 colR_row1);
         // no partition by
         validateRankFunction("select A, B, C, row_number() over (ORDER BY A, B, C) as R from T;",
