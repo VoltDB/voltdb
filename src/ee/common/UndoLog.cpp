@@ -29,7 +29,7 @@ void UndoLog::clear()
     if (m_undoQuantums.size() > 0) {
         release(m_lastUndoToken);
     }
-    for (std::vector<Pool*>::iterator i = m_undoDataPools.begin();
+    for (auto i = m_undoDataPools.begin();
          i != m_undoDataPools.end();
          i++) {
         delete *i;

@@ -18,12 +18,12 @@
 #ifndef UNDOQUANTUM_H_
 #define UNDOQUANTUM_H_
 
-#include <vector>
 #include <stdint.h>
 #include <cassert>
 #include <string.h>
 
 #include "common/Pool.hpp"
+#include "common/VoltContainer.hpp"
 #include "common/UndoReleaseAction.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "boost/unordered_set.hpp"
@@ -91,7 +91,7 @@ protected:
      * but their no-op delete operator leaves them to be purged in one go with the data pool.
      */
     inline Pool* undo() {
-        for (std::vector<UndoReleaseAction*>::reverse_iterator i = m_undoActions.rbegin();
+        for (auto i = m_undoActions.rbegin();
              i != m_undoActions.rend(); ++i) {
             UndoReleaseAction* goner = *i;
             goner->undo();
@@ -116,7 +116,7 @@ protected:
      * table before all the inserts and deletes are released.
      */
     inline Pool* release() {
-        for (std::vector<UndoReleaseAction*>::iterator i = m_undoActions.begin();
+        for (auto i = m_undoActions.begin();
              i != m_undoActions.end(); ++i) {
             UndoReleaseAction* goner = *i;
             goner->release();
@@ -154,7 +154,7 @@ public:
 
 private:
     const int64_t m_undoToken;
-    std::vector<UndoReleaseAction*> m_undoActions;
+    volt_vector<UndoReleaseAction*> m_undoActions;
     uint32_t m_numInterests;
     uint32_t m_interestsCapacity;
     UndoQuantumReleaseInterest **m_interests;

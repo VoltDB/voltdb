@@ -18,13 +18,11 @@
 #ifndef UNDOLOG_H_
 #define UNDOLOG_H_
 
-#include <vector>
-#include <deque>
 #include <stdint.h>
 #include <iostream>
 #include <cassert>
 
-#include "common/Pool.hpp"
+#include "common/VoltContainer.hpp"
 #include "common/UndoQuantum.h"
 
 namespace voltdb
@@ -199,8 +197,8 @@ namespace voltdb
         // any larger value might exist (gaps are possible)
         int64_t m_lastReleaseToken;
 
-        std::vector<Pool*> m_undoDataPools;
-        std::deque<UndoQuantum*> m_undoQuantums;
+        volt_vector<Pool*> m_undoDataPools;
+        volt_deque<UndoQuantum*> m_undoQuantums;
         bool m_undoLogForLowestSite;
     };
 }
