@@ -540,12 +540,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
         }
         if (buffer != null) {
-            //There will be 8 bytes of no data that we can ignore, it is header space for storing
+            //There will be header bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
-            if (buffer.capacity() > 8) {
+            if (buffer.capacity() > StreamBlock.HEADER_SIZE) {
                 // Drop already acked buffer
                 final BBContainer cont = DBBPool.wrapBB(buffer);
-                long bufferSize = (buffer.capacity() - 8) - 1;
+                long bufferSize = (buffer.capacity() - StreamBlock.HEADER_SIZE) - 1;
                 if (m_lastReleasedUso > 0 && m_lastReleasedUso >= (uso + bufferSize)) {
                     m_tupleCount += tupleCount;
                     m_tuplesPending += tupleCount;
