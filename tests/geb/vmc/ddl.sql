@@ -221,6 +221,13 @@ CREATE STREAM export_skinny_partitioned_table PARTITION ON COLUMN rowid
 , rowid                     BIGINT          NOT NULL
 );
 
+-- Simple Table used for Kafka Import
+CREATE TABLE kafka_import_table
+(
+  message                   VARCHAR
+, PRIMARY KEY (message)
+);
+
 -- Simple User-Defined Stored Procedures, to test CREATE PROCEDURE AS ...
 -- and the display of User-Defined Stored Procedures in the VMC
 CREATE PROCEDURE CountPartitionedTable AS

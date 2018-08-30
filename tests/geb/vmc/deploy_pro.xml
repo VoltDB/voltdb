@@ -7,9 +7,9 @@
     <dr id="1" role="master"/>
     <import>
         <configuration type="kafka" format="csv" enabled="true">
-            <property name="brokers">kafkasvr:9092</property>
-            <property name="topics">employees</property>
-            <property name="procedure">EMPLOYEE.insert</property>
+            <property name="brokers">localhost:9092</property>
+            <property name="topics">vmctest</property>
+            <property name="procedure">kafka_import_table.insert</property>
         </configuration>
     </import>
     <export>

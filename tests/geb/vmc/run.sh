@@ -149,6 +149,10 @@ function server-pro() {
     find-directories-if-needed
     echo -e "\n$0 performing: server-pro"
     DEPLOYMENT_FILE=$GEB_VMC_DIR/deploy_pro.xml
+    TEST_ARGS=" -Pdr=true"
+    # TODO: uncomment the line below, and delete the one above
+    # (& this comment), once ENG-14518 is fixed
+    #TEST_ARGS=" -Pdr=true -Pimporter=true"
     test-tools-server-pro
     code[3]=${code_tt_server}
 }
@@ -212,10 +216,10 @@ function prepare-pro() {
 # 'prepare-pro' (or the equivalent) has already been run
 function tests-only() {
     init-if-needed
-    echo -e "\n$0 performing: tests[-only]$ARGS"
+    echo -e "\n$0 performing: tests[-only]$TEST_ARGS$ARGS"
 
     cd $GEB_VMC_DIR
-    TEST_COMMAND="./gradlew$ARGS"
+    TEST_COMMAND="./gradlew$TEST_ARGS$ARGS"
     echo -e "running:\n$TEST_COMMAND"
     $TEST_COMMAND
     code[5]=$?
