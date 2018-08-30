@@ -1,4 +1,4 @@
 # Expected Views: (when running the default GEB VMC
-# test server; see ../../server/run_voltdb_server.sh)
+# test server; see ../../run.sh)
 PARTITIONED_TABLE_GROUP
 REPLICATED_TABLE_GROUP
