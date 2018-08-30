@@ -1213,7 +1213,7 @@ public class PlanAssembler {
         }
 
         // If we have a windowed expression in the display list we want to
-        // add a PartitionByPlanNode here.
+        // add a WindowFunctionPlanNode here.
         if (m_parsedSelect.hasWindowFunctionExpression()) {
             root = handleWindowedOperators(root);
         }
@@ -3013,7 +3013,8 @@ public class PlanAssembler {
                 = m_parsedSelect.isGrouped()
                       && ( ! gbInfo.m_canBeFullySerialized )
                       && isLargeQuery();
-        // We will need an order by node on top iff we have group keys,
+        // We will need an order by node on top iff we have an aggregation node
+        // and top, and we have group keys,
         // and either it's a large query, or there is not a partition column among
         // the group by keys.  The argument is similar to needAggOrderBy, but
         // here we care about whether the group by keys contain a partition
@@ -3023,7 +3024,8 @@ public class PlanAssembler {
         // a top order by node.  But this is implied by the partition in
         // group by requirement, so we are ok.
         boolean needTopOrderBy
-                = m_parsedSelect.isGrouped()
+                = (topAggNode != null)
+                   &&  m_parsedSelect.isGrouped()
                    &&  (! m_parsedSelect.hasPartitionColumnInGroupby())
                    &&  isLargeQuery();
 
@@ -3056,7 +3058,7 @@ public class PlanAssembler {
                 // aggregate expression, the column alias provided by HSQL,
                 // and the offset into the output table schema for the
                 // aggregate node that we're computing.
-                // Oh, oh, it's magic, you know..
+                // Oh, oh, it's magic, you know.
                 TupleValueExpression tve = new TupleValueExpression(
                         AbstractParsedStmt.TEMP_TABLE_NAME,
                         AbstractParsedStmt.TEMP_TABLE_NAME,
@@ -3066,11 +3068,13 @@ public class PlanAssembler {
 
                 boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                 aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
+
                 schema_col = new SchemaColumn(
                         AbstractParsedStmt.TEMP_TABLE_NAME,
                         AbstractParsedStmt.TEMP_TABLE_NAME,
                         "", col.m_alias,
                         tve, outputColumnIndex);
+
                 top_schema_col = new SchemaColumn(
                         AbstractParsedStmt.TEMP_TABLE_NAME,
                         AbstractParsedStmt.TEMP_TABLE_NAME,
