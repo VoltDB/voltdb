@@ -331,7 +331,7 @@ public class RejoinProducer extends JoinProducerBase {
                     allSitesFinishStreaming = s_streamingSiteCount.decrementAndGet() == 0;
                 }
                 else {
-                    int pendingSites = s_streamingSiteCount.get()
+                    int pendingSites = s_streamingSiteCount.get();
                     assert(pendingSites >= 0);
                     allSitesFinishStreaming = pendingSites == 0;
                 }
