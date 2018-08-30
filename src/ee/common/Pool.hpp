@@ -16,12 +16,26 @@
  */
 
 #pragma once
+#include <typeinfo>
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
 #include <vector>
-#include <deque>
+#include <memory>
+
+#undef MODERN_CXX
+
+#if __cplusplus >= 201402
+#define MODERN_CXX
+#endif
+
+#ifdef MODERN_CXX
 #include <atomic>
+#else
+#include <signal.h>     // for sig_atomic_t typedef
+#endif
+
+#include <mutex>
 
 namespace voltdb {
 
@@ -31,25 +45,55 @@ namespace voltdb {
     * A memory pool that provides fast allocation and deallocation. The
     * only way to release memory is to free all memory in the pool by
     * calling purge.
+    *
+    * A pool is **NOT** thread-safe, meaning that multiple
+    * threads should not call allocate() method from the same
+    * Pool instance.
     */
    class Pool {
       /**
-       * Description of a chunk of memory allocated on the heap
+       * A chunk of memory allocated on the heap
        */
-      struct Chunk {
-         uint64_t m_offset = 0;
-         uint64_t m_size = 0;
-         char *m_chunkData = nullptr;
-         Chunk() {}
-         Chunk(uint64_t size, void *chunkData)
-            : m_size(size), m_chunkData(static_cast<char*>(chunkData)) { }
-         int64_t getSize() const {
+      class Chunk {
+         uint64_t m_offset;
+         uint64_t m_size;
+         std::unique_ptr<char[]> m_chunkData;
+      public:
+         Chunk(uint64_t size, uint64_t offset)
+            : m_offset(offset), m_size(size), m_chunkData(std::unique_ptr<char[]>(new char[size])) { }
+         int64_t size() const throw() {
             return m_size;
          }
+         uint64_t offset() const throw () {
+            return m_offset;
+         }
+         uint64_t& offset() throw() {
+            return m_offset;
+         }
+         const char* data() const throw() {
+            return m_chunkData.get();
+         }
+         char* data() throw() {
+            return m_chunkData.get();
+         }
+         size_t padding() const throw() {   // number of bytes needed to advance offset to make next object
+            const size_t padding = 8 - (offset() % 8);    // align in 8-byte memory location.
+            return padding < 8 ? padding : 0;
+         }
       };
-      const uint64_t m_allocationSize = TEMP_POOL_CHUNK_SIZE;
-      std::size_t m_maxChunkCount = 1;
-      std::size_t m_currentChunkIndex = 0;
+#ifndef MODERN_CXX
+      /**
+       * Note: We need this only for the support of Centos6.
+       */
+      struct AllocMemoryCalculator {
+         int64_t operator()(int64_t acc, const Chunk& cur) {
+            return acc + cur.size();
+         }
+      };
+#endif
+      const uint64_t m_allocationSize;
+      std::size_t m_maxChunkCount;
+      std::size_t m_currentChunkIndex;
       std::vector<Chunk> m_chunks;
       /*
        * Oversize chunks that will be freed and not reused.
@@ -62,7 +106,7 @@ namespace voltdb {
       Pool();
       Pool(uint64_t allocationSize, uint64_t maxChunkCount);
       void init();
-      virtual ~Pool();
+      ~Pool();
       /*
        * Allocate a continous block of memory of the specified size.
        */
@@ -79,15 +123,15 @@ namespace voltdb {
     * A debug version of the memory pool that does each allocation on the heap keeps a list for when purge is called
     */
    class Pool {
-      std::vector<char*> m_allocations();
-      int64_t m_memTotal = 0;
+      std::vector<std::unique_ptr<char[]>> m_allocations;
+      int64_t m_memTotal;
       // No implicit copies
       Pool(const Pool&);
       Pool& operator=(const Pool&);
    public:
-      Pool() {}
+      Pool() : m_memTotal(0) {}
       Pool(uint64_t allocationSize, uint64_t maxChunkCount) {}
-      virtual ~Pool() {purge();}
+      ~Pool() {purge();}
       /*
        * Allocate a continous block of memory of the specified size.
        */
@@ -100,63 +144,150 @@ namespace voltdb {
       int64_t getAllocatedMemory() const;
    };
 #endif
+
    /**
     * Resource pool for all heteregeous VoltAllocs.
     */
    class VoltAllocResourceMng {
-   protected:
+#ifdef MODERN_CXX
+      static thread_local Pool s_VoltAllocatorPool;
+      static thread_local std::atomic_ulong s_numInstances;
+#else
       static Pool s_VoltAllocatorPool;
-      static std::atomic_int s_AllocInUse;
+      static volatile sig_atomic_t s_numInstances;
+      static std::mutex s_allocMutex;
+#endif
+   public:
       static void* operator new(std::size_t sz) {
-//         fprintf(stderr, "Ask for %lu bytes\n", sz);
-         void* p = s_VoltAllocatorPool.allocate(sz);
-//         fputs("granted\n", stderr);
-         return p;
+#ifndef MODERN_CXX
+         std::lock_guard<std::mutex> lock(s_allocMutex);   // C++11 has thread_local keyword, so no need for locking
+#endif
+         ++s_numInstances;
+         return s_VoltAllocatorPool.allocate(sz);
       }
       static void* operator new(std::size_t sz, void* p) {
          return p;
       }
-      static void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
+#ifdef MODERN_CXX
+      static void operator delete(void*) {
+         if (1lu == s_numInstances.fetch_sub(1lu)) {       // fetch then subtract. No need for locking, as memory pool is already thread-local
+            s_VoltAllocatorPool.purge();
+         }
+      }
+#else
+      static void operator delete(void*) {
+         if (0 == --s_numInstances) {
+            std::lock_guard<std::mutex> lock(s_allocMutex);
+            s_VoltAllocatorPool.purge();
+         }
+      }
+#endif
    };
    /**
     * An allocator to be used in lieu with STL containers, but
     * allocate from a global memory pool.
     * e.g. std::vector<TxnMem, VoltAlloc<TxnMem>> s;
+    *
+    * The voltdb::allocator (conceptually) uses a common thread-local Pool,
+    * which means that:
+    *
+    * 1. The allocator is thread-safe, i.e. multiple threads
+    * using allocator should be free to use it in any manner;
+    *
+    * 2. One thread's memory is invisible to the other, meaning
+    * that they cannot access the same object in any manner.
     */
-   template<typename T> class allocator: public VoltAllocResourceMng {
-      public:
-         typedef size_t     size_type;
-         typedef ptrdiff_t  difference_type;
-         typedef T*       pointer;
-         typedef const T* const_pointer;
-         typedef T&       reference;
-         typedef const T& const_reference;
-         typedef T        value_type;
-         template<typename Tp1> struct rebind { typedef allocator<Tp1> other; };
+   template<typename T> class allocator {
+   public:
+      typedef std::size_t     size_type;
+      typedef std::ptrdiff_t  difference_type;
+      typedef T*       pointer;
+      typedef const T* const_pointer;
+      typedef T&       reference;
+      typedef const T& const_reference;
+      typedef T        value_type;
+      template<typename R> struct rebind { typedef allocator<R> other; };
 
-         allocator() throw() { }
-         allocator(const allocator&) throw() { }
-         template<typename Tp1> allocator(const allocator<Tp1>&) throw() { }
-         ~allocator() throw() { }
-         pointer address(reference x) const throw() { return std::addressof(x); }
-         const_pointer address(const_reference x) const throw() { return std::addressof(x); }
-         pointer allocate(size_type n, const void* = static_cast<const void*>(nullptr)) {
-            if (n > this->max_size())
-               throw std::bad_alloc();
-            return static_cast<T*>(VoltAllocResourceMng::operator new(n * sizeof(T)));
-         }
-         void deallocate(pointer p, size_type) {
-            VoltAllocResourceMng::operator delete(p);
-         }
-         size_type max_size() const throw() { return size_t(-1) / sizeof(T); }
-//         void construct(pointer p, const T& val) { new((void *)p) T(val); }
-         template<typename U> void destroy(U* p) { p->~U(); }
+      allocator() throw() {
+      }
+      allocator(const allocator&) throw() {
+      }
+      template<typename R> allocator(const allocator<R>&) throw() { }
+      ~allocator() throw() { }
+#ifdef MODERN_CXX
+      pointer address(reference x) const throw() { return std::addressof(x); }
+      const_pointer address(const_reference x) const throw() { return std::addressof(x); }
+#else
+      pointer address(reference x) const throw() { return &x; }
+      const_pointer address(const_reference x) const throw() { return &x; }
+#endif
+      pointer allocate(size_type n, const void* = NULL) {
+         if (n > this->max_size())
+            throw std::bad_alloc();
+         return static_cast<T*>(VoltAllocResourceMng::operator new(n * sizeof(T)));
+      }
+      void deallocate(pointer p, size_type n) {
+         VoltAllocResourceMng::operator delete(p);
+      }
+      size_type max_size() const throw() { return size_t(-1) / sizeof(T); }
+      void construct(pointer p, const T& val) {
+         new((void *)p) T(val);       // NOTE: this calls placement new
+      }
+      template<typename R> void destroy(R* p) {
+         p->~R();
+      }
    };
-
    template<typename T1, typename T2> inline bool operator==(const allocator<T1>&, const allocator<T2>&) throw() { return true; }
    template<typename T> inline bool operator==(const allocator<T>&, const allocator<T>&) throw() { return true; }
-
    template<typename T1, typename T2> inline bool operator!=(const allocator<T1>&, const allocator<T2>&) throw() { return false; }
    template<typename T> inline bool operator!=(const allocator<T>&, const allocator<T>&) throw() { return false; }
+
+   /**
+    * Pattern for static factory of creating arbitrary C++ class
+    * on the thread-local memory pool.
+    * Usage:
+    * class Foo {
+    *    Foo(Arg1 arg1, Arg2 arg2);
+    * public:
+    *    static std::unique_ptr<Foo> createInstance(Arg1 arg1, Arg2 arg2) {
+    *        return InstanceFactory<Foo>::create(arg1, arg2);
+    *    }
+    * };
+    *
+    * NOTE: sadly this does NOT work on C6/C7 machines, with old
+    * compilers that do not support C++11 vararg template type,
+    * and there is no easy solution around this.
+    */
+   template<typename T> struct InstanceFactory: private VoltAllocResourceMng {
+#ifdef MODERN_CXX
+      template<typename... Args> static std::unique_ptr<T> create(Args... args) {
+         return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+      }
+#else
+      // no variadic template argument support...
+       static std::unique_ptr<T> create() {
+          return std::unique_ptr<T>(new T());
+       }
+       template<typename Arg1> static std::unique_ptr<T> create(Arg1 arg1) {
+          return std::unique_ptr<T>(new T(arg1));
+       }
+       template<typename Arg1, typename Arg2>
+       static std::unique_ptr<T> create(Arg1 arg1, Arg2 arg2) {
+          return std::unique_ptr<T>(new T(arg1, arg2));
+       }
+       template<typename Arg1, typename Arg2, typename Arg3>
+       static std::unique_ptr<T> create(Arg1 arg1, Arg2 arg2, Arg3 arg3) {
+          return std::unique_ptr<T>(new T(arg1, arg2, arg3));
+       }
+       template<typename Arg1, typename Arg2, typename Arg3, typename Arg4>
+       static std::unique_ptr<T> create(Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4) {
+          return std::unique_ptr<T>(new T(arg1, arg2, arg3, arg4));
+       }
+       template<typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5>
+       static std::unique_ptr<T> create(Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5) {
+          return std::unique_ptr<T>(new T(arg1, arg2, arg3, arg4, arg5));
+       }
+#endif
+   };
 
 }

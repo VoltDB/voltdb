@@ -48,7 +48,7 @@ protected:
     void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
 
     inline UndoQuantum(int64_t undoToken, Pool *dataPool, bool forLowestSite)
-        : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0), m_interests(NULL),
+        : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0),
           m_forLowestSite(forLowestSite), m_dataPool(dataPool) {}
     inline virtual ~UndoQuantum() {}
 
@@ -58,28 +58,7 @@ public:
         m_undoActions.push_back(undoAction);
 
         if (interest != NULL) {
-            if (m_interests == NULL) {
-                m_interests = reinterpret_cast<UndoQuantumReleaseInterest**>(m_dataPool->allocate(sizeof(void*) * 16));
-                m_interestsCapacity = 16;
-            }
-            bool isDup = false;
-            for (int ii = 0; ii < m_numInterests; ii++) {
-                if (m_interests[ii] == interest) {
-                    isDup = true;
-                }
-            }
-            if (!isDup) {
-                if (m_numInterests == m_interestsCapacity) {
-                    // Don't need to explicitly free the old m_interests because all memory allocated by UndoQuantum
-                    // gets reset (by calling purge) to a clean state after the quantum completes
-                    UndoQuantumReleaseInterest **newStorage =
-                            reinterpret_cast<UndoQuantumReleaseInterest**>(m_dataPool->allocate(sizeof(void*) * m_interestsCapacity * 2));
-                    ::memcpy(newStorage, m_interests, sizeof(void*) * m_interestsCapacity);
-                    m_interests = newStorage;
-                    m_interestsCapacity *= 2;
-                }
-                m_interests[m_numInterests++] = interest;
-            }
+           m_interests.push_back(interest);
         }
     }
 
@@ -91,11 +70,10 @@ protected:
      * but their no-op delete operator leaves them to be purged in one go with the data pool.
      */
     inline Pool* undo() {
-        for (auto i = m_undoActions.rbegin();
+        for (UndoReleaseActionRevIter_t i = m_undoActions.rbegin();
              i != m_undoActions.rend(); ++i) {
-            UndoReleaseAction* goner = *i;
-            goner->undo();
-            delete goner;
+            (*i)->undo();
+            delete *i;
         }
         Pool * result = m_dataPool;
         delete this;
@@ -116,16 +94,13 @@ protected:
      * table before all the inserts and deletes are released.
      */
     inline Pool* release() {
-        for (auto i = m_undoActions.begin();
+        for (UndoReleaseActionIter_t i = m_undoActions.begin();
              i != m_undoActions.end(); ++i) {
-            UndoReleaseAction* goner = *i;
-            goner->release();
-            delete goner;
+            (*i)->release();
+            delete *i;
         }
-        if (m_interests != NULL) {
-            for (int ii = 0; ii < m_numInterests; ii++) {
-                m_interests[ii]->notifyQuantumRelease();
-            }
+        for(UndoQuantumReleaseInterestIter_t cur = m_interests.begin(); cur != m_interests.end(); ++cur) {
+           (*cur)->notifyQuantumRelease();
         }
         Pool* result = m_dataPool;
         delete this;
@@ -154,10 +129,16 @@ public:
 
 private:
     const int64_t m_undoToken;
-    volt_vector<UndoReleaseAction*> m_undoActions;
+    std::deque<UndoReleaseAction*, voltdb::allocator<UndoReleaseAction*>> m_undoActions;
+    typedef std::deque<UndoReleaseAction*, voltdb::allocator<UndoReleaseAction*>>::iterator
+       UndoReleaseActionIter_t;
+    typedef std::deque<UndoReleaseAction*, voltdb::allocator<UndoReleaseAction*>>::reverse_iterator
+       UndoReleaseActionRevIter_t;
     uint32_t m_numInterests;
     uint32_t m_interestsCapacity;
-    UndoQuantumReleaseInterest **m_interests;
+    std::deque<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>> m_interests;
+    typedef std::deque<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>>::iterator
+       UndoQuantumReleaseInterestIter_t;
     const bool m_forLowestSite;
 protected:
     Pool *m_dataPool;

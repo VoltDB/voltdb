@@ -18,7 +18,10 @@
 #include "Pool.hpp"
 #include <sys/mman.h>
 #include <errno.h>
+#include <algorithm>
+#include <iostream>
 #include <climits>
+#include <numeric>
 #include <cstring>
 #include "common/FatalException.hpp"
 
@@ -38,152 +41,133 @@ template <class T> inline T nexthigher(T k) {
    return k+1;
 }
 
-Pool::Pool() {
+Pool::Pool(): m_allocationSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(1), m_currentChunkIndex(0) {
    init();
 }
 
 Pool::Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
 #ifdef USE_MMAP
-   m_allocationSize(nexthigher(allocationSize)),
+#error "Not using mmap"
+//   m_allocationSize(nexthigher(allocationSize)),
 #else
    m_allocationSize(allocationSize),
 #endif
-   m_maxChunkCount(static_cast<std::size_t>(maxChunkCount)),
-   m_currentChunkIndex(0) { init(); }
+   m_maxChunkCount(maxChunkCount), m_currentChunkIndex(0)
+{
+   init();
+}
 
-   void Pool::init() {
+void Pool::init() {
 #ifdef USE_MMAP
-      char *storage =
-         static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-      if (storage == MAP_FAILED) {
-         std::cout << strerror( errno ) << std::endl;
-         throwFatalException("Failed mmap");
-      }
-#else
-      char *storage = new char[m_allocationSize];
+//      char *storage =
+//         static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+//      if (storage == MAP_FAILED) {
+//         std::cout << strerror( errno ) << std::endl;
+//         throwFatalException("Failed mmap");
+//      }
 #endif
-      m_chunks.push_back(Chunk(m_allocationSize, storage));
-   }
+   m_chunks.emplace_back(m_allocationSize, 0);
+}
 
 Pool::~Pool() {
-   for (std::size_t ii = 0; ii < m_chunks.size(); ii++) {
 #ifdef USE_MMAP
-      if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
-         std::cout << strerror( errno ) << std::endl;
-         throwFatalException("Failed munmap");
-      }
-#else
-      delete [] m_chunks[ii].m_chunkData;
+//   for (std::size_t ii = 0; ii < m_chunks.size(); ii++) {
+//         if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
+//            std::cout << strerror( errno ) << std::endl;
+//            throwFatalException("Failed munmap");    // NOTE: this is all wrong, but since we never USE_MMAP, we got no complaints whatsoever.
+//         }
+//   }
+//   for (std::size_t ii = 0; ii < m_oversizeChunks.size(); ii++) {
+//         if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
+//            std::cout << strerror( errno ) << std::endl;
+//            throwFatalException("Failed munmap");
+//         }
+//   }
 #endif
-   }
-   for (std::size_t ii = 0; ii < m_oversizeChunks.size(); ii++) {
-#ifdef USE_MMAP
-      if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
-         std::cout << strerror( errno ) << std::endl;
-         throwFatalException("Failed munmap");
-      }
-#else
-      delete [] m_oversizeChunks[ii].m_chunkData;
-#endif
-   }
 }
 
 void* Pool::allocate(std::size_t size) {
    /*
     * See if there is space in the current chunk
     */
-   Chunk *currentChunk = &m_chunks[m_currentChunkIndex];
-   if (size > currentChunk->m_size - currentChunk->m_offset) {
+   Chunk &currentChunk = m_chunks[m_currentChunkIndex];
+   const bool fitsInLastNormalChunk = size + currentChunk.offset() <= currentChunk.size(),
+         fitsInNormalChunk = size <= m_allocationSize;
+   if (! fitsInLastNormalChunk) {
       /*
-       * Not enough space. Check if it is greater then our allocation size.
+       * Not enough space. Check if it is greater then our allocation size per chunk.
        */
-      if (size > m_allocationSize) {
+      if (! fitsInNormalChunk) {
          /*
-          * Allocate an oversize chunk that will not be reused.
+          * Allocate an oversize chunk that will not be reused,
+          * i.e. reclaimed in call to purge() method.
           */
 #ifdef USE_MMAP
-         char *storage =
-            static_cast<char*>(::mmap( 0, nexthigher(size), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-         if (storage == MAP_FAILED) {
-            std::cout << strerror( errno ) << std::endl;
-            throwFatalException("Failed mmap");
-         }
-#else
-         char *storage = new char[size];
+//         char *storage =
+//            static_cast<char*>(::mmap( 0, nexthigher(size), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+//         if (storage == MAP_FAILED) {
+//            std::cout << strerror( errno ) << std::endl;
+//            throwFatalException("Failed mmap");
+//         }
 #endif
-         m_oversizeChunks.push_back(Chunk(nexthigher(size), storage));
-         Chunk &newChunk = m_oversizeChunks.back();
-         newChunk.m_offset = size;
-         return newChunk.m_chunkData;
-      }
-
-      /*
-       * Check if there is an already allocated chunk we can use.
-       */
-      m_currentChunkIndex++;
-      if (m_currentChunkIndex < m_chunks.size()) {
-         currentChunk = &m_chunks[m_currentChunkIndex];
-         currentChunk->m_offset = size;
-         return currentChunk->m_chunkData;
-      } else {
-         /*
-          * Need to allocate a new chunk
-          */
-         //                std::cout << "Pool had to allocate a new chunk. Not a good thing "
-         //                  "from a performance perspective. If you see this we need to look "
-         //                  "into structuring our pool sizes and allocations so the this doesn't "
-         //                  "happen frequently" << std::endl;
+         m_oversizeChunks.emplace_back(nexthigher(size), size);
+         return m_oversizeChunks.back().data();
+      } else {   // fits in normal chunk size - check if there is an already allocated chunk we can use.
+         m_currentChunkIndex++;
+         if (m_currentChunkIndex < m_chunks.size()) {   // Some chunks from pre-allocated (a.k.a. init()-ed) have not been used yet.
+            Chunk& currentChunk = m_chunks.at(m_currentChunkIndex);
+            currentChunk.offset() = size;
+            return currentChunk.data();
+         } else {                                       // Need to allocate a new chunk
+            std::cout << "Pool had to allocate a new chunk. Not a good thing "
+               "from a performance perspective. If you see this we need to look "
+               "into structuring our pool sizes and allocations so the this doesn't "
+               "happen frequently" << std::endl;
 #ifdef USE_MMAP
-         char *storage =
-            static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-         if (storage == MAP_FAILED) {
-            std::cout << strerror( errno ) << std::endl;
-            throwFatalException("Failed mmap");
-         }
-#else
-         char *storage = new char[m_allocationSize];
+//            char *storage =
+//               static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+//            if (storage == MAP_FAILED) {
+//               std::cout << strerror( errno ) << std::endl;
+//               throwFatalException("Failed mmap");
+//            }
 #endif
-         m_chunks.push_back(Chunk(m_allocationSize, storage));
-         Chunk &newChunk = m_chunks.back();
-         newChunk.m_offset = size;
-         return newChunk.m_chunkData;
+            m_chunks.emplace_back(m_allocationSize, size);    // and adjust chunk's offset
+            return m_chunks.back().data();
+         }
       }
+   } else {   // fits in last normal chunk
+      /*
+       * Get the offset into the current chunk. Then increment the
+       * offset counter by the amount being allocated.
+       */
+      char *retval = currentChunk.data() + currentChunk.offset();
+      currentChunk.offset() += size;
+      //Ensure 8 byte alignment of future allocations. 8-byte
+      //alignment is always done by struct/class, but not for C-array.
+      currentChunk.offset() += currentChunk.padding();
+      // and ensure offset doesn't go beyond
+      currentChunk.offset() = std::min<uint64_t>(currentChunk.offset(), currentChunk.size());
+      return retval;
    }
-
-   /*
-    * Get the offset into the current chunk. Then increment the
-    * offset counter by the amount being allocated.
-    */
-   void *retval = currentChunk->m_chunkData + currentChunk->m_offset;
-   currentChunk->m_offset += size;
-
-   //Ensure 8 byte alignment of future allocations
-   currentChunk->m_offset += (8 - (currentChunk->m_offset % 8));
-   if (currentChunk->m_offset > currentChunk->m_size) {
-      currentChunk->m_offset = currentChunk->m_size;
-   }
-   return retval;
 }
 
 void* Pool::allocateZeroes(std::size_t size) {
-   return ::memset(allocate(size), 0, size);
+   return std::memset(allocate(size), 0, size);
 }
 
 void Pool::purge() throw() {
    /*
     * Erase any oversize chunks that were allocated
     */
-   const std::size_t numOversizeChunks = m_oversizeChunks.size();
-   for (std::size_t ii = 0; ii < numOversizeChunks; ii++) {
 #ifdef USE_MMAP
-      if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
-         std::cout << strerror( errno ) << std::endl;
-         throwFatalException("Failed munmap");
-      }
-#else
-      delete [] m_oversizeChunks[ii].m_chunkData;
+//   const std::size_t numOversizeChunks = m_oversizeChunks.size();
+//   for (std::size_t ii = 0; ii < numOversizeChunks; ii++) {
+//      if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
+//         std::cout << strerror( errno ) << std::endl;
+//         throwFatalException("Failed munmap");
+//      }
+//   }
 #endif
-   }
    m_oversizeChunks.clear();
 
    /*
@@ -196,50 +180,47 @@ void Pool::purge() throw() {
     * If more then maxChunkCount chunks are allocated erase all extra chunks
     */
    if (numChunks > m_maxChunkCount) {
-      for (std::size_t ii = m_maxChunkCount; ii < numChunks; ii++) {
 #ifdef USE_MMAP
-         if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
-            std::cout << strerror( errno ) << std::endl;
-            throwFatalException("Failed munmap");
-         }
-#else
-         delete []m_chunks[ii].m_chunkData;
+//      for (std::size_t ii = m_maxChunkCount; ii < numChunks; ii++) {
+//         if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
+//            std::cout << strerror( errno ) << std::endl;
+//            throwFatalException("Failed munmap");
+//         }
+//      }
 #endif
-      }
-      m_chunks.resize(m_maxChunkCount);
+      m_chunks.erase(std::next(m_chunks.begin(), m_maxChunkCount), m_chunks.end());
    }
-
-   numChunks = m_chunks.size();
-   for (std::size_t ii = 0; ii < numChunks; ii++) {
-      m_chunks[ii].m_offset = 0;
+#ifdef MODERN_CXX
+   std::for_each(m_chunks.begin(), m_chunks.end(), [](Chunk& cur) { cur.offset() = 0; });
+#else
+   for(std::vector<Chunk>::iterator iter = m_chunks.begin(); iter != m_chunks.end(); ++iter) {
+      iter->offset() = 0;
    }
+#endif
 }
 
 int64_t Pool::getAllocatedMemory() const {
-   int64_t total = 0;
-   total += m_chunks.size() * m_allocationSize;
-   for (int i = 0; i < m_oversizeChunks.size(); i++)
-   {
-      total += m_oversizeChunks[i].getSize();
-   }
-   return total;
+#ifdef MODERN_CXX
+   return std::accumulate(m_oversizeChunks.cbegin(), m_oversizeChunks.cend(),
+         m_chunks.size() * m_allocationSize,
+         [](int64_t acc, const Chunk& cur) { return acc + cur.size(); });
+#else
+   return std::accumulate(m_oversizeChunks.cbegin(), m_oversizeChunks.cend(),
+         m_chunks.size() * m_allocationSize, AllocMemoryCalculator());
+#endif
 }
 
 #else // for MEMCHECK builds
 
 void* Pool::allocate(std::size_t size) {
-   char *retval = new char[size];
-   m_allocations.push_back(retval);
+   m_allocations.emplace_back(std::unique_ptr<char[]>(new char[size]));
    m_memTotal += size;
-   return retval;
+   return m_allocations.back().get();
 }
 void* Pool::allocateZeroes(std::size_t size) {
    return ::memset(allocate(size), 0, size);
 }
 void Pool::purge() throw() {
-   for (std::size_t ii = 0; ii < m_allocations.size(); ii++) {
-      delete [] m_allocations[ii];
-   }
    m_allocations.clear();
    m_memTotal = 0;
 }
@@ -249,6 +230,16 @@ int64_t Pool::getAllocatedMemory() const {
 
 #endif
 
-Pool VoltAllocResourceMng::s_VoltAllocatorPool(8192, 2048);
-std::atomic_int VoltAllocResourceMng::s_AllocInUse(0);
+// Thread-local shared pool for heteregeous STL container with
+// customized allocator: 1024 of 16KB chunks, totaling 16MB
+// overhead, per thread.
+
+#ifdef MODERN_CXX
+thread_local Pool VoltAllocResourceMng::s_VoltAllocatorPool(16384, 1024);
+thread_local std::atomic_ulong VoltAllocResourceMng::s_numInstances;
+#else
+Pool VoltAllocResourceMng::s_VoltAllocatorPool(16384, 1024);
+std::mutex VoltAllocResourceMng::s_allocMutex;
+volatile sig_atomic_t VoltAllocResourceMng::s_numInstances = 0;
+#endif
 
