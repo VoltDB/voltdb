@@ -551,6 +551,9 @@ public class VoltZK {
         String node = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(MpInitiator.MP_INIT_PID));
         try {
             zk.delete(node, -1);
+            if (log.isDebugEnabled()) {
+                log.debug("Removed MP repair blocker");
+            }
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
                 log.error("Unable to remove MP repair blocker\n" + e.getMessage(), e);

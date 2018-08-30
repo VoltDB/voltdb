@@ -515,6 +515,11 @@ public class LeaderAppointer implements Promotable
             m_es);
         }
         else {
+            // Create MP repair ZK node to block rejoin
+            VoltZK.createMpRepairBlocker(m_zk);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Creating MP repair blocker");
+            }
             // If we're taking over for a failed LeaderAppointer, we know when
             // we get here that every partition had a leader at some point in
             // time.  We'll seed each of the PartitionCallbacks for each
@@ -551,7 +556,6 @@ public class LeaderAppointer implements Promotable
             m_removedPartitionsAtPromotionTime = null;
 
             // just go ahead and promote our MPI
-            VoltZK.createMpRepairBlocker(m_zk);
             m_MPI.acceptPromotion();
             VoltZK.removeMpRepairBlocker(m_zk, tmLog);
             m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
