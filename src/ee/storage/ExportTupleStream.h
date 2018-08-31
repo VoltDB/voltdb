@@ -63,6 +63,10 @@ public:
     // compute # of bytes needed to serialize the meta data column names
     inline size_t getMDColumnNamesSerializedSize() const { return m_mdSchemaSize; }
 
+    int64_t allocatedBytesInEE() const {
+        return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace));
+    }
+
     void pushStreamBuffer(StreamBlock *block, bool sync);
     void pushEndOfStream();
 
