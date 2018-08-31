@@ -445,6 +445,14 @@ public class VoltZK {
             case catalogUpdateInProgress:
                 if (blockers.contains(leafNodeRejoinInProgress)) {
                     errorMsg = "while a node rejoin is active. Please retry catalog update later.";
+                } else {
+                    // Upon node failures, a MP repair blocker may be registered right before they
+                    // unregistered after repair is done. Let rejoining nodes wait to avoid any
+                    // interference with the transaction repair process.
+                    List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
+                    if (!partitions.isEmpty()) {
+                        errorMsg = "while leader promotion or transaction repair are in progress. Please retry catalog update later.";
+                    }
                 }
                 break;
             case rejoinInProgress:
