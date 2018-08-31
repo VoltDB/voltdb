@@ -165,6 +165,7 @@ def makeSHA256SUM(version, type):
 
 def makeMavenJars():
     with cd(builddir + "/voltdb"):
+        run("VOLTCORE=../voltdb ant -f build.xml maven-jars")
         run("VOLTCORE=../voltdb ant -f build-client.xml maven-jars")
 
 ################################################
@@ -202,17 +203,27 @@ def copyMavenJarsToReleaseDir(releaseDir, version):
     if not os.path.exists(mavenProjectDir):
         os.makedirs(mavenProjectDir)
 
-    #Get the voltdbclient-n.n.jar from the recently built community build
-    get("%s/voltdb/obj/release/dist-client-java/voltdb/voltdbclient-%s.jar" % (builddir, version),
-        "%s/voltdbclient-%s.jar" % (mavenProjectDir, version))
     #Get the upload.gradle file
     get("%s/voltdb/tools/kit_tools/upload.gradle" % (builddir),
         "%s/upload.gradle" % (mavenProjectDir))
-    #Get the src and javadoc .jar files
+
+    #Get the voltdbclient-n.n.jar from the recently built community build
+    get("%s/voltdb/obj/release/dist-client-java/voltdb/voltdbclient-%s.jar" % (builddir, version),
+        "%s/voltdbclient-%s.jar" % (mavenProjectDir, version))
+    #Get the client's src and javadoc .jar files
     get("%s/voltdb/obj/release/voltdbclient-%s-javadoc.jar" % (builddir, version),
         "%s/voltdbclient-%s-javadoc.jar" % (mavenProjectDir, version))
     get("%s/voltdb/obj/release/voltdbclient-%s-sources.jar" % (builddir, version),
         "%s/voltdbclient-%s-sources.jar" % (mavenProjectDir, version))
+
+    #Get the voltdb-n.n.jar from the recently built community build
+    get("%s/voltdb/voltdb/voltdb-%s.jar" % (builddir, version),
+        "%s/voltdb-%s.jar" % (mavenProjectDir, version))
+    #Get the server's src and javadoc .jar files
+    get("%s/voltdb/obj/release/voltdb-%s-javadoc.jar" % (builddir, version),
+        "%s/voltdb%s-javadoc.jar" % (mavenProjectDir, version))
+    get("%s/voltdb/obj/release/voltdb-%s-sources.jar" % (builddir, version),
+        "%s/voltdb-%s-sources.jar" % (mavenProjectDir, version))
 
 ################################################
 # CREATE CANDIDATE SYMLINKS

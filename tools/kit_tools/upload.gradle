@@ -4,30 +4,39 @@ apply plugin: 'signing'
 
 group = 'org.voltdb'
 
+defaultTasks 'uploadArchives'
+
 //Get the version string from the sources jar filename
-def srcfilepath = new FileNameFinder().getFileNames ('.' , 'voltdbclient-*-sources.jar')[0]
-def matcher = ( srcfilepath =~ /.*voltdbclient-(.*)-sources.jar$/)
+def srcfilepath = new FileNameFinder().getFileNames ('.' , 'voltdb-*-sources.jar')[0]
+def matcher = ( srcfilepath =~ /.*voltdb-(.*)-sources.jar$/)
 version = matcher[0][1]
 println version
-description = 'VoltDB client interface libraries'
-archivesBaseName = 'voltdbclient'
+description = 'VoltDB client and server libraries'
 
 configurations {
   clientArchives
+  serverArchives
   ascSignatures
 }
 
 artifacts {
-  clientArchives file: file("voltdbclient-${version}.jar"), name:'voltdbclient',
+  clientArchives file: file("voltdbclient-${version}.jar"), name:"voltdbclient",
                          classifier:null, type:'jar', extension:'jar'
   clientArchives file: file("voltdbclient-${version}-javadoc.jar"), name:'voltdbclient',
                          classifier:'javadoc', type:'jar', extension:'jar'
   clientArchives file: file("voltdbclient-${version}-sources.jar"), name:'voltdbclient',
                          classifier:'sources', type:'jar', extension:'jar'
+  serverArchives file: file("voltdb-${version}.jar"), name:'voltdb',
+                         classifier:null, type:'jar', extension:'jar'
+  serverArchives file: file("voltdb-${version}-javadoc.jar"), name:'voltdb',
+                         classifier:'javadoc', type:'jar', extension:'jar'
+  serverArchives file: file("voltdb-${version}-sources.jar"), name:'voltdb',
+                         classifier:'sources', type:'jar', extension:'jar'
 }
 
 signing {
   sign configurations.clientArchives
+  sign configurations.serverArchives
 }
 
 task debug << {
@@ -36,78 +45,111 @@ task debug << {
       "${it}: ${ca.$/${it}/$}"
     }.join(", "))
   }
+  configurations.serverArchives.artifacts.each { ca ->
+    println(['name','type','extension','classifier','file'].collect {
+      "${it}: ${ca.$/${it}/$}"
+    }.join(", "))
+  }
+}
+
+ext.signAllArts = { archives ->
+	{ MavenDeployment mvnd ->
+		signing.signPom(mvnd)
+		archives.artifacts.each { ca ->
+			def ascfile = file(ca.file.path + '.asc')
+			def ascartf = project.artifacts.add('ascSignatures', ascfile) {
+				classifier = ca.classifier
+				extension = ca.extension + '.asc'
+				type = ca.type + '.asc'
+			}
+		mvnd.addArtifact(ascartf)
+		}
+	}
+}
+
+ext.projectDetails = { String artifactName, String descr -> 
+	return {
+		name artifactName
+		packaging 'jar'
+		description descr
+		url 'http://www.voltdb.com/'
+
+		scm {
+			url 'git@github.com:VoltDB/voltdb.git'
+			connection 'scm:git@github.com:VoltDB/voltdb.git'
+			developerConnection 'scm:git@github.com:VoltDB/voltdb.git'
+		}
+
+		licenses {
+			license {
+				name 'GNU Affero General Public License Version 3'
+				url 'http://www.gnu.org/licenses/agpl.txt'
+				distribution 'repo'
+			}
+		}
+
+		developers {
+			developer {
+				id 'bballard'
+				name 'Ben Ballard'
+				email 'bballard@voltdb.com'
+				organizationUrl 'http://www.voltdb.com'
+			}
+			developer {
+				id 'rmorgenstein'
+				name 'Ruth Morgenstein'
+				email 'rmorgenstein@voltdb.com'
+				organizationUrl 'http://www.voltdb.com'
+			}
+		}
+	}
 }
 
 uploadClientArchives {
     repositories {
         mavenDeployer {
-            beforeDeployment { MavenDeployment mvnd ->
-              signing.signPom(mvnd)
-              configurations.clientArchives.artifacts.each { ca ->
-                def ascfile = file(ca.file.path + '.asc')
-                def ascartf = project.artifacts.add('ascSignatures', ascfile) {
-                  classifier = ca.classifier
-                  extension = ca.extension + '.asc'
-                  type = ca.type + '.asc'
-                }
-                mvnd.addArtifact(ascartf)
-              }
-            }
+            beforeDeployment(signAllArts(configurations.clientArchives))
 
-            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-              authentication(userName: sonatypeUsername, password: sonatypePassword)
-            }
+			repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+			 authentication(userName: sonatypeUsername, password: sonatypePassword)
+		   }
 
-            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-              authentication(userName: sonatypeUsername, password: sonatypePassword)
-            }
-            // repository(url: "file://localhost/Users/stefano/tmp/m2repo/")
+		   snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+			 authentication(userName: sonatypeUsername, password: sonatypePassword)
+		   }
 
-            pom.project {
-               name 'voltdbclient'
-               packaging 'jar'
-               description 'VoltDB client interface libraries'
-               url 'http://www.voltdb.com/'
+//			repository(url: "file:///Users/seetasomagani/.m2/repository/")
 
-               scm {
-                   url 'git@github.com:VoltDB/voltdb.git'
-                   connection 'scm:git@github.com:VoltDB/voltdb.git'
-                   developerConnection 'scm:git@github.com:VoltDB/voltdb.git'
-               }
-
-               licenses {
-                   license {
-                       name 'GNU Affero General Public License Version 3'
-                       url 'http://www.gnu.org/licenses/agpl.txt'
-                       distribution 'repo'
-                   }
-               }
-
-               developers {
-                   developer {
-                       id 'jhugg'
-                       name 'John Hugg'
-                       email 'jhugg@voltdb.com'
-                       organizationUrl 'http://www.voltdb.com'
-                   }
-                   developer {
-                       id 'vtkstef'
-                       name 'Stefano Santoro'
-                       email 'ssantoro@voltdb.com'
-                       organizationUrl 'http://www.voltdb.com'
-                   }
-                   developer {
-                       id 'jpiekos'
-                       name 'John Piekos'
-                       email 'jpiekos@voltdb.com'
-                       organizationUrl 'http://www.voltdb.com'
-                   }
-               }
-            }
+            pom.project(projectDetails('voltdbclient', 'VoltDB client interface libraries'))
         }
     }
 }
 
-uploadClientArchives.dependsOn {
-  [signClientArchives]
+uploadServerArchives {
+	repositories {
+		mavenDeployer {
+			beforeDeployment(signAllArts(configurations.serverArchives))
+
+			repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+			  authentication(userName: sonatypeUsername, password: sonatypePassword)
+			}
+
+			snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+			  authentication(userName: sonatypeUsername, password: sonatypePassword)
+			}
+
+//			repository(url: "file:///Users/seetasomagani/.m2/repository/")
+
+			pom.project(projectDetails('voltdb', 'VoltDB server libraries'))
+		}
+	}
 }
+
+uploadClientArchives.dependsOn {
+	[signClientArchives]
+}
+uploadServerArchives.dependsOn {
+	[signServerArchives]
+}
+uploadArchives.dependsOn uploadClientArchives
+uploadArchives.dependsOn uploadServerArchives
