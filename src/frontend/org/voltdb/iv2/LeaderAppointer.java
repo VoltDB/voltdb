@@ -516,10 +516,8 @@ public class LeaderAppointer implements Promotable
         }
         else {
             // Create MP repair ZK node to block rejoin
-            VoltZK.createMpRepairBlocker(m_zk);
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Creating MP repair blocker");
-            }
+            VoltZK.createMpRepairBlocker(m_zk, tmLog);
+
             // If we're taking over for a failed LeaderAppointer, we know when
             // we get here that every partition had a leader at some point in
             // time.  We'll seed each of the PartitionCallbacks for each

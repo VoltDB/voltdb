@@ -538,13 +538,13 @@ public class VoltZK {
         return true;
     }
 
-    public static void createMpRepairBlocker(ZooKeeper zk) {
+    public static void createMpRepairBlocker(ZooKeeper zk, VoltLogger log) {
         String node = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(MpInitiator.MP_INIT_PID));
         try {
-            zk.create(node,
-                      null,
-                      Ids.OPEN_ACL_UNSAFE,
-                      CreateMode.EPHEMERAL);
+            zk.create(node, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+            if (log.isDebugEnabled()) {
+                log.debug("Creating MP repair blocker");
+            }
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NODEEXISTS) {
                 VoltDB.crashLocalVoltDB("Unable to create MP repair blocker", true, e);
