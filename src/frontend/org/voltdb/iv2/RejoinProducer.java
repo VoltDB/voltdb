@@ -332,6 +332,9 @@ public class RejoinProducer extends JoinProducerBase {
                 if (allSitesFinishStreaming) {
                     doFinishingTask(siteConnection);
                 }
+                else {
+                    returnToTaskQueue(sourcesReady);
+                }
             }
         }
         else {
