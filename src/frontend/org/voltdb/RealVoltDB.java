@@ -2143,7 +2143,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (StartAction.JOIN.equals(startAction)) {
             TransactionTaskQueue.initBarrier(m_nodeSettings.getLocalSitesCount());
         }
-        else if (StartAction.REJOIN.equals(startAction)) {
+        else if (startAction.doesRejoin()) {
             RejoinProducer.initBarrier(m_nodeSettings.getLocalSitesCount());
         }
         return initiators;
