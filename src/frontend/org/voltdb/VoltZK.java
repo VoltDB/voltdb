@@ -492,6 +492,8 @@ public class VoltZK {
                     errorMsg = "while an elastic join is active";
                 }
                 break;
+            case mpRepairInProgress:
+                break;
             default:
                 // not possible
                 VoltDB.crashLocalVoltDB("Invalid request " + node , true, new RuntimeException("Non-supported " + request));
