@@ -177,6 +177,9 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                 // log the info message every 10 seconds, log the initial message under 5 seconds
                 REJOINLOG.info(String.format("Rejoin node is waiting for catalog update or elastic join to finish, "
                         + "time elapsed " + elapsed + " seconds"));
+                if (REJOINLOG.isDebugEnabled()) {
+                    REJOINLOG.debug("Rejoin fails to acquire lock:" + blockerError);
+                }
             }
 
             try {
