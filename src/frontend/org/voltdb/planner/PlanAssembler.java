@@ -2252,72 +2252,93 @@ public class PlanAssembler {
 
 
     private AbstractPlanNode handleMVBasedMultiPartQuery(
-            HashAggregatePlanNode reAggNode,
+            AggregatePlanNode reAggNode,
             AbstractPlanNode root,
             boolean edgeCaseOuterJoin) {
+        /*
+         * Where should we insert this reaggregation node?  Maybe this should be
+         * part of MaterializedViewFixInfo?
+         */
+        MaterializedViewFixInfo.MVFixInsertionLocation insertionLocation = new MaterializedViewFixInfo.MVFixInsertionLocation();
         MaterializedViewFixInfo mvFixInfo = m_parsedSelect.m_mvFixInfo;
 
         AbstractPlanNode receiveNode = root;
-        AbstractPlanNode reAggParent = null;
-        // Find receive plan node and insert the constructed
-        // re-aggregation plan node.
+        // Root must be the root of the plan.  There should be no
+        // parents.  If there is a parent node, some of the logic below
+        // must be revisted.  See the comment below referencing **ParentlessRoot**.
+        assert(root.getParentCount() == 0);
+
+        // Find receive plan node, and note it in the
+        // insertionLocation.  We will not actually provoke
+        // any violence on the plan yet.  But start sharpening
+        // our knives.
+        //
+        // Make a preliminary guess at the top of the receive plan node.
         if (root instanceof AbstractReceivePlanNode) {
-            root = reAggNode;
+            // Insert it at the top of the receive subtree, which
+            // is the root.  We apparently don't think we need a
+            // projection here, though it's not clear why.
+            insertionLocation.setNode(root, null);
         }
         else {
             List<AbstractPlanNode> recList = root.findAllNodesOfClass(AbstractReceivePlanNode.class);
             assert(recList.size() == 1);
             receiveNode = recList.get(0);
-
-            reAggParent = receiveNode.getParent(0);
-            boolean result = reAggParent.replaceChild(receiveNode, reAggNode);
-            assert(result);
+            assert(receiveNode != null);
+            insertionLocation.setNode(receiveNode, null);
         }
-        reAggNode.addAndLinkChild(receiveNode);
-        reAggNode.m_isCoordinatingAggregator = true;
 
         assert(receiveNode instanceof ReceivePlanNode);
         AbstractPlanNode sendNode = receiveNode.getChild(0);
         assert(sendNode instanceof SendPlanNode);
         AbstractPlanNode sendNodeChild = sendNode.getChild(0);
 
-        HashAggregatePlanNode reAggNodeForReplace = null;
         // For cases that joining an implicitly partitioned view
         // (source table partition key not in the group by keys) and a derived table,
         // we need to push down the re-agg node.
-        if (sendNodeChild instanceof AbstractJoinPlanNode && ! edgeCaseOuterJoin) {
-            reAggNodeForReplace = reAggNode;
-        }
-        boolean find = mvFixInfo.processScanNodeWithReAggNode(sendNode, reAggNodeForReplace);
+        boolean onlyForProjection = !(sendNodeChild instanceof AbstractJoinPlanNode && ! edgeCaseOuterJoin);
+        boolean find = mvFixInfo.locateMVFixAggNodeForScan(sendNode, onlyForProjection, insertionLocation);
         assert(find);
 
-        // If it is a normal joined query, replace the node under the
-        // receive node with materialized view scan node.
-        if (sendNodeChild instanceof AbstractJoinPlanNode && ! edgeCaseOuterJoin) {
-            AbstractPlanNode joinNode = sendNodeChild;
-            // No agg, limit pushed down at this point.
-
-            // Fix the node after Re-aggregation node.
-            joinNode.clearParents();
-
-            assert(mvFixInfo.m_scanNode != null);
-            mvFixInfo.m_scanNode.clearParents();
-
-            // replace joinNode with MV scan node on each partition.
-            sendNode.clearChildren();
-            sendNode.addAndLinkChild(mvFixInfo.m_scanNode);
-
-            // If reAggNode has parent node before we put it under join node,
-            // its parent will be the parent of the new join node. Update the root node.
-            if (reAggParent != null) {
-                reAggParent.replaceChild(reAggNode, joinNode);
-                root = reAggParent;
-            }
-            else {
-                root = joinNode;
-            }
+        // Update the plan using the location other stuff we
+        // found and stuffed into insertion Location.  Knives
+        // out ready now!!
+        //
+        // Find out where to insert the agg node.  If the root
+        // passed in originally is not the rootiest root of the tree,
+        // then this logic, with 0 <= childOrder, will not work
+        // properly.  So if the assertion above labelled **ParentlessRoot**
+        // fails this needs to be revisited.
+        AbstractPlanNode insertNode = insertionLocation.getNode();
+        int childOrder = insertNode.findChildOrder();
+        if (0 <= childOrder) {
+            // The insert node is an internal node.
+            // Insert it into the parent.
+            AbstractPlanNode parentNode = insertNode.getParent(0);
+            parentNode.replaceChild(childOrder, reAggNode);
+            // Note that the insertNode is now untethered from
+            // the tree, and the original root is the actual root.
         }
-
+        else {
+            // Here we are adding the reAggNode at the
+            // top of the tree.  So we want to return the
+            // reAggNode, which will be the new tree top.
+            // Note that the insert node will be the root,
+            // which has no parent.
+            root = reAggNode;
+        }
+        // Find out if we need an order by node before the
+        // aggregate node, say for forced serial aggregation in
+        // large temp tables.
+        OrderByPlanNode orderByNode = reAggNode.getOrderBy();
+        if (orderByNode != null) {
+            orderByNode.addAndLinkChild(insertNode);
+            insertNode = orderByNode;
+        }
+        // Put the aggregate node on top of the insert node.
+        // Since the insert node is untethered this should
+        // not result in a cycle.
+        reAggNode.addAndLinkChild(insertNode);
         return root;
     }
 
@@ -3043,6 +3064,7 @@ public class PlanAssembler {
                 outputColumnIndex < m_parsedSelect.m_aggResultColumns.size();
                 outputColumnIndex += 1) {
             ParsedColInfo col = m_parsedSelect.m_aggResultColumns.get(outputColumnIndex);
+            String colName = (col.m_columnName == null) ? "" : col.m_columnName;
             AbstractExpression rootExpr = col.m_expression;
             AbstractExpression agg_input_expr = null;
             SchemaColumn schema_col = null;
@@ -3062,7 +3084,7 @@ public class PlanAssembler {
                 TupleValueExpression tve = new TupleValueExpression(
                         AbstractParsedStmt.TEMP_TABLE_NAME,
                         AbstractParsedStmt.TEMP_TABLE_NAME,
-                        "", col.m_alias,
+                        colName, col.m_alias,
                         rootExpr, outputColumnIndex);
                 tve.setDifferentiator(col.m_differentiator);
 
@@ -3072,13 +3094,13 @@ public class PlanAssembler {
                 schema_col = new SchemaColumn(
                         AbstractParsedStmt.TEMP_TABLE_NAME,
                         AbstractParsedStmt.TEMP_TABLE_NAME,
-                        "", col.m_alias,
+                        colName, col.m_alias,
                         tve, outputColumnIndex);
 
                 top_schema_col = new SchemaColumn(
                         AbstractParsedStmt.TEMP_TABLE_NAME,
                         AbstractParsedStmt.TEMP_TABLE_NAME,
-                        "", col.m_alias,
+                        colName, col.m_alias,
                         tve, outputColumnIndex);
 
                 /*

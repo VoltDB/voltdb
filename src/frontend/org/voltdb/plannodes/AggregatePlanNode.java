@@ -40,6 +40,8 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
+import javax.persistence.OrderBy;
+
 public class AggregatePlanNode extends AbstractPlanNode {
 
     public enum Members {
@@ -83,6 +85,36 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
     public AggregatePlanNode() {
         super();
+    }
+
+
+    /**
+     * Create an aggregate node from another aggregate node.
+     * @param origin
+     */
+    public AggregatePlanNode(AggregatePlanNode origin) {
+        super();
+        m_isCoordinatingAggregator = origin.m_isCoordinatingAggregator;
+        if (origin.m_prePredicate != null) {
+            m_prePredicate = origin.m_prePredicate.clone();
+        }
+        if (origin.m_postPredicate != null) {
+            m_postPredicate = origin.m_postPredicate.clone();
+        }
+        for (AbstractExpression expr : origin.m_groupByExpressions) {
+            addGroupByExpression(expr);
+        }
+        List<ExpressionType> aggregateTypes = origin.m_aggregateTypes;
+        List<Integer> aggregateDistinct = origin.m_aggregateDistinct;
+        List<Integer> aggregateOutputColumns = origin.m_aggregateOutputColumns;
+        List<AbstractExpression> aggregateExpressions = origin.m_aggregateExpressions;
+        for (int i = 0; i < origin.getAggregateTypesSize(); i++) {
+            addAggregate(aggregateTypes.get(i),
+                    aggregateDistinct.get(i) == 1 ? true : false,
+                    aggregateOutputColumns.get(i),
+                    aggregateExpressions.get(i));
+        }
+        setOutputSchema(origin.getOutputSchema());
     }
 
     @Override
@@ -296,6 +328,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
                 int index = tve.setColumnIndexUsingSchema(inputSchema);
                 if (index == -1) {
                     // check to see if this TVE is the aggregate output
+                    // Could we find a stronger test than this?  What if there
+                    // is some other kind of column which has TEMP_TABLE_NAME
+                    // as a table name?
                     if ( ! tve.getTableName().equals(AbstractParsedStmt.TEMP_TABLE_NAME)) {
                         throw new RuntimeException("Unable to find index for column: " +
                                 tve.getColumnName());
@@ -637,4 +672,28 @@ public class AggregatePlanNode extends AbstractPlanNode {
     public boolean planNodeClassNeedsProjectionNode() {
         return false;
     }
+
+    /**
+     * Create an appropriate order by node for serial aggregation.
+     * @return
+     */
+    public OrderByPlanNode getOrderBy() {
+        switch (getPlanNodeType()) {
+            case HASHAGGREGATE:
+            case PARTIALAGGREGATE:
+                return null;
+        }
+        // This is the order by node we will sort by.  But we don't
+        // actually want the group by expressions.  We just want the
+        // column numbers of the group by expressions, since the values
+        // will be computed already.  Happily that's what m_groupByExpressions
+        // gives us.
+        OrderByPlanNode answer = new OrderByPlanNode();
+        for (int idx = 0; idx < m_groupByExpressions.size(); idx += 1) {
+            answer.addSortExpression(m_groupByExpressions.get(idx).clone(), SortDirectionType.ASC);
+        }
+        return answer;
+    }
+
+
 }

@@ -1481,4 +1481,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         assert (m_children.size() == 1);
         m_children.get(0).adjustDifferentiatorField(tve);
     }
+
+    public int findChildOrder() {
+        if (getParentCount() == 0) {
+            return -1;
+        }
+        AbstractPlanNode parentNode = getParent(0);
+        for (int idx = 0; idx < parentNode.getChildCount(); idx +=1 ) {
+            if (this.equals(parentNode.getChild(idx))) {
+                return idx;
+            }
+        }
+        throw new PlanningErrorException(String.format("Cannot find child order of node id %d.  This is an internal error.",
+                                                       getPlanNodeId()));
+    }
 }

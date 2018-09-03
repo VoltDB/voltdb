@@ -26,6 +26,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.sun.corba.se.spi.orb.ORBData;
 import javassist.expr.Expr;
 import org.hsqldb_voltpatches.Expression;
 import org.voltdb.RateLimitedClientNotifier;
@@ -54,9 +55,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
     // Set this to true to print the JSON string for the plan.
     private static boolean PRINT_JSON_PLAN = true;
     // Test normal sized temp tables.
-    private static boolean TEST_NORMAL_SIZE_QUERIES = false;
+    private static boolean TEST_NORMAL_SIZE_QUERIES = true;
     // Test large sized temp tables.
-    private static boolean TEST_LARGE_QUERIES = true;
+    private static boolean TEST_LARGE_QUERIES = false;
 
     @Override
     protected void setUp() throws Exception {
@@ -3020,7 +3021,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql = "select sum(v_r1.v_a1) from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1";
         checkMVFixWithJoin(sql, 0, 1, 2, 0, null, null);
 
-        sql = "select v_p1.v_b1, sum(v_a1) from v_p1 @joinType v_r1 using(v_a1) group by v_p1.v_b1;";
+        sql = "select v_p1.v_b1, sum(v_a1) mumble from v_p1 @joinType v_r1 using(v_a1) group by v_p1.v_b1;";
         if (isPlanningForLargeQueries()) {
             checkMVFixWithJoinLarge(sql);
         }
@@ -3366,7 +3367,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (p instanceof OrderByPlanNode) {
             p = p.getChild(0);
         }
-        HashAggregatePlanNode reAggNode = null;
+        AggregatePlanNode reAggNode = null;
 
         List<AbstractPlanNode> nodes = p.findAllNodesOfClass(AbstractReceivePlanNode.class);
         assertEquals(1, nodes.size());
@@ -3376,8 +3377,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (numGroupByOfTopAggNode == -1) {
             if (needFix) {
                 p = receiveNode.getParent(0);
-                assertTrue(p instanceof HashAggregatePlanNode);
-                reAggNode = (HashAggregatePlanNode) p;
+                if (isPlanningForLargeQueries()) {
+                    assert(PlanNodeType.AGGREGATE.equals(p.getPlanNodeType()));
+                }
+                else {
+                    assertTrue(p instanceof HashAggregatePlanNode);
+                }
+                // AggregatePlanNode works for HashAggregate and SerialAggregate.
+                reAggNode = (AggregatePlanNode) p;
 
                 assertEquals(numGroupByOfReaggNode, reAggNode.getGroupByExpressionsSize());
                 assertEquals(numAggsOfReaggNode, reAggNode.getAggregateTypesSize());
@@ -3416,8 +3423,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         if (needFix) {
             p = receiveNode.getParent(0);
-            assertTrue(p instanceof HashAggregatePlanNode);
-            reAggNode = (HashAggregatePlanNode) p;
+            if (isPlanningForLargeQueries()) {
+                assertTrue(p instanceof OrderByPlanNode);
+                p = p.getParent(0);
+                // Want to distinguish between Aggregate and HashAggregate here.
+                // The plan node type is the most convenient way.
+                assertTrue(PlanNodeType.AGGREGATE.equals(p.getPlanNodeType()));
+            }
+            else {
+                assertTrue(p instanceof HashAggregatePlanNode);
+            }
+            reAggNode = (AggregatePlanNode) p;
 
             assertEquals(numGroupByOfReaggNode, reAggNode.getGroupByExpressionsSize());
             assertEquals(numAggsOfReaggNode, reAggNode.getAggregateTypesSize());
