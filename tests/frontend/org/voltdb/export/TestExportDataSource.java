@@ -390,7 +390,6 @@ public class TestExportDataSource extends TestCase {
                 table.getPartitioncolumn(),
                 TEST_DIR.getAbsolutePath());
         try {
-
             //Ack before push
             s.ack(100);
             TreeSet<String> listing = getSortedDirectoryListingSegments();
@@ -428,6 +427,17 @@ public class TestExportDataSource extends TestCase {
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
+            final CountDownLatch cdl = new CountDownLatch(1);
+            Runnable cdlWaiter = new Runnable() {
+                @Override
+                public void run() {
+                    cdl.countDown();
+                }
+            };
+            s.setOnMastership(cdlWaiter, false);
+            s.acceptMastership();
+            cdl.await();
+
             //Poll and check before and after discard segment files.
             AckingContainer cont = (AckingContainer) s.poll().get();
             listing = getSortedDirectoryListingSegments();
@@ -435,6 +445,8 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
+
+            s.unacceptMastership();
 
             //Last segment is always kept.
             s.ack(2000);
