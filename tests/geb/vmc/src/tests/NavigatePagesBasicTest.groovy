@@ -82,10 +82,15 @@ class NavigatePagesBasicTest extends TestBase {
         and: 'SQL Query link (to SQL Query tab) visible'
         page.isSqlQueryLinkVisible()
 
-        and: 'DR link (to DR tab), visible only if "dr" property set, which it should be only when DR is enabled'
+        and: 'DR link (to DR tab), visible only if "dr" System property set, \
+              which it should be only when DR is enabled, i.e., <dr> tag is \
+              present in the deployment file (and running VoltDB pro)'
         page.isDrLinkVisible() == getBooleanSystemProperty("dr", false)
 
-        and: 'Importer link (to Importer tab), visible only if "importer" property set, which it should be only when import connectors configured and active'
+        and: 'Importer link (to Importer tab), visible only if "importer" System \
+              property set, which it should be only when import connector(s) \
+              enabled, i.e., <importer> tag is present in the deployment file \
+              (and running VoltDB pro)'
         page.isImporterLinkVisible() == getBooleanSystemProperty("importer", false)
     }
 

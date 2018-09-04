@@ -303,7 +303,8 @@ class VoltDBManagementCenterPage extends Page {
     /**
      * Returns true if the "DR" link, i.e. the link to the "DR"
      * page (i.e., the "DR" tab of the VoltDB Management Center page),
-     * is present and visible. (This should be true only when TODO.)
+     * is present and visible. (This should be true only when running
+     * "pro", and a <dr> tag is present in the deployment file.)
      * @return true if a drLink is currently visible.
      */
     def boolean isDrLinkVisible() {
@@ -313,7 +314,8 @@ class VoltDBManagementCenterPage extends Page {
     /**
      * Returns true if the "Importer" link, i.e. the link to the "Importer"
      * page (i.e., the "Importer" tab of the VoltDB Management Center page),
-     * is present and visible. (This should be true only when TODO.)
+     * is present and visible. (This should be true only when running "pro",
+     * and an <importer> tag is present in the deployment file.)
      * @return true if an importerLink is currently visible.
      */
     def boolean isImporterLinkVisible() {
