@@ -22,19 +22,12 @@ Install Requirements
       
 Run
 ---
-In project root folder, simply run:
-```bash
-$ python voltsql/voltsql.py
-```
-
-Or
-```bash
-$ ./voltsql.sh
-```
-Or in the voltdb/bin folder, run:
+Goto the `voltdb/bin` folder, run:
 ```bash
 voltsql
 ```
+
+Or you can add `voltdb/bin` to PATH, then you can directly run `voltsql` from terminal.
 
 Test
 ----
