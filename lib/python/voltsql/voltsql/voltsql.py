@@ -45,6 +45,22 @@ from __future__ import unicode_literals, print_function
 
 import sys
 from subprocess import call
+from pkg_resources import require, DistributionNotFound, VersionConflict
+
+# check if all dependencies are met
+dependencies = [
+    'Pygments>=2.2.0',
+    'sqlparse>=0.2.4',
+    'prompt_toolkit>=2.0.4',
+    'click>=6.7'
+]
+
+try:
+    require(dependencies)
+except (DistributionNotFound, VersionConflict) as error:
+    print(error)
+    print("You need to install the missing Python third-party library.")
+    sys.exit(1)
 
 import click
 from prompt_toolkit import PromptSession
