@@ -1667,6 +1667,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             @Override
             public void run()
             {
+                //create a blocker for repair if this is a MP leader and partition leaders change
+                if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
+                    VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
+                            CreateMode.EPHEMERAL, hostLog, "MP Repair");
+                }
+
                 // First check to make sure that the cluster still is viable before
                 // before allowing the fault log to be updated by the notifications
                 // generated below.
@@ -1719,10 +1725,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 stopRejoiningHost();
 
-                //create a blocker for repair if this is a MP leader and partition leaders change
-                if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
-                    VoltZK.createMpRepairBlocker(m_messenger.getZK());
-                }
                 // let the client interface know host(s) have failed to clean up any outstanding work
                 // especially non-transactional work
                 m_clientInterface.handleFailedHosts(failedHosts);
