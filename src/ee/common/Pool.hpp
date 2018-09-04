@@ -25,10 +25,10 @@
 #include <signal.h>     // for sig_atomic_t typedef
 #include <mutex>
 
-#undef MODERN_CXX
-
-#if __cplusplus >= 201402
+#if defined __GNUC__ && __GNUC__ >= 5
 #define MODERN_CXX
+#else
+#undef MODERN_CXX
 #endif
 
 namespace voltdb {
@@ -52,9 +52,20 @@ namespace voltdb {
          uint64_t m_offset;
          uint64_t m_size;
          std::unique_ptr<char[]> m_chunkData;
+         Chunk& operator=(const Chunk&);
+         Chunk(const Chunk&);
       public:
          Chunk(uint64_t size, uint64_t offset)
             : m_offset(offset), m_size(size), m_chunkData(std::unique_ptr<char[]>(new char[size])) { }
+         Chunk(Chunk&& rhs): m_offset(rhs.m_offset), m_size(rhs.m_size), m_chunkData(std::move(rhs.m_chunkData)) {
+            rhs.m_chunkData.release();
+         }
+         Chunk& operator=(Chunk&& rhs) {
+            m_offset = rhs.m_offset;
+            m_size = rhs.m_size;
+            m_chunkData.swap(rhs.m_chunkData);
+            return *this;
+         }
          int64_t size() const throw() {
             return m_size;
          }
@@ -140,7 +151,18 @@ namespace voltdb {
 #endif
 
    /**
-    * Resource pool for all heteregeous VoltAllocs.
+    * Resource pool for all heteregeous VoltAllocs. Only one
+    * global pool is used, and all new() operations are blocking,
+    * so that at most one thread calls Pool::allocate() method. I
+    * found it exactly the same as using std::new()/delete()
+    * method.
+    *
+    * NOTE: another use case for the allocator is to allocate
+    * from a given pool, rather than the global allocator pool.
+    * This however, would require the allocator to be stateful,
+    * which needs full C++11 support. Therefore, I leave it till
+    * we migrate off from any C++11-partial-supported
+    * compilers/platforms.
     */
    class VoltAllocResourceMng {
       static Pool s_VoltAllocatorPool;
@@ -187,10 +209,8 @@ namespace voltdb {
       typedef T        value_type;
       template<typename R> struct rebind { typedef allocator<R> other; };
 
-      allocator() throw() {
-      }
-      allocator(const allocator&) throw() {
-      }
+      allocator() throw() { }
+      allocator(const allocator&) throw() { }
       template<typename R> allocator(const allocator<R>&) throw() { }
       ~allocator() throw() { }
 #ifdef MODERN_CXX
@@ -232,10 +252,6 @@ namespace voltdb {
     *        return InstanceFactory<Foo>::create(arg1, arg2);
     *    }
     * };
-    *
-    * NOTE: sadly this does NOT work on C6/C7 machines, with old
-    * compilers that do not support C++11 vararg template type,
-    * and there is no easy solution around this.
     */
    template<typename T> struct InstanceFactory: private VoltAllocResourceMng {
 #ifdef MODERN_CXX

@@ -71,7 +71,7 @@ protected:
      * but their no-op delete operator leaves them to be purged in one go with the data pool.
      */
     inline Pool* undo() {
-        for (UndoReleaseActionRevIter_t i = m_undoActions.rbegin();
+        for (auto i = m_undoActions.rbegin();
              i != m_undoActions.rend(); ++i) {
             (*i)->undo();
             delete *i;
@@ -95,12 +95,12 @@ protected:
      * table before all the inserts and deletes are released.
      */
     inline Pool* release() {
-        for (UndoReleaseActionIter_t i = m_undoActions.begin();
+        for (auto i = m_undoActions.begin();
              i != m_undoActions.end(); ++i) {
             (*i)->release();
             delete *i;
         }
-        for(UndoQuantumReleaseInterestIter_t cur = m_interests.begin(); cur != m_interests.end(); ++cur) {
+        for(auto cur = m_interests.begin(); cur != m_interests.end(); ++cur) {
            (*cur)->notifyQuantumRelease();
         }
         Pool* result = m_dataPool;
@@ -131,15 +131,9 @@ public:
 private:
     const int64_t m_undoToken;
     std::deque<UndoReleaseAction*, voltdb::allocator<UndoReleaseAction*>> m_undoActions;
-    typedef std::deque<UndoReleaseAction*, voltdb::allocator<UndoReleaseAction*>>::iterator
-       UndoReleaseActionIter_t;
-    typedef std::deque<UndoReleaseAction*, voltdb::allocator<UndoReleaseAction*>>::reverse_iterator
-       UndoReleaseActionRevIter_t;
     uint32_t m_numInterests;
     uint32_t m_interestsCapacity;
     std::list<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>> m_interests;
-    typedef std::list<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>>::iterator
-       UndoQuantumReleaseInterestIter_t;
     const bool m_forLowestSite;
 protected:
     Pool *m_dataPool;
