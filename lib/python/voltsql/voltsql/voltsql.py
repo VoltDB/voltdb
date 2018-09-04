@@ -43,6 +43,7 @@
 
 from __future__ import unicode_literals, print_function
 
+import os
 import sys
 from subprocess import call
 from pkg_resources import require, DistributionNotFound, VersionConflict
@@ -69,6 +70,7 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.lexers import PygmentsLexer
 from prompt_toolkit.styles import Style
+from prompt_toolkit.history import FileHistory
 from pygments.lexers.sql import SqlLexer
 
 from voltcompleter import VoltCompleter
@@ -153,10 +155,15 @@ class VoltCli(object):
     def run_cli(self):
         # get catalog data before start
         self.refresher.refresh(self.executor, self.completer, [])
+        # Load history into completer so it can learn user preferences
+        history = FileHistory(os.path.expanduser('~/.voltsql_history'))
+        self.completer.init_prioritization_from_history(history)
+
         session = PromptSession(
             lexer=PygmentsLexer(SqlLexer), completer=self.completer, style=style,
             auto_suggest=AutoSuggestFromHistory(), bottom_toolbar=self.bottom_toolbar,
-            key_bindings=self.create_key_bindings(), multiline=self.multiline)
+            key_bindings=self.create_key_bindings(), multiline=self.multiline,
+            history=history)
         option_str = "--servers={server} --port={port_number}{user}{password}{credentials}" \
                      "{ssl}{output_format}{output_skip_metadata}{stop_on_error}{kerberos} " \
                      "--query-timeout={number_of_milliseconds}".format(
