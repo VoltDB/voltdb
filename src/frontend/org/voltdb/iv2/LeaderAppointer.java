@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -515,6 +516,11 @@ public class LeaderAppointer implements Promotable
             m_es);
         }
         else {
+
+            // Create MP repair ZK node to block rejoin
+            VoltZK.createActionBlocker(m_zk, VoltZK.mpRepairInProgress,
+                    CreateMode.EPHEMERAL, tmLog, "MP Repair");
+
             // If we're taking over for a failed LeaderAppointer, we know when
             // we get here that every partition had a leader at some point in
             // time.  We'll seed each of the PartitionCallbacks for each
@@ -551,9 +557,8 @@ public class LeaderAppointer implements Promotable
             m_removedPartitionsAtPromotionTime = null;
 
             // just go ahead and promote our MPI
-            VoltZK.createMpRepairBlocker(m_zk);
             m_MPI.acceptPromotion();
-            VoltZK.removeMpRepairBlocker(m_zk, tmLog);
+            VoltZK.removeActionBlocker(m_zk, VoltZK.mpRepairInProgress, tmLog);
             m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
             blocker.set(null);
         }
