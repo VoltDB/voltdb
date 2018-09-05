@@ -669,6 +669,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
     boost::scoped_array<boost::scoped_ptr<BinaryLog>> logs(new boost::scoped_ptr<BinaryLog>[logCount]);
     int64_t rowCount = 0;
     const char *position = rawLogs;
+    int32_t specialLogCount = 0;
 
     // i is incremented at the end of the loop so logs can be easily skipped
     for (int i = 0; i < logCount;) {
@@ -694,6 +695,14 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
             rowCount += applyReplicatedTxn(logs[i].get(), tables, pool, engine, remoteClusterId, localUniqueId);
             --logCount;
             continue;
+        }
+
+        if (logs[i]->m_hashFlag == TXN_PAR_HASH_SPECIAL) {
+            // Sort all of the special logs to the start of the logs array
+            if (specialLogCount != i) {
+                logs[i].swap(logs[specialLogCount]);
+            }
+            ++specialLogCount;
         }
 
         ++i;
@@ -726,7 +735,9 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
         for (int i = 0; i < logCount; ++i) {
             assert(!logs[i]->isReplicatedTableLog());
 
-            if (!logs[i]->m_taskInfo.hasRemaining()) {
+            if (!logs[i]->m_taskInfo.hasRemaining() ||
+                    // Skip processing log if a truncate has been encountered but this log does not have one
+                    (truncateTableName.length() > 0 && logs[i]->m_hashFlag != TXN_PAR_HASH_SPECIAL)) {
                 continue;
             }
 
@@ -765,7 +776,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
         }
 
         if (truncateTableName.size() > 0) {
-            assert(truncateCount == logCount);
+            assert(truncateCount == specialLogCount);
             truncateCount = 0;
 
             VOLT_DEBUG("Applying MP binary log truncate to %s", truncateTableName.c_str());
