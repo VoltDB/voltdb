@@ -149,6 +149,10 @@ function server-pro() {
     find-directories-if-needed
     echo -e "\n$0 performing: server-pro"
     DEPLOYMENT_FILE=$GEB_VMC_DIR/deploy_pro.xml
+    TEST_ARGS=" -Pdr=true"
+    # TODO: uncomment the line below, and delete the one above
+    # (& this comment), once ENG-14518 is fixed
+    #TEST_ARGS=" -Pdr=true -Pimporter=true"
     test-tools-server-pro
     code[3]=${code_tt_server}
 }
@@ -212,10 +216,10 @@ function prepare-pro() {
 # 'prepare-pro' (or the equivalent) has already been run
 function tests-only() {
     init-if-needed
-    echo -e "\n$0 performing: tests[-only]$ARGS"
+    echo -e "\n$0 performing: tests[-only]$TEST_ARGS$ARGS"
 
     cd $GEB_VMC_DIR
-    TEST_COMMAND="./gradlew$ARGS"
+    TEST_COMMAND="./gradlew$TEST_ARGS$ARGS"
     echo -e "running:\n$TEST_COMMAND"
     $TEST_COMMAND
     code[5]=$?
@@ -372,12 +376,18 @@ while [[ -n "$1" ]]; do
         while [[ -n "$2" ]] && [[ "$2" != "shutdown" ]] && [[ "$2" != "debug" ]]; do
             if [[ "$2" == -P* ]]; then
                 FIRST_ARGS="${FIRST_ARGS} $2"
-            elif [[ "$2" == "--debug" ]] || [[ "$2" == "-debug" ]]; then
-                # "--debug" is short for "-PdebugPrint=true"
-                FIRST_ARGS="${FIRST_ARGS} -PdebugPrint=true"
             elif [[ "$2" == "--basic" ]] || [[ "$2" == "-basic" ]]; then
                 # "--basic" is short for "--tests=*BasicTest*"
                 LAST_ARGS="${LAST_ARGS} --tests=*BasicTest*"
+            elif [[ "$2" == "--debug" ]] || [[ "$2" == "-debug" ]]; then
+                # "--debug" is short for "-PdebugPrint=true"
+                FIRST_ARGS="${FIRST_ARGS} -PdebugPrint=true"
+            elif [[ "$2" == "--dr" ]] || [[ "$2" == "-dr" ]]; then
+                # "--dr" is short for "-Pdr=true"
+                FIRST_ARGS="${FIRST_ARGS} -Pdr=true"
+            elif [[ "$2" == "--importer" ]] || [[ "$2" == "-importer" ]]; then
+                # "--importer" is short for "-Pimporter=true"
+                FIRST_ARGS="${FIRST_ARGS} -Pimporter=true"
             elif [[ "$2" == --* ]]; then
                 LAST_ARGS="${LAST_ARGS} $2"
                 if [[ "$item" == "--rerun-tasks" ]]; then

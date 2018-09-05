@@ -47,23 +47,23 @@ class VoltDBManagementCenterPage extends Page {
     static content = {
         navTabs                             { $('#nav') }
         dbMonitorTab                        { navTabs.find('#navDbmonitor') }
+        analysisTab                         { navTabs.find('#navAnalysis') }
         adminTab                            { navTabs.find('#navAdmin') }
         schemaTab                           { navTabs.find('#navSchema') }
         sqlQueryTab                         { navTabs.find('#navSqlQuery') }
-        drTab                               { $('#navDR') }
-        importerTab                         { $('#navImporter') }
-        analysisTab                         { $('#navAnalysis') }
+        drTab                               { navTabs.find('#navDR') }
+        importerTab                         { navTabs.find('#navImporter') }
         dbMonitorLink (to: DbMonitorPage)   { dbMonitorTab.find('a') }
-        adminLink (to: AdminPage)           { adminTab.find('a') }
-        schemaLink (to: SchemaPage)         { schemaTab.find('a') }
-        sqlQueryLink (to: SqlQueryPage)     { sqlQueryTab.find('a') }
-        drLink (to: DrPage)                 { $('#navDR > a') }
-        importerLink (to: ImporterPage)     { $('#navImporter > a') }
-        analysisLink (to: AnalysisPage)     { analysisTab.find('a') }
-        loginDialog (required: false)       { $('#loginBox') }
+        analysisLink  (to: AnalysisPage)    { analysisTab.find('a') }
+        adminLink     (to: AdminPage)       { adminTab.find('a') }
+        schemaLink    (to: SchemaPage)      { schemaTab.find('a') }
+        sqlQueryLink  (to: SqlQueryPage)    { sqlQueryTab.find('a') }
+        drLink        (to: DrPage)          { $('#navDR > a') }
+        importerLink  (to: ImporterPage)    { $('#navImporter > a') }
+        loginDialog   (required: false)     { $('#loginBox') }
         usernameInput (required: false)     { loginDialog.find('input#username') }
         passwordInput (required: false)     { loginDialog.find('input#password') }
-        loginButton (required: false)       { loginDialog.find('#LoginBtn') }
+        loginButton   (required: false)     { loginDialog.find('#LoginBtn') }
 
         header { module Header }
         footer { module Footer }
@@ -251,12 +251,97 @@ class VoltDBManagementCenterPage extends Page {
     }
 
     /**
+     * Returns true if the "DB Monitor" link, i.e. the link to the "DB Monitor"
+     * page (i.e., the "DB Monitor" tab of the VoltDB Management Center page),
+     * is present and visible. (This should almost always be true.)
+     * @return true if a dbMonitorLink is currently visible.
+     */
+    def boolean isDbMonitorLinkVisible() {
+        return dbMonitorLink.displayed
+    }
+
+    /**
+     * Returns true if the "Analysis" link, i.e. the link to the "Analysis"
+     * page (i.e., the "Analysis" tab of the VoltDB Management Center page),
+     * is present and visible. (This should almost always be true.)
+     * @return true if an analysisLink is currently visible.
+     */
+    def boolean isAnalysisLinkVisible() {
+        return analysisLink.displayed
+    }
+
+    /**
+     * Returns true if the "Admin" link, i.e. the link to the "Admin"
+     * page (i.e., the "Admin" tab of the VoltDB Management Center page),
+     * is present and visible. (This should almost always be true.)
+     * @return true if an adminLink is currently visible.
+     */
+    def boolean isAdminLinkVisible() {
+        return adminLink.displayed
+    }
+
+    /**
+     * Returns true if the "Schema" link, i.e. the link to the "Schema"
+     * page (i.e., the "Schema" tab of the VoltDB Management Center page),
+     * is present and visible. (This should almost always be true.)
+     * @return true if a schemaLink is currently visible.
+     */
+    def boolean isSchemaLinkVisible() {
+        return schemaLink.displayed
+    }
+
+    /**
+     * Returns true if the "SQL Query" link, i.e. the link to the "SQL Query"
+     * page (i.e., the "SQL Query" tab of the VoltDB Management Center page),
+     * is present and visible. (This should almost always be true.)
+     * @return true if a sqlQueryLink is currently visible.
+     */
+    def boolean isSqlQueryLinkVisible() {
+        return sqlQueryLink.displayed
+    }
+
+    /**
+     * Returns true if the "DR" link, i.e. the link to the "DR"
+     * page (i.e., the "DR" tab of the VoltDB Management Center page),
+     * is present and visible. (This should be true only when running
+     * "pro", and a <dr> tag is present in the deployment file.)
+     * @return true if a drLink is currently visible.
+     */
+    def boolean isDrLinkVisible() {
+        return drLink.displayed
+    }
+
+    /**
+     * Returns true if the "Importer" link, i.e. the link to the "Importer"
+     * page (i.e., the "Importer" tab of the VoltDB Management Center page),
+     * is present and visible. (This should be true only when running "pro",
+     * and an <importer> tag is present in the deployment file.)
+     * @return true if an importerLink is currently visible.
+     */
+    def boolean isImporterLinkVisible() {
+        return importerLink.displayed
+    }
+
+    /**
      * Returns true if the current page is a DbMonitorPage (i.e., the "DB Monitor"
      * tab of the VoltDB Management Center page is currently open).
      * @return true if a DbMonitorPage is currently open.
      */
     def boolean isDbMonitorPageOpen() {
         if (dbMonitorTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
+     * Returns true if the current page is a AnalysisPage (i.e., the "Analysis"
+     * tab of the VoltDB Management Center page is currently open).
+     * @return true if a AnalysisPage is currently open.
+     */
+    def boolean isAnalysisPageOpen() {
+        if (analysisTab.attr('class') == 'active') {
             return true
         } else {
             return false
@@ -316,25 +401,12 @@ class VoltDBManagementCenterPage extends Page {
     }
 
     /**
-     * Returns true if the current page is a ImporterPage (i.e., the "Importer"
+     * Returns true if the current page is an ImporterPage (i.e., the "Importer"
      * tab of the VoltDB Management Center page is currently open).
      * @return true if a ImporterPage is currently open.
      */
     def boolean isImporterPageOpen() {
         if (importerTab.attr('class') == 'active') {
-            return true
-        } else {
-            return false
-        }
-    }
-
-    /**
-     * Returns true if the current page is a AnalysisPage (i.e., the "Analysis"
-     * tab of the VoltDB Management Center page is currently open).
-     * @return true if a AnalysisPage is currently open.
-     */
-    def boolean isAnalysisPageOpen() {
-        if (analysisTab.attr('class') == 'active') {
             return true
         } else {
             return false
@@ -348,6 +420,16 @@ class VoltDBManagementCenterPage extends Page {
     def void openDbMonitorPage() {
         if (!isDbMonitorPageOpen()) {
             dbMonitorLink.click()
+        }
+    }
+
+    /**
+     * Clicks the "Analysis" link, opening the "Analysis" page (or tab);
+     * if the "Analysis" page is already open, no action is taken.
+     */
+    def void openAnalysisPage() {
+        if (!isAnalysisPageOpen()) {
+            analysisLink.click()
         }
     }
 
@@ -399,16 +481,6 @@ class VoltDBManagementCenterPage extends Page {
     def void openImporterPage() {
         if (!isImporterPageOpen()) {
             importerLink.click()
-        }
-    }
-
-    /**
-     * Clicks the "Analysis" link, opening the "Analysis" page (or tab);
-     * if the "Analysis" page is already open, no action is taken.
-     */
-    def void openAnalysisPage() {
-        if (!isAnalysisPageOpen()) {
-            analysisLink.click()
         }
     }
 
