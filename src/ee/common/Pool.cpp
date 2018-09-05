@@ -66,6 +66,7 @@ void Pool::init() {
 //         throwFatalException("Failed mmap");
 //      }
 #endif
+   m_chunks.reserve(m_maxChunkCount);
    m_chunks.emplace_back(m_allocationSize, 0);
 }
 

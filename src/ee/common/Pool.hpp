@@ -20,6 +20,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
+#include <list>
 #include <vector>
 #include <memory>
 #include <signal.h>     // for sig_atomic_t typedef
@@ -103,7 +104,7 @@ namespace voltdb {
       /*
        * Oversize chunks that will be freed and not reused.
        */
-      std::vector<Chunk> m_oversizeChunks;
+      std::list<Chunk> m_oversizeChunks;
       // No implicit copies
       Pool(const Pool&);
       Pool& operator=(const Pool&);
