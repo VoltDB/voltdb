@@ -17,23 +17,32 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
-import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.voltcore.utils.Pair;
 
-import org.voltdb.catalog.*;
+import org.json_voltpatches.JSONException;
+import org.voltcore.utils.Pair;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Table;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.Encoder;
-import org.voltdb.expressions.*;
-import org.json_voltpatches.JSONException;
-import scala.Int;
 
 /**
  * Tries to find a matching materialized view for the given SELECT statement, and rewrite the query.
@@ -55,21 +64,8 @@ final class MVQueryRewriter {
         if (m_selectStmt.m_tableList.size() == 1 &&                   // For now, support rewrite SELECT from a single table
                 ! m_selectStmt.m_limitOffset.hasLimitOrOffset() &&    // SELECT with LIMIT xx or OFFSET xx do not match views
                 ! m_selectStmt.hasOrderByColumns() && m_selectStmt.getHavingPredicate() == null) {   // MVI has GBY, does not have OBY or HAVING clause
-            final Optional<Pair<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>>>
-                    any = getMviAndViews(m_selectStmt.m_tableList).entrySet().stream()          // Scan all MV associated with SEL source tables,
-                    .flatMap(kv -> {
-                        final MaterializedViewInfo mv = kv.getKey();                // Filter first by #columns of VIEW tables,
-                        final Map<Pair<String, Integer>, Pair<String, Integer>> rel = gbyMatches(mv);
-                        return rel != null ?                                      // and then by individual column index/agg type
-                                Stream.of(Pair.of(mv, rel)) : // tracing back to MV's source table
-                                null;
-                    }).findFirst();
-            if (any.isPresent()) {                                                   // SELECT query can be rewritten
-                final Pair<MaterializedViewInfo, Map<Pair<String, Integer>, Pair<String, Integer>>>
-                        entry = any.get();
-                m_QueryColumnNameAndIndx_to_MVColumnNameAndIndx = entry.getSecond();
-                m_mvi = entry.getFirst();
-            }
+
+            findMviAndGByhColumns();
         }
     }
 
@@ -91,12 +87,20 @@ final class MVQueryRewriter {
         // The whole parsing/optimization job is done synchronously in a single thread.
         final AtomicInteger indx = new AtomicInteger(0);
         final AtomicBoolean updated = new AtomicBoolean(false);
-        stmt.m_children.stream().flatMap(c -> {
+        stmt.m_children.stream().forEach(c -> {
             if (c instanceof ParsedSelectStmt) {
                 final ParsedSelectStmt s = (ParsedSelectStmt) c;
                 if ((new MVQueryRewriter(s)).rewrite()) {
                     updated.set(true);
-                    return Stream.of(Pair.of(indx.getAndIncrement(), s));
+                    int i = indx.getAndIncrement();
+                    assert (s.m_tableList.size() == 1); // For now, only MV from single table gets rewritten
+                    stmt.m_tableList.set(i, s.m_tableList.get(0));
+                    final Table view = s.m_tableList.get(0);
+                    stmt.m_tableAliasMap.forEach((k, v) -> { // awkward Map value match against (un-aliased) table name
+                        if (v.getTableName().equals(view.getMaterializer().getTypeName())) {
+                            s.generateStmtTableScan(view);
+                        }
+                    });
                 }
             } else if (c instanceof ParsedUnionStmt) {
                 if ((new MVQueryRewriter((ParsedUnionStmt) c)).rewrite()) {
@@ -105,18 +109,6 @@ final class MVQueryRewriter {
             } else {
                 assert(false);
             }
-            return null;
-        }).forEach(kv -> {         // update other fields: table list, table alias map
-            final int i = kv.getFirst();
-            final ParsedSelectStmt sel = kv.getSecond();
-            assert (sel.m_tableList.size() == 1);        // For now, only MV from single table gets rewritten
-            stmt.m_tableList.set(i, sel.m_tableList.get(0));
-            final Table view = sel.m_tableList.get(0);
-            stmt.m_tableAliasMap.forEach((k, v) -> { // awkward Map value match against (un-aliased) table name
-                if (v.getTableName().equals(view.getMaterializer().getTypeName())) {
-                    sel.generateStmtTableScan(view);
-                }
-            });
         });
         return updated.get();
     }
@@ -297,7 +289,7 @@ final class MVQueryRewriter {
         assert(new HashSet<>(mvGbys).equals(m_selectStmt.hasComplexGroupby() ?
                 m_selectStmt.getGroupByColumns().stream()
                         .map(ci -> transformExpressionRidofPVE(ci.m_expression).anonymize())
-                        .collect(Collectors.toSet()) : new HashSet<>()));              // warranted by precondition (gbyMatcher() caller).
+                        .collect(Collectors.toSet()) : Collections.emptySet()));              // warranted by precondition (gbyMatcher() caller).
         final Map<Integer, Integer> selGbyColIndexMap = // SELECT stmt GBY column index ==> VIEW table column index
                 m_selectStmt.displayColumns().stream().flatMap(ci -> {
                     // find index of a SELECT's GBY expression into MV's GBY expression
@@ -357,14 +349,6 @@ final class MVQueryRewriter {
         }
     }
 
-    // returns all materialized view info => view table from table list
-    private static Map<MaterializedViewInfo, Table> getMviAndViews(List<Table> tbls) {
-        return tbls.stream().flatMap(tbl ->
-                StreamSupport.stream(((Iterable<MaterializedViewInfo>) () -> tbl.getViews().iterator()).spliterator(), false)
-                        .map(mv -> Pair.of(mv, mv.getDest())))
-                .collect(Collectors.toMap(Pair::getFirst, Pair::getSecond));
-    }
-
     // Get a copy of *any* AbstractExpression, with itself and all subexpressions that are PVE converted to CVE
     // For scope of ENG-2878, caching would not cause this trouble because parameter
     private static AbstractExpression transformExpressionRidofPVE(AbstractExpression src) {
@@ -398,6 +382,7 @@ final class MVQueryRewriter {
 
     /**
      * Get group-by expression
+     *
      * @param mv
      * @return
      */
@@ -409,4 +394,20 @@ final class MVQueryRewriter {
         }
     }
 
+    /**
+     * Find the first {@link MaterializedViewInfo} which has columns in the group by clause and set {@link #m_mvi} and
+     * {@link #m_QueryColumnNameAndIndx_to_MVColumnNameAndIndx} appropriately.
+     */
+    private void findMviAndGByhColumns() {
+        for (Table tbl : m_selectStmt.m_tableList) {
+            for (MaterializedViewInfo mvi : tbl.getViews()) {
+                Map<Pair<String, Integer>, Pair<String, Integer>> rel = gbyMatches(mvi);
+                if (rel != null) {
+                    m_mvi = mvi;
+                    m_QueryColumnNameAndIndx_to_MVColumnNameAndIndx = rel;
+                    return;
+                }
+            }
+        }
+    }
 }
