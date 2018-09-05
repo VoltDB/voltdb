@@ -122,7 +122,7 @@ struct WindowAggregate {
     }
 
     /**
-     * Do calculations after row insertion to end the row and start the
+     * Do calculations after row insertion to end the current row and start the
      * next row.
      */
     virtual void endRow(TableWindow &window,
