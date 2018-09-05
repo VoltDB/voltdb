@@ -119,10 +119,10 @@ void* Pool::allocate(std::size_t size) {
             currentChunk.offset() = size;
             return currentChunk.data();
          } else {                                       // Need to allocate a new chunk
-            std::cout << "Pool had to allocate a new chunk. Not a good thing "
-               "from a performance perspective. If you see this we need to look "
-               "into structuring our pool sizes and allocations so the this doesn't "
-               "happen frequently" << std::endl;
+//            std::cout << "Pool had to allocate a new chunk. Not a good thing "
+//               "from a performance perspective. If you see this we need to look "
+//               "into structuring our pool sizes and allocations so the this doesn't "
+//               "happen frequently" << std::endl;
 #ifdef USE_MMAP
 //            char *storage =
 //               static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
@@ -230,11 +230,10 @@ int64_t Pool::getAllocatedMemory() const {
 
 #endif
 
-// Thread-local shared pool for heteregeous STL container with
-// customized allocator: 256 of 160KB chunks, totaling 40MB
-// overhead, per thread.
-
-Pool VoltAllocResourceMng::s_VoltAllocatorPool(163840, 256);
+// Global shared pool for heteregeous STL container with
+// customized allocator: 1024 of 16KB chunks, totaling 4MB
+// of high-watermark overhead.
+Pool VoltAllocResourceMng::s_VoltAllocatorPool(16384, 1024);
 std::mutex VoltAllocResourceMng::s_allocMutex;
 volatile sig_atomic_t VoltAllocResourceMng::s_numInstances = 0;
 

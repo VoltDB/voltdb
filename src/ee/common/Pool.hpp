@@ -189,14 +189,18 @@ namespace voltdb {
     * allocate from a global memory pool.
     * e.g. std::vector<TxnMem, VoltAlloc<TxnMem>> s;
     *
-    * The voltdb::allocator (conceptually) uses a common thread-local Pool,
-    * which means that:
+    * The voltdb::allocator (conceptually) uses a common global
+    * Pool with small chunk size, and locks when allocating.
+    * This means:
     *
     * 1. The allocator is thread-safe, i.e. multiple threads
     * using allocator should be free to use it in any manner;
     *
     * 2. One thread's memory is invisible to the other, meaning
     * that they cannot access the same object in any manner.
+    *
+    * 3. Small chunk size helps avoid memory fragmentation, and
+    * increases memory utility.
     */
    template<typename T> class allocator {
    public:
