@@ -700,18 +700,90 @@ public class GenerateEETests extends EEPlanGenerator {
         return rankDenseOutput;
     }
 
+    TableConfig makeRowNumberOutput(Database db)  {
+        TableConfig rowNumberOutput = new TableConfig("row_number_output",
+                db,
+                new Integer[][] {
+                        // A   B    C    row_number
+                        //--------------------------------------
+                        {  1,  1,  101, 1},
+                        {  1,  1,  102, 2},
+                        //======================================
+                        {  1,  2,  201, 3},
+                        {  1,  2,  202, 4},
+                        //======================================
+                        {  1,  3,  203, 5},
+                        //--------------------------------------
+                        {  2,  1, 1101, 1},
+                        {  2,  1, 1102, 2},
+                        //======================================
+                        {  2,  2, 1201, 3},
+                        {  2,  2, 1202, 4},
+                        //======================================
+                        {  2,  3, 1203, 5},
+                        //--------------------------------------
+                        { 20,  1, 2101, 1},
+                        { 20,  1, 2102, 2},
+                        //======================================
+                        { 20,  2, 2201, 3},
+                        { 20,  2, 2202, 4},
+                        //======================================
+                        { 20,  3, 2203, 5},
+                        //--------------------------------------
+                });
+        return rowNumberOutput;
+    }
+
+    TableConfig makeRowNumberWithoutPartitionOutput(Database db)  {
+        TableConfig rowNumberOutput = new TableConfig("row_number_without_partition_output",
+                db,
+                new Integer[][] {
+                        // A   B    C    row_number
+                        //--------------------------------------
+                        {  1,  1,  101, 1},
+                        {  1,  1,  102, 2},
+                        //======================================
+                        {  1,  2,  201, 3},
+                        {  1,  2,  202, 4},
+                        //======================================
+                        {  1,  3,  203, 5},
+                        //--------------------------------------
+                        {  2,  1, 1101, 6},
+                        {  2,  1, 1102, 7},
+                        //======================================
+                        {  2,  2, 1201, 8},
+                        {  2,  2, 1202, 9},
+                        //======================================
+                        {  2,  3, 1203, 10},
+                        //--------------------------------------
+                        { 20,  1, 2101, 11},
+                        { 20,  1, 2102, 12},
+                        //======================================
+                        { 20,  2, 2201, 13},
+                        { 20,  2, 2202, 14},
+                        //======================================
+                        { 20,  3, 2203, 15},
+                        //--------------------------------------
+                });
+        return rowNumberOutput;
+    }
+
     public void generatedRankPlan() throws Exception {
         Database db = getDatabase();
         TableConfig rankInput = makeRankInput(db);
         TableConfig rankOutput = makeRankOutput(db);
         TableConfig rankDenseOutput = makeRankDenseOutput(db);
+        TableConfig rowNumberOutput = makeRowNumberOutput(db);
+        TableConfig rowNumberWithoutPartitionOutput = makeRowNumberWithoutPartitionOutput(db);
 
         DBConfig rankDB = new DBConfig(getClass(),
                                        GenerateEETests.class.getResource(DDL_FILENAME),
                                        getCatalogString(),
                                        rankInput,
                                        rankOutput,
-                                       rankDenseOutput);
+                                       rankDenseOutput,
+                                       rowNumberOutput,
+                                       rowNumberWithoutPartitionOutput);
         String sqlStmt;
         sqlStmt = "select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
 
@@ -725,6 +797,30 @@ public class GenerateEETests extends EEPlanGenerator {
                                       sqlStmt,
                                       false,
                                       rankDenseOutput));
+
+        // row_number() with 'partition' and 'order by'
+        sqlStmt = "select A, B, C, row_number() over (partition by A order by B) as R from T ORDER BY A;";
+
+        rankDB.addTest(new TestConfig("test_row_number",
+                sqlStmt,
+                false,
+                rowNumberOutput));
+
+        // row_number() without 'order by'
+        sqlStmt = "select A, B, C, row_number() over (partition by A) as R from T ORDER BY A;";
+
+        rankDB.addTest(new TestConfig("test_row_number_without_order_by",
+                sqlStmt,
+                false,
+                rowNumberOutput));
+
+        // row_number() without 'partition'
+        sqlStmt = "select A, B, C, row_number() over () as R from T;";
+
+        rankDB.addTest(new TestConfig("test_row_number_without_partition",
+                sqlStmt,
+                false,
+                rowNumberWithoutPartitionOutput));
         generateTests("executors", "TestWindowedRank", rankDB);
     }
 
