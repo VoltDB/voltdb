@@ -24,8 +24,6 @@
 package org.voltdb.sysprocs;
 
 import java.io.IOException;
-import java.util.ArrayList;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -38,7 +36,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
@@ -52,7 +49,8 @@ public class TestLowImpactDelete extends TestCase {
     static int SPH = 2;
     static int HOSTCOUNT = 3;
     static int KFACTOR = 1;
-
+    static int MAX_FREQUENCEY = 1;
+    static int INTERVAL = 1;
     @Before
     public void setUp() throws IOException {
         String testSchema =
@@ -69,7 +67,7 @@ public class TestLowImpactDelete extends TestCase {
               + "    id BIGINT not null, \n"
               + "    ts TIMESTAMP not null, "
               + "    PRIMARY KEY (id) \n"
-              + " ) USING TTL 10 SECONDS ON COLUMN TS; \n"
+              + " ) USING TTL 10 SECONDS ON COLUMN TS BATCH_SIZE 10 MAX_FREQUENCY 3; \n"
               + "PARTITION TABLE ttl ON COLUMN id;"
               + "CREATE INDEX ttlindex ON ttl (ts);"
 
@@ -159,38 +157,29 @@ public class TestLowImpactDelete extends TestCase {
     }
 
 
-    private VoltTable[] loadTable(Client client, String tableName, boolean replicated,
-                                  VoltTable table)
-    {
-        VoltTable[] results = null;
-        try
-        {
+    private void loadTable(Client client, String tableName, boolean replicated,
+                                  VoltTable table) {
+        try{
             if (replicated) {
                 client.callProcedure("@LoadMultipartitionTable", tableName,
                       (byte) 0, table); // using insert
             } else {
-                ArrayList<SyncCallback> callbacks = new ArrayList<>();
                 VoltType columnTypes[] = new VoltType[table.getColumnCount()];
                 for (int ii = 0; ii < columnTypes.length; ii++) {
                     columnTypes[ii] = table.getColumnType(ii);
                 }
                 while (table.advanceRow()) {
-                    SyncCallback cb = new SyncCallback();
-                    callbacks.add(cb);
                     Object params[] = new Object[table.getColumnCount()];
                     for (int ii = 0; ii < columnTypes.length; ii++) {
                         params[ii] = table.get(ii, columnTypes[ii]);
                     }
-                    client.callProcedure(cb, tableName + ".insert", params);
+                    client.callProcedure(tableName + ".insert", params);
                 }
             }
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             ex.printStackTrace();
             fail("loadTable exception: " + ex.getMessage());
         }
-        return results;
     }
 
     // make sure LowImpactDelete complains if the table is missing
@@ -198,7 +187,7 @@ public class TestLowImpactDelete extends TestCase {
     public void testMissingTable() throws Exception {
         // fail on missing table
         try {
-            m_client.callProcedure("@LowImpactDelete", "notable", "nocolumn", "75", "<", 1000, 2000);
+            m_client.callProcedure("@LowImpactDeleteNT", "notable", "nocolumn", "75", "<", 1000, 2000, MAX_FREQUENCEY, INTERVAL);
             fail();
         }
         catch (ProcCallException e) {
@@ -210,7 +199,7 @@ public class TestLowImpactDelete extends TestCase {
 
         // fail on missing column
         try {
-            m_client.callProcedure("@LowImpactDelete", "foo", "nocolumn", "75", "<", 1000, 2000);
+            m_client.callProcedure("@LowImpactDeleteNT", "foo", "nocolumn", "75", "<", 1000, 2000, MAX_FREQUENCEY, INTERVAL);
             fail();
         }
         catch (ProcCallException e) {
@@ -219,7 +208,7 @@ public class TestLowImpactDelete extends TestCase {
 
         // fail on improper type
         try {
-            m_client.callProcedure("@LowImpactDelete", "foo", "a", "stringdata", "<", 1000, 2000);
+            m_client.callProcedure("@LowImpactDeleteNT", "foo", "a", "stringdata", "<", 1000, 2000, MAX_FREQUENCEY, INTERVAL);
             fail();
         }
         catch (ProcCallException e) {
@@ -235,24 +224,24 @@ public class TestLowImpactDelete extends TestCase {
         VoltTable inputTable = createTable(numberOfItems, 0, 0, 0, 0);
         loadTable(m_client, "part", false, inputTable);
         loadTable(m_client, "rep", true, inputTable);
-        ClientResponse response = m_client.callProcedure("@LowImpactDelete", "part", "ts", "9000", "<", 500, 1000 * 1000);
+        ClientResponse response = m_client.callProcedure("@LowImpactDeleteNT", "part", "ts", "9000", "<", 500, 1000 * 1000, MAX_FREQUENCEY, INTERVAL);
         VoltTable result = response.getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
         long deleted = result.getLong("ROWS_DELETED");
-        assertTrue (deleted == 9000);
+        assertTrue (deleted == 1500);
 
-        response = m_client.callProcedure("@LowImpactDelete", "rep", "ts", "9000", "<", 500, 1000 * 1000);
+        response = m_client.callProcedure("@LowImpactDeleteNT", "rep", "ts", "9000", "<", 500, 1000 * 1000, MAX_FREQUENCEY, INTERVAL);
         result = response.getResults()[0];
         assertEquals(1, result.getRowCount());
         result.advanceRow();
         deleted = result.getLong("ROWS_DELETED");
-        assertTrue (deleted == 9000);
+        assertTrue (deleted == 500);
     }
 
     @Test
     public void testLongRunningNibbleDelete() throws InterruptedException {
-        System.out.println("testLowImpactDelete");
+        System.out.println("testLongRunningNibbleDelete");
 
         Thread t1 = new Thread(() -> {
             long numberOfItems = 10000;
@@ -283,7 +272,7 @@ public class TestLowImpactDelete extends TestCase {
             while (now < end) {
                 ClientResponse response = null;
                 try {
-                    response = m_client.callProcedure("@LowImpactDelete", "part", "ts", "1000000000", "<", 10000, 1000 * 1000);
+                    response = m_client.callProcedure("@LowImpactDeleteNT", "part", "ts", "1000000000", "<", 10000, 1000 * 1000, 4, INTERVAL);
                 } catch (NoConnectionsException e) {
                     e.printStackTrace();
                 } catch (IOException e) {

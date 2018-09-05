@@ -30,7 +30,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.StatementCompiler;
-import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;

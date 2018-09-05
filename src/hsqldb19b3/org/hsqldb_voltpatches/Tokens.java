@@ -772,7 +772,10 @@ public class Tokens {
     // End of VoltDB extension
 
     // A VoltDB extension TTL
-    static final String        T_TTL = "TTL";
+    static final String        T_TTL              = "TTL";
+    static final String        T_MAX_FREQUENCY    = "MAX_FREQUENCY";
+    static final String        T_BATCH_SIZE       = "BATCH_SIZE";
+    static final String        T_CANCELABLE       = "CANCELABLE";
     // End of VoltDB extension
     //
     static final String        T_ACOS             = "ACOS";
@@ -1623,6 +1626,9 @@ public class Tokens {
     static final int MINUTES       = 1005;
     static final int HOURS         = 1006;
     static final int DAYS          = 1007;
+    static final int BATCH_SIZE    = 1008;
+    static final int MAX_FREQUENCY = 1009;
+    static final int CANCELABLE    = 1010;
     // End of VoltDB extension
     //
     public static final int X_UNKNOWN_TOKEN = -1;
@@ -1979,6 +1985,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_MINUTES, MINUTES);
         reservedKeys.put(Tokens.T_HOURS, HOURS);
         reservedKeys.put(Tokens.T_DAYS, DAYS);
+        reservedKeys.put(Tokens.T_BATCH_SIZE, BATCH_SIZE);
+        reservedKeys.put(Tokens.T_MAX_FREQUENCY,MAX_FREQUENCY);
+        reservedKeys.put(Tokens.T_CANCELABLE, CANCELABLE);
         // End of VoltDB extension
     }
 

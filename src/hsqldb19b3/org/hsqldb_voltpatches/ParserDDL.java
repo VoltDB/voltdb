@@ -325,13 +325,10 @@ public class ParserDDL extends ParserRoutine {
 
 /*
     CompiledStatementInterface compileAlter() {
-
         CompiledStatementInterface cs = null;
         read();
         String sql = getStatement(getParsePosition(), endStatementTokensAlter);
-
         cs = new CompiledStatementSchema(sql, StatementCodes.ALTER_TYPE, null);
-
         return cs;
     }
 */
@@ -537,12 +534,11 @@ public class ParserDDL extends ParserRoutine {
                     /* disable 3 lines ...
                         database.schemaManager.getSchemaObject(name.name,
                             schemaName, objectType);
-
                     ... disabled 3 lines */
                         database.schemaManager.findSchemaObject(name.name,
                                 schemaName, objectType);
                     if (object == null) {
-                    	writeName = null;
+                        writeName = null;
                     }
                     else  // AS IN else if (cascade) {
                     // End of VoltDB extension
@@ -1004,97 +1000,108 @@ public class ParserDDL extends ParserRoutine {
 
     private Statement readTimeToLive(Table table, boolean alter) {
 
-        //syntax: USING TTL 10 SECOND ON COLUMN a
+        //syntax: USING TTL 10 SECONDS ON COLUMN a MAX_FREQUENCY 1 BATCH_SIZE 1000 CANCELABLE
         if (!alter && token.tokenType != Tokens.USING) {
             return null;
         }
         int timeLiveValue = 0;
         String ttlUnit = "SECONDS";
         String ttlColumn = "";
-        int tokenCount = 0;
-        while (tokenCount <= 5) {
-            read();
-            switch(token.tokenType) {
-            case Tokens.TTL:
-                if (tokenCount != 0) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                break;
-            case Tokens.X_VALUE:
-                if (tokenCount != 1) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                timeLiveValue = (Integer)(token.tokenValue);
-                break;
-            case Tokens.SECONDS:
-            case Tokens.MINUTES:
-            case Tokens.HOURS:
-            case Tokens.DAYS:
-                if (tokenCount != 2) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                ttlUnit = token.tokenString;
-                break;
-            case Tokens.ON:
-                if (tokenCount == 2) {
-                    tokenCount++;
-                }
-                if (tokenCount != 3) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                break;
-            case Tokens.COLUMN:
-                if (tokenCount != 4) {
-                    throw unexpectedToken();
-                }
-                tokenCount++;
-                break;
-            case Tokens.X_IDENTIFIER:
-                if (tokenCount != 5) {
-                    throw unexpectedToken();
-                }
-                ttlColumn = token.tokenString;
+        int batchSize = 1000;
+        int maxFrequency = 1;
 
-                int index = table.findColumn(ttlColumn);
-                if (index < 0) {
-                    throw unexpectedToken();
-                }
-                ColumnSchema col = table.getColumn(index);
-                //TIMESTAMP, INTEGER, BIGINT
-                int colType = col.getDataType().typeCode;
-                if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
-                    throw unexpectedToken();
-                }
-                if (!alter) {
-                    table.addTTL(timeLiveValue, ttlUnit, ttlColumn);
-                }
-                tokenCount++;
-                read();
-                break;
-            default:
+        read();
+        if (token.tokenType != Tokens.TTL) {
+            throw unexpectedToken();
+        }
+
+        read();
+        if (token.tokenType != Tokens.X_VALUE) {
+            throw unexpectedToken();
+        }
+        timeLiveValue = (Integer)(token.tokenValue);
+
+        read();
+        if (token.tokenType == Tokens.SECONDS || token.tokenType == Tokens.MINUTES ||
+             token.tokenType == Tokens.HOURS || token.tokenType == Tokens.DAYS) {
+            ttlUnit = token.tokenString;
+            read();
+        }
+
+        if (token.tokenType == Tokens.ON) {
+            read();
+            if (token.tokenType != Tokens.COLUMN) {
                 throw unexpectedToken();
             }
-        }
-        //missing parameters
-        if (tokenCount != 6) {
+            read();
+            if (token.tokenType != Tokens.X_IDENTIFIER) {
+                throw unexpectedToken();
+            }
+            ttlColumn = token.tokenString;
+            int index = table.findColumn(ttlColumn);
+            if (index < 0) {
+                throw unexpectedToken();
+            }
+            ColumnSchema col = table.getColumn(index);
+            //TIMESTAMP, INTEGER, BIGINT
+            int colType = col.getDataType().typeCode;
+            if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
+                throw unexpectedToken();
+            }
+        } else {
             throw unexpectedToken();
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        }
+        if (token.tokenType == Tokens.BATCH_SIZE) {
+            read();
+            if (token.tokenType != Tokens.X_VALUE) {
+                throw unexpectedToken();
+            }
+            batchSize = (Integer)(token.tokenValue);
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        }
+        if (token.tokenType == Tokens.MAX_FREQUENCY) {
+            read();
+            if (token.tokenType != Tokens.X_VALUE) {
+                throw unexpectedToken();
+            }
+            maxFrequency = (Integer)(token.tokenValue);
+        }
+
+        read();
+        if (token.tokenType == Tokens.SEMICOLON) {
+            return createTimeToLive(table, alter, timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+        } else {
+            throw unexpectedToken();
+        }
+    }
+
+    private Statement createTimeToLive(Table table, boolean alter,int value, String unit, String column,
+            int batchSize, int maxFrequency) {
+        if (!alter) {
+            table.addTTL(value, unit, column, batchSize, maxFrequency);
         }
 
         Object[] args = new Object[] {
                 table.getName(),
-                timeLiveValue,
-                ttlUnit,
-                ttlColumn,
+                value,
+                unit,
+                column,
+                batchSize,
+                maxFrequency,
                 Integer.valueOf(SchemaObject.CONSTRAINT), Boolean.valueOf(false),
                 Boolean.valueOf(false)
             };
         return new StatementSchema(null, StatementTypes.ALTER_TTL, args,
                                        null, table.getName());
-
     }
     //End of VoltDB extension
 
@@ -1835,7 +1842,6 @@ public class ParserDDL extends ParserRoutine {
                 if (!mainTable.hasPrimaryKey()) {
                     throw Trace.error(Trace.CONSTRAINT_NOT_FOUND,
                                       Trace.TABLE_HAS_NO_PRIMARY_KEY);
-
                 }
 */
             }
@@ -5501,30 +5507,30 @@ public class ParserDDL extends ParserRoutine {
     }
 
     private boolean voltDBacceptNotNullConstraint(HsqlArrayList list) {
-		if (list.size() != 2) {
-			return false;
-		}
-		if (! (list.get(1) instanceof Constraint)) {
-			return false;
-		}
+        if (list.size() != 2) {
+            return false;
+        }
+        if (! (list.get(1) instanceof Constraint)) {
+            return false;
+        }
         // This replicates the logic that controls the setting of the Consraint.isNotNull member.
         // Unfortunately that member only gets set a little later.
-		Constraint constraint = (Constraint)list.get(1);
-		if ( constraint.getConstraintType() != Constraint.CHECK ) {
-			return false;
-		}
-		Expression check = constraint.getCheckExpression();
-		if (check.getType() != OpTypes.NOT) {
-			return false;
-		}
-		if (check.getLeftNode().getType() != OpTypes.IS_NULL) {
-			return false;
-		}
-		if (check.getLeftNode().getLeftNode().getType() != OpTypes.COLUMN) {
-			return false;
-		}
-		return true;
-	}
+        Constraint constraint = (Constraint)list.get(1);
+        if ( constraint.getConstraintType() != Constraint.CHECK ) {
+            return false;
+        }
+        Expression check = constraint.getCheckExpression();
+        if (check.getType() != OpTypes.NOT) {
+            return false;
+        }
+        if (check.getLeftNode().getType() != OpTypes.IS_NULL) {
+            return false;
+        }
+        if (check.getLeftNode().getLeftNode().getType() != OpTypes.COLUMN) {
+            return false;
+        }
+        return true;
+    }
 
     // A VoltDB extension to support LIMIT PARTITION ROWS syntax
     private Statement compileAlterTableAddLimitConstraint(Table table, HsqlName name)
