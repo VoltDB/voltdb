@@ -161,7 +161,7 @@ def test_builtin_function_matches_only_at_start(completer):
 def test_user_function_name_completion(completer):
     result = result_set(completer, 'SELECT cu')
     assert result == {function('Custom_Fun', -2), function('Custom_Func1', -2), function('custom_func2', -2),
-                      function('CURRENT_TIMESTAMP()', -2), keyword('CURRENT', -2)}
+                      function('CURRENT_TIMESTAMP()', -2)}
 
 
 @parametrize('completer', completers)
