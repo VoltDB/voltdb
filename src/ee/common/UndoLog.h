@@ -56,7 +56,7 @@ namespace voltdb
             assert(nextUndoToken > m_lastReleaseToken);
             m_lastUndoToken = nextUndoToken;
             Pool *pool = NULL;
-            if (m_undoDataPools.size() == 0) {
+            if (m_undoDataPools.empty()) {
                 pool = new Pool(TEMP_POOL_CHUNK_SIZE, 1);
             } else {
                 pool = m_undoDataPools.back();

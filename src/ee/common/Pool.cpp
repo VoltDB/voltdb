@@ -231,15 +231,10 @@ int64_t Pool::getAllocatedMemory() const {
 #endif
 
 // Thread-local shared pool for heteregeous STL container with
-// customized allocator: 1024 of 16KB chunks, totaling 16MB
+// customized allocator: 256 of 160KB chunks, totaling 40MB
 // overhead, per thread.
 
-#ifdef MODERN_CXX
-thread_local Pool VoltAllocResourceMng::s_VoltAllocatorPool(16384, 1024);
-thread_local std::atomic_ulong VoltAllocResourceMng::s_numInstances;
-#else
-Pool VoltAllocResourceMng::s_VoltAllocatorPool(16384, 1024);
+Pool VoltAllocResourceMng::s_VoltAllocatorPool(163840, 256);
 std::mutex VoltAllocResourceMng::s_allocMutex;
 volatile sig_atomic_t VoltAllocResourceMng::s_numInstances = 0;
-#endif
 

@@ -22,20 +22,14 @@
 #include <cstdint>
 #include <vector>
 #include <memory>
+#include <signal.h>     // for sig_atomic_t typedef
+#include <mutex>
 
 #undef MODERN_CXX
 
 #if __cplusplus >= 201402
 #define MODERN_CXX
 #endif
-
-#ifdef MODERN_CXX
-#include <atomic>
-#else
-#include <signal.h>     // for sig_atomic_t typedef
-#endif
-
-#include <mutex>
 
 namespace voltdb {
 
@@ -149,39 +143,24 @@ namespace voltdb {
     * Resource pool for all heteregeous VoltAllocs.
     */
    class VoltAllocResourceMng {
-#ifdef MODERN_CXX
-      static thread_local Pool s_VoltAllocatorPool;
-      static thread_local std::atomic_ulong s_numInstances;
-#else
       static Pool s_VoltAllocatorPool;
       static volatile sig_atomic_t s_numInstances;
       static std::mutex s_allocMutex;
-#endif
    public:
       static void* operator new(std::size_t sz) {
-#ifndef MODERN_CXX
          std::lock_guard<std::mutex> lock(s_allocMutex);   // C++11 has thread_local keyword, so no need for locking
-#endif
          ++s_numInstances;
          return s_VoltAllocatorPool.allocate(sz);
       }
       static void* operator new(std::size_t sz, void* p) {
          return p;
       }
-#ifdef MODERN_CXX
-      static void operator delete(void*) {
-         if (1lu == s_numInstances.fetch_sub(1lu)) {       // fetch then subtract. No need for locking, as memory pool is already thread-local
-            s_VoltAllocatorPool.purge();
-         }
-      }
-#else
       static void operator delete(void*) {
          if (0 == --s_numInstances) {
             std::lock_guard<std::mutex> lock(s_allocMutex);
             s_VoltAllocatorPool.purge();
          }
       }
-#endif
    };
    /**
     * An allocator to be used in lieu with STL containers, but

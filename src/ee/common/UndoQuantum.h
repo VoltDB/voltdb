@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <cassert>
 #include <string.h>
+#include <list>
 
 #include "common/Pool.hpp"
 #include "common/VoltContainer.hpp"
@@ -136,8 +137,8 @@ private:
        UndoReleaseActionRevIter_t;
     uint32_t m_numInterests;
     uint32_t m_interestsCapacity;
-    std::deque<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>> m_interests;
-    typedef std::deque<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>>::iterator
+    std::list<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>> m_interests;
+    typedef std::list<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>>::iterator
        UndoQuantumReleaseInterestIter_t;
     const bool m_forLowestSite;
 protected:
