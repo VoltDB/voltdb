@@ -23,8 +23,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -32,6 +34,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -39,6 +42,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
+import com.google.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class MpPromoteAlgo implements RepairAlgo
@@ -48,6 +52,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
+    private final Set<Integer> m_survivedHosts;
     private final int m_deadHost;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private long m_maxSeenCompleteTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
@@ -58,6 +63,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
     private final boolean m_isMigratePartitionLeader;
     private final MpRestartSequenceGenerator m_restartSeqGenerator;
+    private boolean m_isMPIPromotion = false;
 
     long getRequestId()
     {
@@ -122,6 +128,8 @@ public class MpPromoteAlgo implements RepairAlgo
         m_isMigratePartitionLeader = false;
         m_whoami = whoami;
         m_restartSeqGenerator = seqGen;
+        m_survivedHosts = Sets.newHashSet();
+        setSurvivedHosts();
     }
 
     /**
@@ -136,6 +144,8 @@ public class MpPromoteAlgo implements RepairAlgo
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
         m_restartSeqGenerator = seqGen;
+        m_survivedHosts = Sets.newHashSet();
+        setSurvivedHosts();
     }
 
     @Override
@@ -150,8 +160,10 @@ public class MpPromoteAlgo implements RepairAlgo
             //remove the flag for the partition if the repair process is not cancelled.
             //The flag is registered upon host failure or MPI promotion. The repair may be interrupted but will
             //be eventually completed.
-            if (!m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
-                VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
+            if (!m_isMPIPromotion && !m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
+                if (VoltDB.instance().getCartographer().hasLeaderElectionCompleted(m_survivedHosts)) {
+                    VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
+                }
             }
         }
         return m_promotionResult;
@@ -396,5 +408,15 @@ public class MpPromoteAlgo implements RepairAlgo
 
             return rollback;
         }
+    }
+
+    void setSurvivedHosts() {
+        for (Long hsid : m_survivors) {
+            m_survivedHosts.add(CoreUtils.getHostIdFromHSId(hsid));
+        }
+    }
+
+    public void setMpiPromotionRepair() {
+        m_isMPIPromotion = true;
     }
 }

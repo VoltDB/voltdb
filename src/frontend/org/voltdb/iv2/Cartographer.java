@@ -1004,4 +1004,10 @@ public class Cartographer extends StatsSource
         }
         return false;
     }
+
+    public boolean hasLeaderElectionCompleted(Set<Integer> surviedHosts) {
+        Set<Integer> masterHosts = Sets.newHashSet();
+        masterHosts.addAll(m_currentMastersByHost.keySet());
+        return masterHosts.size() == surviedHosts.size();
+    }
 }
