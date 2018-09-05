@@ -107,7 +107,7 @@ class VoltCli(object):
         self.refresher = VoltRefresher()
         self.executor = VoltExecutor(self.server, self.port, self.user, self.password,
                                      self.query_timeout, self.kerberos, self.ssl, self.ssl_set, self.credentials)
-        self.multiline = True
+        self.multiline = False
         self.auto_refresh = True
 
     def create_key_bindings(self):
@@ -162,8 +162,14 @@ class VoltCli(object):
         session = PromptSession(
             lexer=PygmentsLexer(SqlLexer), completer=self.completer, style=style,
             auto_suggest=AutoSuggestFromHistory(), bottom_toolbar=self.bottom_toolbar,
-            key_bindings=self.create_key_bindings(), multiline=self.multiline,
+            key_bindings=self.create_key_bindings(), multiline=True,
             history=history)
+
+        # directly assign multiline=False in PromptSession constructor will cause some unexpected behavior
+        # due to some issue i don't know. This is a workaround.
+        if not self.multiline:
+            session.default_buffer.multiline = ~session.default_buffer.multiline
+
         option_str = "--servers={server} --port={port_number}{user}{password}{credentials}" \
                      "{ssl}{output_format}{output_skip_metadata}{stop_on_error}{kerberos} " \
                      "--query-timeout={number_of_milliseconds}".format(

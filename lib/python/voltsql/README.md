@@ -11,13 +11,13 @@ Install Requirements
 - Open a terminal, go to the project folder, and run this command to install all project dependencies:
 
     ```bash
-    $ pip install -r requirements.txt
+    $ sudo pip install -r requirements.txt
     ```
     
 - Or if you want to install the dependencies offline, you can use
 
     ```bash
-    $ pip install -r requirements_offline.txt
+    $ sudo pip install -r requirements_offline.txt
     ```
       
 Run
@@ -34,7 +34,7 @@ Test
 - First you have to install requirements for test
 
     ```bash
-    $ pip install -r requirements_test.txt
+    $ sudo pip install -r requirements_test.txt
     ```
 - Then you can running tests using tox
 
