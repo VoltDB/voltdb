@@ -328,6 +328,8 @@ public abstract class CatalogSchemaTools {
                     table_sb.append(ttl.getTtlunit());
                 }
                 table_sb.append(" ON COLUMN " + ttl.getTtlcolumn().getTypeName());
+                table_sb.append(" BATCH_SIZE " + ttl.getBatchsize());
+                table_sb.append(" MAX_FREQUENCY " + ttl.getMaxfrequency() + " ");
             }
             table_sb.append(";\n");
         }

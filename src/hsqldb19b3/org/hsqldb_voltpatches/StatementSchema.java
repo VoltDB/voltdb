@@ -443,7 +443,9 @@ public class StatementSchema extends Statement {
                     int ttlValue = (Integer) arguments[1];
                     String ttlUnit = (String)arguments[2];
                     String ttlColumn = (String)arguments[3];
-                    table.alterTTL(ttlValue, ttlUnit, ttlColumn);
+                    int batchSize = (Integer) arguments[4];
+                    int maxFrequency = (Integer) arguments[5];
+                    table.alterTTL(ttlValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
                     break;
                 } catch (HsqlException e) {
                     return Result.newErrorResult(e, sql);

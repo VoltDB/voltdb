@@ -32,7 +32,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.iv2.DeterminismHash;
 import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.sysprocs.LowImpactDelete.ComparisonOperation;
+import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
 
 /**
  * VoltProcedures invoke SiteProcedureConnection methods to

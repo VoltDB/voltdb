@@ -59,8 +59,7 @@ import com.google_voltpatches.common.collect.Maps;
 public class MpTransactionState extends TransactionState
 {
     static VoltLogger tmLog = new VoltLogger("TM");
-
-    private static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
+    public static final int DR_MAX_AGGREGATE_BUFFERSIZE = Integer.getInteger("DR_MAX_AGGREGATE_BUFFERSIZE", (45 * 1024 * 1024) + 4096);
     private static final String dr_max_consumer_partitionCount_str = "DR_MAX_CONSUMER_PARTITIONCOUNT";
     private static final String dr_max_consumer_messageheader_room_str = "DR_MAX_CONSUMER_MESSAGEHEADER_ROOM";
     private static final String volt_output_buffer_overflow = "V0001";
