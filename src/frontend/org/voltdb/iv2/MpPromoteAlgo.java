@@ -50,7 +50,6 @@ public class MpPromoteAlgo implements RepairAlgo
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
-    private final Set<Integer> m_survivedHosts;
     private final int m_deadHost;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private long m_maxSeenCompleteTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
@@ -61,6 +60,8 @@ public class MpPromoteAlgo implements RepairAlgo
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
     private final boolean m_isMigratePartitionLeader;
     private final MpRestartSequenceGenerator m_restartSeqGenerator;
+
+    // Indicate if this is used during MPI promotion or MP repair
     private boolean m_isMPIPromotion = false;
 
     long getRequestId()
@@ -126,8 +127,6 @@ public class MpPromoteAlgo implements RepairAlgo
         m_isMigratePartitionLeader = false;
         m_whoami = whoami;
         m_restartSeqGenerator = seqGen;
-        m_survivedHosts = Sets.newHashSet();
-        setSurvivedHosts();
     }
 
     /**
@@ -142,8 +141,6 @@ public class MpPromoteAlgo implements RepairAlgo
         m_isMigratePartitionLeader = migratePartitionLeader;
         m_whoami = whoami;
         m_restartSeqGenerator = seqGen;
-        m_survivedHosts = Sets.newHashSet();
-        setSurvivedHosts();
     }
 
     @Override
@@ -155,11 +152,11 @@ public class MpPromoteAlgo implements RepairAlgo
             repairLogger.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
         } finally {
-            //remove the flag for the partition if the repair process is not cancelled.
-            //The flag is registered upon host failure or MPI promotion. The repair may be interrupted but will
-            //be eventually completed.
-            if (!m_isMPIPromotion && !m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
-                if (VoltDB.instance().getCartographer().hasLeaderElectionCompleted(m_survivedHosts)) {
+            // The flag is registered upon host failure or MPI promotion. The repair may be interrupted but will
+            // be eventually completed. The flag will be removed by the LeaderAppointer in the event of MPI promotion
+            if (!m_isMPIPromotion && !m_isMigratePartitionLeader
+                    && !m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
+                if (VoltDB.instance().getCartographer().areAllPartitionLeadersOnValidHosts()) {
                     VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
                 }
             }
@@ -405,12 +402,6 @@ public class MpPromoteAlgo implements RepairAlgo
             }
 
             return rollback;
-        }
-    }
-
-    void setSurvivedHosts() {
-        for (Long hsid : m_survivors) {
-            m_survivedHosts.add(CoreUtils.getHostIdFromHSId(hsid));
         }
     }
 

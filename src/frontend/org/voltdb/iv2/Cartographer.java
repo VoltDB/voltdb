@@ -1005,9 +1005,14 @@ public class Cartographer extends StatsSource
         return false;
     }
 
-    public boolean hasLeaderElectionCompleted(Set<Integer> surviedHosts) {
+    // In the event of node failures, partition leaders on failed hosts will be relocated to
+    // surviving hosts. Partitions promote their own leader asynchronously. Eventually all the leaders
+    // will be on the live hosts.
+    public boolean areAllPartitionLeadersOnValidHosts() {
         Set<Integer> masterHosts = Sets.newHashSet();
         masterHosts.addAll(m_currentMastersByHost.keySet());
-        return masterHosts.size() == surviedHosts.size();
+        Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
+        masterHosts.removeAll(liveHosts);
+        return masterHosts.isEmpty();
     }
 }
