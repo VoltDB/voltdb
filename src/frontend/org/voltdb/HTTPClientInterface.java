@@ -51,6 +51,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.ClientResponseToJsonApiV2;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -113,13 +114,15 @@ public class HTTPClientInterface {
         final AtomicBoolean m_complete = new AtomicBoolean(false);
         final Continuation m_continuation;
         final String m_jsonp;
+        final HttpServletRequest m_request;
 
-        public JSONProcCallback(Continuation continuation, String jsonp) {
+        public JSONProcCallback(Continuation continuation, String jsonp, HttpServletRequest request) {
             assert continuation != null : "given continuation is null";
 
             m_continuation = continuation;
             m_continuation.addContinuationListener(this);
             m_jsonp = jsonp;
+            m_request = request;
         }
 
         @Override
@@ -135,7 +138,11 @@ public class HTTPClientInterface {
                 return;
             }
             ClientResponseImpl rimpl = (ClientResponseImpl) clientResponse;
-            String msg = rimpl.toJSONString();
+            String msg = null;
+            if ((((Request) m_request).getPathInfo()).equals("/api/2.0/"))
+                msg = ClientResponseToJsonApiV2.toJSONStringV2(rimpl);
+            else
+                msg = rimpl.toJSONString();
 
             // handle jsonp pattern
             // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
@@ -321,7 +328,7 @@ public class HTTPClientInterface {
             continuation.suspend(response);
             suspended = true;
 
-            JSONProcCallback cb = new JSONProcCallback(continuation, jsonp);
+            JSONProcCallback cb = new JSONProcCallback(continuation, jsonp, request);
             boolean success;
             String hostname = request.getRemoteHost();
             if (params != null) {
