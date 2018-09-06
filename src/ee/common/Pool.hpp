@@ -64,6 +64,9 @@ namespace voltdb {
          Chunk& operator=(Chunk&& rhs) {
             m_offset = rhs.m_offset;
             m_size = rhs.m_size;
+#ifdef MODERN_CXX     // error: deleted function ‘void std::unique_ptr<_Tp [], _Tp_Deleter>::reset(_Up) [with _Up = long int, _Tp = char, _Tp_Deleter = std::default_delete<char []>]’
+            m_chunkData.reset(NULL);
+#endif
             m_chunkData.swap(rhs.m_chunkData);
             return *this;
          }
@@ -83,8 +86,7 @@ namespace voltdb {
             return m_chunkData.get();
          }
          size_t padding() const throw() {   // number of bytes needed to advance offset to make next object
-            const size_t padding = 8 - (offset() % 8);    // align in 8-byte memory location.
-            return padding < 8 ? padding : 0;
+            return (8 - (offset() % 8)) % 8;    // align in 8-byte memory location.
          }
       };
 #ifndef MODERN_CXX
@@ -171,7 +173,7 @@ namespace voltdb {
       static std::mutex s_allocMutex;
    public:
       static void* operator new(std::size_t sz) {
-         std::lock_guard<std::mutex> lock(s_allocMutex);   // C++11 has thread_local keyword, so no need for locking
+         std::lock_guard<std::mutex> lock(s_allocMutex);
          ++s_numInstances;
          return s_VoltAllocatorPool.allocate(sz);
       }
@@ -180,7 +182,6 @@ namespace voltdb {
       }
       static void operator delete(void*) {
          if (0 == --s_numInstances) {
-            std::lock_guard<std::mutex> lock(s_allocMutex);
             s_VoltAllocatorPool.purge();
          }
       }
@@ -250,44 +251,38 @@ namespace voltdb {
     * Pattern for static factory of creating arbitrary C++ class
     * on the thread-local memory pool.
     * Usage:
-    * class Foo {
-    *    Foo(Arg1 arg1, Arg2 arg2);
-    * public:
-    *    static std::unique_ptr<Foo> createInstance(Arg1 arg1, Arg2 arg2) {
-    *        return InstanceFactory<Foo>::create(arg1, arg2);
-    *    }
+    * struct Foo {
+    *    Foo(T1 t1, T2 t2, ...);
     * };
+    * Pool spool;
+    * Foo* instanceFromSpool = createInstanceFromPool<Foo>(t1, t2, ...);
     */
-   template<typename T> struct InstanceFactory: private VoltAllocResourceMng {
 #ifdef MODERN_CXX
-      template<typename... Args> static std::unique_ptr<T> create(Args... args) {
-         return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-      }
-#else
-      // no variadic template argument support...
-       static std::unique_ptr<T> create() {
-          return std::unique_ptr<T>(new T());
-       }
-       template<typename Arg1> static std::unique_ptr<T> create(Arg1 arg1) {
-          return std::unique_ptr<T>(new T(arg1));
-       }
-       template<typename Arg1, typename Arg2>
-       static std::unique_ptr<T> create(Arg1 arg1, Arg2 arg2) {
-          return std::unique_ptr<T>(new T(arg1, arg2));
-       }
-       template<typename Arg1, typename Arg2, typename Arg3>
-       static std::unique_ptr<T> create(Arg1 arg1, Arg2 arg2, Arg3 arg3) {
-          return std::unique_ptr<T>(new T(arg1, arg2, arg3));
-       }
-       template<typename Arg1, typename Arg2, typename Arg3, typename Arg4>
-       static std::unique_ptr<T> create(Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4) {
-          return std::unique_ptr<T>(new T(arg1, arg2, arg3, arg4));
-       }
-       template<typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5>
-       static std::unique_ptr<T> create(Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5) {
-          return std::unique_ptr<T>(new T(arg1, arg2, arg3, arg4, arg5));
-       }
+   template<typename T, typename... Args> T* createInstanceFromPool(Pool& pool, Args... args) {
+      return ::new (pool.allocate(sizeof(T))) T(std::forward<Args>(args)...);
+   }
+#else       // no variadic template argument support...
+   template<typename T> T* createInstanceFromPool(Pool& pool) {
+      return ::new (pool.allocate(sizeof(T))) T();
+   }
+   template<typename T, typename Arg1> std::unique_ptr<T> createInstanceFromPool(Pool& pool, Arg1 arg1) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1);
+   }
+   template<typename T, typename Arg1, typename Arg2> T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3>
+   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4>
+   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5>
+   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5);
+   }
 #endif
-   };
 
 }

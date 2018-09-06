@@ -26,7 +26,7 @@ UndoLog::UndoLog()
 
 void UndoLog::clear()
 {
-    if (m_undoQuantums.size() > 0) {
+    if (! m_undoQuantums.empty()) {
         release(m_lastUndoToken);
     }
     for (auto i = m_undoDataPools.begin();

@@ -39,8 +39,6 @@ class UndoLog;
 class UndoQuantum {
     // UndoQuantum has a very limited public API that allows UndoAction registration
     // and copying buffers into pooled storage. Anything else is reserved for friends.
-    friend class UndoLog; // For management access -- allocation, deallocation, etc.
-    friend class UndoReleaseAction; // For allocateAction.
     friend class ::StreamedTableTest;
 
 protected:
@@ -48,12 +46,11 @@ protected:
     void operator delete(void*, Pool&) { /* emergency deallocator does nothing */ }
     void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
 
-    inline UndoQuantum(int64_t undoToken, Pool *dataPool, bool forLowestSite)
-        : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0),
-          m_forLowestSite(forLowestSite), m_dataPool(dataPool) {}
-    inline virtual ~UndoQuantum() {}
 
 public:
+    inline UndoQuantum(int64_t undoToken, Pool *dataPool, bool forLowestSite)
+        : m_undoToken(undoToken), m_dataPool(dataPool) {}
+    inline virtual ~UndoQuantum() {}
     virtual inline void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
         assert(undoAction);
         m_undoActions.push_back(undoAction);
@@ -63,7 +60,6 @@ public:
         }
     }
 
-protected:
     /*
      * Invoke all the undo actions for this UndoQuantum. UndoActions
      * must have released all memory after undo() is called.
@@ -109,7 +105,6 @@ protected:
         return result;
     }
 
-public:
     inline int64_t getUndoToken() const {
         return m_undoToken;
     }
@@ -131,10 +126,7 @@ public:
 private:
     const int64_t m_undoToken;
     std::deque<UndoReleaseAction*, voltdb::allocator<UndoReleaseAction*>> m_undoActions;
-    uint32_t m_numInterests;
-    uint32_t m_interestsCapacity;
     std::list<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>> m_interests;
-    const bool m_forLowestSite;
 protected:
     Pool *m_dataPool;
 };

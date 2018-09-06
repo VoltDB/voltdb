@@ -63,9 +63,9 @@ namespace voltdb
                 m_undoDataPools.pop_back();
             }
             assert(pool);
-            UndoQuantum *undoQuantum = new (*pool) UndoQuantum(nextUndoToken, pool, m_undoLogForLowestSite);
-            m_undoQuantums.push_back(undoQuantum);
-            return undoQuantum;
+            m_undoQuantums.emplace_back(createInstanceFromPool<UndoQuantum>(*pool,
+                     nextUndoToken, pool, m_undoLogForLowestSite));
+            return m_undoQuantums.back();
         }
 
         /*
@@ -99,7 +99,7 @@ namespace voltdb
             }
 
             m_lastUndoToken = undoToken - 1;
-            while (m_undoQuantums.size() > 0) {
+            while (! m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.back();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
                 if (undoQuantumToken < undoToken) {
@@ -134,7 +134,7 @@ namespace voltdb
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             assert(m_lastReleaseToken < undoToken);
             m_lastReleaseToken = undoToken;
-            while (m_undoQuantums.size() > 0) {
+            while (! m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.front();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
                 if (undoQuantumToken > undoToken) {
@@ -160,13 +160,13 @@ namespace voltdb
         int64_t getSize() const
         {
             int64_t total = 0;
-            for (int i = 0; i < m_undoDataPools.size(); i++)
+            for (auto iter = m_undoDataPools.cbegin(); iter != m_undoDataPools.cend(); ++iter)
             {
-                total += m_undoDataPools[i]->getAllocatedMemory();
+                total += (*iter)->getAllocatedMemory();
             }
-            for (int i = 0; i < m_undoQuantums.size(); i++)
+            for (auto iter = m_undoQuantums.cbegin(); iter != m_undoQuantums.cend(); ++iter)
             {
-                total += m_undoQuantums[i]->getAllocatedMemory();
+                total += (*iter)->getAllocatedMemory();
             }
             return total;
         }
