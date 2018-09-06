@@ -61,9 +61,6 @@ public class MigratePartitionLeader extends VoltSystemProcedure {
             return (new VoltTable[] {t});
         }
 
-        // before starting the migration, give some time for old leader to drain any pending tasks
-        ctx.getSiteProcedureConnection().quiesce();
-
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
         Long targetHsid = db.getCartographer().getHSIDForPartitionHost(hostId, partitionId);
         if (targetHsid == null) {
