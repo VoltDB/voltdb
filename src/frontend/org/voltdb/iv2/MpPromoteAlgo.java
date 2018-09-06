@@ -389,6 +389,7 @@ public class MpPromoteAlgo implements RepairAlgo
                             ftm.isNPartTxn(),
                             true);
                     rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
+                    rollback.setTruncationHandle(Long.MIN_VALUE);
                 }
             }
 
