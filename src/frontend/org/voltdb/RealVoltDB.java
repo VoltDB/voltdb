@@ -1620,6 +1620,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_configLogger.start();
 
             scheduleDailyLoggingWorkInNextCheckTime();
+
+            // Write a message to the log file if LARGE_MODE_RATIO system property is set to anything other than 0.
+            // This way it will be possible to verify that various frameworks are exercising large mode.
+
+            // If -Dlarge_mode_ratio=xx is specified via ant, the value will show up in the environment variables and
+            // take higher priority. Otherwise, the value specified via VOLTDB_OPTS will take effect.
+            final double largeModeRatio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
+            if (largeModeRatio > 0) {
+                hostLog.info(String.format("The large_mode_ratio property is set as %.2f", largeModeRatio));
+            }
         }
     }
 

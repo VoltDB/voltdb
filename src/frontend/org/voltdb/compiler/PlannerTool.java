@@ -18,6 +18,7 @@
 package org.voltdb.compiler;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -55,10 +56,15 @@ public class PlannerTool {
     private byte[] m_catalogHash;
     private AdHocCompilerCache m_cache;
     private long m_adHocLargeFallbackCount = 0;
+    private long m_adHocLargeModeCount = 0;
 
     private final HSQLInterface m_hsql;
 
     private static PlannerStatsCollector m_plannerStats;
+
+    // If -Dlarge_mode_ratio=xx is specified via ant, the value will show up in the environment variables and
+    // take higher priority. Otherwise, the value specified via VOLTDB_OPTS will take effect.
+    private final double m_largeModeRatio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
 
     public PlannerTool(final Database database, byte[] catalogHash)
     {
@@ -119,6 +125,10 @@ public class PlannerTool {
         return m_adHocLargeFallbackCount;
     }
 
+    public long getAdHocLargeModeCount() {
+        return m_adHocLargeModeCount;
+    }
+
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
         return planSql(sqlIn, infer, false, null, false, false);
@@ -173,7 +183,14 @@ public class PlannerTool {
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
             boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
-
+        // large_mode_ratio will force execution of SQL queries to use the "large" path (for read-only queries)
+        // a certain percentage of the time
+        if (m_largeModeRatio > 0 && !isLargeQuery) {
+            if (m_largeModeRatio >= 1 || m_largeModeRatio > ThreadLocalRandom.current().nextDouble()) {
+                isLargeQuery = true;
+                m_adHocLargeModeCount++;
+            }
+        }
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
