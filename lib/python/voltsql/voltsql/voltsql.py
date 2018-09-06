@@ -46,6 +46,7 @@ from __future__ import unicode_literals, print_function
 import os
 import sys
 from subprocess import call
+
 from pkg_resources import require, DistributionNotFound, VersionConflict
 
 # check if all dependencies are met
@@ -59,8 +60,15 @@ dependencies = [
 try:
     require(dependencies)
 except (DistributionNotFound, VersionConflict) as error:
-    print(error)
-    print("You need to install the missing Python third-party library.")
+    voltsql_root_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
+    try:
+        import pip
+    except ImportError:
+        print("You need to install pip first. Then you can install the dependencies using the following command: \n"
+              "pip install -r " + voltsql_root_dir + "/requirements.txt")
+        sys.exit(1)
+    print("You can install the missing dependencies using the following command: \n"
+          "pip install -r " + voltsql_root_dir + "/requirements.txt")
     sys.exit(1)
 
 import click
@@ -76,6 +84,7 @@ from pygments.lexers.sql import SqlLexer
 from voltcompleter import VoltCompleter
 from voltexecutor import VoltExecutor
 from voltrefresher import VoltRefresher
+from voltreadme import README
 
 click.disable_unicode_literals_warning = True
 
@@ -199,6 +208,9 @@ class VoltCli(object):
                 if sql_cmd.strip().lower() in ("quit", "quit;", "exit", "exit;"):
                     # exit
                     break
+                if sql_cmd.strip().lower() in ("help", "help;"):
+                    print(README)
+                    continue
                 call(
                     "echo \"{sql_cmd}\" | sqlcmd {options}".format(
                         sql_cmd=sql_cmd, options=option_str),
