@@ -1006,7 +1006,7 @@ public class Cartographer extends StatsSource
     }
 
     // In the event of node failures, partition leaders on failed hosts will be relocated to
-    // surviving hosts. Partitions promote their own leader asynchronously. Eventually all the leaders
+    // surviving hosts. Partitions promote their own leaders asynchronously. Eventually all the leaders
     // will be on the live hosts.
     public boolean areAllPartitionLeadersOnValidHosts() {
         Set<Integer> masterHosts = Sets.newHashSet();

@@ -452,7 +452,6 @@ public class FragmentTask extends FragmentTaskBase
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         sb.append("  TIMESTAMP: ");
-        sb.append("  TASK: ").append(m_fragmentMsg);
         MpRestartSequenceGenerator.restartSeqIdToString(getTimestamp(), sb);
         return sb.toString();
     }

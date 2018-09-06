@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
 import org.voltcore.messaging.VoltMessage;
@@ -40,7 +39,6 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
-import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class MpPromoteAlgo implements RepairAlgo
@@ -121,12 +119,7 @@ public class MpPromoteAlgo implements RepairAlgo
     public MpPromoteAlgo(List<Long> survivors, int deadHost, InitiatorMailbox mailbox,
             MpRestartSequenceGenerator seqGen, String whoami)
     {
-        m_survivors = new ArrayList<Long>(survivors);
-        m_deadHost = deadHost;
-        m_mailbox = mailbox;
-        m_isMigratePartitionLeader = false;
-        m_whoami = whoami;
-        m_restartSeqGenerator = seqGen;
+        this(survivors, deadHost, mailbox,seqGen, whoami, false);
     }
 
     /**
@@ -156,9 +149,14 @@ public class MpPromoteAlgo implements RepairAlgo
             // be eventually completed. The flag will be removed by the LeaderAppointer in the event of MPI promotion
             if (!m_isMPIPromotion && !m_isMigratePartitionLeader
                     && !m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
-                if (VoltDB.instance().getCartographer().areAllPartitionLeadersOnValidHosts()) {
-                    VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
-                }
+                VoltDB.instance().getSES(true).submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (VoltDB.instance().getCartographer().areAllPartitionLeadersOnValidHosts()) {
+                            VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
+                        }
+                    }
+                });
             }
         }
         return m_promotionResult;
