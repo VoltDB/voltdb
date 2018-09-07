@@ -43,8 +43,33 @@
 
 from __future__ import unicode_literals, print_function
 
+import os
 import sys
 from subprocess import call
+
+from pkg_resources import require, DistributionNotFound, VersionConflict
+
+# check if all dependencies are met
+dependencies = [
+    'Pygments>=2.2.0',
+    'sqlparse>=0.2.4',
+    'prompt_toolkit>=2.0.4',
+    'click>=6.7'
+]
+
+try:
+    require(dependencies)
+except (DistributionNotFound, VersionConflict) as error:
+    voltsql_root_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
+    try:
+        import pip
+    except ImportError:
+        print("You need to install pip first. Then you can install the dependencies using the following command: \n"
+              "pip install -r " + voltsql_root_dir + "/requirements.txt")
+        sys.exit(1)
+    print("You can install the missing dependencies using the following command: \n"
+          "pip install -r " + voltsql_root_dir + "/requirements.txt")
+    sys.exit(1)
 
 import click
 from prompt_toolkit import PromptSession
@@ -53,11 +78,13 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.lexers import PygmentsLexer
 from prompt_toolkit.styles import Style
+from prompt_toolkit.history import FileHistory
 from pygments.lexers.sql import SqlLexer
 
 from voltcompleter import VoltCompleter
 from voltexecutor import VoltExecutor
 from voltrefresher import VoltRefresher
+from voltreadme import README
 
 click.disable_unicode_literals_warning = True
 
@@ -89,7 +116,7 @@ class VoltCli(object):
         self.refresher = VoltRefresher()
         self.executor = VoltExecutor(self.server, self.port, self.user, self.password,
                                      self.query_timeout, self.kerberos, self.ssl, self.ssl_set, self.credentials)
-        self.multiline = True
+        self.multiline = False
         self.auto_refresh = True
 
     def create_key_bindings(self):
@@ -137,10 +164,21 @@ class VoltCli(object):
     def run_cli(self):
         # get catalog data before start
         self.refresher.refresh(self.executor, self.completer, [])
+        # Load history into completer so it can learn user preferences
+        history = FileHistory(os.path.expanduser('~/.voltsql_history'))
+        self.completer.init_prioritization_from_history(history)
+
         session = PromptSession(
             lexer=PygmentsLexer(SqlLexer), completer=self.completer, style=style,
             auto_suggest=AutoSuggestFromHistory(), bottom_toolbar=self.bottom_toolbar,
-            key_bindings=self.create_key_bindings(), multiline=self.multiline)
+            key_bindings=self.create_key_bindings(), multiline=True,
+            history=history)
+
+        # directly assign multiline=False in PromptSession constructor will cause some unexpected behavior
+        # due to some issue i don't know. This is a workaround.
+        if not self.multiline:
+            session.default_buffer.multiline = ~session.default_buffer.multiline
+
         option_str = "--servers={server} --port={port_number}{user}{password}{credentials}" \
                      "{ssl}{output_format}{output_skip_metadata}{stop_on_error}{kerberos} " \
                      "--query-timeout={number_of_milliseconds}".format(
@@ -166,6 +204,12 @@ class VoltCli(object):
                 if sql_cmd.lower() == "update":
                     # use "update" command to force a fresh
                     self.refresher.refresh(self.executor, self.completer, [])
+                    continue
+                if sql_cmd.strip().lower() in ("quit", "quit;", "exit", "exit;"):
+                    # exit
+                    break
+                if sql_cmd.strip().lower() in ("help", "help;"):
+                    print(README)
                     continue
                 call(
                     "echo \"{sql_cmd}\" | sqlcmd {options}".format(
