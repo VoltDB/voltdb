@@ -288,12 +288,6 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
         }
     }
 
-    private class TopoMapEntry {
-        int m_partitionKey;
-        ArrayList<HostSiteId> m_hsIds = new ArrayList<>();
-        HostSiteId m_hsLeader;
-    }
-
     private static class HostSiteId implements Comparable<HostSiteId> {
         int m_hostId;
         int m_siteId;
