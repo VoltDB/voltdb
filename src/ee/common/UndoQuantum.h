@@ -48,7 +48,7 @@ protected:
 
 
 public:
-    inline UndoQuantum(int64_t undoToken, Pool *dataPool, bool forLowestSite)
+    inline UndoQuantum(int64_t undoToken, Pool *dataPool)
         : m_undoToken(undoToken), m_dataPool(dataPool) {}
     inline virtual ~UndoQuantum() {}
     virtual inline void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
@@ -66,14 +66,13 @@ public:
      * "delete" here only really calls their virtual destructors (important!)
      * but their no-op delete operator leaves them to be purged in one go with the data pool.
      */
-    inline Pool* undo() {
-        for (auto i = m_undoActions.rbegin();
-             i != m_undoActions.rend(); ++i) {
+    static Pool* undo(UndoQuantum&& quantum) {
+        for (auto i = quantum.m_undoActions.rbegin(); i != quantum.m_undoActions.rend(); ++i) {
             (*i)->undo();
             delete *i;
         }
-        Pool * result = m_dataPool;
-        delete this;
+        Pool * result = quantum.m_dataPool;
+        quantum.~UndoQuantum();
         // return the pool for recycling.
         return result;
     }
@@ -90,17 +89,17 @@ public:
      * tuples in a table, then does a truncate. You do not want to delete that
      * table before all the inserts and deletes are released.
      */
-    inline Pool* release() {
-        for (auto i = m_undoActions.begin();
-             i != m_undoActions.end(); ++i) {
+    static Pool* release(UndoQuantum&& quantum) {
+        for (auto i = quantum.m_undoActions.begin();
+             i != quantum.m_undoActions.end(); ++i) {
             (*i)->release();
             delete *i;
         }
-        for(auto cur = m_interests.begin(); cur != m_interests.end(); ++cur) {
+        for(auto cur = quantum.m_interests.begin(); cur != quantum.m_interests.end(); ++cur) {
            (*cur)->notifyQuantumRelease();
         }
-        Pool* result = m_dataPool;
-        delete this;
+        Pool* result = quantum.m_dataPool;
+        quantum.~UndoQuantum();
         // return the pool for recycling.
         return result;
     }
@@ -115,14 +114,11 @@ public:
     {
         return m_dataPool->getAllocatedMemory();
     }
-
-    template <typename T> T allocatePooledCopy(T original, std::size_t sz)
-    {
-        return reinterpret_cast<T>(::memcpy(m_dataPool->allocate(sz), original, sz));
+    Pool* getPool() const throw() {
+       return m_dataPool;
     }
 
     void* allocateAction(size_t sz) { return m_dataPool->allocate(sz); }
-
 private:
     const int64_t m_undoToken;
     std::deque<UndoReleaseAction*, voltdb::allocator<UndoReleaseAction*>> m_undoActions;

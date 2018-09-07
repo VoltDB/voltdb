@@ -166,6 +166,11 @@ namespace voltdb {
     * which needs full C++11 support. Therefore, I leave it till
     * we migrate off from any C++11-partial-supported
     * compilers/platforms.
+    *
+    * Warning: Be cautious when using this global pool. The pool
+    * itself does not compact, and therefore will never release memory.
+    * This means it is leaking memory as soon as you start using it
+    * on anything but ephemeral storages!!!
     */
    class VoltAllocResourceMng {
       static Pool s_VoltAllocatorPool;
@@ -282,6 +287,18 @@ namespace voltdb {
    template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5>
    T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5) {
       return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6>
+   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6, typename Arg7>
+   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+   }
+   template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6, typename Arg7, typename Arg8>
+   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7, Arg8 arg8) {
+      return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
    }
 #endif
 

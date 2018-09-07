@@ -20,7 +20,7 @@
 namespace voltdb {
 
 UndoLog::UndoLog()
-  : m_lastUndoToken(INT64_MIN), m_lastReleaseToken(INT64_MIN), m_undoLogForLowestSite(false)
+  : m_lastUndoToken(INT64_MIN), m_lastReleaseToken(INT64_MIN)
 {
 }
 
@@ -29,9 +29,7 @@ void UndoLog::clear()
     if (! m_undoQuantums.empty()) {
         release(m_lastUndoToken);
     }
-    for (auto i = m_undoDataPools.begin();
-         i != m_undoDataPools.end();
-         i++) {
+    for (auto i = m_undoDataPools.begin(); i != m_undoDataPools.end(); i++) {
         delete *i;
     }
     m_undoDataPools.clear();
