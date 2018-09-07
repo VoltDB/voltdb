@@ -118,4 +118,5 @@ Commands
 
 `update` force a background catalog refresh
 
+`help` show this readme
 """

@@ -195,6 +195,7 @@
         "REPLACE()",
         "RIGHT",
         "ROUND",
+        "ROW_NUMBER()",
         "SEC()",
         "SECOND()",
         "SET_FIELD()",
