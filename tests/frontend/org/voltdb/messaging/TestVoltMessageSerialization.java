@@ -386,6 +386,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertTrue(ctm2.isForReplay());
         assertFalse(ctm2.isNPartTxn());
         assertFalse(ctm2.isAbortDuringRepair());
+        assertEquals(ctm.m_hash, ctm2.m_hash);
     }
 
     public void testCompleteTransactionResponseMessage() throws IOException
