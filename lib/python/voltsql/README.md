@@ -75,6 +75,10 @@ Commands
 `update` force a background catalog refresh
 
 `help` show this readme
+
+Notes
+-----
+The command history is stored at `~/.voltsql_history`, it is used for retyping the previous commands as well as calculate the prioritization of keywords.
     
 
 Architecture
