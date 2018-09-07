@@ -376,9 +376,14 @@ public class TestVoltMessageSerialization extends TestCase {
                                            true, false, true, false, false);
 
         CompleteTransactionMessage ctm2 = (CompleteTransactionMessage) checkVoltMessage(ctm);
-        assertEquals(ctm.isRollback(), ctm2.isRollback());
-        assertEquals(ctm.requiresAck(), ctm2.requiresAck());
-        assertEquals(ctm.isRestart(), ctm2.isRestart());
+        assertEquals(ctm.m_flags, ctm2.m_flags);
+        assertFalse(ctm2.isReadOnly());
+        assertFalse(ctm2.isRollback());
+        assertTrue(ctm2.requiresAck());
+        assertFalse(ctm2.isRestart());
+        assertTrue(ctm2.isForReplay());
+        assertFalse(ctm2.isNPartTxn());
+        assertFalse(ctm2.isAbortDuringRepair());
         assertEquals(ctm.m_hash, ctm2.m_hash);
     }
 
