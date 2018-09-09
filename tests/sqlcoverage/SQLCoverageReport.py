@@ -750,15 +750,17 @@ h2 {text-transform: uppercase}
     content += """
 <table border=0><tr><td>Key:</td></tr>
 <tr><td align=right bgcolor=#FF0000>Red</td><td>table elements indicate a test failure(s), due to a mismatch between VoltDB and %s results, a crash,
-                                                   or an NPE in VoltDB (or, an <i>extremely</i> slow test suite).</td></tr>
+                                                   or a 'Fatal' Exception in VoltDB (or, an <i>extremely</i> slow test suite).</td></tr>
 <tr><td align=right bgcolor=#FFA500>Orange</td><td>table elements indicate a strong warning, for something that should be looked into (e.g. a pattern
-                                                   that generated no SQL queries, an NPE in %s, or a <i>very</i> slow test suite), but no test failures
-                                                   (or only "known" failures).</td></tr>
+                                                   that generated no SQL queries, an Exception in %s, or a <i>very</i> slow test suite), but no test
+                                                   failures (or only "known" failures).</td></tr>
 <tr><td align=right bgcolor=#FFFF00>Yellow</td><td>table elements indicate a mild warning, for something you might want to improve (e.g. a pattern
                                                    that generated a very large number of SQL queries, or a somewhat slow test suite).</td></tr>
 <tr><td align=right bgcolor=#D3D3D3>Gray</td><td>table elements indicate data that was not computed, due to a crash.</td></tr>
-<tr><td colspan=2>Exceptions/VF: number of 'Fatal' Exceptions (those deemed worth failing the test) while running against VoltDB.</td></tr>
-<tr><td colspan=2>Exceptions/VN: number of 'Non-fatal' Exceptions (those deemed NOT worth failing the test) while running against VoltDB.</td></tr>
+<tr><td colspan=2>Exceptions/VF: number of 'Fatal' Exceptions (those deemed worth failing the test, e.g., NullPointerException's) while running
+                                                   against VoltDB.</td></tr>
+<tr><td colspan=2>Exceptions/VN: number of 'Non-fatal' Exceptions (those deemed NOT worth failing the test, e.g., VoltTypeException's) while running
+                                                   against VoltDB.</td></tr>
 <tr><td colspan=2>Exceptions/%s: number of (any) Exceptions while running against %s (likely in VoltDB's %s backend code).</td></tr>
 <tr><td colspan=2>Crashes/V: number of VoltDB crashes.</td></tr>
 <tr><td colspan=2>Crashes/%s: number of %s crashes.</td></tr>
