@@ -456,18 +456,22 @@ public class MpTransactionState extends TransactionState
             while (msg == null) {
                 msg = m_newDeps.poll(PULL_TIMEOUT, TimeUnit.SECONDS);
                 if (msg == null && !snapShotRestoreProcName.equals(m_initiationMsg.getStoredProcedureName())) {
-                    tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_initiationMsg);
+                    StringBuilder deadlockMsg = new StringBuilder();
+                    deadlockMsg.append("Possible multipartition transaction deadlock detected for: ").append(m_initiationMsg);
                     if (m_remoteWork == null) {
-                        tmLog.warn("Waiting on local BorrowTask response from site: " +
-                                CoreUtils.hsIdToString(m_buddyHSId));
+                        deadlockMsg.append("Waiting on local BorrowTask response from site: ").append(CoreUtils.hsIdToString(m_buddyHSId));
                     }
                     else {
-                        tmLog.warn("Waiting on remote dependencies for message:\n" + m_remoteWork + "\n");
+                        deadlockMsg.append("Waiting on remote dependencies for message:\n").append(m_remoteWork).append("\n");
                         for (Entry<Integer, Set<Long>> e : m_remoteDeps.entrySet()) {
-                            tmLog.warn("Dep ID: " + e.getKey() + " waiting on: " +
-                                    CoreUtils.hsIdCollectionToString(e.getValue()));
+                            deadlockMsg.append("Dep ID: " + e.getKey() + " waiting on: ").append(CoreUtils.hsIdCollectionToString(e.getValue()));
+                        }
+                        if (!m_masterMapForFragmentRestart.isEmpty()) {
+                            deadlockMsg.append("\nOne or more fragments misrouted and resubmitted to:\n");
+                            deadlockMsg.append(CoreUtils.hsIdCollectionToString(m_masterMapForFragmentRestart.keySet()));
                         }
                     }
+                    tmLog.warn(deadlockMsg.toString());
                     m_mbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
                 }
             }
