@@ -129,7 +129,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
             while (!success) {
                 final RepairAlgo repair = m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(),
                                 deadMPIHost, m_whoami, false);
-
+                ((MpPromoteAlgo)repair).setMpiPromotionRepair();
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
                 try {
@@ -171,6 +171,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     TTLManager.instance().scheduleTTLTasks();
+                    VoltZK.removePartitionPromotionIndicator(m_messenger.getZK(), MP_INIT_PID, tmLog);
                 }
                 else {
                     // The only known reason to fail is a failed replica during

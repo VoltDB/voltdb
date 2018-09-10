@@ -260,8 +260,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                         iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
                     m_initiatorMailbox.setMigratePartitionLeaderStatus(migratePartitionLeader);
-                }
-                else {
+                    VoltZK.removePartitionPromotionIndicator(m_messenger.getZK(), m_partitionId, tmLog);
+                } else {
                     // The only known reason to fail is a failed replica during
                     // recovery; that's a bounded event (by k-safety).
                     // CrashVoltDB here means one node failure causing another.
