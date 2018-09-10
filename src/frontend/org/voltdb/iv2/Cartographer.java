@@ -1004,15 +1004,4 @@ public class Cartographer extends StatsSource
         }
         return false;
     }
-
-    // In the event of node failures, partition leaders on failed hosts will be relocated to
-    // surviving hosts. Partitions promote their own leaders asynchronously. Eventually all the leaders
-    // will be on the live hosts.
-    public boolean areAllPartitionLeadersOnValidHosts() {
-        Set<Integer> masterHosts = Sets.newHashSet();
-        masterHosts.addAll(m_currentMastersByHost.keySet());
-        Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
-        masterHosts.removeAll(liveHosts);
-        return masterHosts.isEmpty();
-    }
 }

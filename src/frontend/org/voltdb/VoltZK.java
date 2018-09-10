@@ -42,6 +42,7 @@ import org.voltcore.zk.ZooKeeperLock;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
+import org.voltdb.iv2.MpInitiator;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -185,8 +186,7 @@ public class VoltZK {
     public static final String catalogUpdateInProgress = actionBlockers + "/" + leafNodeCatalogUpdateInProgress;
 
     //register partition while the partition elects a new leader upon node failure
-    public static final String mpRepairBlocker = "mp_repair_blocker";
-    public static final String mpRepairInProgress = actionBlockers + "/" + mpRepairBlocker;
+    public static final String mpRepairBlocker = "/db/mp_repair_blocker";
 
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
@@ -227,7 +227,8 @@ public class VoltZK {
             actionBlockers,
             request_truncation_snapshot,
             host_ids_be_stopped,
-            actionLock
+            actionLock,
+            mpRepairBlocker
     };
 
     /**
@@ -444,7 +445,7 @@ public class VoltZK {
             case catalogUpdateInProgress:
                 if (blockers.contains(leafNodeRejoinInProgress)) {
                     errorMsg = "while a node rejoin is active. Please retry catalog update later.";
-                } else if (blockers.contains(mpRepairBlocker)){
+                } else if (checkMpRepairProgress(zk)) {
                     // Upon node failures, a MP repair blocker may be registered right before they
                     // unregistered after repair is done. Let rejoining nodes wait to avoid any
                     // interference with the transaction repair process.
@@ -459,7 +460,7 @@ public class VoltZK {
                     errorMsg = "while an elastic join is active. Please retry node rejoin later.";
                 } else if (blockers.contains(migrate_partition_leader)){
                     errorMsg = "while leader migration is active. Please retry node rejoin later.";
-                } else if (blockers.contains(mpRepairBlocker)){
+                } else if (checkMpRepairProgress(zk)){
                     // Upon node failures, a MP repair blocker may be registered right before they
                     // unregistered after repair is done. Let rejoining nodes wait to avoid any
                     // interference with the transaction repair process.
@@ -491,8 +492,6 @@ public class VoltZK {
                 if (blockers.contains(leafNodeElasticJoinInProgress)) {
                     errorMsg = "while an elastic join is active";
                 }
-                break;
-            case mpRepairInProgress:
                 break;
             default:
                 // not possible
@@ -534,14 +533,50 @@ public class VoltZK {
     }
 
     public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {
+        removeActionBlocker(zk, node, log);
+    }
+
+    public static void createPartitionPromotionInProgressIndicator(ZooKeeper zk, int partitionId, VoltLogger log) {
+        String path = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(partitionId));
         try {
-            ZKUtil.deleteRecursively(zk, node);
-        } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NONODE) {
-                log.debug("Failed to remove stop node indicator " + node + " on ZK: " + e.getMessage());
+            zk.create(path, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+            if (log.isDebugEnabled()) {
+                log.debug("Create partition leader promotin indicator:" + path);
             }
-            return;
-        } catch (InterruptedException ignore) {}
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NODEEXISTS) {
+                VoltDB.crashLocalVoltDB("Unable to create action blocker " + path, true, e);
+            }
+        } catch (InterruptedException e) {
+        }
+    }
+
+    public static void removePartitionPromotionInProgressIndicator(ZooKeeper zk, int partitionId, VoltLogger log) {
+        String path = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(partitionId));
+        if (log.isDebugEnabled()) {
+            log.debug("Remove partition leader promotin indicator:" + path);
+        }
+        if (partitionId == MpInitiator.MP_INIT_PID) {
+            try {
+                List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
+
+                // do not remove MP partition yet. MP partition should be the last one to be removed.
+                if (partitions.size() > 1) {
+                    return;
+                }
+            } catch (KeeperException | InterruptedException e) {
+            }
+        }
+        removeActionBlocker(zk, path, log);
+    }
+
+    private static boolean checkMpRepairProgress(ZooKeeper zk) {
+        try {
+            List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
+            return (!partitions.isEmpty());
+        } catch (KeeperException | InterruptedException e) {
+        }
+        return false;
     }
 
     /**

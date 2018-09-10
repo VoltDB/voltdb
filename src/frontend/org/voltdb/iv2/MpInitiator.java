@@ -171,6 +171,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     TTLManager.instance().scheduleTTLTasks();
+                    VoltZK.removePartitionPromotionInProgressIndicator(m_messenger.getZK(), MP_INIT_PID, tmLog);
                 }
                 else {
                     // The only known reason to fail is a failed replica during
