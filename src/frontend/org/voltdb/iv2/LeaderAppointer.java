@@ -562,7 +562,6 @@ public class LeaderAppointer implements Promotable
             m_MPI.acceptPromotion();
             m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
             blocker.set(null);
-            VoltZK.debugLeadersInfo(m_zk);
         }
         m_isLeader = true;
     }
