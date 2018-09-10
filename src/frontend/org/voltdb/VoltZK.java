@@ -445,10 +445,7 @@ public class VoltZK {
             case catalogUpdateInProgress:
                 if (blockers.contains(leafNodeRejoinInProgress)) {
                     errorMsg = "while a node rejoin is active. Please retry catalog update later.";
-                } else if (checkMpRepairProgress(zk)) {
-                    // Upon node failures, a MP repair blocker may be registered right before they
-                    // unregistered after repair is done. Let rejoining nodes wait to avoid any
-                    // interference with the transaction repair process.
+                } else if (isRepairProgress(zk)) {
                     errorMsg = "while leader promotion or transaction repair are in progress. Please retry catalog update later.";
                 }
                 break;
@@ -460,10 +457,7 @@ public class VoltZK {
                     errorMsg = "while an elastic join is active. Please retry node rejoin later.";
                 } else if (blockers.contains(migrate_partition_leader)){
                     errorMsg = "while leader migration is active. Please retry node rejoin later.";
-                } else if (checkMpRepairProgress(zk)){
-                    // Upon node failures, a MP repair blocker may be registered right before they
-                    // unregistered after repair is done. Let rejoining nodes wait to avoid any
-                    // interference with the transaction repair process.
+                } else if (isRepairProgress(zk)){
                     errorMsg = "while leader promotion or transaction repair are in progress. Please retry node rejoin later.";
                 }
                 break;
@@ -533,10 +527,17 @@ public class VoltZK {
     }
 
     public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {
-        removeActionBlocker(zk, node, log);
+        try {
+            ZKUtil.deleteRecursively(zk, node);
+        } catch (KeeperException e) {
+            if (e.code() != KeeperException.Code.NONODE) {
+                log.debug("Failed to remove stop node indicator " + node + " on ZK: " + e.getMessage());
+            }
+            return;
+        } catch (InterruptedException ignore) {}
     }
 
-    public static void createPartitionPromotionInProgressIndicator(ZooKeeper zk, int partitionId, VoltLogger log) {
+    public static void createPartitionPromotionIndicator(ZooKeeper zk, int partitionId, VoltLogger log) {
         String path = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(partitionId));
         try {
             zk.create(path, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
@@ -551,26 +552,26 @@ public class VoltZK {
         }
     }
 
-    public static void removePartitionPromotionInProgressIndicator(ZooKeeper zk, int partitionId, VoltLogger log) {
+    public static void removePartitionPromotionIndicator(ZooKeeper zk, int partitionId, VoltLogger log) {
         String path = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(partitionId));
-        if (log.isDebugEnabled()) {
-            log.debug("Remove partition leader promotin indicator:" + path);
-        }
         if (partitionId == MpInitiator.MP_INIT_PID) {
             try {
-                List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
-
                 // do not remove MP partition yet. MP partition should be the last one to be removed.
+                List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
                 if (partitions.size() > 1) {
                     return;
                 }
             } catch (KeeperException | InterruptedException e) {
             }
         }
+        if (log.isDebugEnabled()) {
+            log.debug("Remove partition leader promotin indicator:" + path);
+        }
+
         removeActionBlocker(zk, path, log);
     }
 
-    private static boolean checkMpRepairProgress(ZooKeeper zk) {
+    private static boolean isRepairProgress(ZooKeeper zk) {
         try {
             List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
             return (!partitions.isEmpty());

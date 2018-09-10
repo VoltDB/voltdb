@@ -149,7 +149,7 @@ public class MpPromoteAlgo implements RepairAlgo
             // if so remove the MP repair blocker so that rejoin or UAC can proceed.
             if (!m_repairForMpiPromotion && !m_isMigratePartitionLeader
                     && !m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
-                VoltZK.removePartitionPromotionInProgressIndicator(m_mailbox.m_messenger.getZK(), MpInitiator.MP_INIT_PID, repairLogger);
+                VoltZK.removePartitionPromotionIndicator(m_mailbox.m_messenger.getZK(), MpInitiator.MP_INIT_PID, repairLogger);
             }
         }
         return m_promotionResult;

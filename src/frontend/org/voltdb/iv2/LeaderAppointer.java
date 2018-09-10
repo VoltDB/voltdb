@@ -305,7 +305,7 @@ public class LeaderAppointer implements Promotable
 
             //Partition leader promotion upon node failure
             if (prevLeader != masterHSId && prevLeader != Long.MAX_VALUE) {
-                VoltZK.createPartitionPromotionInProgressIndicator(m_zk, partitionId, tmLog);
+                VoltZK.createPartitionPromotionIndicator(m_zk, partitionId, tmLog);
             }
             try {
                 m_iv2appointees.put(partitionId, masterPair);
@@ -521,7 +521,7 @@ public class LeaderAppointer implements Promotable
         }
         else {
             // Create MP repair ZK node to block rejoin
-            VoltZK.createPartitionPromotionInProgressIndicator(m_zk, MpInitiator.MP_INIT_PID, tmLog);
+            VoltZK.createPartitionPromotionIndicator(m_zk, MpInitiator.MP_INIT_PID, tmLog);
 
             // If we're taking over for a failed LeaderAppointer, we know when
             // we get here that every partition had a leader at some point in
