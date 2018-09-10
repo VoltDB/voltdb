@@ -391,6 +391,7 @@ public class MpPromoteAlgo implements RepairAlgo
                             true,
                             false);
                     rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
+                    rollback.setTruncationHandle(Long.MIN_VALUE);
                 }
             }
 
