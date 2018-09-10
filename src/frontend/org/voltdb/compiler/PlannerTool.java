@@ -64,7 +64,8 @@ public class PlannerTool {
 
     // If -Dlarge_mode_ratio=xx is specified via ant, the value will show up in the environment variables and
     // take higher priority. Otherwise, the value specified via VOLTDB_OPTS will take effect.
-    private final double m_largeModeRatio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
+    private final double m_largeModeRatio = Double.valueOf((System.getenv("LARGE_MODE_RATIO") == null ||
+            System.getenv("LARGE_MODE_RATIO").equals("-1")) ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
 
     public PlannerTool(final Database database, byte[] catalogHash)
     {

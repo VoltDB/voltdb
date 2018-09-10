@@ -64,6 +64,11 @@ public class TestLargeModeRatio extends AdHocQueryTester {
 
     @Test
     public void testLargeModeRatio() throws Exception {
+        // if LARGE_MODE_RATIO environment variable is set, skip this test
+        String sysEnv = System.getenv("LARGE_MODE_RATIO");
+        if (sysEnv != null && !sysEnv.equals("-1")) {
+            return;
+        }
         String originalLargeModeRatio = System.getProperty("LARGE_MODE_RATIO", "0");
 
         // LARGE_MODE_RATIO = 0, no large mode flip
