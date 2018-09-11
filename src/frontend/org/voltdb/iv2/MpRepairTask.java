@@ -91,8 +91,8 @@ public class MpRepairTask extends SiteTasker
 
                     // At this point, all the repairs are completed. This should be the final repair task
                     // in the repair process. Remove the mp repair blocker
-                    if (!m_leaderMigration && m_partitionLeaderPromotionComplete) {
-                        VoltZK.removePartitionPromotionIndicator(m_mailbox.m_messenger.getZK(), MpInitiator.MP_INIT_PID, repairLogger);
+                    if (!m_leaderMigration && m_partitionLeaderPromotionComplete && m_mailbox.m_messenger != null) {
+                        VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
                     }
                 }
             }
