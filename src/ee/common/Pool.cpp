@@ -31,28 +31,29 @@ using namespace voltdb;
 /*
  * Find next higher power of two
  * From http://en.wikipedia.org/wiki/Power_of_two
+ * This is only used in USE_MMAP branch.
  */
-template <class T> inline T nexthigher(T k) {
-   if (k == 0)
-      return 1;
-   k--;
-   for (int i=1; i<sizeof(T)*CHAR_BIT; i<<=1)
-      k = k | k >> i;
-   return k+1;
-}
+//template <class T> inline T nexthigher(T k) {
+//   if (k == 0)
+//      return 1;
+//   k--;
+//   for (int i=1; i<sizeof(T)*CHAR_BIT; i<<=1)
+//      k = k | k >> i;
+//   return k+1;
+//}
 
-Pool::Pool(): m_allocationSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(1), m_currentChunkIndex(0) {
+Pool::Pool(): m_chunkSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(1), m_currentChunkIndex(0), m_oversizeChunkSize(0) {
    init();
 }
 
-Pool::Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
+Pool::Pool(uint64_t chunkSize, uint64_t maxChunkCount) :
 #ifdef USE_MMAP
 #error "Not using mmap"
-//   m_allocationSize(nexthigher(allocationSize)),
+//   m_chunkSize(nexthigher(chunkSize)),
 #else
-   m_allocationSize(allocationSize),
+   m_chunkSize(chunkSize),
 #endif
-   m_maxChunkCount(maxChunkCount), m_currentChunkIndex(0)
+   m_maxChunkCount(maxChunkCount), m_currentChunkIndex(0), m_oversizeChunkSize(0)
 {
    init();
 }
@@ -60,14 +61,14 @@ Pool::Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
 void Pool::init() {
 #ifdef USE_MMAP
 //      char *storage =
-//         static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+//         static_cast<char*>(::mmap( 0, m_chunkSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
 //      if (storage == MAP_FAILED) {
 //         std::cout << strerror( errno ) << std::endl;
 //         throwFatalException("Failed mmap");
 //      }
 #endif
    m_chunks.reserve(m_maxChunkCount);
-   m_chunks.emplace_back(m_allocationSize, 0);
+   m_chunks.emplace_back(m_chunkSize, 0);
 }
 
 Pool::~Pool() {
@@ -92,9 +93,9 @@ void* Pool::allocate(std::size_t size) {
     * See if there is space in the current chunk
     */
    Chunk &currentChunk = m_chunks[m_currentChunkIndex];
-   const bool fitsInLastNormalChunk = size + currentChunk.offset() <= currentChunk.size(),
-         fitsInNormalChunk = size <= m_allocationSize;
-   if (! fitsInLastNormalChunk) {
+   const bool fitsInCurrentChunk = size + currentChunk.offset() <= currentChunk.size(),
+         fitsInNormalChunk = size <= m_chunkSize;
+   if (! fitsInCurrentChunk) {
       /*
        * Not enough space. Check if it is greater then our allocation size per chunk.
        */
@@ -111,8 +112,9 @@ void* Pool::allocate(std::size_t size) {
 //            throwFatalException("Failed mmap");
 //         }
 #endif
-         m_oversizeChunks.emplace_back(nexthigher(size), size);
-         return m_oversizeChunks.back().data();
+         m_oversizeChunks.emplace_back(new char[size]);
+         m_oversizeChunkSize += size;
+         return m_oversizeChunks.back().get();
       } else {   // fits in normal chunk size - check if there is an already allocated chunk we can use.
          m_currentChunkIndex++;
          if (m_currentChunkIndex < m_chunks.size()) {   // Some chunks from pre-allocated (a.k.a. init()-ed) have not been used yet.
@@ -120,19 +122,22 @@ void* Pool::allocate(std::size_t size) {
             currentChunk.offset() = size;
             return currentChunk.data();
          } else {                                       // Need to allocate a new chunk
-//            std::cout << "Pool had to allocate a new chunk. Not a good thing "
-//               "from a performance perspective. If you see this we need to look "
-//               "into structuring our pool sizes and allocations so the this doesn't "
-//               "happen frequently" << std::endl;
+            if (m_currentChunkIndex > m_maxChunkCount) {
+               VOLT_WARN("%s\n",
+                     "Pool had to allocate a new chunk. Not a good thing "
+                     "from a performance perspective. If you see this we need to look "
+                     "into structuring our pool sizes and allocations so the this doesn't "
+                     "happen frequently");
+            }
 #ifdef USE_MMAP
 //            char *storage =
-//               static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+//               static_cast<char*>(::mmap( 0, m_chunkSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
 //            if (storage == MAP_FAILED) {
 //               std::cout << strerror( errno ) << std::endl;
 //               throwFatalException("Failed mmap");
 //            }
 #endif
-            m_chunks.emplace_back(m_allocationSize, size);    // and adjust chunk's offset
+            m_chunks.emplace_back(m_chunkSize, size);    // and adjust chunk's offset
             return m_chunks.back().data();
          }
       }
@@ -170,6 +175,7 @@ void Pool::purge() throw() {
 //   }
 #endif
    m_oversizeChunks.clear();
+   m_oversizeChunkSize = 0;
 
    /*
     * Set the current chunk to the first in the list
@@ -178,7 +184,7 @@ void Pool::purge() throw() {
    std::size_t numChunks = m_chunks.size();
 
    /*
-    * If more then maxChunkCount chunks are allocated erase all extra chunks
+    * If more than maxChunkCount chunks are allocated erase all extra chunks
     */
    if (numChunks > m_maxChunkCount) {
 #ifdef USE_MMAP
@@ -200,17 +206,6 @@ void Pool::purge() throw() {
 #endif
 }
 
-int64_t Pool::getAllocatedMemory() const {
-#ifdef MODERN_CXX
-   return std::accumulate(m_oversizeChunks.cbegin(), m_oversizeChunks.cend(),
-         m_chunks.size() * m_allocationSize,
-         [](int64_t acc, const Chunk& cur) { return acc + cur.size(); });
-#else
-   return std::accumulate(m_oversizeChunks.cbegin(), m_oversizeChunks.cend(),
-         m_chunks.size() * m_allocationSize, AllocMemoryCalculator());
-#endif
-}
-
 #else // for MEMCHECK builds
 
 void* Pool::allocate(std::size_t size) {
@@ -224,9 +219,6 @@ void* Pool::allocateZeroes(std::size_t size) {
 void Pool::purge() throw() {
    m_allocations.clear();
    m_memTotal = 0;
-}
-int64_t Pool::getAllocatedMemory() const {
-   return m_memTotal;
 }
 
 #endif

@@ -176,6 +176,11 @@ struct S4 {
    }
 };
 
+struct S5 {
+   char m_holder[16385];                                // oversized struct that does not fit in normal chunk
+   std::string m_str;
+};
+
 template<typename T, typename Alloc, template<typename, typename> class Cont>
 void updateContainer(Cont<T, Alloc>& cont) {
    // flip a coin to determine using emplace_back() with 80% of likelihood, or pop_back() with 20% of likelihood.
@@ -209,16 +214,18 @@ TEST_F(PoolTest, AllocatorTest) {
    using Cont3 = std::deque<S3, Alloc<S3>>;
    using Cont4 = std::vector<S4, Alloc<S4>>;
 #endif
+   using Cont5 = std::vector<S5, Alloc<S5>>;
    Cont1 cont1;
    Cont2 cont2;
    Cont3 cont3;
    Cont4 cont4;
+   Cont5 cont5;
    // Creating thread pool to freely contend with each other for
    // allocator resources
    std::vector<std::thread> threads;
-   for(int i = 0; i < 4; ++i) {                         // shall have only 3 threads, each working on one container
-      threads.emplace_back([&cont1, &cont2, &cont3, &cont4, i]() {
-            for(size_t iter = 0; iter < 10000lu; ++iter) {
+   for(int i = 0; i < 5; ++i) {                         // shall have only 3 threads, each working on one container
+      threads.emplace_back([&cont1, &cont2, &cont3, &cont4, &cont5, i]() {
+            for(size_t iter = 0; iter < 8000lu; ++iter) {
                switch(i) {
                   case 0:
                      updateContainer(cont1);
@@ -231,6 +238,9 @@ TEST_F(PoolTest, AllocatorTest) {
                      break;
                   case 3:
                      updateContainer(cont4);
+                     break;
+                  case 4:
+                     updateContainer(cont5);
                      break;
                   default:
                      assert(!"Each container can only have 1 thread associated");

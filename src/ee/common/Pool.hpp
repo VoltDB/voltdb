@@ -34,12 +34,57 @@
 
 namespace voltdb {
 
+   // The default chunk size for the Pool is 256 KB.
    static const size_t TEMP_POOL_CHUNK_SIZE = 262144;
+
+   /**
+    * Here are two implementations of the Pool, depending on
+    * whether we are running memcheck test via valgrind:
+    *
+    * When we are building for memcheck test, then there is no
+    * fuzz of careful allocating/resusing after purge(). We
+    * allocate the exact amount from the system by demand;
+    *
+    * For normal build, we do all the careful book keeping to
+    * minimize the cost of malloc() system calls.
+    */
 #ifndef MEMCHECK
    /**
     * A memory pool that provides fast allocation and deallocation. The
     * only way to release memory is to free all memory in the pool by
-    * calling purge.
+    * calling purge; or destructing the Pool instance.
+    *
+    * The Pool works in this way:
+    *
+    * User specify the size (number of bytes) for normal-sized
+    * chunks, and the number of reserved chunks. In Pool creation
+    * time, it allocates a single chunk of memory.
+    * Whenever user asks for some memory, the Pool checks whether
+    * current chunk is big enough for the memory asked:
+    * - If the current chunk is big enough, then update the
+    *   chunk's offset book-keeping, and hand memory back to
+    *   user;
+    * - If the current chunk is not big enough, then the rest of
+    *   the memory in current chunk is wasted. Go check if the
+    *   asked memory size exceeds the size of a normal chunk
+    *   (set in the Pool's constructor):
+    *   - If a normal chunk size is not big enough to hold what
+    *   user asked, then we allocate an oversized chunk of
+    *   exactly that much memory, and hand it to user;
+    *   - Otherwise, allocate another normal-size chunk.
+    * When user explicitly called purge() method, that means that
+    * all memory in the pool is safe to reclaim. We don't release
+    * all memory to the system; instead, we only release all the
+    * over-sized chunks, and normal-size chunks above the number
+    * speicified in the constructor (i.e. the reserved).
+    *
+    * In summary, a Pool can be either used to ask arbitrary
+    * amount of memory, or you can tell the Pool to reclaim ALL
+    * memory allocated from it (when non of the memory previously
+    * allocated is useable any more). There is no intermediate
+    * state. The way the Pool is created, and largely, the sequence
+    * it is asked for memory, determines memory usage efficiency
+    * (i.e. how many bytes are wasted).
     *
     * A pool is **NOT** thread-safe, meaning that multiple
     * threads should not call allocate() method from the same
@@ -89,24 +134,15 @@ namespace voltdb {
             return (8 - (offset() % 8)) % 8;    // align in 8-byte memory location.
          }
       };
-#ifndef MODERN_CXX
-      /**
-       * Note: We need this only for the support of Centos6.
-       */
-      struct AllocMemoryCalculator {
-         int64_t operator()(int64_t acc, const Chunk& cur) {
-            return acc + cur.size();
-         }
-      };
-#endif
-      const uint64_t m_allocationSize;
+      const uint64_t m_chunkSize;
       std::size_t m_maxChunkCount;
       std::size_t m_currentChunkIndex;
+      std::size_t m_oversizeChunkSize;
       std::vector<Chunk> m_chunks;
       /*
        * Oversize chunks that will be freed and not reused.
        */
-      std::list<Chunk> m_oversizeChunks;
+      std::list<std::unique_ptr<char[]>> m_oversizeChunks;
       // No implicit copies
       Pool(const Pool&);
       Pool& operator=(const Pool&);
@@ -124,7 +160,9 @@ namespace voltdb {
        */
       void* allocateZeroes(std::size_t size);
       void purge() throw();
-      int64_t getAllocatedMemory() const;
+      int64_t getAllocatedMemory() const throw() {
+         return m_chunks.size() * m_chunkSize + m_oversizeChunkSize;
+      }
    };
 #else // for MEMCHECK builds
    /**
@@ -138,7 +176,7 @@ namespace voltdb {
       Pool& operator=(const Pool&);
    public:
       Pool() : m_memTotal(0) {}
-      Pool(uint64_t allocationSize, uint64_t maxChunkCount) {}
+      Pool(uint64_t chunkSize, uint64_t maxChunkCount) {}
       ~Pool() {purge();}
       /*
        * Allocate a continous block of memory of the specified size.
@@ -149,7 +187,9 @@ namespace voltdb {
        */
       void* allocateZeroes(std::size_t size);
       void purge() throw();
-      int64_t getAllocatedMemory() const;
+      int64_t getAllocatedMemory() const throw() {
+         return m_memTotal;
+      }
    };
 #endif
 
@@ -186,6 +226,8 @@ namespace voltdb {
          return p;
       }
       static void operator delete(void*) {
+         // We don't need to lock here, because the atomic
+         // integer can be only decremented to 0 once.
          if (0 == --s_numInstances) {
             s_VoltAllocatorPool.purge();
          }
@@ -239,7 +281,9 @@ namespace voltdb {
       void deallocate(pointer p, size_type n) {
          VoltAllocResourceMng::operator delete(p);
       }
-      size_type max_size() const throw() { return size_t(-1) / sizeof(T); }
+      size_type max_size() const throw() {
+         return std::numeric_limits<size_type>::max() / sizeof(T);
+      }
       void construct(pointer p, const T& val) {
          new((void *)p) T(val);       // NOTE: this calls placement new
       }
@@ -263,41 +307,44 @@ namespace voltdb {
     * Foo* instanceFromSpool = createInstanceFromPool<Foo>(t1, t2, ...);
     */
 #ifdef MODERN_CXX
-   template<typename T, typename... Args> T* createInstanceFromPool(Pool& pool, Args... args) {
+   template<typename T, typename... Args> inline T* createInstanceFromPool(Pool& pool, Args... args) {
       return ::new (pool.allocate(sizeof(T))) T(std::forward<Args>(args)...);
    }
 #else       // no variadic template argument support...
-   template<typename T> T* createInstanceFromPool(Pool& pool) {
+   template<typename T>
+   inline T* createInstanceFromPool(Pool& pool) {
       return ::new (pool.allocate(sizeof(T))) T();
    }
-   template<typename T, typename Arg1> std::unique_ptr<T> createInstanceFromPool(Pool& pool, Arg1 arg1) {
+   template<typename T, typename Arg1>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1) {
       return ::new (pool.allocate(sizeof(T))) T(arg1);
    }
-   template<typename T, typename Arg1, typename Arg2> T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2) {
+   template<typename T, typename Arg1, typename Arg2>
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2) {
       return ::new (pool.allocate(sizeof(T))) T(arg1, arg2);
    }
    template<typename T, typename Arg1, typename Arg2, typename Arg3>
-   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3) {
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3) {
       return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3);
    }
    template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4>
-   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4) {
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4) {
       return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4);
    }
    template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5>
-   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5) {
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5) {
       return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5);
    }
    template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6>
-   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6) {
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6) {
       return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6);
    }
    template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6, typename Arg7>
-   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7) {
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7) {
       return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
    }
    template<typename T, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5, typename Arg6, typename Arg7, typename Arg8>
-   T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7, Arg8 arg8) {
+   inline T* createInstanceFromPool(Pool& pool, Arg1 arg1, Arg2 arg2, Arg3 arg3, Arg4 arg4, Arg5 arg5, Arg6 arg6, Arg7 arg7, Arg8 arg8) {
       return ::new (pool.allocate(sizeof(T))) T(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
    }
 #endif
