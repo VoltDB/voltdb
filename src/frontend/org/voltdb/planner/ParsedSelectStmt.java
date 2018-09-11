@@ -1039,6 +1039,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                                 "Windowed SUM must have exactly one numeric argument");
                 }
                 break;
+            case AGGREGATE_WINDOWED_ROW_NUMBER:
+                break;
             default:
                 {
                     String opName = (exprType == null) ? "NULL" : exprType.symbol();

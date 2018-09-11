@@ -245,12 +245,28 @@ def get_max_mismatches(comparison_database, suite_name):
         # Known failures in the joined-matview-* test suites ...
         # Failures in joined-matview-default-full due to ENG-11086
         elif config_name == 'joined-matview-default-full':
-            max_mismatches = 3387
+            max_mismatches = 3390
         # Failures in joined-matview-int due to ENG-11086
         elif config_name == 'joined-matview-int':
             max_mismatches = 46440
 
     return max_mismatches
+
+
+def ignore_known_mismatches(comparison_database, suite_name, reproducer):
+    """Returns the type of reproducer to use when reproducing mismatches or
+    other problems. Normally, this just means the same 'reproducer' passed
+    in, but in certain cases, when running against PostgreSQL (or the PostGIS
+    extension of PostgreSQL), and using the default reproducer, 'DML', and
+    the test suite is one of those that regularly has known failures (see
+    get_max_mismatches above), then Reproduce.NONE should be used instead,
+    to avoid producing lots of meaningless reproducer*.html files.
+    """
+    if (comparison_database.startswith('Post') and reproducer == Reproduce.DML and
+            suite_name in ['basic-joins', 'basic-index-joins', 'basic-compoundex-joins',
+            'basic-int-joins', 'joined-matview-default-full', 'joined-matview-int']):
+        reproducer = Reproduce.NONE
+    return reproducer
 
 
 def get_config_path(basedir, config_key, config_value):
@@ -424,8 +440,9 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
         compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
         success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
                                   jni_path, output_dir, report_invalid, report_all, extraStats,
-                                  comparison_database, modified_sql_path, max_mismatches,
-                                  within_minutes, reproducer, config.get("ddl"))
+                                  comparison_database, modified_sql_path, max_mismatches, within_minutes,
+                                  ignore_known_mismatches(comparison_database, config_name, reproducer),
+                                  config.get("ddl"))
     except:
         print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
         traceback.print_exc()
@@ -438,7 +455,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
                       gray_zero_html_table_element + gray_zero_html_table_element +
                       gray_zero_html_table_element + gray_zero_html_table_element +
                       gray_zero_html_table_element + gray_zero_html_table_element +
-                      gray_zero_html_table_element +
+                      gray_zero_html_table_element + gray_zero_html_table_element +
                       get_numerical_html_table_element(volt_crashes, error_above=0) +
                       get_numerical_html_table_element(cmp_crashes,  error_above=0) +
                       get_numerical_html_table_element(diff_crashes, error_above=0) + someStats + '</tr>' )
@@ -849,6 +866,15 @@ if __name__ == "__main__":
         # for certain rare cases involving known errors in PostgreSQL
         if result["mis"] > get_max_mismatches(comparison_database, config_name):
             success = False
+        # If the number of mismatches is nonzero but less than (or equal to) the
+        # acceptable maximum, then we don't need to save the detailed results,
+        # so delete them
+        elif result["mis"] > 0:
+            print "Deleting unneeded result files, for expected mismatches:\n    " + \
+                report_dir + "/*.html"
+            for file in os.listdir(report_dir):
+                if file.endswith(".html") and not file.endswith("index.html"):
+                    os.remove(os.path.join(report_dir, file))
 
     # Write the summary
     time1 = time.time()

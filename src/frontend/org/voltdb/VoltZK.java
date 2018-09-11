@@ -39,10 +39,9 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZooKeeperLock;
-import org.voltdb.iv2.MigratePartitionLeaderInfo;
-import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
+import org.voltdb.iv2.MigratePartitionLeaderInfo;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -185,6 +184,10 @@ public class VoltZK {
     public static final String leafNodeCatalogUpdateInProgress = "uac_nt_blocker";
     public static final String catalogUpdateInProgress = actionBlockers + "/" + leafNodeCatalogUpdateInProgress;
 
+    //register partition while the partition elects a new leader upon node failure
+    public static final String mpRepairBlocker = "mp_repair_blocker";
+    public static final String mpRepairInProgress = actionBlockers + "/" + mpRepairBlocker;
+
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
     // Synchronized State Machine
@@ -203,9 +206,6 @@ public class VoltZK {
     public static final String host_ids_be_stopped = "/db/host_ids_be_stopped";
 
     public static final String actionLock = "/db/action_lock";
-
-    //register partition while the partition elects a new leader upon node failure
-    public static final String mpRepairBlocker = "/db/mp_repair_blocker";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -227,8 +227,7 @@ public class VoltZK {
             actionBlockers,
             request_truncation_snapshot,
             host_ids_be_stopped,
-            actionLock,
-            mpRepairBlocker
+            actionLock
     };
 
     /**
@@ -445,6 +444,11 @@ public class VoltZK {
             case catalogUpdateInProgress:
                 if (blockers.contains(leafNodeRejoinInProgress)) {
                     errorMsg = "while a node rejoin is active. Please retry catalog update later.";
+                } else if (blockers.contains(mpRepairBlocker)){
+                    // Upon node failures, a MP repair blocker may be registered right before they
+                    // unregistered after repair is done. Let rejoining nodes wait to avoid any
+                    // interference with the transaction repair process.
+                    errorMsg = "while leader promotion or transaction repair are in progress. Please retry catalog update later.";
                 }
                 break;
             case rejoinInProgress:
@@ -455,14 +459,11 @@ public class VoltZK {
                     errorMsg = "while an elastic join is active. Please retry node rejoin later.";
                 } else if (blockers.contains(migrate_partition_leader)){
                     errorMsg = "while leader migration is active. Please retry node rejoin later.";
-                } else {
+                } else if (blockers.contains(mpRepairBlocker)){
                     // Upon node failures, a MP repair blocker may be registered right before they
                     // unregistered after repair is done. Let rejoining nodes wait to avoid any
                     // interference with the transaction repair process.
-                    List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
-                    if (!partitions.isEmpty()) {
-                        errorMsg = "while leader promotion or transaction repair are in progress. Please retry node rejoin later.";
-                    }
+                    errorMsg = "while leader promotion or transaction repair are in progress. Please retry node rejoin later.";
                 }
                 break;
             case elasticJoinInProgress:
@@ -480,7 +481,7 @@ public class VoltZK {
                 }
                 break;
             case migratePartitionLeaderBlocker:
-                //MigratePartitionLeader can not happen when join, rejoin, catalog update is in progress.
+                //MigratePartitionLeader can not happen when join, rejoin, catalog update, or repair is in progress.
                 blockers.remove(leafNodeBanElasticJoin);
                 if (blockers.size() > 1) {
                     errorMsg = "while elastic join, rejoin or catalog update is active";
@@ -490,6 +491,8 @@ public class VoltZK {
                 if (blockers.contains(leafNodeElasticJoinInProgress)) {
                     errorMsg = "while an elastic join is active";
                 }
+                break;
+            case mpRepairInProgress:
                 break;
             default:
                 // not possible
@@ -501,7 +504,7 @@ public class VoltZK {
         }
 
         if (errorMsg != null) {
-            VoltZK.removeActionBlocker(zk, node, hostLog);
+            VoltZK.removeActionBlocker(zk, node, null);
             return "Can't do " + request + " " + errorMsg;
         }
 
@@ -524,36 +527,10 @@ public class VoltZK {
         } catch (InterruptedException e) {
             return false;
         }
-        log.info("Remove action blocker " + node + " successfully.");
+        if (log != null) {
+            log.info("Remove action blocker " + node + " successfully.");
+        }
         return true;
-    }
-
-    public static void createMpRepairBlocker(ZooKeeper zk) {
-        String node = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(MpInitiator.MP_INIT_PID));
-        try {
-            zk.create(node,
-                      null,
-                      Ids.OPEN_ACL_UNSAFE,
-                      CreateMode.EPHEMERAL);
-        } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NODEEXISTS) {
-                VoltDB.crashLocalVoltDB("Unable to create MP repair blocker", true, e);
-            }
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to create MP repair blocker", true, e);
-        }
-    }
-
-    public static void removeMpRepairBlocker(ZooKeeper zk, VoltLogger log) {
-        String node = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(MpInitiator.MP_INIT_PID));
-        try {
-            zk.delete(node, -1);
-        } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NONODE) {
-                log.error("Unable to remove MP repair blocker\n" + e.getMessage(), e);
-            }
-        } catch (InterruptedException e) {
-        }
     }
 
     public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {

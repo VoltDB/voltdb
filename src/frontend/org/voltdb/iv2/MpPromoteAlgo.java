@@ -151,7 +151,7 @@ public class MpPromoteAlgo implements RepairAlgo
             //The flag is registered upon host failure or MPI promotion. The repair may be interrupted but will
             //be eventually completed.
             if (!m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
-                VoltZK.removeMpRepairBlocker(m_mailbox.m_messenger.getZK(), repairLogger);
+                VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
             }
         }
         return m_promotionResult;
@@ -391,6 +391,7 @@ public class MpPromoteAlgo implements RepairAlgo
                             true,
                             false);
                     rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
+                    rollback.setTruncationHandle(Long.MIN_VALUE);
                 }
             }
 

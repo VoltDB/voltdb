@@ -1614,6 +1614,10 @@ TEST CASES
     <condition property="regressions" value="${regressions}" else="all">
         <isset property="regressions"/>
     </condition>
+    <!--force execution of SQL queries to use the "large" path (for read-only queries) a certain percentage of the time.-->
+    <condition property="large_mode_ratio" value="${large_mode_ratio}" else="0">
+        <isset property="large_mode_ratio"/>
+    </condition>
 
     <sequential>
 
@@ -1653,6 +1657,7 @@ TEST CASES
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
             <env key="VOLT_REGRESSIONS" value="${regressions}" />
             <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
+            <env key="LARGE_MODE_RATIO" value="${large_mode_ratio}" />
             <!-- Leave breadcrumbs so we can figure out deep in the bowels of VoltDB if
                  this is a test -->
             <env key="VOLT_JUSTATEST" value="true" />
