@@ -42,7 +42,6 @@ import org.voltcore.zk.ZooKeeperLock;
 import org.voltdb.iv2.LeaderCache;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
-import org.voltdb.iv2.MpInitiator;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -458,7 +457,7 @@ public class VoltZK {
                 } else if (blockers.contains(migrate_partition_leader)){
                     errorMsg = "while leader migration is active. Please retry node rejoin later.";
                 } else if (isRepairProgress(zk)){
-                    errorMsg = "while leader promotion or transaction repair are in progress. Please retry node rejoin later.";
+                    errorMsg = "while leader promotions or transaction repairs are in progress. Please retry node rejoin later.";
                 }
                 break;
             case elasticJoinInProgress:
@@ -554,21 +553,7 @@ public class VoltZK {
 
     public static void removePartitionPromotionIndicator(ZooKeeper zk, int partitionId, VoltLogger log) {
         String path = ZKUtil.joinZKPath(mpRepairBlocker, Integer.toString(partitionId));
-        if (partitionId == MpInitiator.MP_INIT_PID) {
-            try {
-                // do not remove MP partition yet. MP partition should be the last one to be removed.
-                List<String> partitions = zk.getChildren(VoltZK.mpRepairBlocker, false);
-                if (partitions.size() > 1) {
-                    return;
-                }
-            } catch (KeeperException | InterruptedException e) {
-            }
-        }
-        if (log.isDebugEnabled()) {
-            log.debug("Remove partition leader promotin indicator:" + path);
-        }
-
-        removeActionBlocker(zk, path, log);
+         removeActionBlocker(zk, path, log);
     }
 
     private static boolean isRepairProgress(ZooKeeper zk) {

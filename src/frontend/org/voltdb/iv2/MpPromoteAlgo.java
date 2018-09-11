@@ -31,7 +31,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.TheHashinator;
-import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -57,9 +56,6 @@ public class MpPromoteAlgo implements RepairAlgo
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
     private final boolean m_isMigratePartitionLeader;
     private final MpRestartSequenceGenerator m_restartSeqGenerator;
-
-    // Indicate if this is used during MPI promotion or MP repair
-    private boolean m_repairForMpiPromotion = false;
 
     long getRequestId()
     {
@@ -143,14 +139,6 @@ public class MpPromoteAlgo implements RepairAlgo
         } catch (Exception e) {
             repairLogger.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-        } finally {
-            // At this point, the repair blocker for the partition (non MPI) which triggers the repair process has been removed.
-            // If the repair is not for leader migration or MPI promotion, check if all partition leaders have been promoted.
-            // if so remove the MP repair blocker so that rejoin or UAC can proceed.
-            if (!m_repairForMpiPromotion && !m_isMigratePartitionLeader
-                    && !m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
-                VoltZK.removePartitionPromotionIndicator(m_mailbox.m_messenger.getZK(), MpInitiator.MP_INIT_PID, repairLogger);
-            }
         }
         return m_promotionResult;
     }
@@ -395,9 +383,5 @@ public class MpPromoteAlgo implements RepairAlgo
 
             return rollback;
         }
-    }
-
-    public void setMpiPromotionRepair() {
-        m_repairForMpiPromotion = true;
     }
 }
