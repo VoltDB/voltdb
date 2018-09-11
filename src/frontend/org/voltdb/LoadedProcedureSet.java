@@ -298,6 +298,8 @@ public class LoadedProcedureSet {
             // for this plan-on-the-fly procedure
             pr.setProcNameToLoadForFragmentTasks(newCatProc.getTypeName());
             m_defaultProcCache.put(procName, pr);
+            // also list nibble delete into default procedures
+            m_defaultProcManager.m_defaultProcMap.put(procName, pr.getCatalogProcedure());
         }
         return pr;
     }
