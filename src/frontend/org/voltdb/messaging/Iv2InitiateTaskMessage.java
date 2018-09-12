@@ -39,7 +39,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     // The default MP transaction id set by client interface when
     // initiating a single-partition transaction.
     public static final long UNUSED_MP_TXNID = Long.MIN_VALUE;
-    public static final long UNUSED_TRUNC_HANDLE = Long.MIN_VALUE;
 
     public static int SINGLE_PARTITION_MASK = 1;
     public static int N_PARTITION_MASK = 2;
