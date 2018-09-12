@@ -20,7 +20,6 @@ package org.voltdb.rejoin;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -175,8 +174,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
             if (elapsed % 10 == 5) {
                 // log the info message every 10 seconds, log the initial message under 5 seconds
-                REJOINLOG.info(String.format("Rejoin node is waiting for catalog update or elastic join to finish, "
-                        + "time elapsed " + elapsed + " seconds"));
+                REJOINLOG.info("Rejoin node is waiting " + blockerError + " time elapsed " + elapsed + " seconds");
             }
 
             try {

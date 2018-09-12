@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -68,6 +69,7 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -846,6 +848,14 @@ public class CoreUtils {
 
     public static int getHostIdFromHSId(long HSId) {
         return (int) (HSId & 0xffffffff);
+    }
+
+    public static Set<Integer> getHostIdsFromHSIDs(Collection<Long> hsids) {
+        Set<Integer> hosts = Sets.newHashSet();
+        for (Long id : hsids) {
+            hosts.add(getHostIdFromHSId(id));
+        }
+        return hosts;
     }
 
     public static String hsIdToString(long hsId) {

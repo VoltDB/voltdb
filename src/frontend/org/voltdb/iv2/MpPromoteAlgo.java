@@ -25,14 +25,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
-
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ElasticHashinator;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.TheHashinator;
-import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -116,12 +114,7 @@ public class MpPromoteAlgo implements RepairAlgo
     public MpPromoteAlgo(List<Long> survivors, int deadHost, InitiatorMailbox mailbox,
             MpRestartSequenceGenerator seqGen, String whoami)
     {
-        m_survivors = new ArrayList<Long>(survivors);
-        m_deadHost = deadHost;
-        m_mailbox = mailbox;
-        m_isMigratePartitionLeader = false;
-        m_whoami = whoami;
-        m_restartSeqGenerator = seqGen;
+        this(survivors, deadHost, mailbox,seqGen, whoami, false);
     }
 
     /**
@@ -146,13 +139,6 @@ public class MpPromoteAlgo implements RepairAlgo
         } catch (Exception e) {
             repairLogger.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-        } finally {
-            //remove the flag for the partition if the repair process is not cancelled.
-            //The flag is registered upon host failure or MPI promotion. The repair may be interrupted but will
-            //be eventually completed.
-            if (!m_promotionResult.isCancelled() && m_mailbox.m_messenger != null) {
-                VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
-            }
         }
         return m_promotionResult;
     }
