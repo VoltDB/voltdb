@@ -174,7 +174,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
             if (elapsed % 10 == 5) {
                 // log the info message every 10 seconds, log the initial message under 5 seconds
-                REJOINLOG.info("Rejoin node is waiting " + blockerError + "time elapsed " + elapsed + " seconds");
+                REJOINLOG.info("Rejoin node is waiting " + blockerError + " time elapsed " + elapsed + " seconds");
             }
 
             try {
