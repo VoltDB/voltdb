@@ -47,6 +47,7 @@ public class InitiateResponseMessage extends VoltMessage {
     private boolean m_commit;
     private boolean m_recovering;
     private boolean m_readOnly;
+    private boolean m_mpFragmentSent = false;   // Needed to correctly advance the truncation handle
     private ClientResponseImpl m_response;
 
     // Mis-partitioned invocation needs to send the invocation back to ClientInterface for restart
@@ -232,6 +233,14 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_readOnly;
     }
 
+    public void setMpFragmentSent(boolean fragmentSent) {
+        m_mpFragmentSent = fragmentSent;
+    }
+
+    public boolean haveSentMpFragment() {
+        return m_mpFragmentSent;
+    }
+
     @Override
     public int getSerializedSize()
     {
@@ -245,7 +254,8 @@ public class InitiateResponseMessage extends VoltMessage {
             + 1 // read only
             + 1 // node recovering indication
             + 1 // mispartitioned invocation
-            + 1 // createdFromLeader
+            + 1 // for old Leader (pre-migration)
+            + 1 // MP fragment was sent to SPIs (used for repair log truncation)
             + m_response.getSerializedSize();
 
         if (m_mispartitioned || isMisrouted()) {
@@ -272,6 +282,7 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_recovering == true ? 1 : 0));
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
         buf.put((byte) (m_isForOldLeader == true ? 1 : 0));
+        buf.put((byte) (m_mpFragmentSent  == true ? 1 : 0));
         m_response.flattenToBuffer(buf);
         if (m_mispartitioned || isMisrouted()) {
             buf.putLong(m_currentHashinatorConfig.getFirst());
@@ -296,6 +307,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_recovering = buf.get() == 1;
         m_mispartitioned = buf.get() == 1;
         m_isForOldLeader = buf.get() == 1;
+        m_mpFragmentSent = buf.get() == 1;
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
         m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);

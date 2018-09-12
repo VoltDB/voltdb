@@ -458,8 +458,9 @@ public class MpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getTxnId());
-                // Only advance the truncation point on committed transactions.  See ENG-4211
-                if (message.shouldCommit()) {
+                // Only advance the truncation point on committed transactions that sent fragments to SPIs.
+                // See ENG-4211 & ENG-14563
+                if (message.shouldCommit() && message.haveSentMpFragment()) {
                     m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
                     m_repairLogAwaitingCommit = message.getTxnId();
                 }
@@ -475,8 +476,8 @@ public class MpScheduler extends Scheduler
             // doing duplicate suppresion: all done.
         }
         else {
-            // Only advance the truncation point on committed transactions.
-            if (message.shouldCommit()) {
+            // Only advance the truncation point on committed transactions that sent fragments to SPIs.
+            if (message.shouldCommit() && message.haveSentMpFragment()) {
                 m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
                 m_repairLogAwaitingCommit = message.getTxnId();
             }

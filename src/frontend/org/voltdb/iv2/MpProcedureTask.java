@@ -159,7 +159,7 @@ public class MpProcedureTask extends ProcedureTask
                     m_txnState.txnId,
                     m_txnState.isReadOnly(),
                     0,
-                    true,
+                    true,   // rollback
                     false,  // really don't want to have ack the ack.
                     true,   // Don't clear/flush the txn because we are restarting it
                     m_msg.isForReplay(),
@@ -211,6 +211,10 @@ public class MpProcedureTask extends ProcedureTask
             if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {
                 if (!response.shouldCommit()) {
                     txn.setNeedsRollback(true);
+                }
+                else {
+                    // rollback responses won't advance the truncation point so skip the update
+                    response.setMpFragmentSent(txn.haveSentFragment());
                 }
                 completeInitiateTask(siteConnection);
                 // Set the source HSId (ugh) to ourselves so we track the message path correctly
