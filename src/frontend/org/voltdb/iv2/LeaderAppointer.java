@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
@@ -302,11 +303,6 @@ public class LeaderAppointer implements Promotable
                         CoreUtils.hsIdToString(prevLeader) + ") for partition " + partitionId);
             }
             String masterPair = Long.toString(prevLeader) + "/" + Long.toString(masterHSId);
-
-            //Partition leader promotion upon node failure
-            if (prevLeader != masterHSId && prevLeader != Long.MAX_VALUE) {
-                VoltZK.createPartitionPromotionIndicator(m_zk, partitionId, tmLog);
-            }
             try {
                 m_iv2appointees.put(partitionId, masterPair);
             } catch (Exception e) {
@@ -521,7 +517,8 @@ public class LeaderAppointer implements Promotable
         }
         else {
             // Create MP repair ZK node to block rejoin
-            VoltZK.createPartitionPromotionIndicator(m_zk, MpInitiator.MP_INIT_PID, tmLog);
+            VoltZK.createActionBlocker(m_zk, VoltZK.mpRepairInProgress,
+                    CreateMode.EPHEMERAL, tmLog, "MP Repair");
 
             // If we're taking over for a failed LeaderAppointer, we know when
             // we get here that every partition had a leader at some point in
@@ -560,6 +557,7 @@ public class LeaderAppointer implements Promotable
 
             // just go ahead and promote our MPI
             m_MPI.acceptPromotion();
+            VoltZK.removeActionBlocker(m_zk, VoltZK.mpRepairInProgress, tmLog);
             m_zk.getChildren(VoltZK.leaders_initiators, m_partitionCallback);
             blocker.set(null);
         }
