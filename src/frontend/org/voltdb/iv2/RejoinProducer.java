@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -60,6 +61,10 @@ public class RejoinProducer extends JoinProducerBase {
 
     // True if we're handling a table-less rejoin.
     boolean m_schemaHasNoTables = false;
+
+    // Barrier that prevents the finish task for firing until all sites have finished the stream snapshot
+    private static AtomicInteger s_streamingSiteCount;
+
 
     // Get the snapshot nonce from the RejoinCoordinator's INITIATION message.
     // Then register the completion interest.
@@ -118,6 +123,10 @@ public class RejoinProducer extends JoinProducerBase {
 
             SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
         }
+    }
+
+    public static void initBarrier(int siteCount) {
+        s_streamingSiteCount = new AtomicInteger(siteCount);
     }
 
     // Run if the watchdog isn't cancelled within the timeout period
@@ -309,11 +318,23 @@ public class RejoinProducer extends JoinProducerBase {
                 REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
                 m_rejoinSiteProcessor.close();
 
+                boolean allSitesFinishStreaming;
                 if (m_streamSnapshotMb != null) {
                     VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
+                    m_streamSnapshotMb = null;
+                    allSitesFinishStreaming = s_streamingSiteCount.decrementAndGet() == 0;
                 }
-
-                doFinishingTask(siteConnection);
+                else {
+                    int pendingSites = s_streamingSiteCount.get();
+                    assert(pendingSites >= 0);
+                    allSitesFinishStreaming = pendingSites == 0;
+                }
+                if (allSitesFinishStreaming) {
+                    doFinishingTask(siteConnection);
+                }
+                else {
+                    returnToTaskQueue(sourcesReady);
+                }
             }
         }
         else {
