@@ -453,6 +453,9 @@ public class MpScheduler extends Scheduler
             traceLog.add(() -> VoltTrace.endAsync("initmp", message.getTxnId()));
         }
 
+        if (message.getClientResponseData().getHashes() == null) {
+            tmLog.warn("The transaction response has no hash:" + message);
+        }
         DuplicateCounter counter = m_duplicateCounters.get(message.getTxnId());
         if (counter != null) {
             int result = counter.offer(message);
@@ -482,8 +485,13 @@ public class MpScheduler extends Scheduler
             }
             MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(message.getTxnId());
             assert(txn != null);
+
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
+            if (txn == null) {
+                tmLog.warn("The transaction has been completed:" + message);
+            }
+
             // We actually completed this MP transaction.  Create a fake CompleteTransactionMessage
             // to send to our local repair log so that the fate of this transaction is never forgotten
             // even if all the masters somehow die before forwarding Complete on to their replicas.
