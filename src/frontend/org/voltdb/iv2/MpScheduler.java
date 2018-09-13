@@ -161,7 +161,7 @@ public class MpScheduler extends Scheduler
             VoltMessage resp = counter.getLastResponse();
             if (resp != null && resp instanceof InitiateResponseMessage) {
                 InitiateResponseMessage msg = (InitiateResponseMessage)resp;
-                if (msg.shouldCommit()) {
+                if (msg.shouldCommit() && msg.haveSentMpFragment()) {
                     m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
                     m_repairLogAwaitingCommit = msg.getTxnId();
                 }
