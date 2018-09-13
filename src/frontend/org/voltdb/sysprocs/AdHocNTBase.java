@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -248,6 +249,22 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             adhocLog.error(msg + "\n" + stackTrace);
             throw new AdHocPlanningException(msg);
         }
+    }
+
+    /**
+     * Plan and execute a batch of DML/DQL SQL. Any DDL has been filtered out at this point.
+     */
+    protected CompletableFuture<ClientResponse>
+              runNonDDLAdHocThroughCalcite(CatalogContext context,
+                                           List<SqlNode> sqlStatements,
+                                           boolean inferPartitioning,
+                                           Object userPartitionKey,
+                                           ExplainMode explainMode,
+                                           boolean isLargeQuery,
+                                           boolean isSwapTables,
+                                           Object[] userParamSet)
+    {
+        return null;
     }
 
     /**
