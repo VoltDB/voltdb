@@ -132,6 +132,7 @@ public:
 
     void crashVoltDB(voltdb::FatalException e);
 
+    int64_t getFlushedExportBytes(int32_t partitionId, std::string signature);
     virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync);
     virtual void pushEndOfStream(int32_t partitionId, std::string signature);
 

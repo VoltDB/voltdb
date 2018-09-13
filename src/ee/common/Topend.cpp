@@ -61,6 +61,14 @@ namespace voltdb {
     void DummyTopend::crashVoltDB(voltdb::FatalException e) {
     }
 
+    int64_t DummyTopend::getFlushedExportBytes(int32_t partitionId, std::string signature) {
+        int64_t bytes = 0;
+        for (int ii = 0; ii < blocks.size(); ii++) {
+            bytes += blocks[ii]->rawLength();
+        }
+        return bytes;
+    }
+
     void DummyTopend::pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync) {
         if (sync) {
             return;
