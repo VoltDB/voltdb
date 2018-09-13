@@ -63,8 +63,10 @@ public:
     // compute # of bytes needed to serialize the meta data column names
     inline size_t getMDColumnNamesSerializedSize() const { return m_mdSchemaSize; }
 
-    int64_t allocatedBytesInEE() const {
-        return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace));
+    int64_t debugAllocatedBytesInEE() const {
+        DummyTopend* te = static_cast<DummyTopend*>(ExecutorContext::getPhysicalTopend());
+        int64_t flushedBytes = te->getFlushedExportBytes(m_partitionId, m_signature);
+        return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) + flushedBytes;
     }
 
     void pushStreamBuffer(StreamBlock *block, bool sync);
