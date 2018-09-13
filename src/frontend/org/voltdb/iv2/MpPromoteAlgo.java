@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
+
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -336,6 +338,7 @@ public class MpPromoteAlgo implements RepairAlgo
             message.setForReplica(false);
             message.setRequireAck(false);
             message.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
+            message.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
             if (repairLogger.isDebugEnabled()) {
                 repairLogger.debug(m_whoami + "sending completion for txn " + TxnEgo.txnIdToString(message.getTxnId()) +
                         ", ts " + MpRestartSequenceGenerator.restartSeqIdToString(message.getTimestamp()));
@@ -352,7 +355,9 @@ public class MpPromoteAlgo implements RepairAlgo
             // anyway, so not restarting the read is currently harmless.
             boolean restart = !ftm.isReadOnly();
             if (restart) {
-                assert(ftm.getInitiateTask() != null);
+                Iv2InitiateTaskMessage initTaskMsg = ftm.getInitiateTask();
+                assert(initTaskMsg != null);
+                initTaskMsg.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
                 m_interruptedTxns.add(ftm.getInitiateTask());
             }
             CompleteTransactionMessage rollback = null;
@@ -377,7 +382,7 @@ public class MpPromoteAlgo implements RepairAlgo
                             true,
                             false);
                     rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
-                    rollback.setTruncationHandle(Long.MIN_VALUE);
+                    rollback.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
                 }
             }
 

@@ -31,6 +31,7 @@ import java.util.function.Function;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.AuthSystem.AuthUser;
@@ -269,7 +270,7 @@ public class ProcedureRunnerNT {
         final Iv2InitiateTaskMessage workRequest =
                 new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                            m_mailbox.getHSId(),
-                                           Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
+                                           TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE,
                                            m_id,
                                            m_id,
                                            true,
