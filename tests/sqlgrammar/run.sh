@@ -58,26 +58,26 @@ function find-directories-if-needed() {
 # Build VoltDB: 'community', open-source version
 function build() {
     echo -e "\n$0 performing: build$BUILD_ARGS"
-    test-tools-build
+    test-tools-build$BUILD_ARGS
     code[0]=$code_tt_build
 }
 
 # Build VoltDB: 'pro' version
 function build-pro() {
     echo -e "\n$0 performing: build-pro$BUILD_ARGS"
-    test-tools-build-pro
+    test-tools-build-pro$BUILD_ARGS
     code[0]=$code_tt_build
 }
 
 # Build VoltDB, only if not built already
 function build-if-needed() {
-    test-tools-build-if-needed
+    test-tools-build-if-needed$BUILD_ARGS
     code[0]=$code_tt_build
 }
 
 # Build VoltDB 'pro' version, only if not built already
 function build-pro-if-needed() {
-    test-tools-build-pro-if-needed
+    test-tools-build-pro-if-needed$BUILD_ARGS
     code[0]=$code_tt_build
 }
 
@@ -140,7 +140,7 @@ function jars() {
 
     # Compile the classes and build the jar files for the UDF tests
     BUILD_UDF_ARGS=
-    if [[ "$BUILD_ARGS" == *-Dbuild=debug*  ]]; then
+    if [[ "$BUILD_ARGS" == *-Dbuild=debug* ]]; then
         BUILD_UDF_ARGS="--build=debug"
     fi
 
