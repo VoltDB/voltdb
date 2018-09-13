@@ -453,6 +453,9 @@ public class MpScheduler extends Scheduler
             traceLog.add(() -> VoltTrace.endAsync("initmp", message.getTxnId()));
         }
 
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(message);
+        }
         DuplicateCounter counter = m_duplicateCounters.get(message.getTxnId());
         if (counter != null) {
             int result = counter.offer(message);
