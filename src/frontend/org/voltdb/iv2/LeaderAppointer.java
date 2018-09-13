@@ -118,6 +118,8 @@ public class LeaderAppointer implements Promotable
         final int m_partitionId;
         final Set<Long> m_replicas;
         long m_currentLeader;
+        long m_previousLeader = Long.MAX_VALUE;
+        boolean m_isLeaderMigrated = false;
 
         //A candidate to host partition leader when nodes are down
         //It is calculated when nodes are down.
@@ -294,14 +296,18 @@ public class LeaderAppointer implements Promotable
                     break;
                 }
             }
-            if (prevLeader == Long.MAX_VALUE) {
-                tmLog.info(WHOMIM + "Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
-                        partitionId);
+
+            // If the current leader is appointed via leader migration, then re-appoint it if possible
+            if (m_isLeaderMigrated && m_previousLeader != Long.MAX_VALUE && children.contains(m_previousLeader)) {
+                masterHSId = m_previousLeader;
+                tmLog.info(WHOMIM + " Previous leader " + CoreUtils.hsIdToString(masterHSId) + " for partition " +
+                        partitionId + " was appointed via leader migration.");
             }
-            else {
-                tmLog.info(WHOMIM + "Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader (Previous Leader was HSId " +
-                        CoreUtils.hsIdToString(prevLeader) + ") for partition " + partitionId);
-            }
+
+            tmLog.info(WHOMIM + "Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " + partitionId +
+                    " Previous Leader:" + ((prevLeader == Long.MAX_VALUE) ? " none" :
+                        CoreUtils.hsIdToString(prevLeader)));
+
             String masterPair = Long.toString(prevLeader) + "/" + Long.toString(masterHSId);
             try {
                 m_iv2appointees.put(partitionId, masterPair);
@@ -312,9 +318,8 @@ public class LeaderAppointer implements Promotable
         }
     }
 
-    /* We'll use this callback purely for startup so we can discover when all
-     * the leaders we have appointed have completed their promotions and
-     * published themselves to Zookeeper */
+    // Discover when all the leaders we have appointed have completed their promotions and
+    // published themselves to Zookeeper. Also update the partition leaders in PartitionCallback upon leader migration
     LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
@@ -335,7 +340,7 @@ public class LeaderAppointer implements Promotable
             } else {
                 // update partition call backs with correct current leaders after MigratePartitionLeader
                 for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
-                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSId);
+                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSId, entry.getValue().m_isMigratePartitionLeaderRequested);
                 }
             }
         }
@@ -808,10 +813,12 @@ public class LeaderAppointer implements Promotable
      * @param partitionId  partition id
      * @param newMasterHISD new master HSID
      */
-    public void updatePartitionLeader(int partitionId, long newMasterHISD) {
+    public void updatePartitionLeader(int partitionId, long newMasterHISD, boolean isLeaderMigrated) {
         PartitionCallback cb = m_callbacks.get(partitionId);
-        if (cb != null) {
+        if (cb != null && cb.m_currentLeader != newMasterHISD) {
+            cb.m_previousLeader = cb.m_currentLeader;
             cb.m_currentLeader = newMasterHISD;
+            cb.m_isLeaderMigrated = isLeaderMigrated;
         }
     }
 
