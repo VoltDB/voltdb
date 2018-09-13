@@ -689,6 +689,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte[] logsData) {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
+
+    @Override
     public void setBatchTimeout(int batchTimeout) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }

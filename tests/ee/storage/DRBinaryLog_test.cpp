@@ -617,17 +617,20 @@ public:
         boost::shared_array<char> data = m_topend.data.front();
         m_topend.data.pop_front();
 
-        size_t startPos = sb->headerSize() - 4;
-        *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(
-                static_cast<int32_t>(sb->offset()));
+        // Subtract 8 to fit the log count and size of logs
+        size_t startPos = sb->headerSize() - 8;
+        *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(1);
+        *reinterpret_cast<int32_t*>(&data.get()[startPos + 4]) = htonl(static_cast<int32_t>(sb->offset()));
         return std::make_pair(data, startPos);
     }
 
     CopySerializeInputLE* getDRTaskInfo() {
         DRStreamData data = getDRStreamData();
         const char* taskParams = &data.first[data.second];
-        return new CopySerializeInputLE(taskParams + 4,
-                ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
+
+        // Add 8 to skip the log count and size of logs
+        return new CopySerializeInputLE(taskParams + 8,
+                ntohl(*reinterpret_cast<const int32_t*>(taskParams + 4)));
     }
 
     void flushAndApply(int64_t lastCommittedSpHandle, bool success = true, bool forReplicated = false) {
@@ -648,7 +651,6 @@ public:
         tables[44] = m_otherTableWithoutIndexReplica;
         tables[24] = m_replicatedTableReplica;
 
-        if (forReplicated) SynchronizedThreadLock::countDownGlobalTxnStartCount(true);
         while (!m_topend.blocks.empty()) {
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
@@ -658,7 +660,6 @@ public:
             m_drReplicatedStream.m_enabled = true;
         }
         m_topend.receivedDRBuffer = false;
-        if (forReplicated) SynchronizedThreadLock::signalLowestSiteFinished();
         endTxn(m_engineReplica, success);
 
         m_engine->prepareContext();

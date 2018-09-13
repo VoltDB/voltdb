@@ -293,23 +293,27 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
     }
 }
 
-void PersistentTable::deleteAllTuples(bool, bool fallible) {
-    // Instead of recording each tuple deletion, log it as a table truncation DR.
-    ExecutorContext* ec = ExecutorContext::getExecutorContext();
+void PersistentTable::drLogTruncate(ExecutorContext* ec, bool fallible) {
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
     if (doDRActions(drStream)) {
         int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         int64_t currentSpHandle = ec->currentSpHandle();
         int64_t currentUniqueId = ec->currentUniqueId();
-        size_t drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature,
-                m_name, m_partitionColumn, currentSpHandle, currentUniqueId);
+        size_t drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, m_partitionColumn,
+                currentSpHandle, currentUniqueId);
 
-        UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
+        UndoQuantum* uq = ec->getCurrentUndoQuantum();
         if (uq && fallible) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark,
-                    rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE)));
+            uq->registerUndoAction(
+                    new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE)));
         }
     }
+}
+
+void PersistentTable::deleteAllTuples(bool, bool fallible) {
+    // Instead of recording each tuple deletion, log it as a table truncation DR.
+    ExecutorContext* ec = ExecutorContext::getExecutorContext();
+    drLogTruncate(ec, fallible);
 
     // Temporarily disable DR binary logging so that it doesn't record the
     // individual deletions below.
@@ -404,6 +408,8 @@ template<class T> static inline PersistentTable* constructEmptyDestTable(
 
 void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, bool fallible) {
     if (isPersistentTableEmpty()) {
+        // Always log the the truncate if dr is enabled, see ENG-14528.
+        drLogTruncate(ExecutorContext::getExecutorContext(), fallible);
         return;
     }
 
@@ -531,20 +537,9 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
     engine->rebuildTableCollections(replicatedTable, false);
 
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
-    AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-    UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
-    if (doDRActions(drStream)) {
-        int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        int64_t currentSpHandle = ec->currentSpHandle();
-        int64_t currentUniqueId = ec->currentUniqueId();
-        size_t drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, m_partitionColumn,
-                                                currentSpHandle, currentUniqueId);
+    drLogTruncate(ec, fallible);
 
-        if (uq && fallible) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE)));
-        }
-    }
-
+    UndoQuantum* uq = ec->getCurrentUndoQuantum();
     if (uq) {
         if (!fallible) {
             throwFatalException("Attempted to truncate table %s when there was an "

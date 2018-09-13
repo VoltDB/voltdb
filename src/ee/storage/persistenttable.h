@@ -636,6 +636,8 @@ private:
                                     TableTuple const& sourceTupleWithNewValues,
                                     std::vector<TableIndex*> const& indexesToUpdate);
 
+    // Add truncate operation to dr log stream if dr is enabled and running
+    void drLogTruncate(ExecutorContext* ec, bool fallible);
 
     void notifyBlockWasCompactedAway(TBPtr block);
 

@@ -23,25 +23,8 @@
 using namespace std;
 using namespace voltdb;
 
-int64_t BinaryLogSinkWrapper::apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables,
-                                    Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId)
-{
-    ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
-
-    int64_t __attribute__ ((unused)) uniqueId = 0;
-    int64_t __attribute__ ((unused)) sequenceNumber = -1;
-
-    int64_t rowCount = 0;
-    while (taskInfo.hasRemaining()) {
-        pool->purge();
-        const char* recordStart = taskInfo.getRawPointer();
-        const uint8_t drVersion = taskInfo.readByte();
-        if (drVersion >= DRTupleStream::COMPATIBLE_PROTOCOL_VERSION) {
-            rowCount += m_sink.applyTxn(&taskInfo, tables, pool, engine, remoteClusterId,
-                                        recordStart, localUniqueId);
-        } else {
-            throwFatalException("Unsupported DR version %d", drVersion);
-        }
-    }
-    return rowCount;
+int64_t BinaryLogSinkWrapper::apply(const char *logs,
+        boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
+        int32_t remoteClusterId, int64_t localUniqueId) {
+    return m_sink.apply(logs, tables, pool, engine, remoteClusterId, localUniqueId);
 }

@@ -857,7 +857,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         //If there are no tasks, do task log work
                         didWork = replayFromTaskLog(mrm);
                     }
-                    if (!didWork) Thread.yield();
+                    if (!didWork) {
+                        Thread.yield();
+                    }
                 } else {
                     SiteTasker task = m_scheduler.take();
                     task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
@@ -1152,17 +1154,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * @param undo
      */
     private static void handleUndoLog(List<UndoAction> undoLog, boolean undo) {
-        if (undoLog == null) return;
+        if (undoLog == null) {
+            return;
+        }
 
         for (final ListIterator<UndoAction> iterator = undoLog.listIterator(undoLog.size()); iterator.hasPrevious();) {
             final UndoAction action = iterator.previous();
-            if (undo)
+            if (undo) {
                 action.undo();
-            else
+            } else {
                 action.release();
+            }
         }
-        if (undo)
+        if (undo) {
             undoLog.clear();
+        }
     }
 
     private void setLastCommittedSpHandle(long spHandle)
@@ -1188,7 +1194,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //Any new txnid will create a new undo quantum, including the same txnid again
         m_latestUndoTxnId = Long.MIN_VALUE;
         //If the begin undo token is not set the txn never did any work so there is nothing to undo/release
-        if (beginUndoToken == Site.kInvalidUndoToken) return;
+        if (beginUndoToken == Site.kInvalidUndoToken) {
+            return;
+        }
         if (rollback) {
             m_ee.undoUndoToken(beginUndoToken);
         }
@@ -1259,7 +1267,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber) {
-        if (partitionSequenceNumber == null && mpSequenceNumber == null) return;
+        if (partitionSequenceNumber == null && mpSequenceNumber == null) {
+            return;
+        }
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(16);
         paramBuffer.putLong(partitionSequenceNumber != null ? partitionSequenceNumber : Long.MIN_VALUE);
         paramBuffer.putLong(mpSequenceNumber != null ? mpSequenceNumber : Long.MIN_VALUE);
@@ -1748,11 +1758,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public long applyBinaryLog(long txnId, long spHandle,
                                long uniqueId, int remoteClusterId, int remotePartitionId,
                                byte log[]) throws EEException {
-        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(Integer.BYTES * 2 + log.length);
+        paramBuffer.putInt(1);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                            remoteClusterId, remotePartitionId, getNextUndoToken(m_currentTxnId));
+                remoteClusterId, getNextUndoToken(m_currentTxnId));
+    }
+
+    @Override
+    public long applyMpBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logs[])
+            throws EEException {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(logs.length);
+        paramBuffer.put(logs);
+        return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
+                remoteClusterId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
