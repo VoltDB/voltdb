@@ -119,7 +119,7 @@ public class LeaderAppointer implements Promotable
         final Set<Long> m_replicas;
         long m_currentLeader;
         long m_previousLeader = Long.MAX_VALUE;
-        boolean m_isLeaderMigrated = false;;
+        boolean m_isLeaderMigrated = false;
 
         //A candidate to host partition leader when nodes are down
         //It is calculated when nodes are down.
@@ -318,9 +318,8 @@ public class LeaderAppointer implements Promotable
         }
     }
 
-    /* We'll use this callback purely for startup so we can discover when all
-     * the leaders we have appointed have completed their promotions and
-     * published themselves to Zookeeper */
+    // Discover when all the leaders we have appointed have completed their promotions and
+    // published themselves to Zookeeper. Also update the partition leaders in PartitionCallback upon leader migration
     LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
