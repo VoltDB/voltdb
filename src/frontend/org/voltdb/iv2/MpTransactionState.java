@@ -459,10 +459,10 @@ public class MpTransactionState extends TransactionState
                     StringBuilder deadlockMsg = new StringBuilder();
                     deadlockMsg.append("Possible multipartition transaction deadlock detected for: ").append(m_initiationMsg);
                     if (m_remoteWork == null) {
-                        deadlockMsg.append("Waiting on local BorrowTask response from site: ").append(CoreUtils.hsIdToString(m_buddyHSId));
+                        deadlockMsg.append("\nWaiting on local BorrowTask response from site: ").append(CoreUtils.hsIdToString(m_buddyHSId));
                     }
                     else {
-                        deadlockMsg.append("Waiting on remote dependencies for message:\n").append(m_remoteWork).append("\n");
+                        deadlockMsg.append("\nWaiting on remote dependencies for message:\n").append(m_remoteWork).append("\n");
                         for (Entry<Integer, Set<Long>> e : m_remoteDeps.entrySet()) {
                             deadlockMsg.append("Dep ID: " + e.getKey() + " waiting on: ").append(CoreUtils.hsIdCollectionToString(e.getValue()));
                         }
