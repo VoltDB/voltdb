@@ -20,22 +20,11 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
-import java.util.NavigableSet;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
@@ -815,7 +804,10 @@ public class DDLCompiler {
         // note this will need to be decompressed to be used
         String binDDL = CompressionService.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
-
+        System.out.println("Database has tables:");
+        StreamSupport.stream(((Iterable<Table>) () -> db.getTables().iterator()).spliterator(), false)
+                .forEach(t -> System.out.println(t.getSignature()));
+        System.out.println("---- ---- ---- ----");
         // output the xml catalog to disk
         //* enable to debug */ System.out.println("DEBUG: " + m_schema);
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
@@ -1251,7 +1243,7 @@ public class DDLCompiler {
         final String name = node.attributes.get("name");
 
         // create a table node in the catalog
-        final Table table = db.getTables().add(name);
+        final Table table = db.getTables().add(name);   // NOTE: start to create table
         // set max value before return for view table
         table.setTuplelimit(Integer.MAX_VALUE);
 

@@ -969,7 +969,7 @@ public class VoltCompiler {
         return catalog.getClusters().get("cluster").getDatabases().get("database");
     }
 
-    private static Database initCatalogDatabase(Catalog catalog) {
+    public static Database initCatalogDatabase(Catalog catalog) {
         // create the database in the catalog
         catalog.execute("add /clusters#cluster databases database");
         addDefaultRoles(catalog);
@@ -1126,7 +1126,7 @@ public class VoltCompiler {
             // When A/A is enabled, create an export table for every DR table to log possible conflicts
             ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs, m_isXDCR);
 
-            ddlcompiler.compileToCatalog(db, m_isXDCR);
+            ddlcompiler.compileToCatalog(db, m_isXDCR); // NOTE: this is the place catalog gets added for create table.
 
             // add database estimates info
             addDatabaseEstimatesInfo(m_estimates, db);

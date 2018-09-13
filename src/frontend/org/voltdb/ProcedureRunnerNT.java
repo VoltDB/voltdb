@@ -411,7 +411,7 @@ public class ProcedureRunnerNT {
                 return ProcedureRunner.getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
             }
 
-            for (int i = 0; i < m_paramTypes.length; i++) {
+            for (int i = 0; i < m_paramTypes.length; i++) { // NOTE: guard for param type checking
                 try {
                     paramList[i] = ParameterConverter.tryToMakeCompatible(m_paramTypes[i], paramList[i]);
                     // check the result type in an assert

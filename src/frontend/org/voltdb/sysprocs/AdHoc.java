@@ -17,26 +17,34 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.sql.*;
+import org.apache.calcite.sql.ddl.SqlColumnDeclaration;
+import org.apache.calcite.sql.ddl.SqlCreateTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
+import org.voltdb.calciteadapter.rel.VoltDBTable;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
+import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.newplanner.SqlBatch;
 import org.voltdb.newplanner.SqlTask;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.sysprocs.org.voltdb.calciteadapter.ColumnType;
+import org.voltdb.utils.CatalogUtil;
 
 public class AdHoc extends AdHocNTBase {
 
@@ -154,8 +162,8 @@ public class AdHoc extends AdHocNTBase {
 
     private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements) {
         // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
-        SortedSet<String> conflictTables = new TreeSet<String>();
-        Set<String> createdTables = new HashSet<String>();
+        SortedSet<String> conflictTables = new TreeSet<>();
+        Set<String> createdTables = new HashSet<>();
 
         for (String stmt : sqlStatements) {
             // check that the DDL is allowed
@@ -216,7 +224,8 @@ public class AdHoc extends AdHocNTBase {
         return updateApplication("@AdHoc",
                                 null,
                                 null,
-                                sqlStatements.toArray(new String[0]),
+                                //sqlStatements.toArray(new String[0]),
+                sqlStatements.stream().filter(stmt -> !SQLLexer.extractDDLToken(stmt).equals("create")).collect(Collectors.toList()).toArray(new String[0]),
                                 null,
                                 false,
                                 true);

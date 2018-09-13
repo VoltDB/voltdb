@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.VoltLogger;
@@ -37,7 +38,9 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
