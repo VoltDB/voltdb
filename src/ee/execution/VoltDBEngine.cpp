@@ -430,8 +430,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
     bool hasDRBinaryLog = m_executorContext->checkTransactionForDR();
 
-    // reset these at the start of each batch
-    m_executorContext->m_progressStats.resetForNewBatch();
     NValueArray &params = m_executorContext->getParameterContainer();
 
     // Reserve the space to track the number of succeeded fragments.

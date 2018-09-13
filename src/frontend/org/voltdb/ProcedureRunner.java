@@ -328,7 +328,7 @@ public class ProcedureRunner {
         m_spBigBatchBeginToken = -1;
 
         // set procedure name in the site/ee
-        m_site.setProcedureName(m_procedureName);
+        m_site.setupProcedure(m_procedureName);
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
@@ -504,7 +504,7 @@ public class ProcedureRunner {
             m_cachedSingleStmt.expectation = null;
             m_seenFinalBatch = false;
 
-            m_site.setProcedureName(null);
+            m_site.completeProcedure();
         }
 
         return retval;
