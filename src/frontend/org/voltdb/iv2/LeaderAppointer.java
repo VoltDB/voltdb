@@ -707,6 +707,13 @@ public class LeaderAppointer implements Promotable
                 // update k-safety statistics for initialized partitions
                 // the missing partition count may be incorrect if the failed hosts contain any of the replicas?
                 lackingReplication.add(new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size()));
+            } catch (KeeperException ke) {
+
+                // See above comments ENG-14567: ZKUtil.ChildrenCallback or ZKUtil.ByteArrayCallback may throw execption
+                // if the queried node is removed.
+                if (ke.code() == KeeperException.Code.NONODE || ke.code() == KeeperException.Code.NOTEMPTY) {
+                    continue;
+                }
             } catch (Exception e) {
                 String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
