@@ -1614,8 +1614,10 @@ TEST CASES
     <condition property="regressions" value="${regressions}" else="all">
         <isset property="regressions"/>
     </condition>
-    <!--force execution of SQL queries to use the "large" path (for read-only queries) a certain percentage of the time.-->
-    <condition property="large_mode_ratio" value="${large_mode_ratio}" else="0">
+    <!--Force the execution of SQL queries to use the "large" mode
+    (for read-only AdHoc queries) at a certain percentage of the time.
+    -1 means uninitialized, and will be treated equally as null.-->
+    <condition property="large_mode_ratio" value="${large_mode_ratio}" else="-1">
         <isset property="large_mode_ratio"/>
     </condition>
 
