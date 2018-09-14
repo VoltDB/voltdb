@@ -51,6 +51,7 @@ public class VoltDBLSortRule extends RelOptRule {
                         convertedInput,
                         sort.getCollation());
             }
+            // TODO: Chao: why split it to two phases?
             if (sort.offset != null || sort.fetch != null) {
                 RelNode limitInput = (logicalRel != null) ? logicalRel : convertedInput;
                 logicalRel = new VoltDBLLimit(

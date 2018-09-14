@@ -29,6 +29,7 @@ import org.voltdb.calciteadapter.rel.VoltDBTable;
 
 public abstract class AbstractVoltDBTableScan extends TableScan {
 
+    // TODO: Chao: What is this for?
     public static final int MAX_TABLE_ROW_COUNT = 1000000;
 
     protected final VoltDBTable m_voltDBTable;
