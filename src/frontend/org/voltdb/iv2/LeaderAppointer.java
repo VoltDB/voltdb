@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -599,8 +600,7 @@ public class LeaderAppointer implements Promotable
         m_partitionWatchers.put(pid, babySitter);
     }
 
-    public boolean isClusterKSafe(Set<Integer> failedHosts)
-    {
+    public boolean isClusterKSafe(Set<Integer> failedHosts) {
         boolean retval = true;
         List<String> partitionDirs = null;
         try {
@@ -612,8 +612,9 @@ public class LeaderAppointer implements Promotable
         //Don't fetch the values serially do it asynchronously
         Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
         Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<ZKUtil.ChildrenCallback>();
-        for (String partitionDir : partitionDirs) {
+        for (Iterator<String> it = partitionDirs.iterator(); it.hasNext();) {
             //skip checking MP, not relevant to KSafety
+            String partitionDir = it.next();
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
             if (pid == MpInitiator.MP_INIT_PID) continue;
 
@@ -626,7 +627,18 @@ public class LeaderAppointer implements Promotable
                 m_zk.getChildren(dir, false, childrenCallback, null);
                 childrenCallbacks.offer(childrenCallback);
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+                // During elastic rejoin and re-balance partitions, a joining node failure will reject the whole joining
+                // and bring down all joining nodes. In the meantime, other nodes could check the cluster viability and could
+                // encounter the removal of newly elastically added partitions. Ignore these partitions. ENG-14567
+                if ( e instanceof KeeperException) {
+                    KeeperException ke = (KeeperException)e;
+                    if (ke.code() != KeeperException.Code.NONODE) {
+                        VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+                    }
+                    it.remove();
+                } else {
+                    VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+                }
             }
         }
 
