@@ -57,27 +57,33 @@ function find-directories-if-needed() {
 
 # Build VoltDB: 'community', open-source version
 function build() {
-    echo -e "\n$0 performing: build$BUILD_ARGS"
-    test-tools-build$BUILD_ARGS
+    echo -e "\n$0 performing: build $BUILD_ARGS"
+    test-tools-build $BUILD_ARGS
     code[0]=$code_tt_build
 }
 
 # Build VoltDB: 'pro' version
 function build-pro() {
-    echo -e "\n$0 performing: build-pro$BUILD_ARGS"
-    test-tools-build-pro$BUILD_ARGS
+    echo -e "\n$0 performing: build-pro $BUILD_ARGS"
+    test-tools-build-pro $BUILD_ARGS
     code[0]=$code_tt_build
 }
 
 # Build VoltDB, only if not built already
 function build-if-needed() {
-    test-tools-build-if-needed$BUILD_ARGS
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: build-if-needed $BUILD_ARGS"
+    fi
+    test-tools-build-if-needed $BUILD_ARGS
     code[0]=$code_tt_build
 }
 
 # Build VoltDB 'pro' version, only if not built already
 function build-pro-if-needed() {
-    test-tools-build-pro-if-needed$BUILD_ARGS
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: build-pro-if-needed $BUILD_ARGS"
+    fi
+    test-tools-build-pro-if-needed $BUILD_ARGS
     code[0]=$code_tt_build
 }
 
@@ -86,7 +92,7 @@ function init() {
     find-directories-if-needed
     build-if-needed
     echo -e "\n$0 performing: init"
-    test-tools-init
+    test-tools-init $BUILD_ARGS
 
     # Set the default value of the args to pass to SQL-grammar-gen
     DEFAULT_ARGS="--path=$SQLGRAMMAR_DIR --initial_number=100 --log=voltdbroot/log/volt.log,volt_console.out"

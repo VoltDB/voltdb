@@ -69,7 +69,7 @@ function test-tools-find-directories-if-needed() {
 # Optionally, you may specify one or more build arguments ($@)
 function test-tools-build() {
     test-tools-find-directories-if-needed
-    echo -e "\n$0 performing: [test-tools-]build" "$@"
+    echo -e "\n$0 performing: [test-tools-]build $@"
 
     cd $VOLTDB_COM_DIR
     ant clean dist "$@"
@@ -85,7 +85,7 @@ function test-tools-build() {
 # Optionally, you may specify one or more build arguments ($@)
 function test-tools-build-pro() {
     test-tools-find-directories-if-needed
-    echo -e "\n$0 performing: [test-tools-]build-pro" "$@"
+    echo -e "\n$0 performing: [test-tools-]build-pro $@"
 
     cd $VOLTDB_PRO_DIR
     ant -f mmt.xml dist.pro "$@"
@@ -103,6 +103,9 @@ function test-tools-build-pro() {
 # Optionally, you may specify one or more build arguments ($@)
 function test-tools-build-if-needed() {
     test-tools-find-directories-if-needed
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: [test-tools-]build-if-needed $@"
+    fi
     VOLTDB_COM_JAR=$(ls $VOLTDB_COM_DIR/voltdb/voltdb-*.jar)
     if [[ ! -e $VOLTDB_COM_JAR ]]; then
         test-tools-build "$@"
@@ -113,6 +116,9 @@ function test-tools-build-if-needed() {
 # Optionally, you may specify one or more build arguments ($@)
 function test-tools-build-pro-if-needed() {
     test-tools-find-directories-if-needed
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: [test-tools-]build-pro-if-needed $@"
+    fi
     VOLTDB_PRO_TAR=$(ls $VOLTDB_PRO_DIR/obj/pro/voltdb-ent-*.tar.gz)
     if [[ ! -e $VOLTDB_PRO_TAR ]]; then
         test-tools-build-pro "$@"
@@ -122,9 +128,9 @@ function test-tools-build-pro-if-needed() {
 # Set CLASSPATH, PATH, and python, as needed
 function test-tools-init() {
     test-tools-find-directories-if-needed
-    test-tools-build-if-needed
+    test-tools-build-if-needed "$@"
     if [[ "$TT_DEBUG" -gt "0" ]]; then
-        echo -e "\n$0 performing: test-tools-init"
+        echo -e "\n$0 performing: test-tools-init $@"
     fi
 
     # Set CLASSPATH to include the VoltDB Jar file
