@@ -61,6 +61,7 @@ try:
     require(dependencies)
 except (DistributionNotFound, VersionConflict) as error:
     voltsql_root_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
+    print(error)
     try:
         import pip
     except ImportError:
