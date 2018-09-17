@@ -21,7 +21,6 @@ import org.apache.calcite.plan.Convention;
 import org.apache.calcite.rel.RelNode;
 
 public interface VoltDBLRel extends RelNode  {
-    // TODO: Chao:
     final static Convention VOLTDB_LOGICAL = new Convention.Impl("VOLTDB_LOGICAL", VoltDBLRel.class);
 
 }
