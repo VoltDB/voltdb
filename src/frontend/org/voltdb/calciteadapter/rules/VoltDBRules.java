@@ -72,8 +72,8 @@ import org.voltdb.calciteadapter.rules.physical.VoltDBPSortScanToIndexRule;
  *    Sort, Join, Project, Filter, Scan...
  *    Exp:
  *
- *    Project <-- *expression* ( id = [$0], name = [$1] <-- *input* )
- *      Filter (condition=[= ($0, 21)])   <-- *children*
+ *    Project ( id = [$0], name = [$1] ) <-- expression
+ *      Filter (condition=[= ($0, 21)])   <-- children/input
  *          TableScan (table = [[foo, bar]])
  *
  *  # {@link org.apache.calcite.rex.RexNode} represents a row-level expression:
@@ -96,6 +96,8 @@ import org.voltdb.calciteadapter.rules.physical.VoltDBPSortScanToIndexRule;
  *      RelNode interface
  *
  *      Conventions are used to represent a single data source.
+ *
+ *      describing how the expression passes data to its consuming relational expression
  *
  *      Inputs to a relational expression must be in the same convention.
  *
