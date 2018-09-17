@@ -200,29 +200,37 @@ public class MpScheduler extends Scheduler
     @Override
     public void deliver(VoltMessage message)
     {
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("DELIVER: " + message.toString());
-        }
         if (message instanceof Iv2InitiateTaskMessage) {
+            if (tmLog.isDebugEnabled()) {
+                // Protect against race in string conversion of VoltTable parameter on deliver and site threads
+                StringBuilder sb = new StringBuilder("DELIVER: ");
+                ((Iv2InitiateTaskMessage)message).toShortString(sb);
+                tmLog.debug(sb.toString());
+            }
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
         }
-        else if (message instanceof InitiateResponseMessage) {
-            handleInitiateResponseMessage((InitiateResponseMessage)message);
-        }
-        else if (message instanceof FragmentResponseMessage) {
-            handleFragmentResponseMessage((FragmentResponseMessage)message);
-        }
-        else if (message instanceof Iv2EndOfLogMessage) {
-            handleEOLMessage();
-        }
-        else if (message instanceof DummyTransactionTaskMessage) {
-            // leave empty to ignore it on purpose
-        }
-        else if (message instanceof DumpMessage) {
-            // leave empty to ignore it on purpose
-        }
         else {
-            throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("DELIVER: " + message.toString());
+            }
+            if (message instanceof InitiateResponseMessage) {
+                handleInitiateResponseMessage((InitiateResponseMessage)message);
+            }
+            else if (message instanceof FragmentResponseMessage) {
+                handleFragmentResponseMessage((FragmentResponseMessage)message);
+            }
+            else if (message instanceof Iv2EndOfLogMessage) {
+                handleEOLMessage();
+            }
+            else if (message instanceof DummyTransactionTaskMessage) {
+                // leave empty to ignore it on purpose
+            }
+            else if (message instanceof DumpMessage) {
+                // leave empty to ignore it on purpose
+            }
+            else {
+                throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
+            }
         }
     }
 
