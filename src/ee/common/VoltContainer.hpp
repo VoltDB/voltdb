@@ -15,30 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <common/UndoLog.h>
+#pragma once
+#include <deque>
+#include "Pool.hpp"
 
-namespace voltdb {
+// This is the preferred way, but CentOS6 does not support this
+// yet...
+//template<typename T> using volt_vector = std::vector<T, voltdb::allocator<T>>;
+//template<typename T> using volt_deque = std::deque<T, voltdb::allocator<T>>;
 
-UndoLog::UndoLog()
-  : m_lastUndoToken(INT64_MIN), m_lastReleaseToken(INT64_MIN)
-{
-}
-
-void UndoLog::clear()
-{
-    if (! m_undoQuantums.empty()) {
-        release(m_lastUndoToken);
-    }
-    for (auto i = m_undoDataPools.begin(); i != m_undoDataPools.end(); i++) {
-        delete *i;
-    }
-    m_undoDataPools.clear();
-    m_undoQuantums.clear();
-}
-
-UndoLog::~UndoLog()
-{
-    clear();
-}
-
-}

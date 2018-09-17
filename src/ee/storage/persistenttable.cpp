@@ -72,6 +72,10 @@ namespace voltdb {
 
 #define TABLE_BLOCKSIZE 2097152
 
+   template<typename T> inline static T* partialCopyToPool(Pool* pool, const T* src, size_t partialSize) {
+      return reinterpret_cast<T*>(memcpy(pool->allocate(partialSize), src, partialSize));
+   }
+
 class SetAndRestorePendingDeleteFlag
 {
 public:
@@ -880,11 +884,11 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
          */
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
-            char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
+           char* tupleData = partialCopyToPool(uq->getPool(), target.address(), target.tupleLength());
             //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
             //* enable for debug */           << " { " << target.debugNoHeader() << " } "
             //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-            UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon);
+            UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(*uq->getPool(), tupleData, &m_surgeon);
             SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
         }
     }
@@ -983,7 +987,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
              * For undo purposes, before making any changes, save a copy of the state of the tuple
              * into the undo pool temp storage and hold onto it with oldTupleData.
              */
-            oldTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), targetTupleToUpdate.tupleLength());
+           oldTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), targetTupleToUpdate.tupleLength());
         }
     }
 
@@ -1005,7 +1009,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
 
         UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
         if (uq && fallible) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_UPDATE)));
+            uq->registerUndoAction(createInstanceFromPool<DRTupleStreamUndoAction>(
+                     *uq->getPool(), drStream, drMark, rowCostForDRRecord(DR_RECORD_UPDATE)));
         }
     }
 
@@ -1090,10 +1095,9 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
          * Create and register an undo action with copies of the "before" and "after" tuple storage
          * and the "before" and "after" object pointers for non-inlined columns that changed.
          */
-        char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
-        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
-                                                                           oldObjects, newObjects,
-                                                                           &m_surgeon, someIndexGotUpdated);
+       char* newTupleData = partialCopyToPool(uq->getPool(), targetTupleToUpdate.address(), tupleLength);
+        UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoUpdateAction>(
+              *uq->getPool(), oldTupleData, newTupleData, oldObjects, newObjects, &m_surgeon, someIndexGotUpdated);
         SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
     }
     else {
@@ -1217,7 +1221,8 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
                                               currentUniqueId, target, DR_RECORD_DELETE);
 
         if (createUndoAction) {
-            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_DELETE)));
+            uq->registerUndoAction(createInstanceFromPool<DRTupleStreamUndoAction>(
+                     *uq->getPool(), drStream, drMark, rowCostForDRRecord(DR_RECORD_DELETE)));
         }
     }
 
@@ -1228,7 +1233,8 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
         target.setPendingDeleteOnUndoReleaseTrue();
         ++m_tuplesPinnedByUndo;
         ++m_invisibleTuplesPendingDeleteCount;
-        UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon);
+        UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoDeleteAction>(
+              *uq->getPool(), target.address(), &m_surgeon);
         SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction, this);
     }
 
