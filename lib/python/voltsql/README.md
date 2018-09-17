@@ -55,11 +55,11 @@ There are three interactive features that you can turn on and off with function 
 
 - **smart completion**
 
-    When on, _smart completion__ lists schema elements such as table and column names where appropriate along with SQL keywords. Press FN2 to turn smart completion on and off.
+    When on, _smart completion__ lists schema elements such as table and column names where appropriate along with SQL keywords. Press F2 to turn smart completion on and off.
     
 - **multiline**
 
-    When on, _multiline__ lets you enter statements on multiples lines before processing the statement or command. Press ESC and then ENTER to execute the statement. When off, each line is processed when you press ENTER. Press FN3 to turn multiline on and off.
+    When on, _multiline__ lets you enter statements on multiples lines before processing the statement or command. Press ESC and then ENTER to execute the statement. When off, each line is processed when you press ENTER. Press F3 to turn multiline on and off.
 
 - **auto refresh**
 
@@ -67,7 +67,7 @@ There are three interactive features that you can turn on and off with function 
     
     Leaving auto refresh on ensures you have the latest schema available for smart completion. Turning it off can save time if the schema does not change very often.
     
-    Press FN4 to turn auto refresh on and off.
+    Press F4 to turn auto refresh on and off.
     
     
 Notes
