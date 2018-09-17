@@ -51,6 +51,7 @@ public class AdHoc extends AdHocNTBase {
      * @return The client response.
      */
     public CompletableFuture<ClientResponse> runThroughCalcite(ParameterSet params) {
+        // TRAIL [Calcite:1] AdHoc.runThroughCalcite
         // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
         Object[] paramArray = params.toArray();
         String sqlBlock = (String) paramArray[0];
@@ -100,14 +101,16 @@ public class AdHoc extends AdHocNTBase {
         } else {
             // This is where we run non-DDL SQL statements
             // Should use runNonDDLAdHocThroughCalcite when it's ready.
-            return runNonDDLAdHoc(VoltDB.instance().getCatalogContext(),
-                                  sqlList,
-                                  true, // infer partitioning
-                                  null, // no partition key
-                                  ExplainMode.NONE,
-                                  m_backendTargetType.isLargeTempTableTarget, // back end dependent.
-                                  false, // is not swap tables
-                                  userParams);
+            return runNonDDLAdHocThroughCalcite(
+                    VoltDB.instance().getCatalogContext(),
+                    sqlList,
+                    rootNodesOfParsedQueries,
+                    true, // infer partitioning
+                    null, // no partition key
+                    ExplainMode.NONE,
+                    m_backendTargetType.isLargeTempTableTarget, // back end dependent.
+                    false, // is not swap tables
+                    userParams);
         }
     }
 

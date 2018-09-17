@@ -175,6 +175,90 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Compile a batch of one or more SQL statements into a set of plans.
      * Parameters are valid iff there is exactly one DML/DQL statement.
      */
+    public static AdHocPlannedStatement compileAdHocSQLThroughCalcite(
+            PlannerTool plannerTool,
+            String sqlStatement,
+            SqlNode sqlNode,
+            boolean inferPartitioning,
+            Object userPartitionKey,
+            ExplainMode explainMode,
+            boolean isLargeQuery,
+            boolean isSwapTables,
+            Object[] userParamSet) throws AdHocPlanningException
+    {
+        // TRAIL [Calcite:3] compileAdHocSQLThroughCalcite
+        assert(plannerTool != null);
+        assert(sqlStatement != null);
+        final PlannerTool ptool = plannerTool;
+
+        // Take advantage of the planner optimization for inferring single partition work
+        // when the batch has one statement.
+        StatementPartitioning partitioning = null;
+
+        if (inferPartitioning) {
+            partitioning = StatementPartitioning.inferPartitioning();
+        }
+        else if (userPartitionKey == null) {
+            partitioning = StatementPartitioning.forceMP();
+        }
+        else {
+            partitioning = StatementPartitioning.forceSP();
+        }
+
+        try {
+            return ptool.planSqlWithCalcite(
+                    sqlStatement,
+                    sqlNode,
+                    partitioning,
+                    explainMode != ExplainMode.NONE,
+                    userParamSet,
+                    isSwapTables,
+                    isLargeQuery);
+        }
+        catch (Exception e) {
+            throw new AdHocPlanningException(e.getMessage());
+        }
+        catch (StackOverflowError error) {
+            // Overly long predicate expressions can cause a
+            // StackOverflowError in various code paths that may be
+            // covered by different StackOverflowError/Error/Throwable
+            // catch blocks. The factors that determine which code path
+            // and catch block get activated appears to be platform
+            // sensitive for reasons we do not entirely understand.
+            // To generate a deterministic error message regardless of
+            // these factors, purposely defer StackOverflowError handling
+            // for as long as possible, so that it can be handled
+            // consistently by a minimum number of high level callers like
+            // this one.
+            // This eliminates the need to synchronize error message text
+            // in multiple catch blocks, which becomes a problem when some
+            // catch blocks lead to re-wrapping of exceptions which tends
+            // to adorn the final error text in ways that are hard to track
+            // and replicate.
+            // Deferring StackOverflowError handling MAY mean ADDING
+            // explicit StackOverflowError catch blocks that re-throw
+            // the error to bypass more generic catch blocks
+            // for Error or Throwable on the same try block.
+            throw new AdHocPlanningException("Encountered stack overflow error. " +
+                    "Try reducing the number of predicate expressions in the query.");
+        }
+        catch (AssertionError ae) {
+            String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc.  "
+                    + "Please contact VoltDB at support@voltdb.com with your log files.";
+            StringWriter stringWriter = new StringWriter();
+            PrintWriter writer = new PrintWriter(stringWriter);
+            ae.printStackTrace(writer);
+            String stackTrace = stringWriter.toString();
+
+            adhocLog.error(msg + "\n" + stackTrace);
+            throw new AdHocPlanningException(msg);
+        }
+    }
+
+    /**
+     * Compile a batch of one or more SQL statements into a set of plans.
+     * Parameters are valid iff there is exactly one DML/DQL statement.
+     */
     public static AdHocPlannedStatement compileAdHocSQL(PlannerTool plannerTool,
                                                         String sqlStatement,
                                                         boolean inferPartitioning,
@@ -256,7 +340,8 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      */
     protected CompletableFuture<ClientResponse>
               runNonDDLAdHocThroughCalcite(CatalogContext context,
-                                           List<SqlNode> sqlStatements,
+                                           List<String> sqlStatements,
+                                           List<SqlNode> sqlNodes,
                                            boolean inferPartitioning,
                                            Object userPartitionKey,
                                            ExplainMode explainMode,
@@ -264,7 +349,95 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                            boolean isSwapTables,
                                            Object[] userParamSet)
     {
-        return null;
+        // TRAIL [Calcite:2] runNonDDLAdHocThroughCalcite
+        // record the catalog version the query is planned against to
+        // catch races vs. updateApplicationCatalog.
+        if (context == null) {
+            context = VoltDB.instance().getCatalogContext();
+        }
+
+        List<String> errorMsgs = new ArrayList<>();
+        List<AdHocPlannedStatement> stmts = new ArrayList<>();
+        int partitionParamIndex = -1;
+        VoltType partitionParamType = null;
+        Object partitionParamValue = null;
+        assert(sqlStatements != null && sqlNodes != null);
+        assert(sqlStatements.size() == sqlNodes.size());
+
+        boolean inferSP = (sqlStatements.size() == 1) && inferPartitioning;
+
+        if (userParamSet != null && userParamSet.length > 0) {
+            if (sqlStatements.size() != 1) {
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                                         AdHocErrorResponseMessage);
+            }
+        }
+
+        for (int i = 0; i < sqlStatements.size(); i++) {
+            try {
+                AdHocPlannedStatement result = compileAdHocSQLThroughCalcite(
+                        context.m_ptool,
+                        sqlStatements.get(i),
+                        sqlNodes.get(i),
+                        inferSP,
+                        userPartitionKey,
+                        explainMode,
+                        isLargeQuery,
+                        isSwapTables,
+                        userParamSet);
+                // The planning tool may have optimized for the single partition case
+                // and generated a partition parameter.
+                if (inferSP) {
+                    partitionParamIndex = result.getPartitioningParameterIndex();
+                    partitionParamType = result.getPartitioningParameterType();
+                    partitionParamValue = result.getPartitioningParameterValue();
+                }
+                stmts.add(result);
+            }
+            catch (AdHocPlanningException e) {
+                errorMsgs.add(e.getMessage());
+            }
+        }
+        if ( ! errorMsgs.isEmpty()) {
+            String errorSummary = StringUtils.join(errorMsgs, "\n");
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, errorSummary);
+        }
+
+        AdHocPlannedStmtBatch plannedStmtBatch =
+                new AdHocPlannedStmtBatch(userParamSet,
+                                          stmts,
+                                          partitionParamIndex,
+                                          partitionParamType,
+                                          partitionParamValue,
+                                          userPartitionKey == null ? null : new Object[] { userPartitionKey });
+
+        if (adhocLog.isDebugEnabled()) {
+            logBatch(context, plannedStmtBatch, userParamSet);
+        }
+
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endAsync("planadhoc", getClientHandle()));
+        }
+
+        if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
+            return processExplainPlannedStmtBatch(plannedStmtBatch);
+        }
+        else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
+            return processExplainDefaultProc(plannedStmtBatch);
+        }
+        else if (explainMode == ExplainMode.EXPLAIN_JSON) {
+            return processExplainPlannedStmtBatchInJSON(plannedStmtBatch);
+        }
+        else {
+            try {
+                return createAdHocTransaction(plannedStmtBatch, isSwapTables);
+            }
+            catch (VoltTypeException vte) {
+                String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
+                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, msg);
+            }
+        }
     }
 
     /**
