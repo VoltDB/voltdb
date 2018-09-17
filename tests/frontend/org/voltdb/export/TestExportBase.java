@@ -171,6 +171,73 @@ public class TestExportBase extends RegressionSuite {
         //Wait 10 mins only
         long end = System.currentTimeMillis() + (10 * 60 * 1000);
         while (true) {
+            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            boolean passedThisTime = true;
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                System.out.println("Waited too long...");
+                System.out.println(stats);
+                break;
+            }
+            if (ctime - st > (3 * 60 * 1000)) {
+                System.out.println(stats);
+                st = System.currentTimeMillis();
+            }
+            long ts = 0;
+            while (stats.advanceRow()) {
+                String ttype = stats.getString("TABLE_TYPE");
+                Long tts = stats.getLong("TIMESTAMP");
+                //Get highest timestamp and watch is change
+                if (tts > ts) {
+                    ts = tts;
+                }
+                if (ttype.equals("StreamedTable")) {
+                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                        passedThisTime = false;
+                        System.out.println("Partition Not Zero.");
+                        break;
+                    }
+                }
+            }
+            if (passedThisTime) {
+                if (ftime == 0) {
+                    ftime = ts;
+                    continue;
+                }
+                //we got 0 stats 2 times in row with diff highest timestamp.
+                if (ftime != ts) {
+                    passed = true;
+                    break;
+                }
+                System.out.println("Passed but not ready to declare victory.");
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        //System.out.println(stats);
+        assertTrue(passed);
+    }
+
+    /**
+     * Wait for export processor to catch up and have nothing to be exported.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public void waitForExportAllocatedMemoryZero(Client client) throws Exception {
+        boolean passed = false;
+
+        //Quiesc to see all data flushed.
+        System.out.println("Quiesce client....");
+        quiesce(client);
+        System.out.println("Quiesce done....");
+
+        VoltTable stats = null;
+        long ftime = 0;
+        long st = System.currentTimeMillis();
+        //Wait 10 mins only
+        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        while (true) {
             stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             boolean passedThisTime = true;
             long ctime = System.currentTimeMillis();
@@ -190,12 +257,10 @@ public class TestExportBase extends RegressionSuite {
                 if (tts > ts) {
                     ts = tts;
                 }
-                if (true) {
-                    if (0 != stats.getLong("TUPLE_PENDING")) {
-                        passedThisTime = false;
-                        System.out.println("Partition Not Zero. pendingTuples:"+stats.getLong("TUPLE_PENDING"));
-                        break;
-                    }
+                if (0 != stats.getLong("TUPLE_PENDING")) {
+                    passedThisTime = false;
+                    System.out.println("Partition Not Zero. pendingTuples:"+stats.getLong("TUPLE_PENDING"));
+                    break;
                 }
             }
             if (passedThisTime) {
