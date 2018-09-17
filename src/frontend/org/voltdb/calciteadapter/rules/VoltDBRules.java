@@ -71,12 +71,14 @@ import org.voltdb.calciteadapter.rules.physical.VoltDBPSortScanToIndexRule;
  *  # {@link org.apache.calcite.rel.RelNode} represents a relational expression
  *    Sort, Join, Project, Filter, Scan...
  *    Exp:
+ *    select col1 as id, col2 as name from foo where col1=21;
  *
  *    Project ( id = [$0], name = [$1] ) <-- expression
  *      Filter (condition=[= ($0, 21)])   <-- children/input
- *          TableScan (table = [[foo, bar]])
+ *          TableScan (table = [foo])
  *
  *  # {@link org.apache.calcite.rex.RexNode} represents a row-level expression:
+ *  = scalar expr
  *      Projection fields, conditions
  *      Input column reference  -->  RexInputRef
  *      Literal                 -->  RexLiteral
@@ -110,10 +112,14 @@ import org.voltdb.calciteadapter.rules.physical.VoltDBPSortScanToIndexRule;
  *  {@link org.apache.calcite.plan.RelOptRuleOperand}
  *
  *      ## Converter
- *      Converter rules implement {@link org.apache.calcite.rel.convert.Converter}
- *      and convert from one convention to another
+ *      {@link org.apache.calcite.rel.convert.ConverterRule}
+ *      convert() is called for matched rules
  *
- *      Converter rules applied via convert()
+ *          {@link org.apache.calcite.rel.convert.Converter}
+ *          can convert from one convention to another
+ *          via convert()
+ *
+ *          Q: when ConverterRule and when Converter?
  *
  *      ## Transformer
  *      onMatch() is called for matched rules
@@ -140,7 +146,9 @@ public class VoltDBRules {
 
             /*
             LogicalCalc
-
+proj
+filter
+calc = proj & filter
             A relational expression which computes project expressions and also filters.
             This relational expression combines the functionality of LogicalProject and LogicalFilter.
             It should be created in the later stages of optimization,
@@ -172,6 +180,8 @@ public class VoltDBRules {
     public static RelOptRule[] VOLCANO_RULES_1 = {
             // Calcite's Rules
             AbstractConverter.ExpandConversionRule.INSTANCE
+
+            // TODO: why we apply CalcMergeRule again in this stage
             , CalcMergeRule.INSTANCE
 
             // VoltDB Logical Rules

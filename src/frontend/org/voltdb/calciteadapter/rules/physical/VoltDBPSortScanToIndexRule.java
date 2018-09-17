@@ -40,6 +40,7 @@ import org.voltdb.types.SortDirectionType;
 
 public class VoltDBPSortScanToIndexRule extends RelOptRule {
 
+    // TODO: why not split INSTANCE_1 and INSTANCE_2 to two rules?
     public static final VoltDBPSortScanToIndexRule INSTANCE_1 =
             new VoltDBPSortScanToIndexRule(operand(VoltDBPSort.class,
                 operand(VoltDBPTableSeqScan.class, none())),
@@ -55,6 +56,7 @@ public class VoltDBPSortScanToIndexRule extends RelOptRule {
         super(operand, desc);
     }
 
+    // match only when we have a index on the table
     @Override
     public boolean matches(RelOptRuleCall call) {
         VoltDBPTableSeqScan scan = (call.rels.length == 2) ?

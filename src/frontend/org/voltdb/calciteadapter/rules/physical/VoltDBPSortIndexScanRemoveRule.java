@@ -35,6 +35,7 @@ import org.voltdb.types.SortDirectionType;
 
 public class VoltDBPSortIndexScanRemoveRule extends RelOptRule {
 
+    // TODO: why not split INSTANCE_1 and INSTANCE_2 to two rules?
     public static final VoltDBPSortIndexScanRemoveRule INSTANCE_1 =
             new VoltDBPSortIndexScanRemoveRule(
                     operand(VoltDBPSort.class,
