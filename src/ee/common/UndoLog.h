@@ -193,8 +193,8 @@ namespace voltdb
         // any larger value might exist (gaps are possible)
         int64_t m_lastReleaseToken;
 
-        std::vector<Pool*, voltdb::allocator<Pool*>> m_undoDataPools;
-        std::deque<UndoQuantum*, voltdb::allocator<UndoQuantum*>> m_undoQuantums;
+        std::vector<Pool*> m_undoDataPools;
+        std::deque<UndoQuantum*> m_undoQuantums;
     };
 }
 #endif /* UNDOLOG_H_ */

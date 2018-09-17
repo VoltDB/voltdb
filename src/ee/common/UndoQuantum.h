@@ -121,8 +121,8 @@ public:
     void* allocateAction(size_t sz) { return m_dataPool->allocate(sz); }
 private:
     const int64_t m_undoToken;
-    std::deque<UndoReleaseAction*, voltdb::allocator<UndoReleaseAction*>> m_undoActions;
-    std::list<UndoQuantumReleaseInterest*, voltdb::allocator<UndoQuantumReleaseInterest*>> m_interests;
+    std::deque<UndoReleaseAction*> m_undoActions;
+    std::list<UndoQuantumReleaseInterest*> m_interests;
 protected:
     Pool *m_dataPool;
 };
