@@ -52,10 +52,106 @@ import org.voltdb.calciteadapter.rules.physical.VoltDBPSortIndexScanRemoveRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPSortRule;
 import org.voltdb.calciteadapter.rules.physical.VoltDBPSortScanToIndexRule;
 
+/**
+ *  reference https://www.slideshare.net/JordanHalterman/introduction-to-apache-calcite
+ *
+ *  How Calcite optimizer work? (I could be wrong, someone please verify it)
+ *
+ *  steps:
+ *  1. Optimize logical plan (the SQL query can directly translate to a initial logical plan,
+ *  then we optimize it to a better logical plan)
+ *  2. Convert logical plan into a physical plan (represents the physical execution stages)
+ *
+ *  common optimizations:
+ *  Prune unused fields, Merge projections, Convert subqueries to joins, Reorder joins,
+ *  Push down projections, Push down filters
+ *
+ *  Key Concepts:
+ *
+ *  # {@link org.apache.calcite.rel.RelNode} represents a relational expression
+ *    Sort, Join, Project, Filter, Scan...
+ *    Exp:
+ *
+ *    Project <-- *expression* ( id = [$0], name = [$1] <-- *input* )
+ *      Filter (condition=[= ($0, 21)])   <-- *children*
+ *          TableScan (table = [[foo, bar]])
+ *
+ *  # {@link org.apache.calcite.rex.RexNode} represents a row-level expression:
+ *      Projection fields, conditions
+ *      Input column reference  -->  RexInputRef
+ *      Literal                 -->  RexLiteral
+ *      Struct field access     -->  RexFieldAccess
+ *      Function call           -->  RexCall
+ *      Window expression       -->  RexOver
+ *
+ *  # traits
+ *  Defined by the {@link org.apache.calcite.plan.RelTrait} interface
+ *  Traits are used to validate plan output
+ *  {@link org.apache.calcite.plan.Convention}
+ *  {@link org.apache.calcite.rel.RelCollation}
+ *  {@link org.apache.calcite.rel.RelDistribution}
+ *
+ *  ## Convention
+ *      Convention is a type of RelTrait, it is associated with a
+ *      RelNode interface
+ *
+ *      Conventions are used to represent a single data source.
+ *
+ *      Inputs to a relational expression must be in the same convention.
+ *
+ *  # Rules
+ *  Rules are used to modify query plans.
+ *
+ *  Defined by the {@link org.apache.calcite.plan.RelOptRule} interface
+ *
+ *  Rules are matched to elements of a query plan using pattern matching
+ *  {@link org.apache.calcite.plan.RelOptRuleOperand}
+ *
+ *      ## Converter
+ *      Converter rules implement {@link org.apache.calcite.rel.convert.Converter}
+ *      and convert from one convention to another
+ *
+ *      Converter rules applied via convert()
+ *
+ *      ## Transformer
+ *      onMatch() is called for matched rules
+ *
+ *      call.transformTo()
+ *
+ *  # Planners
+ *  {@link org.apache.calcite.plan.volcano.VolcanoPlanner}
+ *  {@link org.apache.calcite.plan.hep.HepPlanner}
+ *
+ *  # Program
+ *  {@link org.apache.calcite.tools.Program}
+ *
+ *  Program that transforms a relational expression into another relational expression.
+ *  A planner is a sequence of programs, each of which is sometimes called a "phase".
+ *
+ *  The most typical program is an invocation of the volcano planner with a particular RuleSet.
+ *
+ */
 public class VoltDBRules {
 
     public static RelOptRule[] VOLCANO_RULES_0 = {
             // Calcite's Logical Rules
+
+            /*
+            LogicalCalc
+
+            A relational expression which computes project expressions and also filters.
+            This relational expression combines the functionality of LogicalProject and LogicalFilter.
+            It should be created in the later stages of optimization,
+            by merging consecutive LogicalProject and LogicalFilter nodes together.
+
+            The following rules relate to LogicalCalc:
+
+            FilterToCalcRule creates this from a LogicalFilter
+            ProjectToCalcRule creates this from a LogicalFilter
+            FilterCalcMergeRule merges this with a LogicalFilter
+            ProjectCalcMergeRule merges this with a LogicalProject
+            CalcMergeRule merges two LogicalCalcs
+             */
             CalcMergeRule.INSTANCE
             , FilterCalcMergeRule.INSTANCE
             , FilterToCalcRule.INSTANCE
@@ -103,6 +199,8 @@ public class VoltDBRules {
             , VoltDBPAggregateExchangeTransposeRule.INSTANCE_3
     };
 
+
+    // TODO: this rule set never used
     public static RelOptRule[] INLINING_RULES = {
             // VoltDB Inline Rules. The rules order declaration
             // has to match the order of rels from a real plan produced by the previous stage.

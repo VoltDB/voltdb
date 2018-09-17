@@ -32,6 +32,7 @@ public class VoltDBLSortRule extends RelOptRule {
 
         public static final VoltDBLSortRule INSTANCE = new VoltDBLSortRule();
 
+        // declare want kind of operand we should match
         VoltDBLSortRule() {
             super(operand(LogicalSort.class, Convention.NONE, any()));
         }
@@ -51,7 +52,7 @@ public class VoltDBLSortRule extends RelOptRule {
                         convertedInput,
                         sort.getCollation());
             }
-            // TODO: Chao: why split it to two phases?
+            // why split it to two phases? why instead of single VoltDBLSort we need VoltDBLSort and VoltDBLLimit
             if (sort.offset != null || sort.fetch != null) {
                 RelNode limitInput = (logicalRel != null) ? logicalRel : convertedInput;
                 logicalRel = new VoltDBLLimit(

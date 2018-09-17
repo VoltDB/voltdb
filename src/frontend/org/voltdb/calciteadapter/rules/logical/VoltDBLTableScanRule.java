@@ -37,6 +37,7 @@ public class VoltDBLTableScanRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         VoltDBLTableScan tableScan = (VoltDBLTableScan) call.rel(0);
         RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
+        // The only change is replace(VoltDBLRel.VOLTDB_LOGICAL)
         call.transformTo(new VoltDBLTableScan(
                 tableScan.getCluster(),
                 convertedTraits,
