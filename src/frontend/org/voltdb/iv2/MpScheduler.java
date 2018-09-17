@@ -492,6 +492,7 @@ public class MpScheduler extends Scheduler
 
                 // Update the DuplicateCounter with new replica
                 counter.updateReplica(message.m_sourceHSId, newLeader);
+                m_leaderMigrationMap.clear();
             } else {
                 // Leader migration not done yet.
                 m_mailbox.send(message.m_sourceHSId, (Iv2InitiateTaskMessage)counter.getOpenMessage());
