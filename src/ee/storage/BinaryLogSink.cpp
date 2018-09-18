@@ -647,7 +647,7 @@ int64_t BinaryLogSink::apply(const char *rawLogs,
         int32_t remoteClusterId, int64_t localUniqueId) {
     int32_t logCount = BinaryLog::readRawInt(rawLogs);
     rawLogs += sizeof(int32_t);
-    int64_t rowCount;
+    int64_t rowCount = 0;
 
     if (logCount == 1) {
         // Optimization for single log
@@ -661,7 +661,7 @@ int64_t BinaryLogSink::apply(const char *rawLogs,
         rowCount = applyMpTxn(rawLogs, logCount, tables, pool, engine, remoteClusterId, localUniqueId);
     }
 
-    VOLT_DEBUG("Completed applying %d log(s) resulting in %jd rows", logCount, rowCount);
+    VOLT_DEBUG("Completed applying %d log(s) resulting in %jd rows", logCount, (intmax_t ) rowCount);
     return rowCount;
 }
 
