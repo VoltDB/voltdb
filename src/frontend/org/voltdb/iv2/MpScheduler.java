@@ -194,8 +194,8 @@ public class MpScheduler extends Scheduler
     }
 
     private void applyLeaderMigration(final List<Long> updatedReplicas, boolean balanceSPI) {
-        m_leaderMigrationMap.clear();
         if (!balanceSPI || !m_isLeader) {
+            m_leaderMigrationMap.clear();
             return;
         }
 
@@ -497,7 +497,7 @@ public class MpScheduler extends Scheduler
             if (newLeader != null) {
                 // Update the DuplicateCounter with new replica
                 counter.updateReplica(message.m_sourceHSId, newLeader);
-                m_leaderMigrationMap.clear();
+                m_leaderMigrationMap.remove(message.m_sourceHSId);
 
                 // Leader migration has updated the leader, send the request to the new leader
                 m_mailbox.send(newLeader, (Iv2InitiateTaskMessage)counter.getOpenMessage());
