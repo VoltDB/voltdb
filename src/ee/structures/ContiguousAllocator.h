@@ -19,7 +19,6 @@
 #define CONTIGUOUSALLOCATOR_H_
 
 #include <cstdlib>
-#include "common/debuglog.h"
 
 namespace voltdb {
 
