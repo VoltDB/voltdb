@@ -15,22 +15,15 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.newplanner.guards;
+package org.voltdb.calciteadapter.rel.logical;
+
+import org.apache.calcite.plan.Convention;
+import org.apache.calcite.rel.RelNode;
 
 /**
- * A check that always fail.
- * @author Yiqun Zhang
- * @since 8.4
+ * From Mike A. A RelNode interface added with calling convention trait.
  */
-public class AlwaysFail extends CalciteCheck {
+public interface VoltDBLRel extends RelNode  {
+    final static Convention VOLTDB_LOGICAL = new Convention.Impl("VOLTDB_LOGICAL", VoltDBLRel.class);
 
-    @Override
-    protected boolean doCheck(String sql) {
-        return false;
-    }
-
-    @Override
-    protected boolean isNegativeCheck() {
-        return false;
-    }
 }

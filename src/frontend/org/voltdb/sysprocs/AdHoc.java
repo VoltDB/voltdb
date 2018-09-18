@@ -25,7 +25,11 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
+import org.apache.calcite.sql.*;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
@@ -120,8 +124,8 @@ public class AdHoc extends AdHocNTBase {
 
         // at this point assume all DDL
         assert(mix == AdHocSQLMix.ALL_DDL);
-
-        return runDDLBatch(sqlStatements);
+        // Since we are not going through Calcite, there is no need to update CalciteSchema.
+        return runDDLBatch(sqlStatements, new ArrayList<>());
     }
 
     /**
@@ -132,10 +136,17 @@ public class AdHoc extends AdHocNTBase {
      * @author Yiqun Zhang
      */
     private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(SqlBatch batch) {
-        return null;
+        // We batch SqlNode with original SQL DDL stmts together, because we need both.
+        final List<Pair<String, SqlNode>> args =
+                StreamSupport.stream(batch.spliterator(), false)
+                .map(task -> Pair.of(task.getSQL(), task.getParsedQuery()))
+                .collect(Collectors.toList());
+        return runDDLBatch(args.stream().map(Pair::getFirst).collect(Collectors.toList()),
+                args.stream().map(Pair::getSecond).collect(Collectors.toList()));
     }
 
-    private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements) {
+
+    private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes) {
         // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
         SortedSet<String> conflictTables = new TreeSet<String>();
         Set<String> createdTables = new HashSet<String>();
@@ -199,7 +210,7 @@ public class AdHoc extends AdHocNTBase {
         return updateApplication("@AdHoc",
                                 null,
                                 null,
-                                sqlStatements.toArray(new String[0]),
+                                sqlStatements.toArray(new String[0]), sqlNodes,
                                 null,
                                 false,
                                 true);

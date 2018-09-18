@@ -22,7 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.voltdb.newplanner.guards.AlwaysFail;
+import org.voltdb.newplanner.guards.RealCalciteCheck;
 import org.voltdb.newplanner.guards.AlwaysPassThrough;
 import org.voltdb.newplanner.guards.CalciteCheck;
 import org.voltdb.newplanner.guards.NoLargeQuery;
@@ -56,7 +56,7 @@ public class SqlBatchImpl implements SqlBatch {
      */
     static {
         s_calcitePass.addNext(new NoLargeQuery())
-                     .addNext(new AlwaysFail());
+                     .addNext(new RealCalciteCheck());
     }
 
     /**

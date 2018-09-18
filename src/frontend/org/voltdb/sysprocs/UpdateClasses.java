@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltcore.logging.VoltLogger;
@@ -45,11 +46,11 @@ public class UpdateClasses extends UpdateApplicationBase {
         }
 
         logCatalogUpdateInvocation("@UpdateClasses");
-
+        // NOTE/TODO: this is not from AdHoc code branch. We use the old code path here, and don't update CalciteSchema from VoltDB catalog.
         return updateApplication("@UpdateClasses",
                                 jarfileBytes,
                                 classesToDeleteSelector,
-                                new String[0],
+                                new String[0], new ArrayList<>(),
                                 null,
                                 false, /* isPromotion */
                                 useDDLSchema);
