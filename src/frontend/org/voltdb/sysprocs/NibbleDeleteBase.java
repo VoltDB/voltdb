@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.DefaultProcedureManager;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
@@ -188,7 +189,7 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
         ComparisonOperation op = ComparisonOperation.fromString(compStr);
 
         ProcedureRunner pr = ctx.getSiteProcedureConnection().getNibbleDeleteProcRunner(
-                tableName + ".nibbledelete", catTable, column, op);
+                tableName + "." + DefaultProcedureManager.NIBBLE_DELETE_PROC, catTable, column, op);
         Procedure newCatProc = pr.getCatalogProcedure();
 
         Statement countStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "0");

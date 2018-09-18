@@ -64,7 +64,7 @@ public class ExplainProc extends AdHocNTBase {
                             "Procedure " + procName + " not in catalog");
                 }
                 String nibbledelete = procName.split("\\.")[1];
-                if (!nibbledelete.equals("nibbledelete")) {
+                if (!nibbledelete.equals(DefaultProcedureManager.NIBBLE_DELETE_PROC)) {
                     String sql = DefaultProcedureManager.sqlForDefaultProc(proc);
                     List<String> sqlStatements = new ArrayList<>(1);
                     sqlStatements.add(sql);
