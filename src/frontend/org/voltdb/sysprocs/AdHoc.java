@@ -26,23 +26,25 @@ import java.util.stream.StreamSupport;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.*;
 import org.apache.calcite.sql.ddl.SqlColumnDeclaration;
+import org.apache.calcite.sql.ddl.SqlColumnDeclarationWithExpression;
 import org.apache.calcite.sql.ddl.SqlCreateTable;
-import org.apache.calcite.sql.parser.SqlParseException;
-import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.dialect.CalciteSqlDialect;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
-import org.voltdb.calciteadapter.rel.VoltDBTable;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.DDLCompiler;
+import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.newplanner.SqlBatch;
 import org.voltdb.newplanner.SqlTask;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.sysprocs.org.voltdb.calciteadapter.ColumnType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -140,8 +142,8 @@ public class AdHoc extends AdHocNTBase {
 
         // at this point assume all DDL
         assert(mix == AdHocSQLMix.ALL_DDL);
-
-        return runDDLBatch(sqlStatements);
+        // Since we are not going through Calcite, there is no need to update CalciteSchema.
+        return runDDLBatch(sqlStatements, new ArrayList<>());
     }
 
     /**
@@ -152,15 +154,122 @@ public class AdHoc extends AdHocNTBase {
      * @author Yiqun Zhang
      */
     private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(SqlBatch batch) {
-        // For now let's keep using the pre-existing parser for DDL.
-        List<String> sqlStatements = new ArrayList<>(batch.getTaskCount());
-        for (SqlTask task : batch) {
-            sqlStatements.add(task.getSQL());
-        }
-        return runDDLBatch(sqlStatements);
+        // We batch SqlNode with original SQL DDL stmts together, because we need both.
+        final List<Pair<String, SqlNode>> args =
+                StreamSupport.stream(((Iterable<SqlTask>) () -> batch.iterator()).spliterator(), false)
+                .map(task -> Pair.of(task.getSQL(), task.getParsedQuery()))
+                .collect(Collectors.toList());
+        return runDDLBatch(args.stream().map(Pair::getFirst).collect(Collectors.toList()),
+                args.stream().map(Pair::getSecond).collect(Collectors.toList()));
     }
 
-    private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements) {
+    private static Pair<Integer, Boolean> validateVarLenColumn(VoltType vt, String tableName, String colName, int size, boolean inBytes) {
+        if (size < 0) {        // user did not provide, e.g. CREATE TABLE t(i VARCHAR);
+            size = vt.defaultLengthForVariableLengthType();
+        } else if (size > VoltType.MAX_VALUE_LENGTH) {
+            throw new PlanningErrorException(String.format("%s column %s in table %s has unsupported length %s",
+                    vt.toSQLString(), colName, VoltType.humanReadableSize(size)));
+        } else if (vt == VoltType.STRING && size > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
+            System.err.println(String.format(
+                    "The size of VARCHAR column %s in table %s greater than %d " +
+                            "will be enforced as byte counts rather than UTF8 character counts. " +
+                            "To eliminate this warning, specify \"VARCHAR(%s BYTES)\"",
+                    colName, tableName, VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS,
+                    VoltType.humanReadableSize(size)));
+            inBytes = true;
+        } else if (size < vt.getMinLengthInBytes()) {
+            throw new PlanningErrorException(String.format(
+                    "%s column %s in table %s has length of %d which is shorter than %d, the minimum length allowed for the type.",
+                    vt.toSQLString(), colName, tableName, size, vt.getMinLengthInBytes()));
+        }
+        if (vt == VoltType.STRING && ! inBytes &&
+                size * DDLCompiler.MAX_BYTES_PER_UTF8_CHARACTER > VoltType.MAX_VALUE_LENGTH) {
+            throw new PlanningErrorException(String.format(
+                    "Column %s.%s specifies a maixmum size of %d characters but the maximum supported size is %s characters or %s bytes",
+                    tableName, colName, size,
+                    VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH / DDLCompiler.MAX_BYTES_PER_UTF8_CHARACTER),
+                    VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH)));
+        }
+        return Pair.of(size, inBytes);
+    }
+
+    private static void updateAndValidateRowSize(String tableName, VoltType vt, AtomicInteger rowSize, int colSize, boolean inBytes) {
+        final int delta;
+        if (vt.isVariableLength()) {
+            delta = 4 + colSize * (inBytes ? 4 : 1);
+        } else {
+            delta = colSize;
+        }
+        if (rowSize.addAndGet(delta) > DDLCompiler.MAX_ROW_SIZE) {
+            throw new PlanningErrorException(String.format(
+                    "Error: table %s has a maximum row size of %s but the maximum supported size is %s",
+                    tableName, VoltType.humanReadableSize(rowSize.get()), VoltType.humanReadableSize(DDLCompiler.MAX_ROW_SIZE)));
+        }
+    }
+
+    public static SchemaPlus addTable(SqlNode node, Database db) {
+        if (node.getKind() != SqlKind.CREATE_TABLE) {           // for now, only patially support CREATE TABLE stmt
+            return CatalogAdapter.schemaPlusFromDatabase(db);
+        }
+       final List<SqlNode> nameAndColListAndQuery = ((SqlCreateTable) node).getOperandList();
+       final String tableName = nameAndColListAndQuery.get(0).toString();
+       final SqlNodeList nodeTableList = (SqlNodeList) nameAndColListAndQuery.get(1);
+       final Table t = db.getTables().add(tableName);
+       t.setAnnotation(new TableAnnotation());
+       ((TableAnnotation) t.getAnnotation()).ddl =      // NOTE: Calcite dialect double-quotes all table/column names. Might not be compatible with our canonical DDL?
+               node.toSqlString(CalciteSqlDialect.DEFAULT).toString();
+       t.setTuplelimit(Integer.MAX_VALUE);
+       t.setIsreplicated(true);
+
+       final AtomicInteger index = new AtomicInteger(0);
+       final SortedMap<Integer, VoltType> columnTypes = new TreeMap<>();
+
+       final int numCols = nodeTableList.getList().size();
+       if (numCols > DDLCompiler.MAX_COLUMNS) {
+           throw new PlanningErrorException(String.format("Table %s has %d columns (max is %d)",
+                   tableName, numCols, DDLCompiler.MAX_COLUMNS));
+       }
+       AtomicInteger rowSize = new AtomicInteger(0);
+       nodeTableList.forEach(c -> {
+          final List<SqlNode> nameAndType = ((SqlColumnDeclaration) c).getOperandList();
+          final String colName = nameAndType.get(0).toString();
+          final Column column = t.getColumns().add(colName);
+          column.setName(colName);
+
+          final SqlDataTypeSpec type = (SqlDataTypeSpec) nameAndType.get(1);
+          //final int scale = type.getScale();
+          int colSize = type.getPrecision();       // -1 when user did not provide.
+          final VoltType vt = ColumnType.getVoltType(type.getTypeName().toString());
+          column.setType(vt.getValue());
+          column.setNullable(type.getNullable());
+          // Validate user-supplied size (SqlDataTypeSpec.precision)
+           boolean inBytes = false;         // TODO: set it when user specified
+           if (vt.isVariableLength()) {     // user did not specify a size. Set to default value
+               final Pair<Integer, Boolean> r = validateVarLenColumn(vt, tableName, colName, colSize, inBytes);
+               colSize = r.getFirst();
+               inBytes = r.getSecond();
+           } else {
+               colSize = vt.getLengthInBytesForFixedTypesWithoutCheck();
+           }
+          updateAndValidateRowSize(tableName, vt, rowSize, colSize, inBytes);
+          column.setSize(colSize);
+          column.setIndex(index.getAndIncrement());
+          columnTypes.put(index.get(), vt);
+          column.setInbytes(inBytes);
+          final SqlNode expr = new SqlColumnDeclarationWithExpression((SqlColumnDeclaration) c).getExpression();
+          if (expr != null) {
+              column.setDefaulttype(vt.getValue());
+              column.setDefaultvalue(expr.toString());
+          } else {
+              column.setDefaultvalue(null);
+          }
+       });
+       t.setSignature(CatalogUtil.getSignatureForTable(tableName, columnTypes));
+       return CatalogAdapter.schemaPlusFromDatabase(db);
+    }
+
+
+    private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes) {
         // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
         SortedSet<String> conflictTables = new TreeSet<>();
         Set<String> createdTables = new HashSet<>();
@@ -224,8 +333,7 @@ public class AdHoc extends AdHocNTBase {
         return updateApplication("@AdHoc",
                                 null,
                                 null,
-                                //sqlStatements.toArray(new String[0]),
-                sqlStatements.stream().filter(stmt -> !SQLLexer.extractDDLToken(stmt).equals("create")).collect(Collectors.toList()).toArray(new String[0]),
+                                sqlStatements.toArray(new String[0]), sqlNodes,
                                 null,
                                 false,
                                 true);

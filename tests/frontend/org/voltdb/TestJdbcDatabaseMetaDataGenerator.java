@@ -24,6 +24,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -524,7 +525,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         c.addClassToJar(jar, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
         c.addClassToJar(jar, org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc.class);
         c.addClassToJar(jar, org.voltdb_testprocs.fullddlfeatures.NoMeaningClass.class);
-        c.compileInMemoryJarfileWithNewDDL(jar, "create procedure from class org.voltdb_testprocs.fullddlfeatures.testImportProc;", c.getCatalog());
+        c.compileInMemoryJarfileWithNewDDL(jar, "create procedure from class org.voltdb_testprocs.fullddlfeatures.testImportProc;", new ArrayList<>(), c.getCatalog());
 
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, jar);

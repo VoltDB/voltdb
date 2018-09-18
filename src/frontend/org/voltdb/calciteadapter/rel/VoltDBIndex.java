@@ -39,6 +39,17 @@ import java.util.List;
 
 import static org.voltdb.calciteadapter.rel.VoltDBTable.toRelDataType;
 
+/**
+ * This is an adaptor between <code>org.voltdb.catalog.Index</code> and
+ * <code>org.apache.calcite.schema.Table</code>, that wraps a Volt index
+ * and expose to calcite planner.
+ *
+ * In the Calcite world, an index is a special subtype of table. Currently
+ * Mike A. retrieves index directly from VoltDB catalog, but it should be
+ * better to retrieve from Calcite's <code>SchemaPlus</code> instead.
+ *
+ * Not in use/tested.
+ */
 public class VoltDBIndex implements Table {
     private final Index m_catIndex;
 

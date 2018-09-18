@@ -44,7 +44,7 @@ public class SqlTask {
         }
         m_sqlString = sql;
         SqlParser parser = ParserFactory.create(sql);
-        m_parsedQuery = parser.parseStmt();
+        m_parsedQuery = parser.parseStmt();     // TODO: VoltDB extended syntax fails on this stmt
     }
 
     /**

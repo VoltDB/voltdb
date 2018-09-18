@@ -26,16 +26,21 @@ import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 
+/**
+ * This is from Mike A. as an adaptor <code>org.apache.calcite.rel.core.TableScan</code> that
+ * views a <code>org.voltdb.calciteadapter.rel.VoltDBTable</code> as a relational expression.
+ */
 public abstract class AbstractVoltDBTableScan extends TableScan {
 
     protected final VoltDBTable m_voltDBTable;
 
     protected AbstractVoltDBTableScan(RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelOptTable table,
-            VoltDBTable voltDBTable) {
-          super(cluster, traitSet, table);
-          this.m_voltDBTable = voltDBTable;
+                                      RelTraitSet traitSet,
+                                      RelOptTable table,
+                                      VoltDBTable voltDBTable) {
+        super(cluster, traitSet, table);
+        assert(voltDBTable != null) : "VoltDB Table is null";
+        this.m_voltDBTable = voltDBTable;
     }
 
     /**
@@ -62,7 +67,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan {
 
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner,
-            RelMetadataQuery mq) {
+                                      RelMetadataQuery mq) {
         double dRows = estimateRowCount(mq);
         double dCpu = dRows + 1; // ensure non-zero cost
         double dIo = 0;

@@ -15,12 +15,23 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rel.logical;
+package org.apache.calcite.sql.ddl;
 
-import org.apache.calcite.plan.Convention;
-import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.sql.SqlNode;
 
-public interface VoltDBLRel extends RelNode  {
-    final static Convention VOLTDB_LOGICAL = new Convention.Impl("VOLTDB_LOGICAL", VoltDBLRel.class);
-
+/**
+ * This class adds an accessor method for the package-private member
+ * <code>org.apache.calcite.sql.SqlNode.SqlColumnDeclaration#expression</code>.
+ */
+public final class SqlColumnDeclarationWithExpression extends SqlColumnDeclaration {
+   public SqlColumnDeclarationWithExpression(SqlColumnDeclaration declaration) {
+      super(declaration.getParserPosition(),
+              declaration.name,
+              declaration.dataType,
+              declaration.expression,
+              declaration.strategy);
+   }
+   public SqlNode getExpression() {
+      return expression;
+   }
 }

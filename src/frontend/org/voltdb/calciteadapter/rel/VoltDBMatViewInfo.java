@@ -1,3 +1,20 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2018 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.voltdb.calciteadapter.rel;
 
 import org.apache.calcite.config.CalciteConnectionConfig;
@@ -22,6 +39,18 @@ import java.util.List;
 
 import static org.voltdb.calciteadapter.rel.VoltDBTable.toRelDataType;
 
+/**
+ * This is an adaptor between <code>org.voltdb.catalog.MaterializedViewInfo</code> and
+ * <code>org.apache.calcite.schema.Table</code>, that wraps a Volt materialized view info
+ * and expose to calcite planner. The <code>org.voltdb.catalog.Table#m_views</code> member
+ * stores all the MVs associated with the hosting <code>org.voltdb.catalog.Table</code>.
+ *
+ * In the Calcite world, a MV is a special subtype of table. Currently
+ * Mike A. retrieves index directly from VoltDB catalog, but it should be
+ * better to retrieve from Calcite's <code>SchemaPlus</code> instead.
+ *
+ * Not in use/tested.
+ */
 public class VoltDBMatViewInfo implements Table {
     private final MaterializedViewInfo m_catMVInfo;
     VoltDBMatViewInfo(MaterializedViewInfo info) {
@@ -36,7 +65,7 @@ public class VoltDBMatViewInfo implements Table {
     public RelDataType getRowType(RelDataTypeFactory typeFactory) {
         return new RelDataTypeFactory.Builder(typeFactory) {{
             CatalogUtil
-                    .getSortedCatalogItems(getCatMVInfo().getGroupbycols(), "index")
+                    .getSortedCatalogItems(getCatMVInfo().getGroupbycols(), "views")
                     .forEach(catGbyColumnRef -> {
                         final Column col = catGbyColumnRef.getColumn();
                         add(col.getName(), typeFactory.createTypeWithNullability(toRelDataType(typeFactory,

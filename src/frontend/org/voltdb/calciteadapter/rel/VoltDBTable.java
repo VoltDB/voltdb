@@ -44,6 +44,13 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 import org.voltdb.catalog.Column;
 import org.voltdb.utils.CatalogUtil;
 
+/**
+ * This comes from Mike A. It is an adaptor between VoltDB catalog table and
+ * <code>org.apache.calcite.schema.TranslateableTable</code>
+ * A Calcite table that is <em>translatable</em> can be translated into a relational expression
+ * ({code}org.apache.calcite.rel.RelNode{\code}), which fulfills roles to be:
+ * sortable, join-able, project-able, filterable, scan-able and sample-able.
+ */
 public class VoltDBTable implements TranslatableTable {
 
     final private org.voltdb.catalog.Table m_catTable;

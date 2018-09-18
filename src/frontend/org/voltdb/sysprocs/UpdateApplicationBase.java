@@ -19,12 +19,14 @@ package org.voltdb.sysprocs;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.calcite.sql.SqlNode;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -87,6 +89,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                     final byte[] operationBytes,
                                                                     final String operationString,
                                                                     final String[] adhocDDLStmts,
+                                                                    final List<SqlNode> sqlNodes,
                                                                     final byte[] replayHashOverride,
                                                                     final boolean isPromotion,
                                                                     final boolean useAdhocDDL,
@@ -157,7 +160,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             else if ("@AdHoc".equals(invocationName)) {
                 // work.adhocDDLStmts should be applied to the current catalog
                 try {
-                    newCatalogJar = addDDLToCatalog(context.catalog, oldJar, adhocDDLStmts, drRole == DrRoleType.XDCR);
+                    newCatalogJar = addDDLToCatalog(context.catalog, oldJar, adhocDDLStmts, sqlNodes, drRole == DrRoleType.XDCR);
                 }
                 catch (IOException | VoltCompilerException e) {
                     retval.errorMsg = e.getMessage();
@@ -303,7 +306,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      * jarfile
      * @throws VoltCompilerException
      */
-    protected static InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile, String[] adhocDDLStmts, boolean isXDCR)
+    protected static InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile, String[] adhocDDLStmts, List<SqlNode> sqlNodes, boolean isXDCR)
     throws IOException, VoltCompilerException
     {
         StringBuilder sb = new StringBuilder();
@@ -317,7 +320,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
 
         VoltCompiler compiler = new VoltCompiler(isXDCR);
-        compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
+        compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, sqlNodes, oldCatalog);
         return jarfile;
     }
 
@@ -476,6 +479,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                                                                   final byte[] operationBytes,
                                                                   final String operationString,
                                                                   final String[] adhocDDLStmts,
+                                                                  final List<SqlNode> sqlNodes,
                                                                   final byte[] replayHashOverride,
                                                                   final boolean isPromotion,
                                                                   final boolean useAdhocDDL)
@@ -494,7 +498,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             ccr = prepareApplicationCatalogDiff(invocationName,
                                                 operationBytes,
                                                 operationString,
-                                                adhocDDLStmts,
+                                                adhocDDLStmts, sqlNodes,
                                                 replayHashOverride,
                                                 isPromotion,
                                                 useAdhocDDL,
