@@ -91,6 +91,11 @@ public class DuplicateCounter
         }
     }
 
+    public void updateReplica (Long previousMaster, Long newMaster){
+        m_expectedHSIds.remove(previousMaster);
+        m_expectedHSIds.add(newMaster);
+    }
+
     void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage, int misMatchPos) {
         if (misMatchPos >= 0) {
             ((InitiateResponseMessage) recentMessage).setMismatchPos(misMatchPos);
