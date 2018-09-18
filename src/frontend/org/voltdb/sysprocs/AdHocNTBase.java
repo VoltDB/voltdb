@@ -337,6 +337,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
     /**
      * Plan and execute a batch of DML/DQL SQL. Any DDL has been filtered out at this point.
+     * TODO: complete this comment block.
      */
     protected CompletableFuture<ClientResponse>
               runNonDDLAdHocThroughCalcite(CatalogContext context,

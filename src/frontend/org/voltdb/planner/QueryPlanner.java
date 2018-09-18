@@ -269,6 +269,16 @@ public class QueryPlanner implements AutoCloseable {
         return m_paramzInfo.extractedParamValues(parameterTypes);
     }
 
+    public CompiledPlan planWithCalcite() throws PlanningErrorException {
+        // TRAIL [Calcite:5] QueryPlanner.planWithCalcite()
+        // reset any error message
+        m_recentErrorMsg = null;
+//        CompiledPlan plan = CalcitePlanner.plan(m_db, m_sql, m_procName + m_stmtName, m_isLargeQuery);
+//        fragmentizePlan(plan);
+//        return plan;
+        return null;
+    }
+
     /**
      * Get the best plan for the SQL statement given, assuming the given costModel.
      *

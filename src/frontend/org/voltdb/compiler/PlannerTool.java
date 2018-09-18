@@ -186,7 +186,7 @@ public class PlannerTool {
             String sql, SqlNode sqlNode, StatementPartitioning partitioning,
             boolean isExplainMode, final Object[] userParams,
             boolean isSwapTables, boolean isLargeQuery) {
-        // TRAIL [Calcite:4] planSqlWithCalcite
+        // TRAIL [Calcite:4] PlannerTool.planSqlWithCalcite()
         // large_mode_ratio will force execution of SQL queries to use the "large" path (for read-only queries)
         // a certain percentage of the time
         if (m_largeModeRatio > 0 && !isLargeQuery) {
@@ -325,7 +325,7 @@ public class PlannerTool {
                 }
 
                 // If not caching or there was no cache hit, do the expensive full planning.
-                plan = planner.plan();
+                plan = planner.planWithCalcite();
                 if (plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
