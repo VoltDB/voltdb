@@ -54,10 +54,14 @@
  * eliminate all instructions in the final binary.
 */
 
+#include "common/ThreadLocalPool.h"
+
 #include <string>
 #include <ctime>
 #include <cstdio>
 #include <vector>
+#include <sys/time.h>
+
 namespace voltdb {
 
 // Log levels.
@@ -69,7 +73,7 @@ namespace voltdb {
 #define VOLT_LEVEL_TRACE  100
 #define VOLT_LEVEL_ALL    0
 
-#define VOLT_LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
+#define VOLT_LOG_TIME_FORMAT "%Y-%m-%d %T"
 
 // Compile Option
 #ifndef VOLT_LOG_LEVEL
@@ -86,7 +90,26 @@ namespace voltdb {
     #define __FUNCTION__ ""
 #endif
 
-void outputLogHeader(const char *file, int line, const char *func, int level);
+#define VOLT_LOG_START(lvl, msg, ...) do {                                      \
+        struct timeval __now__;                                                 \
+        ::gettimeofday(&__now__, NULL);                                         \
+        tm *__curTime__ = localtime(&__now__.tv_sec);                           \
+        char __time_str__[32];                                                  \
+        ::strftime(__time_str__, 32, VOLT_LOG_TIME_FORMAT, __curTime__);        \
+        ::printf("[%s] [T%d:E%d] [%s:%d:%s()] %s,%03jd - " msg "\n", lvl,       \
+                voltdb::ThreadLocalPool::getThreadPartitionIdWithNullCheck(),   \
+                voltdb::ThreadLocalPool::getEnginePartitionIdWithNullCheck(),   \
+                __FILE__, __LINE__, __FUNCTION__,                               \
+                __time_str__, (intmax_t) __now__.tv_usec / 1000, ##__VA_ARGS__);\
+    } while (0)
+
+#define VOLT_LOG_END ::fflush(stdout)
+
+#define VOLT_LOG(...) VOLT_LOG_START(__VA_ARGS__); VOLT_LOG_END
+
+#define VOLT_LOG_STACK(lvl) VOLT_LOG_START(lvl, "STACK TRACE");             \
+    voltdb::StackTrace::printStackTrace();                                  \
+    VOLT_LOG_END
 
 // Two convenient macros for debugging
 // 1. Logging macros.
@@ -97,10 +120,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_ERROR
     #define VOLT_ERROR_ENABLED
     //#pragma message("VOLT_ERROR was enabled.")
-    #define VOLT_ERROR(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_ERROR); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_ERROR_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_ERROR); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_ERROR(...) VOLT_LOG("ERROR", __VA_ARGS__)
+    #define VOLT_ERROR_STACK() VOLT_LOG_STACK("ERROR")
 #else
     #define VOLT_ERROR(...) ((void)0)
     #define VOLT_ERROR_STACK() ((void)0)
@@ -112,10 +133,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_WARN
     #define VOLT_WARN_ENABLED
     //#pragma message("VOLT_WARN was enabled.")
-    #define VOLT_WARN(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_WARN); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_WARN_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_WARN); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_WARN(...) VOLT_LOG("WARN", __VA_ARGS__)
+    #define VOLT_WARN_STACK() VOLT_LOG_STACK("WARN")
 #else
     #define VOLT_WARN(...) ((void)0)
     #define VOLT_WARN_STACK() ((void)0)
@@ -127,10 +146,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_INFO
     #define VOLT_INFO_ENABLED
     //#pragma message("VOLT_INFO was enabled.")
-    #define VOLT_INFO(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_INFO); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_INFO_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_INFO); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_INFO(...) VOLT_LOG("INFO", __VA_ARGS__)
+    #define VOLT_INFO_STACK() VOLT_LOG_STACK("INFO")
 #else
     #define VOLT_INFO(...) ((void)0)
     #define VOLT_INFO_STACK() ((void)0)
@@ -142,10 +159,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_DEBUG
     #define VOLT_DEBUG_ENABLED
     //#pragma message("VOLT_DEBUG was enabled.")
-    #define VOLT_DEBUG(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_DEBUG); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_DEBUG_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_DEBUG); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_DEBUG(...) VOLT_LOG("DEBUG", __VA_ARGS__)
+    #define VOLT_DEBUG_STACK() VOLT_LOG_STACK("DEBUG")
 #else
     #define VOLT_DEBUG(...) ((void)0)
     #define VOLT_DEBUG_STACK() ((void)0)
@@ -157,10 +172,8 @@ void outputLogHeader(const char *file, int line, const char *func, int level);
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
     #define VOLT_TRACE_ENABLED
     //#pragma message("VOLT_TRACE was enabled.")
-    #define VOLT_TRACE(...) voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_TRACE); \
-            ::printf(__VA_ARGS__);printf("\n");::fflush(stdout)
-    #define VOLT_TRACE_STACK() voltdb::outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_TRACE); \
-            ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+    #define VOLT_TRACE(...) VOLT_LOG("TRACE", __VA_ARGS__); VOLT_LOG_END
+    #define VOLT_TRACE_STACK() VOLT_LOG_STACK("TRACE")
 #else
     #define VOLT_TRACE(...) ((void)0)
     #define VOLT_TRACE_STACK() ((void)0)
@@ -193,8 +206,7 @@ private:
     std::vector<std::string> m_traces;
 };
 
-#define PRINT_STACK_TRACE() outputLogHeader(__FILE__, __LINE__, __FUNCTION__, VOLT_LEVEL_ALL); \
-        ::printf("STACK TRACE\n");voltdb::StackTrace::printStackTrace();::fflush(stdout)
+#define PRINT_STACK_TRACE() VOLT_LOG_STACK("UNKWN")
 
 } // namespace voltdb
 
