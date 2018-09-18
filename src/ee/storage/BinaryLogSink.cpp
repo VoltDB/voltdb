@@ -652,8 +652,10 @@ int64_t BinaryLogSink::apply(const char *rawLogs,
     if (logCount == 1) {
         // Optimization for single log
         VOLT_DEBUG("Handling single binary log");
-        BinaryLog log(rawLogs);
-        rowCount = applyLog(&log, tables, pool, engine, remoteClusterId, localUniqueId);
+        boost::scoped_ptr<BinaryLog> log(BinaryLog::create(rawLogs));
+        if (log != NULL) {
+            rowCount = applyLog(log.get(), tables, pool, engine, remoteClusterId, localUniqueId);
+        }
     } else {
         VOLT_DEBUG("Handling multiple binary logs %d", logCount);
         rowCount = applyMpTxn(rawLogs, logCount, tables, pool, engine, remoteClusterId, localUniqueId);
@@ -817,7 +819,7 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, boost::unordered_map<int64_t, Pe
 
     DRRecordType type;
     int64_t rowCount = 0;
-    bool checkForSkip = log->m_hashFlag != TXN_PAR_HASH_REPLICATED && UniqueId::isMpUniqueId(localUniqueId);
+    bool checkForSkip = !log->isReplicatedTableLog() && UniqueId::isMpUniqueId(localUniqueId);
 
     while ((type = log->readRecordType()) != DR_RECORD_END_TXN) {
         assert(log->m_hashFlag != TXN_PAR_HASH_PLACEHOLDER);
