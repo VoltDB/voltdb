@@ -59,7 +59,12 @@ public class ExplainProc extends AdHocNTBase {
                 // check default procs and send them off to be explained using the regular
                 // adhoc explain process
                 proc = context.m_defaultProcs.checkForDefaultProcedure(procName);
-                if (proc != null) {
+                if (proc == null) {
+                    return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                            "Procedure " + procName + " not in catalog");
+                }
+                String nibbledelete = procName.split("\\.")[1];
+                if (!nibbledelete.equals("nibbledelete")) {
                     String sql = DefaultProcedureManager.sqlForDefaultProc(proc);
                     List<String> sqlStatements = new ArrayList<>(1);
                     sqlStatements.add(sql);
@@ -73,8 +78,6 @@ public class ExplainProc extends AdHocNTBase {
                             new Object[0]);
                 }
 
-                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
-                        "Procedure " + procName + " not in catalog");
             }
 
             vt[i] = new VoltTable(new VoltTable.ColumnInfo("STATEMENT_NAME", VoltType.STRING),
