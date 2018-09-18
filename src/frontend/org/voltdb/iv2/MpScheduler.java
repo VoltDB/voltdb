@@ -495,12 +495,12 @@ public class MpScheduler extends Scheduler
             tmLog.info("The message on the partition is misrouted. TxnID: " + TxnEgo.txnIdToString(message.getTxnId()));
             Long newLeader = m_leaderMigrationMap.get(message.m_sourceHSId);
             if (newLeader != null) {
-                // Leader migration has updated the leader, send the request to the new leader
-                m_mailbox.send(newLeader, (Iv2InitiateTaskMessage)counter.getOpenMessage());
-
                 // Update the DuplicateCounter with new replica
                 counter.updateReplica(message.m_sourceHSId, newLeader);
                 m_leaderMigrationMap.clear();
+
+                // Leader migration has updated the leader, send the request to the new leader
+                m_mailbox.send(newLeader, (Iv2InitiateTaskMessage)counter.getOpenMessage());
             } else {
                 // Leader migration not done yet.
                 m_mailbox.send(message.m_sourceHSId, (Iv2InitiateTaskMessage)counter.getOpenMessage());
