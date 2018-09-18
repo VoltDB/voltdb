@@ -513,12 +513,19 @@ public class TestJoinsSuite extends RegressionSuite {
         VoltTable result;
 
         query = "SELECT * FROM R1 LEFT JOIN R2 " +
-                "ON R1.A " + joinOp + " R2.C";
+                "ON R1.A " + joinOp + " R2.C ORDER BY R1.A DESC, R1.C DESC";
+        // Execution result:
+        // 2, 2, 2, NULL, NULL
+        // 1, 2, 1, NULL, NULL
+        // 1, 1, 1, NULL, NULL
+        // -1, 3, 3, NULL, NULL
         result = client.callProcedure("@AdHoc", query).getResults()[0];
         //* enable to debug */ System.out.println(result);
         assertEquals(4, result.getRowCount());
-        VoltTableRow row = result.fetchRow(2);
+        VoltTableRow row = result.fetchRow(1);
+        assertEquals(1, row.getLong(0));
         assertEquals(2, row.getLong(1));
+        assertEquals(1, row.getLong(2));
 
         client.callProcedure("R2.INSERT", 1, 1);
         client.callProcedure("R2.INSERT", 1, 3);
