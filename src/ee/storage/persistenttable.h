@@ -698,9 +698,6 @@ private:
 
     AbstractDRTupleStream* getDRTupleStream(ExecutorContext* ec) {
         if (isReplicatedTable()) {
-            if (ec->drStream()->drProtocolVersion() >= DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION) {
-                return (ec->m_partitionId == 0) ? ec->drStream() : NULL;
-            }
             return ec->drReplicatedStream();
         }
         return ec->drStream();
