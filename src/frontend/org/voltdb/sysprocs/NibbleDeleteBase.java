@@ -188,7 +188,7 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
         ComparisonOperation op = ComparisonOperation.fromString(compStr);
 
         ProcedureRunner pr = ctx.getSiteProcedureConnection().getNibbleDeleteProcRunner(
-                tableName + ".autogenNibbleDelete"+ op.toString(), catTable, column, op);
+                tableName + ".nibbledelete", catTable, column, op);
         Procedure newCatProc = pr.getCatalogProcedure();
 
         Statement countStmt = newCatProc.getStatements().get(VoltDB.ANON_STMT_NAME + "0");
