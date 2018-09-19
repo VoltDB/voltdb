@@ -299,7 +299,7 @@ public class LoadedProcedureSet {
             pr.setProcNameToLoadForFragmentTasks(newCatProc.getTypeName());
             m_defaultProcCache.put(procName, pr);
             // also list nibble delete into default procedures
-            m_defaultProcManager.m_defaultProcMap.put(procName, pr.getCatalogProcedure());
+            m_defaultProcManager.m_defaultProcMap.put(procName.toLowerCase(), pr.getCatalogProcedure());
         }
         return pr;
     }
