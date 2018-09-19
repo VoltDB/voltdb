@@ -51,7 +51,10 @@ public class MpPromoteAlgo implements RepairAlgo
     private final int m_deadHost;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private long m_maxSeenCompleteTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+
+    // A collection of interrupted transactions which should be repaired upon new MPI promotion
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
+
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -352,7 +355,6 @@ public class MpPromoteAlgo implements RepairAlgo
             //the transaction is marked as done and the state is removed. But sites may still have fragments in the backlog or site queue
             //which may block Scoreboard to release downstream transactions. The message would help clean the transaction state.
             String procName = ftm.getProcedureName();
-            boolean restartable = true;
             if (procName != null) {
                 final SystemProcedureCatalog.Config proc = SystemProcedureCatalog.listing.get(procName);
                 if (proc != null && !proc.isRestartable()) {
@@ -371,7 +373,6 @@ public class MpPromoteAlgo implements RepairAlgo
                             false);
                     rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
                     rollback.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
-                    restartable = false;
                 }
             }
 
@@ -382,10 +383,8 @@ public class MpPromoteAlgo implements RepairAlgo
             // 2) We don't want to perturb command logging and/or DR this close to the 3.0 release
             // 3) We don't guarantee the restarted results returned to the client
             // anyway, so not restarting the read is currently harmless.
-            // An abort response should have been sent to client for a non-restartble, the transaction should not be repaired.
-            //
-            boolean restart = !ftm.isReadOnly();
-            if (restart && !restartable) {
+            // 4) Do not restart an non-restartable transaction upon new MPI promotion
+            if (!ftm.isReadOnly() && rollback == null) {
                 Iv2InitiateTaskMessage initTaskMsg = ftm.getInitiateTask();
                 assert(initTaskMsg != null);
                 initTaskMsg.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
