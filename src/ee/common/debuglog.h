@@ -60,6 +60,7 @@
 #include <ctime>
 #include <cstdio>
 #include <vector>
+#include <chrono>
 #include <sys/time.h>
 
 namespace voltdb {
@@ -177,6 +178,46 @@ namespace voltdb {
 #else
     #define VOLT_TRACE(...) ((void)0)
     #define VOLT_TRACE_STACK() ((void)0)
+#endif
+
+#if VOLT_TIMER_ENABLED
+template<typename P>
+struct _TimerLevels {
+    std::chrono::duration<int64_t, P> error;
+    std::chrono::duration<int64_t, P> warn;
+    std::chrono::duration<int64_t, P> info;
+    std::chrono::duration<int64_t, P> debug;
+};
+
+#define __TIMER_LVLS_NAME(name) __ ## name ## TimerLevels
+
+// Define log levels based on timer duration. n: name of lvls struct, r: ratio for duration (milli, micro, ...),
+// e: error duration, w: warning duration, i: info duration, d: debug duration
+#define TIMER_LVLS(n, r, e, w, i, d) const static struct _TimerLevels<std::r> __TIMER_LVLS_NAME(n) = {    \
+        .error = std::chrono::r##seconds(e), .warn = std::chrono::r##seconds(w),                          \
+        .info = std::chrono::r##seconds(i), .debug = std::chrono::r##seconds(d) };
+
+#define __TIMER_NAME(name) __ ## name ## StartTime
+
+// Start a timer with given name
+#define START_TIMER(name) auto __TIMER_NAME(name) = std::chrono::steady_clock::now()
+
+#define __TIMER_LOG(lvl, strfmt, duration, ...) do { VOLT_ ## lvl("Took %ld ns: " \
+        strfmt, duration.count(), ##__VA_ARGS__); } while (0)
+
+// Stop a timer with name and log at appropriate log level as defined by lvls.
+// strfmt: format string to log, and arguments for format string
+#define STOP_TIMER(name, lvls, strfmt, ...)  do {                                                                      \
+        auto __duration__ = std::chrono::steady_clock::now() - __TIMER_NAME(name);                                     \
+        if (__duration__ > __TIMER_LVLS_NAME(lvls).error) __TIMER_LOG(ERROR, strfmt, __duration__, ##__VA_ARGS__);     \
+        else if (__duration__ > __TIMER_LVLS_NAME(lvls).warn) __TIMER_LOG(WARN, strfmt, __duration__, ##__VA_ARGS__);  \
+        else if (__duration__ > __TIMER_LVLS_NAME(lvls).info) __TIMER_LOG(INFO, strfmt, __duration__, ##__VA_ARGS__);  \
+        else if (__duration__ > __TIMER_LVLS_NAME(lvls).debug) __TIMER_LOG(DEBUG, strfmt, __duration__, ##__VA_ARGS__);\
+    } while (0)
+#else
+#define TIMER_LVLS(...)
+#define START_TIMER(...) ((void)0)
+#define STOP_TIMER(...) ((void)0)
 #endif
 
 class StackTrace {

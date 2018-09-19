@@ -145,6 +145,11 @@
     <not><isset property="VOLT_POOL_CHECKING"/></not>
 </condition>
 
+<!-- By default, do not do execution timings  -->
+<condition property="VOLT_TIMER_ENABLED" value="false">
+    <not><isset property="VOLT_TIMER_ENABLED"/></not>
+</condition>
+
 <!-- Default always round trip DDL in junit. Jenkins will turn this off on master  -->
 <condition property="verifycatalogdebug" value="true">
     <not><isset property="verifycatalogdebug"/></not>
@@ -1458,6 +1463,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
@@ -1478,6 +1484,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
@@ -1496,6 +1503,7 @@ NATIVE EE STUFF
         <arg line="--build-type='${build}'" />
     	<arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
@@ -1514,6 +1522,7 @@ NATIVE EE STUFF
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
@@ -1533,6 +1542,7 @@ NATIVE EE STUFF
         <arg line="--build-type=${build}" />
         <arg line="--log-level='${VOLT_LOG_LEVEL}'" />
         <arg line="--pool-checking='${VOLT_POOL_CHECKING}'" />
+        <arg line="--timer-enabled='${VOLT_TIMER_ENABLED}'" />
         <arg line="--max-processors=${cmake.build.maxcores}" />
         <arg line="--verbose-build='${cmake.verbose.build}'" />
     	<arg line="--verbose-config='${cmake.verbose.config}'" />
