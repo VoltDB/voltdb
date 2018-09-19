@@ -294,13 +294,16 @@ public class TransactionTaskQueue
                 int fragmentScore = 0;
                 int completionScore = 0;
                 boolean missingTxn = false;
-                for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
-                    if (isFragTask) {
+                if (isFragTask) {
+                    for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
                         if (!sb.matchFragmentTask(taskTxnId, taskTimestamp)) {
                             break;
                         }
                         fragmentScore++;
-                    } else {
+                    }
+                }
+                else {
+                    for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
                         if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
                             break;
                         }
@@ -320,6 +323,9 @@ public class TransactionTaskQueue
                     hostLog.debug(sb.toString());
                 }
                 if (completionScore == s_stashedMpWrites.getSiteCount()) {
+                    // The initial completion may have been executed but not yet been removed from
+                    // m_outstandingTxns yet because the CompletionResponse has not been processed.
+                    missingTxn |= task.m_txnState.isDone();
                     done = s_stashedMpWrites.releaseStashedCompleteTxns(missingTxn, task.getTxnId());
                 }
                 else if (fragmentScore == s_stashedMpWrites.getSiteCount() && completionScore == 0) {
@@ -342,13 +348,11 @@ public class TransactionTaskQueue
 
             while (!done) {
                 int completionScore = 0;
-                boolean missingTxn = false;
                 for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
                     if (!sb.getCompletionTasks().isEmpty()) {
                         if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
                             break;
                         }
-                        missingTxn |= sb.getCompletionTasks().peekFirst().getSecond();
                         // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                         // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                         // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
@@ -363,7 +367,7 @@ public class TransactionTaskQueue
                     hostLog.debug(sb.toString());
                 }
                 if (completionScore == s_stashedMpWrites.getSiteCount()) {
-                    done = s_stashedMpWrites.releaseStashedCompleteTxns(missingTxn, missingTxnCompletion.getMsgTxnId());
+                    done = s_stashedMpWrites.releaseStashedCompleteTxns(true, missingTxnCompletion.getMsgTxnId());
                 } else {
                     done = true;
                 }
