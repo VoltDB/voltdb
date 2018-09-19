@@ -139,12 +139,30 @@ public class TestJDBCSecurityEnabled {
                 + "A3 DECIMAL DEFAULT 0, "
                 + "PRIMARY KEY(A1)"
                 + ");\n"
-                + "CREATE TABLE TC("
+                + "CREATE TABLE T1("
                 + "A1 INTEGER NOT NULL, "
                 + "A2 DECIMAL, "
                 + "A3 DECIMAL DEFAULT 0, "
                 + "PRIMARY KEY(A1)"
-                + ");";
+                + ");\n"
+                + "CREATE TABLE TC1("
+                + "A1 INTEGER NOT NULL, "
+                + "A2 DECIMAL, "
+                + "A3 DECIMAL DEFAULT 0, "
+                + "PRIMARY KEY(A1)"
+                + ");\n";
+                + "CREATE TABLE T2("
+                + "A1 INTEGER NOT NULL, "
+                + "A2 DECIMAL, "
+                + "A3 DECIMAL DEFAULT 0, "
+                + "PRIMARY KEY(A1)"
+                + ");\n"
+                + "CREATE TABLE TC2("
+                + "A1 INTEGER NOT NULL, "
+                + "A2 DECIMAL, "
+                + "A3 DECIMAL DEFAULT 0, "
+                + "PRIMARY KEY(A1)"
+                + ");\n";
         pb.addLiteralSchema(ddl);
         pb.addPartitionInfo("T", "A1");
         pb.addPartitionInfo("TC", "A1");
@@ -306,7 +324,7 @@ public class TestJDBCSecurityEnabled {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=0",
-                "TC"
+                "TC1"
         };
         CSVLoader.testMode = true;
         CSVLoader.main(csvOptions);
@@ -314,14 +332,14 @@ public class TestJDBCSecurityEnabled {
         String[] jdbcOptions = {
                 "--jdbcdriver=" + driver_class,
                 "--jdbcurl=" + jdbc_url,
-                "--jdbctable=" + "TC",
+                "--jdbctable=" + "TC1",
                 "--reportdir=" + tmpCSVFileDir,
                 "--maxerrors=50",
                 "--jdbcuser=userWithAdminPerm",
                 "--jdbcpassword=password",
                 "--credentials="+ path_csv_user,
                 "--port=",
-                "T"
+                "T1"
         };
 
         //Reload using JDBC
@@ -329,8 +347,8 @@ public class TestJDBCSecurityEnabled {
         JDBCLoader.main(jdbcOptions);
 
         VoltTable modCount;
-        modCount = client.callProcedure("@AdHoc", "SELECT * FROM T;").getResults()[0];
-        System.out.println("data inserted to table T:\n" + modCount);
+        modCount = client.callProcedure("@AdHoc", "SELECT * FROM T1;").getResults()[0];
+        System.out.println("data inserted to table T1:\n" + modCount);
         int rowct = modCount.getRowCount();
         assertEquals(rowct, 1);
     }
@@ -375,7 +393,7 @@ public class TestJDBCSecurityEnabled {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=0",
-                "TC"
+                "TC2"
         };
         CSVLoader.testMode = true;
         CSVLoader.main(csvOptions);
@@ -383,12 +401,12 @@ public class TestJDBCSecurityEnabled {
         String[] jdbcOptions = {
                 "--jdbcdriver=" + driver_class,
                 "--jdbcurl=" + jdbc_url,
-                "--jdbctable=" + "TC",
+                "--jdbctable=" + "TC2",
                 "--reportdir=" + tmpCSVFileDir,
                 "--maxerrors=50",
                 "--credentials=" + path_csv_user,
                 "--port=",
-                "T"
+                "T2"
         };
 
         //Reload using JDBC
@@ -396,8 +414,8 @@ public class TestJDBCSecurityEnabled {
         JDBCLoader.main(jdbcOptions);
 
         VoltTable modCount;
-        modCount = client.callProcedure("@AdHoc", "SELECT * FROM T;").getResults()[0];
-        System.out.println("data inserted to table T:\n" + modCount);
+        modCount = client.callProcedure("@AdHoc", "SELECT * FROM T2;").getResults()[0];
+        System.out.println("data inserted to table T2:\n" + modCount);
         int rowct = modCount.getRowCount();
         assertEquals(rowct, 1);
     }
