@@ -51,12 +51,25 @@ public:
     inline UndoQuantum(int64_t undoToken, Pool *dataPool)
         : m_undoToken(undoToken), m_dataPool(dataPool) {}
     inline virtual ~UndoQuantum() {}
-    virtual inline void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+
+    /**
+     * Add a new UndoReleaseAction to the list of undo actions. interest is an optional UndoQuantumReleaseInterest which
+     * will be added to the list of interested parties and invoked upon release of the undo quantum after all
+     * undoActions have been performed. removeInterest is an optional UndoQuantumReleaseInterest which will be removed
+     * from the list of interested parties if it had been previously added.
+     */
+    virtual inline void registerUndoAction(UndoReleaseAction *undoAction, UndoQuantumReleaseInterest *interest = NULL,
+            UndoQuantumReleaseInterest *removeInterest = NULL) {
         assert(undoAction);
         m_undoActions.push_back(undoAction);
 
         if (interest != NULL) {
            m_interests.push_back(interest);
+        }
+
+        if (removeInterest != NULL) {
+            assert(removeInterest != interest);
+            m_interests.remove(removeInterest);
         }
     }
 
