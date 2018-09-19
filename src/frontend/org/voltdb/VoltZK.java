@@ -169,15 +169,18 @@ public class VoltZK {
     public static final String migrate_partition_leader = "migrate_partition_leader_blocker";
     public static final String migratePartitionLeaderBlocker = actionBlockers + "/" + migrate_partition_leader;
 
-    // two elastic join blockers
+    // three elastic join blockers
     // elasticJoinInProgress blocks the rejoin (create in init state, release before data migration start)
     // banElasticJoin blocks elastic join (currently created by DRProducer if the agreed protocol version
     //                                     for the mesh does not support elastic join during DR (i.e. version <= 7).
     //                                     It is now only released after a DR global reset.)
+    // elasticJoinMigration only blockers SPI Migration
     public static final String leafNodeElasticJoinInProgress = "join_blocker";
     public static final String elasticJoinInProgress = actionBlockers + "/" + leafNodeElasticJoinInProgress;
     public static final String leafNodeBanElasticJoin = "no_join_blocker";
     public static final String banElasticJoin = actionBlockers + "/" + leafNodeBanElasticJoin;
+    public static final String leafNodeElasticJoinMigration = "join_migration_blocker";
+    public static final String elasticJoinMigration = actionBlockers + "/" + leafNodeElasticJoinMigration;
 
     public static final String leafNodeRejoinInProgress = "rejoin_blocker";
     public static final String rejoinInProgress = actionBlockers + "/" + leafNodeRejoinInProgress;
@@ -480,12 +483,18 @@ public class VoltZK {
                 }
                 break;
             case migratePartitionLeaderBlocker:
-                //MigratePartitionLeader can not happen when join, rejoin, catalog update, or repair is in progress.
+                //MigratePartitionLeader can not happen when join (before data fully migrated), rejoin, catalog update, or repair is in progress.
                 blockers.remove(leafNodeBanElasticJoin);
                 if (blockers.size() > 1) {
                     errorMsg = "while elastic join, rejoin or catalog update is active";
                 }
                 break;
+            case elasticJoinMigration:
+                // elastic join balancePartition currently cannot coexist with partition leader migration
+               if (blockers.contains(migrate_partition_leader)) {
+                   errorMsg = "while leader migration is active.";
+               }
+               break;
             case banElasticJoin:
                 if (blockers.contains(leafNodeElasticJoinInProgress)) {
                     errorMsg = "while an elastic join is active";
