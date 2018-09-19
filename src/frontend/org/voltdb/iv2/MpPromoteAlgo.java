@@ -346,25 +346,13 @@ public class MpPromoteAlgo implements RepairAlgo
             return message;
         } else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();
-            // We currently don't want to restart read-only MP transactions because:
-            // 1) We're not writing the Iv2InitiateTaskMessage to the first
-            // FragmentTaskMessage in read-only case in the name of some unmeasured
-            // performance impact,
-            // 2) We don't want to perturb command logging and/or DR this close to the 3.0 release
-            // 3) We don't guarantee the restarted results returned to the client
-            // anyway, so not restarting the read is currently harmless.
-            boolean restart = !ftm.isReadOnly();
-            if (restart) {
-                Iv2InitiateTaskMessage initTaskMsg = ftm.getInitiateTask();
-                assert(initTaskMsg != null);
-                initTaskMsg.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
-                m_interruptedTxns.add(ftm.getInitiateTask());
-            }
             CompleteTransactionMessage rollback = null;
+
             //A response for non-restartable proc will be sent to client immediately if it is restarted. Thus
             //the transaction is marked as done and the state is removed. But sites may still have fragments in the backlog or site queue
             //which may block Scoreboard to release downstream transactions. The message would help clean the transaction state.
             String procName = ftm.getProcedureName();
+            boolean restartable = true;
             if (procName != null) {
                 final SystemProcedureCatalog.Config proc = SystemProcedureCatalog.listing.get(procName);
                 if (proc != null && !proc.isRestartable()) {
@@ -383,9 +371,26 @@ public class MpPromoteAlgo implements RepairAlgo
                             false);
                     rollback.setTimestamp(m_restartSeqGenerator.getNextSeqNum());
                     rollback.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
+                    restartable = false;
                 }
             }
 
+            // We currently don't want to restart read-only MP transactions because:
+            // 1) We're not writing the Iv2InitiateTaskMessage to the first
+            // FragmentTaskMessage in read-only case in the name of some unmeasured
+            // performance impact,
+            // 2) We don't want to perturb command logging and/or DR this close to the 3.0 release
+            // 3) We don't guarantee the restarted results returned to the client
+            // anyway, so not restarting the read is currently harmless.
+            // An abort response should have been sent to client for a non-restartble, the transaction should not be repaired.
+            //
+            boolean restart = !ftm.isReadOnly();
+            if (restart && !restartable) {
+                Iv2InitiateTaskMessage initTaskMsg = ftm.getInitiateTask();
+                assert(initTaskMsg != null);
+                initTaskMsg.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
+                m_interruptedTxns.add(ftm.getInitiateTask());
+            }
             return rollback;
         }
     }
