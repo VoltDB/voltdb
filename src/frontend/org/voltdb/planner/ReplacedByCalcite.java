@@ -15,27 +15,24 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.parser;
+package org.voltdb.planner;
 
-import org.apache.calcite.sql.parser.SqlParser;
-import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.RetentionPolicy.SOURCE;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
 /**
- * This class provides a factory method to create a parser that is used by VoltDB.
- * @since 8.4
- * @author Yiqun Zhang
+ * This specific method will be removed after the Calcite integration.
  */
-public class ParserFactory {
-
+@Documented
+@Target(METHOD)
+@Retention(SOURCE)
+public @interface ReplacedByCalcite {
     /**
-     * Given a SQL statement (could be either a DDL or DQL/DML),
-     * create a {@link SqlParser} for it.
-     * @param sql the SQL statement to parse.
-     * @return a SQL parser created from the SQL statement.
+     * The name of the method by which this method will be replaced.
      */
-    public static SqlParser create(String sql) {
-        return SqlParser.create(sql, SqlParser.configBuilder()
-                                              .setParserFactory(SqlDdlParserImpl.FACTORY)
-                                              .build());
-    }
+    String withMethod() default "";
 }

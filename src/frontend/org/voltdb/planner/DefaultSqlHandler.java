@@ -15,27 +15,27 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.parser;
-
-import org.apache.calcite.sql.parser.SqlParser;
-import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
+package org.voltdb.planner;
 
 /**
- * This class provides a factory method to create a parser that is used by VoltDB.
+ * The default (catch-all) SQL handler for query types without a designated handler.
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class ParserFactory {
+public class DefaultSqlHandler extends SqlHandler {
 
     /**
-     * Given a SQL statement (could be either a DDL or DQL/DML),
-     * create a {@link SqlParser} for it.
-     * @param sql the SQL statement to parse.
-     * @return a SQL parser created from the SQL statement.
+     * The singleton handler instance for the {@link DefaultSqlHandler}.
      */
-    public static SqlParser create(String sql) {
-        return SqlParser.create(sql, SqlParser.configBuilder()
-                                              .setParserFactory(SqlDdlParserImpl.FACTORY)
-                                              .build());
+    public static final DefaultSqlHandler INSTANCE = new DefaultSqlHandler();
+
+    private DefaultSqlHandler() {
+
     }
+
+    @Override
+    public void doAction(SqlTask task) {
+
+    }
+
 }

@@ -20,7 +20,6 @@ package org.voltdb.compiler;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
-import org.apache.calcite.sql.SqlNode;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
@@ -38,6 +37,7 @@ import org.voltdb.planner.CorePlan;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
+import org.voltdb.planner.SqlTask;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.utils.CompressionService;
@@ -183,7 +183,7 @@ public class PlannerTool {
     }
 
     public synchronized AdHocPlannedStatement planSqlWithCalcite(
-            String sql, SqlNode sqlNode, StatementPartitioning partitioning,
+            SqlTask sqlTask, StatementPartitioning partitioning,
             boolean isExplainMode, final Object[] userParams,
             boolean isSwapTables, boolean isLargeQuery) {
         // TRAIL [Calcite:4] PlannerTool.planSqlWithCalcite()
@@ -202,10 +202,6 @@ public class PlannerTool {
         boolean hasUserQuestionMark = false;
         boolean wrongNumberParameters = false;
         try {
-            if ((sql == null) || (sql = sql.trim()).isEmpty()) {    // remove any spaces or newlines
-                throw new RuntimeException("Can't plan empty or null SQL.");
-            }
-
             // No caching for forced single partition or forced multi partition SQL,
             // since these options potentially get different plans that may be invalid
             // or sub-optimal in other contexts. Likewise, plans cached from other contexts
@@ -219,7 +215,7 @@ public class PlannerTool {
             // point it seems worthwhile to cache such plans, we can explore it.
             if (partitioning.isInferred() && !isLargeQuery) {
                 // Check the literal cache for a match.
-                AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sql);
+                AdHocPlannedStatement cachedPlan = m_cache.getWithSQL(sqlTask.getSQL());
                 if (cachedPlan != null) {
                     cacheUse = CacheUse.HIT1;
                     return cachedPlan;
@@ -243,7 +239,7 @@ public class PlannerTool {
             // This try-with-resources block acquires a global lock on all planning
             // This is required until we figure out how to do parallel planning.
             try (QueryPlanner planner = new QueryPlanner(
-                    sql,
+                    sqlTask.getSQL(),
                     "PlannerTool",
                     "PlannerToolProc",
                     m_database,
@@ -311,13 +307,13 @@ public class PlannerTool {
                                 params = ParameterSet.emptyParameterSet();
                             }
 
-                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
+                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sqlTask.getSQL().getBytes(Constants.UTF8ENCODING),
                                                                                    core,
                                                                                    params,
                                                                                    null);
                             ahps.setBoundConstants(matched.m_constants);
                             // parameterized plan from the cache does not have exception
-                            m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, false);
+                            m_cache.put(sqlTask.getSQL(), parsedToken, ahps, extractedLiterals, hasUserQuestionMark, false);
                             cacheUse = CacheUse.HIT2;
                             return ahps;
                         }
@@ -371,7 +367,7 @@ public class PlannerTool {
 
                 assert(parsedToken != null);
                 // Again, plans with inferred partitioning are the only ones supported in the cache.
-                m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planHasExceptionsWhenParameterized);
+                m_cache.put(sqlTask.getSQL(), parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planHasExceptionsWhenParameterized);
             }
             return ahps;
         }

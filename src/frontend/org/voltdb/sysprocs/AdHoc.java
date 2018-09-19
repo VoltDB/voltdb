@@ -26,16 +26,14 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.parser.SqlParseException;
-import org.apache.calcite.sql.parser.SqlParser;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.parser.ParserFactory;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.planner.NonDdlSqlBatch;
+import org.voltdb.planner.ReplacedByCalcite;
+import org.voltdb.planner.SqlBatch;
 
 public class AdHoc extends AdHocNTBase {
 
@@ -45,76 +43,42 @@ public class AdHoc extends AdHocNTBase {
     private final static boolean USE_CALCITE = true;
 
     /**
-     * Run the AdHoc query through the Calcite parser & planner.
-     * @param params The user parameters. The first parameter is always the query text.
-     * The rest parameters are the ones used in the query.
-     * @return The client response.
+     * Run an AdHoc query batch through the Calcite parser & planner.
+     * @param params the user parameters. The first parameter is always the query text.
+     * The rest parameters are the ones used in the queries. </br>
+     * Some notes:
+     * <ul>
+     *   <li>AdHoc DDLs do not take parameters (? will be treated as an unexpected token);</li>
+     *   <li>Currently, a non-DDL batch can take parameters only if the batch has one query.</li>
+     * </ul>
+     * @return the client response.
+     * @since 8.4
+     * @author Yiqun Zhang
      */
     public CompletableFuture<ClientResponse> runThroughCalcite(ParameterSet params) {
-        // TRAIL [Calcite:1] AdHoc.runThroughCalcite
-        // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
-        Object[] paramArray = params.toArray();
-        String sqlBlock = (String) paramArray[0];
-        Object[] userParams = null;
-        // AdHoc query can have parameters, see TestAdHocQueries.testAdHocWithParams.
-        if (params.size() > 1) {
-            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
-        }
-
-        // We can process batches with either all DDL or all DML/DQL, no mixed batch can be accepted.
-        // Split the SQL statements, and run them through SqlParser.
-        // Currently (1.17.0), SqlParser only supports parsing single SQL statement.
-        // https://issues.apache.org/jira/browse/CALCITE-2310
-
-        // TODO: Calcite's error message will contain line and column numbers, this information is lost
-        // during the split. It will be helpful to develop a way to preserve that information.
-        List<String> sqlList = SQLLexer.splitStatements(sqlBlock).getCompletelyParsedStmts();
-        List<SqlNode> rootNodesOfParsedQueries = new ArrayList<>(sqlList.size());
-        // Are all the queries in this input batch DDL? (null means unknown)
-        Boolean isDDLBatch = null;
-
-        for (String sql : sqlList) {
-            SqlParser parser = ParserFactory.create(sql);
-            SqlNode sqlNode;
-            try {
-                sqlNode = parser.parseStmt();
-            } catch (SqlParseException e) {
-                // For now, let's just fail the batch if any parsing error happens.
-                return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
-                        e.getLocalizedMessage());
+        // TRAIL [Calcite:1] [entry] AdHoc.runThroughCalcite()
+        SqlBatch batch;
+        try {
+            // We do not need to worry about the ParameterSet,
+            // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
+            batch = SqlBatch.fromParameterSet(params);
+            if (batch.isDDLBatch()) {
+                return runDDLBatchThroughCalcite(batch);
+            } else {
+                // Large query mode should be set to m_backendTargetType.isLargeTempTableTarget
+                // But for now let's just disable it.
+                return runNonDDLAdHocThroughCalcite(new NonDdlSqlBatch(batch));
             }
-            boolean isDDL = sqlNode.isA(SqlKind.DDL);
-            if (isDDLBatch == null) {
-                isDDLBatch = isDDL;
-            } else if (isDDLBatch ^ isDDL) { // True if isDDLBatch is different from isDDL
-                // No mixing DDL and DML/DQL. Turn this into an error and return it to the client.
-                return makeQuickResponse(
-                        ClientResponse.GRACEFUL_FAILURE,
-                        "DDL mixed with DML and queries is unsupported.");
-            }
-            rootNodesOfParsedQueries.add(sqlNode);
-        }
-
-        if (isDDLBatch) {
-            // Should use runDDLBatchThroughCalcite when it's ready.
-            return runDDLBatch(sqlList);
-        } else {
-            // This is where we run non-DDL SQL statements
-            // Should use runNonDDLAdHocThroughCalcite when it's ready.
-            return runNonDDLAdHocThroughCalcite(
-                    VoltDB.instance().getCatalogContext(),
-                    sqlList,
-                    rootNodesOfParsedQueries,
-                    true, // infer partitioning
-                    null, // no partition key
-                    ExplainMode.NONE,
-                    m_backendTargetType.isLargeTempTableTarget, // back end dependent.
-                    false, // is not swap tables
-                    userParams);
+        } catch (Exception ex) {
+            // For now, let's just fail the batch if any error happens.
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
+                                     ex.getLocalizedMessage());
         }
     }
 
+    @ReplacedByCalcite(withMethod = "runThroughCalcite")
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        // TRAIL [Calcite:0] [entry] AdHoc.run()
         if (USE_CALCITE) {
             return runThroughCalcite(params);
         }
@@ -166,11 +130,18 @@ public class AdHoc extends AdHocNTBase {
         return runDDLBatch(sqlStatements);
     }
 
-    private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(
-            List<String> sqlStatements, List<SqlNode> sqlNodes) {
+    /**
+     * Run a DDL batch through Calcite.
+     * @param batch the batch to run.
+     * @return the client response.
+     * @since 8.4
+     * @author Yiqun Zhang
+     */
+    private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(SqlBatch batch) {
         return null;
     }
 
+    @ReplacedByCalcite(withMethod = "runDDLBatchThroughCalcite")
     private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements) {
         // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
         SortedSet<String> conflictTables = new TreeSet<String>();
