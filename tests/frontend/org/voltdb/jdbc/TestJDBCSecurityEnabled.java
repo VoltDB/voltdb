@@ -150,7 +150,7 @@ public class TestJDBCSecurityEnabled {
                 + "A2 DECIMAL, "
                 + "A3 DECIMAL DEFAULT 0, "
                 + "PRIMARY KEY(A1)"
-                + ");\n";
+                + ");\n"
                 + "CREATE TABLE T2("
                 + "A1 INTEGER NOT NULL, "
                 + "A2 DECIMAL, "
