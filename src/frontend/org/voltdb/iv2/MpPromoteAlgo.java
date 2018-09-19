@@ -51,7 +51,10 @@ public class MpPromoteAlgo implements RepairAlgo
     private final int m_deadHost;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private long m_maxSeenCompleteTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+
+    // A collection of interrupted transactions which should be repaired upon new MPI promotion
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
+
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -346,21 +349,8 @@ public class MpPromoteAlgo implements RepairAlgo
             return message;
         } else {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg.getPayload();
-            // We currently don't want to restart read-only MP transactions because:
-            // 1) We're not writing the Iv2InitiateTaskMessage to the first
-            // FragmentTaskMessage in read-only case in the name of some unmeasured
-            // performance impact,
-            // 2) We don't want to perturb command logging and/or DR this close to the 3.0 release
-            // 3) We don't guarantee the restarted results returned to the client
-            // anyway, so not restarting the read is currently harmless.
-            boolean restart = !ftm.isReadOnly();
-            if (restart) {
-                Iv2InitiateTaskMessage initTaskMsg = ftm.getInitiateTask();
-                assert(initTaskMsg != null);
-                initTaskMsg.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
-                m_interruptedTxns.add(ftm.getInitiateTask());
-            }
             CompleteTransactionMessage rollback = null;
+
             //A response for non-restartable proc will be sent to client immediately if it is restarted. Thus
             //the transaction is marked as done and the state is removed. But sites may still have fragments in the backlog or site queue
             //which may block Scoreboard to release downstream transactions. The message would help clean the transaction state.
@@ -386,6 +376,20 @@ public class MpPromoteAlgo implements RepairAlgo
                 }
             }
 
+            // We currently don't want to restart read-only MP transactions because:
+            // 1) We're not writing the Iv2InitiateTaskMessage to the first
+            // FragmentTaskMessage in read-only case in the name of some unmeasured
+            // performance impact,
+            // 2) We don't want to perturb command logging and/or DR this close to the 3.0 release
+            // 3) We don't guarantee the restarted results returned to the client
+            // anyway, so not restarting the read is currently harmless.
+            // 4) Do not restart an non-restartable transaction upon new MPI promotion
+            if (!ftm.isReadOnly() && rollback == null) {
+                Iv2InitiateTaskMessage initTaskMsg = ftm.getInitiateTask();
+                assert(initTaskMsg != null);
+                initTaskMsg.setTruncationHandle(TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE);
+                m_interruptedTxns.add(ftm.getInitiateTask());
+            }
             return rollback;
         }
     }
