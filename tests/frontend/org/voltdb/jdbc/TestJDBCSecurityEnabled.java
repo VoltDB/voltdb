@@ -165,7 +165,10 @@ public class TestJDBCSecurityEnabled {
                 + ");\n";
         pb.addLiteralSchema(ddl);
         pb.addPartitionInfo("T", "A1");
-        pb.addPartitionInfo("TC", "A1");
+        pb.addPartitionInfo("T1", "A1");
+        pb.addPartitionInfo("T2", "A1");
+        pb.addPartitionInfo("TC1", "A1");
+        pb.addPartitionInfo("TC2", "A1");
 
         pb.addRoles(GROUPS);
         pb.addUsers(USERS);
