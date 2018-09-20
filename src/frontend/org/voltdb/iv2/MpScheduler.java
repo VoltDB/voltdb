@@ -505,6 +505,7 @@ public class MpScheduler extends Scheduler
                 // Leader migration not done yet.
                 m_mailbox.send(message.m_sourceHSId, (Iv2InitiateTaskMessage)counter.getOpenMessage());
             }
+            return;
         }
 
         if (counter != null) {
