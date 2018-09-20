@@ -501,7 +501,7 @@ public class JDBCExportClient extends ExportClientBase {
                 try {
                     conn = m_ds.getDataSource().getConnection();
                     conn.setAutoCommit(false);
-                } catch (SQLException e) {
+                } catch (Exception e) {
                     m_logger.warn("JDBC export unable to connect", e);
                     closeConnection();
                     throw new RestartBlockException(true);
@@ -521,6 +521,9 @@ public class JDBCExportClient extends ExportClientBase {
                 throw new RestartBlockException(true);
             } catch (SQLException e) {
                 rateLimitedLogError(m_logger, "commit() failed for row %s", Throwables.getStackTraceAsString(e));
+                throw new RestartBlockException(true);
+            } catch (Exception e) {
+                rateLimitedLogError(m_logger, "Exception while executing and committing batch %s", Throwables.getStackTraceAsString(e));
                 throw new RestartBlockException(true);
             } finally{
                 m_dataRows.clear();
@@ -594,7 +597,7 @@ public class JDBCExportClient extends ExportClientBase {
                         m_logger.debug(pstmtString);
                     }
                     pstmt = conn.prepareStatement(pstmtString);
-                } catch (SQLException e) {
+                } catch (Exception e) {
                     m_logger.warn("JDBC export unable to prepare insert statement", e);
                     closeConnection();
                     throw new RestartBlockException(true);
