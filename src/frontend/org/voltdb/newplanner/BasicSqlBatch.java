@@ -15,53 +15,55 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner;
+package org.voltdb.newplanner;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.ParameterSet;
 import org.voltdb.parser.SQLLexer;
 
 /**
- * A SQL query batch containing one or more {@link SqlTask}s. </br>
- * This class implemented the {@code Iterable<SqlTask>} interface.
+ * A basic SQL query batch containing one or more {@link SqlTask}s.
+ * It does not carry information specific to DDL or non-DDL planning.
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class SqlBatch implements Iterable<SqlTask> {
+public class BasicSqlBatch extends SqlBatch {
 
-    final List<SqlTask> m_tasks;
-    final Boolean m_isDDLBatch;
-    final Object[] m_userParams;
+    private final List<SqlTask> m_tasks;
+    private final Boolean m_isDDLBatch;
+    private final Object[] m_userParams;
 
-    static final VoltLogger s_adHocLog = new VoltLogger("ADHOC");
+    static final String s_adHocErrorResponseMessage =
+            "The @AdHoc stored procedure when called with more than one parameter "
+                    + "must be passed a single parameterized SQL statement as its first parameter. "
+                    + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
 
     /**
-     * Build a batch from a string with one or more SQL statements. </br>
+     * Build a batch from a string of one or more SQL statements. </br>
      * The SQL statements can have parameter place-holders, but we will throw
-     * an error if the batch has more than one query and user parameters are supplied
+     * an error if the batch has more than one query when user parameters are supplied
      * because we currently do not support this.
      * @param sqlBlock a string of one or more SQL statements.
      * @param userParams user parameter values for the query.
      * @throws SqlParseException when the query parsing went wrong.
      * @throws UnsupportedOperationException when the batch is a mixture of
-     * DDL and non-DDL statements.
+     * DDL and non-DDL statements or has parameters and more than one query at the same time.
      */
-    public SqlBatch(String sqlBlock, Object... userParams) throws SqlParseException {
-        // We can process batches with either all DDL or all DML/DQL, no mixed batch can be accepted.
-        // Split the SQL statements, and run them through SqlParser.
+    public BasicSqlBatch(String sqlBlock, Object... userParams) throws SqlParseException {
+        // We can process batches of either all DDL or all DML/DQL, no mixed batch can be accepted.
+        // Split the SQL statements, and process them one by one.
         // Currently (1.17.0), SqlParser only supports parsing single SQL statement.
         // https://issues.apache.org/jira/browse/CALCITE-2310
 
         // TODO: Calcite's error message (in SqlParseException) will contain line and column numbers,
-        // this information is lost during the split. It will be helpful to develop a way to preserve
-        // this information.
+        // this information is lost during the split. It will be helpful to develop a way to preserve it.
         List<String> sqlList = SQLLexer.splitStatements(sqlBlock).getCompletelyParsedStmts();
+        if (userParams != null && userParams.length > 0 && sqlList.size() != 1) {
+            throw new UnsupportedOperationException(s_adHocErrorResponseMessage);
+        }
         m_tasks = new ArrayList<>(sqlList.size());
         // Are all the queries in this input batch DDL? (null means not determined yet)
         Boolean isDDLBatch = null;
@@ -79,59 +81,23 @@ public class SqlBatch implements Iterable<SqlTask> {
         m_userParams = userParams;
     }
 
-    /**
-     * A package-visible copy constructor for internal usages.
-     * @param other the other {@link SqlBatch} to copy from.
-     */
-    SqlBatch(SqlBatch other) {
-        m_tasks = other.m_tasks;
-        m_isDDLBatch = other.m_isDDLBatch;
-        m_userParams = other.m_userParams;
-    }
-
-    /**
-     * Check if the batch is purely comprised of DDL statements.
-     * @return true if the batch is comprised of DDL statements only.
-     */
+    @Override
     public boolean isDDLBatch() {
         return m_isDDLBatch;
     }
 
-    /**
-     * Get an iterator over the {@link SqlTask}s in this batch.
-     * @return an iterator over the {@code SqlTasks} in this batch.
-     */
     @Override
     public Iterator<SqlTask> iterator() {
         return m_tasks.iterator();
     }
 
-    /**
-     * Build a {@link SqlBatch} from a {@link ParameterSet} passed through the {@code @AdHoc}
-     * system stored procedure.
-     * @param params the user parameters. The first parameter is always the query text.
-     * The rest parameters are the ones used in the query.
-     * @return a {@code SqlBatch} built from the given {@code ParameterSet}.
-     * @throws SqlParseException when the query parsing went wrong.
-     * @throws UnsupportedOperationException when the batch is a mixture of
-     * DDL and non-DDL statements.
-     */
-    public static SqlBatch fromParameterSet(ParameterSet params) throws SqlParseException {
-        Object[] paramArray = params.toArray();
-        String sqlBlock = (String) paramArray[0];
-        Object[] userParams = null;
-        // AdHoc query can have parameters, see TestAdHocQueries.testAdHocWithParams.
-        if (params.size() > 1) {
-            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
-        }
-        return new SqlBatch(sqlBlock, userParams);
-    }
-
-    /**
-     * Get the user parameters.
-     * @return the user parameter array.
-     */
+    @Override
     public Object[] getUserParameters() {
         return m_userParams;
+    }
+
+    @Override
+    public int getTaskCount() {
+        return m_tasks.size();
     }
 }

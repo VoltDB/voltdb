@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner;
+package org.voltdb.newplanner;
 
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
@@ -29,8 +29,8 @@ import org.voltdb.parser.ParserFactory;
  * @author Yiqun Zhang
  */
 public class SqlTask {
-    final String m_sqlString;
-    final SqlNode m_parsedTree;
+    private final String m_sqlString;
+    private final SqlNode m_parsedQuery;
 
     /**
      * Create a {@link SqlTask} from a SQL query string.
@@ -44,7 +44,7 @@ public class SqlTask {
         }
         m_sqlString = sql;
         SqlParser parser = ParserFactory.create(sql);
-        m_parsedTree = parser.parseStmt();
+        m_parsedQuery = parser.parseStmt();
     }
 
     /**
@@ -52,7 +52,7 @@ public class SqlTask {
      * @return true if this {@code SqlTask} is a DDL task.
      */
     public boolean isDDL() {
-        return m_parsedTree.isA(SqlKind.DDL);
+        return m_parsedQuery.isA(SqlKind.DDL);
     }
 
     /**
@@ -61,5 +61,13 @@ public class SqlTask {
      */
     public String getSQL() {
         return m_sqlString;
+    }
+
+    /**
+     * Get the parsed query node tree.
+     * @return the parsed query node tree.
+     */
+    public SqlNode getParsedQuery() {
+        return m_parsedQuery;
     }
 }
