@@ -661,24 +661,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<BBContainer> poll() {
-        // ENG-14488, it's possible to have the export master gives up mastership
-        // but still try to poll immediately after that, e.g. from Pico Network
-        // thread the master gives up mastership, from decoder thread it tries to
-        // poll periodically, they won't overlap but poll can happen after giving up
-        // mastership. If it happens m_pollFuture can be mistakingly set, and when
-        // the old master retakes mastership again it refuses to export because
-        // m_pollFuture should be false on a fresh master.
-        //
-        // Add following check to eliminate this window.
-        if (!m_mastershipAccepted.get()) {
-            return null;
-        }
-
         final SettableFuture<BBContainer> fut = SettableFuture.create();
         try {
             m_es.execute(new Runnable() {
                 @Override
                 public void run() {
+                    // ENG-14488, it's possible to have the export master gives up mastership
+                    // but still try to poll immediately after that, e.g. from Pico Network
+                    // thread the master gives up mastership, from decoder thread it tries to
+                    // poll periodically, they won't overlap but poll can happen after giving up
+                    // mastership. If it happens m_pollFuture can be mistakingly set, and when
+                    // the old master retakes mastership again it refuses to export because
+                    // m_pollFuture should be false on a fresh master.
+                    //
+                    // Add following check to eliminate this window.
+                    if (!m_mastershipAccepted.get()) {
+                        fut.set(null);
+                        return;
+                    }
+
                     try {
                         //If we have anything pending set that before moving to next block.
                         if (m_pendingContainer.get() != null) {
@@ -1091,7 +1092,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = false;
         m_eos = false;
         m_pollFuture = null;
-
+        m_readyForPolling = false;
     }
 
     /**
