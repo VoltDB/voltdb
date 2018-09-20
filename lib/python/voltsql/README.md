@@ -6,39 +6,80 @@ Install Requirements
 
 - We require Python 2.6+, we don't support Python 3 currently.
 
+- Install pip.
+
 - Open a terminal, go to the project folder, and run this command to install all project dependencies:
 
-    ```
-    $ pip install -r requirements.txt
+    ```bash
+    $ sudo pip install -r requirements.txt
     ```
     
 - Or if you want to install the dependencies offline, you can use
 
-    ```
-    $ pip install -r requirements_offline.txt
+    ```bash
+    $ sudo pip install -r requirements_offline.txt
     ```
       
 Run
 ---
-In project root folder, simply run:
-```
-$ python voltsql/voltsql.py
-```
-
-Or
-```
-$ ./voltsql.sh
-```
-Or in the voltdb/bin folder, run:
-```
+Goto the `voltdb/bin` folder, run:
+```bash
 voltsql
 ```
 
+Or you can add `voltdb/bin` to PATH, then you can directly run `voltsql` from terminal.
+
 Test
 ----
-```
-$ tox
-```
+- First you have to install requirements for test
+
+    ```bash
+    $ sudo pip install -r requirements_test.txt
+    ```
+- Then you can running tests using tox
+
+    ```bash
+    $ tox
+    ```
+
+Options
+-----
+- **smart completion**
+
+    If it's on, voltsql will read from voltdb catalog. It will enable voltsql to suggest the table name, column name and udf function.
+    
+    If it's off, voltsql will only suggest keywords.
+    
+- **multiline**
+
+    If it's on, press enter key will create a newline instead of execute the statements. To execute the statements, you have to press Meta+Enter (Or Escape followed by Enter).
+    
+    If it's off, press enter will execute the statements.
+    
+- **auto refresh**
+
+    If it's on, voltsql will fetch the voltdb catalog everytime you execute a statement from voltsql. 
+    
+    If it's off, voltsql will only fetch catalog one time when you start voltsql.
+    
+    Despite the option, you can always force an refresh using the command
+    
+    ```
+    update
+    ```
+    
+Commands
+-------
+`quit`: quit voltsql
+
+`update` force a background catalog refresh
+
+`help` show this readme
+
+Notes
+-----
+The command history is stored at `~/.voltsql_history`, it is used for retyping the previous commands as well as calculate the prioritization of keywords.
+    
 
 Architecture
 ------------

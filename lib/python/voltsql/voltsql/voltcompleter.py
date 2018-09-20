@@ -367,3 +367,17 @@ class VoltCompleter(Completer):
 
     def update_procedures(self, procedures):
         self.dbmetadata['procedures'] = procedures
+
+    def extend_query_history(self, text):
+        # Currently only load keyword preferences from history, not names
+        self.prioritizer.update_keywords(text)
+
+    def init_prioritization_from_history(self, history, n_recent=100):
+        cnt = 0
+        # load the most n recent history
+        for recent in history.load_history_strings():
+            cnt += 1
+            if cnt > n_recent:
+                break
+            self.extend_query_history(recent)
+
