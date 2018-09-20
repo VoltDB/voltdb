@@ -71,7 +71,7 @@ public class CompleteTransactionTask extends TransactionTask
         // The transaction should not be flushed at this moment.
         if (m_completeMsg.isAbortDuringRepair() || (m_repairCompletionMatched && !m_completeMsg.isRestart())) {
             if (hostLog.isDebugEnabled()) {
-                hostLog.debug("releaseStashedComleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(getTxnId()));
+                hostLog.debug("releaseStashedCompleteTxns: flush non-restartable logs at " + TxnEgo.txnIdToString(getTxnId()));
             }
             // Mark the transaction state as DONE
             // Transaction state could be null when a CompleteTransactionTask is added to scoreboard.
