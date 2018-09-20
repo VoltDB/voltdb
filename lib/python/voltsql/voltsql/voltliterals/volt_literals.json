@@ -88,6 +88,7 @@
             "TABLE"
         ],
         "PRIMARY": [],
+        "RECURSIVE": [],
         "REPLACE": [],
         "RIGHT": [],
         "ROLLBACK": [],
