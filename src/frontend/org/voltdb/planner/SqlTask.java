@@ -31,7 +31,6 @@ import org.voltdb.parser.ParserFactory;
 public class SqlTask {
     final String m_sqlString;
     final SqlNode m_parsedTree;
-    final SqlHandler m_sqlHandler;
 
     /**
      * Create a {@link SqlTask} from a SQL query string.
@@ -46,7 +45,6 @@ public class SqlTask {
         m_sqlString = sql;
         SqlParser parser = ParserFactory.create(sql);
         m_parsedTree = parser.parseStmt();
-        m_sqlHandler = SqlHandler.ofKind(m_parsedTree.getKind());
     }
 
     /**
