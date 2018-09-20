@@ -1,121 +1,75 @@
-voltcli
+voltsql
 =======
 
-Install Requirements
-----------------
+Installation Requirements
+-------------------------
 
-- We require Python 2.6+, we don't support Python 3 currently.
+voltsql requires Python 2.6+. It does not currently support Python 3. It also requires additional libraries that must be installed, as listed in the `requirements.txt` file. You can either install the requirements system wide, or you can use virtualenv to create a private python environment.
 
-- Install pip.
+Before using voltsql, install the necessary libraries as follows:
 
-- Open a terminal, go to the project folder, and run this command to install all project dependencies:
+  1. Install pip.
+
+  2. Optionally, install and activate virtualenv. (See notes below.)
+
+  3. Open a terminal session and install all project dependencies. When installing system-wide, use `sudo`. For example if VoltDB is install in the `voltdb` folder in your home directory:
 
     ```bash
-    $ sudo pip install -r requirements.txt
+    $ sudo pip install -r ~/voltdb/lib/python/voltsql/requirements.txt
     ```
     
-- Or if you want to install the dependencies offline, you can use
+   Or if you want to install the dependencies offline, you can use:
 
     ```bash
-    $ sudo pip install -r requirements_offline.txt
+    $ sudo pip install -r ~/voltdb/lib/python/voltsql/requirements_offline.txt
     ```
+    
+Note that on Macintosh OS X, an earlier version of the click library is pre-installed and cannot be updated system wide without deleting the current version first. You can use `sudo` to do this, or avoid this issue by installing in a private environment using `virtualenv`.
       
-Run
----
-Goto the `voltdb/bin` folder, run:
-```bash
-voltsql
-```
-
-Or you can add `voltdb/bin` to PATH, then you can directly run `voltsql` from terminal.
-
-Test
-----
-- First you have to install requirements for test
+Running voltsql
+----------------
+Make sure the `bin` folder from the VoltDB installation is in your PATH environment, then you can use the `voltsql` command like all other VoltDB utilities:
 
     ```bash
-    $ sudo pip install -r requirements_test.txt
+    $ voltsql
     ```
-- Then you can running tests using tox
 
-    ```bash
-    $ tox
-    ```
+
+Commands
+-----
+Once voltsql is running, you can enter SQL statements interactively. As you type, voltsql lists available SQL keywords and function names for you. Use the up and down arrow keys to select the desired keyword, then continue typing.
+
+You can also use standard directives from sqlcmd to examine tables and procedures, list classes, and so on. Available commands are:
+
+-  `exit` or `quit`: quit voltsql
+-  `examine`: View the execution plan for a statement
+-  `exec`: execute a stored procedure
+-  `help`: display help text
+-  `show` or `list`: List tables, procedures, or classes
+-  `update` refresh the schema
+
 
 Options
 -----
+There are three interactive features that you can turn on and off with function keys:
+
 - **smart completion**
 
-    If it's on, voltsql will read from voltdb catalog. It will enable voltsql to suggest the table name, column name and udf function.
-    
-    If it's off, voltsql will only suggest keywords.
+    When on, _smart completion__ lists schema elements such as table and column names where appropriate along with SQL keywords. Press F2 to turn smart completion on and off.
     
 - **multiline**
 
-    If it's on, press enter key will create a newline instead of execute the statements. To execute the statements, you have to press Meta+Enter (Or Escape followed by Enter).
-    
-    If it's off, press enter will execute the statements.
-    
+    When on, _multiline__ lets you enter statements on multiples lines before processing the statement or command. Press ESC and then ENTER to execute the statement. When off, each line is processed when you press ENTER. Press F3 to turn multiline on and off.
+
 - **auto refresh**
 
-    If it's on, voltsql will fetch the voltdb catalog everytime you execute a statement from voltsql. 
+    When on, -auto refresh_ refreshes the schema after each statement is processed. When off, you must refresh the schema manually with the UPDATE command if the schema changes.
     
-    If it's off, voltsql will only fetch catalog one time when you start voltsql.
+    Leaving auto refresh on ensures you have the latest schema available for smart completion. Turning it off can save time if the schema does not change very often.
     
-    Despite the option, you can always force an refresh using the command
+    Press F4 to turn auto refresh on and off.
     
-    ```
-    update
-    ```
     
-Commands
--------
-`quit`: quit voltsql
-
-`update` force a background catalog refresh
-
-`help` show this readme
-
 Notes
 -----
-The command history is stored at `~/.voltsql_history`, it is used for retyping the previous commands as well as calculate the prioritization of keywords.
-    
-
-Architecture
-------------
-```text
-+-----------------------------------+
-|    _    __      ____  ____  ____  |	
-|   | |  / /___  / / /_/ __ \/ __ ) |
-|   | | / / __ \/ / __/ / / / __  | |
-|   | |/ / /_/ / / /_/ /_/ / /_/ /  |
-|   |___/\____/_/\__/_____/_____/   |
-+-----------------------------------+
-           |         ^
-           v         | 
-+---------------------------------------------+ 
-|        SQLCMD                               |
-|     ======	                              |
-|   We still use the SQLCMD to execute SQLs,  |
-|   and get response from its stdout.         |
-|   It's like our "server"                    |
-+---------------------------------------------+
-           |         ^
-           v         |
-+---------------------------------------------------------------+
-|     VoltSQL                                                   |
-|     =======                                                   |
-|          - Build interactive command line based on Python     |
-|            Prompt Toolkit.                                    |
-|          - Get the database information from @SystemCatalog   |
-|          - Parse the buffer while typing, so that we can      |
-|            generate context-sensitive suggestions based on    |
-|            current cursor's postion                           |
-|                                                               |
-|            +-----------------------------------------------+  |
-|            | Completer, SQLParser, refresher, Executor     |  |
-|            | =========================================     |  |
-|            |                                               |  |
-|            +-----------------------------------------------+  |
-+---------------------------------------------------------------+
-```
+The command history is saved in the file `~/.voltsql_history`, which voltsql uses for recalling previous commands as well as calculating the prioritization of keywords.

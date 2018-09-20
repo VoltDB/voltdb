@@ -42,85 +42,24 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 README = """
-voltcli
-=======
+VOLTSQL -- an interactive SQL interpreter with command completion. Lists available SQL keywords as you type. Use arrow keys to select.
 
-Install Requirements
-----------------
+COMMANDS
+  exit / quit -- quit voltsql
+  examine -- View SQL execution plan
+  exec -- execute stored procedures
+  help -- display this text
+  show / list -- List tables, procedures, classes
+  update -- refresh schema
 
-- We require Python 2.6+, we don't support Python 3 currently.
+OPTIONS (press specified key to enable/disable each option)
 
-- Install pip.
+[F2] SMART COMPLETION
+Adds schema elements (table, column, function name) to command completion.
 
-- Open a terminal, go to the project folder, and run this command to install all project dependencies:
+[F3] MULTILINE
+Lets you enter multiples lines before processing. Press ESC then ENTER to execute the statement. When off, each line is processed when you press ENTER.
 
-    ```bash
-    $ sudo pip install -r requirements.txt
-    ```
-
-- Or if you want to install the dependencies offline, you can use
-
-    ```bash
-    $ sudo pip install -r requirements_offline.txt
-    ```
-
-Run
----
-Goto the `voltdb/bin` folder, run:
-```bash
-voltsql
-```
-
-Or you can add `voltdb/bin` to PATH, then you can directly run `voltsql` from terminal.
-
-Test
-----
-- First you have to install requirements for test
-
-    ```bash
-    $ sudo pip install -r requirements_test.txt
-    ```
-- Then you can running tests using tox
-
-    ```bash
-    $ tox
-    ```
-
-Options
------
-- **smart completion**
-
-    If it's on, voltsql will read from voltdb catalog. It will enable voltsql to suggest the table name, column name and udf function.
-
-    If it's off, voltsql will only suggest keywords.
-
-- **multiline**
-
-    If it's on, press enter key will create a newline instead of execute the statements. To execute the statements, you have to press Meta+Enter (Or Escape followed by Enter).
-
-    If it's off, press enter will execute the statements.
-
-- **auto refresh**
-
-    If it's on, voltsql will fetch the voltdb catalog everytime you execute a statement from voltsql.
-
-    If it's off, voltsql will only fetch catalog one time when you start voltsql.
-
-    Despite the option, you can always force an refresh using the command
-
-    ```
-    update
-    ```
-
-Commands
--------
-`quit`: quit voltsql
-
-`update` force a background catalog refresh
-
-`help` show this readme
-
-Notes
------
-The command history is stored at `~/.voltsql_history`, it is used for retyping the previous commands as well as calculate the prioritization of keywords.
+[F4] AUTO REFRESH
+Refreshes the schema after each statement is processed. When off, refresh the schema manually with the UPDATE command.
 """
