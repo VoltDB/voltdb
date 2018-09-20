@@ -482,7 +482,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
     {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         CatalogChangeResult ccr = null;
-
+        long start = System.nanoTime();
         String errMsg = VoltZK.createActionBlocker(zk, VoltZK.catalogUpdateInProgress, CreateMode.EPHEMERAL,
                                                     hostLog, "catalog update(" + invocationName + ")" );
         if (errMsg != null) {
@@ -576,6 +576,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             VoltZK.removeActionBlocker(zk, VoltZK.catalogUpdateInProgress, hostLog);
             return null;
         });
+
+        hostLog.info("Catalog update time: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) + " ms");
         return second;
     }
 
