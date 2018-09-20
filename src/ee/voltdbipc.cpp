@@ -1692,7 +1692,6 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
                                         ntohll(params->lastCommittedSpHandle),
                                         ntohll(params->uniqueId),
                                         ntohl(params->remoteClusterId),
-                                        ntohl(params->remotePartitionId),
                                         ntohll(params->undoToken),
                                         params->log);
         char response[9];

@@ -50,6 +50,7 @@ public class DRProducerStatsBase {
         public static final String LAST_ACK_TIMESTAMP = "LASTACKTIMESTAMP";
         public static final String IS_SYNCED = "ISSYNCED";
         public static final String MODE = "MODE";
+        public static final String CONNECTION_STATUS = "CONNECTION_STATUS";
     }
 
     public static class DRProducerNodeStatsBase extends StatsSource {
@@ -99,6 +100,7 @@ public class DRProducerStatsBase {
             columns.add(new ColumnInfo(Columns.IS_SYNCED, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.MODE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.QUEUE_GAP, VoltType.BIGINT));
+            columns.add(new ColumnInfo(Columns.CONNECTION_STATUS, VoltType.STRING));
         }
 
         @Override

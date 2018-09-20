@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -118,6 +119,8 @@ public class LeaderAppointer implements Promotable
         final int m_partitionId;
         final Set<Long> m_replicas;
         long m_currentLeader;
+        long m_previousLeader = Long.MAX_VALUE;
+        boolean m_isLeaderMigrated = false;
 
         //A candidate to host partition leader when nodes are down
         //It is calculated when nodes are down.
@@ -294,14 +297,18 @@ public class LeaderAppointer implements Promotable
                     break;
                 }
             }
-            if (prevLeader == Long.MAX_VALUE) {
-                tmLog.info(WHOMIM + "Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
-                        partitionId);
+
+            // If the current leader is appointed via leader migration, then re-appoint it if possible
+            if (m_isLeaderMigrated && m_previousLeader != Long.MAX_VALUE && children.contains(m_previousLeader)) {
+                masterHSId = m_previousLeader;
+                tmLog.info(WHOMIM + " Previous leader " + CoreUtils.hsIdToString(masterHSId) + " for partition " +
+                        partitionId + " was appointed via leader migration.");
             }
-            else {
-                tmLog.info(WHOMIM + "Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader (Previous Leader was HSId " +
-                        CoreUtils.hsIdToString(prevLeader) + ") for partition " + partitionId);
-            }
+
+            tmLog.info(WHOMIM + "Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " + partitionId +
+                    " Previous Leader:" + ((prevLeader == Long.MAX_VALUE) ? " none" :
+                        CoreUtils.hsIdToString(prevLeader)));
+
             String masterPair = Long.toString(prevLeader) + "/" + Long.toString(masterHSId);
             try {
                 m_iv2appointees.put(partitionId, masterPair);
@@ -312,9 +319,8 @@ public class LeaderAppointer implements Promotable
         }
     }
 
-    /* We'll use this callback purely for startup so we can discover when all
-     * the leaders we have appointed have completed their promotions and
-     * published themselves to Zookeeper */
+    // Discover when all the leaders we have appointed have completed their promotions and
+    // published themselves to Zookeeper. Also update the partition leaders in PartitionCallback upon leader migration
     LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
@@ -335,7 +341,7 @@ public class LeaderAppointer implements Promotable
             } else {
                 // update partition call backs with correct current leaders after MigratePartitionLeader
                 for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
-                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSId);
+                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSId, entry.getValue().m_isMigratePartitionLeaderRequested);
                 }
             }
         }
@@ -516,7 +522,6 @@ public class LeaderAppointer implements Promotable
             m_es);
         }
         else {
-
             // Create MP repair ZK node to block rejoin
             VoltZK.createActionBlocker(m_zk, VoltZK.mpRepairInProgress,
                     CreateMode.EPHEMERAL, tmLog, "MP Repair");
@@ -595,8 +600,7 @@ public class LeaderAppointer implements Promotable
         m_partitionWatchers.put(pid, babySitter);
     }
 
-    public boolean isClusterKSafe(Set<Integer> failedHosts)
-    {
+    public boolean isClusterKSafe(Set<Integer> failedHosts) {
         boolean retval = true;
         List<String> partitionDirs = null;
         try {
@@ -608,8 +612,9 @@ public class LeaderAppointer implements Promotable
         //Don't fetch the values serially do it asynchronously
         Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
         Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<ZKUtil.ChildrenCallback>();
-        for (String partitionDir : partitionDirs) {
+        for (Iterator<String> it = partitionDirs.iterator(); it.hasNext();) {
             //skip checking MP, not relevant to KSafety
+            String partitionDir = it.next();
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
             if (pid == MpInitiator.MP_INIT_PID) continue;
 
@@ -622,7 +627,18 @@ public class LeaderAppointer implements Promotable
                 m_zk.getChildren(dir, false, childrenCallback, null);
                 childrenCallbacks.offer(childrenCallback);
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+                // During elastic rejoin and re-balance partitions, a joining node failure will reject the whole joining
+                // and bring down all joining nodes. In the meantime, other nodes could check the cluster viability and could
+                // encounter the removal of newly elastically added partitions. Ignore these partitions. ENG-14567
+                if ( e instanceof KeeperException) {
+                    KeeperException ke = (KeeperException)e;
+                    if (ke.code() != KeeperException.Code.NONODE) {
+                        VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+                    }
+                    it.remove();
+                } else {
+                    VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+                }
             }
         }
 
@@ -691,6 +707,12 @@ public class LeaderAppointer implements Promotable
                 // update k-safety statistics for initialized partitions
                 // the missing partition count may be incorrect if the failed hosts contain any of the replicas?
                 lackingReplication.add(new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size()));
+            } catch (KeeperException ke) {
+                // See above comments ENG-14567: ZKUtil.ChildrenCallback or ZKUtil.ByteArrayCallback may throw exception
+                // if the queried node is removed.
+                if (ke.code() == KeeperException.Code.NONODE || ke.code() == KeeperException.Code.NOTEMPTY) {
+                    continue;
+                }
             } catch (Exception e) {
                 String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
                 VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
@@ -809,10 +831,12 @@ public class LeaderAppointer implements Promotable
      * @param partitionId  partition id
      * @param newMasterHISD new master HSID
      */
-    public void updatePartitionLeader(int partitionId, long newMasterHISD) {
+    public void updatePartitionLeader(int partitionId, long newMasterHISD, boolean isLeaderMigrated) {
         PartitionCallback cb = m_callbacks.get(partitionId);
-        if (cb != null) {
+        if (cb != null && cb.m_currentLeader != newMasterHISD) {
+            cb.m_previousLeader = cb.m_currentLeader;
             cb.m_currentLeader = newMasterHISD;
+            cb.m_isLeaderMigrated = isLeaderMigrated;
         }
     }
 

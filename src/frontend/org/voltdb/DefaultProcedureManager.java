@@ -56,6 +56,8 @@ public class DefaultProcedureManager {
     // part of the main catalog
     private final Database m_fakeDb;
 
+    public static final String NIBBLE_DELETE_PROC = "nibbledelete";
+
     public DefaultProcedureManager(Database db) {
         m_db = db;
         m_fakeDb = new Catalog().getClusters().add("cluster").getDatabases().add("database");

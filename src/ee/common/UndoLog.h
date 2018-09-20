@@ -18,13 +18,11 @@
 #ifndef UNDOLOG_H_
 #define UNDOLOG_H_
 
-#include <vector>
-#include <deque>
 #include <stdint.h>
 #include <iostream>
 #include <cassert>
 
-#include "common/Pool.hpp"
+#include "common/VoltContainer.hpp"
 #include "common/UndoQuantum.h"
 
 namespace voltdb
@@ -44,8 +42,6 @@ namespace voltdb
          */
         void clear();
 
-        inline void setUndoLogForLowestSite() { m_undoLogForLowestSite = true; }
-
         inline UndoQuantum* generateUndoQuantum(int64_t nextUndoToken)
         {
             //std::cout << "Generating token " << nextUndoToken
@@ -58,16 +54,16 @@ namespace voltdb
             assert(nextUndoToken > m_lastReleaseToken);
             m_lastUndoToken = nextUndoToken;
             Pool *pool = NULL;
-            if (m_undoDataPools.size() == 0) {
+            if (m_undoDataPools.empty()) {
                 pool = new Pool(TEMP_POOL_CHUNK_SIZE, 1);
             } else {
                 pool = m_undoDataPools.back();
                 m_undoDataPools.pop_back();
             }
             assert(pool);
-            UndoQuantum *undoQuantum = new (*pool) UndoQuantum(nextUndoToken, pool, m_undoLogForLowestSite);
-            m_undoQuantums.push_back(undoQuantum);
-            return undoQuantum;
+            m_undoQuantums.emplace_back(createInstanceFromPool<UndoQuantum>(*pool,
+                     nextUndoToken, pool));
+            return m_undoQuantums.back();
         }
 
         /*
@@ -101,26 +97,25 @@ namespace voltdb
             }
 
             m_lastUndoToken = undoToken - 1;
-            while (m_undoQuantums.size() > 0) {
+            while (! m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.back();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
                 if (undoQuantumToken < undoToken) {
-                    return;
+                   break;
                 }
 
                 m_undoQuantums.pop_back();
                 // Destroy the quantum, but possibly retain its pool for reuse.
-                Pool *pool = undoQuantum->undo();
+                Pool *pool = UndoQuantum::undo(std::move(*undoQuantum));
                 pool->purge();
                 if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
                     m_undoDataPools.push_back(pool);
-                }
-                else {
-                    delete pool; pool = NULL;
+                } else {
+                    delete pool;
                 }
 
                 if(undoQuantumToken == undoToken) {
-                    return;
+                   break;
                 }
             }
         }
@@ -136,7 +131,7 @@ namespace voltdb
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             assert(m_lastReleaseToken < undoToken);
             m_lastReleaseToken = undoToken;
-            while (m_undoQuantums.size() > 0) {
+            while (! m_undoQuantums.empty()) {
                 UndoQuantum *undoQuantum = m_undoQuantums.front();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
                 if (undoQuantumToken > undoToken) {
@@ -145,13 +140,12 @@ namespace voltdb
 
                 m_undoQuantums.pop_front();
                 // Destroy the quantum, but possibly retain its pool for reuse.
-                Pool *pool = undoQuantum->release();
+                Pool *pool = UndoQuantum::release(std::move(*undoQuantum));
                 pool->purge();
                 if (m_undoDataPools.size() < MAX_CACHED_POOLS) {
                     m_undoDataPools.push_back(pool);
-                }
-                else {
-                    delete pool; pool = NULL;
+                } else {
+                    delete pool;
                 }
                 if(undoQuantumToken == undoToken) {
                     return;
@@ -162,13 +156,13 @@ namespace voltdb
         int64_t getSize() const
         {
             int64_t total = 0;
-            for (int i = 0; i < m_undoDataPools.size(); i++)
+            for (auto iter = m_undoDataPools.cbegin(); iter != m_undoDataPools.cend(); ++iter)
             {
-                total += m_undoDataPools[i]->getAllocatedMemory();
+                total += (*iter)->getAllocatedMemory();
             }
-            for (int i = 0; i < m_undoQuantums.size(); i++)
+            for (auto iter = m_undoQuantums.cbegin(); iter != m_undoQuantums.cend(); ++iter)
             {
-                total += m_undoQuantums[i]->getAllocatedMemory();
+                total += (*iter)->getAllocatedMemory();
             }
             return total;
         }
@@ -201,7 +195,6 @@ namespace voltdb
 
         std::vector<Pool*> m_undoDataPools;
         std::deque<UndoQuantum*> m_undoQuantums;
-        bool m_undoLogForLowestSite;
     };
 }
 #endif /* UNDOLOG_H_ */

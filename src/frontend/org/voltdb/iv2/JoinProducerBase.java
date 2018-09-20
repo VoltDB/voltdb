@@ -216,8 +216,8 @@ public abstract class JoinProducerBase extends SiteTasker {
             // If we've done something meaningful, go ahead and return ourselves to the queue immediately
             m_taskQueue.offer(this);
         } else {
-            // Otherwise, avoid spinning too aggressively, so wait a few milliseconds before requeueing
-            VoltDB.instance().scheduleWork(new ReturnToTaskQueueAction(), 5, -1, TimeUnit.MILLISECONDS);
+            // Otherwise, avoid spinning too aggressively, so wait a millisecond before requeueing
+            VoltDB.instance().scheduleWork(new ReturnToTaskQueueAction(), 1, -1, TimeUnit.MILLISECONDS);
         }
     }
 }

@@ -143,6 +143,7 @@ import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MigratePartitionLeaderInfo;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.RejoinProducer;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TransactionTaskQueue;
@@ -1626,7 +1627,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // If -Dlarge_mode_ratio=xx is specified via ant, the value will show up in the environment variables and
             // take higher priority. Otherwise, the value specified via VOLTDB_OPTS will take effect.
-            final double largeModeRatio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
+            // If the test is started by ant and -Dlarge_mode_ratio is not set, it will take a default value "-1" which
+            // we should ignore.
+            final double largeModeRatio = Double.valueOf((System.getenv("LARGE_MODE_RATIO") == null ||
+                    System.getenv("LARGE_MODE_RATIO").equals("-1")) ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
             if (largeModeRatio > 0) {
                 hostLog.info(String.format("The large_mode_ratio property is set as %.2f", largeModeRatio));
             }
@@ -2153,6 +2157,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         if (StartAction.JOIN.equals(startAction)) {
             TransactionTaskQueue.initBarrier(m_nodeSettings.getLocalSitesCount());
+        }
+        else if (startAction.doesRejoin()) {
+            RejoinProducer.initBarrier(m_nodeSettings.getLocalSitesCount());
         }
         return initiators;
     }

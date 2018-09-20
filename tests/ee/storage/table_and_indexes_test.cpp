@@ -301,6 +301,15 @@ class TableAndIndexTest : public Test {
                                                                    customerTable);
         }
 
+        size_t drStartPosition(boost::shared_ptr<StreamBlock> sb) {
+            return sb->headerSize() - 8;
+        }
+
+        void appendDrHeader(boost::shared_array<char> data, size_t startPos, boost::shared_ptr<StreamBlock> sb) {
+            *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(1);
+            *reinterpret_cast<int32_t*>(&data.get()[startPos + 4]) = htonl(static_cast<int32_t>(sb->offset()));
+        }
+
         ~TableAndIndexTest() {
             delete eContext;
             delete mockEngine;
@@ -437,9 +446,9 @@ TEST_F(TableAndIndexTest, DrTest) {
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
 
-    //Add a length prefix for test, then apply it
-    size_t startPos = sb->headerSize() - 4;
-    *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
+    //Add a dr header for test, and apply the update
+    size_t startPos = drStartPosition(sb);
+    appendDrHeader(data, startPos, sb);
     drStream.m_enabled = false;
     districtTable->setDR(false);
     sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1, addPartitionId(70));
@@ -481,8 +490,8 @@ TEST_F(TableAndIndexTest, DrTest) {
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
 
-    //Add a length prefix for test and apply it
-    *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
+    //Add a dr header for test, and apply the update
+    appendDrHeader(data, startPos, sb);
     drStream.m_enabled = false;
     districtTable->setDR(false);
     sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1, addPartitionId(72));
@@ -517,8 +526,8 @@ TEST_F(TableAndIndexTest, DrTest) {
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
 
-    //Add a length prefix for test, and apply the update
-    *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
+    //Add a dr header for test, and apply the update
+    appendDrHeader(data, startPos, sb);
     drStream.m_enabled = false;
     districtTable->setDR(false);
     sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1, addPartitionId(89));
@@ -581,9 +590,9 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
 
-    //Add a length prefix for test, then apply it
-    size_t startPos = sb->headerSize() - 4;
-    *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
+    //Add a dr header for test, and apply the update
+    size_t startPos = drStartPosition(sb);
+    appendDrHeader(data, startPos, sb);
     drStream.m_enabled = false;
     districtTable->setDR(false);
     sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1, addPartitionId(70));
@@ -621,9 +630,8 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
 
-    //Add a length prefix for test, and apply the update
-    *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
-    drStream.m_enabled = false;
+    //Add a dr header for test, and apply the update
+    appendDrHeader(data, startPos, sb);    drStream.m_enabled = false;
     districtTable->setDR(false);
     sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1, addPartitionId(72));
     drStream.m_enabled = true;
@@ -700,9 +708,9 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
 
-    //Add a length prefix for test, then apply it
-    size_t startPos = sb->headerSize() - 4;
-    *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
+    //Add a dr header for test, and apply the update
+    size_t startPos = drStartPosition(sb);
+    appendDrHeader(data, startPos, sb);
     drStream.m_enabled = false;
     customerTable->setDR(false);
     sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1, addPartitionId(70));
@@ -740,8 +748,8 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     topend.data.pop_back();
     topend.receivedDRBuffer = false;
 
-    //Add a length prefix for test, and apply the update
-    *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
+    //Add a dr header for test, and apply the update
+    appendDrHeader(data, startPos, sb);
     drStream.m_enabled = false;
     customerTable->setDR(false);
     sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1, addPartitionId(72));

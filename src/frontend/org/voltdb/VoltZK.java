@@ -445,9 +445,8 @@ public class VoltZK {
                 if (blockers.contains(leafNodeRejoinInProgress)) {
                     errorMsg = "while a node rejoin is active. Please retry catalog update later.";
                 } else if (blockers.contains(mpRepairBlocker)){
-                    // Upon node failures, a MP repair blocker may be registered right before they
-                    // unregistered after repair is done. Let rejoining nodes wait to avoid any
-                    // interference with the transaction repair process.
+                    // Avoid UAC during MP repair or promotion since UAC will invoke GlobalServiceElector to
+                    // register other promotable services while MPI is accepting promotion
                     errorMsg = "while leader promotion or transaction repair are in progress. Please retry catalog update later.";
                 }
                 break;

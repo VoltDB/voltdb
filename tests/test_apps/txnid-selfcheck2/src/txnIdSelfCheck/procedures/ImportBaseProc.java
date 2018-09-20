@@ -70,10 +70,10 @@ public class ImportBaseProc extends VoltProcedure {
                         " serious error expected cid " + cid + " != fetched cid: "+ fcid);
             long mts = Math.max(row.getLong("ts"), ts);
             long mcnt = Math.max(row.getLong("cnt"), cnt);
-            System.err.println("Invoke update query: mts " + mts + " mcnt " + mcnt + " cid " + cid + " ts " + ts + " cnt " + cnt);
+            //System.err.println("Invoke update query: mts " + mts + " mcnt " + mcnt + " cid " + cid + " ts " + ts + " cnt " + cnt);
             voltQueueSQL(update, mts, mcnt, cid);
         } else {
-            System.err.println("Invoke insert query: cid " + cid + " ts " + ts + " cnt " + cnt);
+            //System.err.println("Invoke insert query: cid " + cid + " ts " + ts + " cnt " + cnt);
             voltQueueSQL(insert, ts, cid, cnt, 1);
         }
 
@@ -86,12 +86,12 @@ public class ImportBaseProc extends VoltProcedure {
                 // detect/report duplicates ?
             }
             bitmap[B] |= mask;
-            System.err.println("Invoke bitmap update query: bitmap " + Encoder.hexEncode(bitmap) + " cid " + cid + " seq " + seq + " cnt " + cnt);
+            //System.err.println("Invoke bitmap update query: bitmap " + Encoder.hexEncode(bitmap) + " cid " + cid + " seq " + seq + " cnt " + cnt);
             voltQueueSQL(update_bitmap, bitmap, cid, seq);
         } else {
             bitmap = new byte[1024];
             bitmap[B] |= mask;
-            System.err.println("Invoke bitmap insert query: cid " + cid + " seq " + seq + " bitmap " + Encoder.hexEncode(bitmap) + " cnt " + cnt);
+            //System.err.println("Invoke bitmap insert query: cid " + cid + " seq " + seq + " bitmap " + Encoder.hexEncode(bitmap) + " cnt " + cnt);
             voltQueueSQL(insert_bitmap, cid, seq, bitmap);
         }
         return voltExecuteSQL(true);

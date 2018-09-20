@@ -66,13 +66,13 @@ function test-tools-find-directories-if-needed() {
 }
 
 # Build VoltDB: 'community', open-source version
-# Optionally, you may specify BUILD_ARGS
+# Optionally, you may specify one or more build arguments ($@)
 function test-tools-build() {
     test-tools-find-directories-if-needed
-    echo -e "\n$0 performing: [test-tools-]build $BUILD_ARGS"
+    echo -e "\n$0 performing: [test-tools-]build $@"
 
     cd $VOLTDB_COM_DIR
-    ant clean dist $BUILD_ARGS
+    ant clean dist "$@"
     code_tt_build=$?
     cd -
 
@@ -82,13 +82,13 @@ function test-tools-build() {
 }
 
 # Build VoltDB: 'pro' version
-# Optionally, you may specify BUILD_ARGS
+# Optionally, you may specify one or more build arguments ($@)
 function test-tools-build-pro() {
     test-tools-find-directories-if-needed
-    echo -e "\n$0 performing: [test-tools-]build-pro $BUILD_ARGS"
+    echo -e "\n$0 performing: [test-tools-]build-pro $@"
 
     cd $VOLTDB_PRO_DIR
-    ant -f mmt.xml dist.pro $BUILD_ARGS
+    ant -f mmt.xml dist.pro "$@"
     code_tt_build=$?
     cd -
     VOLTDB_PRO_BIN=$(cd $VOLTDB_PRO_DIR/obj/pro/voltdb-ent-*/bin; pwd)
@@ -100,31 +100,37 @@ function test-tools-build-pro() {
 }
 
 # Build VoltDB ('community'), only if not built already
-# Optionally, you may specify BUILD_ARGS
+# Optionally, you may specify one or more build arguments ($@)
 function test-tools-build-if-needed() {
     test-tools-find-directories-if-needed
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: [test-tools-]build-if-needed $@"
+    fi
     VOLTDB_COM_JAR=$(ls $VOLTDB_COM_DIR/voltdb/voltdb-*.jar)
     if [[ ! -e $VOLTDB_COM_JAR ]]; then
-        test-tools-build
+        test-tools-build "$@"
     fi
 }
 
 # Build VoltDB 'pro' version, only if not built already
-# Optionally, you may specify BUILD_ARGS
+# Optionally, you may specify one or more build arguments ($@)
 function test-tools-build-pro-if-needed() {
     test-tools-find-directories-if-needed
+    if [[ "$TT_DEBUG" -ge "2" ]]; then
+        echo -e "\n$0 performing: [test-tools-]build-pro-if-needed $@"
+    fi
     VOLTDB_PRO_TAR=$(ls $VOLTDB_PRO_DIR/obj/pro/voltdb-ent-*.tar.gz)
     if [[ ! -e $VOLTDB_PRO_TAR ]]; then
-        test-tools-build-pro
+        test-tools-build-pro "$@"
     fi
 }
 
 # Set CLASSPATH, PATH, and python, as needed
 function test-tools-init() {
     test-tools-find-directories-if-needed
-    test-tools-build-if-needed
+    test-tools-build-if-needed "$@"
     if [[ "$TT_DEBUG" -gt "0" ]]; then
-        echo -e "\n$0 performing: test-tools-init"
+        echo -e "\n$0 performing: test-tools-init $@"
     fi
 
     # Set CLASSPATH to include the VoltDB Jar file

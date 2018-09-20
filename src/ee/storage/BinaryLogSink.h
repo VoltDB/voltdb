@@ -29,23 +29,58 @@ class PersistentTable;
 class Pool;
 class VoltDBEngine;
 
+class BinaryLog;
+
 /*
  * Responsible for applying binary logs to table data
  */
 class BinaryLogSink {
 public:
     BinaryLogSink();
-    int64_t applyTxn(ReferenceSerializeInputLE *taskInfo,
-                     boost::unordered_map<int64_t, PersistentTable*> &tables,
-                     Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                     const char *txnStart,
-                     int64_t localUniqueId);
+    /**
+     * Apply the binary logs. The logs can either be on log for multiple transactions to the same partition or multiple
+     * logs which correspond to a single multi-partition transaction.
+     *
+     * The format of logs should be:
+     *  number of logs: int32
+     *  for each log:
+     *      size of log: int32
+     *      log contents
+     */
+    int64_t apply(const char *logs, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool,
+            VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId);
 
 private:
-    int64_t apply(ReferenceSerializeInputLE *taskInfo, const DRRecordType type,
-                  boost::unordered_map<int64_t, PersistentTable*> &tables,
-                  Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                  const char *txnStart, int64_t sequenceNumber, int64_t uniqueId, bool skipRow, bool replicatedTableOperation);
+    /**
+     * Apply all transactions within one log
+     */
+    int64_t applyLog(BinaryLog *log, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool,
+            VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId);
+
+    /**
+     * Apply all records within a single transaction from the binary log.
+     */
+    int64_t applyTxn(BinaryLog *log, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool,
+            VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId, bool replicatedTable);
+
+    /**
+     * Apply a single transaction to replicated tables
+     */
+    int64_t applyReplicatedTxn(BinaryLog *log, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool,
+            VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId);
+
+    /**
+     * Apply multiple logs from a single MP transaction
+     */
+    int64_t applyMpTxn(const char *logs, int32_t logCount, boost::unordered_map<int64_t, PersistentTable*> &tables,
+            Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId);
+
+    /**
+     * Apply a single record from a binary log performing any necessary conflict handling.
+     */
+    int64_t applyRecord(BinaryLog *log, const DRRecordType type,
+            boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
+            int32_t remoteClusterId, bool replicatedTable, bool skipRow);
 };
 
 

@@ -45,7 +45,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_isRestart = msg.isRestart();
         m_spiHSId = msg.getCoordinatorHSId();
         m_ackRequired = msg.requiresAck();
-        m_isAborted = msg.isRestart() || msg.m_isAbortDuringRepair;
+        m_isAborted = msg.isRestart() || msg.isAbortDuringRepair();
     }
 
     public long getTxnId()

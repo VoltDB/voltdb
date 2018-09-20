@@ -57,6 +57,8 @@ public class DeterminismHash {
 
     public final static int MAX_HASHES_COUNT = Integer.getInteger("MAX_STATEMENTS_WITH_DETAIL", 32) * 2;
 
+    public final static int HASH_NOT_INCLUDE = Integer.MAX_VALUE;
+
     int m_catalogVersion = 0;
     int m_hashCount = 0;
 
@@ -113,6 +115,10 @@ public class DeterminismHash {
         assert(leftHashes.length >= 3);
         assert(rightHashes.length >= 3);
 
+        // Compare total checksum first
+        if (leftHashes[0] == rightHashes[0]) {
+            return -1;
+        }
         int includedHashLeft = Math.min(leftHashes[2], MAX_HASHES_COUNT);
         int includedHashRight = Math.min(rightHashes[2], MAX_HASHES_COUNT);
         int includedHashMin = Math.min(includedHashLeft, includedHashRight);
@@ -123,7 +129,9 @@ public class DeterminismHash {
             }
             pos++;
         }
-        return -1;
+        // If the number of per-statement hashes is more than MAX_HASHES_COUNT and
+        // the mismatched hash isn't included in the per-statement hashes
+        return HASH_NOT_INCLUDE;
     }
 
     /**
@@ -149,7 +157,12 @@ public class DeterminismHash {
             pos++;
         }
         if (hashes[2] > MAX_HASHES_COUNT) {
-            sb.append("\n  Additional SQL statements truncated");
+            sb.append("\n  Additional SQL statements truncated.");
+            if (m_hashMismatchPos == DeterminismHash.HASH_NOT_INCLUDE) {
+                sb.append("\n  The mismatched hash is also truncated. "
+                        + "For debugging purpose, use VOLTDB_OPTS=\"-DMAX_STATEMENTS_WITH_DETAIL=<hashcount>\" to set to a higher value, "
+                        + "it could impact performance.");
+            }
         }
         return sb.toString();
     }

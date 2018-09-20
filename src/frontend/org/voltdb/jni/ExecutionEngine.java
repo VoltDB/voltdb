@@ -830,24 +830,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Apply binary log data. To be able to advance the DR sequence number and
      * regenerate binary log for chaining correctly, proper spHandle and
      * lastCommittedSpHandle from the current transaction need to be passed in.
-     * @param log                      The binary log data
+     * @param logs                     The binary log data
      * @param txnId                    The txnId of the current transaction
      * @param spHandle                 The spHandle of the current transaction
      * @param lastCommittedSpHandle    The spHandle of the last committed transaction
      * @param uniqueId                 The uniqueId of the current transaction
      * @param remoteClusterId          The cluster id of producer cluster
-     * @param remotePartitionId        The partition id of producer cluster
      * @param undoToken                For undo
      * @throws EEException
      */
-    public abstract long applyBinaryLog(ByteBuffer log,
-                                        long txnId,
-                                        long spHandle,
-                                        long lastCommittedSpHandle,
-                                        long uniqueId,
-                                        int remoteClusterId,
-                                        int remotePartitionId,
-                                        long undoToken) throws EEException;
+    public abstract long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
+            long uniqueId, int remoteClusterId, long undoToken) throws EEException;
 
     /**
      * Execute an arbitrary non-transactional task that is described by the task id and
@@ -1128,14 +1121,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native long nativeTableHashCode(long pointer, int tableId);
 
-    protected native long nativeApplyBinaryLog(long pointer,
-                                               long txnId,
-                                               long spHandle,
-                                               long lastCommittedSpHandle,
-                                               long uniqueId,
-                                               int remoteClusterId,
-                                               int remotePartitionId,
-                                               long undoToken);
+    protected native long nativeApplyBinaryLog(long pointer, long txnId, long spHandle, long lastCommittedSpHandle,
+            long uniqueId, int remoteClusterId, long undoToken);
 
     /**
      * Execute an arbitrary task based on the task ID and serialized task parameters.

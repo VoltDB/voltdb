@@ -14,34 +14,13 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef BINARYLOGSINKWRAPPER_H
-#define BINARYLOGSINKWRAPPER_H
 
-#include "storage/BinaryLogSink.h"
+#pragma once
+#include <deque>
+#include "Pool.hpp"
 
-#include <boost/unordered_map.hpp>
-#include <boost/shared_ptr.hpp>
+// This is the preferred way, but CentOS6 does not support this
+// yet...
+//template<typename T> using volt_vector = std::vector<T, voltdb::allocator<T>>;
+//template<typename T> using volt_deque = std::deque<T, voltdb::allocator<T>>;
 
-namespace voltdb {
-
-class PersistentTable;
-class Pool;
-class VoltDBEngine;
-
-/*
- * Responsible for applying binary logs to table data
- */
-class BinaryLogSinkWrapper {
-public:
-    BinaryLogSinkWrapper() {}
-
-    int64_t apply(const char *logs,
-            boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
-            int32_t remoteClusterId, int64_t localUniqueId);
-private:
-    BinaryLogSink m_sink;
-};
-
-
-}
-#endif

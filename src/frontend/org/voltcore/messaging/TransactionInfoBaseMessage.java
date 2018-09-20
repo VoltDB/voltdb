@@ -49,6 +49,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected boolean m_isForReplica = false;
 
     public static final long INITIAL_TIMESTAMP = Long.MIN_VALUE;
+    public static final long UNUSED_TRUNC_HANDLE = Long.MIN_VALUE;
 
     /** Empty constructor for de-serialization */
     protected TransactionInfoBaseMessage() {

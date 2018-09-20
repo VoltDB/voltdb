@@ -402,7 +402,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
 
-        if (numFragmentIds == 0) return m_emptyDeserializer;
+        if (numFragmentIds == 0) {
+            return m_emptyDeserializer;
+        }
         final int batchSize = numFragmentIds;
         if (HOST_TRACE_ENABLED) {
             for (int i = 0; i < batchSize; ++i) {
@@ -527,8 +529,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         try {
             int length = m_nextDeserializer.readInt();
-            if (length == 0) return null;
-            if (length < 0) VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
+            if (length == 0) {
+                return null;
+            }
+            if (length < 0) {
+                VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
+            }
 
             byte uniqueViolations[] = new byte[length];
             m_nextDeserializer.readFully(uniqueViolations);
@@ -732,12 +738,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               int remoteClusterId, int remotePartitionId, long undoToken) throws EEException
-    {
-        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId,remotePartitionId, undoToken);
+    public long applyBinaryLog(ByteBuffer logs, long txnId, long spHandle, long lastCommittedSpHandle,
+            long uniqueId, int remoteClusterId, long undoToken) throws EEException {
+        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId,
+                undoToken);
         if (rowCount < 0) {
-            throwExceptionForError((int)rowCount);
+            throwExceptionForError((int) rowCount);
         }
         return rowCount;
     }

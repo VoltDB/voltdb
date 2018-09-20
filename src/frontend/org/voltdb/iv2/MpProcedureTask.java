@@ -159,7 +159,7 @@ public class MpProcedureTask extends ProcedureTask
                     m_txnState.txnId,
                     m_txnState.isReadOnly(),
                     0,
-                    true,
+                    true,   // rollback
                     false,  // really don't want to have ack the ack.
                     true,   // Don't clear/flush the txn because we are restarting it
                     m_msg.isForReplay(),
@@ -211,6 +211,10 @@ public class MpProcedureTask extends ProcedureTask
             if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {
                 if (!response.shouldCommit()) {
                     txn.setNeedsRollback(true);
+                }
+                else {
+                    // rollback responses won't advance the truncation point so skip the update
+                    response.setMpFragmentSent(txn.haveSentFragment());
                 }
                 completeInitiateTask(siteConnection);
                 // Set the source HSId (ugh) to ourselves so we track the message path correctly
@@ -298,14 +302,32 @@ public class MpProcedureTask extends ProcedureTask
         m_queue.restart();
     }
 
-    @Override
-    public String toString()
+    private void taskToString(StringBuilder sb)
     {
-        StringBuilder sb = new StringBuilder();
         sb.append("MpProcedureTask:");
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+    }
+
+    // Use this version when it is possible for multiple threads to make a string from the invocation
+    // at the same time (seems to only be an issue if the parameter to the procedure is a VoltTable)
+    public String toShortString()
+    {
+        StringBuilder sb = new StringBuilder();
+        taskToString(sb);
+        if (m_msg != null) {
+            sb.append("\n");
+            m_msg.toShortString(sb);
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        taskToString(sb);
         if (m_msg != null) {
             sb.append("\n" + m_msg);
         }

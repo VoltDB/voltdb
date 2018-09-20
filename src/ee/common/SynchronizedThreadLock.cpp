@@ -224,7 +224,7 @@ void SynchronizedThreadLock::signalLowestSiteFinished() {
 }
 
 void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
-        PersistentTable *table) {
+        PersistentTable *table, PersistentTable *deletedTable) {
     if (synchronized) {
         assert(isInSingleThreadMode());
         // For shared replicated table, in the same host site with lowest id
@@ -236,21 +236,28 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq, U
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
             UndoReleaseAction* undoAction;
             UndoQuantumReleaseInterest *releaseInterest = NULL;
+            UndoQuantumReleaseInterest *removeReleaseInterest = NULL;
             if (uq == currUQ) {
                 undoAction = action->getSynchronizedUndoAction(currUQ);
                 if (table) {
                     releaseInterest = table->getReplicatedInterest();
+                }
+                if (deletedTable != NULL) {
+                    removeReleaseInterest = deletedTable->getReplicatedInterest();
                 }
             } else {
                 undoAction = action->getDummySynchronizedUndoAction(currUQ);
                 if (table) {
                     releaseInterest = table->getDummyReplicatedInterest();
                 }
+                if (deletedTable != NULL) {
+                    removeReleaseInterest = deletedTable->getDummyReplicatedInterest();
+                }
             }
-            currUQ->registerUndoAction(undoAction, releaseInterest);
+            currUQ->registerUndoAction(undoAction, releaseInterest, removeReleaseInterest);
         }
     } else {
-        uq->registerUndoAction(action, table);
+        uq->registerUndoAction(action, table, deletedTable);
     }
 }
 
