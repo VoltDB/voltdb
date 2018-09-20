@@ -1597,6 +1597,28 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
+     * Get a JSON /api/2.0/ representation of this table.
+     * @return A string containing a JSON representation of this table.
+     */
+    public JSONStringer toJSONStringerV2(JSONStringer js) throws JSONException{
+        // array of row data
+            VoltTableRow row = cloneRow();
+            row.resetRowPosition();
+            js.array();
+            while (row.advanceRow()) {
+                js.object();
+                for (int i = 0; i < getColumnCount(); i++) {
+
+                    js.key(getColumnName(i));
+                    row.putJSONRep(i, js);
+                }
+                js.endObject();
+            }
+            js.endArray();
+        return js;
+    }
+
+    /**
      * Construct a table from a JSON string. Only parses VoltDB VoltTable JSON format.
      *
      * @param json String containing JSON-formatted table data.
