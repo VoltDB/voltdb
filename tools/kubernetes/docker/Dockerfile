@@ -20,6 +20,7 @@ EXPOSE 22 5555 8080 8081 9000 21211 21212
 EXPOSE 3021 4560 9090 5555
 
 # Set up environment
+RUN apt update
 RUN apt-get update
 RUN apt-get -y --no-install-recommends --no-install-suggests install sudo software-properties-common python-software-properties
 RUN apt-get -y --no-install-recommends --no-install-suggests install alien
@@ -28,7 +29,7 @@ RUN apt-get update
 RUN echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | sudo /usr/bin/debconf-set-selections
 RUN apt-get -y --no-install-recommends --no-install-suggests install oracle-java8-installer
 RUN apt-get -y --no-install-recommends --no-install-suggests install libxml2-utils procps python vim less curl jq
-RUN apt-get -y --no-install-recommends --no-install-suggests install dnsutils net-tools iputils-ping telnet
+RUN apt-get -y --no-install-recommends --no-install-suggests install dnsutils net-tools iputils-ping telnet iperf
 RUN apt-get -y --no-install-recommends --no-install-suggests install python-pip python-setuptools python-dev build-essential
 RUN pip install --upgrade pip
 RUN pip install --upgrade httplib2
