@@ -15,9 +15,7 @@
         "CASCADE": [],
         "CASE": [],
         "CHAR": [],
-        "CHECK": [],
         "COLUMN": [],
-        "COMMIT": [],
         "COPY": [],
         "CREATE": [
             "FUNCTION",
@@ -91,6 +89,7 @@
         ],
         "PRIMARY": [],
         "RECURSIVE": [],
+        "REMOVE CLASSES": [],
         "REPLACE": [],
         "RIGHT": [],
         "ROLLBACK": [],
@@ -98,7 +97,7 @@
         "ROWS": [],
         "SELECT": [],
         "SET": [],
-        "SHOW": [],
+        "SHOW": ["CLASSES","PROCEDURES", "TABLES"],
         "STARTS WITH": [],
         "SMALLINT": [],
         "TABLE": [],
@@ -115,7 +114,10 @@
         "VIEW": [],
         "WHEN": [],
         "WHERE": [],
-        "WITH": []
+        "WITH": [],
+        "QUIT": [],
+        "REFRESH": [],
+        "HELP": []
     },
     "functions": [
         "ABS",
@@ -278,7 +280,6 @@
         "BOTH",
         "CASE",
         "CAST",
-        "CHECK",
         "COLLATE",
         "COLUMN",
         "CONSTRAINT",
