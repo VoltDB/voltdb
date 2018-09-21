@@ -286,6 +286,7 @@ public class HTTPAdminListener {
             //Following are the servelets jetty is configured with see URL pattern for what they handle.
             servlets.addServletWithMapping(DBMonitorServlet.class, "/").setAsyncSupported(true);
             servlets.addServletWithMapping(ApiRequestServlet.class, "/api/1.0/*").setAsyncSupported(true);
+            servlets.addServletWithMapping(ApiRequestServletV2.class, "/api/2.0/*").setAsyncSupported(true);
             servlets.addServletWithMapping(CatalogRequestServlet.class, "/catalog/*").setAsyncSupported(true);
             servlets.addServletWithMapping(DeploymentRequestServlet.class, "/deployment/*").setAsyncSupported(true);
             servlets.addServletWithMapping(UserProfileServlet.class, "/profile/*").setAsyncSupported(true);
