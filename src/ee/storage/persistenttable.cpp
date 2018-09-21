@@ -554,7 +554,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool replicatedTable, 
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
         UndoReleaseAction* undoAction = new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable, replicatedTable);
-        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
+        SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction, NULL, this);
     }
     else {
         if (fallible) {

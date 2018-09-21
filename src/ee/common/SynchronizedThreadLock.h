@@ -86,8 +86,13 @@ public:
     static bool countDownGlobalTxnStartCount(bool lowestSite);
     static void signalLowestSiteFinished();
 
+    /**
+     * Add a new undo action possibly in a synchronized manner.
+     *
+     * Wrapper around calling UndoQuantum::registerUndoAction
+     */
     static void addUndoAction(bool synchronized, UndoQuantum *uq, UndoReleaseAction* action,
-            PersistentTable *interest = NULL);
+            PersistentTable *interest = NULL, PersistentTable *removeInterest = NULL);
 
     static bool isInSingleThreadMode();
     static void setIsInSingleThreadMode(bool value);
