@@ -255,17 +255,16 @@
     ],
     "datatypes": [
         "BIGINT",
-        "BOOLEAN",
-        "CHAR",
-        "DATE",
-        "DOUBLE PRECISION",
-        "INT",
+        "DECIMAL",
+        "FLOAT",
+        "GEOGRAPHY",
+        "GEOGRAPHY_POINT",
         "INTEGER",
-        "NUMERIC",
-        "REAL",
-        "TEXT",
-        "VARCHAR",
-        "VOID"
+        "SMALLINT",
+        "TIMESTAMP",
+        "TINYINT",
+        "VARBINARY",
+        "VARCHAR"
     ],
     "reserved": [
         "ALL",
