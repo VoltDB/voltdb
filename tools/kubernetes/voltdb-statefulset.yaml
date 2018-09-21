@@ -69,19 +69,19 @@ spec:
         # For liveness/readiness checks, if security is enabled, provide userid/password, see https://docs.voltdb.com/UsingVoltDB/ProgLangJson.php
         # For liveness probes, set the initialDelay to ensure the probe is not issued until all the pods are initialized, otherwise
         # k8s will restart your pod(s) during initialization. The time will vary with the number of nodes and your k8s system load.
-#        livenessProbe:
-#          tcpSocket:
-#            port: intra-node
-#          initialDelaySeconds: 60
-#          periodSeconds: 60
-        # The sample readinessProbe is in the voltdb kit in tools/kubernetes/bin, configure it to your requirements.
-#        readinessProbe:
-#          exec:
-#            command:
-#            - k8sreadycheck.py
-#          initialDelaySeconds: 60
-#          periodSeconds: 60
-#          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: intra-node
+          initialDelaySeconds: 60
+          periodSeconds: 60
+        # The sample readinessProbe is in the voltdb kit in tools/kubernetes/bin.
+        readinessProbe:
+          exec:
+            command:
+            - k8sreadycheck.py
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          failureThreshold: 3
         env:
 #         Specify 'voltdb start ...' command line args (space separated list)
 #         IMPORTANT!!!! VoltDB requires linux kernel feature Transparent Huge Pages (THP) be DISABLED when running VoltDB in PRODUCTION.
