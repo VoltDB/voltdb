@@ -46,7 +46,7 @@ You can also use standard directives from sqlcmd to examine tables and procedure
 -  `exec`: execute a stored procedure
 -  `help`: display help text
 -  `show` or `list`: List tables, procedures, or classes
--  `update` refresh the schema
+-  `refresh` refresh the schema
 
 
 Options

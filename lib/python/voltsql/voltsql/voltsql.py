@@ -129,12 +129,12 @@ class VoltCli(object):
 
         @bindings.add('f3')
         def _(event):
-            self.multiline = not self.multiline
-            event.app.current_buffer.multiline = ~event.app.current_buffer.multiline
+            self.auto_refresh = not self.auto_refresh
 
         @bindings.add('f4')
         def _(event):
-            self.auto_refresh = not self.auto_refresh
+            self.multiline = not self.multiline
+            event.app.current_buffer.multiline = ~event.app.current_buffer.multiline
 
         return bindings
 
@@ -142,23 +142,23 @@ class VoltCli(object):
         toolbar_result = []
         if self.completer.smart_completion:
             toolbar_result.append(
-                '<style bg="ansiyellow">[F2]</style> <b><style bg="ansigreen">Smart Completion:</style></b> ON')
+                '<style bg="ansiyellow">[F2]</style> <b><style bg="ansigreen">Smart Completion:</style></b> <b>ON</b>')
         else:
             toolbar_result.append(
                 '<style bg="ansiyellow">[F2]</style> <b><style bg="ansired">Smart Completion:</style></b> OFF')
-
-        if self.multiline:
-            toolbar_result.append(
-                '<style bg="ansiyellow">[F3]</style> <b><style bg="ansigreen">Multiline:</style></b> ON')
-        else:
-            toolbar_result.append(
-                '<style bg="ansiyellow">[F3]</style> <b><style bg="ansired">Multiline:</style></b> OFF')
         if self.auto_refresh:
             toolbar_result.append(
-                '<style bg="ansiyellow">[F4]</style> <b><style bg="ansigreen">Auto Refresh:</style></b> ON')
+                '<style bg="ansiyellow">[F3]</style> <b><style bg="ansigreen">Auto Refresh:</style></b> <b>ON</b>')
         else:
             toolbar_result.append(
-                '<style bg="ansiyellow">[F4]</style> <b><style bg="ansired">Auto Refresh:</style></b> OFF')
+                '<style bg="ansiyellow">[F3]</style> <b><style bg="ansired">Auto Refresh:</style></b> OFF')
+        if self.multiline:
+            toolbar_result.append(
+                '<style bg="ansiyellow">[F4]</style> <b><style bg="ansigreen">Multiline:</style></b> <b>ON</b>')
+            toolbar_result.append('<style bg="ansiyellow">Execute: [ESC+ENTER]</style>')
+        else:
+            toolbar_result.append(
+                '<style bg="ansiyellow">[F4]</style> <b><style bg="ansired">Multiline:</style></b> OFF')
 
         return HTML('  '.join(toolbar_result))
 
@@ -202,8 +202,8 @@ class VoltCli(object):
             except EOFError:
                 break
             else:
-                if sql_cmd.lower() == "update":
-                    # use "update" command to force a fresh
+                if sql_cmd.lower() == "refresh":
+                    # use "refresh" command to force a fresh
                     self.refresher.refresh(self.executor, self.completer, [])
                     continue
                 if sql_cmd.strip().lower() in ("quit", "quit;", "exit", "exit;"):
