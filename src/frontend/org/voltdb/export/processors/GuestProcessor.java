@@ -340,19 +340,29 @@ public class GuestProcessor implements ExportDataProcessor {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
-                                long generation = -1L;
-                                ExportRow row = null;
-                                while (buf.hasRemaining() && !m_shutdown) {
-                                    int length = buf.getInt();
-                                    byte[] rowdata = new byte[length];
-                                    buf.get(rowdata, 0, length);
-                                    if (edb.isLegacy()) {
+                                if (edb.isLegacy()) {
+                                    // It is too painful to collect the first Txn start time for legacy connectors so measure delivery time
+                                    cont.updateStartTime(System.currentTimeMillis());
+                                    while (buf.hasRemaining() && !m_shutdown) {
+                                        int length = buf.getInt();
+                                        byte[] rowdata = new byte[length];
+                                        buf.get(rowdata, 0, length);
                                         edb.onBlockStart();
                                         edb.processRow(length, rowdata);
-                                    } else {
+                                    }
+                                    edb.onBlockCompletion();
+                                }
+                                else {
+                                    long generation = -1L;
+                                    ExportRow row = null;
+                                    while (buf.hasRemaining() && !m_shutdown) {
+                                        int length = buf.getInt();
+                                        byte[] rowdata = new byte[length];
+                                        buf.get(rowdata, 0, length);
                                         //New style connector.
                                         try {
                                             if (row == null) {
+                                                // Decode first row of the block (and find transaction start time)
                                                 row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
                                                 cont.updateStartTime((long)row.values[1]);
                                             }
@@ -376,12 +386,9 @@ public class GuestProcessor implements ExportDataProcessor {
                                         }
                                         generation = row.generation;
                                     }
-                                }
-                                if (edb.isLegacy()) {
-                                    edb.onBlockCompletion();
-                                }
-                                if (row != null) {
-                                    edb.onBlockCompletion(row);
+                                    if (row != null) {
+                                        edb.onBlockCompletion(row);
+                                    }
                                 }
                                 //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
                                 if (cont != null) {

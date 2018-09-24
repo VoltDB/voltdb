@@ -100,7 +100,7 @@ public class TestExportSnapshotPreservesSequenceNumber extends TestExportBaseSoc
         client.drain();
 
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyStream(client, m_verifier);
     }
 
 

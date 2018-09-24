@@ -99,7 +99,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             client.callProcedure("Insert", params);
             client.callProcedure("Insert", paramsGrp);
         }
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     public TestExportV2Suite(final String name) {
