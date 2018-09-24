@@ -407,6 +407,8 @@ public class TestJDBCSecurityEnabled {
                 "--jdbctable=" + "TC2",
                 "--reportdir=" + tmpCSVFileDir,
                 "--maxerrors=50",
+                "--jdbcuser=userWithAdminPerm2",
+                "--jdbcpassword=password!!!",
                 "--credentials=" + path_csv_user,
                 "--port=",
                 "T2"
