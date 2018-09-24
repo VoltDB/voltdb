@@ -151,7 +151,7 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
             @Override
             public void run() {
                 try {
-                    BBContainer cont = fut.get();
+                    AckingContainer cont = fut.get();
                     if (cont == null) {
                         return;
                     }
@@ -180,7 +180,14 @@ public class StandaloneGuestProcessor implements StandaloneExportDataProcessor {
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
                                     try {
-                                        row = ExportRow.decodeRow(refRow, source.getPartitionId(), m_startTS, rowdata);
+                                        if (row == null) {
+                                            // Decode first row of the block (and find transaction start time)
+                                            row = ExportRow.decodeRow(refRow, source.getPartitionId(), m_startTS, rowdata);
+                                            cont.updateStartTime((long)row.values[1]);
+                                        }
+                                        else {
+                                            row = ExportRow.decodeRow(refRow, source.getPartitionId(), m_startTS, rowdata);
+                                        }
                                         refRow = row;
                                     } catch (IOException ioe) {
                                         //TODO: LOG

@@ -92,7 +92,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
 
         //create a non stream table
         for (int i = 0; i < 5; i++) {
@@ -105,7 +105,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
 
         //drop a non stream table
         for (int i = 0; i < 5; i++) {
@@ -118,7 +118,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
 
         //create a stream view table
         for (int i = 0; i < 5; i++) {
@@ -131,7 +131,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
 
         //drop a new stream table
         for (int i = 0; i < 5; i++) {
@@ -144,7 +144,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
 
 
         //drop a stream view table
@@ -158,7 +158,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
 
 
         for (int i = 0; i < 5; i++) {
@@ -170,7 +170,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         quiesce(client);
 
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
 
         //recreate tables and export again
         for (int i = 0; i < 5; i++) {
@@ -182,7 +182,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
 
         // must still be able to verify the export data.
         client.close();
@@ -215,7 +215,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         //create procedure and then insert data again.
         response = client.callProcedure("@AdHoc", "create PROCEDURE CountFunny AS SELECT COUNT(*) FROM funny WHERE j=?;");
@@ -226,7 +226,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
 
         //create procedure and then insert data again.
@@ -238,7 +238,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
 
         // must still be able to verify the export data.
@@ -298,7 +298,7 @@ public class TestExportLiveDDLSuite extends TestExportBaseSocketExport {
 
         startListener();
         m_verifier = new ExportTestExpectedData(m_serverSockets, m_isExportReplicated, true, k_factor+1);
-        quiesceAndVerify(client,m_verifier);
+        quiesceAndVerifyStream(client,m_verifier);
 
         // must still be able to verify the export data.
         client.close();

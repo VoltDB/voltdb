@@ -169,7 +169,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         callAdHocExpectSuccess(client,
                 "INSERT INTO tuple_count_persist VALUES ( 2 ); " +
                 "INSERT INTO tuple_count_export VALUES ( 2 );");
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         // Verify that table stats show both insertions.
         checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, true);
@@ -230,7 +230,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
 
         //Resume will put flg on onserver export to start consuming.
         startListener();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         for (int i = 40; i < 50; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -244,7 +244,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
             assertEquals(responseGrp.getStatus(), ClientResponse.SUCCESS);
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         m_config.shutDown();
         if (isNewCli) {
             m_config.startUp(true);
@@ -262,7 +262,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         client.drain();
 
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
 
         //Allocated memory should go to 0
         //If this is failing watch out for ENG-5708

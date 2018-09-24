@@ -163,12 +163,12 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
             numberOfInserts = cr.getResults()[0].asScalarLong();
         }
         assertEquals(ROWS.size(), numberOfInserts);
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         System.out.println("Again Seen Verifiers: " + m_verifier.m_seen_verifiers);
 
         assertEquals(ROWS.size(), m_verifier.getExportedDataCount());
-        quiesceAndVerify(client,m_verifier);
+        quiesceAndVerifyTarget(client,m_verifier);
     }
 
     static private enum AdHocKind {

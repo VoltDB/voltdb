@@ -105,7 +105,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         }
 
         System.out.println("Again Seen Verifiers: " + m_verifier.m_seen_verifiers);
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     //  Test Export of a DROPPED table.  Queues some data to a table.
@@ -124,7 +124,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             client.callProcedure("Insert", params);
             client.callProcedure("Insert", paramsGrp);
         }
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
@@ -136,7 +136,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         client = getClient();
 
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     // Test that a table w/o Export enabled does not produce Export content
@@ -158,9 +158,9 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             client.callProcedure("Insert", params);
         }
         //Make sure that we have not recieved any new data.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         assertEquals(icnt, ExportTestClient.getExportedDataCount());
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     // Verify that planner rejects updates to append-only tables
@@ -251,7 +251,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         }
         // Make sure some are exported and seen by me
         assertTrue((m_verifier.getExportedDataCount() - icnt > 0));
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     //
@@ -308,7 +308,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         }
 
         // verify the el data
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     public void testSwapTables() throws Exception {
