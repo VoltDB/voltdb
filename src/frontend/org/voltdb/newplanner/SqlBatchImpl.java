@@ -30,7 +30,7 @@ import org.voltdb.parser.SQLLexer;
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class BasicSqlBatch extends SqlBatch {
+public class SqlBatchImpl extends SqlBatch {
 
     private final List<SqlTask> m_tasks;
     private final Boolean m_isDDLBatch;
@@ -52,14 +52,14 @@ public class BasicSqlBatch extends SqlBatch {
      * @throws UnsupportedOperationException when the batch is a mixture of
      * DDL and non-DDL statements or has parameters and more than one query at the same time.
      */
-    public BasicSqlBatch(String sqlBlock, Object... userParams) throws SqlParseException {
+    public SqlBatchImpl(String sqlBlock, Object... userParams) throws SqlParseException {
         // We can process batches of either all DDL or all DML/DQL, no mixed batch can be accepted.
         // Split the SQL statements, and process them one by one.
         // Currently (1.17.0), SqlParser only supports parsing single SQL statement.
         // https://issues.apache.org/jira/browse/CALCITE-2310
 
-        // TODO: Calcite's error message (in SqlParseException) will contain line and column numbers,
-        // this information is lost during the split. It will be helpful to develop a way to preserve it.
+        // TODO: Calcite's error message (in SqlParseException) will contain line and column numbers.
+        // This information is lost during the split. It will be helpful to develop a way to preserve it.
         List<String> sqlList = SQLLexer.splitStatements(sqlBlock).getCompletelyParsedStmts();
         if (userParams != null && userParams.length > 0 && sqlList.size() != 1) {
             throw new UnsupportedOperationException(s_adHocErrorResponseMessage);
@@ -76,6 +76,7 @@ public class BasicSqlBatch extends SqlBatch {
                 // No mixing DDL and DML/DQL. Turn this into an error and return it to the client.
                 throw new UnsupportedOperationException("Mixing DDL with DML/DQL queries is unsupported.");
             }
+            m_tasks.add(sqlTask);
         }
         m_isDDLBatch = isDDLBatch;
         m_userParams = userParams;

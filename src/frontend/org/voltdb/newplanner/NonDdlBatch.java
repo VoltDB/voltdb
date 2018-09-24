@@ -27,7 +27,8 @@ import org.voltdb.planner.StatementPartitioning;
 
 /**
  * A batch of non-DDL SQL queries.
- * A non-DDL batch contains more contextual information for query planning.
+ * This class is a decorator for a {@link SqlBatch}, adding
+ * some contextual information for planning.
  * @since 8.4
  * @author Yiqun Zhang
  */
@@ -141,7 +142,7 @@ public final class NonDdlBatch extends SqlBatch {
      * Get an array of user partitioning keys.
      * @return an array of user partitioning keys.
      */
-    Object[] getUserPartitioningKeys() {
+    public Object[] getUserPartitioningKeys() {
         if (m_userPartitionKeys == null || m_userPartitionKeys.size() == 0) {
             return null;
         }

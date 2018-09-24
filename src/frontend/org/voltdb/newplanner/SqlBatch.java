@@ -68,6 +68,6 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
         if (params.size() > 1) {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
-        return new BasicSqlBatch(sqlBlock, userParams);
+        return new SqlBatchImpl(sqlBlock, userParams);
     }
 }
