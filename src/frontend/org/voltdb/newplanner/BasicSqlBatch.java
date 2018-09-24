@@ -58,8 +58,8 @@ public class BasicSqlBatch extends SqlBatch {
         // Currently (1.17.0), SqlParser only supports parsing single SQL statement.
         // https://issues.apache.org/jira/browse/CALCITE-2310
 
-        // TODO: Calcite's error message (in SqlParseException) will contain line and column numbers,
-        // this information is lost during the split. It will be helpful to develop a way to preserve it.
+        // TODO: Calcite's error message (in SqlParseException) will contain line and column numbers.
+        // This information is lost during the split. It will be helpful to develop a way to preserve it.
         List<String> sqlList = SQLLexer.splitStatements(sqlBlock).getCompletelyParsedStmts();
         if (userParams != null && userParams.length > 0 && sqlList.size() != 1) {
             throw new UnsupportedOperationException(s_adHocErrorResponseMessage);
@@ -76,6 +76,7 @@ public class BasicSqlBatch extends SqlBatch {
                 // No mixing DDL and DML/DQL. Turn this into an error and return it to the client.
                 throw new UnsupportedOperationException("Mixing DDL with DML/DQL queries is unsupported.");
             }
+            m_tasks.add(sqlTask);
         }
         m_isDDLBatch = isDDLBatch;
         m_userParams = userParams;

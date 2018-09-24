@@ -24,7 +24,7 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.voltdb.parser.ParserFactory;
 
 /**
- * SqlTask stores a parsed query and its corresponding query handler.
+ * SqlTask stores a parsed query.
  * @since 8.4
  * @author Yiqun Zhang
  */
