@@ -31,14 +31,10 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.newplanner.SqlBatch;
+import org.voltdb.newplanner.SqlTask;
 import org.voltdb.parser.SQLLexer;
 
 public class AdHoc extends AdHocNTBase {
-
-    /**
-     * Turn this to true to enable the Calcite parser.
-     */
-    private final static boolean USE_CALCITE = true;
 
     /**
      * Run an AdHoc query batch through the Calcite planner.
@@ -76,9 +72,21 @@ public class AdHoc extends AdHocNTBase {
         }
     }
 
+    /**
+     * Check if the batch should be run through Calcite
+     * @return true if the batch should be run through Calcite.
+     */
+    private boolean shouldBeUsingCalcite() {
+        // We do not use Calcite to run large temp table queries now.
+        if (m_backendTargetType.isLargeTempTableTarget) {
+            return false;
+        }
+        return true;
+    }
+
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
         // TRAIL [Calcite:0] [entry] AdHoc.run()
-        if (USE_CALCITE) {
+        if (shouldBeUsingCalcite()) {
             return runThroughCalcite(params);
         }
         if (params.size() == 0) {
@@ -137,7 +145,12 @@ public class AdHoc extends AdHocNTBase {
      * @author Yiqun Zhang
      */
     private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(SqlBatch batch) {
-        return null;
+        // For now let's keep using the pre-existing parser for DDL.
+        List<String> sqlStatements = new ArrayList<>(batch.getTaskCount());
+        for (SqlTask task : batch) {
+            sqlStatements.add(task.getSQL());
+        }
+        return runDDLBatch(sqlStatements);
     }
 
     private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements) {
