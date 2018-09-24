@@ -420,9 +420,7 @@ def suggest_based_on_last_token(token, stmt):
             return suggest_based_on_last_token(prev_keyword, stmt)
         else:
             return ()
-    elif token_v in ('type', '::'):
-        #   ALTER TABLE foo SET DATA TYPE bar
-        #   SELECT foo::bar
+    elif token_v in 'type':
         suggestions = [Datatype()]
         return tuple(suggestions)
     elif token_v in {'alter', 'create', 'drop'}:

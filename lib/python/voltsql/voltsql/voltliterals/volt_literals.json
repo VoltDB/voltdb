@@ -260,6 +260,7 @@
         "FLOAT",
         "GEOGRAPHY",
         "GEOGRAPHY_POINT",
+        "INT",
         "INTEGER",
         "SMALLINT",
         "TIMESTAMP",
