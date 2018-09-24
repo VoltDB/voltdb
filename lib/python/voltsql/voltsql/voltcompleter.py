@@ -58,6 +58,9 @@ from voltliterals.literals import get_literals
 
 Match = namedtuple('Match', ['completion', 'priority'])
 
+# the set of keywords that are case sensitive
+RESERVED_KEYWORDS_SET = {"classes", "procedures", "tables"}
+
 
 class VoltCompleter(Completer):
     # keywords_tree: A dict mapping keywords to well known following keywords.
@@ -324,9 +327,9 @@ class VoltCompleter(Completer):
                 casing = 'upper'
 
         if casing == 'upper':
-            keywords = [k.upper() for k in keywords]
+            keywords = [k.upper() if k not in RESERVED_KEYWORDS_SET else k for k in keywords]
         else:
-            keywords = [k.lower() for k in keywords]
+            keywords = [k.lower() if k not in RESERVED_KEYWORDS_SET else k for k in keywords]
 
         return self.find_matches(word_before_cursor, keywords,
                                  mode='strict', meta='keyword')

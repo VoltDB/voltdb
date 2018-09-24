@@ -50,7 +50,7 @@ COMMANDS
   exec -- execute stored procedures
   help -- display this text
   show / list -- List tables, procedures, classes
-  update -- refresh schema
+  refresh -- refresh schema
 
 OPTIONS (press specified key to enable/disable each option)
 
