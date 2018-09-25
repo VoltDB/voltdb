@@ -1073,6 +1073,8 @@ CREATE TABLE T63
 ) USING TTL 10 ON COLUMN C3;
 PARTITION TABLE T63 ON COLUMN C3;
 CREATE INDEX ttl_idx ON T63 (C3);
+ALTER TABLE T63 DROP TTL;
+ALTER TABLE T63 ADD USING TTL 10 ON COLUMN C3;
 
 -- These statements were added when use of some Volt-specific functions or ||
 -- or NULL in indexed expressions was discovered to be mishandled (ENG-7792).
