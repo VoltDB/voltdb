@@ -90,14 +90,15 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testDDLCompilerTTL() throws Exception {
-        String ddl = "create table ttl (a integer, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
-                "alter table ttl USING TTL 20 MINUTES ON COLUMN a;\n" +                         "alter table ttl USING TTL 20 MINUTES ON COLUMN a;\n" +
+        String ddl = "create table ttl (a integer NOT NULL, b integer, PRIMARY KEY(a)) USING TTL 10 SECONDS ON COLUMN a;\n" +
+                "alter table ttl USING TTL 20 MINUTES ON COLUMN a;\n" +
                 "alter table ttl USING TTL 20 ON COLUMN a;\n" +
                 "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
                 "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10;\n" +
                 "alter table ttl USING TTL 20 MINUTES ON COLUMN a BATCH_SIZE 10 MAX_FREQUENCY 3;\n" +
                 "alter table ttl USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n" +
-                "alter table ttl drop TTL;\n";
+                "alter table ttl drop TTL;\n" +
+                "alter table ttl ADD USING TTL 20 ON COLUMN a BATCH_SIZE 10;\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(ddl);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("testout.jar")));
