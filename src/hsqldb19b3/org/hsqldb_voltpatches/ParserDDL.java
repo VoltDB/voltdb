@@ -902,7 +902,11 @@ public class ParserDDL extends ParserRoutine {
                         checkIsSimpleName();
 
                         return compileAlterTableAddColumn(t);
-
+                    case Tokens.USING :
+                        if (t.getTTL() != null) {
+                            throw Error.error(ErrorCode.X_42504);
+                        }
+                        return readTimeToLive(t, true);
                     default :
                         if (cname != null) {
                             throw unexpectedToken();
@@ -919,8 +923,6 @@ public class ParserDDL extends ParserRoutine {
                 switch (token.tokenType) {
 
                     case Tokens.PRIMARY : {
-                        boolean cascade = false;
-
                         read();
                         readThis(Tokens.KEY);
 
@@ -1004,7 +1006,7 @@ public class ParserDDL extends ParserRoutine {
 
     private Statement readTimeToLive(Table table, boolean alter) {
 
-        //syntax: USING TTL 10 SECONDS ON COLUMN a MAX_FREQUENCY 1 BATCH_SIZE 1000 CANCELABLE
+        //syntax: USING TTL 10 SECONDS ON COLUMN a BATCH_SIZE 1000 MAX_FREQUENCY 1
         if (!alter && token.tokenType != Tokens.USING) {
             return null;
         }
