@@ -578,7 +578,7 @@ public class StatsAgent extends OpsAgent
             break;
         case EXPORT:
             stats = collectStats(StatsSelector.EXPORT, interval);
-        	break;
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly

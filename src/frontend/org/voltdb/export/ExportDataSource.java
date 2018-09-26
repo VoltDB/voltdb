@@ -265,10 +265,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_partitionId = jsObj.getInt("partitionId");
             // SiteId is outside the valid range if it is no longer local
             int partitionsLocalSite = 16384;
-            for (Pair<Integer, Integer> partition : localPartitionsToSites) {
-                if (partition.getFirst() == m_partitionId) {
-                    partitionsLocalSite = partition.getSecond();
-                    break;
+            if (localPartitionsToSites != null) {
+                for (Pair<Integer, Integer> partition : localPartitionsToSites) {
+                    if (partition.getFirst() == m_partitionId) {
+                        partitionsLocalSite = partition.getSecond();
+                        break;
+                    }
                 }
             }
             m_siteId = partitionsLocalSite;

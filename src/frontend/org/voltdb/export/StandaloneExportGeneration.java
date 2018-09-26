@@ -173,7 +173,7 @@ public class StandaloneExportGeneration implements Generation {
     private void addDataSource(
             File adFile,
             Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(this, adFile);
+        ExportDataSource source = new ExportDataSource(this, adFile, null);
         //Mark all as EOS so after buffer is consumed we will do source drain.
         source.pushEndOfStream();
         partitions.add(source.getPartitionId());
