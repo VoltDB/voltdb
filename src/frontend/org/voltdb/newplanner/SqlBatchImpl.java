@@ -30,7 +30,7 @@ import org.voltdb.parser.SQLLexer;
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class BasicSqlBatch extends SqlBatch {
+public class SqlBatchImpl extends SqlBatch {
 
     private final List<SqlTask> m_tasks;
     private final Boolean m_isDDLBatch;
@@ -52,7 +52,7 @@ public class BasicSqlBatch extends SqlBatch {
      * @throws UnsupportedOperationException when the batch is a mixture of
      * DDL and non-DDL statements or has parameters and more than one query at the same time.
      */
-    public BasicSqlBatch(String sqlBlock, Object... userParams) throws SqlParseException {
+    public SqlBatchImpl(String sqlBlock, Object... userParams) throws SqlParseException {
         // We can process batches of either all DDL or all DML/DQL, no mixed batch can be accepted.
         // Split the SQL statements, and process them one by one.
         // Currently (1.17.0), SqlParser only supports parsing single SQL statement.
