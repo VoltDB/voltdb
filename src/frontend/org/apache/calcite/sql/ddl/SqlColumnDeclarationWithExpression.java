@@ -17,6 +17,7 @@
 
 package org.apache.calcite.sql.ddl;
 
+import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlNode;
 
 /**
@@ -33,5 +34,8 @@ public final class SqlColumnDeclarationWithExpression extends SqlColumnDeclarati
    }
    public SqlNode getExpression() {
       return expression;
+   }
+   public SqlDataTypeSpec getDataType() {
+      return dataType;
    }
 }

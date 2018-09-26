@@ -231,7 +231,8 @@ public class AdHoc extends AdHocNTBase {
        }
        AtomicInteger rowSize = new AtomicInteger(0);
        nodeTableList.forEach(c -> {
-          final List<SqlNode> nameAndType = ((SqlColumnDeclaration) c).getOperandList();
+           final SqlColumnDeclarationWithExpression colDecl = new SqlColumnDeclarationWithExpression((SqlColumnDeclaration) c);
+          final List<SqlNode> nameAndType = colDecl.getOperandList();
           final String colName = nameAndType.get(0).toString();
           final Column column = t.getColumns().add(colName);
           column.setName(colName);
@@ -243,7 +244,7 @@ public class AdHoc extends AdHocNTBase {
           column.setType(vt.getValue());
           column.setNullable(type.getNullable());
           // Validate user-supplied size (SqlDataTypeSpec.precision)
-           boolean inBytes = false;         // TODO: set it when user specified
+           boolean inBytes = colDecl.getDataType().getInBytes();
            if (vt.isVariableLength()) {     // user did not specify a size. Set to default value
                final Pair<Integer, Boolean> r = validateVarLenColumn(vt, tableName, colName, colSize, inBytes);
                colSize = r.getFirst();
@@ -256,7 +257,7 @@ public class AdHoc extends AdHocNTBase {
           column.setIndex(index.getAndIncrement());
           columnTypes.put(index.get(), vt);
           column.setInbytes(inBytes);
-          final SqlNode expr = new SqlColumnDeclarationWithExpression((SqlColumnDeclaration) c).getExpression();
+          final SqlNode expr = new SqlColumnDeclarationWithExpression(colDecl).getExpression();
           if (expr != null) {
               column.setDefaulttype(vt.getValue());
               column.setDefaultvalue(expr.toString());
