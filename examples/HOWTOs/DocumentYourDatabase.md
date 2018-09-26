@@ -270,45 +270,44 @@ Note: The files with this prefix need to be located in the specified path on one
 To make major configuration changes to the database, such as changing the kfactor or sitesperhost settings, or modifying the configuration of command logging or export, the database must be stopped and restarted.  Using "voltdb recover" to recover from the command log is for recovering the cluster in exactly the same configuration, not to make configuration changes, so the process involves restarting the database empty as if for the first time using "voltdb start" and then restoring a backup.  The additional commands "pause" and "resume" ensure that users do not try to add any data between when the snapshot (backup) is taken and when it is restored.
 
 
-1) Pause the database (stop accepting requests from users)
+Pause the database (stop accepting requests from users)
 
     voltadmin pause
 
-2) Take a manual snapshot
+Take a manual snapshot
 
     voltadmin save --blocking /home/voltdb/voltdb_saved_snapshots snapshot_prefix
 
 Note: the "--blocking" parameter means voltadmin will wait to make sure the snapshot was successful before returning.
 
-3) Shut down the database
+Shut down the database
 
     voltadmin shutdown
 
-4) Make changes to the configuration file and copy it to each of the servers.
+Make changes to the configuration file and copy it to each of the servers.
 
 
-5) Reinitialize the database root directory on all nodes, specifying the edited configuration file
+Reinitialize the database root directory on all nodes, specifying the edited configuration file
 
     cd $HOME/voltdb_instance
     voltdb init --force --config=deployment.xml
 
 
-6) Restart the database in admin mode
-
+Restart the database in admin mode
 
     # on each host
     cd $HOME/voltdb_instance
     voltdb start -B -l license.xml -H "voltserver1,voltserver2,voltserver3" --pause
 
-7) (Optionally) Reload the schema, if any changes were made
+(Optionally) Reload the schema, if any changes were made
 
     sqlcmd < ddl.sql
 
-8) Reload the data from the snapshot
+Reload the data from the snapshot
 
     voltadmin restore /home/voltdb/voltdb_saved_snapshots snapshot_prefix
 
-9) Resume the database (allow users to connect and send requests)
+Resume the database (allow users to connect and send requests)
 
     voltadmin resume
 
