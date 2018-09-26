@@ -7,21 +7,21 @@ Use this document as a template for an operator "Cheat Sheet", or as a starting 
 
 ## Contents
 
-1. [Provisioning VoltDB Servers](DocumentYourDatabase.md#Provisioning-VoltDB-Servers)
-2. [Installing VoltDB](DocumentYourDatabase.md#Installing-VoltDB)
-3. [Creating a database instance](DocumentYourDatabase.md#Create-a-database-instance)
-4. [Starting the Cluster](DocumentYourDatabase.md#Starting-the-Cluster)
-5. [Loading the Schema](DocumentYourDatabase.md#Loading-the-Schema)
-6. [Stopping the Cluster](DocumentYourDatabase.md#Stopping-the-Cluster)
-7. [Restarting the Cluster](DocumentYourDatabase.md#Restarting-the-Cluster)
-8. [Pause and Resume the Cluster](DocumentYourDatabase.md#Pause-and-Resume-the-Cluster)
-9. [Updating the license file](DocumentYourDatabase.md#Updating-the-license-file)
-10. [Taking a manual backup](DocumentYourDatabase.md#Taking-a-manual-backup)
-11. [Restoring a manual backup](DocumentYourDatabase.md#Restoring-a-manual-backup)
-12. [Stopping and restarting the cluster for a maintenance window](DocumentYourDatabase.md#Stopping-and-restarting-the-cluster-for-a-maintenance-window)
-13. [Rejoining a failed node to the cluster](DocumentYourDatabase.md#Rejoining-a-failed-node-to-the-cluster)
-14. [Stopping a node manually](DocumentYourDatabase.md#Stopping-a-node-manually)
-15. [Adding nodes to increase capacity](DocumentYourDatabase.md#Adding-nodes-to-increase-capacity)
+1. [Provisioning VoltDB Servers](DocumentYourDatabase.md#provisioning-voltdb-servers)
+2. [Installing VoltDB](DocumentYourDatabase.md#installing-voltdb)
+3. [Creating a database instance](DocumentYourDatabase.md#create-a-database-instance)
+4. [Starting the Cluster](DocumentYourDatabase.md#starting-the-cluster)
+5. [Loading the Schema](DocumentYourDatabase.md#loading-the-schema)
+6. [Stopping the Cluster](DocumentYourDatabase.md#stopping-the-cluster)
+7. [Restarting the Cluster](DocumentYourDatabase.md#restarting-the-cluster)
+8. [Pause and Resume the Cluster](DocumentYourDatabase.md#pause-and-resume-the-cluster)
+9. [Updating the license file](DocumentYourDatabase.md#updating-the-license-file)
+10. [Taking a manual backup](DocumentYourDatabase.md#taking-a-manual-backup)
+11. [Restoring a manual backup](DocumentYourDatabase.md#restoring-a-manual-backup)
+12. [Stopping and restarting the cluster for a maintenance window](DocumentYourDatabase.md#reconfiguring-the-cluster-during-a-maintenance-window)
+13. [Rejoining a failed node to the cluster](DocumentYourDatabase.md#rejoining-a-failed-node-to-the-cluster)
+14. [Stopping a node manually](DocumentYourDatabase.md#stopping-a-node-manually)
+15. [Adding nodes to increase capacity](DocumentYourDatabase.md#adding-nodes-to-increase-capacity)
 
 
 
@@ -284,22 +284,23 @@ Note: the "--blocking" parameter means voltadmin will wait to make sure the snap
 
     voltadmin shutdown
 
-5) Make changes to the configuration file and copy it to each of the servers.
+4) Make changes to the configuration file and copy it to each of the servers.
 
 
-6) Reinitialize the database root directory on all nodes, specifying the edited configuration file
+5) Reinitialize the database root directory on all nodes, specifying the edited configuration file
 
     cd $HOME/voltdb_instance
     voltdb init --force --config=deployment.xml
 
 
-7) Restart the database in admin mode
+6) Restart the database in admin mode
+
 
     # on each host
     cd $HOME/voltdb_instance
     voltdb start -B -l license.xml -H "voltserver1,voltserver2,voltserver3" --pause
 
-(Optionally) Reload the schema, if any changes were made
+7) (Optionally) Reload the schema, if any changes were made
 
     sqlcmd < ddl.sql
 
