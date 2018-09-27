@@ -758,7 +758,7 @@ public abstract class ProcedureCompiler {
             if (curStmt.equalsIgnoreCase("end")) continue;
 
             // ENG-14487 truncate statement is not allowed for single partitioned procedures.
-            if(info.isSinglePartition() && curStmt.toUpperCase().startsWith("TRUNCATE")) {
+            if (info.isSinglePartition() && curStmt.toUpperCase().startsWith("TRUNCATE")) {
                 throw compiler.new VoltCompilerException("Single partitioned procedure: " +
                         shortName + " has TRUNCATE statement: \"" + curStmt + "\".");
             }
