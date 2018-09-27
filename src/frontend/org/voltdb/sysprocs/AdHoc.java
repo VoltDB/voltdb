@@ -193,80 +193,87 @@ public class AdHoc extends AdHocNTBase {
         return Pair.of(size, inBytes);
     }
 
-    private static void updateAndValidateRowSize(String tableName, VoltType vt, AtomicInteger rowSize, int colSize, boolean inBytes) {
-        final int delta;
+    private static int addColumn(SqlColumnDeclarationWithExpression col, Table t, String tableName,
+                                 AtomicInteger index, Map<Integer, VoltType> columnTypes) {
+        final List<SqlNode> nameAndType = col.getOperandList();
+        final String colName = nameAndType.get(0).toString();
+        final Column column = t.getColumns().add(colName);
+        column.setName(colName);
+
+        final SqlDataTypeSpec type = (SqlDataTypeSpec) nameAndType.get(1);
+        //final int scale = type.getScale();
+        int colSize = type.getPrecision();       // -1 when user did not provide.
+        final VoltType vt = ColumnType.getVoltType(type.getTypeName().toString());
+        column.setType(vt.getValue());
+        column.setNullable(type.getNullable());
+        // Validate user-supplied size (SqlDataTypeSpec.precision)
+        boolean inBytes = col.getDataType().getInBytes();
+        if (vt.isVariableLength()) {     // user did not specify a size. Set to default value
+            final Pair<Integer, Boolean> r = validateVarLenColumn(vt, tableName, colName, colSize, inBytes);
+            colSize = r.getFirst();
+            inBytes = r.getSecond();
+        } else if (colSize < 0) {
+            colSize = vt.getLengthInBytesForFixedTypesWithoutCheck();
+        }
+        final int rowSizeDelta;
         if (vt.isVariableLength()) {
-            delta = 4 + colSize * (inBytes ? 4 : 1);
+            rowSizeDelta = 4 + colSize * (inBytes ? 4 : 1);
         } else {
-            delta = colSize;
+            rowSizeDelta = colSize;
         }
-        if (rowSize.addAndGet(delta) > DDLCompiler.MAX_ROW_SIZE) {
-            throw new PlanningErrorException(String.format(
-                    "Error: table %s has a maximum row size of %s but the maximum supported size is %s",
-                    tableName, VoltType.humanReadableSize(rowSize.get()), VoltType.humanReadableSize(DDLCompiler.MAX_ROW_SIZE)));
+        column.setSize(colSize);
+        column.setIndex(index.getAndIncrement());
+        columnTypes.put(index.get(), vt);
+        column.setInbytes(inBytes);
+        final SqlNode expr = col.getExpression();
+        if (expr != null) {
+            column.setDefaulttype(vt.getValue());
+            column.setDefaultvalue(expr.toString());
+        } else {
+            column.setDefaultvalue(null);
         }
+        return rowSizeDelta;
     }
 
     public static SchemaPlus addTable(SqlNode node, Database db) {
         if (node.getKind() != SqlKind.CREATE_TABLE) {           // for now, only patially support CREATE TABLE stmt
             return CatalogAdapter.schemaPlusFromDatabase(db);
         }
-       final List<SqlNode> nameAndColListAndQuery = ((SqlCreateTable) node).getOperandList();
-       final String tableName = nameAndColListAndQuery.get(0).toString();
-       final SqlNodeList nodeTableList = (SqlNodeList) nameAndColListAndQuery.get(1);
-       final Table t = db.getTables().add(tableName);
-       t.setAnnotation(new TableAnnotation());
-       ((TableAnnotation) t.getAnnotation()).ddl =      // NOTE: Calcite dialect double-quotes all table/column names. Might not be compatible with our canonical DDL?
-               node.toSqlString(CalciteSqlDialect.DEFAULT).toString();
-       t.setTuplelimit(Integer.MAX_VALUE);
-       t.setIsreplicated(true);
+        final List<SqlNode> nameAndColListAndQuery = ((SqlCreateTable) node).getOperandList();
+        final String tableName = nameAndColListAndQuery.get(0).toString();
+        final SqlNodeList nodeTableList = (SqlNodeList) nameAndColListAndQuery.get(1);
+        final Table t = db.getTables().add(tableName);
+        t.setAnnotation(new TableAnnotation());
+        ((TableAnnotation) t.getAnnotation()).ddl =      // NOTE: Calcite dialect double-quotes all table/column names. Might not be compatible with our canonical DDL?
+                node.toSqlString(CalciteSqlDialect.DEFAULT).toString();
+        t.setTuplelimit(Integer.MAX_VALUE);
+        t.setIsreplicated(true);
 
-       final AtomicInteger index = new AtomicInteger(0);
-       final SortedMap<Integer, VoltType> columnTypes = new TreeMap<>();
+        final int numCols = nodeTableList.getList().size();
+        if (numCols > DDLCompiler.MAX_COLUMNS) {
+            throw new PlanningErrorException(String.format("Table %s has %d columns (max is %d)",
+                    tableName, numCols, DDLCompiler.MAX_COLUMNS));
+        }
+        int rowSize = 0;
+        final AtomicInteger index = new AtomicInteger(0);
+        final SortedMap<Integer, VoltType> columnTypes = new TreeMap<>();
 
-       final int numCols = nodeTableList.getList().size();
-       if (numCols > DDLCompiler.MAX_COLUMNS) {
-           throw new PlanningErrorException(String.format("Table %s has %d columns (max is %d)",
-                   tableName, numCols, DDLCompiler.MAX_COLUMNS));
-       }
-       AtomicInteger rowSize = new AtomicInteger(0);
-       nodeTableList.forEach(c -> {
-           final SqlColumnDeclarationWithExpression colDecl = new SqlColumnDeclarationWithExpression((SqlColumnDeclaration) c);
-          final List<SqlNode> nameAndType = colDecl.getOperandList();
-          final String colName = nameAndType.get(0).toString();
-          final Column column = t.getColumns().add(colName);
-          column.setName(colName);
-
-          final SqlDataTypeSpec type = (SqlDataTypeSpec) nameAndType.get(1);
-          //final int scale = type.getScale();
-          int colSize = type.getPrecision();       // -1 when user did not provide.
-          final VoltType vt = ColumnType.getVoltType(type.getTypeName().toString());
-          column.setType(vt.getValue());
-          column.setNullable(type.getNullable());
-          // Validate user-supplied size (SqlDataTypeSpec.precision)
-           boolean inBytes = colDecl.getDataType().getInBytes();
-           if (vt.isVariableLength()) {     // user did not specify a size. Set to default value
-               final Pair<Integer, Boolean> r = validateVarLenColumn(vt, tableName, colName, colSize, inBytes);
-               colSize = r.getFirst();
-               inBytes = r.getSecond();
-           } else {
-               colSize = vt.getLengthInBytesForFixedTypesWithoutCheck();
-           }
-          updateAndValidateRowSize(tableName, vt, rowSize, colSize, inBytes);
-          column.setSize(colSize);
-          column.setIndex(index.getAndIncrement());
-          columnTypes.put(index.get(), vt);
-          column.setInbytes(inBytes);
-          final SqlNode expr = new SqlColumnDeclarationWithExpression(colDecl).getExpression();
-          if (expr != null) {
-              column.setDefaulttype(vt.getValue());
-              column.setDefaultvalue(expr.toString());
-          } else {
-              column.setDefaultvalue(null);
-          }
-       });
-       t.setSignature(CatalogUtil.getSignatureForTable(tableName, columnTypes));
-       return CatalogAdapter.schemaPlusFromDatabase(db);
+        for (SqlNode c : nodeTableList) {
+            switch (c.getKind()) {
+                case PRIMARY_KEY:        // For now, skip constraint entries.
+                    continue;
+                case COLUMN_DECL:
+                    rowSize += addColumn(new SqlColumnDeclarationWithExpression((SqlColumnDeclaration) c),
+                            t, tableName, index, columnTypes);
+                    if (rowSize > DDLCompiler.MAX_ROW_SIZE) {       // fails when the accumulative row size exeeds limit
+                        throw new PlanningErrorException(String.format(
+                                "Error: table %s has a maximum row size of %s but the maximum supported size is %s",
+                                tableName, VoltType.humanReadableSize(rowSize), VoltType.humanReadableSize(DDLCompiler.MAX_ROW_SIZE)));
+                    }
+            }
+        }
+        t.setSignature(CatalogUtil.getSignatureForTable(tableName, columnTypes));
+        return CatalogAdapter.schemaPlusFromDatabase(db);
     }
 
 

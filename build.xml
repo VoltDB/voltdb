@@ -1224,9 +1224,9 @@ JAVA COMPILATION
    <copy tofile="${lib.dir}/calcite-core-1.17.0.jar" file="${build.calcite.dir}/core/target/calcite-core-1.18.0-SNAPSHOT.jar"/>
    <copy tofile="${lib.dir}/calcite-core-1.17.0-sources.jar" file="${build.calcite.dir}/core/target/calcite-core-1.18.0-SNAPSHOT-sources.jar"/>
    <copy tofile="${lib.dir}/calcite-server-1.17.0.jar" file="${build.calcite.dir}/server/target/calcite-server-1.18.0-SNAPSHOT.jar"/>
-   <copy tofile="${lib.dir}/calcite-server-1.17.0.jar" file="${build.calcite.dir}/server/target/calcite-server-1.18.0-SNAPSHOT-sources.jar"/>
+   <copy tofile="${lib.dir}/calcite-server-1.17.0-sources.jar" file="${build.calcite.dir}/server/target/calcite-server-1.18.0-SNAPSHOT-sources.jar"/>
    <copy tofile="${lib.dir}/calcite-linq4j-1.17.0.jar" file="${build.calcite.dir}/linq4j/target/calcite-linq4j-1.18.0-SNAPSHOT.jar"/>
-   <copy tofile="${lib.dir}/calcite-linq4j-1.17.0.jar" file="${build.calcite.dir}/linq4j/target/calcite-linq4j-1.18.0-SNAPSHOT-sources.jar"/>
+   <copy tofile="${lib.dir}/calcite-linq4j-1.17.0-sources.jar" file="${build.calcite.dir}/linq4j/target/calcite-linq4j-1.18.0-SNAPSHOT-sources.jar"/>
    <echo message="Calcite jar refreshed." />
 </target>
 
