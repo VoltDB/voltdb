@@ -171,30 +171,28 @@ public class OperatorExpression extends AbstractExpression {
         m_valueSize = cast_type.getLengthInBytesForFixedTypes();
     }
 
-    @Override
+    @Override       // NOTE: this method does similar job of what Calcite.unparse does: to canonicalize a query, but the name is misleading. Refer to CatalogSchemaTools.toSchema().
     public String explain(String impliedTableName) {
-        ExpressionType type = getExpressionType();
-        if (type == ExpressionType.OPERATOR_IS_NULL) {
-            return "(" + m_left.explain(impliedTableName) + " IS NULL)";
+        switch(getExpressionType()) {
+            case OPERATOR_IS_NULL:
+                return "(" + m_left.explain(impliedTableName) + " IS NULL)";
+            case OPERATOR_NOT:
+                return "(NOT " + m_left.explain(impliedTableName) + ")";
+            case OPERATOR_CAST:
+                return "(CAST (" + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + "))";
+            case OPERATOR_EXISTS:
+                return "(EXISTS " + m_left.explain(impliedTableName) + ")";
+            case OPERATOR_CASE_WHEN:
+                return "(CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
+                        m_right.m_left.explain(impliedTableName) + " ELSE " +
+                        m_right.m_right.explain(impliedTableName) + " END)";
+            case OPERATOR_UNARY_MINUS:
+                return "-" + m_left.explain(impliedTableName);
+            default:
+                return "(" + m_left.explain(impliedTableName) +
+                        " " + getExpressionType().symbol() + " " +
+                        m_right.explain(impliedTableName) + ")";
         }
-        if (type == ExpressionType.OPERATOR_NOT) {
-            return "(NOT " + m_left.explain(impliedTableName) + ")";
-        }
-        if (type == ExpressionType.OPERATOR_CAST) {
-            return "(CAST (" + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + "))";
-        }
-
-        if (type == ExpressionType.OPERATOR_EXISTS) {
-            return "(EXISTS " + m_left.explain(impliedTableName) + ")";
-        }
-        if (type == ExpressionType.OPERATOR_CASE_WHEN) {
-            return "(CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
-                    m_right.m_left.explain(impliedTableName) + " ELSE " +
-                    m_right.m_right.explain(impliedTableName) + " END)";
-        }
-        return "(" + m_left.explain(impliedTableName) +
-            " " + type.symbol() + " " +
-            m_right.explain(impliedTableName) + ")";
     }
 
     @Override
@@ -210,5 +208,4 @@ public class OperatorExpression extends AbstractExpression {
             return true;
         }
     }
-
 }

@@ -19,12 +19,16 @@ package org.voltdb.sysprocs;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.apache.calcite.sql.SqlNode;
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -167,7 +171,8 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     return retval;
                 }
                 catch (Exception ex) {
-                    retval.errorMsg = "Unexpected condition occurred applying DDL statements: " + ex.getMessage();
+                    retval.errorMsg = "Unexpected condition occurred applying DDL statements: " + ex.getMessage() +
+                            Arrays.stream(ex.getStackTrace()).map(st -> st.toString()).collect(Collectors.joining("\n"));
                     return retval;
                 }
                 // Real deploymentString should be the current deployment, just set it to null

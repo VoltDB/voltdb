@@ -49,7 +49,6 @@
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/uacbench/voltcore.testapps.uacbench.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/uacbench/voltcore.testapps.uacbench.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/udfbenchmark/voltcore.testapps.udfbenchmark.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/udfbenchmark/voltcore.testapps.udfbenchmark.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../tests/test_apps/voter-selfcheck/voltcore.testapps.voter-selfcheck.iml" filepath="$PROJECT_DIR$/../../tests/test_apps/voter-selfcheck/voltcore.testapps.voter-selfcheck.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../../../pro/voltpro.iml" filepath="$PROJECT_DIR$/../../../pro/voltpro.iml" />
     </modules>
   </component>
 </project>

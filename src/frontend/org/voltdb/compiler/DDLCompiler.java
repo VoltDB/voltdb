@@ -1245,7 +1245,7 @@ public class DDLCompiler {
                 hasCreated.set(true);
             }
         });
-        assert(hasCreated.get()) : "All tables should have been created for CalciteSchema.";
+        //assert(hasCreated.get()) : "All tables should have been created for CalciteSchema.";
         if (hasCreated.get()) {
             return;
         }       // Code below this point is not executed any more.
@@ -1877,7 +1877,7 @@ public class DDLCompiler {
         indexMap.put(name, index);
     }
 
-    protected static String convertToJSONArray(List<AbstractExpression> exprs) throws JSONException {
+    public static String convertToJSONArray(List<AbstractExpression> exprs) throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.array();
         for (AbstractExpression abstractExpression : exprs) {

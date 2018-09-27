@@ -53,7 +53,7 @@ import static org.voltdb.calciteadapter.rel.VoltDBTable.toRelDataType;
  */
 public class VoltDBMatViewInfo implements Table {
     private final MaterializedViewInfo m_catMVInfo;
-    VoltDBMatViewInfo(MaterializedViewInfo info) {
+    public VoltDBMatViewInfo(MaterializedViewInfo info) {
         assert(info != null) : "null voltdb.catalog.MaterializedViewInfo";
         m_catMVInfo = info;
     }

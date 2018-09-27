@@ -1197,7 +1197,6 @@ JAVA COMPILATION
 
 <!-- Build Calcite jar files -->
 <target name="refresh_calcite">
-   <property name="calcite.patch.file" value="0001-Hack-to-support-VoltDB-VARCHAR-34-BYTES-DDL-syntax.patch" />
    <exec executable="rm" failonerror="true">   <!-- Remove previous Calcite artifacts -->
       <arg value="-rf"/>
       <arg value="${build.calcite.dir}"/>
@@ -1209,11 +1208,8 @@ JAVA COMPILATION
       <arg value="-C"/>
       <arg value="${build.calcite.dir}/../"/>
    </exec>
-   <copy file="${vendor.tar.dir}/${calcite.patch.file}" todir="${build.calcite.dir}"/>
-   <copy todir="${build.calcite.dir}" file="${vendor.tar.dir}/${calcite.patch.file}" />
-   <exec executable="git" dir="${build.calcite.dir}" failonerror="true">
-      <arg value="apply"/>
-      <arg value="${vendor.tar.dir}/${calcite.patch.file}"/>
+   <exec executable="patch" dir="${build.calcite.dir}" failonerror="true" input="${vendor.tar.dir}/commits.patch">
+      <arg value="-p1"/>
    </exec>
    <echo message="Untarred and patched Calcite. Prepare to build." />
    <exec executable="mvn" dir="${build.calcite.dir}" failonerror="true">
