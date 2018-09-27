@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 
+import javax.annotation_voltpatches.Nullable;
+
 import org.voltcore.utils.Pair;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -141,10 +143,18 @@ public interface SiteProcedureConnection {
     public void setBatch(int batchIndex);
 
     /**
-     * Let the EE know what the name of the currently executing procedure is
-     * so it can include this information in any slow query progress log messages.
+     * Let the EE know what the name of the currently executing procedure is so it can include this information in any
+     * slow query progress log messages.
+     *
+     * @param procedureName Name of the procedure which is about to be run.
      */
-    public void setProcedureName(String procedureName);
+    public void setupProcedure(@Nullable String procedureName);
+
+    /**
+     * Let the EE know that the currently executing procedure has completed. Should be called by all callers of
+     * {@link #setupProcedure(String)}
+     */
+    public void completeProcedure();
 
     public void setBatchTimeout(int batchTimeout);
     public int getBatchTimeout();

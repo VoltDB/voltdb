@@ -679,8 +679,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setProcedureName(String procedureName) {
+    public void setupProcedure(String procedureName) {
         // don't need to do anything here I think?
+    }
+
+    @Override
+    public void completeProcedure() {
+        // don't need to do anything here
     }
 
     @Override

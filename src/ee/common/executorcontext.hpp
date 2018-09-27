@@ -133,6 +133,8 @@ class ExecutorContext {
         m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH_IN_MILLIS;
         m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
         m_traceOn = traceOn;
+        // reset stats for each plan
+        m_progressStats.resetForNewBatch();
     }
 
     // data available via tick()
