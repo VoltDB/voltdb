@@ -2659,13 +2659,7 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
     case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
         uint8_t drProtocolVersion = static_cast<uint8_t >(taskInfo.readInt());
         // create or delete dr replicated stream as needed
-        if (drProtocolVersion >= DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION &&
-                m_drReplicatedStream != NULL) {
-            delete m_drReplicatedStream;
-            m_drReplicatedStream = NULL;
-        }
-        else if (drProtocolVersion < DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION &&
-                m_drReplicatedStream == NULL && m_isLowestSite) {
+        if (m_drReplicatedStream == NULL && m_isLowestSite) {
             m_drReplicatedStream = new DRTupleStream(16383, m_drStream->m_defaultCapacity, drProtocolVersion);
         }
         m_drStream->setDrProtocolVersion(drProtocolVersion);

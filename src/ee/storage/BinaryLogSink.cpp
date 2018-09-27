@@ -580,7 +580,6 @@ public:
         m_sequenceNumber = m_taskInfo.readLong();
 
         m_hashFlag = static_cast<DRTxnPartitionHashFlag>(m_taskInfo.readByte());
-        assert((m_hashFlag & REPLICATED_TABLE_MASK) != REPLICATED_TABLE_MASK);
 
         m_txnLen = m_taskInfo.readInt();
         assert(m_txnStart + m_txnLen <= m_logEnd);
