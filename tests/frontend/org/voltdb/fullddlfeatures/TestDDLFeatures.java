@@ -142,6 +142,16 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         RegressionSuite.verifyProcFails(m_client, "The statement's parameter count 1200 must not exceed the maximum 1025",
                 "@AdHoc", tooManyParmsProcBuilder.toString());
+
+        // ENG-14487 truncate statement is not allowed for single partitioned procedures.
+        String ENG14487 = "CREATE PROCEDURE ENG14487 PARTITION ON TABLE T2 COLUMN area\n" +
+                "   AS BEGIN\n" +
+                "      select * from t2 where area=?;\n" +
+                "      truncate table t2;\n" +
+                "   END;";
+        RegressionSuite.verifyProcFails(m_client,
+                "Single partitioned procedure: ENG14487 has TRUNCATE statement: \"truncate table t2\"",
+                "@AdHoc", ENG14487);
     }
 
     @Test
@@ -187,6 +197,12 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         // ENG-14210 more than 1025 parameters
         RegressionSuite.verifyProcFails(m_client, "The statement's parameter count 1200 must not exceed the maximum 1025",
                 "@AdHoc", "CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.fullddlfeatures.testJavaProcTooManyParams;");
+
+        // ENG-14487 truncate statement is not allowed for single partitioned procedures.
+        RegressionSuite.verifyProcFails(m_client,
+                "Single partitioned procedure: org.voltdb_testprocs.fullddlfeatures.testSinglePartitionedTruncateProc has TRUNCATE statement: \"truncate table t2;\".",
+                "@AdHoc",
+                "CREATE PROCEDURE PARTITION ON TABLE T2 COLUMN area FROM CLASS org.voltdb_testprocs.fullddlfeatures.testSinglePartitionedTruncateProc;");
     }
 
     @Test
