@@ -79,6 +79,7 @@
 
 <property name='base.dir'                    location='.' />
 <property name='build.dir'                   location='obj/${build}' />
+<property name='build.calcite.dir'           location='${build.dir}/calcite'/>
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.prod.dbmonitor.dir.js' location='${build.prod.dir}/org/voltdb/dbmonitor/js' />
 <property name='build.test.dir'              location='${build.dir}/test' />
@@ -104,6 +105,7 @@
 <property name='lib.dir'                     location='lib' />
 <property name='vendor.lib.dir'              location='third_party/java/jars' />
 <property name='vendor.src.dir'              location='third_party/java/src'  />
+<property name='vendor.tar.dir'              location='third_party/java/tar'  />
 <property name='vendor.cpp.dir'              location='third_party/cpp' />
 <property name='src.ee.parent.dir'           location='src/ee' />
 <property name='src.ee.dir'                  location='src/ee' />
@@ -1193,7 +1195,42 @@ JAVA COMPILATION
     </ant>
 </target>
 
-<target name="compile_core" depends="compile_client">
+<!-- Build Calcite jar files -->
+<target name="refresh_calcite">
+   <property name="calcite.patch.file" value="0001-Hack-to-support-VoltDB-VARCHAR-34-BYTES-DDL-syntax.patch" />
+   <exec executable="rm" failonerror="true">   <!-- Remove previous Calcite artifacts -->
+      <arg value="-rf"/>
+      <arg value="${build.calcite.dir}"/>
+   </exec>
+   <mkdir dir="${build.calcite.dir}"/>
+   <exec executable="tar" failonerror="true">
+      <arg value="-xf"/>
+      <arg value="${vendor.tar.dir}/Calcite-1.17.0.tgz"/>
+      <arg value="-C"/>
+      <arg value="${build.calcite.dir}/../"/>
+   </exec>
+   <copy file="${vendor.tar.dir}/${calcite.patch.file}" todir="${build.calcite.dir}"/>
+   <copy todir="${build.calcite.dir}" file="${vendor.tar.dir}/${calcite.patch.file}" />
+   <exec executable="git" dir="${build.calcite.dir}" failonerror="true">
+      <arg value="apply"/>
+      <arg value="${vendor.tar.dir}/${calcite.patch.file}"/>
+   </exec>
+   <echo message="Untarred and patched Calcite. Prepare to build." />
+   <exec executable="mvn" dir="${build.calcite.dir}" failonerror="true">
+      <arg value="install"/>
+      <arg value="-DskipTests"/>
+   </exec>
+   <echo message="Calcite built successfully. Copying to lib directory" />   <!-- NOTE: the jar files are still labeled as 1.18 snapshot even though it's from 1.17 release branch. -->
+   <copy tofile="${lib.dir}/calcite-core-1.17.0.jar" file="${build.calcite.dir}/core/target/calcite-core-1.18.0-SNAPSHOT.jar"/>
+   <copy tofile="${lib.dir}/calcite-core-1.17.0-sources.jar" file="${build.calcite.dir}/core/target/calcite-core-1.18.0-SNAPSHOT-sources.jar"/>
+   <copy tofile="${lib.dir}/calcite-server-1.17.0.jar" file="${build.calcite.dir}/server/target/calcite-server-1.18.0-SNAPSHOT.jar"/>
+   <copy tofile="${lib.dir}/calcite-server-1.17.0.jar" file="${build.calcite.dir}/server/target/calcite-server-1.18.0-SNAPSHOT-sources.jar"/>
+   <copy tofile="${lib.dir}/calcite-linq4j-1.17.0.jar" file="${build.calcite.dir}/linq4j/target/calcite-linq4j-1.18.0-SNAPSHOT.jar"/>
+   <copy tofile="${lib.dir}/calcite-linq4j-1.17.0.jar" file="${build.calcite.dir}/linq4j/target/calcite-linq4j-1.18.0-SNAPSHOT-sources.jar"/>
+   <echo message="Calcite jar refreshed." />
+</target>
+
+<target name="compile_core" depends="compile_client" >
     <mkdir dir='${build.prod.dir}' />
     <mkdir dir='${build.test.dir}' />
     <mkdir dir='${build.testproc.dir}' />
