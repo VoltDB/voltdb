@@ -33,7 +33,7 @@
 {
     # Tests of SQL Analytic Windowed Functions (e.g. RANK, DENSE_RANK)
     "analytic-ints": {"schema": "int-schema.py",
-                      "ddl": "int-DDL.sql",
+                      "ddl": "int-DDL-null.sql",
                       "template": "analytic-ints.sql",
                       "normalizer": "normalizer.py"},
 }
