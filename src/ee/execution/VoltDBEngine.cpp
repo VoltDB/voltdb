@@ -2588,7 +2588,7 @@ void VoltDBEngine::dispatchValidatePartitioningTask(ReferenceSerializeInputBE &t
 }
 
 void VoltDBEngine::collectDRTupleStreamStateInfo() {
-    std::size_t size = 3 * sizeof(int64_t) + 4 /*drVersion*/ + 1 /*hasReplicatedStream*/;
+    std::size_t size = 3 * sizeof(int64_t) + 4 /*drVersion*/;
     if (m_executorContext->drReplicatedStream()) {
         size += 3 * sizeof(int64_t);
     }

@@ -140,7 +140,6 @@ private:
     DRTxnPartitionHashFlag m_hashFlag;
     int64_t m_firstParHash;
     int64_t m_lastParHash;
-    bool m_hasReplicatedStream;
     bool m_wasFirstChangeReplicatedTable;
     bool m_wasLastChangeReplicatedTable;
     size_t m_beginTxnUso;
