@@ -17,11 +17,7 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
 import org.voltdb.VoltTable.ColumnInfo;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -37,9 +33,9 @@ public class ExportStatsBase extends StatsSource {
         public final long m_tuplesPending;
         public final long m_averageLatency;
         public final long m_maxLatency;
-
+        public final String m_status;
         public ExportStatsRow(int partitionId, int siteId, String streamName, String exportTarget,
-                long tupleCount, long tuplesPending, long averageLatency, long maxLatency) {
+                long tupleCount, long tuplesPending, long averageLatency, long maxLatency, String status) {
             m_partitionId = partitionId;
             m_siteId = siteId;
             m_streamName = streamName;
@@ -48,6 +44,7 @@ public class ExportStatsBase extends StatsSource {
             m_tuplesPending = tuplesPending;
             m_averageLatency = averageLatency;
             m_maxLatency = maxLatency;
+            m_status = status;
         }
     }
 
@@ -66,6 +63,7 @@ public class ExportStatsBase extends StatsSource {
         public static final String TUPLE_PENDING = "TUPLE_PENDING";
         public static final String AVERAGE_LATENCY = "AVERAGE_LATENCY";
         public static final String MAX_LATENCY = "MAX_LATENCY";
+        public static final String STATUS = "STATUS";
     }
 
     /* Constructor */
@@ -84,6 +82,7 @@ public class ExportStatsBase extends StatsSource {
         columns.add(new ColumnInfo(Columns.TUPLE_PENDING, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.AVERAGE_LATENCY, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.MAX_LATENCY, VoltType.BIGINT));
+        columns.add(new ColumnInfo(Columns.STATUS, VoltType.STRING));
     }
 
     @Override

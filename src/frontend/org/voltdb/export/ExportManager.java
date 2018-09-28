@@ -190,6 +190,7 @@ public class ExportManager
             rowValues[columnNameToIndex.get(Columns.TUPLE_PENDING)] = stat.m_tuplesPending;
             rowValues[columnNameToIndex.get(Columns.AVERAGE_LATENCY)] = stat.m_averageLatency;
             rowValues[columnNameToIndex.get(Columns.MAX_LATENCY)] = stat.m_maxLatency;
+            rowValues[columnNameToIndex.get(Columns.STATUS)] = stat.m_status;
         }
 
         public ExportStatsRow getStatsRow(Object rowKey) {

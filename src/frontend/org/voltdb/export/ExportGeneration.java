@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,11 +51,12 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.utils.CatalogUtil;
 
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -177,6 +179,7 @@ public class ExportGeneration implements Generation {
             List<Pair<Integer, Integer>> localPartitionsToSites)
     {
         // Now create datasources based on the catalog
+        updateDataSources(catalogContext.database);
         boolean createdSources = false;
         for (Connector conn : connectors) {
             if (conn.getEnabled()) {
@@ -194,6 +197,30 @@ public class ExportGeneration implements Generation {
                 new ArrayList<Integer>();
 
         createAckMailboxesIfNeeded(messenger, partitionsInUse);
+    }
+
+    // mark a DataSource as dropped if its stream is dropped upon uac
+    private void updateDataSources(Database database) {
+
+        if (m_dataSourcesByPartition.isEmpty()) {
+            return;
+        }
+
+        // current streams in catalog
+        List<String>  exportSignatures = CatalogUtil.getExportTables(database).stream().
+                map(Table::getSignature).collect(Collectors.toList());
+
+        for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
+            Map<String, ExportDataSource> sources = it.next();
+            for (String signature : sources.keySet()) {
+                ExportDataSource src = sources.get(signature);
+                if (exportSignatures.contains(src)) {
+                    src.setStatus(ExportDataSource.STREAM_STATUS.ACTIVE);
+                } else {
+                    src.setStatus(ExportDataSource.STREAM_STATUS.DROPPED);
+                }
+            }
+        }
     }
 
     /**
@@ -356,9 +383,9 @@ public class ExportGeneration implements Generation {
                     try {
                         children = p.getSecond().getChildren();
                     } catch (InterruptedException e) {
-                        Throwables.propagate(e);
+                        throw new RuntimeException(e);
                     } catch (KeeperException e) {
-                        Throwables.propagate(e);
+                        throw new RuntimeException(e);
                     }
                     ImmutableList.Builder<Long> mailboxes = ImmutableList.builder();
 
@@ -376,7 +403,7 @@ public class ExportGeneration implements Generation {
         try {
             fut.get();
         } catch (Throwable t) {
-            Throwables.propagate(t);
+            throw new RuntimeException(t);
         }
     }
 

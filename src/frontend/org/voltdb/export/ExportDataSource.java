@@ -143,6 +143,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
 
+    static enum STREAM_STATUS {
+        ACTIVE,
+        DROPPED
+    }
+    private STREAM_STATUS m_status = STREAM_STATUS.ACTIVE;
 
     /**
      * Create a new data source.
@@ -526,7 +531,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
 
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
-                        m_tupleCount, m_tuplesPending, avgLatency, maxLatency);
+                        m_tupleCount, m_tuplesPending, avgLatency, maxLatency, m_status.toString());
             }
         });
     }
@@ -1351,6 +1356,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
     public long getLastReleaseUso() {
         return m_lastReleasedUso;
+    }
+
+    public void setStatus(STREAM_STATUS status) {
+        this.m_status = status;
     }
 
     @Override
