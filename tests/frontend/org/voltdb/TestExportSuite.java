@@ -257,7 +257,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
     //
     // Verify that snapshot can be enabled with a streamed table present
     //
-    public void xtestExportPlusSnapshot() throws Exception {
+    public void testExportPlusSnapshot() throws Exception {
         System.out.println("testExportPlusSnapshot");
         final Client client = getClient();
         for (int i=0; i < 10; i++) {
