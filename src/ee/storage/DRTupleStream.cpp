@@ -334,7 +334,7 @@ void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t spH
                     "Active transactions moving backwards: openSpHandle is %jd, while the truncate spHandle is %jd",
                     (intmax_t)m_openSpHandle, (intmax_t)spHandle);
         }
-        return false;
+        return;
     }
 
     if (!m_opened) {
