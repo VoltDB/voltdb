@@ -101,7 +101,7 @@ public class NonDdlBatchCompiler {
         final PlannerTool ptool = m_batch.m_catalogContext.m_ptool;
 
         try {
-            return null;// ptool.planSqlWithCalcite(task, m_batch);
+            return ptool.planSqlCalcite(task, m_batch);
         } catch (Exception e) {
             throw new AdHocPlanningException(e.getMessage());
         } catch (StackOverflowError error) {

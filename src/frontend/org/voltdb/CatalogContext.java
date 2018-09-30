@@ -137,6 +137,9 @@ public class CatalogContext {
 
     public long m_lastUpdateCoreDuration = -1; // in nano seconds
 
+    // =================== Calcite ====================
+
+
     /**
      * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
      * When @param hasSchemaChange is true, @param defaultProcManager and @param plannerTool will be created as new.
