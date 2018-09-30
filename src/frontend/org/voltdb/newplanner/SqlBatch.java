@@ -62,6 +62,7 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
      */
     public static SqlBatch fromParameterSet(ParameterSet params) throws SqlParseException {
         Object[] paramArray = params.toArray();
+        // The first parameter is always the query string.
         String sqlBlock = (String) paramArray[0];
         Object[] userParams = null;
         // AdHoc query can have parameters, see TestAdHocQueries.testAdHocWithParams.

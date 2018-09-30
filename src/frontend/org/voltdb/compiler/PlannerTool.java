@@ -185,8 +185,8 @@ public class PlannerTool {
 
         return plan;
     }
-    
-    
+
+
 
     /**
      * Plan a query with the Calcite planner.
