@@ -51,7 +51,7 @@ public class TTLManager extends StatsSource{
     //DRTupleStream.cpp
     public static final String DR_LIMIT_MSG = "bytes exceeds max DR Buffer size";
     static final int DELAY = Integer.getInteger("TIME_TO_LIVE_DELAY", 0) * 1000;
-    static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1);
+    static final int INTERVAL = Integer.getInteger("TIME_TO_LIVE_INTERVAL", 1000);
     static final int CHUNK_SIZE = Integer.getInteger("TIME_TO_LIVE_CHUNK_SIZE", 1000);
     static final int TIMEOUT = Integer.getInteger("TIME_TO_LIVE_TIMEOUT", 2000);
     static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
