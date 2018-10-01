@@ -75,8 +75,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
 
     // Used below (twice), for an UPSERT INTO SELECT statement
     private static final String COLUMN_DEFN = "(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w"
-    		+ "+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/|\\|\\|)"
-    		+ "\\s*(\\w|')+)*(\\s+(ASC|DESC))?";
+            + "+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s*(\\+|\\-|\\*|\\/|\\|\\|)"
+            + "\\s*(\\w|')+)*(\\s+(ASC|DESC))?";
 
     // Captures the use of ORDER BY, with up to 6 order-by columns; beyond
     // those will be ignored (similar to
