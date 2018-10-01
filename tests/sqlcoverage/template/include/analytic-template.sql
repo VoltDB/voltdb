@@ -11,7 +11,7 @@
 -- {@fromtables = "_table"}
 -- {@onefun = "ABS"}
 -- {@plus10 = " + 10"}
--- {@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+-- {@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 -- {@star = "*"}
 -- {@winagg = "_numwinagg"}
 
@@ -29,17 +29,19 @@ INSERT INTO @dmltable VALUES (@insertvals)
 {_maybeorderby |= "@orderbyclause"}
 {@orderbyid = "ORDER BY _symbol[#ord @idcol] _sortorder"}
 
--- Define the actual windowed analytic functions being tested (such as RANK), with arguments, if any
+-- Define the actual windowed analytic functions being tested (such as RANK),
+-- with arguments, if any
 {_analyticfunc1 |= "RANK()"}
 {_analyticfunc1 |= "DENSE_RANK()"}
 {_analyticfunc1 |= "COUNT(*)"}
 {_analyticfunc1 |= "@winagg(_columnorexpr)"}
 -- Because ROW_NUMBER sometimes allows omitting ORDER BY where others require it,
 -- yet omitting it makes the result non-deterministic, it is tested separately in
--- some of the query templates below
+-- some of the query templates below, with strictly deterministic query templates
 {_analyticfunc2 |= "ROW_NUMBER()"}
--- Some of the query templates below test all of the above windowed analytic
--- functions above, including ROW_NUMBER
+-- This is not currently used, but could be if we come up with query templates
+-- that work with all of the above windowed analytic functions, including
+-- ROW_NUMBER
 {_analyticfunc3 |= "_analyticfunc1"}
 {_analyticfunc3 |= "_analyticfunc2"}
 
@@ -49,8 +51,8 @@ SELECT               @star,  _analyticfunc1 OVER (                              
 SELECT                       _analyticfunc1 OVER (                                                         @orderbyclause) FUNC, @star     FROM @fromtables W02A
 -- ... with PARTITION BY clause:
 SELECT               @star,  _analyticfunc1 OVER (PARTITION BY __[#ord]                                    @orderbyclause) FUNC            FROM @fromtables W03A
-SELECT            __[#ord],  _analyticfunc3 OVER (PARTITION BY _variable[#part]                            @orderbyclause) FUNC, __[#part] FROM @fromtables W04
-SELECT __[#ord], __[#part],  _analyticfunc3 OVER (PARTITION BY _variable[#part]                            @orderbyclause) FUNC            FROM @fromtables W05
+SELECT            __[#ord],  _analyticfunc1 OVER (PARTITION BY _variable[#part]                            @orderbyclause) FUNC, __[#part] FROM @fromtables W04A
+SELECT __[#ord], __[#part],  _analyticfunc1 OVER (PARTITION BY _variable[#part]                            @orderbyclause) FUNC            FROM @fromtables W05A
 
 SELECT       _columnorexpr,  _analyticfunc1 OVER (PARTITION BY _variable                                    _maybeorderby) FUNC            FROM @fromtables W06A
 SELECT                       _analyticfunc1 OVER (PARTITION BY _columnorexpr                                _maybeorderby) FUNC, @star     FROM @fromtables W07A
@@ -71,7 +73,10 @@ SELECT                 *,    _analyticfunc1 OVER (                              
 -- is non-deterministic and will therefore result in test failures
 SELECT               @star,  _analyticfunc2 OVER (                                                             @orderbyid) FUNC            FROM @fromtables W01B
 SELECT                       _analyticfunc2 OVER (                                                             @orderbyid) FUNC, @star     FROM @fromtables W02B
+
 SELECT               @star,  _analyticfunc2 OVER (PARTITION BY __[#ord]                                        @orderbyid) FUNC            FROM @fromtables W03B
+SELECT            __[#ord],  _analyticfunc2 OVER (PARTITION BY _variable[#part]                                @orderbyid) FUNC, __[#part] FROM @fromtables W04B
+SELECT __[#ord], __[#part],  _analyticfunc2 OVER (PARTITION BY _variable[#part]                                @orderbyid) FUNC            FROM @fromtables W05B
 
 SELECT       _columnorexpr,  _analyticfunc2 OVER (PARTITION BY _variable                                       @orderbyid) FUNC            FROM @fromtables W06B
 SELECT                       _analyticfunc2 OVER (PARTITION BY _columnorexpr                                   @orderbyid) FUNC, @star     FROM @fromtables W07B
