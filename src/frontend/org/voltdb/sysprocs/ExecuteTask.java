@@ -127,7 +127,7 @@ public class ExecuteTask extends VoltSystemProcedure {
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    result.addRow("FAILURE");
+                    result.addRow(STATUS_FAILURE);
                 }
                 break;
             }
@@ -145,7 +145,7 @@ public class ExecuteTask extends VoltSystemProcedure {
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    result.addRow("FAILURE");
+                    result.addRow(STATUS_FAILURE);
                 }
                 break;
             }

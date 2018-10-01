@@ -818,11 +818,20 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, boost::unordered_map<int64_t, Pe
 
     DRRecordType type;
     int64_t rowCount = 0;
-    bool checkForSkip = !log->isReplicatedTableLog() && UniqueId::isMpUniqueId(localUniqueId);
+    bool checkForSkip = !log->isReplicatedTableLog();
+    bool canSkip = UniqueId::isMpUniqueId(localUniqueId);
 
     while ((type = log->readRecordType()) != DR_RECORD_END_TXN) {
         assert(log->m_hashFlag != TXN_PAR_HASH_PLACEHOLDER);
-        bool skipRow = checkForSkip && !engine->isLocalSite(log->m_partitionHash);
+        bool skipRow = false;
+        if (checkForSkip && !engine->isLocalSite(log->m_partitionHash)) {
+            if (canSkip) {
+                skipRow = true;
+            } else {
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
+                    "Binary log txns were sent to the wrong partition");
+            }
+        }
         rowCount += applyRecord(log, type, tables, pool, engine, remoteClusterId, replicatedTable, skipRow);
     }
 
