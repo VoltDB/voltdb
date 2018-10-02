@@ -31,13 +31,14 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.newplanner.SqlBatch;
-import org.voltdb.newplanner.SqlTask;
+import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
 
 public class AdHoc extends AdHocNTBase {
 
     /**
-     * Run an AdHoc query batch through the Calcite planner.
+     * Run an AdHoc query batch through the Calcite parser and planner, fall back to the old
+     * parser and planner when the batch cannot be handled.
      * @param params the user parameters. The first parameter is always the query text.
      * The rest parameters are the ones used in the queries. </br>
      * Some notes:
@@ -51,8 +52,8 @@ public class AdHoc extends AdHocNTBase {
      * @since 8.4
      * @author Yiqun Zhang
      */
-    public CompletableFuture<ClientResponse> runThroughCalcite(ParameterSet params) {
-        // TRAIL [Calcite:1] [entry] AdHoc.runThroughCalcite()
+    public CompletableFuture<ClientResponse> run(ParameterSet params) {
+        // TRAIL [Calcite:0] [entry] AdHoc.run()
         SqlBatch batch;
         try {
             // We do not need to worry about the ParameterSet,
@@ -65,6 +66,8 @@ public class AdHoc extends AdHocNTBase {
                 // But for now let's just disable it.
                 return runNonDDLBatchThroughCalcite(batch);
             }
+        } catch (PlannerFallbackException ex) {
+            return runFallback(params);
         } catch (Exception ex) {
             // For now, let's just fail the batch if any error happens.
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
@@ -72,23 +75,7 @@ public class AdHoc extends AdHocNTBase {
         }
     }
 
-    /**
-     * Check if the batch should be run through Calcite
-     * @return true if the batch should be run through Calcite.
-     */
-    private boolean shouldBeUsingCalcite() {
-        // We do not use Calcite to run large temp table queries now.
-        if (m_backendTargetType.isLargeTempTableTarget) {
-            return false;
-        }
-        return true;
-    }
-
-    public CompletableFuture<ClientResponse> run(ParameterSet params) {
-        // TRAIL [Calcite:0] [entry] AdHoc.run()
-        if (shouldBeUsingCalcite()) {
-            return runThroughCalcite(params);
-        }
+    public CompletableFuture<ClientResponse> runFallback(ParameterSet params) {
         if (params.size() == 0) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                     "Adhoc system procedure requires at least the query parameter.");
@@ -145,12 +132,7 @@ public class AdHoc extends AdHocNTBase {
      * @author Yiqun Zhang
      */
     private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(SqlBatch batch) {
-        // For now let's keep using the pre-existing parser for DDL.
-        List<String> sqlStatements = new ArrayList<>(batch.getTaskCount());
-        for (SqlTask task : batch) {
-            sqlStatements.add(task.getSQL());
-        }
-        return runDDLBatch(sqlStatements);
+        return null;
     }
 
     private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements) {

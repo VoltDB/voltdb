@@ -195,7 +195,6 @@ public class PlannerTool {
      * @return a planned statement.
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
-
         return null;
     }
 
