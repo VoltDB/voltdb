@@ -44,7 +44,6 @@ import org.voltdb.compiler.PlannerTool;
 import org.voltdb.newplanner.NonDdlBatch;
 import org.voltdb.newplanner.NonDdlBatchCompiler;
 import org.voltdb.newplanner.SqlBatch;
-import org.voltdb.newplanner.SqlTask;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
@@ -82,7 +81,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
     /**
      * Log ad hoc batch info
-     * @param batch  planned statement batch
+     * @param batch planned statement batch
      */
     private void logBatch(final CatalogContext context,
                           final AdHocPlannedStmtBatch batch,
@@ -262,41 +261,35 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * @author Yiqun Zhang
      */
     protected CompletableFuture<ClientResponse> runNonDDLBatchThroughCalcite(SqlBatch batchIn) {
-        // TRAIL [Calcite:2] runNonDDLAdHocThroughCalcite
+        // TRAIL [Calcite:1] runNonDDLAdHocThroughCalcite
         NonDdlBatch batch = new NonDdlBatch(batchIn);
         NonDdlBatchCompiler compiler = new NonDdlBatchCompiler(batch);
         AdHocPlannedStmtBatch plannedStmtBatch;
-//        try {
-//            plannedStmtBatch = compiler.compile();
-            List<String> sqlStatements = new ArrayList<>();
-            for (SqlTask task : batch) {
-                sqlStatements.add(task.getSQL());
-            }
-            return runNonDDLAdHoc(batch.m_catalogContext, sqlStatements, batch.inferPartitioning(),
-                    batch.getUserPartitioningKeys(), ExplainMode.NONE, false, false, batch.getUserParameters());
-//        } catch (AdHocPlanningException ex) {
-//            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getLocalizedMessage());
-//        }
+        try {
+            plannedStmtBatch = compiler.compile();
+        } catch (AdHocPlanningException ex) {
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getLocalizedMessage());
+        }
 
-//        if (adhocLog.isDebugEnabled()) {
-//            logBatch(batch.m_catalogContext, plannedStmtBatch, batch.getUserParameters());
-//        }
-//        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
-//        if (traceLog != null) {
-//            traceLog.add(() -> VoltTrace.endAsync("planadhoc", getClientHandle()));
-//        }
-//
-//        // No explain mode and swap tables now.
-//        try {
-//            return createAdHocTransaction(plannedStmtBatch, false);
-//        } catch (VoltTypeException vte) {
-//            String msg = "Unable to execute AdHoc SQL statement(s): " + vte.getMessage();
-//            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, msg);
-//        }
+        if (adhocLog.isDebugEnabled()) {
+            logBatch(batch.m_catalogContext, plannedStmtBatch, batch.getUserParameters());
+        }
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endAsync("planadhoc", getClientHandle()));
+        }
+
+        // No explain mode and swap tables now.
+        try {
+            return createAdHocTransaction(plannedStmtBatch, false);
+        } catch (VoltTypeException vte) {
+            String msg = "Unable to execute AdHoc SQL statement(s): " + vte.getMessage();
+            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, msg);
+        }
     }
 
     /**
-     * Plan and execute a batch of DML/DQL sql. Any DDL has been filtered out at this point.
+     * Plan and execute a batch of DML/DQL. Any DDL has been filtered out at this point.
      */
     protected CompletableFuture<ClientResponse> runNonDDLAdHoc(CatalogContext context,
                                                                List<String> sqlStatements,

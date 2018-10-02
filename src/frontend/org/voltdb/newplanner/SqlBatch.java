@@ -21,6 +21,7 @@ import java.util.Arrays;
 
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.ParameterSet;
+import org.voltdb.newplanner.guards.PlannerFallbackException;
 
 /**
  * The abstract class for a SQL query batch containing one or more {@link SqlTask}s. </br>
@@ -57,11 +58,13 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
      * The rest parameters are the ones used in the query.
      * @return a {@code SqlBatch} built from the given {@code ParameterSet}.
      * @throws SqlParseException when the query parsing went wrong.
+     * @throws PlannerFallbackException when any of the queries in the batch cannot be handled by Calcite.
      * @throws UnsupportedOperationException when the batch is a mixture of
      * DDL and non-DDL statements or has parameters and more than one query at the same time.
      */
-    public static SqlBatch fromParameterSet(ParameterSet params) throws SqlParseException {
+    public static SqlBatch fromParameterSet(ParameterSet params) throws SqlParseException, PlannerFallbackException {
         Object[] paramArray = params.toArray();
+        // The first parameter is always the query string.
         String sqlBlock = (String) paramArray[0];
         Object[] userParams = null;
         // AdHoc query can have parameters, see TestAdHocQueries.testAdHocWithParams.

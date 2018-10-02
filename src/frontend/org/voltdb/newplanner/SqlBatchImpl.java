@@ -22,6 +22,11 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.calcite.sql.parser.SqlParseException;
+import org.voltdb.newplanner.guards.AlwaysFail;
+import org.voltdb.newplanner.guards.AlwaysPassThrough;
+import org.voltdb.newplanner.guards.CalcitePass;
+import org.voltdb.newplanner.guards.NoLargeQuery;
+import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
 
 /**
@@ -41,6 +46,13 @@ public class SqlBatchImpl extends SqlBatch {
                     + "must be passed a single parameterized SQL statement as its first parameter. "
                     + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
 
+    static final CalcitePass s_calcitePass = new AlwaysPassThrough();
+
+    static {
+        s_calcitePass.addNext(new NoLargeQuery())
+                     .addNext(new AlwaysFail());
+    }
+
     /**
      * Build a batch from a string of one or more SQL statements. </br>
      * The SQL statements can have parameter place-holders, but we will throw
@@ -49,10 +61,11 @@ public class SqlBatchImpl extends SqlBatch {
      * @param sqlBlock a string of one or more SQL statements.
      * @param userParams user parameter values for the query.
      * @throws SqlParseException when the query parsing went wrong.
+     * @throws PlannerFallbackException when any of the queries in the batch cannot be handled by Calcite.
      * @throws UnsupportedOperationException when the batch is a mixture of
      * DDL and non-DDL statements or has parameters and more than one query at the same time.
      */
-    public SqlBatchImpl(String sqlBlock, Object... userParams) throws SqlParseException {
+    public SqlBatchImpl(String sqlBlock, Object... userParams) throws SqlParseException, PlannerFallbackException {
         // We can process batches of either all DDL or all DML/DQL, no mixed batch can be accepted.
         // Split the SQL statements, and process them one by one.
         // Currently (1.17.0), SqlParser only supports parsing single SQL statement.
@@ -69,6 +82,11 @@ public class SqlBatchImpl extends SqlBatch {
         Boolean isDDLBatch = null;
         // Iterate over the SQL string list and build SqlTasks out of the SQL strings.
         for (final String sql : sqlList) {
+            if (! s_calcitePass.check(sql)) {
+                // The query cannot pass the compatibility check, throw a fallback exception
+                // so that VoltDB will use the old parser and planner.
+                throw new PlannerFallbackException();
+            }
             SqlTask sqlTask = new SqlTask(sql);
             if (isDDLBatch == null) {
                 isDDLBatch = sqlTask.isDDL();

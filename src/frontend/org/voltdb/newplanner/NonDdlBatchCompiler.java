@@ -52,7 +52,7 @@ public class NonDdlBatchCompiler {
      * collected from planning the entire batch.
      */
     public AdHocPlannedStmtBatch compile() throws AdHocPlanningException {
-        // TRAIL [Calcite:3] NonDdlBatchCompiler.compile()
+        // TRAIL [Calcite:2] NonDdlBatchCompiler.compile()
         List<String> errorMsgs = new ArrayList<>();
         List<AdHocPlannedStatement> plannedStmts = new ArrayList<>();
         int partitionParamIndex = -1;
@@ -95,13 +95,13 @@ public class NonDdlBatchCompiler {
      * Parameters are valid iff there is exactly one DML/DQL statement.
      */
     private AdHocPlannedStatement compileTask(SqlTask task) throws AdHocPlanningException {
-        // TRAIL [Calcite:4] NonDdlBatchCompiler.compileTask()
+        // TRAIL [Calcite:3] NonDdlBatchCompiler.compileTask()
         assert(m_batch.m_catalogContext.m_ptool != null);
         assert(task != null);
         final PlannerTool ptool = m_batch.m_catalogContext.m_ptool;
 
         try {
-            return null;// ptool.planSqlWithCalcite(task, m_batch);
+            return ptool.planSqlCalcite(task, m_batch);
         } catch (Exception e) {
             throw new AdHocPlanningException(e.getMessage());
         } catch (StackOverflowError error) {

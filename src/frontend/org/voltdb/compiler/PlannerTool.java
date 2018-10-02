@@ -31,6 +31,8 @@ import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
+import org.voltdb.newplanner.NonDdlBatch;
+import org.voltdb.newplanner.SqlTask;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
@@ -182,6 +184,16 @@ public class PlannerTool {
         }
 
         return plan;
+    }
+
+    /**
+     * Plan a query with the Calcite planner.
+     * @param task the query to plan.
+     * @param batch the query batch which this query belongs to.
+     * @return a planned statement.
+     */
+    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
+        return null;
     }
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
