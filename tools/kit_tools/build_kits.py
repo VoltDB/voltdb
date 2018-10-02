@@ -221,7 +221,7 @@ def copyMavenJarsToReleaseDir(releaseDir, version):
         "%s/voltdb-%s.jar" % (mavenProjectDir, version))
     #Get the server's src and javadoc .jar files
     get("%s/voltdb/obj/release/voltdb-%s-javadoc.jar" % (builddir, version),
-        "%s/voltdb%s-javadoc.jar" % (mavenProjectDir, version))
+        "%s/voltdb-%s-javadoc.jar" % (mavenProjectDir, version))
     get("%s/voltdb/obj/release/voltdb-%s-sources.jar" % (builddir, version),
         "%s/voltdb-%s-sources.jar" % (mavenProjectDir, version))
 
