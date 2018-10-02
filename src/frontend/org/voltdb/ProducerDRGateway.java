@@ -27,6 +27,13 @@ public interface ProducerDRGateway {
     public abstract void blockOnDRStateConvergence();
 
     /**
+     * Binary Logs are encoded with Table Hash values that are Sha1 Hashes of the signature.
+     * This method provides this mapping based on the last known catalog.
+     * @return The map of table signature hash to the table name
+     */
+    public Map<Long, String> getSignatureToTableNames();
+
+    /**
      * Start listening on the ports
      */
     public abstract void initialize(boolean drProducerEnabled, int listenPort, String portInterface);
