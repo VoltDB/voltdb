@@ -1113,7 +1113,7 @@ JAR BUILDING
             <section name="Shared">
                 <attribute
                     name="Title"
-                    value="VoltDB Server JavaDoc"
+                    value="VoltDB Stored Procedure JavaDoc"
                 />
                 <attribute name="Date" value="${TODAY}" />
             </section>
