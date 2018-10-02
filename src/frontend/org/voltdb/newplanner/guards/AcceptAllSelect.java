@@ -26,8 +26,6 @@ public class AcceptAllSelect extends CalcitePass {
 
     @Override
     protected final boolean isNegativeCheck() {
-        //  Auto-generated method stub
         return false;
     }
-
 }

@@ -33,5 +33,4 @@ public class AlwaysFail extends CalcitePass {
     protected boolean isNegativeCheck() {
         return false;
     }
-
 }
