@@ -131,19 +131,6 @@ int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn
 bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
 {
     if (isReplicatedTable) {
-        // For replicated table changes, the hash flag should stay the same as
-        // the initial value, which is TXN_PAR_HASH_REPLICATED, if it's older
-        // versions.
-        assert(m_hashFlag == m_initialHashFlag);
-        if (m_hashFlag == TXN_PAR_HASH_PLACEHOLDER) {
-            m_wasFirstChangeReplicatedTable = true;
-            m_wasLastChangeReplicatedTable = true;
-            return false;
-        }
-        else if (!m_wasLastChangeReplicatedTable) {
-            m_wasLastChangeReplicatedTable = true;
-            return true;
-        }
         return false;
     }
 
