@@ -122,6 +122,19 @@ void AbstractDRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumbe
     assert(m_committedSequenceNumber <= m_openSequenceNumber);
     m_openSequenceNumber = sequenceNumber;
     m_committedSequenceNumber = sequenceNumber;
+    // This is only called after a snapshot restore, rejoin
+    // or when we switch streams because of setDrProtocolVersion.
+    // In all these cases, currBlock must be empty.
+    if (m_currBlock && m_currBlock->offset() > 0) {
+        fatalDRErrorWithPoisonPill(m_openSpHandle, m_openUniqueId,
+                "Expected new DR stream to be empty when setting sequence number to %jd. "
+                "Last DR sequence number in stream is %jd",
+                (intmax_t) sequenceNumber, (intmax_t)m_currBlock->lastDRSequenceNumber());
+        return;
+    }
+    // Set the last dr sequence number in currBlock also in case it is set to a real value.
+    // Not clear if this will ever happen, but trying this as a fix for OP-347
+    m_currBlock->recordCompletedSequenceNumForDR(sequenceNumber);
 }
 
 void AbstractDRTupleStream::handleOpenTransaction(StreamBlock *oldBlock)
