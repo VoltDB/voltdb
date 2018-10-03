@@ -1251,7 +1251,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         long partitionMpUniqueId = resultBuffer.getLong();
         int drVersion = resultBuffer.getInt();
         DRLogSegmentId partitionInfo = new DRLogSegmentId(partitionSequenceNumber, partitionSpUniqueId, partitionMpUniqueId);
-        TupleStreamStateInfo info = new TupleStreamStateInfo(partitionInfo, drVersion);
+        byte hasReplicatedStateInfo = resultBuffer.get();
+        TupleStreamStateInfo info = null;
+        if (hasReplicatedStateInfo != 0) {
+            long replicatedSequenceNumber = resultBuffer.getLong();
+            long replicatedSpUniqueId = resultBuffer.getLong();
+            long replicatedMpUniqueId = resultBuffer.getLong();
+            DRLogSegmentId replicatedInfo = new DRLogSegmentId(replicatedSequenceNumber, replicatedSpUniqueId, replicatedMpUniqueId);
+            info = new TupleStreamStateInfo(partitionInfo, replicatedInfo, drVersion);
+        } else {
+            info = new TupleStreamStateInfo(partitionInfo, drVersion);
+        }
         return info;
     }
 
