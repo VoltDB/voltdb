@@ -212,6 +212,7 @@ public class MpTransactionState extends TransactionState
         m_haveDistributedInitTask = false;
         m_isRestart = true;
         m_haveSentfragment = false;
+        m_drBufferChangedAgg = 0;
     }
 
     @Override
@@ -235,7 +236,6 @@ public class MpTransactionState extends TransactionState
         m_remoteWork = null;
         m_remoteDeps = null;
         m_remoteDepTables.clear();
-        m_drBufferChangedAgg = 0;
     }
 
     // I met this List at bandcamp...
@@ -350,7 +350,6 @@ public class MpTransactionState extends TransactionState
             // Create some record of expected dependencies for tracking
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
                                                              m_useHSIds);
-
             // clear up DR buffer size tracker
             m_drBufferChangedAgg = 0;
             // if there are remote deps, block on them
@@ -611,6 +610,9 @@ public class MpTransactionState extends TransactionState
     }
 
     public boolean drTxnDataCanBeRolledBack() {
+        if (tmLog.isTraceEnabled()) {
+            tmLog.trace("DR Txn can be rolled back=" + (m_drBufferChangedAgg == 0));
+        }
         return m_drBufferChangedAgg == 0;
     }
 
