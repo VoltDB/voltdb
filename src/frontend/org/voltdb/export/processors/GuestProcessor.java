@@ -338,8 +338,36 @@ public class GuestProcessor implements ExportDataProcessor {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
-                                long generation = -1L;
+                                byte version = buf.get();
+                                assert(version == 1);
+                                long generation = buf.getLong();
+                                int schemaSize = buf.getInt();
+                                ExportRow previousRow = edb.getPreviousRow();
+                                if (previousRow == null || previousRow.generation != generation) {
+                                    byte[] schemadata = new byte[schemaSize];
+                                    buf.get(schemadata, 0, schemaSize);
+                                    ByteBuffer sbuf = ByteBuffer.wrap(schemadata);
+                                    sbuf.order(ByteOrder.LITTLE_ENDIAN);
+
+                                    String tableName = ExportRow.decodeString(sbuf);
+                                    List<String> colNames = new ArrayList<>();
+                                    List<Integer> colLengths = new ArrayList<>();
+                                    List<VoltType> colTypes = new ArrayList<>();
+                                    while (sbuf.position() < schemaSize) {
+                                        colNames.add(ExportRow.decodeString(sbuf));
+                                        colTypes.add(VoltType.get(sbuf.get()));
+                                        colLengths.add(sbuf.getInt());
+                                    }
+
+                                    edb.setPreviousRow(new ExportRow(tableName, colNames, colTypes, colLengths,
+                                            new Object[] {}, null, -1, source.getPartitionId(), generation));
+                                }
+                                else {
+                                    // Skip past the schema header because it has not changed.
+                                    buf.position(buf.position() + schemaSize);
+                                }
                                 ExportRow row = null;
+                                boolean firstRowOfBlock = true;
                                 while (buf.hasRemaining() && !m_shutdown) {
                                     int length = buf.getInt();
                                     byte[] rowdata = new byte[length];
@@ -358,15 +386,11 @@ public class GuestProcessor implements ExportDataProcessor {
                                             cont = null;
                                             break;
                                         }
-                                        if (generation == -1L) {
+                                        if (firstRowOfBlock) {
                                             edb.onBlockStart(row);
+                                            firstRowOfBlock = false;
                                         }
                                         edb.processRow(row);
-                                        if (generation != -1L && row.generation != generation) {
-                                            edb.onBlockCompletion(row);
-                                            edb.onBlockStart(row);
-                                        }
-                                        generation = row.generation;
                                     }
                                 }
                                 if (edb.isLegacy()) {
