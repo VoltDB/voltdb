@@ -135,13 +135,12 @@ public class ExecuteTask extends VoltSystemProcedure {
             {
                 result = new VoltTable(STATUS_SCHEMA);
                 try {
-                    boolean hasReplicatedStream = buffer.get() == (byte)1;
                     byte[] paramBuf = new byte[buffer.remaining()];
                     buffer.get(paramBuf);
                     ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
                     ObjectInputStream ois = new ObjectInputStream(bais);
                     Map<Byte, Integer> clusterIdToPartitionCountMap = (Map<Byte, Integer>)ois.readObject();
-                    context.initDRAppliedTracker(clusterIdToPartitionCountMap, hasReplicatedStream);
+                    context.initDRAppliedTracker(clusterIdToPartitionCountMap);
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
                     e.printStackTrace();

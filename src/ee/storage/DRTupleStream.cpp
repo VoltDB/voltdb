@@ -48,8 +48,6 @@ DRTupleStream::DRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t 
       m_hashFlag(m_initialHashFlag),
       m_firstParHash(LONG_MAX),
       m_lastParHash(LONG_MAX),
-      m_wasFirstChangeReplicatedTable(false),
-      m_wasLastChangeReplicatedTable(false),
       m_beginTxnUso(0),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
@@ -131,22 +129,8 @@ int64_t DRTupleStream::getParHashForTuple(TableTuple& tuple, int partitionColumn
 bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
 {
     if (isReplicatedTable) {
-        // For replicated table changes, the hash flag should stay the same as
-        // the initial value, which is TXN_PAR_HASH_REPLICATED, if it's older
-        // versions.
-        assert(!m_hasReplicatedStream || m_hashFlag == m_initialHashFlag);
-        if (m_hasReplicatedStream) {
-            return false;
-        }
-        if (m_hashFlag == TXN_PAR_HASH_PLACEHOLDER) {
-            m_wasFirstChangeReplicatedTable = true;
-            m_wasLastChangeReplicatedTable = true;
-            return false;
-        }
-        else if (!m_wasLastChangeReplicatedTable) {
-            m_wasLastChangeReplicatedTable = true;
-            return true;
-        }
+        // the initial value, which is TXN_PAR_HASH_REPLICATED
+        assert(m_hashFlag == m_initialHashFlag);
         return false;
     }
 
@@ -157,11 +141,6 @@ bool DRTupleStream::updateParHash(bool isReplicatedTable, int64_t parHash)
         m_hashFlag = (parHash == LONG_MAX) ? TXN_PAR_HASH_SPECIAL : TXN_PAR_HASH_SINGLE;
         // no delimiter needed for first record
         return false;
-    }
-    else if (m_wasLastChangeReplicatedTable) {
-        m_lastParHash = parHash;
-        m_wasLastChangeReplicatedTable = false;
-        return true;
     }
     else if (parHash != m_lastParHash) {
         m_lastParHash = parHash;
