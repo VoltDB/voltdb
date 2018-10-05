@@ -18,7 +18,9 @@
 package org.voltdb.export;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -32,7 +34,7 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  *
  * Export Data Source Executor Factory.
  *
- * Singleton instance allocating {@code ListeningExecutorService} for {@code ExportDataSource}.
+ * Singleton instance allocating {@link ListeningExecutorService} for {@link ExportDataSource}.
  *
  * Each {@code ExportDataSource} instance uses a mono-thread {@code ListeningExecutorService},
  * so that executing its runnables in that unique thread ensures that the instance is implictly
@@ -46,7 +48,8 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  *
  * This factory implements a thread sharing policy using a fixed number of threads. The default number
  * of threads is 1: all {@code ExportDataSource} instances sharing the same thread. This limit may be
- * increased with the MAX_EXPORT_THREADS system property.
+ * increased with the MAX_EXPORT_THREADS system property. Further, the thread sharing policy ensures
+ * that all {@code ExportDataSource} instances for a given partition share the same thread.
  *
  * Note on synchronization: we don't need a sophisticated synchronization mechanism here, as the
  * factory is just used by the {@code ExportDataSource} constructors.
@@ -65,7 +68,7 @@ public class ExecutorFactory {
     private ArrayList<ListeningExecutorService> m_executors;
     private IdentityHashMap<ListeningExecutorService, Integer> m_refCounts;
 
-    private IdentityHashMap<ExportDataSource, ListeningExecutorService> m_eds2execMap;
+    private Map<Integer, ListeningExecutorService> m_pid2execMap;
 
     /**
      * Singleton accessor
@@ -124,7 +127,7 @@ public class ExecutorFactory {
         m_nextAlloc = 0;
         m_executors = new ArrayList<>(m_maxThreads);
         m_refCounts = new IdentityHashMap<>();
-        m_eds2execMap = new IdentityHashMap<>();
+        m_pid2execMap = new HashMap<>();
     }
 
     /**
@@ -145,24 +148,19 @@ public class ExecutorFactory {
     /**
      * Get an executor for an export data source
      *
-     * @param eds {@code ExportDataSource} instance
-     * @return {@code ListeningExecutorService} allocated
+     * @param eds {@link ExportDataSource} instance
+     * @return {@link ListeningExecutorService} allocated
      */
     public synchronized ListeningExecutorService getExecutor(ExportDataSource eds) {
 
         initialize();
-        if (m_eds2execMap.keySet().contains(eds)) {
-            // Paranoid check for maintenance
-            throw new IllegalStateException("Export Data Source for table: " + eds.getTableName()
-                    + ", partition: " + eds.getPartitionId() + " requests more than 1 executor");
-        }
         return allocate(eds);
     }
 
     /**
      * Free an executor used by an export data source
      *
-     * @param eds {@code ExportDataSource} instance
+     * @param eds {@link ExportDataSource} instance
      */
     public synchronized void freeExecutor(ExportDataSource eds) {
 
@@ -172,7 +170,7 @@ public class ExecutorFactory {
             + ", partition: " + eds.getPartitionId() + " frees uninitialized executor");
         }
 
-        if (!m_eds2execMap.keySet().contains(eds)) {
+        if (!m_pid2execMap.keySet().contains(eds.getPartitionId())) {
             // Paranoid check for maintenance
             throw new IllegalStateException("Export Data Source for table: " + eds.getTableName()
                     + ", partition: " + eds.getPartitionId() + " frees unallocated executor");
@@ -183,52 +181,66 @@ public class ExecutorFactory {
     /**
      * Allocate executor for new export data source
      *
-     * @param eds {@code ExportDataSource} instance, verified new
-     * @return {@code ListeningExecutorService} allocated
+     * @param eds {@link ExportDataSource} instance, verified new
+     * @return {@link ListeningExecutorService} allocated
      */
     private ListeningExecutorService allocate(ExportDataSource eds) {
 
-        ListeningExecutorService les = null;
-        if (m_executors.size() < m_maxThreads) {
+        ListeningExecutorService les = m_pid2execMap.get(eds.getPartitionId());
+        if (les != null) {
+            // Existing executor for this partition
+            int refCount = m_refCounts.get(les).intValue() + 1;
+            m_refCounts.put(les, refCount);
+
+            trace("Allocated existing executor %d, for partition %d",
+                    les.hashCode(), eds.getPartitionId());
+        }
+        else if (m_executors.size() < m_maxThreads) {
+            // Create new executor for partition
             les = CoreUtils.getListeningExecutorService("ExportDataSource executor", 1);
             m_executors.add(les);
             m_refCounts.put(les, 1);
+            m_pid2execMap.put(eds.getPartitionId(), les);
 
-            trace("Allocated new executor %d, %d executors running", les.hashCode(), m_executors.size());
+            trace("Allocated new executor %d, for partition %d, %d executors running",
+                    les.hashCode(), eds.getPartitionId(), m_executors.size());
         }
         else {
+            // Re-use existing executor for this partition
             if (m_nextAlloc >= m_executors.size()) {
                 m_nextAlloc = 0;
             }
             les = m_executors.get(m_nextAlloc);
             int refCount = m_refCounts.get(les).intValue() + 1;
             m_refCounts.put(les, refCount);
+            m_pid2execMap.put(eds.getPartitionId(), les);
 
-            trace("Allocated executor %d, index %d", les.hashCode(), m_nextAlloc);
+            trace("Allocated executor %d, index %d, for partition %d",
+                    les.hashCode(), m_nextAlloc, eds.getPartitionId());
             m_nextAlloc += 1;
         }
-        m_eds2execMap.put(eds, les);
         return les;
     }
 
     /**
      * Release executor for export data source
      *
-     * @param eds {@code ExportDataSource} instance, verified mapped in factory
+     * @param eds {@link ExportDataSource} instance, verified mapped in factory
      */
     private void release(ExportDataSource eds) {
 
-        ListeningExecutorService  les = m_eds2execMap.remove(eds);
+        ListeningExecutorService les = m_pid2execMap.get(eds.getPartitionId());
         int refCount = m_refCounts.get(les).intValue() - 1;
         if (refCount < 0) {
             throw new IllegalStateException("Invalid refCount for table: " + eds.getTableName()
                         + "partition: " + eds.getPartitionId());
         }
-        m_refCounts.put(les, refCount);
 
         if (refCount == 0) {
             m_executors.remove(les);
             m_refCounts.remove(les);
+            m_pid2execMap.get(eds.getPartitionId());
+
             if (m_nextAlloc > m_executors.size()) {
                 m_nextAlloc = 0;
             }
@@ -236,12 +248,13 @@ public class ExecutorFactory {
             trace("Shutdown executor %d", les.hashCode());
         }
         else {
+            m_refCounts.put(les, refCount);
             trace("Defer shutdown executor %d, refCount %d", les.hashCode(), refCount);
         }
     }
 
     private void trace(String msg) {
-        trace(msg, new Object[0]);
+        trace(msg, null);
     }
 
     private void trace(String format, Object... arguments) {
