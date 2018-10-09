@@ -111,15 +111,14 @@ public class ExecutorFactory {
         else {
             int localSitesCount = getLocalSitesCount();
             if (localSitesCount == 0) {
-                // FIXME: can this happen?
                 exportLog.warn("Parameter \"" + MAX_EXPORT_THREADS
                         + "\" cannot be checked, forcing to default value of 1");
                 m_maxThreads = 1;
             }
             else if (m_maxThreads > localSitesCount) {
                 exportLog.warn("Parameter \"" + MAX_EXPORT_THREADS
-                        + "\" exceeds local sites count, forcing to default value of 1");
-                m_maxThreads = 1;
+                        + "\" exceeds local sites count, forcing to " + localSitesCount);
+                m_maxThreads = localSitesCount;
             }
         }
         trace("Export Data Sources running with %d executor threads", m_maxThreads);
@@ -146,8 +145,8 @@ public class ExecutorFactory {
         VoltDBInterface volt = VoltDB.instance();
         if (volt != null &&  volt.getCatalogContext() != null
                 && volt.getCatalogContext().getNodeSettings() != null) {
-                    locSitesCount = volt.getCatalogContext().getNodeSettings().getLocalSitesCount();
-                }
+            locSitesCount = volt.getCatalogContext().getNodeSettings().getLocalSitesCount();
+        }
         return locSitesCount;
     }
 
@@ -230,7 +229,7 @@ public class ExecutorFactory {
     private void release(ExportDataSource eds) {
 
         // The EDS must be mapped...
-        ListeningExecutorService les = m_pid2execMap.remove(eds.getPartitionId());
+        ListeningExecutorService les = m_pid2execMap.get(eds.getPartitionId());
         if (les == null) {
             throw new IllegalStateException("Export Data Source for table: " + eds.getTableName()
             + ", partition: " + eds.getPartitionId() + " frees unallocated executor");
@@ -245,6 +244,9 @@ public class ExecutorFactory {
         if (refCount == 0) {
             m_executors.remove(les);
             m_refCounts.remove(les);
+
+            // The executor may remain mapped for other partitions, remove all mappings
+            m_pid2execMap.values().removeIf(v -> v == les);
 
             if (m_nextAlloc > m_executors.size()) {
                 m_nextAlloc = 0;
