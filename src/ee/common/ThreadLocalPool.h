@@ -23,7 +23,6 @@
 #include "boost/pool/pool.hpp"
 #include "boost/shared_ptr.hpp"
 #include <boost/unordered_map.hpp>
-#include "common/debuglog.h"
 
 namespace voltdb {
 

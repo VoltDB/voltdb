@@ -111,7 +111,7 @@ public interface SystemProcedureExecutionContext {
 
     public boolean hasRealDrAppliedTracker(byte clusterId);
 
-    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream);
+    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
 
     public Map<Integer, Map<Integer, DRSiteDrIdTracker>> getDrAppliedTrackers();
 
