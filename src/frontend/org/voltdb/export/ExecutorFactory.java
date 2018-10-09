@@ -175,12 +175,6 @@ public class ExecutorFactory {
             throw new IllegalStateException("Export Data Source for table: " + eds.getTableName()
             + ", partition: " + eds.getPartitionId() + " frees uninitialized executor");
         }
-
-        if (!m_pid2execMap.keySet().contains(eds.getPartitionId())) {
-            // Paranoid check for maintenance
-            throw new IllegalStateException("Export Data Source for table: " + eds.getTableName()
-                    + ", partition: " + eds.getPartitionId() + " frees unallocated executor");
-        }
         release(eds);
     }
 
@@ -231,11 +225,17 @@ public class ExecutorFactory {
     /**
      * Release executor for export data source
      *
-     * @param eds {@link ExportDataSource} instance, verified mapped in factory
+     * @param eds {@link ExportDataSource} instance
      */
     private void release(ExportDataSource eds) {
 
-        ListeningExecutorService les = m_pid2execMap.get(eds.getPartitionId());
+        // The EDS must be mapped...
+        ListeningExecutorService les = m_pid2execMap.remove(eds.getPartitionId());
+        if (les == null) {
+            throw new IllegalStateException("Export Data Source for table: " + eds.getTableName()
+            + ", partition: " + eds.getPartitionId() + " frees unallocated executor");
+        }
+
         int refCount = m_refCounts.get(les).intValue() - 1;
         if (refCount < 0) {
             throw new IllegalStateException("Invalid refCount for table: " + eds.getTableName()
@@ -245,7 +245,6 @@ public class ExecutorFactory {
         if (refCount == 0) {
             m_executors.remove(les);
             m_refCounts.remove(les);
-            m_pid2execMap.remove(eds.getPartitionId());
 
             if (m_nextAlloc > m_executors.size()) {
                 m_nextAlloc = 0;
