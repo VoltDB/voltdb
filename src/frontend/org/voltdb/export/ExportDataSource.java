@@ -1087,7 +1087,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // Current master sends migrate event to all export replicas
             if (m_newLeaderHostId != null && uso >= m_usoToDrain) {
                 unacceptMastership();
-                sendTakeMastershipEvent(uso, tuplesSent);
+                sendTakeMastershipEvent(uso);
             }
         }
     }
@@ -1113,13 +1113,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // if no new buffer to be drained, send the migrate event right away
                 if (m_usoToDrain == m_lastReleasedUso) {
                     unacceptMastership();
-                    sendTakeMastershipEvent(m_usoToDrain, 0);
+                    sendTakeMastershipEvent(m_usoToDrain);
                 }
             }
         });
     }
 
-    private void sendTakeMastershipEvent(long uso, int tuplesSent) {
+    private void sendTakeMastershipEvent(long uso) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0 && m_newLeaderHostId != null) {
@@ -1133,7 +1133,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(uso);
-            buf.putInt(tuplesSent);
+            buf.putInt(0);
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
             for(Long siteId: p.getSecond()) {
@@ -1321,7 +1321,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // if no new buffer to be drained, send the migrate event right away
                     if (m_usoToDrain == m_lastReleasedUso) {
                         unacceptMastership();
-                        sendTakeMastershipEvent(m_usoToDrain, 0);
+                        sendTakeMastershipEvent(m_usoToDrain);
                     }
                 }
             });
