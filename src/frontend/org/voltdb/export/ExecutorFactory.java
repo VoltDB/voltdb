@@ -141,8 +141,14 @@ public class ExecutorFactory {
      * @return local sites count, or 0 if undefined, package private for JUnit tests
      */
     int getLocalSitesCount() {
+        int locSitesCount = 0;
+        // JUnit environment may give inconsistent answers
         VoltDBInterface volt = VoltDB.instance();
-        return volt == null ? 0 : volt.getCatalogContext().getNodeSettings().getLocalSitesCount();
+        if (volt != null &&  volt.getCatalogContext() != null
+                && volt.getCatalogContext().getNodeSettings() != null) {
+                    locSitesCount = volt.getCatalogContext().getNodeSettings().getLocalSitesCount();
+                }
+        return locSitesCount;
     }
 
     /**
@@ -239,7 +245,7 @@ public class ExecutorFactory {
         if (refCount == 0) {
             m_executors.remove(les);
             m_refCounts.remove(les);
-            m_pid2execMap.get(eds.getPartitionId());
+            m_pid2execMap.remove(eds.getPartitionId());
 
             if (m_nextAlloc > m_executors.size()) {
                 m_nextAlloc = 0;
