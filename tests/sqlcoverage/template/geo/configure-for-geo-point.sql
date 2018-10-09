@@ -28,7 +28,7 @@
 {@onefun = ""}  -- There are no handy unary point-to-point functions
 {@optionalfn = "_geofun"}
 {@plus10 = ""} -- You cannot add to a point
-{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star    = "ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2), LONGITUDE(PT3), LATITUDE(PT3), RATIO"}
 {@lhsstar = "LHS.ID, LONGITUDE(LHS.PT1), LATITUDE(LHS.PT1), LONGITUDE(LHS.PT2), LATITUDE(LHS.PT2), LONGITUDE(LHS.PT3), LATITUDE(LHS.PT3)"}
 {@updatecolumn = "PT3"}
