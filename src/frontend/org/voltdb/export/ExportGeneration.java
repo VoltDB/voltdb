@@ -262,7 +262,7 @@ public class ExportGeneration implements Generation {
 
                     if (msgType == ExportManager.RELEASE_BUFFER) {
                         final long ackUSO = buf.getLong();
-                        long tuplesSent = buf.getLong();  // STAKUTIS
+                        int tuplesSent = buf.getInt();
                         if (tuplesSent < 0 ) {
                             exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
                             tuplesSent = 0;
@@ -283,7 +283,7 @@ public class ExportGeneration implements Generation {
                         }
                     } else if (msgType == ExportManager.TAKE_MASTERSHIP) {
                         final long ackUSO = buf.getLong();
-                        long tuplesSent = buf.getLong();  // STAKUTIS
+                        int tuplesSent = buf.getInt();
                         if (tuplesSent < 0 ) {
                             exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
                             tuplesSent = 0;

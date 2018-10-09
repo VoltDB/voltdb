@@ -33,6 +33,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
@@ -89,7 +90,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final int m_siteId;
     private String m_exportTargetName = "";
     private long m_tupleCount = 0;
-    private long m_tuplesPending = 0;
+    private AtomicInteger m_tuplesPending = new AtomicInteger(0);
     private long m_averageLatency = 0; // for current counting-session
     private long m_maxLatency = 0; // for current counting-session
     private long m_blocksSentSinceClear = 0;
@@ -344,7 +345,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_client;
     }
 
-    private synchronized void releaseExportBytes(long releaseUso, long tuplesSent) throws IOException {
+    private synchronized void releaseExportBytes(long releaseUso, int tuplesSent) throws IOException {
         // if released offset is in an already-released past, just return success
         if (!m_committedBuffers.isEmpty() && releaseUso < m_committedBuffers.peek().uso()) {
             return;
@@ -375,8 +376,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         m_lastReleasedUso = releaseUso;
         m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso+1);
-        m_tuplesPending -= tuplesSent;
-
+        int pendingCount = m_tuplesPending.get();
+        m_tuplesPending.set(pendingCount - tuplesSent);
         return;
     }
 
@@ -531,7 +532,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
 
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
-                        m_tupleCount, m_tuplesPending, avgLatency, maxLatency, m_status.toString());
+                        m_tupleCount, m_tuplesPending.get(), avgLatency, maxLatency, m_status.toString());
             }
         });
     }
@@ -555,7 +556,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 long bufferSize = (buffer.capacity() - StreamBlock.HEADER_SIZE) - 1;
                 if (m_lastReleasedUso > 0 && m_lastReleasedUso >= (uso + bufferSize)) {
                     m_tupleCount += tupleCount;
-                    m_tuplesPending += tupleCount;
                     //What ack from future is known?
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Dropping already acked USO: " + m_lastReleasedUso
@@ -587,7 +587,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_lastPushedUso = uso + bufferSize;
 
                     m_tupleCount += tupleCount;
-                    m_tuplesPending += tupleCount;
+                    m_tuplesPending.addAndGet(tupleCount);
                     m_committedBuffers.offer(sb);
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
@@ -978,7 +978,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (mbx != null && p.getSecond().size() > 0) {
             // partition:int(4) + length:int(4) +
             // signaturesBytes.length + ackUSO:long(8) + tuplesSent:int(4).
-            final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 4;
+            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 4;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.put(ExportManager.RELEASE_BUFFER);
@@ -1041,7 +1041,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    public void ack(final long uso, long tuplesSent) {
+    public void ack(final long uso, int tuplesSent) {
 
         //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
@@ -1074,7 +1074,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-     private void ackImpl(long uso, long tuplesSent) {
+     private void ackImpl(long uso, int tuplesSent) {
 
         //Process the ack if any and add blocks to the delete list or move the released USO pointer
         if (uso > 0) {
@@ -1087,7 +1087,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // Current master sends migrate event to all export replicas
             if (m_newLeaderHostId != null && uso >= m_usoToDrain) {
                 unacceptMastership();
-                sendTakeMastershipEvent(uso);
+                sendTakeMastershipEvent(uso, tuplesSent);
             }
         }
     }
@@ -1113,18 +1113,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // if no new buffer to be drained, send the migrate event right away
                 if (m_usoToDrain == m_lastReleasedUso) {
                     unacceptMastership();
-                    sendTakeMastershipEvent(m_usoToDrain);
+                    sendTakeMastershipEvent(m_usoToDrain, 0);
                 }
             }
         });
     }
 
-    private void sendTakeMastershipEvent(long uso) {
+    private void sendTakeMastershipEvent(long uso, int tuplesSent) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0 && m_newLeaderHostId != null) {
             // msg type(1) + partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8).
+            // signaturesBytes.length + ackUSO:long(8) + tupleSent:int(4).
             final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
@@ -1133,7 +1133,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(uso);
-
+            buf.putInt(tuplesSent);
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
             for(Long siteId: p.getSecond()) {
@@ -1321,7 +1321,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // if no new buffer to be drained, send the migrate event right away
                     if (m_usoToDrain == m_lastReleasedUso) {
                         unacceptMastership();
-                        sendTakeMastershipEvent(m_usoToDrain);
+                        sendTakeMastershipEvent(m_usoToDrain, 0);
                     }
                 }
             });

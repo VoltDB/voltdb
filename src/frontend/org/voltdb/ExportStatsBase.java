@@ -41,7 +41,7 @@ public class ExportStatsBase extends StatsSource {
             m_streamName = streamName;
             m_exportTarget = exportTarget;
             m_tupleCount = tupleCount;
-            m_tuplesPending = tuplesPending;
+            m_tuplesPending = tuplesPending > 0 ? tuplesPending : 0;
             m_averageLatency = averageLatency;
             m_maxLatency = maxLatency;
             m_status = status;
