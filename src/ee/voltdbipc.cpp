@@ -121,7 +121,7 @@ public:
 
     bool execute(struct ipc_command *cmd);
 
-    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, int64_t committedSpHandle, voltdb::StreamBlock *block);
 
     void pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::StreamBlock *block);
 
@@ -1691,7 +1691,7 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     }
 }
 
-int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
+int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, int64_t committedSpHandle, voltdb::StreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();
     }
