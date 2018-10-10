@@ -76,7 +76,7 @@ public class ExecutorFactory {
      * @return the {@code EDSExecutorFactory } instance
      */
     public static final ExecutorFactory instance() {
-        return m_execFactory;
+        return EXEC_FACTORY_INSTANCE;
     }
 
     /**
@@ -260,10 +260,6 @@ public class ExecutorFactory {
         }
     }
 
-    private void trace(String msg) {
-        trace(msg, null);
-    }
-
     private void trace(String format, Object... arguments) {
         if (exportLog.isTraceEnabled()) {
             if (arguments != null && arguments.length > 0) {
@@ -274,5 +270,5 @@ public class ExecutorFactory {
         }
     }
 
-    private static final ExecutorFactory m_execFactory = new ExecutorFactory();
+    private static final ExecutorFactory EXEC_FACTORY_INSTANCE = new ExecutorFactory();
 }

@@ -225,8 +225,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_eos = false;
         m_client = null;
         m_es = ExecutorFactory.instance().getExecutor(this);
-        trace("got executor " + m_es.hashCode() + " for table " + m_tableName
-                + ", partition " + m_partitionId);
     }
 
     public ExportDataSource(Generation generation, File adFile) throws IOException {
@@ -279,8 +277,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_eos = false;
         m_client = null;
         m_es = ExecutorFactory.instance().getExecutor(this);
-        trace("generation " + generation + " got executor " + m_es.hashCode()
-            + " for table " + m_tableName + ", partition " + m_partitionId);
     }
 
     public void setReadyForPolling(boolean readyForPolling) {
@@ -460,8 +456,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean sync,
             boolean poll) throws Exception {
 
-        trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
-        if (buffer != null) {
+            if (exportLog.isTraceEnabled()) {
+                exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
+            }
+            if (buffer != null) {
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
             if (buffer.capacity() > 8) {
@@ -739,7 +737,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //Returning null indicates end of stream
                 m_pollFuture = null;
                 try {
-                    trace("set end of stream");
                     fut.set(null);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source.
@@ -790,7 +787,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 final AckingContainer ackingContainer = new AckingContainer(first_unpolled_block.unreleasedContainer(),
                                                                             first_unpolled_block.uso() + first_unpolled_block.totalSize() - 1);
                 try {
-                    trace("poll returning uso " + ackingContainer.m_uso);
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source dont discard next processor will pick it up.
@@ -818,7 +814,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
-                        trace("AckingContainer.discard with uso: " + m_uso);
+                        if (exportLog.isTraceEnabled()) {
+                            exportLog.trace("AckingContainer.discard with uso: " + m_uso);
+                        }
                         try {
                             m_backingCont.discard();
                             try {
@@ -1232,19 +1230,5 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     @Override
     public String toString() {
         return "ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId();
-    }
-
-    private void trace(String msg) {
-        trace(msg, new Object[0]);
-    }
-
-    private void trace(String format, Object... arguments) {
-        if (exportLog.isTraceEnabled()) {
-            if (arguments != null && arguments.length > 0) {
-                exportLog.trace(String.format(format, arguments));
-            } else {
-                exportLog.trace(format);
-            }
-        }
     }
 }
