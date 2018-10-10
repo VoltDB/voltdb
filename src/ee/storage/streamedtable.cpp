@@ -61,8 +61,9 @@ StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
     TupleSchema *schema, std::string tableName, std::vector<std::string> & columnNames) {
     StreamedTable * st = new StreamedTable();
+    st->m_name = tableName;
     st->m_wrapper = new ExportTupleStream(ctx->m_partitionId,
-                                           ctx->m_siteId, 0, "sign", tableName, columnNames);
+                                           ctx->m_siteId, 0, "sign", st->m_name, columnNames);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
     st->m_wrapper->setDefaultCapacityForTest(wrapperBufSize);
     return st;

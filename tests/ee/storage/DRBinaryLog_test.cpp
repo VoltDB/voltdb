@@ -112,8 +112,9 @@ static std::map<int, ClusterCtx> s_clusterMap;
 
 class MockExportTupleStream : public ExportTupleStream {
 public:
-    MockExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature)
-        : ExportTupleStream(partitionId, siteId, generation, signature)
+    MockExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
+                          const std::string &tableName, const std::vector<std::string> &columnNames)
+        : ExportTupleStream(partitionId, siteId, generation, signature, tableName, columnNames)
     { }
 
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
@@ -121,9 +122,7 @@ public:
                                            int64_t seqNo,
                                            int64_t uniqueId,
                                            int64_t timestamp,
-                                           const std::string &tableName,
                                            const TableTuple &tuple,
-                                           const std::vector<std::string> &columnNames,
                                            int partitionColumn,
                                            ExportTupleStream::Type type) {
         receivedTuples.push_back(tuple);
@@ -195,10 +194,11 @@ public:
                                            "ROW_DECISION", "CLUSTER_ID", "TIMESTAMP", "DIVERGENCE", "TABLE_NAME",
                                            "CURRENT_CLUSTER_ID", "CURRENT_TIMESTAMP", "TUPLE"};
         const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12);
+        const std::string tableName = "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED";
 
-        m_exportStream = new MockExportTupleStream(1, 1, 0, "sign");
+        m_exportStream = new MockExportTupleStream(1, 1, 0, "sign", tableName, exportColumnName);
         m_conflictStreamedTable.reset(TableFactory::getStreamedTableForTest(0,
-                "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
+                tableName,
                 m_exportSchema,
                 exportColumnName,
                 m_exportStream,

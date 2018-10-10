@@ -44,7 +44,7 @@ const uint8_t ExportTupleStream::s_EXPORT_BUFFER_VERSION = 1;
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
                                      const std::string &tableName, const std::vector<std::string> &columnNames)
-    : TupleStreamBase(EL_BUFFER_SIZE, computeSchemaSize(tableName, columnNames)),
+    : TupleStreamBase(EL_BUFFER_SIZE, computeSchemaSize(tableName, columnNames) + s_FIXED_BUFFER_HEADER_SIZE),
       m_partitionId(partitionId),
       m_siteId(siteId),
       m_signature(signature),
@@ -112,8 +112,15 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     }
     bool includeSchema = m_currBlock->needsSchema();
     if (includeSchema) {
-        ExportSerializeOutput hdr(m_currBlock->headerDataPtr(), m_currBlock->headerSize());
-        writeSchema(hdr, tuple);
+        ExportSerializeOutput blkhdr(m_currBlock->headerDataPtr(), m_currBlock->headerSize());
+        // FIXED_BUFFER_HEADER
+        // version and generation Id for the buffer
+        blkhdr.writeByte(s_EXPORT_BUFFER_VERSION);
+        blkhdr.writeLong(m_generation);
+        // length of schema header
+        blkhdr.writeInt(m_ddlSchemaSize);
+        // Schema
+        writeSchema(blkhdr, tuple);
         m_currBlock->noSchema();
     }
 
@@ -169,12 +176,11 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 //Computes full schema size includes metadata columns.
 size_t
 ExportTupleStream::computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames) {
-    size_t schemaSz = s_FIXED_BUFFER_HEADER_SIZE;
     // column names size for metadata columns
-    schemaSz += s_mdSchemaSize;
+    size_t schemaSz = s_mdSchemaSize;
     // table name size
     schemaSz += getTextStringSerializedSize(tableName);
-    // Column name sizes for table columns.
+    // Column name sizes for table columns + Column length field.
     for (int i = 0; i < columnNames.size(); i++) {
         schemaSz += getTextStringSerializedSize(columnNames[i]);
         schemaSz += sizeof(int32_t);
@@ -186,11 +192,6 @@ ExportTupleStream::computeSchemaSize(const std::string &tableName, const std::ve
 
 void
 ExportTupleStream::writeSchema(ExportSerializeOutput &hdr, const TableTuple &tuple) {
-    // version and generation Id for the buffer
-    hdr.writeByte(s_EXPORT_BUFFER_VERSION);
-    hdr.writeLong(m_generation);
-    // length of schema header
-    hdr.writeInt(m_ddlSchemaSize);
     // table name
     hdr.writeTextString(m_tableName);
 
