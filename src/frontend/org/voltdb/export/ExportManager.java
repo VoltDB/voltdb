@@ -687,7 +687,7 @@ public class ExportManager
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();
-        if (generation != null) {
+        if (generation != null && truncationPoint != null) {
             generation.updateInitialExportStateToTxnId(partitionId, signature,
                     isRecover, truncationPoint, sequenceNumber);
         }
