@@ -26,6 +26,7 @@ package org.voltdb;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
@@ -90,7 +91,8 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         VoltTable stats = null;
         long st = System.currentTimeMillis();
         //Wait 10 mins only
-        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        long maxWait = TimeUnit.MINUTES.toMillis(10);
+        long end = System.currentTimeMillis() + maxWait;
         while (true) {
             stats = client.callProcedure("@Statistics", isPersistent ? "table" : "export", 0).getResults()[0];
             boolean passedThisTime = false;
@@ -100,7 +102,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
                 System.out.println(stats);
                 break;
             }
-            if (ctime - st > (3 * 60 * 1000)) {
+            if (ctime - st > maxWait) {
                 System.out.println(stats);
                 st = System.currentTimeMillis();
             }
@@ -246,12 +248,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         client.drain();
         waitForStreamedTargetAllocatedMemoryZero(client);
         m_config.shutDown();
-        if (isNewCli) {
-            m_config.startUp(true);
-        } else {
-            m_config.startUp(false);
-        }
-
+        m_config.startUp(false);
         client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
