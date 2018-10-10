@@ -29,6 +29,7 @@ import java.util.Set;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.utils.VoltFile;
 
@@ -173,7 +174,7 @@ public class StandaloneExportGeneration implements Generation {
     private void addDataSource(
             File adFile,
             Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(this, adFile, null);
+        ExportDataSource source = new ExportDataSource(this, adFile, (List<Pair<Integer, Integer>>)null);
         //Mark all as EOS so after buffer is consumed we will do source drain.
         source.pushEndOfStream();
         partitions.add(source.getPartitionId());
