@@ -348,19 +348,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                     buf.get(schemadata, 0, schemaSize);
                                     ByteBuffer sbuf = ByteBuffer.wrap(schemadata);
                                     sbuf.order(ByteOrder.LITTLE_ENDIAN);
-
-                                    String tableName = ExportRow.decodeString(sbuf);
-                                    List<String> colNames = new ArrayList<>();
-                                    List<Integer> colLengths = new ArrayList<>();
-                                    List<VoltType> colTypes = new ArrayList<>();
-                                    while (sbuf.position() < schemaSize) {
-                                        colNames.add(ExportRow.decodeString(sbuf));
-                                        colTypes.add(VoltType.get(sbuf.get()));
-                                        colLengths.add(sbuf.getInt());
-                                    }
-
-                                    edb.setPreviousRow(new ExportRow(tableName, colNames, colTypes, colLengths,
-                                            new Object[] {}, null, -1, source.getPartitionId(), generation));
+                                    edb.setPreviousRow(ExportRow.decodeBufferSchema(sbuf, schemaSize, source.getPartitionId(), generation));
                                 }
                                 else {
                                     // Skip past the schema header because it has not changed.
