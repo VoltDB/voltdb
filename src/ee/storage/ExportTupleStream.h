@@ -97,6 +97,12 @@ public:
     virtual int partitionId() { return m_partitionId; }
     void setNew() { m_new = true; }
 
+public:
+    // Computed size for metadata columns
+    static const size_t s_mdSchemaSize;
+    // Size of Fixed header (not including schema)
+    static const size_t s_FIXED_BUFFER_HEADER_SIZE;
+
 private:
     // cached catalog values
     const CatalogId m_partitionId;
@@ -110,10 +116,6 @@ private:
     const std::vector<std::string> &m_columnNames;
     const int32_t m_ddlSchemaSize;
 
-    // Computed size for metadata columns
-    static const size_t s_mdSchemaSize;
-    // Size of Fixed header (not including schema)
-    static const size_t s_FIXED_BUFFER_HEADER_SIZE;
     // Buffer version (used for proper decoding of buffers by standalone processors)
     static const uint8_t s_EXPORT_BUFFER_VERSION;
     // meta-data column count
