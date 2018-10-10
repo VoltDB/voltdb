@@ -149,6 +149,10 @@ namespace voltdb
             return m_lastMpUniqueId;
         }
 
+        int64_t lastCommittedSpHandle() {
+            return m_lastCommittedSpHandle;
+        }
+
         void recordCompletedSequenceNumForDR(int64_t lastDRSequenceNumber) {
             m_lastDRSequenceNumber = lastDRSequenceNumber;
         }
@@ -159,6 +163,10 @@ namespace voltdb
 
         void recordCompletedMpTxnForDR(int64_t lastMpUniqueId) {
             m_lastMpUniqueId = lastMpUniqueId;
+        }
+
+        void recordLastCommittedSpHandle(int64_t spHandle) {
+            m_lastCommittedSpHandle = spHandle;
         }
 
         void markAsEventBuffer(DREventType type) {

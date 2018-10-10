@@ -1280,6 +1280,7 @@ SnapshotCompletionInterest, Promotable
             fetchSnapshotTxnId();
 
             exitRestore();
+            //?  directly transfer to replay state and did the replay, not using state transition
             m_state = State.REPLAY;
 
             /*
