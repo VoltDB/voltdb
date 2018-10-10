@@ -43,20 +43,17 @@ CREATE TABLE R2 (
   PRIMARY KEY (ID)
 );
 
--- Is this used anywhere??
 CREATE VIEW V_P2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS
     SELECT wage, dept, count(*), sum(age), sum(rent)  FROM P2
     GROUP BY wage, dept;
 
--- Is this used anywhere??
 CREATE VIEW V_R2 (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS
-	SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R2
-	GROUP BY wage, dept;
+    SELECT wage, dept, count(*), sum(age), sum(rent)  FROM R2
+    GROUP BY wage, dept;
 
--- Is this used anywhere??
 CREATE VIEW V_R2_ABS (V_G1, V_G2, V_CNT, V_sum_age, V_sum_rent) AS
-	SELECT ABS(wage), dept, count(*), sum(age), sum(rent)  FROM R2
-	GROUP BY ABS(wage), dept;
+    SELECT ABS(wage), dept, count(*), sum(age), sum(rent)  FROM R2
+    GROUP BY ABS(wage), dept;
 
 -- Materialized Views with 0, 1, 2, 3, or 4 GROUP BY columns
 CREATE VIEW P2_V0 (CNT,      WAGE,      DEPT,        AGE,      RENT,      ID      ) AS
@@ -111,7 +108,8 @@ CREATE VIEW R2_V4 (WAGE, DEPT, AGE, RENT, CNT,          ID) AS
     WHERE          ABS(WAGE) < 60 AND ABS(AGE) BETWEEN 30 AND 64
     GROUP BY       WAGE, DEPT, AGE, RENT;
 
---- This table is for testing three table joins, as mv partition table can only join with two more replicated tables.
+-- This table is for testing three table joins, since MV partitioned table
+-- (or view) can only join with two more replicated tables.
 CREATE TABLE R2V (
   V_G1 INTEGER NOT NULL,
   V_G2 SMALLINT,
@@ -120,3 +118,19 @@ CREATE TABLE R2V (
   V_sum_rent SMALLINT,
   PRIMARY KEY (V_G1)
 );
+
+-- Materialized Views without COUNT(*) (per ENG-14114); column names may not
+-- make sense, but match those of other materialized views above (V_P2, V_R2,
+-- V_R2_ABS; table R2V) that are used in the same or similar test suites.
+-- "NCS" stands for "No Count Star".
+CREATE VIEW V_P2_NCS (V_G1, V_G2, V_CNT,   V_sum_age, V_sum_rent) AS
+    SELECT            WAGE, DEPT, MAX(ID), MIN(AGE),  SUM(RENT) FROM P2
+    GROUP BY          WAGE, DEPT;
+
+CREATE VIEW V_R2_NCS (V_G1, V_G2, V_CNT,   V_sum_age, V_sum_rent) AS
+    SELECT            WAGE, DEPT, MAX(ID), MIN(AGE),  SUM(RENT) FROM R2
+    GROUP BY          WAGE, DEPT;
+
+CREATE VIEW V_R2_ABS_NCS (V_G1,      V_G2, V_CNT,   V_sum_age, V_sum_rent) AS
+    SELECT                ABS(WAGE), DEPT, MAX(ID), MIN(AGE),  SUM(RENT) FROM R2
+    GROUP BY              ABS(WAGE), DEPT;

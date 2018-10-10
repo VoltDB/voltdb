@@ -113,7 +113,8 @@ legit-table-name        ::= {table-name-w-no-pk} | {table-name-w-pk-int} 4| {tab
                             {table-name-w-pk-int-str} | {table-name-w-pk-str-int} | \
                             {table-name-w-pk-varbin}  | {table-name-w-pk-i-s-v}
 
-legit-view-name         ::= VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | VR5 | VP5
+legit-view-name         ::= VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | \
+                            VR5 | VP5 | VR6 | VP6 | VR7 | VP7
 
 table-name              ::= {legit-table-name} 199| NONEXISTENT_TABLE
 view-name               ::= {legit-view-name}  199| NONEXISTENT_VIEW
