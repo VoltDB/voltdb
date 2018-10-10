@@ -78,6 +78,21 @@ public class ExportRow {
         return "";
     }
 
+    public static ExportRow decodeBufferSchema(ByteBuffer bb, int schemaSize,
+            int partitionCol, long generation) throws IOException {
+        String tableName = ExportRow.decodeString(bb);
+        List<String> colNames = new ArrayList<>();
+        List<Integer> colLengths = new ArrayList<>();
+        List<VoltType> colTypes = new ArrayList<>();
+        while (bb.position() < schemaSize) {
+            colNames.add(ExportRow.decodeString(bb));
+            colTypes.add(VoltType.get(bb.get()));
+            colLengths.add(bb.getInt());
+        }
+        return new ExportRow(tableName, colNames, colTypes, colLengths,
+                new Object[] {}, null, -1, partitionCol, generation);
+    }
+
     /**
      * Decode a byte array of row data into ExportRow
      *
