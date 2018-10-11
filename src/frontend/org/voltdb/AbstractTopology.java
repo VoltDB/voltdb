@@ -406,14 +406,6 @@ public class AbstractTopology {
         }
     }
 
-    public static class PartitionDescription {
-        public final int k;
-
-        public PartitionDescription(int k) {
-            this.k = k;
-        }
-    }
-
     public static AbstractTopology mutateAddHosts(AbstractTopology currentTopology,
                                                   HostDescription[] hostDescriptions)
     {
@@ -464,15 +456,9 @@ public class AbstractTopology {
     }
 
     public static AbstractTopology mutateAddPartitionsToEmptyHosts(AbstractTopology currentTopology,
-                                                                   Set<Integer> missingHosts,
-                                                                   PartitionDescription[] partitionDescriptions)
-    {
+            Set<Integer> missingHosts, int partitionCount, int kfactor) {
         // validate input
         assert(currentTopology != null);
-        Arrays.stream(partitionDescriptions).forEach(pd -> {
-            assert(pd != null);
-            assert(pd.k >= 0);
-        });
 
         /////////////////////////////////
         // convert all hosts to mutable hosts to add partitions and sites
@@ -502,8 +488,8 @@ public class AbstractTopology {
         // generate partitions
         /////////////////////////////////
         Map<Integer, MutablePartition> partitionsToAdd = new TreeMap<>();
-        for (PartitionDescription partitionDescription : partitionDescriptions) {
-            MutablePartition partition = new MutablePartition(largestPartitionId++, partitionDescription.k);
+        for (int i = 0; i < partitionCount; ++i) {
+            MutablePartition partition = new MutablePartition(largestPartitionId++, kfactor);
             partitionsToAdd.put(partition.id, partition);
             mutablePartitionMap.put(partition.id, partition);
         }
@@ -1447,15 +1433,12 @@ public class AbstractTopology {
             totalSites += entry.getValue();
         }
         int partitionCount = totalSites / (kfactor + 1);
-        PartitionDescription[] partitions = new PartitionDescription[partitionCount];
-        for (int j = 0; j < partitionCount; j++) {
-            partitions[j] = new PartitionDescription(kfactor);
-        }
 
         // get topology
         AbstractTopology abstractTopo =
                 AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hosts);
-        abstractTopo = AbstractTopology.mutateAddPartitionsToEmptyHosts( abstractTopo, missingHosts, partitions);
+        abstractTopo = AbstractTopology.mutateAddPartitionsToEmptyHosts(abstractTopo, missingHosts, partitionCount,
+                kfactor);
 
         return abstractTopo;
     }
