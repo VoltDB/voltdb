@@ -1086,7 +1086,9 @@ public class AbstractTopology {
         int size = Math.min(token1parts.length, token2parts.length);
         int index = 0;
         while (index < size) {
-            if (!token1parts[index].equals(token2parts[index])) break;
+            if (!token1parts[index].equals(token2parts[index])) {
+                break;
+            }
             index++;
         }
 
@@ -1150,6 +1152,7 @@ public class AbstractTopology {
         final List<HAGroup> result = Lists.newArrayList(haGroupDistance.keySet());
         Collections.sort(result, new Comparator<HAGroup>() {
 
+            @Override
             public int compare(HAGroup o1, HAGroup o2) {
                 // First sort by the distance, descending order
                 int distanceComp = haGroupDistance.get(o2) - haGroupDistance.get(o1);
@@ -1332,7 +1335,9 @@ public class AbstractTopology {
 
                 for (MutablePartition partition : fullHost.partitions) {
                     // skip moving this one if we're already a replica
-                    if (host.partitions.contains(partition)) continue;
+                    if (host.partitions.contains(partition)) {
+                        continue;
+                    }
 
                     // move it!
                     host.partitions.add(partition);
@@ -1574,7 +1579,9 @@ public class AbstractTopology {
         // Memorize the distance, map the distance to host ids.
         Multimap<Integer, Integer> distanceMap = LinkedListMultimap.create();
         for (Map.Entry<Integer, String> entry : hostGroups.entrySet()) {
-            if (hostId == entry.getKey()) continue;
+            if (hostId == entry.getKey()) {
+                continue;
+            }
             distanceMap.put(computeHADistance(localHostGroup, entry.getValue()), entry.getKey());
         }
 
