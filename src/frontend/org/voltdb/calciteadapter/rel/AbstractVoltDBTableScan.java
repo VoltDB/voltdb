@@ -59,20 +59,4 @@ public abstract class AbstractVoltDBTableScan extends TableScan {
     public VoltTable getVoltDBTable() {
         return m_voltDBTable;
     }
-
-    @Override
-    public RelDataType deriveRowType() {
-        return table.getRowType();
-    }
-
-    @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
-        double dRows = estimateRowCount(mq);
-        double dCpu = dRows + 1; // ensure non-zero cost
-        double dIo = 0;
-        RelOptCost cost = planner.getCostFactory().makeCost(dRows, dCpu, dIo);
-        return cost;
-    }
-
 }
