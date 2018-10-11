@@ -96,7 +96,7 @@ public class TestExportDecoderBase extends TestCase
     static final GeographyPointValue GEOG_POINT = GeographyPointValue.fromWKT("point(-122 37)");
     static final GeographyValue GEOG = GeographyValue.fromWKT("polygon((0 0, 1 1, 0 1, 0 0))");
 
-    static List<VoltType> types = new ArrayList();
+    static List<VoltType> types = new ArrayList<VoltType>();
     static {
         types.add(VoltType.BIGINT);
         types.add(VoltType.BIGINT);
@@ -156,7 +156,6 @@ public class TestExportDecoderBase extends TestCase
 
     public void testNullFlags() throws IOException
     {
-        StubExportDecoder dut = new StubExportDecoder(constructTestSource());
         final int columnCount = COLUMN_TYPES.length;
         for (int i = 0; i < COLUMN_TYPES.length; i++)        {
             byte[] flag = new byte[2];
@@ -179,14 +178,16 @@ public class TestExportDecoderBase extends TestCase
     }
 
     public void testExportWriter() throws IOException {
-        StubExportDecoder dut
-                = new StubExportDecoder(constructTestSource());
-
         long l = System.currentTimeMillis();
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 7, 1L);
-        ExportRow rowdata = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        bb.getInt(); // row size
+        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -235,17 +236,16 @@ public class TestExportDecoderBase extends TestCase
     }
 
     public void testExportSchemaBlocks() throws IOException {
-        StubExportDecoder dut
-                = new StubExportDecoder(constructTestSource());
-
         long l = System.currentTimeMillis();
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
         byte[] rowBytes = ExportEncoder.encodeTable(vtable, "mytable", 7, 1L);
         ByteBuffer bb = ByteBuffer.wrap(rowBytes);
         bb.order(ByteOrder.LITTLE_ENDIAN);
-
-        ExportRow rowdata = ExportRow.decodeRow(null, 0, 0L, bb);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        bb.getInt(); // row size
+        ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -271,6 +271,7 @@ public class TestExportDecoderBase extends TestCase
         assertEquals(rd[14].toString(), GEOG_POINT.toString());
         assertEquals(rd[15].toString(), GEOG.toString());
 
+        bb.getInt(); // row size
         rowdata = ExportRow.decodeRow(rowdata, 0, 0L, bb);
         rd = rowdata.values;
         assertEquals(rd[0], l);
@@ -322,8 +323,6 @@ public class TestExportDecoderBase extends TestCase
 
     public void testExportDecoderPartitioning() throws IOException {
         AdvertisedDataSource source = constructTestSource();
-        StubExportDecoder dut
-                = new StubExportDecoder(source);
 
         String pnames[] = {"tinyint", "smallint", "integer", "bigint", "float", "timestamp", "string", "decimal",
                 "geog_point", "geog"};
@@ -336,7 +335,12 @@ public class TestExportDecoderBase extends TestCase
             vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
             vtable.advanceRow();
             byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 6 + i, 1L);
-            ExportRow rowdata = ExportRow.decodeRow(null, 0, 0L, rowBytes);
+            ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            int schemaSize = bb.getInt();
+            ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+            bb.getInt(); // row size
+            ExportRow rowdata = ExportRow.decodeRow(schemaRow, 0, 0L, bb);
             Object[] rd = rowdata.values;
 
             assertEquals(rd[0], l);
