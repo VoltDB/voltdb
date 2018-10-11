@@ -351,6 +351,7 @@
     <include name='org/voltdb/dtxn/Test*.class' />
     <include name='org/voltdb/export/TestExportSnapshotPreservesSequenceNumber.class' />
     <include name='org/voltdb/export/TestStreamBlockQueue.class' />
+    <include name='org/voltdb/export/TestExecutorFactory.class' />
     <include name='org/voltdb/exportclient/TestElasticSearchHttpExportClient.class' />
     <include name='org/voltdb/exportclient/TestExportDecoderBase.class' />
     <include name='org/voltdb/exportclient/TestExportToFileClient.class' />

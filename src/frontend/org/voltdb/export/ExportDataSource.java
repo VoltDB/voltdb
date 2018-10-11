@@ -224,7 +224,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = true;
         m_eos = false;
         m_client = null;
-        m_es = ExecutorFactory.instance().getExecutor(this);
+        m_es = ExecutorFactory.instance().getExecutor(m_partitionId, m_tableName);
     }
 
     public ExportDataSource(Generation generation, File adFile) throws IOException {
@@ -276,7 +276,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = false;
         m_eos = false;
         m_client = null;
-        m_es = ExecutorFactory.instance().getExecutor(this);
+        m_es = ExecutorFactory.instance().getExecutor(m_partitionId, m_tableName);
     }
 
     public void setReadyForPolling(boolean readyForPolling) {
@@ -628,7 +628,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch(IOException e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
                 } finally {
-                    ExecutorFactory.instance().freeExecutor(ExportDataSource.this);
+                    ExecutorFactory.instance().freeExecutor(m_partitionId, m_tableName);
                 }
             }
         });
@@ -647,7 +647,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 } catch (IOException e) {
                     exportLog.error(e.getMessage(), e);
                 } finally {
-                    ExecutorFactory.instance().freeExecutor(ExportDataSource.this);
+                    ExecutorFactory.instance().freeExecutor(m_partitionId, m_tableName);
                 }
             }
         });

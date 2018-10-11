@@ -102,7 +102,7 @@ public class ExecutorFactory {
         }
 
         // Note - this theoretically could throw on permissions
-        m_maxThreads = getMaxThreads();
+        m_maxThreads = getConfigMaxThreads();
         if (m_maxThreads < 1) {
             exportLog.warn("Parameter \"" + MAX_EXPORT_THREADS
                     + "\" should have a positive value, forcing to default value of 1");
@@ -130,9 +130,9 @@ public class ExecutorFactory {
     }
 
     /**
-     * @return max threads, package private for JUnit tests
+     * @return max threads configured, package private for JUnit tests
      */
-    Integer getMaxThreads() {
+    Integer getConfigMaxThreads() {
         return Integer.getInteger(MAX_EXPORT_THREADS, 1);
     }
 
@@ -151,58 +151,75 @@ public class ExecutorFactory {
     }
 
     /**
-     * Get an executor for an export data source
-     *
-     * @param eds {@link ExportDataSource} instance
-     * @return {@link ListeningExecutorService} allocated
+     * @return the max thread count this factory is currently operating upon, or 0 if uninitialized
      */
-    public synchronized ListeningExecutorService getExecutor(ExportDataSource eds) {
-
-        initialize();
-        return allocate(eds);
+    public synchronized int getMaxThreadCount() {
+        return m_maxThreads;
     }
 
     /**
-     * Free an executor used by an export data source
-     *
-     * @param eds {@link ExportDataSource} instance
+     * @return current
      */
-    public synchronized void freeExecutor(ExportDataSource eds) {
+    public synchronized int getCurrentThreadCount() {
+        return m_executors.size();
+    }
+
+    /**
+     * Get an executor for an {@link ExportDataSource} identified by partitionId and tableName
+     *
+     * @param partitionId
+     * @param tableName
+     * @return {@link ListeningExecutorService} allocated
+     */
+    public synchronized ListeningExecutorService getExecutor(int partitionId, String tableName) {
+
+        initialize();
+        return allocate(partitionId, tableName);
+    }
+
+    /**
+     * Free an executor used by an export data source identified by partitionId and tableName
+     *
+     * @param partitionId
+     * @param tableName
+     */
+    public synchronized void freeExecutor(int partitionId, String tableName) {
 
         if (!isInitialized()) {
             // Paranoid check for maintenance
-            throw new IllegalStateException("Export Data Source for table: " + eds.getTableName()
-            + ", partition: " + eds.getPartitionId() + " frees uninitialized executor");
+            throw new IllegalStateException("Export Data Source for table: " + tableName
+            + ", partition: " + partitionId + " frees uninitialized executor");
         }
-        release(eds);
+        release(partitionId, tableName);
     }
 
     /**
      * Allocate executor for new export data source
      *
-     * @param eds {@link ExportDataSource} instance, verified new
-     * @return {@link ListeningExecutorService} allocated
+     * @param partitionId
+     * @param tableName
+     * @return
      */
-    private ListeningExecutorService allocate(ExportDataSource eds) {
+    private ListeningExecutorService allocate(int partitionId, String tableName) {
 
-        ListeningExecutorService les = m_pid2execMap.get(eds.getPartitionId());
+        ListeningExecutorService les = m_pid2execMap.get(partitionId);
         if (les != null) {
             // Existing executor for this partition
             int refCount = m_refCounts.get(les).intValue() + 1;
             m_refCounts.put(les, refCount);
 
             trace("Allocated existing executor %d, for partition %d",
-                    les.hashCode(), eds.getPartitionId());
+                    les.hashCode(), partitionId);
         }
         else if (m_executors.size() < m_maxThreads) {
             // Create new executor for partition
             les = CoreUtils.getListeningExecutorService("ExportDataSource executor", 1);
             m_executors.add(les);
             m_refCounts.put(les, 1);
-            m_pid2execMap.put(eds.getPartitionId(), les);
+            m_pid2execMap.put(partitionId, les);
 
             trace("Allocated new executor %d, for partition %d, %d executors running",
-                    les.hashCode(), eds.getPartitionId(), m_executors.size());
+                    les.hashCode(), partitionId, m_executors.size());
         }
         else {
             // Re-use existing executor for this partition
@@ -212,10 +229,10 @@ public class ExecutorFactory {
             les = m_executors.get(m_nextAlloc);
             int refCount = m_refCounts.get(les).intValue() + 1;
             m_refCounts.put(les, refCount);
-            m_pid2execMap.put(eds.getPartitionId(), les);
+            m_pid2execMap.put(partitionId, les);
 
             trace("Allocated executor %d, index %d, for partition %d",
-                    les.hashCode(), m_nextAlloc, eds.getPartitionId());
+                    les.hashCode(), m_nextAlloc, partitionId);
             m_nextAlloc += 1;
         }
         return les;
@@ -224,21 +241,22 @@ public class ExecutorFactory {
     /**
      * Release executor for export data source
      *
-     * @param eds {@link ExportDataSource} instance
+     * @param partitionId
+     * @param tableName
      */
-    private void release(ExportDataSource eds) {
+    private void release(int partitionId, String tableName) {
 
-        // The EDS must be mapped...
-        ListeningExecutorService les = m_pid2execMap.get(eds.getPartitionId());
+        // The partition must be mapped...
+        ListeningExecutorService les = m_pid2execMap.get(partitionId);
         if (les == null) {
-            throw new IllegalStateException("Export Data Source for table: " + eds.getTableName()
-            + ", partition: " + eds.getPartitionId() + " frees unallocated executor");
+            throw new IllegalStateException("Export Data Source for table: " + tableName
+            + ", partition: " + partitionId + " frees unallocated executor");
         }
 
         int refCount = m_refCounts.get(les).intValue() - 1;
         if (refCount < 0) {
-            throw new IllegalStateException("Invalid refCount for table: " + eds.getTableName()
-                        + "partition: " + eds.getPartitionId());
+            throw new IllegalStateException("Invalid refCount for table: " + tableName
+                        + "partition: " + partitionId);
         }
 
         if (refCount == 0) {
