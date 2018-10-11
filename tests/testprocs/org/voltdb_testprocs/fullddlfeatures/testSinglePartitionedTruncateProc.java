@@ -20,40 +20,29 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-package txnIdSelfCheck.procedures;
+package org.voltdb_testprocs.fullddlfeatures;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
-import org.voltdb.VoltProcedure.VoltAbortException;
 
-public class TRUPTruncateTableSP extends VoltProcedure {
-    final SQLStmt count = new SQLStmt("select count(*) from trup;");
-    final SQLStmt scancount = new SQLStmt("select count(*) from trup where p >= 0;");
-    final SQLStmt truncate = new SQLStmt("truncate table trup;");
+// ENG-14487 truncate statement is not allowed for single partitioned procedures.
+public class testSinglePartitionedTruncateProc extends VoltProcedure {
 
-    public VoltTable[] run(long p, byte shouldRollback) {
-        voltQueueSQL(truncate);
-        voltQueueSQL(count);
-        voltQueueSQL(scancount);
-        VoltTable[] results = voltExecuteSQL(true);
-        VoltTable data = results[1];
-        VoltTableRow row = data.fetchRow(0);
-        long optCount = row.getLong(0);
-        if (optCount != 0) {
-            throw new VoltAbortException("after truncate (opt) count not zero");
-        }
-        data = results[2];
-        row = data.fetchRow(0);
-        long scanCount = row.getLong(0);
-        if (scanCount != 0) {
-            throw new VoltAbortException("after truncate (scan) count not zero");
-        }
-        if (shouldRollback != 0) {
-            throw new VoltAbortException("EXPECTED ROLLBACK");
-        }
-        return results;
+    public final SQLStmt sql1 = new SQLStmt(
+            "SELECT * " +
+                    "FROM T2 " +
+                    "WHERE area = ?;"
+    );
+
+    public final SQLStmt sql2 = new SQLStmt(
+            "   truncate table t2;"
+    );
+
+    public VoltTable[] run(int area)
+            throws VoltAbortException {
+        voltQueueSQL(sql1, area);
+        voltQueueSQL(sql2);
+        return voltExecuteSQL();
     }
 }

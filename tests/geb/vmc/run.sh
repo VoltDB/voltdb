@@ -116,6 +116,7 @@ function debug() {
     echo "MIDDLE_ARGS    :" $MIDDLE_ARGS
     echo "LAST_ARGS      :" $LAST_ARGS
     echo "ARGS           :" $ARGS
+    echo "TEST_ARGS      :" $TEST_ARGS
 }
 
 # Create the Jar file used by the GEB tests of the VMC
@@ -216,10 +217,10 @@ function prepare-pro() {
 # 'prepare-pro' (or the equivalent) has already been run
 function tests-only() {
     init-if-needed
-    echo -e "\n$0 performing: tests[-only]$TEST_ARGS$ARGS"
+    echo -e "\n$0 performing: tests[-only]${TEST_ARGS}${ARGS}"
 
     cd $GEB_VMC_DIR
-    TEST_COMMAND="./gradlew$TEST_ARGS$ARGS"
+    TEST_COMMAND="./gradlew${TEST_ARGS}${ARGS}"
     echo -e "running:\n$TEST_COMMAND"
     $TEST_COMMAND
     code[5]=$?
@@ -257,7 +258,7 @@ function all() {
 # everything you need to prepare for them; provides a "fresh start", i.e.,
 # re-builds the latest versions of VoltDB ('pro'), the Jar file, etc.
 function all-pro() {
-    echo -e "\n$0 performing: all$ARGS"
+    echo -e "\n$0 performing: all-pro$ARGS"
     prepare-pro
     tests
     shutdown

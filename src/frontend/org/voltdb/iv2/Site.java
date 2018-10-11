@@ -552,12 +552,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             for (Map.Entry<Byte, Integer> entry : clusterIdToPartitionCountMap.entrySet()) {
                 int producerClusterId = entry.getKey();
                 Map<Integer, DRSiteDrIdTracker> clusterSources =
                         m_maxSeenDrLogsBySrcPartition.getOrDefault(producerClusterId, new HashMap<>());
-                if (hasReplicatedStream && !clusterSources.containsKey(MpInitiator.MP_INIT_PID)) {
+                if (!clusterSources.containsKey(MpInitiator.MP_INIT_PID)) {
                     DRSiteDrIdTracker tracker =
                             DRConsumerDrIdTracker.createSiteTracker(0,
                                     DRLogSegmentId.makeEmptyDRId(producerClusterId),
@@ -1745,8 +1745,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setProcedureName(String procedureName) {
-        m_ee.setProcedureName(procedureName);
+    public void setupProcedure(String procedureName) {
+        m_ee.setupProcedure(procedureName);
+    }
+
+    @Override
+    public void completeProcedure() {
+        m_ee.completeProcedure();
     }
 
     @Override
@@ -1755,9 +1760,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long applyBinaryLog(long txnId, long spHandle,
-                               long uniqueId, int remoteClusterId, int remotePartitionId,
-                               byte log[]) throws EEException {
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte log[])
+            throws EEException {
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(Integer.BYTES * 2 + log.length);
         paramBuffer.putInt(1);
         paramBuffer.putInt(log.length);

@@ -56,6 +56,8 @@ public class DefaultProcedureManager {
     // part of the main catalog
     private final Database m_fakeDb;
 
+    public static final String NIBBLE_DELETE_PROC = "nibbledelete";
+
     public DefaultProcedureManager(Database db) {
         m_db = db;
         m_fakeDb = new Catalog().getClusters().add("cluster").getDatabases().add("database");
@@ -210,6 +212,8 @@ public class DefaultProcedureManager {
             else {
                 return generateCrudReplicatedUpsert(table, pkey);
             }
+        case "nibbledelete":
+            return generateNibbleDelete(defaultProc);
         default:
             throw new RuntimeException("Invalid input to default proc SQL generator.");
         }
@@ -446,6 +450,14 @@ public class DefaultProcedureManager {
         generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
         sb.append(';');
 
+        return sb.toString();
+    }
+
+    private static String generateNibbleDelete(Procedure proc) {
+        StringBuilder sb = new StringBuilder();
+        for (org.voltdb.catalog.Statement stmt : proc.getStatements()) {
+            sb.append(stmt.getSqltext());
+        }
         return sb.toString();
     }
 

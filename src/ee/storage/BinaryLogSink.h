@@ -61,7 +61,7 @@ private:
      * Apply all records within a single transaction from the binary log.
      */
     int64_t applyTxn(BinaryLog *log, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool,
-            VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId);
+            VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId, bool replicatedTable);
 
     /**
      * Apply a single transaction to replicated tables
@@ -80,7 +80,7 @@ private:
      */
     int64_t applyRecord(BinaryLog *log, const DRRecordType type,
             boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
-            int32_t remoteClusterId, bool skipRow);
+            int32_t remoteClusterId, bool replicatedTable, bool skipRow);
 };
 
 

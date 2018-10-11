@@ -91,6 +91,11 @@ public class DuplicateCounter
         }
     }
 
+    public void updateReplica (Long previousMaster, Long newMaster){
+        m_expectedHSIds.remove(previousMaster);
+        m_expectedHSIds.add(newMaster);
+    }
+
     void logRelevantMismatchInformation(String reason, int[] hashes, VoltMessage recentMessage, int misMatchPos) {
         if (misMatchPos >= 0) {
             ((InitiateResponseMessage) recentMessage).setMismatchPos(misMatchPos);
@@ -157,19 +162,19 @@ public class DuplicateCounter
                 m_responseHashes = hashes;
                 m_txnSucceed = txnSucceed;
             }
+            else if (m_txnSucceed != txnSucceed) {
+                tmLog.fatal("Stored procedure " + getStoredProcedureName()
+                + " succeeded on one partition but failed on another partition."
+                + " Shutting down to preserve data integrity.");
+                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
+                return ABORT;
+            }
             else if ((pos = DeterminismHash.compareHashes(m_responseHashes, hashes)) >= 0) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
                 logRelevantMismatchInformation("HASH MISMATCH", hashes, message, pos);
                 return MISMATCH;
-            }
-            else if (m_txnSucceed != txnSucceed) {
-                tmLog.fatal("Stored procedure " + getStoredProcedureName()
-                        + " succeeded on one partition but failed on another partition."
-                        + " Shutting down to preserve data integrity.");
-                logRelevantMismatchInformation("PARTIAL ROLLBACK/ABORT", hashes, message, pos);
-                return ABORT;
             }
             m_lastResponse = message;
             m_lastResultTables = resultTables;

@@ -1707,7 +1707,8 @@ correlated-bool-expr    ::= {numeric-expression}   {comparison-operator} {table-
 # Window functions - a.k.a. analytic functions
 #
 window-function-expr    ::= {window-function} OVER ({partition-or-order-by})
-window-function         ::= {window-agg-func-expr} 4| COUNT(*) | RANK() | DENSE_RANK()
+window-function         ::= {window-agg-func-expr} 4| COUNT(*) | RANK() | \
+                            DENSE_RANK() | ROW_NUMBER()
 
 # SUM can only take numeric argument; others can take any type;
 # (AVG not actually supported here, but it should not crash)

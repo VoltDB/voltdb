@@ -73,6 +73,9 @@ public class MpScheduler extends Scheduler
     private final List<Long> m_iv2Masters;
     private final Map<Integer, Long> m_partitionMasters;
     private final List<Long> m_buddyHSIds;
+    // Leader migrated from one site to another
+    private final Map<Long, Long> m_leaderMigrationMap;
+
     private int m_nextBuddy = 0;
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
@@ -95,6 +98,7 @@ public class MpScheduler extends Scheduler
         m_partitionMasters = Maps.newHashMap();
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
         m_leaderNodeId = leaderNodeId;
+        m_leaderMigrationMap = Maps.newHashMap();
     }
 
     void setMpRoSitePool(MpRoSitePool sitePool)
@@ -133,6 +137,8 @@ public class MpScheduler extends Scheduler
     public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
             boolean balanceSPI)
     {
+        applyLeaderMigration(replicas, balanceSPI);
+
         // Handle startup and promotion semi-gracefully
         m_iv2Masters.clear();
         m_iv2Masters.addAll(replicas);
@@ -146,35 +152,38 @@ public class MpScheduler extends Scheduler
         // Stolen from SpScheduler.  Need to update the duplicate counters associated with any EveryPartitionTasks
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
-        List<Long> doneCounters = new LinkedList<Long>();
-        for (Entry<Long, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
-            DuplicateCounter counter = entry.getValue();
-            int result = counter.updateReplicas(m_iv2Masters);
-            if (result == DuplicateCounter.DONE) {
-                doneCounters.add(entry.getKey());
-            }
-        }
 
-        // Maintain the CI invariant that responses arrive in txnid order.
-        Collections.sort(doneCounters);
-        for (Long key : doneCounters) {
-            DuplicateCounter counter = m_duplicateCounters.remove(key);
-            VoltMessage resp = counter.getLastResponse();
-            if (resp != null && resp instanceof InitiateResponseMessage) {
-                InitiateResponseMessage msg = (InitiateResponseMessage)resp;
-                if (msg.shouldCommit() && msg.haveSentMpFragment()) {
-                    m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
-                    m_repairLogAwaitingCommit = msg.getTxnId();
+        // Do not update DuplicateCounter upon leader migration
+        if (!balanceSPI) {
+            List<Long> doneCounters = new LinkedList<Long>();
+            for (Entry<Long, DuplicateCounter> entry : m_duplicateCounters.entrySet()) {
+                DuplicateCounter counter = entry.getValue();
+                int result = counter.updateReplicas(m_iv2Masters);
+                if (result == DuplicateCounter.DONE) {
+                    doneCounters.add(entry.getKey());
                 }
-                m_outstandingTxns.remove(msg.getTxnId());
-                m_mailbox.send(counter.m_destinationId, resp);
             }
-            else {
-                hostLog.warn("TXN " + counter.getTxnId() + " lost all replicas and " +
-                        "had no responses.  This should be impossible?");
+
+            // Maintain the CI invariant that responses arrive in txnid order.
+            Collections.sort(doneCounters);
+            for (Long key : doneCounters) {
+                DuplicateCounter counter = m_duplicateCounters.remove(key);
+                VoltMessage resp = counter.getLastResponse();
+                if (resp != null && resp instanceof InitiateResponseMessage) {
+                    InitiateResponseMessage msg = (InitiateResponseMessage)resp;
+                    if (msg.shouldCommit() && msg.haveSentMpFragment()) {
+                        m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                        m_repairLogAwaitingCommit = msg.getTxnId();
+                    }
+                    m_outstandingTxns.remove(msg.getTxnId());
+                    m_mailbox.send(counter.m_destinationId, resp);
+                }
+                else {
+                    hostLog.warn("TXN " + counter.getTxnId() + " lost all replicas and " +
+                            "had no responses.  This should be impossible?");
+                }
             }
         }
-
         // Determine if all the partition leaders are on live hosts, that is, all partitions have promoted
         // their leaders.
         Set<Integer> partitionLeaderHosts = CoreUtils.getHostIdsFromHSIDs(m_iv2Masters);
@@ -184,6 +193,25 @@ public class MpScheduler extends Scheduler
         MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas, balanceSPI, partitionLeaderHosts.isEmpty());
         m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
         return new long[0];
+    }
+
+    private void applyLeaderMigration(final List<Long> updatedReplicas, boolean balanceSPI) {
+
+        if (!balanceSPI || !m_isLeader) {
+            m_leaderMigrationMap.clear();
+            return;
+        }
+         // Find the old leader
+        Set<Long> previousLeaders = Sets.newHashSet();
+        previousLeaders.addAll(m_iv2Masters);
+        previousLeaders.removeAll(updatedReplicas);
+         // Find the new leader
+        Set<Long> currentLeaders = Sets.newHashSet();
+        currentLeaders.addAll(updatedReplicas);
+        currentLeaders.removeAll(m_iv2Masters);
+         // Leader migration moves partition leader from a host to another, one at a time
+        assert(previousLeaders.size() == 1 && currentLeaders.size() == 1);
+        m_leaderMigrationMap.put(previousLeaders.iterator().next(), currentLeaders.iterator().next());
     }
 
     /**
@@ -200,29 +228,37 @@ public class MpScheduler extends Scheduler
     @Override
     public void deliver(VoltMessage message)
     {
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("DELIVER: " + message.toString());
-        }
         if (message instanceof Iv2InitiateTaskMessage) {
+            if (tmLog.isDebugEnabled()) {
+                // Protect against race in string conversion of VoltTable parameter on deliver and site threads
+                StringBuilder sb = new StringBuilder("DELIVER: ");
+                ((Iv2InitiateTaskMessage)message).toShortString(sb);
+                tmLog.debug(sb.toString());
+            }
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
         }
-        else if (message instanceof InitiateResponseMessage) {
-            handleInitiateResponseMessage((InitiateResponseMessage)message);
-        }
-        else if (message instanceof FragmentResponseMessage) {
-            handleFragmentResponseMessage((FragmentResponseMessage)message);
-        }
-        else if (message instanceof Iv2EndOfLogMessage) {
-            handleEOLMessage();
-        }
-        else if (message instanceof DummyTransactionTaskMessage) {
-            // leave empty to ignore it on purpose
-        }
-        else if (message instanceof DumpMessage) {
-            // leave empty to ignore it on purpose
-        }
         else {
-            throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("DELIVER: " + message.toString());
+            }
+            if (message instanceof InitiateResponseMessage) {
+                handleInitiateResponseMessage((InitiateResponseMessage)message);
+            }
+            else if (message instanceof FragmentResponseMessage) {
+                handleFragmentResponseMessage((FragmentResponseMessage)message);
+            }
+            else if (message instanceof Iv2EndOfLogMessage) {
+                handleEOLMessage();
+            }
+            else if (message instanceof DummyTransactionTaskMessage) {
+                // leave empty to ignore it on purpose
+            }
+            else if (message instanceof DumpMessage) {
+                // leave empty to ignore it on purpose
+            }
+            else {
+                throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
+            }
         }
     }
 
@@ -458,6 +494,25 @@ public class MpScheduler extends Scheduler
         }
 
         DuplicateCounter counter = m_duplicateCounters.get(message.getTxnId());
+
+        // A transaction may be routed back here for EveryPartitionTask via leader migration
+        if (counter != null && message.isMisrouted()) {
+            tmLog.info("The message on the partition is misrouted. TxnID: " + TxnEgo.txnIdToString(message.getTxnId()));
+            Long newLeader = m_leaderMigrationMap.get(message.m_sourceHSId);
+            if (newLeader != null) {
+                // Update the DuplicateCounter with new replica
+                counter.updateReplica(message.m_sourceHSId, newLeader);
+                m_leaderMigrationMap.remove(message.m_sourceHSId);
+
+                // Leader migration has updated the leader, send the request to the new leader
+                m_mailbox.send(newLeader, (Iv2InitiateTaskMessage)counter.getOpenMessage());
+            } else {
+                // Leader migration not done yet.
+                m_mailbox.send(message.m_sourceHSId, (Iv2InitiateTaskMessage)counter.getOpenMessage());
+            }
+            return;
+        }
+
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {

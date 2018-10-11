@@ -302,14 +302,32 @@ public class MpProcedureTask extends ProcedureTask
         m_queue.restart();
     }
 
-    @Override
-    public String toString()
+    private void taskToString(StringBuilder sb)
     {
-        StringBuilder sb = new StringBuilder();
         sb.append("MpProcedureTask:");
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+    }
+
+    // Use this version when it is possible for multiple threads to make a string from the invocation
+    // at the same time (seems to only be an issue if the parameter to the procedure is a VoltTable)
+    public String toShortString()
+    {
+        StringBuilder sb = new StringBuilder();
+        taskToString(sb);
+        if (m_msg != null) {
+            sb.append("\n");
+            m_msg.toShortString(sb);
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        taskToString(sb);
         if (m_msg != null) {
             sb.append("\n" + m_msg);
         }

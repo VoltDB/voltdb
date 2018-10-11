@@ -241,9 +241,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "8.3";
+    static final String m_defaultVersionString = "8.4";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q8.3\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q8.4\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -1627,7 +1627,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // If -Dlarge_mode_ratio=xx is specified via ant, the value will show up in the environment variables and
             // take higher priority. Otherwise, the value specified via VOLTDB_OPTS will take effect.
-            final double largeModeRatio = Double.valueOf(System.getenv("LARGE_MODE_RATIO") == null ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
+            // If the test is started by ant and -Dlarge_mode_ratio is not set, it will take a default value "-1" which
+            // we should ignore.
+            final double largeModeRatio = Double.valueOf((System.getenv("LARGE_MODE_RATIO") == null ||
+                    System.getenv("LARGE_MODE_RATIO").equals("-1")) ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
             if (largeModeRatio > 0) {
                 hostLog.info(String.format("The large_mode_ratio property is set as %.2f", largeModeRatio));
             }

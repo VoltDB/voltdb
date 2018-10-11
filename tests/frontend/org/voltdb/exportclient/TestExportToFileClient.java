@@ -204,19 +204,32 @@ public class TestExportToFileClient extends ExportClientTestBase {
         decoder.onBlockCompletion(row);
 
         // The file should rollover after 1s
-        boolean rolledOver = false;
         while (System.currentTimeMillis() - startTs < 60 * 1000) { // timeout after 1 minute
             final File dir = new File(m_dir);
             final File[] files = dir.listFiles();
-            if (files != null && files.length > 0 && !files[0].getName().startsWith("active")) {
+            int index;
+            if (files != null && files.length > 0 && (index = findFileNotStartWithActive(files)) >= 0) {
                 assertTrue(System.currentTimeMillis() - startTs > 1000);
-                verifyContent(files[0], l);
-                rolledOver = true;
-                break;
+                verifyContent(files[index], l);
+                return;
             }
             Thread.sleep(100);
         }
-        assertTrue("Timed out waiting for file to roll over", rolledOver);
+        fail("Timed out waiting for file to roll over");
+    }
+
+    // Find the index of file array whose name does not start with "active"; -1 when not found.
+    private static int findFileNotStartWithActive(File[] files) {
+        if (files == null || files.length == 0) {
+            return -1;
+        } else {
+            for (int indx = 0; indx < files.length; ++indx) {
+                if (!files[indx].getName().startsWith("active")) {
+                    return indx;
+                }
+            }
+            return -1;
+        }
     }
 
     @Test

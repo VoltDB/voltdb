@@ -55,7 +55,7 @@ public:
         srand(0);
         m_topend = new DummyTopend();
         m_pool = new Pool();
-        m_quantum = new (*m_pool) UndoQuantum(0, m_pool, false);
+        m_quantum = createInstanceFromPool<UndoQuantum>(*m_pool, 0, m_pool);
         VoltDBEngine* noEngine = NULL;
         m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool,
                                         noEngine, "", 0, NULL, NULL, 0);
@@ -99,8 +99,8 @@ public:
     void nextQuantum(int i, int64_t tokenOffset)
     {
         // Takes advantage of "grey box test" friend privileges on UndoQuantum.
-        m_quantum->release();
-        m_quantum = new (*m_pool) UndoQuantum(i + tokenOffset, m_pool, false);
+       UndoQuantum::release(std::move(*m_quantum));
+        m_quantum = createInstanceFromPool<UndoQuantum>(*m_pool, i + tokenOffset, m_pool);
         // quant, currTxnId, committedTxnId
         m_context->setupForPlanFragments(m_quantum, i, i, i - 1, 0, false);
     }
@@ -111,7 +111,7 @@ public:
             TupleSchema::freeTupleSchema(m_schema);
         delete m_table;
         delete m_context;
-        m_quantum->release();
+        UndoQuantum::release(std::move(*m_quantum));
         delete m_pool;
         delete m_topend;
         voltdb::globalDestroyOncePerProcess();

@@ -250,7 +250,7 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
         }
 
         //spread additional deletes within the interval
-        long delay = TimeUnit.SECONDS.toMillis(interval)/attemptsLeft;
+        long delay = interval/attemptsLeft;
         ScheduledExecutorService es = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("TTLDeleter"));
         CountDownLatch latch = new CountDownLatch(attemptsLeft);
         String[] errors = new String[attemptsLeft];

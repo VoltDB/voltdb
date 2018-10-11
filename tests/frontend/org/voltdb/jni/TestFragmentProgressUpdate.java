@@ -115,7 +115,9 @@ public class TestFragmentProgressUpdate extends TestCase {
         int i = 0;
         // this kinda assumes the right order
         for (PlanFragment f : selectStmt.getFragments()) {
-            if (i != 0) selectBottomFrag = f;
+            if (i != 0) {
+                selectBottomFrag = f;
+            }
             i++;
         }
         // populate plan cache
@@ -171,7 +173,9 @@ public class TestFragmentProgressUpdate extends TestCase {
         int i = 0;
         // this kinda assumes the right order
         for (PlanFragment f : selectStmt.getFragments()) {
-            if (i != 0) selectBottomFrag = f;
+            if (i != 0) {
+                selectBottomFrag = f;
+            }
             i++;
         }
         // populate plan cache
@@ -211,7 +215,9 @@ public class TestFragmentProgressUpdate extends TestCase {
         int j = 0;
         // this kinda assumes the right order
         for (PlanFragment f : deleteStmt.getFragments()) {
-            if (j != 0) deleteBottomFrag = f;
+            if (j != 0) {
+                deleteBottomFrag = f;
+            }
             j++;
         }
         // populate plan cache
@@ -286,7 +292,9 @@ public class TestFragmentProgressUpdate extends TestCase {
         int i = 0;
         // this kinda assumes the right order
         for (PlanFragment f : selectStmt.getFragments()) {
-            if (i != 0) selectBottomFrag = f;
+            if (i != 0) {
+                selectBottomFrag = f;
+            }
             i++;
         }
         // populate plan cache
@@ -479,6 +487,8 @@ public class TestFragmentProgressUpdate extends TestCase {
                 fail("Invalid value for sqlTextExpectation");
             }
 
+            m_ee.setupProcedure(null);
+
             m_ee.executePlanFragments(
                     numFragsToExecute,
                     fragIds,
@@ -539,30 +549,24 @@ public class TestFragmentProgressUpdate extends TestCase {
         verifyLongRunningQueries(numRowsToInsert, timeout, stmtName, 1, readOnly, SqlTextExpectation.SQL_STATEMENT);
     }
 
-    public void testTimingoutQueries() throws Exception {
-        //
-        // ReadOnly query
-        //
-        String procName = "item_crazy_join";
+    public void testTimingQueriyReadOnly200() throws Exception {
+        verifyLongRunningQueries(200, 0, "item_crazy_join", true);
+    }
 
-        verifyLongRunningQueries(200, 0, procName, true);
-        tearDown(); setUp();
+    public void testTimingQueryReadOnly200_2() throws Exception {
+        verifyLongRunningQueries(200, 0, "item_crazy_join", true);
+    }
 
-        verifyLongRunningQueries(200, 0, procName, true);
-        tearDown(); setUp();
+    public void testTimingQueryReadOnly300() throws Exception {
+        verifyLongRunningQueries(300, 0, "item_crazy_join", true);
+    }
 
-        verifyLongRunningQueries(300, 0, procName, true);
-        tearDown(); setUp();
+    public void testTimingQueryWrite() throws Exception {
+        verifyLongRunningQueries(50000, 0, "item_big_del", false);
+    }
 
-        //
-        // Write query (negative)
-        //
-        procName = "item_big_del";
-        verifyLongRunningQueries(50000, 0, procName, false);
-        tearDown(); setUp();
-
-        verifyLongRunningQueries(50000, 100, procName, false);
-        tearDown(); setUp();
+    public void testTimingoutQueryWrite() throws Exception {
+        verifyLongRunningQueries(50000, 100, "item_big_del", false);
     }
 
     private ExecutionEngine m_ee;
