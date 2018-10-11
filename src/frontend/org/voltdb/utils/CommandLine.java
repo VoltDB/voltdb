@@ -340,7 +340,9 @@ public class CommandLine extends VoltDB.Configuration
 
     String voltFilePrefix = "";
     public CommandLine voltFilePrefix(String voltFilePrefix) {
-        if (m_newCli) return this;
+        if (m_newCli) {
+            return this;
+        }
 
         this.voltFilePrefix = voltFilePrefix;
         return this;
@@ -539,8 +541,9 @@ public class CommandLine extends VoltDB.Configuration
          */
         cmdline.add("-Djavax.security.auth.useSubjectCredsOnly=false");
 
-        if (rmi_host_name != null)
+        if (rmi_host_name != null) {
             cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
+        }
         cmdline.add("-Dlog4j.configuration=" + log4j);
         if (m_vemTag != null) {
             cmdline.add("-D" + VEM_TAG_PROPERTY + "=" + m_vemTag);

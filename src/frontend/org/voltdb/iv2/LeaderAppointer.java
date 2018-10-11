@@ -444,7 +444,9 @@ public class LeaderAppointer implements Promotable
             });
             blocker.get();
         } catch (RejectedExecutionException e) {
-            if (m_es.isShutdown()) return;
+            if (m_es.isShutdown()) {
+                return;
+            }
             throw new RejectedExecutionException(e);
         }
     }
@@ -616,7 +618,9 @@ public class LeaderAppointer implements Promotable
             //skip checking MP, not relevant to KSafety
             String partitionDir = it.next();
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
-            if (pid == MpInitiator.MP_INIT_PID) continue;
+            if (pid == MpInitiator.MP_INIT_PID) {
+                continue;
+            }
 
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
@@ -650,7 +654,9 @@ public class LeaderAppointer implements Promotable
         final long statTs = System.currentTimeMillis();
         for (String partitionDir : partitionDirs) {
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
-            if (pid == MpInitiator.MP_INIT_PID) continue;
+            if (pid == MpInitiator.MP_INIT_PID) {
+                continue;
+            }
 
             try {
                 // The data of the partition dir indicates whether the partition has finished
@@ -727,11 +733,15 @@ public class LeaderAppointer implements Promotable
                 Integer pid = entry.getKey();
                 Long hsId = entry.getValue();
                 //ignore MPI
-                if (pid == MpInitiator.MP_INIT_PID) continue;
+                if (pid == MpInitiator.MP_INIT_PID) {
+                    continue;
+                }
                 int hostId = CoreUtils.getHostIdFromHSId(hsId);
 
                 //ignore the failed hosts
-                if (failedHosts.contains(hostId)) continue;
+                if (failedHosts.contains(hostId)) {
+                    continue;
+                }
                 Host host = hostLeaderMap.get(hostId);
                 if (host == null) {
                     host = new Host(hostId);
