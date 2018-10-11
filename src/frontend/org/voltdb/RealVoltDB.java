@@ -2708,13 +2708,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         + config.m_pathToDeployment, false, null);
                 return new ReadDeploymentResults(deploymentBytes, deployment);
             }
-            // Override local sites count if possible
-            if (config.m_sitesperhost == VoltDB.UNDEFINED) {
-                config.m_sitesperhost = deployment.getCluster().getSitesperhost();
-            } else {
-                hostLog.info("Set the local sites count to " + config.m_sitesperhost);
-                consoleLog.info("CLI overrides the local sites count to " + config.m_sitesperhost);
-            }
+            // Set local sites count
+            config.m_sitesperhost = deployment.getCluster().getSitesperhost();
             NodeSettings nodeSettings = null;
             // adjust deployment host count when the cluster members are given by mesh configuration
             // providers

@@ -466,8 +466,6 @@ public class VoltDB {
                     m_hostCount = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("missing")) {
                     m_missingHostCount = Integer.parseInt(args[++i].trim());
-                }else if (arg.equals("sitesperhost")){
-                    m_sitesperhost = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();
                 } else if (arg.startsWith("publicinterface ")) {

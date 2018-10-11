@@ -59,7 +59,6 @@ import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
-import com.google_voltpatches.common.collect.Maps;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -173,7 +172,6 @@ public class LocalCluster extends VoltServerConfig {
     private String[] m_buildStringOverrides = null;
 
     private String[] m_modeOverrides = null;
-    private Map<Integer, Integer> m_sitesperhostOverrides = null;
     private String[] m_placementGroups = null;
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
@@ -379,10 +377,6 @@ public class LocalCluster extends VoltServerConfig {
 
         m_siteCount = siteCount;
         m_hostCount = hostCount;
-        m_sitesperhostOverrides = Maps.newHashMap();
-        for (int hostId = 0; hostId < hostCount; hostId++) {
-            m_sitesperhostOverrides.put(hostId, m_siteCount);
-        }
         templateCmdLine.hostCount(hostCount);
         templateCmdLine.setMissingHostCount(m_missingHostCount);
         setEnableSSL(isEnableSSL);
@@ -694,11 +688,6 @@ public class LocalCluster extends VoltServerConfig {
             assert(m_modeOverrides[hostId] != null);
             cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
             cmdln.m_isPaused = true;
-        }
-
-        if ((m_sitesperhostOverrides != null) && (m_sitesperhostOverrides.size() > hostId)) {
-            assert(m_sitesperhostOverrides.containsKey(hostId));
-            cmdln.m_sitesperhost = m_sitesperhostOverrides.get(hostId);
         }
 
         // for debug, dump the command line to a unique file.
@@ -1242,11 +1231,6 @@ public class LocalCluster extends VoltServerConfig {
                 cmdln.m_modeOverrideForTest = m_modeOverrides[hostId];
             }
 
-            if ((m_sitesperhostOverrides != null) && (m_sitesperhostOverrides.size() > hostId)) {
-                assert(m_sitesperhostOverrides.containsKey(hostId));
-                cmdln.m_sitesperhost = m_sitesperhostOverrides.get(hostId);
-            }
-
             cmdln.setMissingHostCount(m_missingHostCount);
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
@@ -1555,12 +1539,6 @@ public class LocalCluster extends VoltServerConfig {
                 }
             }
             //Rejoin does not do paused mode.
-
-            //Rejoin mixed sitesperhost
-            if ((m_sitesperhostOverrides != null) && (m_sitesperhostOverrides.size() > hostId)) {
-                assert(m_sitesperhostOverrides.containsKey(hostId));
-                rejoinCmdLn.m_sitesperhost = m_sitesperhostOverrides.get(hostId);
-            }
 
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
             String cmdLineFull = "Rejoin cmd line:";
@@ -2064,13 +2042,6 @@ public class LocalCluster extends VoltServerConfig {
         assert(modes != null);
 
         m_modeOverrides = modes;
-    }
-
-    public void setOverridesForSitesperhost(Map<Integer, Integer> sphMap) {
-        assert(sphMap != null);
-        assert(!sphMap.isEmpty());
-
-        m_sitesperhostOverrides = sphMap;
     }
 
     public void setPlacementGroups(String[] placementGroups) {
