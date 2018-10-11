@@ -24,7 +24,7 @@
 {@idcol = "V_G1"}
 {@numcol = "V_SUM_AGE"}
 {@plus10 = " + 10"}
-{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star = "*"}
 {@lhsstar = "*"}
 

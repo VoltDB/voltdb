@@ -33,11 +33,11 @@
 {
     # Tests of SQL Analytic Windowed Functions (e.g. RANK, DENSE_RANK)
     "analytic": {"schema": "schema.py",
-                 "ddl": "DDL.sql",
+                 "ddl": "DDL-null.sql",
                  "template": "analytic.sql",
                  "normalizer": "normalizer.py"},
     "analytic-strings": {"schema": "strings-schema.py",
-                         "ddl": "strings-DDL.sql",
+                         "ddl": "strings-DDL-null.sql",
                          "template": "analytic-strings.sql",
                          "normalizer": "normalizer.py"},
 

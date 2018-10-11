@@ -107,10 +107,11 @@ namespace voltdb {
 //        auto relativeTableIndex = it->second;
         if (viewHandlerPartitioned == sourceTable->isCatalogTableReplicated()) {
             assert(viewHandlerPartitioned);
+#ifndef NDEBUG // SynchronizedThreadLock::isHoldingResourceLock() only available in debug build
             VOLT_DEBUG("Dropping Source Table %s (%p) for view %s (%p). isInSingleThreadMode %s, isHoldingResourceLock %s.",
                                 sourceTable->name().c_str(), sourceTable, m_destTable->name().c_str(), m_destTable,
                                 SynchronizedThreadLock::isInSingleThreadMode()?"true":"false",  SynchronizedThreadLock::isHoldingResourceLock()?"true":"false");
-
+#endif
             // We are dropping our (partitioned) ViewHandler to a Replicated Table
             ScopedReplicatedResourceLock scopedLock;
             sourceTable->dropViewHandler(m_replicatedWrapper.get());
@@ -130,9 +131,11 @@ namespace voltdb {
         assert(!m_sourceTables.empty());
         if (viewHandlerPartitioned == sourceTable->isCatalogTableReplicated()) {
             assert(viewHandlerPartitioned);
+#ifndef NDEBUG // SynchronizedThreadLock::isHoldingResourceLock() only available in debug build
             VOLT_DEBUG("Dropping Source Table %s (%p) for view %s (%p). isInSingleThreadMode %s, isHoldingResourceLock %s.",
                     sourceTable->name().c_str(), sourceTable, m_destTable->name().c_str(), m_destTable,
-                    SynchronizedThreadLock::isInSingleThreadMode()?"true":"false",  SynchronizedThreadLock::isHoldingResourceLock()?"true":"false");
+                    SynchronizedThreadLock::isInSingleThreadMode()?"true":"false", SynchronizedThreadLock::isHoldingResourceLock()?"true":"false");
+#endif
             assert(SynchronizedThreadLock::isInSingleThreadMode() || SynchronizedThreadLock::isHoldingResourceLock());
             sourceTable->dropViewHandler(m_replicatedWrapper.get());
         }

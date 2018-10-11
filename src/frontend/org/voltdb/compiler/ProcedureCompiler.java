@@ -270,6 +270,12 @@ public abstract class ProcedureCompiler {
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
 
+            // ENG-14487 truncate statement is not allowed for single partitioned procedures.
+            if (isSinglePartition && stmt.getText().toUpperCase().startsWith("TRUNCATE")) {
+                throw compiler.new VoltCompilerException("Single partitioned procedure: " +
+                        procedure.getClassname() + " has TRUNCATE statement: \"" + stmt.getText() + "\".");
+            }
+
             // if this was a cache hit or specified single, don't worry about figuring out more partitioning
             if (partitioning.wasSpecifiedAsSingle() || cacheHit) {
                 procWantsCommonPartitioning = false; // Don't try to infer what's already been asserted.
@@ -750,6 +756,12 @@ public abstract class ProcedureCompiler {
         for (String curStmt : stmts) {
             // Skip processing 'END' statement in multi-statement procedures
             if (curStmt.equalsIgnoreCase("end")) continue;
+
+            // ENG-14487 truncate statement is not allowed for single partitioned procedures.
+            if (info.isSinglePartition() && curStmt.toUpperCase().startsWith("TRUNCATE")) {
+                throw compiler.new VoltCompilerException("Single partitioned procedure: " +
+                        shortName + " has TRUNCATE statement: \"" + curStmt + "\".");
+            }
 
             // Add the statement to the catalog
             Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME + String.valueOf(stmtNum));

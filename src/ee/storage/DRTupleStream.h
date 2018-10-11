@@ -44,7 +44,6 @@ public:
     static const uint8_t COMPATIBLE_PROTOCOL_VERSION = 7;
 
     static const uint8_t ELASTICADD_PROTOCOL_VERSION = 8;
-    static const uint8_t NO_REPLICATED_STREAM_PROTOCOL_VERSION = 9;
 
     DRTupleStream(int partitionId, size_t defaultBufferSize, uint8_t drProtocolVersion=PROTOCOL_VERSION);
 
@@ -105,7 +104,6 @@ public:
 
     void setDrProtocolVersion(uint8_t drProtocolVersion) {
             m_drProtocolVersion = drProtocolVersion;
-            m_hasReplicatedStream = (drProtocolVersion < NO_REPLICATED_STREAM_PROTOCOL_VERSION);
     }
 
 private:
@@ -142,9 +140,6 @@ private:
     DRTxnPartitionHashFlag m_hashFlag;
     int64_t m_firstParHash;
     int64_t m_lastParHash;
-    bool m_hasReplicatedStream;
-    bool m_wasFirstChangeReplicatedTable;
-    bool m_wasLastChangeReplicatedTable;
     size_t m_beginTxnUso;
 
     int64_t m_lastCommittedSpUniqueId;

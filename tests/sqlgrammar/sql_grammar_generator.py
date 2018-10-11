@@ -1152,7 +1152,8 @@ if __name__ == "__main__":
                             ["Explain doesn't support DDL"],
                             ['PartitionInfo specifies invalid parameter index for procedure'],
                             ['Failed to plan for statement'],
-                            ['Invalid parameter index value']
+                            ['Invalid parameter index value'],
+                            ['Single partitioned procedure', 'has TRUNCATE statement:']
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of

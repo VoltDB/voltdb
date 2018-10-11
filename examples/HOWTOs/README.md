@@ -23,6 +23,6 @@ Administration:
  * [Enable Authentication](EnableAuthentication.md)
  * [Enable SSL](EnableSSL.md)
  * [Configure Logging](ConfigureLogging.md)
-
+ * [Documenting your VoltDB deployment](DocumentYourDatabase.md)
 --------------------------------------------------------------------------------------
 If there's something you'd like to see here, please let us know at support@voltdb.com.

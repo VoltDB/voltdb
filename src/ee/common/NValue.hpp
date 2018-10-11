@@ -3944,7 +3944,19 @@ inline NValue NValue::like(const NValue& rhs) const {
                     }
 
                     const char *postPercentPatternIterator = m_pattern.getCursor();
-                    const uint32_t nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
+                    uint32_t nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
+
+                    // ENG-14485 handle two or more consecutive '%' characters at the end of the pattern
+                    if (m_value.atEnd()) {
+                        while (nextPatternCodePointAfterPercent == '%') {
+                            if (m_pattern.atEnd()) {
+                                return true;
+                            }
+                            nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
+                        }
+                        return false;
+                    }
+
                     const bool nextPatternCodePointAfterPercentIsSpecial =
                             (nextPatternCodePointAfterPercent == '_') ||
                             (nextPatternCodePointAfterPercent == '%');
