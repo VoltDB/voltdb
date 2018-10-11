@@ -132,7 +132,6 @@ public class KafkaStreamImporter extends AbstractImporter {
                 try {
                     for (int i = 1; i < consumerCount; i++) {
                         if (m_shutdown.get()) {
-                            shutdown();
                             return;
                         }
                         m_consumers.add(createConsumerRunner(props));
@@ -152,7 +151,6 @@ public class KafkaStreamImporter extends AbstractImporter {
             } else {
                 for (KafkaInternalConsumerRunner consumer : m_consumers) {
                     if (m_shutdown.get()) {
-                        shutdown();
                         return;
                     }
                     m_executorService.submit(consumer);
@@ -171,32 +169,27 @@ public class KafkaStreamImporter extends AbstractImporter {
     public void stop() {
         m_shutdown.set(true);
         synchronized(m_lock) {
-            shutdown();
-        }
-    }
-
-    private void shutdown() {
-
-        if (m_consumers != null) {
-            for (KafkaInternalConsumerRunner consumer : m_consumers) {
-                if (consumer != null) {
-                    consumer.shutdown();
+            if (m_consumers != null) {
+                for (KafkaInternalConsumerRunner consumer : m_consumers) {
+                    if (consumer != null) {
+                        consumer.shutdown();
+                    }
                 }
+                m_consumers.clear();
             }
-            m_consumers.clear();
-        }
 
-        if (m_executorService == null) {
-            return;
-        }
+            if (m_executorService == null) {
+                return;
+            }
 
-        //graceful shutdown to allow importers to properly process post shutdown tasks.
-        m_executorService.shutdown();
-        try {
-            m_executorService.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (InterruptedException ignore) {
-        } finally {
-            m_executorService = null;
+            //graceful shutdown to allow importers to properly process post shutdown tasks.
+            m_executorService.shutdown();
+            try {
+                m_executorService.awaitTermination(60, TimeUnit.SECONDS);
+            } catch (InterruptedException ignore) {
+            } finally {
+                m_executorService = null;
+            }
         }
     }
 }
