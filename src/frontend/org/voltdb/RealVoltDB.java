@@ -1118,12 +1118,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // wait to make sure every host actually *see* each other's ZK node state.
             final int numberOfNodes = m_messenger.getLiveHostIds().size();
             Map<Integer, HostInfo> hostInfos = m_messenger.waitForGroupJoin(numberOfNodes);
-            Map<Integer, String> hostGroups = Maps.newHashMap();
-            Map<Integer, Integer> sitesPerHostMap = Maps.newHashMap();
-            hostInfos.forEach((k, v) -> {
-                hostGroups.put(k, v.m_group);
-                sitesPerHostMap.put(k, v.m_localSitesCount);
-            });
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
             }
@@ -1201,7 +1195,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
-            AbstractTopology topo = getTopology(config.m_startAction, hostGroups, sitesPerHostMap, m_joinCoordinator);
+            AbstractTopology topo = getTopology(config.m_startAction, hostInfos, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
@@ -1218,12 +1212,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 Set<Integer> partitionGroupPeers = null;
                 if (m_rejoining) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
-                    partitions = recoverPartitions(topo, hostGroups.get(m_messenger.getHostId()));
+                    partitions = recoverPartitions(topo, hostInfos.get(m_messenger.getHostId()).m_group);
                     if (partitions == null) {
                         partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
-                                                                          m_catalogContext.getNodeSettings().getLocalSitesCount(),
-                                                                          m_messenger.getHostId(),
-                                                                          hostGroups);
+                                m_catalogContext.getNodeSettings().getLocalSitesCount(), m_messenger.getHostId(),
+                                Maps.transformValues(hostInfos, h -> h.m_group));
                     }
                     partitionGroupPeers = m_cartographer.findPartitionGroupPeers(partitions);
                     if (partitions.size() == 0) {
@@ -2097,8 +2090,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private AbstractTopology getTopology(StartAction startAction, Map<Integer, String> hostGroups,
-            Map<Integer, Integer> sitesPerHostMap, JoinCoordinator joinCoordinator)
+    private AbstractTopology getTopology(StartAction startAction, Map<Integer, HostInfo> hostInfos,
+            JoinCoordinator joinCoordinator)
     {
         AbstractTopology topology = null;
         if (startAction == StartAction.JOIN) {
@@ -2114,7 +2107,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else {
             // initial start or recover
             int hostcount = m_clusterSettings.get().hostcount();
-            if (sitesPerHostMap.size() != (hostcount - m_config.m_missingHostCount)) {
+            if (hostInfos.size() != (hostcount - m_config.m_missingHostCount)) {
                 VoltDB.crashLocalVoltDB("The total number of live and missing hosts must be the same as the cluster host count", false, null);
             }
             int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
@@ -2135,19 +2128,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             //The topology will contain hosts which are marked as missing.The missing hosts will not host any master partitions.
             //At least one partition replica must be on the live hosts (not missing). Otherwise, the cluster will not be started up.
             //LeaderAppointer will ignore these hosts during startup.
-            int sph = sitesPerHostMap.values().iterator().next();
+            int sph = hostInfos.values().iterator().next().m_localSitesCount;
             int missingHostId = Integer.MAX_VALUE;
             Set<Integer> missingHosts = Sets.newHashSet();
             for (int i = 0; i < m_config.m_missingHostCount; i++) {
-                sitesPerHostMap.put(missingHostId, sph);
-                hostGroups.put(missingHostId, AbstractTopology.PLACEMENT_GROUP_DEFAULT);
+                hostInfos.put(missingHostId, new HostInfo("", AbstractTopology.PLACEMENT_GROUP_DEFAULT, sph));
                 missingHosts.add(missingHostId--);
             }
-            int totalSites = sitesPerHostMap.values().stream().mapToInt(Number::intValue).sum();
+            int totalSites = sph * hostcount;
             if (totalSites % (kfactor + 1) != 0) {
                 VoltDB.crashLocalVoltDB("Total number of sites is not divisible by the number of partitions.", false, null);
             }
-            topology = AbstractTopology.getTopology(sitesPerHostMap, missingHosts, hostGroups, kfactor);
+            topology = AbstractTopology.getTopology(hostInfos, missingHosts, kfactor);
             String err;
             if ((err = topology.validateLayout()) != null) {
                 hostLog.warn("Unable to find optimal placement layout. " + err);

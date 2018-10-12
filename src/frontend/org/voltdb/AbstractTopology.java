@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -39,6 +38,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.messaging.HostMessenger.HostInfo;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -373,46 +373,21 @@ public class AbstractTopology {
     //
     /////////////////////////////////////
 
-    public static class HostDescription {
-        public final int hostId;
-        public final int targetSiteCount;
-        public final String haGroupToken;
-
-        public HostDescription(int hostId, int targetSiteCount, String haGroupToken) {
-            this.hostId = hostId;
-            this.targetSiteCount = targetSiteCount;
-            this.haGroupToken = haGroupToken;
-        }
-    }
-
     public static AbstractTopology mutateAddHosts(AbstractTopology currentTopology,
-                                                  HostDescription[] hostDescriptions)
+            Map<Integer, HostInfo> hosts)
     {
         // validate input
         assert(currentTopology != null);
-        Arrays.stream(hostDescriptions).forEach(hd -> {
-            assert(hd != null);
-            assert(hd.targetSiteCount >= 0);
-            assert(hd.haGroupToken != null);
-        });
 
         // validate no duplicate host ids
-        Set<Integer> hostIds = new HashSet<>(currentTopology.hostsById.keySet());
-        for (HostDescription hostDescription : hostDescriptions) {
-            if (hostIds.contains(hostDescription.hostId)) {
-                throw new RuntimeException("New host descriptions must contain unique and unused hostid.");
-            }
-            hostIds.add(hostDescription.hostId);
+        if (!Collections.disjoint(hosts.keySet(), currentTopology.hostsById.keySet())) {
+            throw new RuntimeException("New hosts must contain unique and unused hostid.");
         }
 
         // for now, just add empty nodes to the topology -- not much else to do here
 
         // get immutable HAGroups - these are fixed by user command line
-        final HAGroup[] haGroups = getHAGroupsForHosts(currentTopology, hostDescriptions);
-
-        // get a map of hostid => hostdescription for new hosts
-        Map<Integer, HostDescription> hostDescriptionsById = Arrays.stream(hostDescriptions)
-                .collect(Collectors.toMap(hd -> hd.hostId, hd -> hd));
+        final HAGroup[] haGroups = getHAGroupsForHosts(currentTopology, hosts);
 
         // build the full set of immutable hosts, using the HAGroups
         Set<Host> fullHostSet = new TreeSet<>();
@@ -424,9 +399,9 @@ public class AbstractTopology {
                     newHost = new Host(hostId, currentHost.targetSiteCount, haGroup, currentHost.partitions);
                 }
                 else {
-                    HostDescription hostDescription = hostDescriptionsById.get(hostId);
-                    assert(hostDescription != null);
-                    newHost = new Host(hostId, hostDescription.targetSiteCount, haGroup, new TreeSet<>());
+                    HostInfo hostInfo = hosts.get(hostId);
+                    assert (hostInfo != null);
+                    newHost = new Host(hostId, hostInfo.m_localSitesCount, haGroup, new TreeSet<>());
                 }
                 fullHostSet.add(newHost);
             }
@@ -786,7 +761,7 @@ public class AbstractTopology {
         }
     }
 
-    private static HAGroup[] getHAGroupsForHosts(AbstractTopology currentTopology, HostDescription[] hostDescriptions) {
+    private static HAGroup[] getHAGroupsForHosts(AbstractTopology currentTopology, Map<Integer, HostInfo> hosts) {
 
         class MutableHAGroup {
             String token = "";
@@ -811,13 +786,9 @@ public class AbstractTopology {
         }
 
         // deal with all new hosts
-        for (HostDescription host : hostDescriptions) {
-            MutableHAGroup haGroup = groupsByToken.get(host.haGroupToken);
-            if (haGroup == null) {
-                haGroup = new MutableHAGroup(host.haGroupToken);
-                groupsByToken.put(host.haGroupToken, haGroup);
-            }
-            haGroup.hostsIds.add(host.hostId);
+        for (Map.Entry<Integer, HostInfo> entry : hosts.entrySet()) {
+            String haGroupToken = entry.getValue().m_group;
+            groupsByToken.computeIfAbsent(haGroupToken, MutableHAGroup::new).hostsIds.add(entry.getKey());
         }
 
         // convert mutable to immutable
@@ -1165,25 +1136,20 @@ public class AbstractTopology {
     }
 
     public static AbstractTopology getTopology(
-            Map<Integer, Integer> sitesPerHostMap,
+            Map<Integer, HostInfo> hosts,
             Set<Integer> missingHosts,
-            Map<Integer, String> hostGroups,
             int kfactor)
     {
-        // host descriptions
-        HostDescription [] hosts = new HostDescription[sitesPerHostMap.size()];
-        int i = 0;
-        for (Map.Entry<Integer, Integer> e : sitesPerHostMap.entrySet()) {
-            int hostId = e.getKey();
-            int sitesCount = e.getValue();
-            hosts[i++] = new HostDescription(hostId, sitesCount, hostGroups.get(hostId));
+        int sitesPerHost = -1;
+        for (HostInfo hi : hosts.values()) {
+            if (sitesPerHost == -1) {
+                sitesPerHost = hi.m_localSitesCount;
+            } else if (hi.m_localSitesCount != sitesPerHost) {
+                throw new RuntimeException("Not all hosts have the same site count: " + hosts);
+            }
         }
         // partition descriptions
-        int totalSites = 0;
-        for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
-            totalSites += entry.getValue();
-        }
-        int partitionCount = totalSites / (kfactor + 1);
+        int partitionCount = sitesPerHost * hosts.size() / (kfactor + 1);
 
         // get topology
         AbstractTopology abstractTopo =

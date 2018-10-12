@@ -34,7 +34,6 @@ import static org.mockito.Mockito.when;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -45,6 +44,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
 import org.voltcore.zk.ZKUtil;
@@ -58,15 +58,12 @@ import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 
 public class TestLeaderAppointer extends ZKTestBase {
 
     private final int NUM_AGREEMENT_SITES = 1;
     private int m_kfactor;
     private AbstractTopology m_topo;
-    private Set<Integer> m_hostIds;
-    private Map<Integer, String> m_hostGroups;
     private MpInitiator m_mpi = null;
     private HostMessenger m_hm = null;
     private ZooKeeper m_zk = null;
@@ -117,21 +114,15 @@ public class TestLeaderAppointer extends ZKTestBase {
         when(m_hm.getZK()).thenReturn(m_zk);
         VoltZK.createPersistentZKNodes(m_zk);
 
-        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        Map<Integer, HostInfo> hostInfos = Maps.newHashMap();
         for (int hostId = 0; hostId < hostCount; hostId++) {
-            sphMap.put(hostId, sitesPerHost);
-        }
-        m_hostIds = Sets.newTreeSet();
-        m_hostGroups = Maps.newHashMap();
-        for (int i = 0; i < hostCount; i++) {
-            m_hostIds.add(i);
-            m_hostGroups.put(i, "0");
+            hostInfos.put(hostId, new HostInfo("", "0", sitesPerHost));
         }
         m_kfactor = replicationFactor;
-        m_topo = AbstractTopology.getTopology(sphMap, new HashSet<Integer>(), m_hostGroups, replicationFactor);
+        m_topo = AbstractTopology.getTopology(hostInfos, new HashSet<Integer>(), replicationFactor);
         int partitionCount = m_topo.getPartitionCount();
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(partitionCount));
-        when(m_hm.getLiveHostIds()).thenReturn(m_hostIds);
+        when(m_hm.getLiveHostIds()).thenReturn(hostInfos.keySet());
         m_mpi = mock(MpInitiator.class);
         createAppointer(enablePPD);
 
