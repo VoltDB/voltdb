@@ -20,7 +20,19 @@
 # generation is necessary at all.
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-voltdb_dir=$(readlink -f $(dirname $0)/../)
+read_link() {    # Emulates GNU `readlink -f' behavior on Linux and MacOS.
+    local path=$1
+    if [ -d $path ] ; then
+        local abspath=$(cd $path; pwd)
+    else
+        local dirnam=$(cd $(dirname -- $path) ; pwd)
+        local basename=$(basename $path)
+        local abspath=$prefix/$suffix
+    fi
+    echo $abspath
+}
+
+voltdb_dir=$(read_link $(dirname $0)/../)
 calcite_dir=$voltdb_dir/../calcite/
 if [ ! -d "$calcite_dir" ]; then       # Check location of calcite/ directory
    echo "Cannot find calcite repo in $calcite_dir"
