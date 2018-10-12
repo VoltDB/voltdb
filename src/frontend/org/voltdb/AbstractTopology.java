@@ -65,14 +65,16 @@ public class AbstractTopology {
     public final static String TOPO_HOST = "host";
     public final static String TOPO_SPH = "targetSiteCount";
     public final static String TOPO_HOST_MISSING = "missing";
+    public final static String TOPO_REPLICATION_FACTOR = "replicationFactor";
 
     public final static String PLACEMENT_GROUP_DEFAULT="0";
 
     public final long version;
+    public final int replicationFactor;
     public final ImmutableMap<Integer, Host> hostsById;
     public final ImmutableMap<Integer, Partition> partitionsById;
 
-    public static final AbstractTopology EMPTY_TOPOLOGY = new AbstractTopology(0, new TreeSet<>());
+    public static final AbstractTopology EMPTY_TOPOLOGY = new AbstractTopology(0, new TreeSet<>(), -1);
 
     /////////////////////////////////////
     //
@@ -82,16 +84,13 @@ public class AbstractTopology {
 
     public static class Partition implements Comparable<Partition>{
         public final int id;
-        public final int k;
         public int leaderHostId;
         public final ImmutableSortedSet<Integer> hostIds;
 
-        private Partition(int id, int k, int leaderHostId, Collection<Integer> hostIds) {
+        private Partition(int id, int leaderHostId, Collection<Integer> hostIds) {
             this.id = id;
-            this.k = k;
             this.leaderHostId = leaderHostId;
             this.hostIds = ImmutableSortedSet.copyOf(hostIds);
-            assert(k >= 0);
         }
 
         @Override
@@ -103,7 +102,6 @@ public class AbstractTopology {
         private void toJSON(JSONStringer stringer) throws JSONException {
             stringer.object();
             stringer.key(TOPO_PARTITION_ID).value(id);
-            stringer.key(TOPO_KFACTOR).value(k);
             stringer.key(TOPO_MASTER).value(leaderHostId);
             stringer.key(TOPO_REPLICA).array();
             for (Integer hostId : hostIds) {
@@ -115,7 +113,6 @@ public class AbstractTopology {
 
         private static Partition fromJSON(JSONObject json) throws JSONException {
             int id = json.getInt(TOPO_PARTITION_ID);
-            int k = json.getInt(TOPO_KFACTOR);
             int leaderHostId = json.getInt(TOPO_MASTER);
 
             List<Integer> mutableHostIds = new ArrayList<>();
@@ -123,7 +120,7 @@ public class AbstractTopology {
             for (int i = 0; i < jsonHostIds.length(); i++) {
                 mutableHostIds.add(jsonHostIds.getInt(i));
             }
-            return new Partition(id, k, leaderHostId, mutableHostIds);
+            return new Partition(id, leaderHostId, mutableHostIds);
         }
 
         @Override
@@ -302,13 +299,11 @@ public class AbstractTopology {
 
     private static class MutablePartition implements Comparable<MutablePartition> {
         final int id;
-        final int k;
         final Set<MutableHost> hosts = new TreeSet<>();
         MutableHost leader = null;
 
-        MutablePartition(int id, int k) {
+        MutablePartition(int id) {
             this.id = id;
-            this.k = k;
         }
 
         @Override
@@ -419,7 +414,7 @@ public class AbstractTopology {
                 fullHostSet.add(newHost);
             }
         }
-        return new AbstractTopology(currentTopology.version + 1, fullHostSet);
+        return new AbstractTopology(currentTopology.version + 1, fullHostSet, currentTopology.getReplicationFactor());
     }
 
     public static AbstractTopology mutateAddPartitionsToEmptyHosts(AbstractTopology currentTopology,
@@ -460,16 +455,10 @@ public class AbstractTopology {
         /////////////////////////////////
         Map<Integer, MutablePartition> partitionsToAdd = new TreeMap<>();
         for (int i = 0; i < partitionCount; ++i) {
-            MutablePartition partition = new MutablePartition(largestPartitionId++, kfactor);
+            MutablePartition partition = new MutablePartition(largestPartitionId++);
             partitionsToAdd.put(partition.id, partition);
             mutablePartitionMap.put(partition.id, partition);
         }
-
-        // group partitions by k
-        Map<Integer, List<MutablePartition>> newPartitionsByK = partitionsToAdd.values().stream()
-                .collect(Collectors.groupingBy(mp -> mp.k));
-        // sort partitions by k
-        newPartitionsByK = new TreeMap<>(newPartitionsByK);
 
         /////////////////////////////////
         // compute HAGroup distances
@@ -489,23 +478,15 @@ public class AbstractTopology {
             }
         }
 
+        int targetReplicaCount = kfactor + 1;
+
         /////////////////////////////////
         // place partitions with hosts
         /////////////////////////////////
         while (partitionsToAdd.size() > 0) {
-            // PLAN:
-            // 1. Start with the largest k, over all partitions
-            // 2. Find k+1 eligible hosts, starting with ha groups that have low max distance to other ha groups
-            Entry<Integer, List<MutablePartition>> partitionsWithLargestK = //newPartitionsByK.//findMostCommonK(newPartitionsByK);
-                    newPartitionsByK.entrySet().stream()
-                            .filter(e -> e.getValue().size() > 0) // ignore k with empty partition lists
-                            .max((e1, e2) -> e1.getKey() - e2.getKey()).get();
-
             // goal is to find a set k + 1 hosts that contain the starter host that
             //  a) have space for at least one partition
             //  b) are reasonably distributed w.r.t. ha groups
-            int targetReplicaCount = partitionsWithLargestK.getKey() + 1;
-
             // verify enough hosts exist
             if (eligibleHosts.size() < targetReplicaCount) {
                 throw new RuntimeException(String.format(
@@ -540,19 +521,20 @@ public class AbstractTopology {
                     .mapToInt(h -> h.freeSpace())
                     .min().getAsInt();
             // determine how many partitions we have with this k value
-            int availablePartitionCount = partitionsWithLargestK.getValue().size();
+            int availablePartitionCount = partitionsToAdd.size();
+            Iterator<MutablePartition> iter = partitionsToAdd.values().iterator();
 
             // assign the partitions
             for (int i = 0; i < Math.min(minAvailableSitesForSet, availablePartitionCount); i++) {
                 // pop a partition of the list
-                MutablePartition partition = partitionsWithLargestK.getValue().remove(0);
+                MutablePartition partition = iter.next();
                 // assign it to the host set
                 for (MutableHost host : peerHostsForPartition) {
                     host.partitions.add(partition);
                     partition.hosts.add(host);
                 }
                 // remove the partition from the tracking
-                partitionsToAdd.remove(partition.id);
+                iter.remove();
             }
         }
 
@@ -567,23 +549,8 @@ public class AbstractTopology {
         return convertMutablesToTopology(
                 currentTopology.version + 1,
                 mutableHostMap,
-                mutablePartitionMap);
-    }
-
-    /**
-     * Get the total number of missing replicas across all partitions.
-     * Note this doesn't say how many partitions are under-represented.
-     *
-     * If this returns > 0, you should rejoin, rather than elastic join.
-     *
-     * @param topology Current topology
-     * @return The number of missing replicas.
-     */
-    public int countMissingPartitionReplicas() {
-        // sum up, for all partitions, the diff between k+1 and replica count
-        return partitionsById.values().stream()
-                .mapToInt(p -> (p.k + 1) - p.hostIds.size())
-                .sum();
+                mutablePartitionMap,
+                kfactor);
     }
 
     /////////////////////////////////////
@@ -615,6 +582,8 @@ public class AbstractTopology {
             host.toJSON(stringer);
         }
         stringer.endArray();
+        stringer.key(TOPO_REPLICATION_FACTOR).value(getReplicationFactor());
+
 
         stringer.endObject();
 
@@ -651,7 +620,9 @@ public class AbstractTopology {
             hosts.add(host);
         }
 
-        return new AbstractTopology(version, hosts);
+        int replicationFactor = jsonTopology.getInt(TOPO_REPLICATION_FACTOR);
+
+        return new AbstractTopology(version, hosts, replicationFactor);
     }
 
     /////////////////////////////////////
@@ -660,7 +631,7 @@ public class AbstractTopology {
     //
     /////////////////////////////////////
 
-    private AbstractTopology(long version, Collection<Host> hosts) {
+    private AbstractTopology(long version, Collection<Host> hosts, int replicationFactor) {
         assert(hosts != null);
         assert(version >= 0);
 
@@ -681,6 +652,7 @@ public class AbstractTopology {
             }
         }
         this.partitionsById = ImmutableMap.copyOf(paritionsByIdTemp);
+        this.replicationFactor = replicationFactor;
     }
 
     /////////////////////////////////////
@@ -703,7 +675,7 @@ public class AbstractTopology {
 
         // create partitions
         for (Partition partition : topology.partitionsById.values()) {
-            MutablePartition mp = new MutablePartition(partition.id, partition.k);
+            MutablePartition mp = new MutablePartition(partition.id);
             mutablePartitionMap.put(mp.id, mp);
             for (Integer hostId : partition.hostIds) {
                 mp.hosts.add(mutableHostMap.get(hostId));
@@ -724,7 +696,7 @@ public class AbstractTopology {
     private static AbstractTopology convertMutablesToTopology(
             final long currentVersion,
             final Map<Integer, MutableHost> mutableHostMap,
-            final Map<Integer, MutablePartition> mutablePartitionMap)
+            final Map<Integer, MutablePartition> mutablePartitionMap, final int replicationFactor)
     {
         final Map<Integer, Partition> partitionsById = new TreeMap<>();
         mutablePartitionMap.values().stream().forEach(mp -> {
@@ -734,7 +706,7 @@ public class AbstractTopology {
                     .map(h -> h.id)
                     .collect(Collectors.toList());
 
-            Partition p = new Partition(mp.id, mp.k, mp.leader.id, hostIds);
+            Partition p = new Partition(mp.id, mp.leader.id, hostIds);
             partitionsById.put(p.id, p);
         });
 
@@ -748,7 +720,7 @@ public class AbstractTopology {
             fullHostSet.add(newHost);
         }
 
-        return new AbstractTopology(currentVersion + 1, fullHostSet);
+        return new AbstractTopology(currentVersion + 1, fullHostSet, replicationFactor);
     }
 
     private static int getNextFreePartitionId(AbstractTopology topology) {
@@ -1097,7 +1069,6 @@ public class AbstractTopology {
         // sort partitions by small k, so we can assign less flexible partitions first
         List<MutablePartition> leaderlessPartitionsSortedByK = mutablePartitionMap.values().stream()
                 .filter(p -> p.leader == null)
-                .sorted((p1, p2) -> p1.k - p2.k)
                 .collect(Collectors.toList());
 
         // pick a leader for each partition based on the host that is least full of leaders
@@ -1176,11 +1147,8 @@ public class AbstractTopology {
     }
 
     public int getReplicationFactor() {
-        //assume all partitions have the same k factor.
-        Partition partition =  partitionsById.values().iterator().next();
-        return partition.k;
+        return replicationFactor;
     }
-
     public boolean hasMissingPartitions() {
         Set<Partition> partitions = Sets.newHashSet();
         for (Host host : hostsById.values()) {
@@ -1214,7 +1182,7 @@ public class AbstractTopology {
         }
 
         for (Partition partition : topology.partitionsById.values()) {
-            MutablePartition mp = new MutablePartition(partition.id, partition.k);
+            MutablePartition mp = new MutablePartition(partition.id);
             mutablePartitionMap.put(mp.id, mp);
             for (Integer hId : partition.hostIds) {
                 final MutableHost mutableHost = mutableHostMap.get(hId);
@@ -1248,7 +1216,8 @@ public class AbstractTopology {
             }
             mp.leader = mutableHostMap.get(leaderId);
         }
-        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
+        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap,
+                topology.getReplicationFactor());
     }
 
     /**
@@ -1332,7 +1301,7 @@ public class AbstractTopology {
 
         //move partitions to host
         for (Partition partition : topology.partitionsById.values()) {
-            MutablePartition mp = new MutablePartition(partition.id, partition.k);
+            MutablePartition mp = new MutablePartition(partition.id);
             mutablePartitionMap.put(mp.id, mp);
             for (Integer hId : partition.hostIds) {
                 int hostId = (hId == recoveredHostId) ? localHostId : hId;
@@ -1343,7 +1312,8 @@ public class AbstractTopology {
             int leader = (partition.leaderHostId == recoveredHostId) ? localHostId : partition.leaderHostId;
             mp.leader = mutableHostMap.get(leader);
         }
-        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
+        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap,
+                topology.getReplicationFactor());
     }
 
     /**
@@ -1367,6 +1337,7 @@ public class AbstractTopology {
             topLevelGroups.add(tokens[0]);
         }
         int unbalancedPartitions = 0;
+        int partitionReplicas = getReplicationFactor() + 1;
         for (Partition p : partitionsById.values()) {
             List<HAGroup> grp = Lists.newArrayList(haGroups);
             for (Integer hId : p.hostIds) {
@@ -1379,7 +1350,7 @@ public class AbstractTopology {
                     }
                 }
             }
-            if (topLevelGroups.size() <= (getReplicationFactor() + 1)) {
+            if (topLevelGroups.size() <= partitionReplicas) {
                 // When # of rack <= K+1, each rack should have at least one
                 // replica and no further guarantee are made on how the replicas
                 // will be distributed among racks, try in best effort to balance
@@ -1393,7 +1364,7 @@ public class AbstractTopology {
             } else {
                 // When # of rack >= K+1, each rack will have at most one replica,
                 // each partition must span K+1 racks.
-                if ((topLevelGroups.size() - grp.size()) != (getReplicationFactor() + 1)) {
+                if ((topLevelGroups.size() - grp.size()) != partitionReplicas) {
                     unbalancedPartitions++;
                     /* Turn on to debug
                     sb.append("Partition " + p.id + " is not balanced across placement groups.\n"); //*/

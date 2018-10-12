@@ -133,7 +133,7 @@ public class TestAbstractTopology extends TestCase {
                 });
             });
             // check k+1 copies of partition
-            assert(p.hostIds.size() == p.k + 1);
+            assert (p.hostIds.size() == topo.getReplicationFactor() + 1);
         });
 
         // check ha groups and hosts are mirrored
