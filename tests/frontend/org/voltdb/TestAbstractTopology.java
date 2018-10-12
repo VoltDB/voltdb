@@ -41,12 +41,12 @@ import java.util.stream.Collectors;
 
 import org.json_voltpatches.JSONException;
 import org.junit.Ignore;
+import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltdb.AbstractTopology.HAGroup;
 import org.voltdb.AbstractTopology.Host;
-import org.voltdb.AbstractTopology.HostDescription;
-import org.voltdb.AbstractTopology.KSafetyViolationException;
 import org.voltdb.AbstractTopology.Partition;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 
@@ -55,7 +55,7 @@ import junit.framework.TestCase;
 public class TestAbstractTopology extends TestCase {
 
     static class TestDescription {
-        HostDescription[] hosts;
+        Map<Integer, HostInfo> hosts;
         int partitionCount;
         int kfactor;
         int expectedPartitionGroups = -1;
@@ -64,17 +64,15 @@ public class TestAbstractTopology extends TestCase {
         @Override
         public String toString() {
             // group hosts by sph
-           String[] bySPH = Arrays.stream(hosts)
-                   .collect(Collectors.groupingBy(h -> h.targetSiteCount)).entrySet().stream()
-                           .map(e -> String.format("sph=%d (%d)", e.getKey(), e.getValue().size()))
-                           .toArray(String[]::new);
+            String[] bySPH = hosts.values().stream().collect(Collectors.groupingBy(h -> h.m_localSitesCount)).entrySet()
+                    .stream().map(e -> String.format("sph=%d (%d)", e.getKey(), e.getValue().size()))
+                    .toArray(String[]::new);
            String hostString = String.join(", ", bySPH);
 
            // hagroups
-           String[] haGroups = Arrays.stream(hosts)
-                   .collect(Collectors.groupingBy(h -> h.haGroupToken)).entrySet().stream()
-                           .map(e -> String.format("%s (%d)", e.getKey(), e.getValue().size()))
-                           .toArray(String[]::new);
+            String[] haGroups = hosts.values().stream().collect(Collectors.groupingBy(h -> h.m_group)).entrySet()
+                    .stream().map(e -> String.format("%s (%d)", e.getKey(), e.getValue().size()))
+                    .toArray(String[]::new);
            String haGroupsString = String.join(", ", haGroups);
 
            return "TEST:\n" +
@@ -267,12 +265,10 @@ public class TestAbstractTopology extends TestCase {
     }
 
     public void testKTooLarge() {
-        HostDescription[] hds = new HostDescription[3];
-        hds[0] = new HostDescription(0, 2, "0");
-        hds[1] = new HostDescription(1, 2, "0");
-        hds[2] = new HostDescription(2, 2, "0");
+        Map<Integer, HostInfo> hosts = ImmutableMap.of(0, new HostInfo("", "0", 2), 1, new HostInfo("", "0", 2), 2,
+                new HostInfo("", "0", 2));
 
-        AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
+        AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hosts);
         try {
             AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), 1, 3);
             fail();
@@ -284,44 +280,18 @@ public class TestAbstractTopology extends TestCase {
         }
     }
 
-    public void testSubtleKTooLarge() {
-        HostDescription[] hds = new HostDescription[3];
-        hds[0] = new HostDescription(0, 4, "0");
-        hds[1] = new HostDescription(1, 1, "0");
-        hds[2] = new HostDescription(2, 1, "0");
-
-        AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
-        try {
-            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), 2, 2);
-            fail();
-        }
-        catch (Exception e) {
-            assertTrue(e.getMessage().contains("Topology request invalid"));
-        }
-    }
-
     public void testNonUniqueHostIds() {
-        HostDescription[] hds = new HostDescription[3];
-        hds[0] = new HostDescription(201, 1, "0");
-        hds[1] = new HostDescription(202, 1, "0");
-        hds[2] = new HostDescription(201, 1, "0");
-
-        try {
-            AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hds);
-            fail();
-        }
-        catch (Exception e) {
-            assertTrue(e.getMessage().contains("must contain unique and unused hostid"));
-        }
-
         // now try adding on from existing topo
         TestDescription td = getBoringDescription(5, 6, 1, 2, 1);
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
         topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td.partitionCount,
                 td.kfactor);
 
+        int lastHostId = td.hosts.keySet().stream().mapToInt(Integer::intValue).max().getAsInt();
+        Map<Integer, HostInfo> hosts = ImmutableMap.of(lastHostId, new HostInfo("", "0", 1), lastHostId + 1,
+                new HostInfo("", "0", 1));
         try {
-            AbstractTopology.mutateAddHosts(topo, hds);
+            AbstractTopology.mutateAddHosts(topo, hosts);
             fail();
         }
         catch (Exception e) {
@@ -394,9 +364,9 @@ public class TestAbstractTopology extends TestCase {
         // treeWidth > 1 means the group contains subgroup
         List<String> haGroups = getHAGroupTagTree(1, rackCount);
         TestDescription td = new TestDescription();
-        td.hosts = new HostDescription[totalNodeCount];
+        td.hosts = new HashMap<>();
         for (int i = 0; i < totalNodeCount; i++) {
-            td.hosts[i] = new HostDescription(i, sph, haGroups.get(i % haGroups.size()));
+            td.hosts.put(i, new HostInfo("", haGroups.get(i % haGroups.size()), sph));
         }
         td.partitionCount = sph * totalNodeCount / (k + 1);
         td.kfactor = k;
@@ -449,9 +419,9 @@ public class TestAbstractTopology extends TestCase {
         // treeWidth > 1 means the group contains subgroup
         List<String> haGroups = getHAGroupTagTree(1, rackCount);
         TestDescription td = new TestDescription();
-        td.hosts = new HostDescription[totalNodeCount];
+        td.hosts = new HashMap<>();
         for (int i = 0; i < totalNodeCount; i++) {
-            td.hosts[i] = new HostDescription(i, sph, haGroups.get(i % haGroups.size()));
+            td.hosts.put(i, new HostInfo("", haGroups.get(i % haGroups.size()), sph));
         }
         td.partitionCount = sph * totalNodeCount / (k + 1);
         td.kfactor = k;
@@ -498,9 +468,9 @@ public class TestAbstractTopology extends TestCase {
 
         List<String> haGroupTags = getHAGroupTagTree(treeWidth, leafCount);
 
-        td.hosts = new HostDescription[nodeCount];
+        td.hosts = new HashMap<>();
         for (int i = 0; i < nodeCount; i++) {
-            td.hosts[i] = new HostDescription(i + hostIdOffset, sph, haGroupTags.get(i % haGroupTags.size()));
+            td.hosts.put(i + hostIdOffset, new HostInfo("", haGroupTags.get(i % haGroupTags.size()), sph));
         }
 
         td.partitionCount = sph * nodeCount / (k + 1);
@@ -530,10 +500,10 @@ public class TestAbstractTopology extends TestCase {
         td.kfactor = rand.nextInt(Math.min(MAX_K + 1, nodeCount));
         td.partitionCount = sph * nodeCount / (td.kfactor + 1);
 
-        td.hosts = new HostDescription[nodeCount];
+        td.hosts = new HashMap<>();
         for (int i = 0; i < nodeCount; i++) {
             int haIndex = rand.nextInt(haGroupTags.size());
-            td.hosts[i] = new HostDescription(i, sph, haGroupTags.get(haIndex));
+            td.hosts.put(i, new HostInfo("", haGroupTags.get(haIndex), sph));
         }
 
         td.expectedMaxReplicationPerHAGroup = 0;
@@ -629,41 +599,17 @@ public class TestAbstractTopology extends TestCase {
             return;
         }
 
-        int consolidationCount = rand.nextInt(td.hosts.length) + 1;
+        int consolidationCount = rand.nextInt(td.hosts.size()) + 1;
 
         for (int i = 0; i < consolidationCount; i++) {
-            int hostIndexToCopyTo = rand.nextInt(td.hosts.length);
-            int hostIndedToCopyFrom = rand.nextInt(td.hosts.length);
+            int hostIndexToCopyTo = rand.nextInt(td.hosts.size());
+            int hostIndedToCopyFrom = rand.nextInt(td.hosts.size());
 
-            HostDescription hd = new HostDescription(
-                    td.hosts[hostIndexToCopyTo].hostId,
-                    td.hosts[hostIndexToCopyTo].targetSiteCount,
-                    td.hosts[hostIndedToCopyFrom].haGroupToken);
+            HostInfo orig = td.hosts.get(hostIndexToCopyTo);
 
-            td.hosts[hostIndexToCopyTo] = hd;
+            td.hosts.put(hostIndexToCopyTo,
+                    new HostInfo(orig.m_hostIp, td.hosts.get(hostIndedToCopyFrom).m_group, orig.m_localSitesCount));
         }
-    }
-
-    void mutateChangeSPH(Random rand, TestDescription td) {
-        if (td.hosts.length == 0) {
-            return;
-        }
-
-        int sphBumpCount = rand.nextInt(td.hosts.length) + 1;
-
-        for (int i = 0; i < sphBumpCount; i++) {
-            int hostIndex = rand.nextInt(td.hosts.length);
-
-            HostDescription hd = new HostDescription(
-                    td.hosts[hostIndex].hostId,
-                    td.hosts[hostIndex].targetSiteCount + 1,
-                    td.hosts[hostIndex].haGroupToken);
-
-            td.hosts[hostIndex] = hd;
-        }
-
-        // making no promises for non-boring clusters yet
-        td.expectedPartitionGroups = Integer.MAX_VALUE;
     }
 
     public void testManySlightlyImperfectCluster() throws JSONException {
@@ -673,9 +619,6 @@ public class TestAbstractTopology extends TestCase {
             TestDescription td = getRandomBoringTestDescription(rand);
             if (rand.nextDouble() < .3) {
                 mutateSwapHAGroups(rand, td);
-            }
-            if (rand.nextDouble() < .3) {
-                mutateChangeSPH(rand, td);
             }
             subTestDescription(td, false);
         }
@@ -697,7 +640,7 @@ public class TestAbstractTopology extends TestCase {
             TestDescription td1 = getRandomBoringTestDescription(rand);
             AbstractTopology topo = subTestDescription(td1, false);
             // get another random topology that offsets hostids so they don't collide
-            TestDescription td2 = getRandomBoringTestDescription(rand, td1.hosts.length);
+            TestDescription td2 = getRandomBoringTestDescription(rand, td1.hosts.size());
             topo = AbstractTopology.mutateAddHosts(topo, td2.hosts);
             topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td2.partitionCount,
                     td2.kfactor);
@@ -710,40 +653,29 @@ public class TestAbstractTopology extends TestCase {
      * @throws InterruptedException
      */
     public void testTopologyStatibility() throws InterruptedException {
-        Map<Integer, String> hostGroups = new HashMap<>();
-        hostGroups.put(0, "g0");
-        hostGroups.put(1, "g0");
-        hostGroups.put(2, "g0");
-        hostGroups.put(3, "g0");
-        Map<Integer, Integer> sitesPerHostMap = new HashMap<>();
-        sitesPerHostMap.put(0, 6);
-        sitesPerHostMap.put(1, 6);
-        sitesPerHostMap.put(2, 6);
-        sitesPerHostMap.put(3, 6);
+        Map<Integer, HostInfo> hostInfos = new HashMap<>();
+        hostInfos.put(0, new HostInfo("", "g0", 6));
+        hostInfos.put(1, new HostInfo("", "g0", 6));
+        hostInfos.put(2, new HostInfo("", "g0", 6));
+        hostInfos.put(3, new HostInfo("", "g0", 6));
         //test 1
-        doStabilityTest(hostGroups, sitesPerHostMap, 2);
+        doStabilityTest(hostInfos, 2);
 
-        hostGroups.put(4, "g1");
-        hostGroups.put(5, "g1");
-        hostGroups.put(6, "g1");
-        hostGroups.put(7, "g1");
-
-        sitesPerHostMap.put(4, 6);
-        sitesPerHostMap.put(5, 6);
-        sitesPerHostMap.put(6, 6);
-        sitesPerHostMap.put(7, 6);
+        hostInfos.put(4, new HostInfo("", "g1", 6));
+        hostInfos.put(5, new HostInfo("", "g1", 6));
+        hostInfos.put(6, new HostInfo("", "g1", 6));
+        hostInfos.put(7, new HostInfo("", "g1", 6));
         //test 2
-        doStabilityTest(hostGroups, sitesPerHostMap, 3);
+        doStabilityTest(hostInfos, 3);
     }
 
-    private void doStabilityTest( Map<Integer, String> hostGroups,
-            Map<Integer, Integer> sitesPerHostMap, int kfactor) throws InterruptedException {
+    private void doStabilityTest(Map<Integer, HostInfo> hostInfos, int kfactor) throws InterruptedException {
         int count = 200;
         CountDownLatch latch = new CountDownLatch(count);
         Set<String> topos = new HashSet<>();
         List<StabilityTestTask> tasks = new ArrayList<> ();
         while (count > 0) {
-            tasks.add(new StabilityTestTask(latch, topos,sitesPerHostMap, hostGroups, kfactor));
+            tasks.add(new StabilityTestTask(latch, topos, hostInfos, kfactor));
             count--;
         }
         for (StabilityTestTask task :tasks) {
@@ -755,20 +687,19 @@ public class TestAbstractTopology extends TestCase {
     class StabilityTestTask implements Runnable {
         final CountDownLatch latch;
         Set<String> topos;
-        final Map<Integer, Integer>  sitesPerHostMap;
-        final Map<Integer, String> hostGroups;
+        final Map<Integer, HostInfo> hostInfos;
         final int kfactor;
-        public StabilityTestTask (CountDownLatch latch, Set<String> topos,
-                Map<Integer, Integer>  sitesPerHostMap, Map<Integer, String> hostGroups, int kfactor) {
+
+        public StabilityTestTask(CountDownLatch latch, Set<String> topos, Map<Integer, HostInfo> hostInfos,
+                int kfactor) {
             this.latch = latch;
             this.topos = topos;
-            this.hostGroups = hostGroups;
+            this.hostInfos = hostInfos;
             this.kfactor = kfactor;
-            this.sitesPerHostMap = sitesPerHostMap;
         }
         @Override
         public void run() {
-            AbstractTopology topology = AbstractTopology.getTopology(sitesPerHostMap, new HashSet<Integer>(), hostGroups, kfactor);
+            AbstractTopology topology = AbstractTopology.getTopology(hostInfos, new HashSet<Integer>(), kfactor);
             try {
                 topos.add(topology.topologyToJSON().toString());
             } catch (JSONException e) {
