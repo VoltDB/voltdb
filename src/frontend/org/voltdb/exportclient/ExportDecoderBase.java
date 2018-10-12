@@ -18,23 +18,26 @@
 package org.voltdb.exportclient;
 
 
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
-import com.google_voltpatches.common.base.Preconditions;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
-import org.voltdb.export.AdvertisedDataSource;
+import static org.voltdb.exportclient.ExportRow.getFirstField;
 
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltType;
-import static org.voltdb.exportclient.ExportRow.getFirstField;
+import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
+
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 
 /**
@@ -47,6 +50,10 @@ public abstract class ExportDecoderBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
     public static final int INTERNAL_FIELD_COUNT = ExportRow.INTERNAL_FIELD_COUNT;
     public static final int PARTITION_ID_INDEX = 3;
+
+    // Default executor service, using a thread terminating after 1s keepAlive
+    private static final ListeningExecutorService DEFAULT_EXECUTOR = CoreUtils.getCachedSingleThreadExecutor(
+            "Default Export Decoder thread", 1000);
 
     public static class RestartBlockException extends Exception {
         private static final long serialVersionUID = 1L;
@@ -260,7 +267,7 @@ public abstract class ExportDecoderBase {
     }
 
     public ListeningExecutorService getExecutor() {
-        return CoreUtils.LISTENINGSAMETHREADEXECUTOR;
+        return DEFAULT_EXECUTOR;
     }
 
     public int getPartition() {
