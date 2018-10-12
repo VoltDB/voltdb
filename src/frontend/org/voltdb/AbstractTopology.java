@@ -63,18 +63,19 @@ public class AbstractTopology {
     public final static String TOPO_HAGROUP = "haGroup";
     public final static String TOPO_HOSTS = "hosts";
     public final static String TOPO_HOST = "host";
-    public final static String TOPO_SPH = "targetSiteCount";
     public final static String TOPO_HOST_MISSING = "missing";
+    public final static String TOPO_SITES_PER_HOST = "sitesPerHost";
     public final static String TOPO_REPLICATION_FACTOR = "replicationFactor";
 
     public final static String PLACEMENT_GROUP_DEFAULT="0";
 
     public final long version;
     public final int replicationFactor;
+    public final int sitesPerHost;
     public final ImmutableMap<Integer, Host> hostsById;
     public final ImmutableMap<Integer, Partition> partitionsById;
 
-    public static final AbstractTopology EMPTY_TOPOLOGY = new AbstractTopology(0, new TreeSet<>(), -1);
+    public static final AbstractTopology EMPTY_TOPOLOGY = new AbstractTopology(0, new TreeSet<>(), -1, -1);
 
     /////////////////////////////////////
     //
@@ -203,21 +204,19 @@ public class AbstractTopology {
 
     public static class Host implements Comparable<Host> {
         public final int id;
-        public final int targetSiteCount;
         public final HAGroup haGroup;
         public final ImmutableSortedSet<Partition> partitions;
 
         //a flag indicating if the host is missing or not
         public boolean isMissing = false;
-        private Host(int id, int targetSiteCount, HAGroup haGroup, Collection<Partition> partitions) {
+
+        private Host(int id, HAGroup haGroup, Collection<Partition> partitions) {
             assert(id >= 0);
-            assert(targetSiteCount >= 0);
             assert(haGroup != null);
             assert(partitions != null);
             assert(partitions.size() >= 0);
 
             this.id = id;
-            this.targetSiteCount = targetSiteCount;
             this.haGroup = haGroup;
             this.partitions = ImmutableSortedSet.copyOf(partitions);
         }
@@ -247,13 +246,12 @@ public class AbstractTopology {
         public String toString() {
             String[] partitionIdStrings = partitions.stream().map(p -> String.valueOf(p.id)).toArray(String[]::new);
             return String.format("Host %d sph:%d ha:%s (Partitions %s)",
-                    id, targetSiteCount, haGroup.token, String.join(",", partitionIdStrings));
+                    id, haGroup.token, String.join(",", partitionIdStrings));
         }
 
         private void toJSON(JSONStringer stringer) throws JSONException {
             stringer.object();
             stringer.key(TOPO_HOST_ID).value(id);
-            stringer.key(TOPO_SPH).value(targetSiteCount);
             stringer.key(TOPO_HAGROUP).value(haGroup.token);
             stringer.key(TOPO_HOST_MISSING).value(isMissing);
             stringer.key(TOPO_PARTITIONS).array();
@@ -271,7 +269,6 @@ public class AbstractTopology {
                         throws JSONException
         {
             int id = json.getInt(TOPO_HOST_ID);
-            int targetSiteCount = json.getInt(TOPO_SPH);
             String haGroupToken = json.getString(TOPO_HAGROUP);
             HAGroup haGroup = haGroupsByToken.get(haGroupToken);
             JSONArray jsonPartitions = json.getJSONArray(TOPO_PARTITIONS);
@@ -280,7 +277,7 @@ public class AbstractTopology {
                 int partitionId = jsonPartitions.getInt(i);
                 partitions.add(partitionsById.get(partitionId));
             }
-            Host host =  new Host(id, targetSiteCount, haGroup, partitions);
+            Host host = new Host(id, haGroup, partitions);
             host.markHostMissing(json.getBoolean(TOPO_HOST_MISSING));
             return host;
         }
@@ -384,7 +381,7 @@ public class AbstractTopology {
         // get immutable HAGroups - these are fixed by user command line
         final HAGroup[] haGroups = getHAGroupsForHosts(currentTopology, hosts);
 
-        int sitesPerHost = -1;
+        int sitesPerHost = currentTopology.getSitesPerHost();
 
         // build the full set of immutable hosts, using the HAGroups
         Set<Host> fullHostSet = new TreeSet<>();
@@ -393,13 +390,7 @@ public class AbstractTopology {
                 Host currentHost = currentTopology.hostsById.get(hostId);
                 Host newHost = null;
                 if (currentHost != null) {
-                    if (sitesPerHost == -1) {
-                        sitesPerHost = currentHost.targetSiteCount;
-                    } else if (currentHost.targetSiteCount != sitesPerHost) {
-                        throw new RuntimeException(
-                                "Not all hosts have the same site count: " + currentTopology.hostsById + " " + hosts);
-                    }
-                    newHost = new Host(hostId, currentHost.targetSiteCount, haGroup, currentHost.partitions);
+                    newHost = new Host(hostId, haGroup, currentHost.partitions);
                 } else {
                     HostInfo hostInfo = hosts.get(hostId);
                     assert (hostInfo != null);
@@ -409,12 +400,13 @@ public class AbstractTopology {
                         throw new RuntimeException(
                                 "Not all hosts have the same site count: " + currentTopology.hostsById + " " + hosts);
                     }
-                    newHost = new Host(hostId, hostInfo.m_localSitesCount, haGroup, new TreeSet<>());
+                    newHost = new Host(hostId, haGroup, new TreeSet<>());
                 }
                 fullHostSet.add(newHost);
             }
         }
-        return new AbstractTopology(currentTopology.version + 1, fullHostSet, currentTopology.getReplicationFactor());
+        return new AbstractTopology(currentTopology.version + 1, fullHostSet, sitesPerHost,
+                currentTopology.getReplicationFactor());
     }
 
     public static AbstractTopology mutateAddPartitionsToEmptyHosts(AbstractTopology currentTopology,
@@ -550,6 +542,7 @@ public class AbstractTopology {
                 currentTopology.version + 1,
                 mutableHostMap,
                 mutablePartitionMap,
+                currentTopology.getSitesPerHost(),
                 kfactor);
     }
 
@@ -582,7 +575,8 @@ public class AbstractTopology {
             host.toJSON(stringer);
         }
         stringer.endArray();
-        stringer.key(TOPO_REPLICATION_FACTOR).value(getReplicationFactor());
+        stringer.keySymbolValuePair(TOPO_SITES_PER_HOST, getSitesPerHost());
+        stringer.keySymbolValuePair(TOPO_REPLICATION_FACTOR, getReplicationFactor());
 
 
         stringer.endObject();
@@ -620,9 +614,11 @@ public class AbstractTopology {
             hosts.add(host);
         }
 
+        int sitesPerHost = jsonTopology.getInt(TOPO_SITES_PER_HOST);
+
         int replicationFactor = jsonTopology.getInt(TOPO_REPLICATION_FACTOR);
 
-        return new AbstractTopology(version, hosts, replicationFactor);
+        return new AbstractTopology(version, hosts, sitesPerHost, replicationFactor);
     }
 
     /////////////////////////////////////
@@ -631,7 +627,7 @@ public class AbstractTopology {
     //
     /////////////////////////////////////
 
-    private AbstractTopology(long version, Collection<Host> hosts, int replicationFactor) {
+    private AbstractTopology(long version, Collection<Host> hosts, int sitesPerHost, int replicationFactor) {
         assert(hosts != null);
         assert(version >= 0);
 
@@ -652,6 +648,7 @@ public class AbstractTopology {
             }
         }
         this.partitionsById = ImmutableMap.copyOf(paritionsByIdTemp);
+        this.sitesPerHost = sitesPerHost;
         this.replicationFactor = replicationFactor;
     }
 
@@ -669,7 +666,7 @@ public class AbstractTopology {
         // create mutable hosts without partitions
         for (Host host : topology.hostsById.values()) {
             final MutableHost mutableHost = new MutableHost(
-                    host.id, host.targetSiteCount, host.haGroup);
+                    host.id, topology.getSitesPerHost(), host.haGroup);
             mutableHostMap.put(host.id, mutableHost);
         }
 
@@ -696,7 +693,9 @@ public class AbstractTopology {
     private static AbstractTopology convertMutablesToTopology(
             final long currentVersion,
             final Map<Integer, MutableHost> mutableHostMap,
-            final Map<Integer, MutablePartition> mutablePartitionMap, final int replicationFactor)
+            final Map<Integer, MutablePartition> mutablePartitionMap,
+            final int sitesPerHost,
+            final int replicationFactor)
     {
         final Map<Integer, Partition> partitionsById = new TreeMap<>();
         mutablePartitionMap.values().stream().forEach(mp -> {
@@ -715,12 +714,12 @@ public class AbstractTopology {
             List<Partition> hostPartitions = mutableHost.partitions.stream()
                     .map(mp -> partitionsById.get(mp.id))
                     .collect(Collectors.toList());
-            Host newHost = new Host(mutableHost.id, mutableHost.targetSiteCount, mutableHost.haGroup, hostPartitions);
+            Host newHost = new Host(mutableHost.id, mutableHost.haGroup, hostPartitions);
             newHost.markHostMissing(mutableHost.isMissing);
             fullHostSet.add(newHost);
         }
 
-        return new AbstractTopology(currentVersion + 1, fullHostSet, replicationFactor);
+        return new AbstractTopology(currentVersion + 1, fullHostSet, sitesPerHost, replicationFactor);
     }
 
     private static int getNextFreePartitionId(AbstractTopology topology) {
@@ -1146,9 +1145,14 @@ public class AbstractTopology {
         return (h != null) ? h.getSortedPartitionIdList() : null;
     }
 
+    public int getSitesPerHost() {
+        return sitesPerHost;
+    }
+
     public int getReplicationFactor() {
         return replicationFactor;
     }
+
     public boolean hasMissingPartitions() {
         Set<Partition> partitions = Sets.newHashSet();
         for (Host host : hostsById.values()) {
@@ -1174,7 +1178,7 @@ public class AbstractTopology {
 
         // create mutable missing Hosts without partitions
         for (Host host : topology.hostsById.values()) {
-            final MutableHost mutableHost = new MutableHost(host.id, host.targetSiteCount, host.haGroup);
+            final MutableHost mutableHost = new MutableHost(host.id, topology.getSitesPerHost(), host.haGroup);
             if (missingHosts.contains(host.id)) {
                 mutableHost.markHostMissing(true);
             }
@@ -1217,7 +1221,7 @@ public class AbstractTopology {
             mp.leader = mutableHostMap.get(leaderId);
         }
         return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap,
-                topology.getReplicationFactor());
+                topology.getSitesPerHost(), topology.getReplicationFactor());
     }
 
     /**
@@ -1282,7 +1286,7 @@ public class AbstractTopology {
                 haGroupMaps.put(host.haGroup.token, groupHostIds);
             }
             groupHostIds.add(hostId);
-            final MutableHost mutableHost = new MutableHost(hostId, host.targetSiteCount, null);
+            final MutableHost mutableHost = new MutableHost(hostId, topology.getSitesPerHost(), null);
             mutableHostMap.put(hostId, mutableHost);
         }
         //no matching candidate found.
@@ -1313,7 +1317,7 @@ public class AbstractTopology {
             mp.leader = mutableHostMap.get(leader);
         }
         return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap,
-                topology.getReplicationFactor());
+                topology.getSitesPerHost(), topology.getReplicationFactor());
     }
 
     /**
