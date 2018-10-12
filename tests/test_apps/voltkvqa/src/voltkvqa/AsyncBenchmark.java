@@ -60,6 +60,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
@@ -653,6 +654,10 @@ public class AsyncBenchmark {
             }
             else {
                 failedGets.incrementAndGet();
+                ClientResponseImpl cri = (ClientResponseImpl) response;
+                System.err.println(cri.toJSONString());
+                System.out.println("ERROR: Bad Client response from Volt");
+                System.exit(1);
             }
         }
     }
@@ -688,6 +693,10 @@ public class AsyncBenchmark {
             }
             else {
                 failedPuts.incrementAndGet();
+                ClientResponseImpl cri = (ClientResponseImpl) response;
+                System.err.println(cri.toJSONString());
+                System.out.println("ERROR: Bad Client response from Volt");
+                System.exit(1);
             }
             networkPutData.addAndGet(storeValueLength);
             rawPutData.addAndGet(rawValueLength);
@@ -721,7 +730,9 @@ public class AsyncBenchmark {
                 }
             }
             else {
-                System.out.print("ERROR: Bad Client response from Volt");
+                ClientResponseImpl cri = (ClientResponseImpl) response;
+                System.err.println(cri.toJSONString());
+                System.out.println("ERROR: Bad Client response from Volt");
                 System.exit(1);
             }
         }
@@ -819,6 +830,7 @@ public class AsyncBenchmark {
             }
 
             // Decide whether to perform a GET or PUT operation
+            boolean response;
             if (rand.nextDouble() < config.getputratio) {
                 // Get a key/value pair, asynchronously
                 mpRand = rand.nextDouble();
@@ -829,10 +841,10 @@ public class AsyncBenchmark {
                     }
                     else
                         debug = false;
-                    client.callProcedure(new GetCallback(mpRand), "GetMp", processor.generateRandomKeyForRetrieval());
+                    response = client.callProcedure(new GetCallback(mpRand), "GetMp", processor.generateRandomKeyForRetrieval());
                 }
                 else {
-                    client.callProcedure(new GetCallback(mpRand), "Get", processor.generateRandomKeyForRetrieval());
+                    response = client.callProcedure(new GetCallback(mpRand), "Get", processor.generateRandomKeyForRetrieval());
                 }
             }
             else {
@@ -847,11 +859,15 @@ public class AsyncBenchmark {
                     }
                     else
                         debug = false;
-                    client.callProcedure(new PutCallback(pair, mpRand), "PutMp", pair.Key, pair.getStoreValue());
+                    response = client.callProcedure(new PutCallback(pair, mpRand), "PutMp", pair.Key, pair.getStoreValue());
                 }
                 else {
-                    client.callProcedure(new PutCallback(pair, mpRand), "Put", pair.Key, pair.getStoreValue());
+                    response = client.callProcedure(new PutCallback(pair, mpRand), "Put", pair.Key, pair.getStoreValue());
                 }
+            }
+            if (!response) {
+                System.err.print("Invocation failed...");
+                System.exit(1);
             }
             currentTime = System.currentTimeMillis();
             diff = benchmarkEndTime - currentTime;
