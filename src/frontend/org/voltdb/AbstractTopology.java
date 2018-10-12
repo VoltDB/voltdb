@@ -42,7 +42,6 @@ import org.json_voltpatches.JSONStringer;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.LinkedListMultimap;
 import com.google_voltpatches.common.collect.Lists;
@@ -292,26 +291,6 @@ public class AbstractTopology {
         @Override
         public int compareTo(Host o) {
             return (this.id - o.id);
-        }
-    }
-
-    public static class KSafetyViolationException extends Exception {
-        private static final long serialVersionUID = 1L;
-        public final int failedHostId;
-        public final ImmutableSet<Integer> missingPartitionIds;
-
-        public KSafetyViolationException(int failedHostId, Set<Integer> missingPartitionIds) {
-            assert(missingPartitionIds != null);
-            this.failedHostId = failedHostId;
-            this.missingPartitionIds = ImmutableSet.copyOf(missingPartitionIds);
-        }
-
-        @Override
-        public String getMessage() {
-            // convert set of ints to array of strings
-            String[] strIds = missingPartitionIds.stream().map(i -> String.valueOf(i)).toArray(String[]::new);
-            return String.format("After Host %d failure, non-viable cluster due to k-safety violation. "
-                               + "Missing partitions: %s", failedHostId, String.join(",", strIds));
         }
     }
 
@@ -614,101 +593,6 @@ public class AbstractTopology {
                 mutablePartitionMap);
     }
 
-    public static AbstractTopology mutateRemoveHost(AbstractTopology currentTopology, int hostId)
-        throws KSafetyViolationException
-    {
-        /////////////////////////////////
-        // convert all hosts to mutable hosts to add partitions and sites
-        /////////////////////////////////
-        final Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
-        final Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
-        convertTopologyToMutables(currentTopology, mutableHostMap, mutablePartitionMap);
-
-        Set<Integer> missingPartitionIds = new HashSet<>();
-
-        MutableHost hostToRemove = mutableHostMap.remove(hostId);
-        if (hostToRemove == null) {
-            throw new RuntimeException("Can't remove host; host id not present in current topology.");
-        }
-        for (MutablePartition partition : hostToRemove.partitions) {
-            partition.hosts.remove(hostToRemove);
-            if (partition.hosts.size() == 0) {
-                missingPartitionIds.add(partition.id);
-            }
-        }
-
-        // check for k-safety violation
-        if (missingPartitionIds.size() > 0) {
-            throw new KSafetyViolationException(hostId, missingPartitionIds);
-        }
-
-        Set<Integer> mutableHostIds = new HashSet<>(hostToRemove.haGroup.hostIds);
-        mutableHostIds.remove(hostId);
-        int[] hostIdArray = hostToRemove.haGroup.hostIds.stream()
-                .filter(candidateId -> candidateId != hostId)
-                .mapToInt(id -> id)
-                .toArray();
-
-        HAGroup newHaGroup = new HAGroup(hostToRemove.haGroup.token, hostIdArray);
-        mutableHostMap.values().forEach(h -> {
-            if (h.haGroup.token.equals(newHaGroup.token)) {
-                h.haGroup = newHaGroup;
-            }
-        });
-
-        /////////////////////////////////
-        // pick leaders for partitions that need them (naive)
-        /////////////////////////////////
-        assignLeadersToPartitionsThatNeedThem(mutableHostMap, mutablePartitionMap);
-
-        /////////////////////////////////
-        // convert mutable hosts to hosts to prep a return value
-        /////////////////////////////////
-        return convertMutablesToTopology(
-                currentTopology.version + 1,
-                mutableHostMap,
-                mutablePartitionMap);
-    }
-
-    public static AbstractTopology mutateAddReplicaSite(AbstractTopology topology, int hostId, int partitionId) {
-
-        Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
-        Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
-
-        // create mutable hosts without partitions
-        for (Host host : topology.hostsById.values()) {
-            int sph = host.targetSiteCount;
-            if (host.id == hostId) {
-                assert(host.partitions.stream().filter(p->p.id == partitionId).collect(Collectors.toList()).isEmpty());
-                sph++;
-            }
-            final MutableHost mutableHost = new MutableHost(host.id, sph, host.haGroup);
-            mutableHostMap.put(host.id, mutableHost);
-        }
-
-        for (Partition partition : topology.partitionsById.values()) {
-            int k = partition.k;
-            if (partition.id == partitionId) {
-                assert(!(partition.hostIds.contains(hostId)));
-                k++;
-            }
-            MutablePartition mp = new MutablePartition(partition.id, k);
-            mutablePartitionMap.put(mp.id, mp);
-            for (Integer hId : partition.hostIds) {
-                final MutableHost mutableHost = mutableHostMap.get(hId);
-                mp.hosts.add(mutableHost);
-                mutableHost.partitions.add(mp);
-            }
-            mp.leader = mutableHostMap.get(partition.leaderHostId);
-            if (partition.id == partitionId) {
-                final MutableHost mutableHost = mutableHostMap.get(hostId);
-                mp.hosts.add(mutableHost);
-                mutableHost.partitions.add(mp);
-            }
-        }
-        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
-    }
-
     /**
      * Get the total number of missing replicas across all partitions.
      * Note this doesn't say how many partitions are under-represented.
@@ -723,124 +607,6 @@ public class AbstractTopology {
         return partitionsById.values().stream()
                 .mapToInt(p -> (p.k + 1) - p.hostIds.size())
                 .sum();
-    }
-
-    /**
-     *
-     * @param currentTopology
-     * @param hostDescription
-     * @return
-     */
-    public static AbstractTopology mutateRejoinHost(AbstractTopology currentTopology, HostDescription hostDescription) {
-        // add the node
-        currentTopology = AbstractTopology.mutateAddHosts(currentTopology, new HostDescription[] { hostDescription });
-
-        /////////////////////////////////
-        // convert all hosts to mutable hosts to add partitions and sites
-        /////////////////////////////////
-        final Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
-        final Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
-        convertTopologyToMutables(currentTopology, mutableHostMap, mutablePartitionMap);
-
-        // collect under-replicated partitions by hostid
-        List<MutablePartition> underReplicatedPartitions = mutablePartitionMap.values().stream()
-                .filter(p -> (p.k + 1) > p.hosts.size())
-                .collect(Collectors.toList());
-
-        // find hosts with under-replicated partitions
-        Map<Integer, List<MutablePartition>> urPartitionsByHostId = new TreeMap<>();
-        underReplicatedPartitions.forEach(urPartition -> {
-            urPartition.hosts.forEach(host -> {
-                List<MutablePartition> partitionsForHost = urPartitionsByHostId.get(host.id);
-                if (partitionsForHost == null) {
-                    partitionsForHost = new ArrayList<>();
-                    urPartitionsByHostId.put(host.id, partitionsForHost);
-                }
-                partitionsForHost.add(urPartition);
-            });
-        });
-
-        // divide partitions into groups
-        Set<MutablePartition> partitionsToScan = new HashSet<>(underReplicatedPartitions);
-        List<List<MutablePartition>> partitionGroups = new ArrayList<>();
-        while (!partitionsToScan.isEmpty()) {
-            List<MutablePartition> partitionGroup = new ArrayList<MutablePartition>();
-            partitionGroups.add(partitionGroup);
-            // get any partition from the set to scan
-            MutablePartition starter = partitionsToScan.iterator().next();
-            scanPeerParititions(partitionsToScan, partitionGroup, starter);
-        }
-
-        // sort partition groups from largest to smallest
-        partitionGroups = partitionGroups.stream()
-                .sorted((l1, l2) -> l2.size() - l1.size())
-                .collect(Collectors.toList());
-
-        // look for a group with the right number of partitions
-        List<MutablePartition> match = null;
-        // look for a fallback where host covers exactly 1/X (for some X) of a partition group
-        List<MutablePartition> altMatch1 = null;
-        // look for a second fallback where host covers some of a group, but not perfectly 1/X
-        List<MutablePartition> altMatch2 = null;
-        // look for a third fallback where host joins two groups
-        List<MutablePartition> altMatch3 = null;
-        for (List<MutablePartition> partitionGroup : partitionGroups) {
-            if (partitionGroup.size() == hostDescription.targetSiteCount) {
-                match = partitionGroup;
-                break;
-            }
-            if ((partitionGroup.size() % hostDescription.targetSiteCount) == 0) {
-                altMatch1 = partitionGroup;
-                continue;
-            }
-            if (partitionGroup.size() > hostDescription.targetSiteCount) {
-                altMatch2 = partitionGroup;
-                continue;
-            }
-            for (List<MutablePartition> altPartitionGroup : partitionGroups) {
-                if (altPartitionGroup == partitionGroup) {
-                    continue;
-                }
-
-            }
-        }
-
-        // collapse the alternates to pick the best one we can
-        if (match == null) match = altMatch1;
-        if (match == null) match = altMatch2;
-        if (match == null) match = altMatch3;
-
-        // if no match or alternates, combine groups until you get a fit
-        if (match == null) {
-            match = new ArrayList<>();
-            // remember: list of partition groups are sorted by size
-            for (List<MutablePartition> partitionGroup : partitionGroups) {
-                match.addAll(partitionGroup);
-                // break when we have enough partitions
-                if (match.size() >= hostDescription.targetSiteCount) {
-                    break;
-                }
-                // though we might add all of them if target SPH > under-replicated partitions
-            }
-        }
-
-        // now we can assume match is correct!
-        MutableHost rejoiningHost = mutableHostMap.get(hostDescription.hostId);
-        assert(rejoiningHost.targetSiteCount == hostDescription.targetSiteCount);
-        assert(rejoiningHost.id == hostDescription.hostId);
-        assert(rejoiningHost.partitions.isEmpty());
-
-        rejoiningHost.partitions.addAll(match);
-        match.forEach(p -> p.hosts.add(rejoiningHost));
-        mutableHostMap.put(rejoiningHost.id, rejoiningHost);
-
-        /////////////////////////////////
-        // convert mutable hosts to hosts to prep a return value
-        /////////////////////////////////
-        return convertMutablesToTopology(
-                currentTopology.version + 1,
-                mutableHostMap,
-                mutablePartitionMap);
     }
 
     /////////////////////////////////////
@@ -1347,21 +1113,6 @@ public class AbstractTopology {
                 .mapToInt(h -> (h.targetSiteCount > h.partitions.size()) ? 1 : 0)
                 .sum();
         return freeSpaceHostCount;
-    }
-
-    private static void scanPeerParititions(Set<MutablePartition> partitionsToScan,
-            List<MutablePartition> partitionGroup,
-            MutablePartition partition)
-    {
-        partitionsToScan.remove(partition);
-        partitionGroup.add(partition);
-        for (MutableHost host : partition.hosts) {
-            for (MutablePartition peer : host.partitions) {
-                if (partitionsToScan.contains(peer)) {
-                    scanPeerParititions(partitionsToScan, partitionGroup, peer);
-                }
-            }
-        }
     }
 
     private static void assignLeadersToPartitionsThatNeedThem(
