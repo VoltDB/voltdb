@@ -98,8 +98,10 @@ public class StreamBlockQueue {
         } else {
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
+            fcont.b().order(ByteOrder.LITTLE_ENDIAN);
             long uso = cont.b().getLong(0);
             int tupleCount = cont.b().getInt(8);
+            fcont.b().order(ByteOrder.BIG_ENDIAN);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
             StreamBlock block = new StreamBlock( fcont,
