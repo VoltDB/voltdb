@@ -251,26 +251,13 @@ public class TestAbstractTopology extends TestCase {
         subTestDescription(td, false);
     }
 
-    public void testTooManyPartitions() {
-        TestDescription td = getBoringDescription(5, 6, 1, 2, 1);
-        AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
-        try {
-            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td.partitionCount + 1,
-                    td.kfactor);
-            fail();
-        }
-        catch (Exception e) {
-            assertTrue(e.getMessage().contains("Hosts have inadequate space"));
-        }
-    }
-
     public void testKTooLarge() {
         Map<Integer, HostInfo> hosts = ImmutableMap.of(0, new HostInfo("", "0", 2), 1, new HostInfo("", "0", 2), 2,
                 new HostInfo("", "0", 2));
 
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hosts);
         try {
-            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), 1, 3);
+            AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), 3);
             fail();
         }
         catch (Exception e) {
@@ -284,8 +271,7 @@ public class TestAbstractTopology extends TestCase {
         // now try adding on from existing topo
         TestDescription td = getBoringDescription(5, 6, 1, 2, 1);
         AbstractTopology topo = AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, td.hosts);
-        topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td.partitionCount,
-                td.kfactor);
+        topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td.kfactor);
 
         int lastHostId = td.hosts.keySet().stream().mapToInt(Integer::intValue).max().getAsInt();
         Map<Integer, HostInfo> hosts = ImmutableMap.of(lastHostId, new HostInfo("", "0", 1), lastHostId + 1,
@@ -522,8 +508,7 @@ public class TestAbstractTopology extends TestCase {
         //System.out.println(topo.topologyToJSON());
 
         try {
-        topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(
-                    topo, new HashSet<Integer>(), td.partitionCount, td.kfactor);
+            topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td.kfactor);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -557,14 +542,28 @@ public class TestAbstractTopology extends TestCase {
         final int MAX_SPH = 60;
         final int MAX_K = 10;
 
-        int hostCount, k, sph, leafCount, treeWidth;
-
-
+        int hostCount, k, sph;
         hostCount = rand.nextInt(MAX_NODE_COUNT) + 1;
-        k = rand.nextInt(Math.min(hostCount - 1, MAX_K) + 1);
 
+        k = rand.nextInt(Math.min(hostCount - 1, MAX_K) + 1);
         do { sph = rand.nextInt(MAX_SPH) + 1; }
         while ((sph * hostCount) % (k + 1) != 0);
+        return getRandomBoringTestDescription(rand, hostCount, sph, k, hostIdOffset);
+    }
+
+    private TestDescription getRandomBoringTestDescription(Random rand, int sph, int k, int hostIdOffset) {
+        final int MAX_NODE_COUNT = 120;
+
+        int hostCount;
+        do {
+            hostCount = rand.nextInt(MAX_NODE_COUNT) + 1;
+        } while (hostCount < k + 1 || (sph * hostCount) % (k + 1) != 0);
+        return getRandomBoringTestDescription(rand, hostCount, sph, k, hostIdOffset);
+    }
+
+    private TestDescription getRandomBoringTestDescription(Random rand, int hostCount, int sph, int k,
+            int hostIdOffset) {
+        int leafCount, treeWidth;
 
         ArrayList<Integer> leafOptions = new ArrayList<>();
         for (int leafCountOption = k + 1;
@@ -640,10 +639,10 @@ public class TestAbstractTopology extends TestCase {
             TestDescription td1 = getRandomBoringTestDescription(rand);
             AbstractTopology topo = subTestDescription(td1, false);
             // get another random topology that offsets hostids so they don't collide
-            TestDescription td2 = getRandomBoringTestDescription(rand, td1.hosts.size());
+            TestDescription td2 = getRandomBoringTestDescription(rand,
+                    td1.hosts.values().iterator().next().m_localSitesCount, td1.kfactor, td1.hosts.size());
             topo = AbstractTopology.mutateAddHosts(topo, td2.hosts);
-            topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td2.partitionCount,
-                    td2.kfactor);
+            topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, new HashSet<Integer>(), td2.kfactor);
             validate(topo);
         }
     }
