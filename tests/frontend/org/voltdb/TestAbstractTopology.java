@@ -235,19 +235,6 @@ public class TestAbstractTopology extends TestCase {
     public void testTwoNodesTwoRacks() throws JSONException {
         TestDescription td = getBoringDescription(2, 7, 1, 2, 2);
         AbstractTopology topo = subTestDescription(td, false);
-        //System.out.printf("TOPO PRE: %s\n", topo.topologyToJSON());
-
-        // kill and rejoin a host
-        HostDescription hostDescription = td.hosts[0];
-        try {
-            topo = AbstractTopology.mutateRemoveHost(topo, hostDescription.hostId);
-        } catch (KSafetyViolationException e) {
-            e.printStackTrace();
-            fail();
-        }
-        //System.out.printf("TOPO MID: %s\n", topo.topologyToJSON());
-        topo = AbstractTopology.mutateRejoinHost(topo, hostDescription);
-        //System.out.printf("TOPO END: %s\n", topo.topologyToJSON());
         validate(topo);
     }
 
@@ -630,24 +617,15 @@ public class TestAbstractTopology extends TestCase {
             AbstractTopology topo = subTestDescription(td, false);
 
             // kill and rejoin a host
-            if (td.hosts.length == 0) {
+            if (td.hosts.isEmpty()) {
                 continue;
             }
-            HostDescription hostDescription = td.hosts[rand.nextInt(td.hosts.length)];
-            try {
-                topo = AbstractTopology.mutateRemoveHost(topo, hostDescription.hostId);
-            } catch (KSafetyViolationException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                return;
-            }
-            topo = AbstractTopology.mutateRejoinHost(topo, hostDescription);
             validate(topo);
         }
     }
 
     void mutateSwapHAGroups(Random rand, TestDescription td) {
-        if (td.hosts.length == 0) {
+        if (td.hosts.isEmpty()) {
             return;
         }
 
