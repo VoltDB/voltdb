@@ -25,6 +25,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -44,7 +45,8 @@ public class KafkaStreamImporter extends AbstractImporter {
 
     private ExecutorService m_executorService = null;
     private List<KafkaInternalConsumerRunner> m_consumers;
-
+    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
+    private final Object m_lock = new Object();
     public KafkaStreamImporter(KafkaStreamImporterConfig config) {
         super();
         m_config = config;
@@ -98,53 +100,65 @@ public class KafkaStreamImporter extends AbstractImporter {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, m_config.getAutoOffsetReset());
         props.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, RoundRobinAssignor.class.getName());
 
-        int kafkaPartitions = 0;
-        KafkaInternalConsumerRunner theConsumer = null;
-        try {
-            theConsumer = createConsumerRunner(props);
-            kafkaPartitions = theConsumer.getKafkaTopicPartitionCount();
-        } catch (KafkaException ke) {
-            LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
-        } catch (Throwable terminate) {
-            LOGGER.error("Failed creating Kafka consumer ", terminate);
-        }
-
-        //paused or shutting down
-        if (kafkaPartitions < 1) {
-            return;
-        }
-
-        int totalConsumerCount = kafkaPartitions;
-        if (m_config.getConsumerCount() > 0) {
-            totalConsumerCount = m_config.getConsumerCount();
-        }
-        int consumerCount = (int)Math.ceil((double)totalConsumerCount/m_config.getDBHostCount());
-        m_executorService = Executors.newFixedThreadPool(consumerCount);
-        m_consumers = new ArrayList<>();
-        m_consumers.add(theConsumer);
-        if (consumerCount > 1) {
+        // While importers could be restarted upon catalog update, a cluster could be paused, triggering
+        // stopping the importer @stop().
+        // Thus sync the block to avoid any concurrent update.
+        synchronized(m_lock) {
+            int kafkaPartitions = 0;
+            KafkaInternalConsumerRunner theConsumer = null;
             try {
-                for (int i = 1; i < consumerCount; i++) {
-                    m_consumers.add(createConsumerRunner(props));
-                }
+                theConsumer = createConsumerRunner(props);
+                kafkaPartitions = theConsumer.getKafkaTopicPartitionCount();
             } catch (KafkaException ke) {
                 LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
             } catch (Throwable terminate) {
-                LOGGER.error("Couldn't create Kafka consumer. ", terminate);
+                LOGGER.error("Failed creating Kafka consumer ", terminate);
             }
+
+            //paused or shutting down
+            if (kafkaPartitions < 1) {
+                return;
+            }
+
+            int totalConsumerCount = kafkaPartitions;
+            if (m_config.getConsumerCount() > 0) {
+                totalConsumerCount = m_config.getConsumerCount();
+            }
+            int consumerCount = (int)Math.ceil((double)totalConsumerCount/m_config.getDBHostCount());
+            m_executorService = Executors.newFixedThreadPool(consumerCount);
+            m_consumers = new ArrayList<>();
+            m_consumers.add(theConsumer);
+            if (consumerCount > 1) {
+                try {
+                    for (int i = 1; i < consumerCount; i++) {
+                        if (m_shutdown.get()) {
+                            return;
+                        }
+                        m_consumers.add(createConsumerRunner(props));
+                    }
+                } catch (KafkaException ke) {
+                    LOGGER.error("Couldn't create Kafka consumer. Please check the configuration paramaters. Error:" + ke.getMessage());
+                } catch (Throwable terminate) {
+                    LOGGER.error("Couldn't create Kafka consumer. ", terminate);
+                }
+            }
+
+            if (m_consumers.size() != consumerCount) {
+                for (KafkaInternalConsumerRunner consumer : m_consumers) {
+                    consumer.shutdown();
+                }
+                m_consumers.clear();
+            } else {
+                for (KafkaInternalConsumerRunner consumer : m_consumers) {
+                    if (m_shutdown.get()) {
+                        return;
+                    }
+                    m_executorService.submit(consumer);
+                }
+            }
+            LOGGER.info("Number of Kafka Consumers on this host:" + consumerCount);
         }
 
-        if (m_consumers.size() != consumerCount) {
-            for (KafkaInternalConsumerRunner consumer : m_consumers) {
-                consumer.shutdown();
-            }
-        } else {
-            for (KafkaInternalConsumerRunner consumer : m_consumers) {
-                m_executorService.submit(consumer);
-            }
-        }
-
-        LOGGER.info("Number of Kafka Consumers on this host:" + consumerCount);
         // After the importer is initialized, insert records in @Statistics IMPORTER to make sure VMC can keep track of the import progress
         for (String topicName : m_config.getTopics().split("\\s*,\\s*")) {
             reportInitializedStat(m_config.getProcedure(topicName));
@@ -153,25 +167,29 @@ public class KafkaStreamImporter extends AbstractImporter {
 
     @Override
     public void stop() {
-        if (m_consumers != null) {
-            for (KafkaInternalConsumerRunner consumer : m_consumers) {
-                if (consumer != null) {
-                    consumer.shutdown();
+        m_shutdown.set(true);
+        synchronized(m_lock) {
+            if (m_consumers != null) {
+                for (KafkaInternalConsumerRunner consumer : m_consumers) {
+                    if (consumer != null) {
+                        consumer.shutdown();
+                    }
                 }
+                m_consumers.clear();
             }
-        }
 
-        if (m_executorService == null) {
-            return;
-        }
+            if (m_executorService == null) {
+                return;
+            }
 
-        //graceful shutdown to allow importers to properly process post shutdown tasks.
-        m_executorService.shutdown();
-        try {
-            m_executorService.awaitTermination(60, TimeUnit.SECONDS);
-        } catch (InterruptedException ignore) {
-        } finally {
-            m_executorService = null;
+            //graceful shutdown to allow importers to properly process post shutdown tasks.
+            m_executorService.shutdown();
+            try {
+                m_executorService.awaitTermination(60, TimeUnit.SECONDS);
+            } catch (InterruptedException ignore) {
+            } finally {
+                m_executorService = null;
+            }
         }
     }
 }
