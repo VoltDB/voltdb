@@ -1199,7 +1199,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
-                m_configuredReplicationFactor = topo.getReplicationFactor();
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
                 m_partitionZeroLeader = new Supplier<Boolean>() {
@@ -2110,7 +2109,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (hostInfos.size() != (hostcount - m_config.m_missingHostCount)) {
                 VoltDB.crashLocalVoltDB("The total number of live and missing hosts must be the same as the cluster host count", false, null);
             }
-            int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+            int kfactor = getKFactor();
             if (kfactor == 0 && m_config.m_missingHostCount > 0) {
                 VoltDB.crashLocalVoltDB("A cluster with 0 kfactor can not be started with missing nodes ", false, null);
             }
@@ -2641,6 +2640,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                   deploymentBytes,
                                                   m_messenger);
 
+            m_configuredReplicationFactor = getCatalogContext().getDeployment().getCluster().getKfactor();
             return ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled()));
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -4975,8 +4975,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public int getKFactor() {
-        return (m_catalogContext == null) ? 0 :
-                   getCatalogContext().getDeployment().getCluster().getKfactor();
+        return m_configuredReplicationFactor;
     }
 
     @Override
