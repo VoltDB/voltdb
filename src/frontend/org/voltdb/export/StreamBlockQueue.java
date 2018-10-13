@@ -256,51 +256,27 @@ public class StreamBlockQueue {
             ByteBuffer b = bbc.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
             try {
-                final int headerSize = 8 + 4 + 4 + 1; // generation, partition index + column count + byte for schema flag.
+                final int headerSize = 4 + 4; // partition index + column count.
                 b.position(b.position() + 8);//Don't need the USO
+                byte version = b.get();
+                assert(version == 1);
+                b.getLong();  // generation
+                int firstRowStart = b.position() + b.getInt();
+                b.position(firstRowStart);
+
                 while (b.hasRemaining()) {
                     int rowLength = b.getInt();
-                    //Get Generation
-                    b.getLong();
                     //Get partition col index
                     b.getInt();
                     //Get column count includes metadata column count.
                     int columnCount = b.getInt();
-                    //Get schema flag.
-                    byte hasSchema = b.get();
 
                     int nullArrayLength = ((columnCount + 7) & -8) >> 3;
                     b.position(b.position() + nullArrayLength);
 
-                    int skiplen = 0;
-                    if (hasSchema == 1) {
-                        //Table Name + Its length size
-                        skiplen += 4;
-                        int tlen = b.getInt();
-                        byte[] bx = new byte[tlen];
-                        b.get(bx);
-                        skiplen += tlen;
-
-                        for (int i = 0; i < columnCount; i++) {
-                            //Col Name length
-                            tlen = b.getInt();
-                            skiplen += 4;
-                            bx = new byte[tlen];
-                            //Col Name
-                            b.get(bx);
-                            skiplen += tlen;
-                            //Type Byte
-                            b.get();
-                            skiplen++;
-                            //Get length of column
-                            b.getInt();
-                            skiplen += 4;
-                        }
-                    }
-
                     long rowTxnId = b.getLong();
                     if (exportLog.isTraceEnabled()) {
-                        exportLog.trace("Evaluating row with txnId " + rowTxnId + " for truncation, skiplen=" + skiplen);
+                        exportLog.trace("Evaluating row with txnId " + rowTxnId + " for truncation");
                     }
                     if (rowTxnId > txnId) {
                         if (exportLog.isDebugEnabled()) {
@@ -310,11 +286,11 @@ public class StreamBlockQueue {
                         //The txnid of this row is the greater then the truncation txnid.
                         //Don't want this row, but want to preserve all rows before it.
                         //Move back before the row length prefix, txnId and header
-                        b.position(b.position() - (skiplen + 12 + headerSize + nullArrayLength));
+                        b.position(b.position() - (12 + headerSize + nullArrayLength));
 
                         //If the truncation point was the first row in the block, the entire block is to be discard
                         //We know it is the first row if the position before the row is after the uso (8 bytes)
-                        if (b.position() == 8) {
+                        if (b.position() == firstRowStart) {
                             return PersistentBinaryDeque.fullTruncateResponse();
                         } else {
                             //Return everything in the block before the truncation point.
@@ -327,7 +303,7 @@ public class StreamBlockQueue {
                         //Not the row we are looking to truncate at. Skip past it keeping in mind
                         //we read the first 8 bytes for the txn id, the null array which
                         //is included in the length prefix and the header size
-                        b.position(b.position() + (rowLength - (skiplen + 8 + headerSize + nullArrayLength)));
+                        b.position(b.position() + (rowLength - (8 + headerSize + nullArrayLength)));
                     }
                 }
             } finally {
