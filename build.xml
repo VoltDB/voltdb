@@ -943,6 +943,7 @@ CLEANING
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
 
+  <delete dir="${build.calcite.dir}" quiet="true"/>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
   </exec>
@@ -1223,6 +1224,7 @@ JAVA COMPILATION
    <copy tofile="${lib.dir}/calcite-server-1.17.0-sources.jar" file="${build.calcite.dir}/server/target/calcite-server-1.18.0-SNAPSHOT-sources.jar"/>
    <copy tofile="${lib.dir}/calcite-linq4j-1.17.0.jar" file="${build.calcite.dir}/linq4j/target/calcite-linq4j-1.18.0-SNAPSHOT.jar"/>
    <copy tofile="${lib.dir}/calcite-linq4j-1.17.0-sources.jar" file="${build.calcite.dir}/linq4j/target/calcite-linq4j-1.18.0-SNAPSHOT-sources.jar"/>
+   <delete dir="${build.calcite.dir}"/>
    <echo message="Calcite jar refreshed." />
 </target>
 
