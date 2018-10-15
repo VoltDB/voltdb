@@ -683,9 +683,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Truncating to txnId: " + TxnEgo.txnIdToString(truncationPoint));
-                    }
                     m_tupleCount = sequenceNumber;
                     if (isRecover) {
                         if (truncationPoint == null) {
@@ -694,6 +691,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         else {
                             m_committedBuffers.truncateToTxnId(truncationPoint);
+                            if (exportLog.isDebugEnabled()) {
+                                exportLog.debug("Truncating to txnId: " + TxnEgo.txnIdToString(truncationPoint));
+                            }
                         }
                     }
                 } catch (Throwable t) {
