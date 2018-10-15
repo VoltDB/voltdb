@@ -74,7 +74,7 @@ public class StoredProcedureInvocation implements JSONString {
         copy.originalUniqueId = originalUniqueId;
         if (serializedParams != null)
         {
-            copy.serializedParams = serializedParams.duplicate();
+            copy.serializedParams = serializedParams.duplicate().order(serializedParams.order());
         }
         else
         {
@@ -270,7 +270,7 @@ public class StoredProcedureInvocation implements JSONString {
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
         serializedParams = in.remainder();
-        final ByteBuffer duplicate = serializedParams.duplicate();
+        final ByteBuffer duplicate = serializedParams.duplicate().order(serializedParams.order());
         params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {
