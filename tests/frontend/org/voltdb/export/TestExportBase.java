@@ -23,7 +23,14 @@
 
 package org.voltdb.export;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.Socket;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
@@ -38,6 +45,8 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertAddedTable;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertBase;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.RollbackInsert;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update_Export;
+
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 public class TestExportBase extends RegressionSuite {
 
@@ -286,9 +295,94 @@ public class TestExportBase extends RegressionSuite {
         assertTrue(passed);
     }
 
+    protected void exportVerify(boolean exact, int expsize) {
+        assertTrue(m_seenIds.size() > 0);
+        long st = System.currentTimeMillis();
+        //Wait 2 mins only
+        long end = System.currentTimeMillis() + (2 * 60 * 1000);
+        boolean passed = false;
+        while (true) {
+            boolean passedThisTime = true;
+            for (Entry<Long, AtomicLong> l : m_seenIds.entrySet()) {
+                //If we have seen at least expectedTimes number
+                if (exact) {
+                    if (l.getValue().longValue() != m_copies) {
+                        System.out.println("[Exact] Invalid id: " + l.getKey() + " Count: " + l.getValue().longValue());
+                        passedThisTime = false;
+                        break;
+                    }
+                }
+            }
+            if (passedThisTime) {
+                passed = true;
+                break;
+            }
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                System.out.println("Waited too long...");
+                break;
+            }
+            if (ctime - st > (3 * 60 * 1000)) {
+                st = System.currentTimeMillis();
+            }
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException ex) {
+
+            }
+            System.out.println("Failed this time wait for socket export to arrive.");
+        }
+        System.out.println("Seen Id size is: " + m_seenIds.size() + " expected:" + expsize + " Passed: " + passed);
+        assertTrue(m_seenIds.size() == expsize);
+        assertTrue(passed);
+    }
 
     public TestExportBase(String s) {
         super(s);
     }
 
+    protected final ConcurrentMap<Long, AtomicLong> m_seenIds = new ConcurrentHashMap<Long, AtomicLong>();
+    protected int m_copies = 3;
+    public class ClientConnectionHandler extends Thread {
+        private final Socket m_clientSocket;
+        private boolean m_closed = false;
+        final CSVParser m_parser = new CSVParser();
+        public ClientConnectionHandler(Socket clientSocket) {
+            m_clientSocket = clientSocket;
+        }
+
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    BufferedReader in = new BufferedReader(
+                            new InputStreamReader(m_clientSocket.getInputStream()));
+                    while (true) {
+                        String line = in.readLine();
+                        //You should convert your data to params here.
+                        if (line == null && m_closed) {
+                            break;
+                        }
+                        if (line == null) continue;
+                        String parts[] = m_parser.parseLine(line);
+                        if (parts == null) {
+                            continue;
+                        }
+                        Long i = Long.parseLong(parts[0]);
+                        if (m_seenIds.putIfAbsent(i, new AtomicLong(1)) != null) {
+                            synchronized(m_seenIds) {
+                                m_seenIds.get(i).incrementAndGet();
+                            }
+                        }
+                    }
+                    m_clientSocket.close();
+                }
+            } catch (IOException ioe) {
+            }
+        }
+
+        public void stopClient() {
+            m_closed = true;
+        }
+    }
 }

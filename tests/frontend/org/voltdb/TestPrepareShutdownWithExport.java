@@ -23,10 +23,8 @@
 
 package org.voltdb;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -34,12 +32,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
-
 import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -51,13 +44,10 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.utils.VoltFile;
 
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
-
 public class TestPrepareShutdownWithExport extends TestExportBase
 {
     private ServerListener m_serverSocket;
     private final List<ClientConnectionHandler> m_clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
-    private final ConcurrentMap<Long, AtomicLong> m_seenIds = new ConcurrentHashMap<Long, AtomicLong>();
 
     public TestPrepareShutdownWithExport(String name) {
         super(name);
@@ -90,7 +80,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
 
         //push out export buffer and verify if there are any export queue.
         waitForStreamedAllocatedMemoryZero(client2);
-        exportVerify(false, 3, 10000);
+        exportVerify(false, 10000);
 
         for (ClientConnectionHandler s : m_clients) {
             s.stopClient();
@@ -156,47 +146,6 @@ public class TestPrepareShutdownWithExport extends TestExportBase
         return builder;
     }
 
-    private void exportVerify(boolean exact, int copies, int expsize) {
-        assertTrue(m_seenIds.size() > 0);
-        long st = System.currentTimeMillis();
-        //Wait 2 mins only
-        long end = System.currentTimeMillis() + (2 * 60 * 1000);
-        boolean passed = false;
-        while (true) {
-            boolean passedThisTime = true;
-            for (Entry<Long, AtomicLong> l : m_seenIds.entrySet()) {
-                //If we have seen at least expectedTimes number
-                if (exact) {
-                    if (l.getValue().longValue() != copies) {
-                        System.out.println("[Exact] Invalid id: " + l.getKey() + " Count: " + l.getValue().longValue());
-                        passedThisTime = false;
-                        break;
-                    }
-                }
-            }
-            if (passedThisTime) {
-                passed = true;
-                break;
-            }
-            long ctime = System.currentTimeMillis();
-            if (ctime > end) {
-                System.out.println("Waited too long...");
-                break;
-            }
-            if (ctime - st > (3 * 60 * 1000)) {
-                st = System.currentTimeMillis();
-            }
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException ex) {
-
-            }
-            System.out.println("Failed this time wait for socket export to arrive.");
-        }
-        assertTrue(m_seenIds.size() == expsize);
-        System.out.println("Seen Id size is: " + m_seenIds.size() + " Passed: " + passed);
-        assertTrue(passed);
-    }
     class ServerListener extends Thread {
         private ServerSocket ssocket;
         private boolean shuttingDown = false;
@@ -226,49 +175,6 @@ public class TestPrepareShutdownWithExport extends TestExportBase
                     break;
                 }
             }
-        }
-    }
-
-   class ClientConnectionHandler extends Thread {
-        private final Socket m_clientSocket;
-        private boolean m_closed = false;
-        final CSVParser m_parser = new CSVParser();
-        public ClientConnectionHandler(Socket clientSocket) {
-            m_clientSocket = clientSocket;
-        }
-
-        @Override
-        public void run() {
-            try {
-                while (true) {
-                    BufferedReader in = new BufferedReader(
-                            new InputStreamReader(m_clientSocket.getInputStream()));
-                    while (true) {
-                        String line = in.readLine();
-                        //You should convert your data to params here.
-                        if (line == null && m_closed) {
-                            break;
-                        }
-                        if (line == null) continue;
-                        String parts[] = m_parser.parseLine(line);
-                        if (parts == null) {
-                            continue;
-                        }
-                        Long i = Long.parseLong(parts[0]);
-                        if (m_seenIds.putIfAbsent(i, new AtomicLong(1)) != null) {
-                            synchronized(m_seenIds) {
-                                m_seenIds.get(i).incrementAndGet();
-                            }
-                        }
-                    }
-                    m_clientSocket.close();
-                }
-            } catch (IOException ioe) {
-            }
-        }
-
-        public void stopClient() {
-            m_closed = true;
         }
     }
 }
