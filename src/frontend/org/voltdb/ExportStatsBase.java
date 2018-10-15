@@ -33,9 +33,10 @@ public class ExportStatsBase extends StatsSource {
         public final long m_tuplesPending;
         public final long m_averageLatency;
         public final long m_maxLatency;
+        public final long m_gapCount;
         public final String m_status;
         public ExportStatsRow(int partitionId, int siteId, String streamName, String exportTarget,
-                long tupleCount, long tuplesPending, long averageLatency, long maxLatency, String status) {
+                long tupleCount, long tuplesPending, long averageLatency, long maxLatency, long gapCount, String status) {
             m_partitionId = partitionId;
             m_siteId = siteId;
             m_streamName = streamName;
@@ -44,6 +45,7 @@ public class ExportStatsBase extends StatsSource {
             m_tuplesPending = tuplesPending > 0 ? tuplesPending : 0;
             m_averageLatency = averageLatency;
             m_maxLatency = maxLatency;
+            m_gapCount = gapCount;
             m_status = status;
         }
     }
@@ -63,6 +65,7 @@ public class ExportStatsBase extends StatsSource {
         public static final String TUPLE_PENDING = "TUPLE_PENDING";
         public static final String AVERAGE_LATENCY = "AVERAGE_LATENCY";
         public static final String MAX_LATENCY = "MAX_LATENCY";
+        public static final String GAP_COUNT = "GAP_COUNT";
         public static final String STATUS = "STATUS";
     }
 
@@ -82,6 +85,7 @@ public class ExportStatsBase extends StatsSource {
         columns.add(new ColumnInfo(Columns.TUPLE_PENDING, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.AVERAGE_LATENCY, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.MAX_LATENCY, VoltType.BIGINT));
+        columns.add(new ColumnInfo(Columns.GAP_COUNT, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.STATUS, VoltType.STRING));
     }
 
