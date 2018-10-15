@@ -724,11 +724,13 @@ public class ParserBase {
         expressionTypeMap.put(Tokens.VAR_SAMP, OpTypes.VAR_SAMP);
         expressionTypeMap.put(Tokens.RANK, OpTypes.WINDOWED_RANK);
         expressionTypeMap.put(Tokens.DENSE_RANK, OpTypes.WINDOWED_DENSE_RANK);
+        expressionTypeMap.put(Tokens.ROW_NUMBER, OpTypes.WINDOWED_ROW_NUMBER);
         // Windowed aggregate operators go here
         // as well as in the expression type map
         // above.
         windowedExpressionTypeMap.put(Tokens.RANK, OpTypes.WINDOWED_RANK);
         windowedExpressionTypeMap.put(Tokens.DENSE_RANK, OpTypes.WINDOWED_DENSE_RANK);
+        windowedExpressionTypeMap.put(Tokens.ROW_NUMBER, OpTypes.WINDOWED_ROW_NUMBER);
         windowedExpressionTypeMap.put(Tokens.COUNT, OpTypes.WINDOWED_COUNT);
         windowedExpressionTypeMap.put(Tokens.MIN, OpTypes.WINDOWED_MIN);
         windowedExpressionTypeMap.put(Tokens.MAX, OpTypes.WINDOWED_MAX);

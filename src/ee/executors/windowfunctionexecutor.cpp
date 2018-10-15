@@ -122,6 +122,15 @@ struct WindowAggregate {
     }
 
     /**
+     * Do calculations after row insertion to end the current row and start the
+     * next row.
+     */
+    virtual void endRow(TableWindow &window,
+                          WindowFunctionExecutor::EdgeType edgeType) {
+        ;
+    }
+
+    /**
      * Calculate the final value for the output tuple.
      */
     virtual NValue finalize(ValueType type)
@@ -204,6 +213,33 @@ public:
         m_orderByPeerIncrement = ValueFactory::getBigIntValue(window.m_orderByGroupSize);
     }
     ~WindowedRankAgg() {
+    }
+};
+
+/**
+ * Row number returns a unique number for each row starting with 1.
+ */
+class WindowedRowNumberAgg : public WindowAggregate {
+public:
+    WindowedRowNumberAgg() {
+        m_value = ValueFactory::getBigIntValue(1);
+        m_needsLookahead = false;
+    }
+
+    virtual ~WindowedRowNumberAgg() {
+    }
+
+    virtual const char *getAggName() const {
+        return "ROW_NUMBER";
+    }
+
+    virtual void endRow(TableWindow &window, WindowFunctionExecutor::EdgeType etype) {
+        m_value = m_value.op_add(m_one);
+    }
+
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        m_value = ValueFactory::getBigIntValue(1);
     }
 };
 
@@ -465,6 +501,9 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK:
         answer = new (memoryPool) WindowedDenseRankAgg();
         break;
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_ROW_NUMBER:
+        answer = new (memoryPool) WindowedRowNumberAgg();
+        break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT:
         answer = new (memoryPool) WindowedCountAgg();
         break;
@@ -527,6 +566,13 @@ inline void WindowFunctionExecutor::endGroupForAggs(TableWindow &tableWindow, Ed
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         aggs[ii]->endGroup(tableWindow, edgeType);
+    }
+}
+
+inline void WindowFunctionExecutor::endRowForAggs(TableWindow &tableWindow, EdgeType edgeType) {
+    WindowAggregate** aggs = m_aggregateRow->getAggregates();
+    for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        aggs[ii]->endRow(tableWindow, edgeType);
     }
 }
 
@@ -652,6 +698,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
             m_pmp->countdownProgress();
             m_aggregateRow->recordPassThroughTuple(nextTuple);
             insertOutputTuple();
+            endRowForAggs(tableWindow, etype);
         }
         endGroupForAggs(tableWindow, etype);
         VOLT_TRACE("FirstEdge: %s", tableWindow.debug().c_str());

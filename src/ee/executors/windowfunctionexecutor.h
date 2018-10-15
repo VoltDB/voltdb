@@ -200,6 +200,13 @@ private:
      * for each group and cannot be disabled.
      */
     void endGroupForAggs(TableWindow &tableWindow, EdgeType edgeType);
+
+    /**
+    * Call endRow for each column after insertion to output tuple.  This will happen
+    * for each row and cannot be disabled.
+    */
+    void endRowForAggs(TableWindow &tableWindow, EdgeType edgeType);
+
     /**
      * Insert the output tuple.
      */
