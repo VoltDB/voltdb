@@ -23,7 +23,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
-    "V_P2": {
+    "V_P2_NCS": {
         "columns": (("V_G1", FastSerializer.VOLTTYPE_INTEGER),
                     ("V_G2", FastSerializer.VOLTTYPE_INTEGER),
                     ("V_CNT", FastSerializer.VOLTTYPE_INTEGER),
@@ -31,7 +31,7 @@
                     ("V_SUM_RENT", FastSerializer.VOLTTYPE_INTEGER),
         ),
     },
-    "V_R2_ABS": {
+    "V_R2_NCS": {
         "columns": (("V_G1", FastSerializer.VOLTTYPE_INTEGER),
                     ("V_G2", FastSerializer.VOLTTYPE_INTEGER),
                     ("V_CNT", FastSerializer.VOLTTYPE_INTEGER),
@@ -39,7 +39,7 @@
                     ("V_SUM_RENT", FastSerializer.VOLTTYPE_INTEGER),
         ),
     },
-    "V_R2": {
+    "V_R2_ABS_NCS": {
         "columns": (("V_G1", FastSerializer.VOLTTYPE_INTEGER),
                     ("V_G2", FastSerializer.VOLTTYPE_INTEGER),
                     ("V_CNT", FastSerializer.VOLTTYPE_INTEGER),
