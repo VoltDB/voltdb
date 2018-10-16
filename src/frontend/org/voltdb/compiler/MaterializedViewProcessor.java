@@ -465,7 +465,7 @@ public class MaterializedViewProcessor {
      * @param compiler The VoltCompiler
      * @throws VoltCompilerException
      */
-    private void checkViewSources(ArrayList<Table> tableList) throws VoltCompilerException {
+    private void checkViewSources(List<Table> tableList) throws VoltCompilerException {
         HashSet<String> tableSet = new HashSet<>();
         for (Table tbl : tableList) {
             if (! tableSet.add(tbl.getTypeName())) {

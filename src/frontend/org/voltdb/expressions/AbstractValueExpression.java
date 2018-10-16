@@ -32,7 +32,7 @@ public abstract class AbstractValueExpression extends AbstractExpression {
     // This works on the assumption that it is only used to return final "leaf node" bindingLists that
     // are never updated "in place", but just get their contents dumped into a summary List that was created
     // inline and NOT initialized here.
-    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<AbstractExpression>();
+    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<>();
 
     public AbstractValueExpression() {
         // This is needed for serialization

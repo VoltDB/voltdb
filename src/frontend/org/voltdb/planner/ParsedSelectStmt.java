@@ -50,11 +50,11 @@ import org.voltdb.types.JoinType;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
-    public ArrayList<ParsedColInfo> m_displayColumns = new ArrayList<>();
-    private ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<>();
+    public List<ParsedColInfo> m_displayColumns = new ArrayList<>();
+    private List<ParsedColInfo> m_orderColumns = new ArrayList<>();
     private AbstractExpression m_having = null;
     private List<ParsedColInfo> m_groupByColumns = new ArrayList<>();
-    private ArrayList<ParsedColInfo> m_distinctGroupByColumns = null;
+    private List<ParsedColInfo> m_distinctGroupByColumns = null;
     private boolean m_groupAndOrderByPermutationWasTested = false;
     private boolean m_groupAndOrderByPermutationResult = false;
 
@@ -67,15 +67,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // This list contains the core information for aggregation.
     // It collects aggregate expression, group by expression from display columns,
     // group by columns, having, order by columns.
-    public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<>();
+    public List<ParsedColInfo> m_aggResultColumns = new ArrayList<>();
     // It represents the group by expression and replace TVE if it's complex group by.
     public Map<String, AbstractExpression> m_groupByExpressions = null;
 
-    private ArrayList<ParsedColInfo> m_avgPushdownDisplayColumns = null;
-    private ArrayList<ParsedColInfo> m_avgPushdownAggResultColumns = null;
+    private List<ParsedColInfo> m_avgPushdownDisplayColumns = null;
+    private List<ParsedColInfo> m_avgPushdownAggResultColumns = null;
     private List<ParsedColInfo> m_avgPushdownGroupByColumns = null;
-    private ArrayList<ParsedColInfo> m_avgPushdownDistinctGroupByColumns = null;
-    private ArrayList<ParsedColInfo> m_avgPushdownOrderColumns = null;
+    private List<ParsedColInfo> m_avgPushdownDistinctGroupByColumns = null;
+    private List<ParsedColInfo> m_avgPushdownOrderColumns = null;
     private AbstractExpression m_avgPushdownHaving = null;
     private NodeSchema m_avgPushdownProjectSchema;
     private NodeSchema m_avgPushdownFinalProjectSchema;
@@ -99,7 +99,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return m_limit != -1 || m_limitParameterId != -1;
         }
 
-        public boolean hasOffset() {
+        private boolean hasOffset() {
             return m_offset > 0 || m_offsetParameterId != -1;
         }
 
@@ -110,7 +110,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return false;
         }
 
-        public boolean hasLimitOrOffsetParameters() {
+        private boolean hasLimitOrOffsetParameters() {
             return m_limitParameterId != -1 || m_offsetParameterId != -1;
         }
 
@@ -130,8 +130,24 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return m_offset;
         }
 
-        public long getLimitParameterId () {
+        private long getLimitParameterId () {
             return m_limitParameterId;
+        }
+
+        /**
+         * Set the limit node when the predicate evaluates to false.
+         * This is the remnant of expression normalizer that I want to keep around.
+         */
+        void setFalse() {
+            m_limitNodeTop = new LimitPlanNode();
+            getLimitNodeTop().setLimit(-1);
+            getLimitNodeTop().setOffset(0);
+            getLimitNodeTop().setLimitParameterIndex(0);
+            m_limitNodeDist = new LimitPlanNode();
+            m_limitNodeDist.setLimit(-1);
+            m_limitNodeDist.setOffset(0);
+            m_limitParameterId = 1;
+            m_limitCanPushdown = true;
         }
     }
 
@@ -147,7 +163,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean m_hasLargeNumberOfTableJoins = false;
     // this list is the join order either from the user or parser if it has large number of table joins.
-    private final ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
+    private final List<JoinNode> m_joinOrderList = new ArrayList<>();
     private boolean m_hasPartitionColumnsInWindowedAggregates = false;
     // If this statement is the query for a materialized view, and
     // some expression has operations which are unsafe to create
@@ -216,9 +232,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     @Override
-    void parse(VoltXMLElement stmtNode) {
-        String node;
-        if ((node = stmtNode.attributes.get("distinct")) != null) {
+    void parse(VoltXMLElement stmtNode) {       // TODO: to enable elimination of excessive projections in query like "SELECT a + b - a FROM foo ORDER BY a + b - a;",
+        String node;                            // we have to do the expression normalization piece-by-piece in this function. Doing it after parse() had been called
+        if ((node = stmtNode.attributes.get("distinct")) != null) { // is too late, as temp table, etc. are already replaced with.
             m_distinct = Boolean.parseBoolean(node);
         }
 
@@ -328,15 +344,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             VoltXMLElement groupbyElement, VoltXMLElement havingElement,
             VoltXMLElement orderbyElement) {
 
-        ArrayList<ParsedColInfo> tmpDisplayColumns = m_displayColumns;
+        List<ParsedColInfo> tmpDisplayColumns = m_displayColumns;
         m_displayColumns = new ArrayList<>();
-        ArrayList<ParsedColInfo> tmpAggResultColumns = m_aggResultColumns;
+        List<ParsedColInfo> tmpAggResultColumns = m_aggResultColumns;
         m_aggResultColumns = new ArrayList<>();
         List<ParsedColInfo> tmpGroupByColumns = m_groupByColumns;
         m_groupByColumns = new ArrayList<>();
-        ArrayList<ParsedColInfo> tmpDistinctGroupByColumns = m_distinctGroupByColumns;
+        List<ParsedColInfo> tmpDistinctGroupByColumns = m_distinctGroupByColumns;
         m_distinctGroupByColumns = new ArrayList<>();
-        ArrayList<ParsedColInfo> tmpOrderColumns = m_orderColumns;
+        List<ParsedColInfo> tmpOrderColumns = m_orderColumns;
         m_orderColumns = new ArrayList<>();
         AbstractExpression tmpHaving = m_having;
 
@@ -1554,7 +1570,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_joinOrder != null || m_hasLargeNumberOfTableJoins;
     }
 
-    public ArrayList<JoinNode> getJoinOrder() {
+    public List<JoinNode> getJoinOrder() {
         return m_joinOrderList;
     }
 

@@ -28,6 +28,8 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.VoltTypeUtil;
 
+import java.util.Comparator;
+
 /**
  *
  */
@@ -39,10 +41,70 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
 
     protected String m_value = null;
-    protected boolean m_isNull = true;
+    private boolean m_isNull = true;
 
     public ConstantValueExpression() {
         super(ExpressionType.VALUE_CONSTANT);
+    }
+    public ConstantValueExpression(String value, VoltType type) {
+        super(ExpressionType.VALUE_CONSTANT);
+        m_value = value;
+        m_valueType = type;
+        m_isNull = false;
+        setValueSize(type.getLengthInBytesForFixedTypes());
+    }
+    public ConstantValueExpression(float val) {
+        this(Float.toString(val), VoltType.FLOAT);
+    }
+    public ConstantValueExpression(double val) {
+        this(Double.toString(val), VoltType.FLOAT);
+    }
+    public ConstantValueExpression(int val) {
+        this(Integer.toString(val), VoltType.INTEGER);
+    }
+    public ConstantValueExpression(String content, int size) {
+        this();
+        setValue(content);
+        setValueSize(size);
+        setValueType(VoltType.STRING);
+        m_isNull = false;
+    }
+
+    @Override
+    public int compareTo(AbstractExpression other) {
+        if (other instanceof ConstantValueExpression) {
+            return Comparator.comparing(ConstantValueExpression::getValue,
+                    Comparator.nullsLast(Comparator.naturalOrder()))
+                    .compare(this, (ConstantValueExpression) other);
+        } else if (other instanceof ParameterValueExpression) {
+            final ConstantValueExpression o = ((ParameterValueExpression) other).getOriginalValue();
+            return o == null ? 1 :
+                    Comparator.comparing(ConstantValueExpression::getValue,
+                            Comparator.nullsLast(Comparator.naturalOrder()))
+                            .compare(this, o);
+        } else {
+            return super.compareTo(other);
+        }
+    }
+
+    @Override
+    public boolean equivalent(AbstractExpression other) {
+        if (other instanceof ConstantValueExpression) {
+            if (m_isNull != ((ConstantValueExpression) other).m_isNull) {
+                return false;
+            } else if (equals(other)) {
+                return true;
+            } else if (getValueType().isNumber() && other.getValueType().isNumber()) {
+                return Double.valueOf(getValue())           // Special treatment of different number constants: as long as
+                        .equals(Double.valueOf(((ConstantValueExpression) other).getValue()));  // their values match
+            } else {
+                return false;
+            }
+        } else if (other instanceof ParameterValueExpression) {
+            return equivalent(((ParameterValueExpression) other).getOriginalValue());
+        } else {
+            return false;
+        }
     }
 
     @Override
@@ -529,6 +591,10 @@ public class ConstantValueExpression extends AbstractValueExpression {
     */
    public static boolean isBooleanFalse(AbstractExpression expr) {
        return isBooleanValue(expr, Boolean.FALSE);
+   }
+
+   public static boolean isBooleanValue(AbstractExpression expr) {
+       return isBooleanTrue(expr) || isBooleanFalse(expr);
    }
 
    private static boolean isBooleanValue(AbstractExpression expr, Boolean value) {

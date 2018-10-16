@@ -42,9 +42,9 @@ public class AggregateExpression extends AbstractExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if(super.equals(obj) == false) return false;
+        if(! super.equals(obj)) return false;
 
-        if (obj instanceof AggregateExpression == false) return false;
+        if (! (obj instanceof AggregateExpression)) return false;
         AggregateExpression expr = (AggregateExpression) obj;
         if (m_distinct != expr.isDistinct()) return false;
         return true;

@@ -164,10 +164,9 @@ public class TestMVOptimization extends PlannerTestCase {
     public void testComplexGbyExpr() {  // test complex GBY expressions
         checkQueriesPlansAreTheSame("SELECT a * 2 + a1, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a * 2 + a1, b - a;",
                 "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4");
-        // negative test: equivalent but different expression
-        checkQueriesPlansAreDifferent("SELECT a1 + a * 2, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a1 + a * 2, b - a;",
-                "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4",
-                "GBY expression equivalent but different: should not match view");
+        // equivalent but different GBY expression
+        checkQueriesPlansAreTheSame("SELECT a1 + a * 2, b - a, SUM(a1), MIN(b1), COUNT(*) FROM t1 GROUP BY a1 + a * 2, b - a;",
+                "SELECT a2pa1, b_minus_a, sum_a1, min_b1, counts FROM v4");
         // negative tests: SELECT stmt's display column contains aggregates on its group by column
         // Future improvements should rewrite the expression to match MV.
         assertMatch("SELECT ABS(WAGE), COUNT(*), MAX(ID), SUM(RENT), MIN(AGE),  COUNT(DEPT) FROM P2 M02  GROUP BY WAGE",

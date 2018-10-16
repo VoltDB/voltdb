@@ -20,20 +20,20 @@ package org.voltdb.planner;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
-import java.util.function.UnaryOperator;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
 import org.voltcore.utils.Pair;
 
 import org.voltdb.catalog.*;
+import org.voltdb.planner.optimizer.EquivalentExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.expressions.*;
 import org.json_voltpatches.JSONException;
-import scala.Int;
 
 /**
  * Tries to find a matching materialized view for the given SELECT statement, and rewrite the query.
@@ -181,53 +181,19 @@ final class MVQueryRewriter {
     private boolean gbyTablesEqual(MaterializedViewInfo mv) {
         if (m_selectStmt.hasComplexGroupby() != mv.getGroupbyexpressionsjson().isEmpty()) {
             if (m_selectStmt.hasComplexGroupby()) {     // when both have complex GBY expressions, anonymize table/column of SEL stmt and compare the two expressions.
-                final Set<AbstractExpression>
+                final Set<EquivalentExpression>
                         selGby = m_selectStmt.groupByColumns().stream()
                         .map(ci -> transformExpressionRidofPVE(ci.m_expression).anonymize())
-                        .collect(Collectors.toSet()),
-                        viewGby = new HashSet<>(getGbyExpressions(mv));
-                return selGby.equals(viewGby) &&        // NOTE: as TVE's equal() method misses column index comparison,
-                        // which is almost the whole point, and we need to do the checking here. This is quite hacky, but
-                        // is the only way to do it here.
-                        selGby.stream().map(MVQueryRewriter::extractTVEIndices).collect(Collectors.toSet()).equals(
-                                viewGby.stream().map(MVQueryRewriter::extractTVEIndices).collect(Collectors.toSet()));
+                        .map(EquivalentExpression::new)
+                        .collect(Collectors.toCollection(TreeSet::new)),
+                        viewGby = EquivalentExpression.toSet(getGbyExpressions(mv));
+                return selGby.equals(viewGby);        // NOTE: TVE's equal() method misses column index comparison; but equivalent() does not.
             } else {    // when neither has complex GBY expression, we already know that GBY table names match, since
                 return true;    // we are only checking SELECT query from a single table.
             }
         } else {        // unequal when one has complex gby and the other doesn't
             return false;
         }
-    }
-
-    /**
-     * Helper method to extract all TVE column indices from an expression.
-     * @param e source expression to check/extract
-     * @param accum accumulator
-     * @return accumulated indices.
-     */
-    private static List<Integer> extractTVEIndices(AbstractExpression e, List<Integer> accum) {
-        if (e != null) {
-            if (e instanceof TupleValueExpression) {
-                accum.add(((TupleValueExpression) e).getColumnIndex());
-            } else {
-                extractTVEIndices(e.getRight(), extractTVEIndices(e.getLeft(), accum));
-                if (e.getArgs() != null) {
-                    e.getArgs().forEach(ex -> extractTVEIndices(ex, accum));
-                }
-            }
-        }
-        return accum;
-    }
-
-    /**
-     * Map/extract all internal TVE's column indices in the order of left, right, args.
-     * This is quite hacky, but we need to do it here because the equal() method in TVE does not compare the
-     * column index, which is the whole point of comparing two TVEs.
-     * @param e expression
-     * @return All TVE indices inside expression, e.g. when e is a TVE, a function with TVE arg(s), a VVE with TVEs, etc.
-     */
-    private static List<Integer> extractTVEIndices(AbstractExpression e) {
-        return extractTVEIndices(e, new ArrayList<>());
     }
 
     private boolean gbyColumnsMatch(MaterializedViewInfo mv) {
@@ -294,14 +260,17 @@ final class MVQueryRewriter {
                 m_selectStmt.hasComplexGroupby() ? getGbyExpressions(mv) : new ArrayList<>(); //  when it contains complex GBY expression.
         // Assertion that both MV and SELECT stmt have same group-by expressions. This is guaranteed by caller in gbyMatchers()
         // method, which is guaranteed by calling gbyTablesEqual() method.
-        assert(new HashSet<>(mvGbys).equals(m_selectStmt.hasComplexGroupby() ?
-                m_selectStmt.getGroupByColumns().stream()
-                        .map(ci -> transformExpressionRidofPVE(ci.m_expression).anonymize())
-                        .collect(Collectors.toSet()) : new HashSet<>()));              // warranted by precondition (gbyMatcher() caller).
+        assert(EquivalentExpression.toSet(mvGbys).equals(
+                m_selectStmt.hasComplexGroupby() ?
+                        EquivalentExpression.toSet(m_selectStmt.getGroupByColumns().stream()
+                                .map(ci -> transformExpressionRidofPVE(ci.m_expression).anonymize())
+                                .collect(Collectors.toSet())) :
+                        new TreeSet<>()));              // warranted by precondition (gbyMatcher() caller).
         final Map<Integer, Integer> selGbyColIndexMap = // SELECT stmt GBY column index ==> VIEW table column index
                 m_selectStmt.displayColumns().stream().flatMap(ci -> {
                     // find index of a SELECT's GBY expression into MV's GBY expression
-                    final int index = mvGbys.indexOf(transformExpressionRidofPVE(ci.m_expression).anonymize());
+                    final int index = EquivalentExpression.indexOf(mvGbys,
+                            transformExpressionRidofPVE(ci.m_expression).anonymize());
                     return index >= 0 ?     // mark index only for GBY expressions.
                             Stream.of(new AbstractMap.SimpleEntry<>(ci.m_index, index)) : Stream.empty();
                 }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));

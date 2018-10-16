@@ -30,6 +30,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AccessPath;
+import org.voltdb.planner.optimizer.ExpressionNormalizer;
 import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
@@ -49,12 +50,12 @@ public abstract class JoinNode implements Cloneable {
     protected AbstractExpression m_whereExpr = null;
 
     // Buckets for children expression classification
-    public final ArrayList<AbstractExpression> m_joinOuterList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_joinInnerList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_joinInnerOuterList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_whereOuterList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_whereInnerList = new ArrayList<>();
-    public final ArrayList<AbstractExpression> m_whereInnerOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_joinOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_joinInnerList = new ArrayList<>();
+    public final List<AbstractExpression> m_joinInnerOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_whereOuterList = new ArrayList<>();
+    public final List<AbstractExpression> m_whereInnerList = new ArrayList<>();
+    public final List<AbstractExpression> m_whereInnerOuterList = new ArrayList<>();
 
     // All possible access paths for this node
     public List<AccessPath> m_accessPaths = new ArrayList<>();

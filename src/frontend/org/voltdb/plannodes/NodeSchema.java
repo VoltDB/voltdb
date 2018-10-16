@@ -17,15 +17,7 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
@@ -150,7 +142,7 @@ public class NodeSchema implements Iterable<SchemaColumn> {
      * @return a list of the columns in this schema.  These columns will be
      * in the order in which they will appear at the output of this node.
      */
-    private ArrayList<SchemaColumn> getColumns() {
+    private List<SchemaColumn> getColumns() {
         return m_columns;
     }
 

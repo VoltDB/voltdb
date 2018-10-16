@@ -45,11 +45,39 @@ public class OperatorExpression extends AbstractExpression {
         super(type, left, right);
     }
 
+    /*
+     * Finalizes value type in addition. Should only be used inside planner.optimizer.*.
+     */
+    public OperatorExpression(ExpressionType type, AbstractExpression left, AbstractExpression right, int ignored) {
+        super(type, left, right);
+        finalizeValueTypes();
+    }
+
     public OperatorExpression() {
         //
         // This is needed for serialization
         //
         super();
+    }
+
+    @Override
+    public boolean equivalent(AbstractExpression other) {
+        if (getExpressionType().equals(other.getExpressionType())) {
+            if (needsRightExpression()) {
+                switch (getExpressionType()) {
+                    case OPERATOR_PLUS:
+                    case OPERATOR_MULTIPLY:
+                        return getLeft().equivalent(other.getLeft()) && getRight().equivalent(other.getRight()) ||
+                                getLeft().equivalent(other.getRight()) && getRight().equivalent(other.getLeft());
+                    default:
+                        return getLeft().equivalent(other.getLeft()) && getRight().equivalent(other.getRight());
+                }
+            } else {
+                return getLeft().equivalent(other.getLeft());
+            }
+        } else {
+            return false;
+        }
     }
 
     @Override
@@ -89,14 +117,13 @@ public class OperatorExpression extends AbstractExpression {
         m_valueSize = cast_type.getLengthInBytesForFixedTypes();
     }
 
+
     @Override
     public void refineValueType(VoltType neededType, int neededSize)
     {
         if (! needsRightExpression()) {
             return;
-        }
-
-        if (getExpressionType() == ExpressionType.OPERATOR_CASE_WHEN) {
+        } else if (getExpressionType() == ExpressionType.OPERATOR_CASE_WHEN) {
             assert(m_right.getExpressionType() == ExpressionType.OPERATOR_ALTERNATIVE);
             m_right.refineValueType(neededType, neededSize);
             m_valueType = m_right.getValueType();
@@ -115,15 +142,14 @@ public class OperatorExpression extends AbstractExpression {
         if (operandType.isBackendIntegerType()) {
             operandType = VoltType.BIGINT;
         }
-        VoltType leftType = m_left.getValueType();
-        VoltType rightType = m_right.getValueType();
+        final VoltType leftType = m_left.getValueType();
+        final VoltType rightType = m_right.getValueType();
         if (leftType == VoltType.FLOAT || rightType == VoltType.FLOAT) {
             operandType = VoltType.FLOAT;
         }
-        else if (operandType != VoltType.FLOAT) {
-            if (leftType == VoltType.DECIMAL || rightType == VoltType.DECIMAL) {
-                operandType = VoltType.DECIMAL;
-            }
+        else if (operandType != VoltType.FLOAT &&
+                (leftType == VoltType.DECIMAL || rightType == VoltType.DECIMAL)) {
+            operandType = VoltType.DECIMAL;
         }
         m_left.refineOperandType(operandType);
         m_right.refineOperandType(operandType);
@@ -173,28 +199,26 @@ public class OperatorExpression extends AbstractExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        ExpressionType type = getExpressionType();
-        if (type == ExpressionType.OPERATOR_IS_NULL) {
-            return "(" + m_left.explain(impliedTableName) + " IS NULL)";
+        switch (getExpressionType()) {
+            case OPERATOR_IS_NULL:
+                return "(" + m_left.explain(impliedTableName) + " IS NULL)";
+            case OPERATOR_NOT:
+                return "(NOT " + m_left.explain(impliedTableName) + ")";
+            case OPERATOR_CAST:
+                return "(CAST (" + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + "))";
+            case OPERATOR_EXISTS:
+                return "(EXISTS " + m_left.explain(impliedTableName) + ")";
+            case OPERATOR_UNARY_MINUS:
+                return "(- " + m_left.explain(impliedTableName) + ")";
+            case OPERATOR_CASE_WHEN:
+                return "(CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
+                        m_right.m_left.explain(impliedTableName) + " ELSE " +
+                        m_right.m_right.explain(impliedTableName) + " END)";
+            default:
+                return "(" + m_left.explain(impliedTableName) +
+                        " " + getExpressionType().symbol() + " " +
+                        m_right.explain(impliedTableName) + ")";
         }
-        if (type == ExpressionType.OPERATOR_NOT) {
-            return "(NOT " + m_left.explain(impliedTableName) + ")";
-        }
-        if (type == ExpressionType.OPERATOR_CAST) {
-            return "(CAST (" + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + "))";
-        }
-
-        if (type == ExpressionType.OPERATOR_EXISTS) {
-            return "(EXISTS " + m_left.explain(impliedTableName) + ")";
-        }
-        if (type == ExpressionType.OPERATOR_CASE_WHEN) {
-            return "(CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
-                    m_right.m_left.explain(impliedTableName) + " ELSE " +
-                    m_right.m_right.explain(impliedTableName) + " END)";
-        }
-        return "(" + m_left.explain(impliedTableName) +
-            " " + type.symbol() + " " +
-            m_right.explain(impliedTableName) + ")";
     }
 
     @Override
