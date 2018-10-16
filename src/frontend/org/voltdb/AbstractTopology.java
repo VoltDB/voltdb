@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -27,13 +28,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableSet;
+import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -41,11 +44,13 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.messaging.HostMessenger.HostInfo;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Splitter;
+import com.google_voltpatches.common.collect.Collections2;
+import com.google_voltpatches.common.collect.ComparisonChain;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Iterables;
 import com.google_voltpatches.common.collect.LinkedListMultimap;
-import com.google_voltpatches.common.collect.Lists;
-import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
 
@@ -57,25 +62,25 @@ public class AbstractTopology {
     public final static String TOPO_MASTER = "master";
     public final static String TOPO_REPLICA = "replicas";
     public final static String TOPO_HOST_ID = "host_id";
-    public final static String TOPO_KFACTOR = "kfactor";
     public final static String TOPO_VERSION = "version";
-    public final static String TOPO_HAGROUPS = "haGroups";
     public final static String TOPO_HAGROUP = "haGroup";
     public final static String TOPO_HOSTS = "hosts";
-    public final static String TOPO_HOST = "host";
     public final static String TOPO_HOST_MISSING = "missing";
     public final static String TOPO_SITES_PER_HOST = "sitesPerHost";
     public final static String TOPO_REPLICATION_FACTOR = "replicationFactor";
+    public final static String TOPO_UNBALANCED_PART_COUNT = "unbalancedPartitionCount";
 
     public final static String PLACEMENT_GROUP_DEFAULT="0";
 
     public final long version;
-    public final int replicationFactor;
-    public final int sitesPerHost;
+    public final int m_replicationFactor;
+    public final int m_sitesPerHost;
+    public final int m_unbalancedPartitionCount;
     public final ImmutableMap<Integer, Host> hostsById;
     public final ImmutableMap<Integer, Partition> partitionsById;
 
-    public static final AbstractTopology EMPTY_TOPOLOGY = new AbstractTopology(0, new TreeSet<>(), -1, -1);
+    public static final AbstractTopology EMPTY_TOPOLOGY = new AbstractTopology(0, ImmutableMap.of(), ImmutableMap.of(),
+            -1, -1, 0);
 
     /////////////////////////////////////
     //
@@ -116,12 +121,12 @@ public class AbstractTopology {
             int id = json.getInt(TOPO_PARTITION_ID);
             int leaderHostId = json.getInt(TOPO_MASTER);
 
-            List<Integer> mutableHostIds = new ArrayList<>();
+            ImmutableSortedSet.Builder<Integer> builder = ImmutableSortedSet.naturalOrder();
             JSONArray jsonHostIds = json.getJSONArray(TOPO_REPLICA);
             for (int i = 0; i < jsonHostIds.length(); i++) {
-                mutableHostIds.add(jsonHostIds.getInt(i));
+                builder.add(jsonHostIds.getInt(i));
             }
-            return new Partition(id, leaderHostId, mutableHostIds);
+            return new Partition(id, leaderHostId, builder.build());
         }
 
         @Override
@@ -130,87 +135,36 @@ public class AbstractTopology {
         }
     }
 
-    public static class HAGroup implements Comparable<HAGroup> {
-        public final String token;
-        public final ImmutableSortedSet<Integer> hostIds;
-
-        private HAGroup(String token, int[] hostIds) {
-            this.token = token;
-            Integer[] hostIdsInteger = ArrayUtils.toObject(hostIds);
-            this.hostIds = ImmutableSortedSet.copyOf(hostIdsInteger);
-        }
-
-        @Override
-        public String toString() {
-            String[] hostIdStrings = hostIds.stream().map(id -> id.toString()).toArray(String[]::new);
-            return String.format("HAGroup %s (Hosts %s)", token, String.join(",", hostIdStrings));
-        }
-
-        private void toJSON(JSONStringer stringer) throws JSONException {
-            stringer.object();
-            stringer.key("token").value(token);
-            stringer.key(TOPO_HOST).array();
-            for (int hostId : hostIds) {
-                stringer.value(hostId);
-            }
-            stringer.endArray();
-            stringer.endObject();
-        }
-
-        private static HAGroup fromJSON(JSONObject json) throws JSONException {
-            String token = json.getString("token");
-            JSONArray jsonHosts = json.getJSONArray(TOPO_HOST);
-            int[] hostIds = new int[jsonHosts.length()];
-            for (int i = 0; i < jsonHosts.length(); i++) {
-                hostIds[i] = jsonHosts.getInt(i);
-            }
-            return new HAGroup(token, hostIds);
-        }
-
-        @Override
-        public int compareTo(HAGroup o) {
-            return this.token.compareTo(o.token);
-        }
-
-        // test if two leaf HA groups share part of the path
-        public boolean shareAcenstry(HAGroup another) {
-            if (this == another) {
-                return true;
-            }
-            String[] tokens = this.token.split("\\.");
-            String[] anotherTokens = another.token.split("\\.");
-
-            String[] token1, token2;
-            if (tokens.length <= anotherTokens.length) {
-                token1 = tokens;
-                token2 = anotherTokens;
-            } else {
-                token1 = anotherTokens;
-                token2 = tokens;
-            }
-            int sharedPaths = 0;
-            for (int i = 0; i < token1.length; i++) {
-                if (!token1[i].equals(token2[i])) {
-                    break;
-                }
-                sharedPaths++;
-            }
-            if (sharedPaths > 0) {
-                return true;
-            }
-            return false;
-        }
-    }
-
     public static class Host implements Comparable<Host> {
         public final int id;
-        public final HAGroup haGroup;
+        public final String haGroup;
         public final ImmutableSortedSet<Partition> partitions;
 
-        //a flag indicating if the host is missing or not
-        public boolean isMissing = false;
+        public final boolean isMissing;
 
-        private Host(int id, HAGroup haGroup, Collection<Partition> partitions) {
+        private Host(Host oldHost, int newId, Map<Integer, Partition> allPartitions) {
+            ImmutableSortedSet.Builder<Partition> builder = ImmutableSortedSet.naturalOrder();
+            for (Partition p : oldHost.partitions) {
+                builder.add(allPartitions.get(p.id));
+            }
+            id = newId;
+            haGroup = oldHost.haGroup;
+            partitions = builder.build();
+            isMissing = false;
+        }
+
+        private Host(HostBuilder hostBuilder, Map<Integer, Partition> allPartitions) {
+            ImmutableSortedSet.Builder<Partition> builder = ImmutableSortedSet.naturalOrder();
+            for (PartitionBuilder pb : hostBuilder.m_partitions) {
+                builder.add(allPartitions.get(pb.m_id));
+            }
+            id = hostBuilder.m_id;
+            haGroup = hostBuilder.m_haGroup;
+            partitions = builder.build();
+            isMissing = hostBuilder.m_missing;
+        }
+
+        private Host(int id, String haGroup, ImmutableSortedSet<Partition> partitions, boolean missing) {
             assert(id >= 0);
             assert(haGroup != null);
             assert(partitions != null);
@@ -218,18 +172,14 @@ public class AbstractTopology {
 
             this.id = id;
             this.haGroup = haGroup;
-            this.partitions = ImmutableSortedSet.copyOf(partitions);
+            this.partitions = partitions;
+            this.isMissing = missing;
         }
 
-        public List<Integer> getSortedPartitionIdList() {
+        public List<Integer> getPartitionIdList() {
             return partitions.stream()
                     .map(p -> p.id)
-                    .sorted()
                     .collect(Collectors.toList());
-        }
-
-        public void markHostMissing(boolean isMissing) {
-            this.isMissing = isMissing;
         }
 
         public int getleaderCount() {
@@ -246,13 +196,13 @@ public class AbstractTopology {
         public String toString() {
             String[] partitionIdStrings = partitions.stream().map(p -> String.valueOf(p.id)).toArray(String[]::new);
             return String.format("Host %d sph:%d ha:%s (Partitions %s)",
-                    id, haGroup.token, String.join(",", partitionIdStrings));
+                    id, haGroup, String.join(",", partitionIdStrings));
         }
 
         private void toJSON(JSONStringer stringer) throws JSONException {
             stringer.object();
             stringer.key(TOPO_HOST_ID).value(id);
-            stringer.key(TOPO_HAGROUP).value(haGroup.token);
+            stringer.key(TOPO_HAGROUP).value(haGroup);
             stringer.key(TOPO_HOST_MISSING).value(isMissing);
             stringer.key(TOPO_PARTITIONS).array();
             for (Partition partition : partitions) {
@@ -262,23 +212,17 @@ public class AbstractTopology {
             stringer.endObject();
         }
 
-        private static Host fromJSON(
-                JSONObject json,
-                final Map<String, HAGroup> haGroupsByToken,
-                final Map<Integer, Partition> partitionsById)
-                        throws JSONException
-        {
+        private static Host fromJSON(JSONObject json, final Map<Integer, Partition> partitionsById)
+                throws JSONException {
             int id = json.getInt(TOPO_HOST_ID);
             String haGroupToken = json.getString(TOPO_HAGROUP);
-            HAGroup haGroup = haGroupsByToken.get(haGroupToken);
             JSONArray jsonPartitions = json.getJSONArray(TOPO_PARTITIONS);
-            ArrayList<Partition> partitions = new ArrayList<>();
+            ImmutableSortedSet.Builder<Partition> partitionBuilder = ImmutableSortedSet.naturalOrder();
             for (int i = 0; i < jsonPartitions.length(); i++) {
                 int partitionId = jsonPartitions.getInt(i);
-                partitions.add(partitionsById.get(partitionId));
+                partitionBuilder.add(partitionsById.get(partitionId));
             }
-            Host host = new Host(id, haGroup, partitions);
-            host.markHostMissing(json.getBoolean(TOPO_HOST_MISSING));
+            Host host = new Host(id, haGroupToken, partitionBuilder.build(), json.getBoolean(TOPO_HOST_MISSING));
             return host;
         }
 
@@ -294,69 +238,624 @@ public class AbstractTopology {
     //
     /////////////////////////////////////
 
-    private static class MutablePartition implements Comparable<MutablePartition> {
-        final int id;
-        final Set<MutableHost> hosts = new TreeSet<>();
-        MutableHost leader = null;
+    /**
+     * Checks whether or not a partition is considered to be balanced in relation to the ha groups in which it resides.
+     */
+    private interface BalancedPartitionChecker {
+        /**
+         * @param partition {@link PartitionBuilder} to test
+         * @return {@code true} if the partition is properly balanced across ha groups
+         */
+        boolean isBalanced(PartitionBuilder partition);
+    }
 
-        MutablePartition(int id) {
-            this.id = id;
+    /**
+     * Selects the hosts to be part of a protection group. Taking in consideration the ha group layout for the cluster.
+     */
+    private interface ProtectionGroupSelector {
+        /**
+         * Request the next protection group from the selector with {@code size} nodes in the group
+         *
+         * @param size number of nodes that should be in the next protection group
+         * @return an array of {@link HostBuilder}
+         */
+        HostBuilder[] getNextProtectionGroup(int size, int maxMissing);
+
+        /**
+         * @return a {@link BalancedPartitionChecker} implementation which works with this selector implementation
+         */
+        BalancedPartitionChecker getBalancedPartitionChecker();
+    }
+
+    /**
+     * Implementation of {@link BalancedPartitionChecker} which checks that the hosts which on which a partition reside
+     * are in a minimum number of unique host groups
+     */
+    private static final class MinimumGroupBalancedPartitionChecker implements BalancedPartitionChecker {
+        final int m_minimumGroupCount;
+
+        public MinimumGroupBalancedPartitionChecker(int numberOfGroups, int replicaCount) {
+            super();
+            this.m_minimumGroupCount = numberOfGroups >= replicaCount ? replicaCount : 2;
         }
 
         @Override
-        public int compareTo(MutablePartition o) {
-            return (id - o.id);
-        }
-
-        @Override
-        public String toString() {
-            String[] hostIdStrings = hosts.stream().map(h -> String.valueOf(h.id)).toArray(String[]::new);
-            return String.format("Partition %d (leader %d, hosts %s)", id, leader == null ? -1 : leader.id, String.join(",", hostIdStrings));
+        public boolean isBalanced(PartitionBuilder partition) {
+            return partition.m_hosts.stream().map(h -> h.m_haGroup).distinct().count() >= m_minimumGroupCount;
         }
     }
 
-    private static class MutableHost implements Comparable<MutableHost> {
-        final int id;
-        int targetSiteCount;
-        //a flag indicating if the host is missing or not
-        boolean isMissing = false;
-        HAGroup haGroup;
-        Set<MutablePartition> partitions = new TreeSet<MutablePartition>();
+    /**
+     * A simple implementation of {@link ProtectionGroupSelector} where there is only one ha group. With only one group
+     * the hosts can just be pulled from the group one after the other. Also, because there is only one group the
+     * partitions are considered to be balanced.
+     */
+    private static class SingleGroupProtectionGroupSelector implements ProtectionGroupSelector {
+        final HAGroup m_haGroup;
 
-        MutableHost(int id, int targetSiteCount, HAGroup haGroup) {
-            this.id = id;
-            this.targetSiteCount = targetSiteCount;
-            this.haGroup = haGroup;
-        }
-
-        int freeSpace() {
-            return Math.max(targetSiteCount - partitions.size(), 0);
-        }
-
-        /** Count the number of partitions that consider this host a leader */
-        int leaderCount() {
-            return (int) partitions.stream().filter(p -> p.leader == this).count();
-        }
-
-        public void markHostMissing(boolean isMissing) {
-            this.isMissing = isMissing;
-        }
-
-        public boolean isAbsent() {
-            return isMissing;
+        SingleGroupProtectionGroupSelector(HAGroup group) {
+            super();
+            this.m_haGroup = group;
         }
 
         @Override
-        public int compareTo(MutableHost o) {
-            return (id - o.id);
+        public HostBuilder[] getNextProtectionGroup(int size, int maxMissing) {
+            HostBuilder[] hostBuilders = new HostBuilder[size];
+            for (int i = 0; i < size; ++i) {
+                hostBuilders[i] = m_haGroup.pollHost(maxMissing > 0);
+                if (hostBuilders[i].m_missing) {
+                    --maxMissing;
+                }
+            }
+            return hostBuilders;
+        }
+
+        @Override
+        public BalancedPartitionChecker getBalancedPartitionChecker() {
+            return p -> true;
+        }
+    }
+
+    /**
+     * An implementation of {@link ProtectionGroupSelector} which handles the case that there are multple ha groups but
+     * they are all the same distance away from each other. This means that all groups are equal and there is no reason
+     * to favor selection from one group over another.
+     * <p>
+     * Groups are stored in a queue and removed from the queue until {@code size} of group is met or queue is empty.
+     * When the queue is empty the already used groups are put back in the queue to be selected again.
+     */
+    private static class EqualDistantHaGroupsProtectionGroupSelector implements ProtectionGroupSelector {
+        final NavigableSet<HAGroup> m_groups = new TreeSet<>();
+        final BalancedPartitionChecker m_balancedPartitionChecker;
+
+        EqualDistantHaGroupsProtectionGroupSelector(Collection<HAGroup> groups, int replicaCount) {
+            m_groups.addAll(groups);
+            m_balancedPartitionChecker = new MinimumGroupBalancedPartitionChecker(groups.size(), replicaCount);
+        }
+
+        @Override
+        public HostBuilder[] getNextProtectionGroup(int size, int maxMissing) {
+            HostBuilder[] hostBuilders = new HostBuilder[size];
+            List<HAGroup> usedGroups = new ArrayList<>(size);
+
+            for (int i = 0; i < size; ++i) {
+                do {
+                    if (m_groups.isEmpty()) {
+                        returnGroups(usedGroups);
+                    }
+                    HAGroup group = m_groups.pollFirst();
+                    usedGroups.add(group);
+                    hostBuilders[i] = group.pollHost(maxMissing > 0);
+                } while (hostBuilders[i] == null);
+                if (hostBuilders[i].m_missing) {
+                    --maxMissing;
+                }
+            }
+
+            returnGroups(usedGroups);
+
+            return hostBuilders;
+        }
+
+        @Override
+        public BalancedPartitionChecker getBalancedPartitionChecker() {
+            return m_balancedPartitionChecker;
+        }
+
+        private void returnGroups(List<HAGroup> usedGroups) {
+            for (HAGroup group : usedGroups) {
+                if (!group.isEmpty()) {
+                    m_groups.add(group);
+                }
+            }
+            usedGroups.clear();
+        }
+    }
+
+    /**
+     * A complex {@link ProtectionGroupSelector} which handles multiple ha groups with varying distances and overlapping
+     * ancestry.
+     * <p>
+     * The distance and shared ancestry is calculated for every pair of groups and then the groups are sorted by the
+     * distance to the farthest group. The group with the smallest max is then selected to provide the first node. This
+     * makes it so that the group in the "middle" is chosen.
+     * <p>
+     * Each time a group is chosen the distance from it to other groups and the ancestry overlap is accumulated and the
+     * group that has the highest distance and the lowest ancestry overlap is chosen as the next group. This is repeated
+     * until {@code size} groups have been selected.
+     */
+    private static class ComplexHaGroupsProtectionGroupSelector implements ProtectionGroupSelector {
+        final NavigableSet<HAGroupWithRelationships> m_groupRelationships = new TreeSet<>();
+        final Map<String, HAGroupRelationship> m_eligibleGroupsByToken = new HashMap<>();
+        final BalancedPartitionChecker m_balancedPartitionChecker;
+
+        ComplexHaGroupsProtectionGroupSelector(Collection<HAGroup> groups, int replicaCount) {
+            List<HAGroupWithRelationships> tempGroups = new ArrayList<>(groups.size());
+            for (HAGroup newGroup : groups) {
+                HAGroupWithRelationships newGroupDistances = new HAGroupWithRelationships(newGroup);
+                for (HAGroupWithRelationships otherGroup : tempGroups) {
+                    HAGroupWithRelationships.associateGroups(newGroupDistances, otherGroup);
+                }
+                tempGroups.add(newGroupDistances);
+                m_eligibleGroupsByToken.put(newGroup.m_token,
+                        new HAGroupRelationship(newGroupDistances, new RelationshipDescription(0, 0)));
+            }
+            m_groupRelationships.addAll(tempGroups);
+            m_balancedPartitionChecker = new MinimumGroupBalancedPartitionChecker(groups.size(), replicaCount);
+        }
+
+        @Override
+        public HostBuilder[] getNextProtectionGroup(int size, int maxMissing) {
+            HostBuilder[] hostBuilders = new HostBuilder[size];
+
+            do {
+                hostBuilders[0] = getHostFromGroup(m_groupRelationships.first(), false);
+            } while (hostBuilders[0] == null);
+
+            for (int i = 1; i < size; ++i) {
+                do {
+                    HAGroupWithRelationships group = m_eligibleGroupsByToken.values().stream()
+                            .max(Comparator.naturalOrder()).get().m_groupWithRelationships;
+                    hostBuilders[i] = getHostFromGroup(group, maxMissing > 0);
+                } while (hostBuilders[i] == null);
+
+                if (hostBuilders[i].m_missing) {
+                    --maxMissing;
+                }
+            }
+
+            for (HAGroupRelationship group : m_eligibleGroupsByToken.values()) {
+                group.m_relationship.m_distance = 0;
+                group.m_relationship.m_sharedAncestry = 0;
+            }
+
+            return hostBuilders;
+        }
+
+        @Override
+        public BalancedPartitionChecker getBalancedPartitionChecker() {
+            return m_balancedPartitionChecker;
+        }
+
+        /**
+         * Retrieves the next {@link HostBuilder} from {@code group} which is available for partitions. Also, handles
+         * when groups run out of hosts.
+         * <p>
+         * This lazily cleans up empty groups by first removing them from {@link #m_eligibleGroupsByToken} and
+         * {@link #m_groupRelationships} and then the removal is detected by other groups when they are selected and the
+         * distances are to be added to the groups in {@link #m_eligibleGroupsByToken}
+         *
+         * @param group {@link HAGroupWithRelationships} from which to retrieve a host
+         * @return next {@link HostBuilder} from {@code group}
+         */
+        private HostBuilder getHostFromGroup(HAGroupWithRelationships group, boolean allowMissing) {
+            Iterator<HAGroupRelationship> distanceIter = group.m_distances.iterator();
+
+            m_groupRelationships.remove(group);
+
+            while (distanceIter.hasNext()) {
+                HAGroupRelationship distance = distanceIter.next();
+                HAGroupRelationship accumulator = m_eligibleGroupsByToken.get(distance.getGroupToken());
+                if (accumulator == null) {
+                    distanceIter.remove();
+                } else {
+                    accumulator.m_relationship.m_distance += distance.m_relationship.m_distance;
+                    accumulator.m_relationship.m_sharedAncestry += distance.m_relationship.m_sharedAncestry;
+                }
+            }
+
+            HostBuilder host = group.m_group.pollHost(allowMissing);
+            if (group.m_group.isEmpty()) {
+                m_eligibleGroupsByToken.remove(group.m_group.m_token);
+            } else {
+                m_groupRelationships.add(group);
+            }
+            return host;
+        }
+
+        /**
+         * Helper class which associates a {@link HAGroupWithRelationships} with the distance and shared parents count
+         * relative to some other group or used for running accumulation.
+         */
+        static final class HAGroupRelationship implements Comparable<HAGroupRelationship> {
+            final HAGroupWithRelationships m_groupWithRelationships;
+            final RelationshipDescription m_relationship;
+
+            HAGroupRelationship(HAGroupWithRelationships group, RelationshipDescription relationship) {
+                m_groupWithRelationships = group;
+                m_relationship = relationship;
+            }
+
+            String getGroupToken() {
+                return m_groupWithRelationships.m_group.m_token;
+            }
+
+            @Override
+            public int compareTo(HAGroupRelationship o) {
+                return o == this ? 0
+                        : ComparisonChain.start().compare(m_relationship, o.m_relationship)
+                                .compare(m_groupWithRelationships.m_group, o.m_groupWithRelationships.m_group).result();
+            }
+        }
+
+        /**
+         * Tracks the {@link HAGroupRelationship} between a given group and all of the other eligible groups in the system.
+         */
+        static final class HAGroupWithRelationships implements Comparable<HAGroupWithRelationships> {
+            final HAGroup m_group;
+            final NavigableSet<HAGroupRelationship> m_distances = new TreeSet<>();
+
+            static void associateGroups(HAGroupWithRelationships group1, HAGroupWithRelationships group2) {
+                RelationshipDescription relationship = group1.m_group.getRelationshipTo(group2.m_group);
+
+                group1.addRelationship(group2, relationship);
+                group2.addRelationship(group1, relationship);
+            }
+
+            HAGroupWithRelationships(HAGroup m_group) {
+                this.m_group = m_group;
+
+                // Add this so that the accumulator sets shared ancestry high for this group to avoid being selected
+                addRelationship(this, new RelationshipDescription(0, 1024));
+            }
+
+            void addRelationship(HAGroupWithRelationships group, RelationshipDescription relationship) {
+                m_distances.add(new HAGroupRelationship(group, relationship));
+            }
+
+            @Override
+            public int compareTo(HAGroupWithRelationships o) {
+                return o == this ? 0
+                        : ComparisonChain.start()
+                                .compare(m_distances.last().m_relationship, o.m_distances.last().m_relationship)
+                                .compare(m_group, o.m_group).result();
+            }
+        }
+    }
+
+    /**
+     * Builder class for {@link Partition}
+     */
+    private static final class PartitionBuilder implements Comparable<PartitionBuilder> {
+        final Integer m_id;
+        final Set<HostBuilder> m_hosts = new HashSet<>();
+        HostBuilder m_leader = null;
+
+        PartitionBuilder(Integer id) {
+            this.m_id = id;
+        }
+
+        Partition build() {
+            return new Partition(m_id, m_leader.m_id, Collections2.transform(m_hosts, h -> h.m_id));
+        }
+
+        @Override
+        public int compareTo(PartitionBuilder o) {
+            return m_id.compareTo(o.m_id);
         }
 
         @Override
         public String toString() {
-            String[] partitionIdStrings = partitions.stream().map(p -> String.valueOf(p.id)).toArray(String[]::new);
-            return String.format("Host %d sph:%d ha:%s (Partitions %s)",
-                    id, targetSiteCount, haGroup.token, String.join(",", partitionIdStrings));
+            String[] hostIdStrings = m_hosts.stream().map(h -> String.valueOf(h.m_id)).toArray(String[]::new);
+            return String.format("Partition %d (leader %d, hosts %s)", m_id, m_leader == null ? -1 : m_leader.m_id,
+                    String.join(",", hostIdStrings));
         }
+    }
+
+    /**
+     * Builder class for {@link Host}
+     */
+    private static class HostBuilder implements Comparable<HostBuilder> {
+        final Integer m_id;
+        // a flag indicating if the host is missing or not
+        final boolean m_missing;
+        final String m_haGroup;
+        final String m_ipAddress;
+        final Set<PartitionBuilder> m_partitions = new TreeSet<>();
+        int m_ledPartitionCount = 0;
+
+        HostBuilder(Integer id, HostInfo info, boolean missing) {
+            this.m_id = id;
+            this.m_haGroup = info.m_group;
+            this.m_ipAddress = info.m_hostIp;
+            this.m_missing = missing;
+        }
+
+        @Override
+        public int compareTo(HostBuilder o) {
+            return m_ipAddress.compareTo(o.m_ipAddress);
+        }
+
+        @Override
+        public String toString() {
+            String[] partitionIdStrings = m_partitions.stream().map(p -> String.valueOf(p.m_id)).toArray(String[]::new);
+            return String.format("Host %d ha:%s (Partitions %s)", m_id, m_haGroup, String.join(",", partitionIdStrings));
+        }
+    }
+
+    private static final class RelationshipDescription implements Comparable<RelationshipDescription> {
+        int m_distance;
+        int m_sharedAncestry;
+
+        public RelationshipDescription(int distance, int sharedAncestry) {
+            super();
+            m_distance = distance;
+            m_sharedAncestry = sharedAncestry;
+        }
+
+        @Override
+        public int compareTo(RelationshipDescription o) {
+            return ComparisonChain.start().compare(m_distance, o.m_distance)
+                    .compare(o.m_sharedAncestry, m_sharedAncestry).result();
+        }
+    }
+
+    /**
+     * Class to represent an ha group. Used by {@link TopologyBuilder} to construct a {@link AbstractTopology}. Keeps
+     * track of which hosts are eligible for partition selection within the group.
+     */
+    private static class HAGroup implements Comparable<HAGroup> {
+        final static Splitter GROUP_SPLITTER = Splitter.on('.');
+
+        final String m_token;
+        final List<String> m_tokenParts;
+        private final Queue<HostBuilder> m_hosts = new PriorityQueue<>();
+        private final Queue<HostBuilder> m_missingHosts = new ArrayDeque<>();
+
+        HAGroup(String token) {
+            super();
+            this.m_token = token;
+            this.m_tokenParts = GROUP_SPLITTER.splitToList(token);
+        }
+
+        RelationshipDescription getRelationshipTo(HAGroup other) {
+            int size = Math.min(m_tokenParts.size(), other.m_tokenParts.size());
+            int sharedAncestry = 0;
+            while (sharedAncestry < size) {
+                if (!m_tokenParts.get(sharedAncestry).equals(other.m_tokenParts.get(sharedAncestry))) {
+                    break;
+                }
+                sharedAncestry++;
+            }
+
+            // distance is the sum of the two diverting path lengths
+            int distance = m_tokenParts.size() + other.m_tokenParts.size() - 2 * sharedAncestry;
+
+            return new RelationshipDescription(distance, sharedAncestry);
+        }
+
+        void addHost(HostBuilder host) {
+            if (host.m_missing) {
+                m_missingHosts.offer(host);
+            } else {
+                m_hosts.offer(host);
+            }
+        }
+
+        HostBuilder pollHost(boolean allowMissing) {
+            return allowMissing && !m_missingHosts.isEmpty() ? m_missingHosts.poll() : m_hosts.poll();
+        }
+
+        boolean isEmpty() {
+            return m_hosts.isEmpty() && m_missingHosts.isEmpty();
+        }
+
+        int size() {
+            return m_hosts.size() + m_missingHosts.size();
+        }
+
+        @Override
+        public int hashCode() {
+            return m_token.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            HAGroup other = (HAGroup) obj;
+            return m_token.equals(other.m_token);
+        }
+
+        @Override
+        public int compareTo(HAGroup o) {
+            return ComparisonChain.start().compare(size(), o.size()).compare(m_token, o.m_token)
+                    .result();
+        }
+    }
+
+    /**
+     * Builder class for {@link AbstractTopology}. Determines which partitions should be placed on which hosts. Hosts
+     * are grouped together into protection groups. Each group is as small as possible with the larger groups attempted
+     * to be selected first and contain the partitions with the lowest IDs.
+     */
+    private static class TopologyBuilder {
+        final List<HostBuilder> m_hosts;
+        final List<PartitionBuilder> m_partitions;
+        final int m_replicaCount;
+        final int m_sitesPerHost;
+        final ProtectionGroupSelector m_selector;
+        int m_missingCount;
+        int m_unbalancedPartitionCount = 0;
+
+        TopologyBuilder(Map<Integer, HostInfo> hosts, Set<Integer> missingHosts, int firstPartitionId,
+                int replicaCount) {
+            m_hosts = new ArrayList<>(hosts.size());
+            m_replicaCount = replicaCount;
+            m_missingCount = missingHosts.size();
+            int sitesPerHost = -1;
+
+            // Convert hosts passed in to HostBuilder and build the ha groups
+            boolean equalDistance = true;
+            int lastDistance = -1;
+            Map<String, HAGroup> groups = new HashMap<>();
+            for (Map.Entry<Integer, HostInfo> entry : hosts.entrySet()) {
+                HostInfo hostInfo = entry.getValue();
+                if (sitesPerHost == -1) {
+                    sitesPerHost = hostInfo.m_localSitesCount;
+                } else if (sitesPerHost != hostInfo.m_localSitesCount) {
+                    throw new RuntimeException("Not all hosts have the same site count: " + hosts);
+                }
+                HAGroup group = groups.get(hostInfo.m_group);
+                if (group == null) {
+                    group = new HAGroup(hostInfo.m_group);
+                    if (equalDistance) {
+                        for (HAGroup neighbor : groups.values()) {
+                            int distance = group.getRelationshipTo(neighbor).m_distance;
+                            if (lastDistance == -1) {
+                                lastDistance = distance;
+                            } else if (lastDistance != distance) {
+                                equalDistance = false;
+                                break;
+                            }
+                        }
+                    }
+                    groups.put(hostInfo.m_group, group);
+                }
+                Integer hostId = entry.getKey();
+                HostBuilder host = new HostBuilder(hostId, hostInfo, missingHosts.contains(hostId));
+                group.addHost(host);
+                m_hosts.add(host);
+            }
+
+            m_sitesPerHost = sitesPerHost;
+
+            if (hosts.size() < replicaCount) {
+                throw new RuntimeException(String.format("System requesting %d replicas "
+                        + "but there are only %d eligable hosts on which to place them. " + "Topology request invalid.",
+                        replicaCount, hosts.size()));
+            }
+
+            // Populate the list of partitions in reverse order so that the highest partition IDs are given out first
+            final int partitionsCount = sitesPerHost * hosts.size() / replicaCount;
+            m_partitions = new ArrayList<>(partitionsCount);
+            for (int i = firstPartitionId + partitionsCount - 1; i >= firstPartitionId; --i) {
+                m_partitions.add(new PartitionBuilder(i));
+            }
+            assert (m_partitions.size() == partitionsCount);
+
+            // Select the ProtectionGroupSelector based on the ha groups
+            if (groups.size() == 1) {
+                m_selector = new SingleGroupProtectionGroupSelector(groups.values().iterator().next());
+            } else if (equalDistance) {
+                m_selector = new EqualDistantHaGroupsProtectionGroupSelector(groups.values(), replicaCount);
+            } else {
+                m_selector = new ComplexHaGroupsProtectionGroupSelector(groups.values(), replicaCount);
+            }
+        }
+
+        /**
+         * Distribute the partitions out to the hosts in this topology builder.
+         *
+         * @return {@code this}
+         */
+        TopologyBuilder addPartitionsToHosts() {
+            int hostsNotInAGroup = m_hosts.size();
+            Iterator<PartitionBuilder> partitionIter = m_partitions.iterator();
+            BalancedPartitionChecker bpc = m_selector.getBalancedPartitionChecker();
+
+            while (partitionIter.hasNext()) {
+                int protectionGoupCount = (hostsNotInAGroup / m_replicaCount);
+                /*
+                 * Calculate how many hosts should be in each group. Ideally this is replica count but with some host
+                 * counts, sites per host and replica count values that is not possible. When it isn't possible try to
+                 * make the groups as small as possible with the largest groups selected last to have the partitions
+                 * with the lowest IDs
+                 */
+                int hostsInGroup = m_replicaCount
+                        + ((hostsNotInAGroup % m_replicaCount) / protectionGoupCount);
+
+                // Keep adding hosts to group until the number of sites it can hold is a multiple of m_replicaCount
+                while (hostsInGroup < hostsNotInAGroup && hostsInGroup * m_sitesPerHost % m_replicaCount != 0) {
+                    ++hostsInGroup;
+                }
+
+                /*
+                 * If there are not enough hosts left to make a new group toss them in this group.
+                 */
+                hostsNotInAGroup -= hostsInGroup;
+                if (hostsNotInAGroup > 0 && hostsNotInAGroup < m_replicaCount) {
+                    hostsInGroup += hostsNotInAGroup;
+                }
+
+                int maxMissing = m_missingCount / protectionGoupCount;
+                if (maxMissing >= hostsInGroup) {
+                    throw new RuntimeException("Too many missing hosts for configuration");
+                }
+
+                HostBuilder[] protectionGroup = m_selector.getNextProtectionGroup(hostsInGroup, maxMissing);
+                int partitionsInGroup = hostsInGroup * m_sitesPerHost / m_replicaCount;
+
+                if (maxMissing > 0) {
+                    for (HostBuilder host : protectionGroup) {
+                        if (host.m_missing) {
+                            --m_missingCount;
+                        }
+                    }
+                }
+
+                int counter = 0;
+                List<HostBuilder> eligibleLeaders = new ArrayList<>(m_replicaCount);
+                for (int i = 0; i < partitionsInGroup; ++i) {
+                    PartitionBuilder partition = partitionIter.next();
+                    for (int j = 0; j < m_replicaCount; ++j) {
+                        HostBuilder host = protectionGroup[counter++ % hostsInGroup];
+                        host.m_partitions.add(partition);
+                        partition.m_hosts.add(host);
+                        if (!host.m_missing) {
+                            eligibleLeaders.add(host);
+                        }
+                    }
+
+                    if (!bpc.isBalanced(partition)) {
+                        ++m_unbalancedPartitionCount;
+                    }
+
+                    partition.m_leader = eligibleLeaders.stream()
+                            .min((h1, h2) -> Integer.compare(h1.m_ledPartitionCount, h2.m_ledPartitionCount)).get();
+                    ++partition.m_leader.m_ledPartitionCount;
+                    eligibleLeaders.clear();
+                }
+            }
+
+            return this;
+        }
+
+        int getReplicationFactor() {
+            return m_replicaCount - 1;
+        }
+    }
+
+    private static TopologyBuilder addPartitionsToHosts(Map<Integer, HostInfo> hostInfos, Set<Integer> missingHosts,
+            int kfactor, int firstPartitionId) {
+        return new TopologyBuilder(hostInfos, missingHosts, firstPartitionId, kfactor + 1).addPartitionsToHosts();
     }
 
     /////////////////////////////////////
@@ -365,185 +864,94 @@ public class AbstractTopology {
     //
     /////////////////////////////////////
 
-    public static AbstractTopology mutateAddHosts(AbstractTopology currentTopology,
-            Map<Integer, HostInfo> hosts)
-    {
-        // validate input
-        assert(currentTopology != null);
-
-        // validate no duplicate host ids
-        if (!Collections.disjoint(hosts.keySet(), currentTopology.hostsById.keySet())) {
-            throw new RuntimeException("New hosts must contain unique and unused hostid.");
-        }
-
-        // for now, just add empty nodes to the topology -- not much else to do here
-
-        // get immutable HAGroups - these are fixed by user command line
-        final HAGroup[] haGroups = getHAGroupsForHosts(currentTopology, hosts);
-
-        int sitesPerHost = currentTopology.getSitesPerHost();
-
-        // build the full set of immutable hosts, using the HAGroups
-        Set<Host> fullHostSet = new TreeSet<>();
-        for (HAGroup haGroup : haGroups) {
-            for (int hostId : haGroup.hostIds) {
-                Host currentHost = currentTopology.hostsById.get(hostId);
-                Host newHost = null;
-                if (currentHost != null) {
-                    newHost = new Host(hostId, haGroup, currentHost.partitions);
-                } else {
-                    HostInfo hostInfo = hosts.get(hostId);
-                    assert (hostInfo != null);
-                    if (sitesPerHost == -1) {
-                        sitesPerHost = hostInfo.m_localSitesCount;
-                    } else if (hostInfo.m_localSitesCount != sitesPerHost) {
-                        throw new RuntimeException(
-                                "Not all hosts have the same site count: " + currentTopology.hostsById + " " + hosts);
-                    }
-                    newHost = new Host(hostId, haGroup, new TreeSet<>());
-                }
-                fullHostSet.add(newHost);
-            }
-        }
-        return new AbstractTopology(currentTopology.version + 1, fullHostSet, sitesPerHost,
-                currentTopology.getReplicationFactor());
-    }
-
-    public static AbstractTopology mutateAddPartitionsToEmptyHosts(AbstractTopology currentTopology,
-            Set<Integer> missingHosts, int kfactor) {
-        // validate input
-        assert(currentTopology != null);
-
-        /////////////////////////////////
-        // convert all hosts to mutable hosts to add partitions and sites
-        /////////////////////////////////
-        final Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
-        final Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
-        convertTopologyToMutables(currentTopology, mutableHostMap, mutablePartitionMap);
-
-        // get max used site and partition ids so new ones will be unique
+    /**
+     * Add new hosts to an existing topology and layout partitions on those hosts
+     *
+     * @param currentTopology to extend
+     * @param newHostInfos    new hosts to add to topology
+     * @return update {@link AbstractTopology} with new hosts
+     * @throws RuntimeException if hosts are not valid for topology
+     */
+    public static AbstractTopology mutateAddNewHosts(AbstractTopology currentTopology,
+            Map<Integer, HostInfo> newHostInfos) {
         int largestPartitionId = getNextFreePartitionId(currentTopology);
 
-        /////////////////////////////////
-        // find eligible mutable hosts (those without any partitions and with sph > 0)
-        /////////////////////////////////
-        Map<Integer, MutableHost> eligibleHosts = new HashMap<>();
-        int totalSites = 0;
-        for (MutableHost host : mutableHostMap.values()) {
-            if (host.partitions.isEmpty() && host.targetSiteCount > 0) {
-                eligibleHosts.put(host.id, host);
-                totalSites += host.targetSiteCount;
+        TopologyBuilder topologyBuilder = addPartitionsToHosts(newHostInfos, Collections.emptySet(),
+                currentTopology.getReplicationFactor(), largestPartitionId);
 
-                if (missingHosts.contains(host.id)) {
-                    host.markHostMissing(true);
-                }
-            }
+        return new AbstractTopology(currentTopology, topologyBuilder);
+    }
+
+    /**
+     * Create a new topology using {@code hosts}
+     *
+     * @param hostInfos    hosts to put in topology
+     * @param missingHosts set of missing host IDs
+     * @param kfactor      for cluster
+     * @return {@link AbstractTopology} for cluster
+     * @throws RuntimeException if hosts are not valid for topology
+     */
+    public static AbstractTopology getTopology(Map<Integer, HostInfo> hostInfos, Set<Integer> missingHosts,
+            int kfactor) {
+        TopologyBuilder builder = addPartitionsToHosts(hostInfos, missingHosts, kfactor, 0);
+        return new AbstractTopology(EMPTY_TOPOLOGY, builder);
+    }
+
+    /**
+     * Best effort to find the matching host on the existing topology from ZK Use the placement group of the recovering
+     * host to match a lost node in the topology
+     *
+     * @param topology       The topology
+     * @param liveHosts      The live host ids
+     * @param localHostId    The rejoining host id
+     * @param placementGroup The rejoining placement group
+     * @return recovered topology if a matching node is found
+     */
+    public static AbstractTopology mutateRecoverTopology(AbstractTopology topology, Set<Integer> liveHosts,
+            Integer localHostId, String placementGroup) {
+        Optional<Host> optionalHost = topology.hostsById.values().stream()
+                .filter(h -> !liveHosts.contains(h.id) && h.haGroup.equalsIgnoreCase(placementGroup)).findFirst();
+
+        if (!optionalHost.isPresent()) {
+            return null;
         }
 
-        int partitionCount = totalSites / (kfactor + 1);
+        Host replaceHost = optionalHost.get();
+        Integer replaceHostId = replaceHost.id;
 
-        /////////////////////////////////
-        // generate partitions
-        /////////////////////////////////
-        Map<Integer, MutablePartition> partitionsToAdd = new TreeMap<>();
-        for (int i = 0; i < partitionCount; ++i) {
-            MutablePartition partition = new MutablePartition(largestPartitionId++);
-            partitionsToAdd.put(partition.id, partition);
-            mutablePartitionMap.put(partition.id, partition);
-        }
+        ImmutableMap.Builder<Integer, Partition> partitionsByIdBuilder = ImmutableMap.builder();
+        ArrayList<Integer> hostIds = new ArrayList<>();
 
-        /////////////////////////////////
-        // compute HAGroup distances
-        /////////////////////////////////
-        List<HAGroup> haGroups = mutableHostMap.values().stream()
-                .map(h -> h.haGroup)
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<HAGroup, Map<HAGroup, Integer>> haGroupDistances = new TreeMap<>();
-        for (HAGroup haGroup1 : haGroups) {
-            Map<HAGroup, Integer> distances = new TreeMap<>();
-            haGroupDistances.put(haGroup1, distances);
-            for (HAGroup haGroup2 : haGroups) {
-                int distance = computeHADistance(haGroup1.token, haGroup2.token);
-                distances.put(haGroup2, distance);
-            }
-        }
-
-        int targetReplicaCount = kfactor + 1;
-
-        /////////////////////////////////
-        // place partitions with hosts
-        /////////////////////////////////
-        while (partitionsToAdd.size() > 0) {
-            // goal is to find a set k + 1 hosts that contain the starter host that
-            //  a) have space for at least one partition
-            //  b) are reasonably distributed w.r.t. ha groups
-            // verify enough hosts exist
-            if (eligibleHosts.size() < targetReplicaCount) {
-                throw new RuntimeException(String.format(
-                        "Partition requesting %d replicas " +
-                        "but there are only %d eligable hosts on which to place them. " +
-                        "Topology request invalid.",
-                        targetReplicaCount, eligibleHosts.size()));
-            }
-
-            // if there isn't space for a partition, shift partitions around until there is
-            // or give up if shifting can't free up enough space
-            int partitionsToBeShifted;
-            while ((partitionsToBeShifted = targetReplicaCount - countHostsWithFreeSpace(eligibleHosts)) > 0) {
-             // if there aren't k + 1 good nodes, then move around some partition replicas until there are
-                if (!shiftAPartition(eligibleHosts, partitionsToBeShifted, haGroupDistances)) {
-                    throw new RuntimeException(String.format(
-                            "Partition requesting %d replicas " +
-                            "but unable to find more than %d hosts with free space to place them. " +
-                            "Topology request invalid.",
-                            targetReplicaCount, countHostsWithFreeSpace(eligibleHosts)));
+        for (Map.Entry<Integer, Partition> entry : topology.partitionsById.entrySet()) {
+            Partition partition = entry.getValue();
+            boolean modified = false;
+            for (Integer id : partition.hostIds) {
+                if (id.equals(replaceHostId)) {
+                    modified = true;
+                    hostIds.add(localHostId);
+                } else {
+                    hostIds.add(id);
                 }
             }
 
-            // pick one host to be part of a partition group
-            MutableHost starterHost = findBestStarterHost(eligibleHosts, haGroupDistances);
-            // find k + 1 peers for starter host
-            List<MutableHost> peerHostsForPartition = findBestPeerHosts(starterHost, targetReplicaCount, eligibleHosts, haGroupDistances, false);
-            assert(peerHostsForPartition.size() == targetReplicaCount);
-
-            // determine how many partitions this group of hosts can handle
-            int minAvailableSitesForSet =  peerHostsForPartition.stream()
-                    .mapToInt(h -> h.freeSpace())
-                    .min().getAsInt();
-            // determine how many partitions we have with this k value
-            int availablePartitionCount = partitionsToAdd.size();
-            Iterator<MutablePartition> iter = partitionsToAdd.values().iterator();
-
-            // assign the partitions
-            for (int i = 0; i < Math.min(minAvailableSitesForSet, availablePartitionCount); i++) {
-                // pop a partition of the list
-                MutablePartition partition = iter.next();
-                // assign it to the host set
-                for (MutableHost host : peerHostsForPartition) {
-                    host.partitions.add(partition);
-                    partition.hosts.add(host);
-                }
-                // remove the partition from the tracking
-                iter.remove();
+            if (modified) {
+                partition = new Partition(partition.id,
+                        replaceHostId.equals(partition.leaderHostId) ? localHostId : partition.leaderHostId, hostIds);
             }
+
+            partitionsByIdBuilder.put(entry.getKey(), partition);
+            hostIds.clear();
         }
 
-        /////////////////////////////////
-        // pick leaders for partitions that need them
-        /////////////////////////////////
-        assignLeadersToPartitionsThatNeedThem(mutableHostMap, mutablePartitionMap);
+        ImmutableMap<Integer, Partition> partitionsById = partitionsByIdBuilder.build();
 
-        /////////////////////////////////
-        // convert mutable hosts to hosts to prep a return value
-        /////////////////////////////////
-        return convertMutablesToTopology(
-                currentTopology.version + 1,
-                mutableHostMap,
-                mutablePartitionMap,
-                currentTopology.getSitesPerHost(),
-                kfactor);
+        ImmutableMap.Builder<Integer, Host> hostsByIdBuilder = ImmutableMap.builder();
+        for (Map.Entry<Integer, Host> entry : topology.hostsById.entrySet()) {
+            Integer id = entry.getKey().intValue() == replaceHostId ? localHostId : entry.getKey();
+            hostsByIdBuilder.put(id, new Host(entry.getValue(), id, partitionsById));
+        }
+
+        return new AbstractTopology(topology, hostsByIdBuilder.build(), partitionsById);
     }
 
     /////////////////////////////////////
@@ -557,12 +965,6 @@ public class AbstractTopology {
         stringer.object();
 
         stringer.keySymbolValuePair(TOPO_VERSION, version);
-        stringer.key(TOPO_HAGROUPS).array();
-        List<HAGroup> haGroups = getHAGroups();
-        for (HAGroup haGroup : haGroups) {
-            haGroup.toJSON(stringer);
-        }
-        stringer.endArray();
 
         stringer.key(TOPO_PARTITIONS).array();
         for (Partition partition : partitionsById.values()) {
@@ -577,7 +979,7 @@ public class AbstractTopology {
         stringer.endArray();
         stringer.keySymbolValuePair(TOPO_SITES_PER_HOST, getSitesPerHost());
         stringer.keySymbolValuePair(TOPO_REPLICATION_FACTOR, getReplicationFactor());
-
+        stringer.keySymbolValuePair(TOPO_UNBALANCED_PART_COUNT, m_unbalancedPartitionCount);
 
         stringer.endObject();
 
@@ -590,35 +992,32 @@ public class AbstractTopology {
     }
 
     public static AbstractTopology topologyFromJSON(JSONObject jsonTopology) throws JSONException {
-        Map<Integer, Partition> partitionsById = new TreeMap<>();
-        Map<String, HAGroup> haGroupsByToken = new TreeMap<>();
-        List<Host> hosts = new ArrayList<>();
+        ImmutableMap.Builder<Integer, Partition> partitionsByIdBuilder = ImmutableMap.builder();
+        ImmutableMap.Builder<Integer, Host> hostsByIdBuilder = ImmutableMap.builder();
 
         long version = jsonTopology.getLong(TOPO_VERSION);
-
-        JSONArray haGroupsJSON = jsonTopology.getJSONArray(TOPO_HAGROUPS);
-        for (int i = 0; i < haGroupsJSON.length(); i++) {
-            HAGroup haGroup = HAGroup.fromJSON(haGroupsJSON.getJSONObject(i));
-            haGroupsByToken.put(haGroup.token, haGroup);
-        }
 
         JSONArray partitionsJSON = jsonTopology.getJSONArray(TOPO_PARTITIONS);
         for (int i = 0; i < partitionsJSON.length(); i++) {
             Partition partition = Partition.fromJSON(partitionsJSON.getJSONObject(i));
-            partitionsById.put(partition.id, partition);
+            partitionsByIdBuilder.put(partition.id, partition);
         }
+        ImmutableMap<Integer, Partition> partitionsById = partitionsByIdBuilder.build();
 
         JSONArray hostsJSON = jsonTopology.getJSONArray(TOPO_HOSTS);
         for (int i = 0; i < hostsJSON.length(); i++) {
-            Host host = Host.fromJSON(hostsJSON.getJSONObject(i), haGroupsByToken, partitionsById);
-            hosts.add(host);
+            Host host = Host.fromJSON(hostsJSON.getJSONObject(i), partitionsById);
+            hostsByIdBuilder.put(host.id, host);
         }
 
         int sitesPerHost = jsonTopology.getInt(TOPO_SITES_PER_HOST);
 
         int replicationFactor = jsonTopology.getInt(TOPO_REPLICATION_FACTOR);
 
-        return new AbstractTopology(version, hosts, sitesPerHost, replicationFactor);
+        int unbalancedPartitionCount = jsonTopology.getInt(TOPO_UNBALANCED_PART_COUNT);
+
+        return new AbstractTopology(version, hostsByIdBuilder.build(), partitionsById, sitesPerHost, replicationFactor,
+                unbalancedPartitionCount);
     }
 
     /////////////////////////////////////
@@ -626,30 +1025,58 @@ public class AbstractTopology {
     // PRIVATE TOPOLOGY CONSTRUCTOR
     //
     /////////////////////////////////////
+    private AbstractTopology(AbstractTopology existingTopology, TopologyBuilder topologyBuilder) {
+        Preconditions.checkArgument(
+                (existingTopology.getSitesPerHost() == -1 && topologyBuilder.m_sitesPerHost != -1)
+                        || existingTopology.getSitesPerHost() == topologyBuilder.m_sitesPerHost,
+                "Sites per host is not the same for all hosts: " + existingTopology.getSitesPerHost() + " vs "
+                        + topologyBuilder.m_sitesPerHost);
+        assert ((existingTopology.getReplicationFactor() == -1 && topologyBuilder.getReplicationFactor() != -1)
+                || existingTopology.getReplicationFactor() == topologyBuilder.getReplicationFactor());
+        version = existingTopology.version + 1;
 
-    private AbstractTopology(long version, Collection<Host> hosts, int sitesPerHost, int replicationFactor) {
-        assert(hosts != null);
-        assert(version >= 0);
+        ImmutableMap.Builder<Integer, Partition> partitionBuilder = ImmutableMap.builder();
+        for (Partition partition : Iterables.concat(existingTopology.partitionsById.values(),
+                Collections2.transform(topologyBuilder.m_partitions, PartitionBuilder::build))) {
+            partitionBuilder.put(partition.id, partition);
+        }
+
+        partitionsById = partitionBuilder.build();
+
+        ImmutableMap.Builder<Integer, Host> hostsBuilder = ImmutableMap.builder();
+        for (Host host : Iterables.concat(existingTopology.hostsById.values(),
+                Collections2.transform(topologyBuilder.m_hosts, h -> new Host(h, partitionsById)))) {
+            hostsBuilder.put(host.id, host);
+        }
+        try {
+            hostsById = hostsBuilder.build();
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("must contain unique and unused hostid", e);
+        }
+        this.m_sitesPerHost = topologyBuilder.m_sitesPerHost;
+        m_replicationFactor = topologyBuilder.getReplicationFactor();
+        m_unbalancedPartitionCount = existingTopology.m_unbalancedPartitionCount
+                + topologyBuilder.m_unbalancedPartitionCount;
+    }
+
+    private AbstractTopology(AbstractTopology existingTopology, ImmutableMap<Integer, Host> hostsById,
+            ImmutableMap<Integer, Partition> partitionsById) {
+        this(existingTopology.version + 1, hostsById, partitionsById, existingTopology.getSitesPerHost(),
+                existingTopology.getReplicationFactor(), existingTopology.m_unbalancedPartitionCount);
+    }
+
+    private AbstractTopology(long version, ImmutableMap<Integer, Host> hostsById,
+            ImmutableMap<Integer, Partition> partitionsById, int sitesPerHost, int replicationFactor,
+            int unbalancedPartitionCount) {
+        assert (version >= 0);
 
         this.version = version;
+        this.hostsById = hostsById;
+        this.partitionsById = partitionsById;
 
-        // get a sorted map of hosts across the cluster by id
-        Map<Integer, Host> hostsByIdTemp = new TreeMap<>();
-        for (Host host : hosts) {
-            hostsByIdTemp.put(host.id, host);
-        }
-        this.hostsById = ImmutableMap.copyOf(hostsByIdTemp);
-
-        // get a sorted map of unique partitions across the cluster by id
-        Map<Integer, Partition> paritionsByIdTemp = new TreeMap<>();
-        for (Host host : hosts) {
-            for (Partition partition : host.partitions) {
-                paritionsByIdTemp.put(partition.id, partition);
-            }
-        }
-        this.partitionsById = ImmutableMap.copyOf(paritionsByIdTemp);
-        this.sitesPerHost = sitesPerHost;
-        this.replicationFactor = replicationFactor;
+        this.m_sitesPerHost = sitesPerHost;
+        this.m_replicationFactor = replicationFactor;
+        this.m_unbalancedPartitionCount = unbalancedPartitionCount;
     }
 
     /////////////////////////////////////
@@ -657,70 +1084,6 @@ public class AbstractTopology {
     // PRIVATE STATIC HELPER METHODS
     //
     /////////////////////////////////////
-
-    private static void convertTopologyToMutables(
-            final AbstractTopology topology,
-            final Map<Integer, MutableHost> mutableHostMap,
-            final Map<Integer, MutablePartition> mutablePartitionMap)
-    {
-        // create mutable hosts without partitions
-        for (Host host : topology.hostsById.values()) {
-            final MutableHost mutableHost = new MutableHost(
-                    host.id, topology.getSitesPerHost(), host.haGroup);
-            mutableHostMap.put(host.id, mutableHost);
-        }
-
-        // create partitions
-        for (Partition partition : topology.partitionsById.values()) {
-            MutablePartition mp = new MutablePartition(partition.id);
-            mutablePartitionMap.put(mp.id, mp);
-            for (Integer hostId : partition.hostIds) {
-                mp.hosts.add(mutableHostMap.get(hostId));
-            }
-            mp.leader = mutableHostMap.get(partition.leaderHostId);
-        }
-
-        // link partitions and hosts
-        for (Host host : topology.hostsById.values()) {
-            final MutableHost mutableHost = mutableHostMap.get(host.id);
-            host.partitions.stream().forEach(p -> {
-                MutablePartition mp = mutablePartitionMap.get(p.id);
-                mutableHost.partitions.add(mp);
-            });
-        }
-    }
-
-    private static AbstractTopology convertMutablesToTopology(
-            final long currentVersion,
-            final Map<Integer, MutableHost> mutableHostMap,
-            final Map<Integer, MutablePartition> mutablePartitionMap,
-            final int sitesPerHost,
-            final int replicationFactor)
-    {
-        final Map<Integer, Partition> partitionsById = new TreeMap<>();
-        mutablePartitionMap.values().stream().forEach(mp -> {
-            assert(mp.leader != null);
-
-            List<Integer> hostIds = mp.hosts.stream()
-                    .map(h -> h.id)
-                    .collect(Collectors.toList());
-
-            Partition p = new Partition(mp.id, mp.leader.id, hostIds);
-            partitionsById.put(p.id, p);
-        });
-
-        Set<Host> fullHostSet = new HashSet<>();
-        for (MutableHost mutableHost : mutableHostMap.values()) {
-            List<Partition> hostPartitions = mutableHost.partitions.stream()
-                    .map(mp -> partitionsById.get(mp.id))
-                    .collect(Collectors.toList());
-            Host newHost = new Host(mutableHost.id, mutableHost.haGroup, hostPartitions);
-            newHost.markHostMissing(mutableHost.isMissing);
-            fullHostSet.add(newHost);
-        }
-
-        return new AbstractTopology(currentVersion + 1, fullHostSet, sitesPerHost, replicationFactor);
-    }
 
     private static int getNextFreePartitionId(AbstractTopology topology) {
         OptionalInt maxPartitionIdOptional = topology.partitionsById.values().stream()
@@ -734,41 +1097,11 @@ public class AbstractTopology {
         }
     }
 
-    private static HAGroup[] getHAGroupsForHosts(AbstractTopology currentTopology, Map<Integer, HostInfo> hosts) {
-
-        class MutableHAGroup {
-            String token = "";
-            List<Integer> hostsIds;
-
-            private MutableHAGroup(String token) {
-                this.token = token;
-                this.hostsIds = new ArrayList<>();
-            }
-        }
-
-        final Map<String, MutableHAGroup> groupsByToken = new TreeMap<>();
-
-        // deal with all pre-existing hosts
-        for (Host host : currentTopology.hostsById.values()) {
-            groupsByToken.computeIfAbsent(host.haGroup.token, MutableHAGroup::new).hostsIds.add(host.id);
-        }
-
-        // deal with all new hosts
-        for (Map.Entry<Integer, HostInfo> entry : hosts.entrySet()) {
-            groupsByToken.computeIfAbsent(entry.getValue().m_group, MutableHAGroup::new).hostsIds.add(entry.getKey());
-        }
-
-        // convert mutable to immutable
-        return groupsByToken.values().stream()
-                .map(g -> new HAGroup(g.token, g.hostsIds.stream().mapToInt(i -> i).toArray()))
-                .toArray(HAGroup[]::new);
-    }
-
     /**
      * Compute the tree-edge distance between any two ha group tokens
      * Not the most efficient way to do this, but even n^2 for 100 nodes is computable
      */
-    private static int computeHADistance(String token1, String token2) {
+    static int computeHADistance(String token1, String token2) {
 
         // break into arrays of graph edges
         String[] token1parts = token1.split("\\.");
@@ -786,336 +1119,6 @@ public class AbstractTopology {
         return token1parts.length + token2parts.length - 2 * index;
     }
 
-    /**
-     * First, find hosts in the ha group that has the lowest max distance to another ha group
-     * Second, find hosts with the most free sites per host target within that ha group
-     */
-    private static MutableHost findBestStarterHost(
-            Map<Integer, MutableHost> eligableHosts,
-            Map<HAGroup, Map<HAGroup, Integer>> haGroupDistances)
-    {
-        // special case the one node setup
-        if (eligableHosts.size() == 1) {
-            MutableHost host = eligableHosts.values().iterator().next();
-            // we assume if there was one host, and it was full, we wouldn't be here
-            assert(host.partitions.size() < host.targetSiteCount);
-            return host;
-        }
-
-        Map<HAGroup, Integer> distances = new HashMap<>();
-        for (Entry<HAGroup, Map<HAGroup, Integer>> e : haGroupDistances.entrySet()) {
-            int distance = 0;
-            if (e.getValue().size() > 0) {
-                distance = e.getValue().values().stream()
-                        .mapToInt(i -> i)
-                        .max().getAsInt();
-            }
-            distances.put(e.getKey(), distance);
-        }
-
-        List<HAGroup> haGroupsByMinimalMaxHADistance = distances.entrySet().stream()
-                .sorted((e1,e2) -> e1.getValue() - e2.getValue())
-                .map(e -> e.getKey())
-                .collect(Collectors.toList());
-
-        for (HAGroup haGroup : haGroupsByMinimalMaxHADistance) {
-            List<MutableHost> hostsByAvailability = haGroup.hostIds.stream()
-                    .map(id -> eligableHosts.get(id))
-                    .filter(h -> h != null)
-                    .filter(h -> h.targetSiteCount > h.partitions.size())
-                    .sorted((h1, h2) -> h2.freeSpace() - h1.freeSpace())
-                    .collect(Collectors.toList());
-            if (!hostsByAvailability.isEmpty()) {
-                return hostsByAvailability.get(0);
-            }
-        }
-
-        assert(false);
-        return null;
-    }
-
-    //
-    private static List<HAGroup> sortHAGroupByDistance(
-            final Map<HAGroup, Integer> haGroupDistance,
-            final Map<HAGroup, Integer> undesirableHAGroups)
-    {
-        final List<HAGroup> result = Lists.newArrayList(haGroupDistance.keySet());
-        Collections.sort(result, new Comparator<HAGroup>() {
-
-            @Override
-            public int compare(HAGroup o1, HAGroup o2) {
-                // First sort by the distance, descending order
-                int distanceComp = haGroupDistance.get(o2) - haGroupDistance.get(o1);
-                // If two groups have same distance, then sort by number of undesirable siblings
-                if (distanceComp == 0) {
-                    int penalty1 = 0;
-                    int penalty2 = 0;
-                    for (Map.Entry<HAGroup, Integer> undesirableGroup : undesirableHAGroups.entrySet()) {
-                        penalty1 += o1.shareAcenstry(undesirableGroup.getKey()) ? undesirableGroup.getValue() : 0;
-                        penalty2 += o2.shareAcenstry(undesirableGroup.getKey()) ? undesirableGroup.getValue() : 0;
-                    }
-                    return Integer.compare(penalty1, penalty2);
-                } else {
-                    return distanceComp;
-                }
-            }
-        });
-        return result;
-    }
-
-    private static MutableHost findNextPeerHost(
-            final Set<MutableHost> peers,
-            final MutableHost lastFoundPeer,
-            int peerCount,
-            final Map<Integer, MutableHost> eligibleHosts,
-            final Map<HAGroup, Map<HAGroup, Integer>> haGroupDistances,
-            boolean shiftPartitions)
-    {
-        List<MutableHost> hostsInOrder = null;
-        MutableHost anyHost;
-        if (lastFoundPeer == null) {
-            anyHost = peers.iterator().next();
-        } else {
-            anyHost = lastFoundPeer;
-        }
-
-        Map<HAGroup, Integer> undesireableHAGroups = new HashMap<>();
-        for (MutableHost h : peers) {
-            Integer count;
-            if ((count = undesireableHAGroups.get(h.haGroup)) == null) {
-                undesireableHAGroups.put(h.haGroup, 1);
-            } else {
-                undesireableHAGroups.put(h.haGroup, count + 1);
-            }
-        }
-
-        Map<HAGroup, Integer> hasByDistance = haGroupDistances.get(anyHost.haGroup);
-        List<HAGroup> haGroupsByDistance = sortHAGroupByDistance(hasByDistance, undesireableHAGroups);
-
-        for (HAGroup haGroup : haGroupsByDistance) {
-            List<MutableHost> validHosts = haGroup.hostIds.stream()
-                    .map(id -> eligibleHosts.get(id))
-                    .filter(h -> h != null)
-                    .filter(h -> !peers.contains(h))
-                    .collect(Collectors.toList());
-
-            long missingHosts = peers.stream().filter(h -> h.isAbsent() == true).count();
-            long expectedMissingHosts = 0;
-            if (!shiftPartitions) {
-                assert (peerCount > 0);
-                long partitionGroups = eligibleHosts.size() / peerCount;
-                long totalMissingHosts = eligibleHosts.values().stream().filter(h -> h.isAbsent() == true).count();
-                expectedMissingHosts = (totalMissingHosts + partitionGroups - 1) / partitionGroups;
-            }
-
-            if (missingHosts < expectedMissingHosts) {
-                // If some nodes are absent, prefer absent nodes
-                // find non-full hosts sorted by availability (more -> less)
-                hostsInOrder = validHosts.stream()
-                        .filter(h -> h.isAbsent() == true)  // list all absent nodes
-                        .filter(h -> h.targetSiteCount > h.partitions.size())
-                        .sorted((h1, h2) -> h2.freeSpace() - h1.freeSpace())
-                        .collect(Collectors.toList());
-            } else {
-                // find non-full hosts sorted by availability (more -> less)
-                hostsInOrder = validHosts.stream()
-                        .filter(h -> h.isAbsent() == false) // list all non-absent nodes
-                        .filter(h -> h.targetSiteCount > h.partitions.size())
-                        .sorted((h1, h2) -> h2.freeSpace() - h1.freeSpace())
-                        .collect(Collectors.toList());
-            }
-
-            if (!hostsInOrder.isEmpty()) {
-                return hostsInOrder.get(0);
-            }
-        }
-
-        // at this point, give up on using distinct ha groups and just find a host
-
-        // sort candidate hosts by free space
-        hostsInOrder = eligibleHosts.values().stream()
-                .filter(h -> h.freeSpace() > 0) // has space
-                .filter(h -> peers.contains(h) == false) // not chosen yet
-                .sorted((h1, h2) -> h2.freeSpace() - h1.freeSpace()) // pick most free space
-                .collect(Collectors.toList());
-
-        if (hostsInOrder.isEmpty()) {
-            return null;
-        }
-
-        // pick the most empty hosts that haven't been selected
-        return hostsInOrder.get(0);
-    }
-
-    // Given the pre-computed group distance chart, evenly pick N peer nodes from all the racks
-    // E.g. to pick 6 nodes from 3 racks, in every rack pick 2 nodes.
-    private static List<MutableHost> findBestPeerHosts(
-            MutableHost starterHost,
-            int peerCount,
-            Map<Integer, MutableHost> eligibleHosts,
-            Map<HAGroup, Map<HAGroup, Integer>> haGroupDistances,
-            boolean shiftPartitions)
-    {
-        final Set<MutableHost> peers = new HashSet<>();
-        final List<MutableHost> result = Lists.newArrayList();
-        peers.add(starterHost);
-        result.add(starterHost);
-        // special case k = 0
-        if (peerCount == 1) {
-            return result;
-        }
-
-        MutableHost lastFoundPeer = null;
-        while (peers.size() < peerCount) {
-            MutableHost nextPeer = findNextPeerHost(peers, lastFoundPeer, peerCount, eligibleHosts, haGroupDistances, shiftPartitions);
-            if (nextPeer == null) {
-                return result;
-            }
-            peers.add(nextPeer);
-            result.add(nextPeer);
-            lastFoundPeer = nextPeer;
-        }
-
-        return result;
-    }
-
-    /**
-     * Find (peerCount - 1) nodes that are full, and move N partitions from them (sorted by emptiness)
-     * to the given host. Obviously, make sure the moved partitions aren't the same one.
-     * If nodes are rack-aware, only move partitions to host within the same rack.
-     */
-    private static boolean shiftAPartition(Map<Integer, MutableHost> eligibleHosts,
-            int partitionsToBeShifted,
-            Map<HAGroup, Map<HAGroup, Integer>> haGroupDistances)
-    {
-        // find a host that has at least two open slots to move a partition to
-        List<MutableHost> hostsWithSpaceInOrder = eligibleHosts.values().stream()
-                .filter(h -> h.freeSpace() >= 2) // need at least two open slots
-                .sorted((h1, h2) -> h2.freeSpace() - h1.freeSpace()) // sorted by emptiness
-                .collect(Collectors.toList());
-        assert (hostsWithSpaceInOrder != null);
-
-        // If rack-awareness is enabled and there are more than one suitable
-        // host to move partitions to,
-        List<MutableHost> targets = hostsWithSpaceInOrder;
-        if (hostsWithSpaceInOrder.size() > 1) {
-            MutableHost starterHost = hostsWithSpaceInOrder.get(0);
-            Map<Integer, MutableHost> hostsWithSpaceMap =
-                    hostsWithSpaceInOrder.stream()
-                    .collect(Collectors.toMap(h -> h.id, h -> h));
-            targets = findBestPeerHosts(starterHost, partitionsToBeShifted,
-                    hostsWithSpaceMap, haGroupDistances, true);
-        }
-        // iterate over all hosts with space free
-        for (MutableHost host : targets) {
-            // get candidate hosts to donate a partition to the target hosts
-            List<MutableHost> fullHostsInOrder = eligibleHosts.values().stream()
-                    .filter(h -> h.freeSpace() == 0) // full hosts
-                    .filter(h -> h.targetSiteCount > 0) // not slotless hosts
-                    .sorted((h1, h2) ->
-                        computeHADistance(host.haGroup.token, h1.haGroup.token) -
-                        computeHADistance(host.haGroup.token, h2.haGroup.token)
-                    ) // by distance from starter host
-                    .collect(Collectors.toList());
-
-            // walk through all candidate hosts, swapping at most one partition
-
-            for (MutableHost fullHost : fullHostsInOrder) {
-                assert(fullHost.freeSpace() == 0);
-
-                for (MutablePartition partition : fullHost.partitions) {
-                    // skip moving this one if we're already a replica
-                    if (host.partitions.contains(partition)) {
-                        continue;
-                    }
-
-                    // move it!
-                    host.partitions.add(partition);
-                    partition.hosts.add(host);
-                    fullHost.partitions.remove(partition);
-                    partition.hosts.remove(fullHost);
-
-                    assert(host.partitions.size() <= host.targetSiteCount);
-                    assert(host.partitions.size() <= fullHost.targetSiteCount);
-                    return true;
-                }
-            }
-        }
-
-        // didn't shift anything
-        return false;
-    }
-
-    private static int countHostsWithFreeSpace(Map<Integer, MutableHost> eligibleHosts) {
-        int freeSpaceHostCount = eligibleHosts.values().stream()
-                .mapToInt(h -> (h.targetSiteCount > h.partitions.size()) ? 1 : 0)
-                .sum();
-        return freeSpaceHostCount;
-    }
-
-    private static void assignLeadersToPartitionsThatNeedThem(
-            Map<Integer, MutableHost> mutableHostMap,
-            Map<Integer, MutablePartition> mutablePartitionMap)
-    {
-        // clean up any partitions with leaders that don't exist
-        // (this is used by remove node, not during new cluster forming)
-        mutablePartitionMap.values().stream()
-                .filter(p -> p.leader != null)
-                // if a leader isn't in the current set of hosts, set to null
-                .filter(p -> mutableHostMap.containsKey(p.leader.id) == false)
-                .forEach(p -> p.leader = null);
-
-        // sort partitions by small k, so we can assign less flexible partitions first
-        List<MutablePartition> leaderlessPartitionsSortedByK = mutablePartitionMap.values().stream()
-                .filter(p -> p.leader == null)
-                .collect(Collectors.toList());
-
-        // pick a leader for each partition based on the host that is least full of leaders
-        for (MutablePartition partition : leaderlessPartitionsSortedByK) {
-            // find host with fewest leaders
-            MutableHost leaderHost = partition.hosts.stream()
-                    .min((h1, h2) -> h1.leaderCount() - h2.leaderCount()).get();
-            partition.leader = leaderHost;
-            assert(partition.hosts.contains(leaderHost));
-        }
-
-        // run through and shift leaders from hosts with high partition counts to those with low ones
-        // iterate until it's not possible to shift things this way
-        //
-        // There might be better ways to do this that invovle mutli-swaps, but this is probably decent
-        boolean foundAMove;
-        do {
-            foundAMove = false;
-
-            for (MutablePartition partition : leaderlessPartitionsSortedByK) {
-                int loadOfLeadHost = partition.leader.leaderCount();
-                MutableHost loadWithMinLeaders = partition.hosts.stream()
-                        .min((h1, h2) -> h1.leaderCount() - h2.leaderCount()).get();
-                if ((loadOfLeadHost - loadWithMinLeaders.leaderCount()) >= 2) {
-                    foundAMove = true;
-                    partition.leader = loadWithMinLeaders;
-                    break;
-                }
-            }
-
-        } while (foundAMove);
-    }
-
-    public static AbstractTopology getTopology(
-            Map<Integer, HostInfo> hosts,
-            Set<Integer> missingHosts,
-            int kfactor)
-    {
-
-
-        // get topology
-        AbstractTopology abstractTopo =
-                AbstractTopology.mutateAddHosts(AbstractTopology.EMPTY_TOPOLOGY, hosts);
-        abstractTopo = AbstractTopology.mutateAddPartitionsToEmptyHosts(abstractTopo, missingHosts, kfactor);
-
-        return abstractTopo;
-    }
-
     public int getHostCount() {
         return hostsById.size();
     }
@@ -1131,26 +1134,23 @@ public class AbstractTopology {
      */
     public Set<Integer> getPartitionGroupPeers(int hostId) {
         Set<Integer> peers = Sets.newHashSet();
-        for (Integer pid : getPartitionIdList(hostId)) {
-            Partition p = partitionsById.get(pid);
-            if (p != null) {
-                peers.addAll(p.hostIds);
-            }
+        for (Partition p : hostsById.get(hostId).partitions) {
+            peers.addAll(p.hostIds);
         }
         return peers;
     }
 
     public List<Integer> getPartitionIdList(int hostId) {
         Host h = hostsById.get(hostId);
-        return (h != null) ? h.getSortedPartitionIdList() : null;
+        return (h != null) ? h.getPartitionIdList() : null;
     }
 
     public int getSitesPerHost() {
-        return sitesPerHost;
+        return m_sitesPerHost;
     }
 
     public int getReplicationFactor() {
-        return replicationFactor;
+        return m_replicationFactor;
     }
 
     public boolean hasMissingPartitions() {
@@ -1161,67 +1161,6 @@ public class AbstractTopology {
             }
         }
         return getPartitionCount() > partitions.size();
-    }
-
-    /**
-     * reassign partition leaders from the missing hosts to other hosts.
-     * @param topology current topology
-     * @param missingHosts The hosts on which partition leaders will be reassigned.
-     * @return new AbstractTopology
-     */
-    public static AbstractTopology shiftPartitionLeaders(AbstractTopology topology, Set<Integer> missingHosts) {
-        if (missingHosts == null || missingHosts.isEmpty()) {
-            return topology;
-        }
-        Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
-        Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
-
-        // create mutable missing Hosts without partitions
-        for (Host host : topology.hostsById.values()) {
-            final MutableHost mutableHost = new MutableHost(host.id, topology.getSitesPerHost(), host.haGroup);
-            if (missingHosts.contains(host.id)) {
-                mutableHost.markHostMissing(true);
-            }
-            mutableHostMap.put(host.id, mutableHost);
-        }
-
-        for (Partition partition : topology.partitionsById.values()) {
-            MutablePartition mp = new MutablePartition(partition.id);
-            mutablePartitionMap.put(mp.id, mp);
-            for (Integer hId : partition.hostIds) {
-                final MutableHost mutableHost = mutableHostMap.get(hId);
-                mp.hosts.add(mutableHost);
-                mutableHost.partitions.add(mp);
-            }
-            int leaderId = partition.leaderHostId;
-            if (missingHosts.contains(leaderId)) {
-                List<Host> perspectiveHosts = Lists.newArrayList();
-                for (Host host : topology.hostsById.values()) {
-                    if (!missingHosts.contains(host.id)) {
-                        List<Integer> partitionListOnNonMissingHost = topology.getPartitionIdList(host.id);
-                        if (partitionListOnNonMissingHost.contains(partition.id)) {
-                            perspectiveHosts.add(host);
-                        }
-                    }
-                }
-
-                //Place the partition master to a node which hosts the partition and has the least masters.
-                //if there is no perspective host to place this partition, the host count, missing count, or site per host is
-                //incorrect, the server will not be booted up. Example: host count =3, k=1, missing=2
-                assert(!perspectiveHosts.isEmpty());
-                if (perspectiveHosts.size() > 1) {
-                    perspectiveHosts.sort((Host a, Host b) -> {
-                        return (a.getleaderCount() - b.getleaderCount());
-                    });
-                    //Set the new partition leader
-                    leaderId = perspectiveHosts.get(0).id;
-                    partition.leaderHostId = leaderId;
-                }
-            }
-            mp.leader = mutableHostMap.get(leaderId);
-        }
-        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap,
-                topology.getSitesPerHost(), topology.getReplicationFactor());
     }
 
     /**
@@ -1254,71 +1193,6 @@ public class AbstractTopology {
 
         return result;
     }
-    /**
-     * Best effort to find the matching host on the existing topology from ZK
-     * Use the placement group of the recovering host to match a lost node in the topology
-     * @param topology The topology
-     * @param liveHosts The live host ids
-     * @param localHostId The rejoining host id
-     * @param placementGroup The rejoining placement group
-     * @return recovered topology if a matching node is found
-     */
-    public static AbstractTopology mutateRecoverTopology(AbstractTopology topology,
-            Set<Integer> liveHosts, int localHostId, String placementGroup) {
-
-        Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
-        Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
-
-        // create mutable hosts without partitions
-        int recoveredHostId = -1;
-        Map<String, Set<Integer>> haGroupMaps = Maps.newHashMap();
-        for (Host host : topology.hostsById.values()) {
-            int hostId = host.id;
-            //recover from the 1st none-living node in the same placement group
-            if (host.haGroup.token.equalsIgnoreCase(placementGroup) &&
-                    !liveHosts.contains(hostId) && recoveredHostId < 0) {
-                recoveredHostId = host.id;
-                hostId = localHostId;
-            }
-            Set<Integer> groupHostIds = haGroupMaps.get(host.haGroup.token);
-            if (groupHostIds == null) {
-                groupHostIds = Sets.newHashSet();
-                haGroupMaps.put(host.haGroup.token, groupHostIds);
-            }
-            groupHostIds.add(hostId);
-            final MutableHost mutableHost = new MutableHost(hostId, topology.getSitesPerHost(), null);
-            mutableHostMap.put(hostId, mutableHost);
-        }
-        //no matching candidate found.
-        if (recoveredHostId < 0) {
-            return null;
-        }
-
-        //update placement groups with recovering host
-        for (Map.Entry<String, Set<Integer>> entry : haGroupMaps.entrySet()) {
-            HAGroup haGroup = new HAGroup(entry.getKey(), entry.getValue().stream().mapToInt(Number::intValue).toArray());
-            for (Integer hostId : entry.getValue()) {
-                final MutableHost mutableHost = mutableHostMap.get(hostId);
-                mutableHost.haGroup = haGroup;
-            }
-        }
-
-        //move partitions to host
-        for (Partition partition : topology.partitionsById.values()) {
-            MutablePartition mp = new MutablePartition(partition.id);
-            mutablePartitionMap.put(mp.id, mp);
-            for (Integer hId : partition.hostIds) {
-                int hostId = (hId == recoveredHostId) ? localHostId : hId;
-                final MutableHost mutableHost = mutableHostMap.get(hostId);
-                mp.hosts.add(mutableHost);
-                mutableHost.partitions.add(mp);
-            }
-            int leader = (partition.leaderHostId == recoveredHostId) ? localHostId : partition.leaderHostId;
-            mp.leader = mutableHostMap.get(leader);
-        }
-        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap,
-                topology.getSitesPerHost(), topology.getReplicationFactor());
-    }
 
     /**
      * The default placement group (a.k.a. rack-aware group) is "0", if user override the setting
@@ -1331,65 +1205,10 @@ public class AbstractTopology {
      * @return null if the topology is balanced, otherwise return the error message
      */
     public String validateLayout() {
-        StringBuilder sb = new StringBuilder();
-        List<HAGroup> haGroups = getHAGroups();
-        // Subgrouping is allowed in placement group identifier, but here we just care
-        // about the top level, no guarantee are made for layout in subgroup.
-        Set<String> topLevelGroups = new HashSet<>();
-        for (HAGroup group : haGroups) {
-            String[] tokens = group.token.split("\\.");
-            topLevelGroups.add(tokens[0]);
-        }
-        int unbalancedPartitions = 0;
-        int partitionReplicas = getReplicationFactor() + 1;
-        for (Partition p : partitionsById.values()) {
-            List<HAGroup> grp = Lists.newArrayList(haGroups);
-            for (Integer hId : p.hostIds) {
-                Iterator<HAGroup> iter = grp.iterator();
-                while (iter.hasNext()) {
-                    HAGroup group = iter.next();
-                    if (group.hostIds.contains(hId)) {
-                        iter.remove();
-                        break;
-                    }
-                }
-            }
-            if (topLevelGroups.size() <= partitionReplicas) {
-                // When # of rack <= K+1, each rack should have at least one
-                // replica and no further guarantee are made on how the replicas
-                // will be distributed among racks, try in best effort to balance
-                // partition across racks.
-                if (!grp.isEmpty()) {
-                    unbalancedPartitions++;
-                    /* Turn on to debug
-                    sb.append("Partition " + p.id + " is not balanced across placement groups.\n"); //*/
-
-                }
-            } else {
-                // When # of rack >= K+1, each rack will have at most one replica,
-                // each partition must span K+1 racks.
-                if ((topLevelGroups.size() - grp.size()) != partitionReplicas) {
-                    unbalancedPartitions++;
-                    /* Turn on to debug
-                    sb.append("Partition " + p.id + " is not balanced across placement groups.\n"); //*/
-
-                }
-            }
-        }
-        if (unbalancedPartitions > 0) {
-            sb.append(String.format("%d out of %d partitions are unbalanced across placement groups.",
-                    unbalancedPartitions, partitionsById.size()));
-        }
-        if (sb.length() != 0) {
-            return sb.toString();
+        if (m_unbalancedPartitionCount > 0) {
+            return String.format("%d out of %d partitions are unbalanced across placement groups.",
+                    m_unbalancedPartitionCount, partitionsById.size());
         }
         return null;
-    }
-
-    public List<HAGroup> getHAGroups() {
-        return hostsById.values().stream()
-                .map(h -> h.haGroup)
-                .distinct()
-                .collect(Collectors.toList());
     }
 }
