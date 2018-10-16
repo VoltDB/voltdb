@@ -17,21 +17,30 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.Constraint;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
-import org.voltdb.plannodes.*;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
+import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -133,7 +142,7 @@ public class QueryPlanner implements AutoCloseable {
         m_isLargeQuery = isLargeQuery;
         m_planSelector = new PlanSelector(m_estimates, m_stmtName,
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
-                suppressDebugOutput);
+                suppressDebugOutput, m_isLargeQuery);
         m_isUpsert = false;
     }
 
@@ -253,7 +262,7 @@ public class QueryPlanner implements AutoCloseable {
         return m_paramzInfo.getParamLiteralValues();
     }
 
-    public ParameterSet extractedParamValues(VoltType[] parameterTypes) {
+    public ParameterSet extractedParamValues(VoltType[] parameterTypes) throws Exception {
         if (m_paramzInfo == null) {
             return null;
         }
@@ -362,7 +371,7 @@ public class QueryPlanner implements AutoCloseable {
      * </li>
      * <li>
      *   Do some final cleaning up and verifying of the plan.  For example,
-     *   We renumber the nodes starting at 1.
+     *   we renumber the nodes starting at 1.
      * </li>
      * </ol>
      *
@@ -375,7 +384,13 @@ public class QueryPlanner implements AutoCloseable {
         // The callers of compilePlan are ready to catch any exceptions thrown here.
         // Simple constant expressions (i.e. "1 + 1" or "(2 * 4 + 2)/3") are evaluated and substituted by HSQL;
         // but expressions with functions (i.e. "cast(power(2, 3) to int)" are not.
-        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null, m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
+        AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(null,
+                                                                 m_sql,
+                                                                 xmlSQL,
+                                                                 paramValues,
+                                                                 m_db,
+                                                                 m_joinOrder,
+                                                                 m_isLargeQuery);
         if (parsedStmt == null) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();
             return null;

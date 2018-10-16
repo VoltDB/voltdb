@@ -36,6 +36,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     }
 
     public ProjectionPlanNode(NodeSchema schemaToClone) {
+        super();
         m_outputSchema = schemaToClone.clone();
         m_hasSignificantOutputSchema = true;
     }

@@ -20,12 +20,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
  * A class which can match an abstract plan node.
- *
- * PlanNodeType implements this, so plan nodes of
- * a given type can be matched.
- *
- * @author bwhite
- *
  */
 public interface PlanMatcher {
     /**
@@ -35,5 +29,10 @@ public interface PlanMatcher {
      * @param node
      * @return
      */
-    String match(AbstractPlanNode node);
+    String match(AbstractPlanNode node, int fragmentNo, int numFragments);
+
+    /**
+     * Get the name of a plan matcher.
+     */
+    String matchName();
 }

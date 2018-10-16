@@ -32,29 +32,8 @@ public class HashAggregatePlanNode extends AggregatePlanNode {
         super();
     }
 
-    public HashAggregatePlanNode(HashAggregatePlanNode origin) {
-        super();
-        m_isCoordinatingAggregator = origin.m_isCoordinatingAggregator;
-        if (origin.m_prePredicate != null) {
-            m_prePredicate = origin.m_prePredicate.clone();
-        }
-        if (origin.m_postPredicate != null) {
-            m_postPredicate = origin.m_postPredicate.clone();
-        }
-        for (AbstractExpression expr : origin.m_groupByExpressions) {
-            addGroupByExpression(expr);
-        }
-        List<ExpressionType> aggregateTypes = origin.m_aggregateTypes;
-        List<Integer> aggregateDistinct = origin.m_aggregateDistinct;
-        List<Integer> aggregateOutputColumns = origin.m_aggregateOutputColumns;
-        List<AbstractExpression> aggregateExpressions = origin.m_aggregateExpressions;
-        for (int i = 0; i < origin.getAggregateTypesSize(); i++) {
-            addAggregate(aggregateTypes.get(i),
-                    aggregateDistinct.get(i) == 1 ? true : false,
-                    aggregateOutputColumns.get(i),
-                    aggregateExpressions.get(i));
-        }
-        setOutputSchema(origin.getOutputSchema());
+    public HashAggregatePlanNode(HashAggregatePlanNode template) {
+        super(template);
     }
 
     @Override
@@ -62,4 +41,8 @@ public class HashAggregatePlanNode extends AggregatePlanNode {
         return PlanNodeType.HASHAGGREGATE;
     }
 
+    @Override
+    public OrderByPlanNode getOrderBy() {
+        return null;
+    }
 }

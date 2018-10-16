@@ -26,6 +26,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import junit.framework.AssertionFailedError;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -38,10 +39,13 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
 public class TestPlansOrderBy extends PlannerTestCase {
+    private static boolean PRINT_JSON_PLAN = false;
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestPlansGroupBy.class.getResource("testplans-orderby-ddl.sql"),
                     "testplansorderby", false);
+        // Probably not necessary.
+        planForLargeQueries(false);
     }
 
     @Override
@@ -55,18 +59,34 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validatePlan(sql, expectIndexScan, expectSeqScan, expectOrderBy, false, false);
     }
 
-    private void validatePlan(String sql, boolean expectIndexScan,
-            boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate,
-            boolean expectedAggregate)
+    private void validatePlan(String sql,
+                              boolean expectIndexScan,
+                              boolean expectSeqScan,
+                              boolean expectOrderBy,
+                              boolean expectHashAggregate,
+                              boolean expectedAggregate)
     {
         AbstractPlanNode pn = compile(sql);
         //* to debug */ System.out.println(pn.getChild(0).toJSONString());
         //* to debug */ System.out.println(pn.getChild(0).toExplainPlanString());
-        assertEquals(expectIndexScan, pn.hasAnyNodeOfType(PlanNodeType.INDEXSCAN));
-        assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
-        assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
-        assertEquals(expectHashAggregate, pn.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE));
-        assertEquals(expectedAggregate, pn.hasAnyNodeOfType(PlanNodeType.AGGREGATE));
+        String label = "None";
+        try {
+            label = "Index Scan";
+            assertEquals(expectIndexScan, pn.hasAnyNodeOfType(PlanNodeType.INDEXSCAN));
+            label = "Seq Scan";
+            assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
+            label = "Order By";
+            assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
+            label = "Hash Aggregate";
+            assertEquals(expectHashAggregate, pn.hasAnyNodeOfType(PlanNodeType.HASHAGGREGATE));
+            label = "Serial Aggregate";
+            assertEquals(expectedAggregate, pn.hasAnyNodeOfType(PlanNodeType.AGGREGATE));
+        } catch (AssertionFailedError ex) {
+            System.out.printf("Unexpected %s result:\nPlan %s\n",
+                              label,
+                              pn.toJSONExplainString(isPlanningForLargeQueries()));
+            throw ex;
+        }
     }
 
     private void validateMultiPartitionedPlan(String sql,
@@ -113,27 +133,61 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validatePlan(sql, true, false, true);
     }
 
-    public void testOrderByOneOfTwoIndexKeys()
-    {
+    public void testOrderByOneOfTwoIndexKeys() {
+        planForLargeQueries(false);
+        basicTestOrderByOneOfTwoIndexKeys();
+        planForLargeQueries(true);
+        basicTestOrderByOneOfTwoIndexKeys();
+    }
+
+    public void basicTestOrderByOneOfTwoIndexKeys() {
         validateOptimalPlan("SELECT * from T ORDER BY T_D0");
         validateOptimalPlan("SELECT * from T WHERE T_D0 = 1 ORDER BY T_D1");
     }
 
     public void testOrderByIndexedColumns() {
+        planForLargeQueries(false);
+        basicTestOrderByIndexedColumns();
+        planForLargeQueries(true);
+        basicTestOrderByIndexedColumns();
+    }
+
+    public void basicTestOrderByIndexedColumns() {
         validateOptimalPlan("SELECT * from T ORDER BY T_D0, T_D1");
         validateOptimalPlan("SELECT * from Tmanykeys ORDER BY T_D0, T_D1, T_D2");
     }
 
     public void testOrderByTwoDesc() {
+        planForLargeQueries(false);
+        basicTestOrderByTwoDesc();
+        planForLargeQueries(true);
+        basicTestOrderByTwoDesc();
+    }
+
+    public void basicTestOrderByTwoDesc() {
         validateOptimalPlan("SELECT * from T ORDER BY T_D0 DESC, T_D1 DESC");
     }
 
     public void testOrderByTwoAscDesc() {
+        planForLargeQueries(false);
+        basicTestOrderByTwoAscDesc();
+        planForLargeQueries(true);
+        basicTestOrderByTwoAscDesc();
+    }
+
+    public void basicTestOrderByTwoAscDesc() {
         validateBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1 DESC");
         validateBruteForcePlan("SELECT * from Tnokey ORDER BY T_D0, T_D1 DESC");
     }
 
-    public void testOrderByTwoOfThreeIndexKeys()
+    public void testOrderByTwoOfThreeIndexKeys() {
+        planForLargeQueries(false);
+        basicTestOrderByTwoOfThreeIndexKeys();
+        planForLargeQueries(true);
+        basicTestOrderByTwoOfThreeIndexKeys();
+    }
+
+    public void basicTestOrderByTwoOfThreeIndexKeys()
     {
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D0 = ? ORDER BY T_D1, T_D2");
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D1 = ? ORDER BY T_D0, T_D2");
@@ -144,6 +198,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderByOneOfThreeIndexKeys()
+    {
+        planForLargeQueries(false);
+        basicTestOrderByOneOfThreeIndexKeys();
+        planForLargeQueries(true);
+        basicTestOrderByOneOfThreeIndexKeys();
+    }
+
+    public void basicTestOrderByOneOfThreeIndexKeys()
     {
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D0 = ? AND T_D1 = ? ORDER BY T_D2");
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D1 = ? AND T_D2 = ? ORDER BY T_D0");
@@ -159,6 +221,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderByWrongPermutation()
+    {
+        planForLargeQueries(false);
+        basicTestOrderByWrongPermutation();
+        planForLargeQueries(true);
+        basicTestOrderByWrongPermutation();
+    }
+
+    public void basicTestOrderByWrongPermutation()
     {
         // Order determinism, so do not make it worse by using index scan.
         validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D2, T_D1, T_D0");
@@ -178,17 +248,41 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
     public void testOrderByTooManyToIndex()
     {
+        planForLargeQueries(false);
+        basicTestOrderByTooManyToIndex();
+        planForLargeQueries(true);
+        basicTestOrderByTooManyToIndex();
+    }
+
+    public void basicTestOrderByTooManyToIndex()
+    {
         validateBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
         validateBruteForcePlan("SELECT * from Tnokey ORDER BY T_D0, T_D1, T_D2");
     }
 
     public void testOrderByTooMany()
     {
+        planForLargeQueries(false);
+        basicTestOrderByTooMany();
+        planForLargeQueries(true);
+        basicTestOrderByTooMany();
+    }
+
+    public void basicTestOrderByTooMany()
+    {
         validateBruteForcePlan("SELECT * from Tnokey ORDER BY T_D0, T_D1, T_D2");
         validateBruteForcePlan("SELECT * from T ORDER BY T_D0, T_D1, T_D2");
     }
 
-    public void testNoIndexToOrderBy() {
+    public void testNoIndexToOrderBy()
+    {
+        planForLargeQueries(false);
+        basicTestNoIndexToOrderBy();
+        planForLargeQueries(true);
+        basicTestNoIndexToOrderBy();
+    }
+
+    public void basicTestNoIndexToOrderBy() {
         validateIndexedBruteForcePlan("SELECT * FROM T ORDER BY T_D2");
         validateBruteForcePlan("SELECT * FROM Tnokey ORDER BY T_D2");
         validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys ORDER BY T_D2");
@@ -196,12 +290,28 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
     public void testOrderByNLIJ()
     {
+        planForLargeQueries(false);
+        basicTestOrderByNLIJ();
+        planForLargeQueries(true);
+        basicTestOrderByNLIJ();
+    }
+
+    public void basicTestOrderByNLIJ()
+    {
         validatePlan("SELECT Tnokey.T_D1, T.T_D0, T.T_D1 from Tnokey, T " +
                      "where Tnokey.T_D2 = 2 AND T.T_D0 = Tnokey.T_D0 " +
                      "ORDER BY T.T_D0, T.T_D1", true, true, true);
     }
 
-    public void testTableAgg() {
+    public void testTableAgg()
+    {
+        planForLargeQueries(false);
+        basicTestTableAgg();
+        planForLargeQueries(true);
+        basicTestTableAgg();
+    }
+
+    public void basicTestTableAgg() {
         validatePlan("SELECT SUM(T_D0) from T", false, true, false, false, true);
         validatePlan("SELECT SUM(T_D0), COUNT(*), AVG(T_D1) from T", false, true, false, false, true);
 
@@ -211,12 +321,39 @@ public class TestPlansOrderBy extends PlannerTestCase {
                 false, true, false, false, true);
     }
 
-    public void testOrderByCountStar() {
-        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO", true, false, true, false, true);
-        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM Tnokey GROUP BY T_D0 ORDER BY FOO", false, true, true, true, false);
+    public void testOrderByCountStar()
+    {
+        planForLargeQueries(false);
+        basicTestOrderByCountStar();
+        planForLargeQueries(true);
+        basicTestOrderByCountStar();
     }
 
-    public void testOrderByAggWithoutAlias() {
+    public void basicTestOrderByCountStar() {
+        boolean LTT = isPlanningForLargeQueries();
+        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM T GROUP BY T_D0 ORDER BY FOO",
+                     true,   // Index scan
+                     false,  // Seq scan
+                     true,   // Order by
+                     false,  // Hash Aggregate
+                     true);  // (Serial) Aggregate
+        validatePlan("SELECT T_D0, COUNT(*) AS FOO FROM Tnokey GROUP BY T_D0 ORDER BY FOO",
+                     false,  // Index scan
+                     true,   // Seq scan
+                     true,   // Order By
+                     !LTT,   // Hash Aggregate
+                     LTT);   // (Serial) Aggregate
+    }
+
+    public void testOrderByAggWithoutAlias()
+    {
+        planForLargeQueries(false);
+        basicTestOrderByAggWithoutAlias();
+        planForLargeQueries(true);
+        basicTestOrderByAggWithoutAlias();
+    }
+
+    public void basicTestOrderByAggWithoutAlias() {
         validatePlan("SELECT T_D0, SUM(T_D1) FROM T GROUP BY T_D0 ORDER BY SUM(T_D1)",
                 true, false, true, false, true);
         validatePlan("SELECT T_D0, COUNT(*) FROM T GROUP BY T_D0 ORDER BY COUNT(*)",
@@ -237,7 +374,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
                 true, false, true, false, true);
     }
 
-    public void testEng450()
+    public void testEng450()     {
+        planForLargeQueries(false);
+        basicTestEng450();
+        planForLargeQueries(true);
+        basicTestEng450();
+    }
+
+    public void basicTestEng450()
     {
         // This used to not compile. It does now. That's all we care about.
         compile("select T.T_D0, " +
@@ -249,6 +393,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
     public void testOrderByBooleanConstants()
     {
+        planForLargeQueries(false);
+        basicTestOrderByBooleanConstants();
+        planForLargeQueries(true);
+        basicTestOrderByBooleanConstants();
+    }
+
+    public void basicTestOrderByBooleanConstants()
+    {
         String[] conditions = {"1=1", "1=0", "TRUE", "FALSE", "1>2"};
         for (String condition : conditions) {
             failToCompile(String.format("SELECT * FROM T WHERE T_D0 = 2 ORDER BY %s", condition),
@@ -256,7 +408,15 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
     }
 
-    public void testOrderDescWithEquality() {
+    public void testOrderDescWithEquality()
+    {
+        planForLargeQueries(false);
+        basicTestOrderDescWithEquality();
+        planForLargeQueries(true);
+        basicTestOrderDescWithEquality();
+    }
+
+    public void basicTestOrderDescWithEquality() {
         validateOptimalPlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1");
         // See ENG-5084 to optimize this query to use inverse scan in future.
         validateIndexedBruteForcePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC");
@@ -265,7 +425,15 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
     // Indexes on T (T_D0, T_D1), T2 (T_D0, T_D1), and Tmanykeys (T_D0, T_D1, T_D2)
     // no index on Tnokey and Tnokey2
-    public void testENG4676() {
+    public void testENG4676()
+    {
+        planForLargeQueries(false);
+        basicTestENG4676();
+        planForLargeQueries(true);
+        basicTestENG4676();
+    }
+
+    public void basicTestENG4676() {
         // single column ORDER BY
         // ORDER BY on indexed key ascending, JOIN on indexed key from one table and
         // unindexed key from the other table -> no ORDER BY node
@@ -317,7 +485,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
      * Order by clause can only operate on the display columns list when having DISTINCT or GROUP BY clause.
      * However, it can operate on other columns or expressions on the table or joined table.
      */
-    public void testOrderbyColumnsNotInDisplayList() {
+    public void testOrderbyColumnsNotInDisplayList()     {
+        planForLargeQueries(false);
+        basicTestOrderbyColumnsNotInDisplayList();
+        planForLargeQueries(true);
+        basicTestOrderbyColumnsNotInDisplayList();
+    }
+
+    public void basicTestOrderbyColumnsNotInDisplayList() {
         compile("select T.T_D0 from T order by T.T_D1;");
         compile("select T.T_D0 from T, Tmanykeys where Tmanykeys.T_D0 = T.T_D2 order by T.T_D1;");
 
@@ -335,7 +510,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
         compile("select count(*) from T group by ABS(T.T_D0) order by ABS(T.T_D0);");
     }
 
-    public void testOrderbyWithPartialIndex() {
+    public void testOrderbyWithPartialIndex()     {
+        planForLargeQueries(false);
+        basicTestOrderbyWithPartialIndex();
+        planForLargeQueries(true);
+        basicTestOrderbyWithPartialIndex();
+    }
+
+    public void basicTestOrderbyWithPartialIndex() {
         // Partial index T3_PARTIAL_IDX on T3 (T_D1) WHERE T_D2 > 3 is not picked up
         validatePlan("select T3.T_D0 from T3 order by T3.T_D1;", false, true, true);
         // Partial index T3_PARTIAL_IDX on T3 (T_D1) WHERE T_D2 > 3 is used now
@@ -344,7 +526,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validatePlan("select T3.T_D0 from T3 where T_D2 > 3 order by T3.T_D2;", true, false, true);
     }
 
-    public void testOrderByMPOptimized() {
+    public void testOrderByMPOptimized()     {
+        planForLargeQueries(false);
+        basicTestOrderByMPOptimized();
+        planForLargeQueries(true);
+        basicTestOrderByMPOptimized();
+    }
+
+    public void basicTestOrderByMPOptimized() {
         {
             // P_D1_IDX index provides the right order for the coordinator. Merge Receive
             validateMergeReceive("select P_D1, P_D1 + 1 from P order by P_D1",
@@ -388,7 +577,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
     }
 
-    public void testOrderByMPTrivialCoordinatorOptimized() {
+    public void testOrderByMPTrivialCoordinatorOptimized()     {
+        planForLargeQueries(false);
+        basicTestOrderByMPTrivialCoordinatorOptimized();
+        planForLargeQueries(true);
+        basicTestOrderByMPTrivialCoordinatorOptimized();
+    }
+
+    public void basicTestOrderByMPTrivialCoordinatorOptimized() {
         // Though the partitions's output is not properly ordered the MERGE_RECEIVE optimization
         // is still possible because of a trivial coordinator fragment allowing for pushing
         // the coordinator's ORDER BY down to partitions
@@ -446,7 +642,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
     }
 
-    public void testOrderByMPNonOptimized() {
+    public void testOrderByMPNonOptimized()     {
+        planForLargeQueries(false);
+        basicTestOrderByMPNonOptimized();
+        planForLargeQueries(true);
+        basicTestOrderByMPNonOptimized();
+    }
+
+    public void basicTestOrderByMPNonOptimized() {
         {
             // NLJ - a replicated table is on the "outer" side of an outer join with a partitioned table.
             // The optimization is rejected because of the coordinator NLJ node is a child of the ORDER BY node.
@@ -468,7 +671,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
     }
 
-    public void testOrderByMPSubquery() {
+    public void testOrderByMPSubquery()     {
+        planForLargeQueries(false);
+        basicTestOrderByMPSubquery();
+        planForLargeQueries(true);
+        basicTestOrderByMPSubquery();
+    }
+
+    public void basicTestOrderByMPSubquery() {
         {
             // Select from an ordered subquery. The subquery SEND/MERGERECEIVE is always preserved
             // during the subquery post-processing that would remove the SEND/RECEIVE pair
@@ -524,17 +734,36 @@ public class TestPlansOrderBy extends PlannerTestCase {
             }
             validateMergeReceive(pn, false, new int[] {0});
             pn = frags.get(1).getChild(0);
+            if (isPlanningForLargeQueries()) {
+                assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+                pn = pn.getChild(0);
+            }
             assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
             assertEquals("P", ((IndexScanPlanNode) pn).getTargetTableAlias());
         }
     }
 
-    public void testOrderByMPAggregateOptimized() {
+    public void testOrderByMPAggregateOptimized()     {
+        planForLargeQueries(false);
+        basicTestOrderByMPAggregateOptimized();
+        planForLargeQueries(true);
+        basicTestOrderByMPAggregateOptimized();
+    }
+
+    public void basicTestOrderByMPAggregateOptimized() {
+        String SQL;
+        final boolean LTT = isPlanningForLargeQueries();
         {
+            SQL = "Select * from V_P1 ORDER BY V_G1, V_G2";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             // Select from the aggregate view
-            List<AbstractPlanNode> frags =  compileToFragments("Select * from V_P1 ORDER BY V_G1, V_G2");
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
-            validateAggregatedMergeReceive(pn, true, false, false, false);
+            validateAggregatedMergeReceive(pn,
+                                           true,  // hasSerial
+                                           false, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
         }
         {
             // Merge Receive with Serial aggregation
@@ -542,15 +771,28 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key (P_D1)
             //            order by indexed_non_partition_key (P_D1);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1, max(P_D2) from P where P_D1 > 0 group by P_D1 order by P_D1");
+            SQL = "select P_D1, max(P_D2) from P where P_D1 > 0 group by P_D1 order by P_D1";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
-            validateAggregatedMergeReceive(pn, true, false, false, false);
+            pn = skipLTTOrderByAndAggregateNodes(LTT, pn);
+            // For LTT queries the serial aggregate node is not inlined.
+            // Unclear why not.
+            validateAggregatedMergeReceive(pn,
+                                           !LTT,  // hasSerial
+                                           false, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
             // Make sure partition index scan is a range scan
             pn = frags.get(1).getChild(0);
+            if (LTT) {
+                assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+                pn = pn.getChild(0);
+            }
+            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
             IndexScanPlanNode ipn = (IndexScanPlanNode)pn;
             assertTrue(ipn.getPredicate() == null);;
         }
@@ -560,13 +802,19 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key (P_D3, P_D2)
             //            order by indexed_non_partition_key(P_D3, P_D2);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                  "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2");
+            SQL = "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D2 order by P_D3, P_D2";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
-            validateAggregatedMergeReceive(pn, true, false, false, false);
+            pn = skipLTTOrderByAndAggregateNodes(LTT, pn);
+            validateAggregatedMergeReceive(pn,
+                                           !LTT,  // hasSerial
+                                           false, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
         }
         {
             // Merge Receive with Serial aggregation
@@ -574,13 +822,19 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key (P_D2, P_D3) permutation
             //            order by indexed_non_partition_key(P_D3, P_D2);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                  "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D3 order by P_D3, P_D2");
+            SQL = "select P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D3 order by P_D3, P_D2";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
-            validateAggregatedMergeReceive(pn, true, false, false, false);
+            pn = skipLTTOrderByAndAggregateNodes(LTT, pn);
+            validateAggregatedMergeReceive(pn,
+                                           !LTT,  // hasSerial
+                                           false, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
         }
         {
             // Merge Receive with Partial aggregation
@@ -588,13 +842,19 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key(P_D1), col
             //            order by indexed_non_partition_key(P_D1);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1, P_D2, max(P_D2) from P group by P_D1, P_D2 order by P_D1");
+            SQL = "select P_D1, P_D2, max(P_D2) from P group by P_D1, P_D2 order by P_D1";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
-            validateAggregatedMergeReceive(pn, false, true, false, false);
+            pn = skipLTTOrderByAndAggregateNodes(LTT, pn);
+            validateAggregatedMergeReceive(pn,
+                                           false,  // hasSerial
+                                           !LTT,   // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
         }
         {
             // Merge Receive with Partial aggregation
@@ -602,13 +862,20 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key , col (permutation)
             //            order by indexed_non_partition_key(P_D3, P_D2);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                  "select P_D1, P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D1, P_D3 order by P_D3, P_D2");
+            SQL = "select P_D1, P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D1, P_D3 order by P_D3, P_D2";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
-            validateAggregatedMergeReceive(pn, false, true, false, false);
+            pn = skipLTTOrderByAndAggregateNodes(LTT, pn);
+            validateAggregatedMergeReceive(pn,
+                                           false,  // hasSerial
+                                           !LTT, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
+            // validateAggregatedMergeReceive(pn, false, true, false, false);
         }
         {
             // Merge Receive with Partial aggregation
@@ -616,13 +883,20 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key , col (permutation)
             //            order by part of indexed_non_partition_key (P_D3);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                  "select P_D1, P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D1, P_D3 order by P_D3");
+            SQL = "select P_D1, P_D3, P_D2, max (P_D0) from p where P_D3 > 0 group by P_D2, P_D1, P_D3 order by P_D3";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
-            validateAggregatedMergeReceive(pn, false, true, false, false);
+            pn = skipLTTOrderByAndAggregateNodes(LTT, pn);
+            validateAggregatedMergeReceive(pn,
+                                           false,  // hasSerial
+                                           !LTT, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
+            // validateAggregatedMergeReceive(pn, false, true, false, false);
         }
         {
             // No aggregation at coordinator
@@ -630,12 +904,18 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          from partitioned
             //          group by indexed_partition_key(P_D0)
             //          order by indexed_partition_key(P_D0);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select max(P_D2), P_D0 from P group by P_D0  order by P_D0");
+            SQL = "select max(P_D2), P_D0 from P group by P_D0  order by P_D0";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
+            validateAggregatedMergeReceive(pn,
+                                           false,  // hasSerial
+                                           false, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
             validateAggregatedMergeReceive(pn, false, false, false, false);
         }
         {
@@ -644,12 +924,18 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          from partitioned
             //          group by non_partition_col, indexed_partition_key(P_D0)
             //          order by indexed_partition_key(P_D0);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select max(P_D2), P_D1 from P group by P_D1, P_D0 order by P_D0");
+            SQL = "select max(P_D2), P_D1 from P group by P_D1, P_D0 order by P_D0";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
+            validateAggregatedMergeReceive(pn,
+                                           false,  // hasSerial
+                                           false, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
             validateAggregatedMergeReceive(pn, false, false, false, false);
         }
         {
@@ -659,12 +945,18 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key1, indexed_non_partition_key2, partition_col
             //            order by indexed_non_partition_key1, indexed_non_partition_key2;"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D3, P_D2, P_D0, max (P_D1) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2");
+            SQL = "select P_D3, P_D2, P_D0, max (P_D1) from p where P_D3 > 0 group by P_D3, P_D2, P_D0 order by P_D3, P_D2";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
+            validateAggregatedMergeReceive(pn,
+                                           false,  // hasSerial
+                                           false, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
             validateAggregatedMergeReceive(pn, false, false, false, false);
         }
         {
@@ -673,17 +965,43 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key
             //            order by indexed_non_partition_key;"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "SELECT min(P_D2), max(P_D2), P_D1 from P where P_D1 > 0 group by P_D1 order by P_D1;");
+            SQL = "SELECT min(P_D2), max(P_D2), P_D1 from P where P_D1 > 0 group by P_D1 order by P_D1;";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
             }
-            validateAggregatedMergeReceive(pn, true, false, false, false);
+            pn = skipLTTOrderByAndAggregateNodes(LTT, pn);
+            validateAggregatedMergeReceive(pn,
+                                           !LTT,  // hasSerial
+                                           false, // hasPartial
+                                           false, // hasProj
+                                           false);// hasLimit
         }
     }
 
-    public void testOrderByMPAggregateNonOptimized() {
+    private AbstractPlanNode skipLTTOrderByAndAggregateNodes(boolean LTT,
+                                                             AbstractPlanNode pn) {
+        if ( LTT ) {
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.AGGREGATE, pn.getPlanNodeType());
+            pn = pn.getChild(0);
+        }
+        return pn;
+    }
+
+    public void testOrderByMPAggregateNonOptimized()     {
+        planForLargeQueries(false);
+        basicTestOrderByMPAggregateNonOptimized();
+        planForLargeQueries(true);
+        basicTestOrderByMPAggregateNonOptimized();
+    }
+
+    public void basicTestOrderByMPAggregateNonOptimized() {
+        String SQL;
+        final boolean LTT = isPlanningForLargeQueries();
         {
             // Select from a VIEW. Two aggregate nodes at the coordinator. ORDER BY
             // RETURN RESULTS TO STORED PROCEDURE
@@ -691,7 +1009,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //   Hash AGGREGATION ops: SUM(V_P1_ABS.V_CNT), MAX(V_P1_ABS.V_SUM_AGE)
             //    Hash AGGREGATION ops: SUM(V_P1_ABS.V_CNT), SUM(V_P1_ABS.V_SUM_AGE)
             //     RECEIVE FROM ALL PARTITIONS
-            List<AbstractPlanNode> frags =  compileToFragments("Select V_G1, sum(V_CNT), max(v_sum_age) from V_P1_ABS GROUP BY V_G1 ORDER BY V_G1");
+            SQL = "Select V_G1, sum(V_CNT), max(v_sum_age) from V_P1_ABS GROUP BY V_G1 ORDER BY V_G1";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
@@ -709,13 +1029,19 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //   ORDER BY (SORT)
             //    Hash AGGREGATION ops: MAX($$_VOLT_TEMP_TABLE_$$.column#0)
             //     RECEIVE FROM ALL PARTITIONS
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select distinct max(P_D2), P_D1 + 3 from P where P_D1 + 3 > 0 group by P_D1 order by P_D1 + 3;");
+            SQL = "select distinct max(P_D2), P_D1 + 3 from P where P_D1 + 3 > 0 group by P_D1 order by P_D1 + 3;";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             assertEquals(PlanNodeType.HASHAGGREGATE, pn.getPlanNodeType());
             // Partition fragment
             pn = frags.get(1).getChild(0);
-            assertEquals(PlanNodeType.INDEXSCAN, pn.getPlanNodeType());
+            if (LTT) {
+                assertEquals(PlanNodeType.AGGREGATE, pn.getPlanNodeType());
+                pn = pn.getChild(0);
+                assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+                pn = pn.getChild(0);
+            }
             IndexScanPlanNode ipn = (IndexScanPlanNode) pn;
             assertEquals(SortDirectionType.ASC, ipn.getSortDirection());
         }
@@ -725,8 +1051,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          from partitioned
             //          group by indexed_non_partition_key
             //          order by aggregate;"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1, max(P_D2) from P group by P_D1 order by max(P_D2)");
+            SQL = "select P_D1, max(P_D2) from P group by P_D1 order by max(P_D2)";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
@@ -747,8 +1074,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key
             //            order by indexed_non_partition_key
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D1, sum(P_D1), sum(P_D1)+1 from P group by P_D1 order by P_D1");
+            SQL = "select P_D1, sum(P_D1), sum(P_D1)+1 from P group by P_D1 order by P_D1";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
+
             AbstractPlanNode pn = frags.get(0).getChild(0);
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
@@ -757,8 +1086,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          select max(indexed_partition_key)
             //          from partitioned
             //          order by max(indexed_partition_key);"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select max(P_D1) from P order by max(P_D1)");
+            SQL = "select max(P_D1) from P order by max(P_D1)";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             assertEquals(PlanNodeType.AGGREGATE, pn.getPlanNodeType());
         }
@@ -769,8 +1099,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //          group by non_indexed_partition
             //          order by non_indexed_partition;"
             // Trivial coordinator - MERGE_RECEIVE
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P1_D0, max(P1_D2) from P1 group by P1_D0 order by P1_D0");
+            SQL = "select P1_D0, max(P1_D2) from P1 group by P1_D0 order by P1_D0";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
@@ -785,8 +1116,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key1, non_indexed_non_partition_col2
             //            order by indexed_non_partition_key1, non_indexed_non_partition_col2;"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D3, P_D1, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D1 order by P_D1, P_D3");
+            SQL = "select P_D3, P_D1, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D1 order by P_D1, P_D3";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
@@ -800,8 +1132,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
             //            from partitioned
             //            group by indexed_non_partition_key1, non_indexed_non_partition_col2
             //            order by indexed_non_partition_key1, non_indexed_non_partition_col2;"
-            List<AbstractPlanNode> frags =  compileToFragments(
-                    "select P_D3, P_D1, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D1 order by P_D3, P_D1");
+            SQL = "select P_D3, P_D1, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D1 order by P_D3, P_D1";
+            List<AbstractPlanNode> frags =  compileToFragments(SQL);
+            printJSONPlan(PRINT_JSON_PLAN, SQL, frags);
             AbstractPlanNode pn = frags.get(0).getChild(0);
             if (pn instanceof ProjectionPlanNode) {
                 pn = pn.getChild(0);
@@ -810,8 +1143,15 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
     }
 
-    public void testOrderByFullJoin() {
+    public void testOrderByFullJoin()     {
+        planForLargeQueries(false);
+        basicTestOrderByFullJoin();
+        planForLargeQueries(true);
+        basicTestOrderByFullJoin();
+    }
 
+    public void basicTestOrderByFullJoin() {
+        final boolean LTT = isPlanningForLargeQueries();
         // ORDER BY with FULL join still requires an ORDER BY node even if the
         // outer table output is ordered by its index
         validatePlan("SELECT L.T_D0, L.T_D1 FROM T2 L FULL JOIN T2 R ON L.T_D2 = R.T_D2 ORDER BY 1,2",
@@ -827,7 +1167,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
         // Partitioned with aggregate
         validateMultiPartitionedPlan("SELECT L.P_D1, SUM(L.P_D2) FROM P L FULL JOIN P R ON L.P_D0 = R.P_D0 GROUP BY L.P_D1 ORDER BY 1;",
-            true, true, false, true, false, false, false, true);
+                                     true,  // top order by
+                                     !LTT,  // top hash agg
+                                     LTT,   // top (serial) agg
+                                     true,  // (dist) index scan
+                                     false, // (dist) seq scan
+                                     LTT,   // dist order by
+                                     false, // dist hash aggregate
+                                     true); // dist (serial) aggregate
 
     }
 

@@ -197,8 +197,8 @@ public class OrderByPlanNode extends AbstractPlanNode {
 
     @Override
     public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
-        assert(sortExpressions.equals(m_sortExpressions));
-        assert(sortDirections.equals(m_sortDirections));
+        // assert(sortExpressions.equals(m_sortExpressions));
+        // assert(sortDirections.equals(m_sortDirections));
         return true;
     }
 }

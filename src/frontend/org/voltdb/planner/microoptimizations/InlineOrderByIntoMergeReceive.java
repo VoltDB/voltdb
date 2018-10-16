@@ -234,7 +234,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
             //  - the coordinator's plan below the ORDER BY node is trivial. At the moment only RECEIVE node is allowed.
             //    A future enhancement may allow PROJECTION/RECEIVE
             //  - Coordinator's ORDER BY node does not have inline LIMIT/OFFSET node. If a plan has an ORDER BY and
-            // LIMIT/OFFSET nodes, PlanAssembeler tries to push both of them to a partition fragment
+            // LIMIT/OFFSET nodes, PlanAssembler tries to push both of them to a partition fragment
             // as LIMIT pushed down optimization during the regular planning phase (PlanAssembler.handleSelectLimitOperator).
             // If it succeeds, the partition's output would be ordered and we wouldn't get there.
             // If we get there and ODER BY node does have inline LIMIT it means that the PlanAssembler

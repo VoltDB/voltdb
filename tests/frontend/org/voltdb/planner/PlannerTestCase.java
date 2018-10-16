@@ -30,15 +30,14 @@ import java.util.Map.Entry;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.utils.Pair;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
-import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.*;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanMatcher;
@@ -337,6 +336,14 @@ public class PlannerTestCase extends TestCase {
                                String basename) throws Exception {
         m_byDefaultInferPartitioning = inferPartitioning;
         m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
+    }
+
+    protected void planForLargeQueries(boolean b) {
+        m_aide.planForLargeQueries(b);
+    }
+
+    protected boolean isPlanningForLargeQueries() {
+        return m_aide.isPlanningForLargeQueries();
     }
 
     public String getCatalogString() {
@@ -706,68 +713,470 @@ public class PlannerTestCase extends TestCase {
                 stack.isEmpty());
     }
 
-    private String planNodeListString(List<PlanNodeType> list) {
-        StringBuilder buf = new StringBuilder();
-        String sep = "";
-        for (PlanNodeType pnt : list) {
-            buf.append(sep)
-               .append(pnt.name());
-            sep = ", ";
-        }
-        return buf.toString();
+    /**
+     * For use in lambdas.
+     */
+    protected interface IIndexScanMatcher {
+        boolean match(IndexScanPlanNode p);
     }
 
-    protected static class PlanWithInlineNodes implements PlanMatcher {
-        PlanNodeType m_type = null;
+    /**
+     * Match some kind of index scan plan node.
+     */
+    protected static class IndexScanPlanMatcher implements PlanMatcher {
+        private String      m_indexName;
 
-        List<PlanNodeType> m_branches = new ArrayList<>();
-        public PlanWithInlineNodes(PlanNodeType mainType, PlanNodeType ... nodes) {
-            m_type = mainType;
-            for (PlanNodeType node : nodes) {
-                m_branches.add(node);
+        /**
+         * Create an {@link IndexScanPlanMatcher} which must have a
+         * given named index.
+         *
+         * @param indexName The index we need to match.
+         */
+        public IndexScanPlanMatcher(String indexName) {
+            assert(indexName != null);
+            m_indexName = indexName;
+        }
+
+        @Override
+        public String match(AbstractPlanNode node, int fn, int nf) {
+            if ( ! (node instanceof IndexScanPlanNode) ) {
+                return String.format("Expected IndexScanPlanNode, not %s: fragment %d/%d, id %d",
+                                     node.getPlanNodeType(),
+                                     fn, nf, node.getPlanNodeId());
+            }
+
+            if (m_indexName != null) {
+                String idxName = ((IndexScanPlanNode) node).getTargetIndexName();
+                if (!m_indexName.equals(idxName)) {
+                    return String.format("Expected IndexScanPlanNode of index %s, not %s: fragment %d/%d, id %d",
+                                         m_indexName, idxName, fn, nf, node.getPlanNodeId());
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public String matchName() {
+            return "INDEX_SCAN_NODE[" + m_indexName + "]";
+        }
+    }
+
+    public static class MatchSchemaColumn {
+        String m_columnName;
+        VoltType m_columnType;
+        int m_columnIndex;
+        public MatchSchemaColumn(String columnName, VoltType columnType, int columnIndex) {
+            m_columnName = columnName;
+            m_columnType = columnType;
+            m_columnIndex = columnIndex;
+        }
+    }
+
+    public static MatchSchemaColumn[] makeSchema(Object ... args) {
+        assertTrue(args.length % 3 == 0);
+        MatchSchemaColumn[] answer = new MatchSchemaColumn[args.length/3];
+        for (int idx = 0; idx < args.length/3; idx += 1) {
+            assertTrue(args[3*idx] instanceof String);
+            assertTrue(args[3*idx+1] instanceof VoltType);
+            assertTrue(args[3*idx+2] instanceof Integer);
+            answer[idx] = new MatchSchemaColumn((String)args[3*idx],
+                                                (VoltType)args[3*idx+1],
+                                                (Integer)args[3*idx+2]);
+        }
+        return answer;
+    }
+    /**
+     * This matcher matches a node schema.  If the name is null, it
+     * matches everything.
+     */
+    protected static class OutputSchemaMatcher implements PlanMatcher {
+        private MatchSchemaColumn[] m_schema;
+
+        public OutputSchemaMatcher(Object ... args) {
+            assertTrue(args.length % 3 == 0);
+            m_schema = new MatchSchemaColumn[args.length/3];
+            for (int idx = 0; idx < args.length/3; idx += 1) {
+                assertTrue(args[3*idx] instanceof String);
+                assertTrue(args[3*idx+1] instanceof VoltType);
+                assertTrue(args[3*idx+2] instanceof Integer);
+                m_schema[idx] = new MatchSchemaColumn((String)args[3*idx],
+                                                      (VoltType)args[3*idx+1],
+                                                      (Integer)args[3*idx+2]);
             }
         }
 
         @Override
-        public String match(AbstractPlanNode node) {
-            PlanNodeType mainNodeType = node.getPlanNodeType();
-            if (m_type != mainNodeType) {
-                return String.format("PlanWithInlineNode: expected main plan node type %s, got %s "
-                                     + "at plan node id %d.",
-                                     m_type, mainNodeType,
-                                     node.getPlanNodeId());
-            }
-            for (PlanNodeType nodeType : m_branches) {
-                AbstractPlanNode inlineNode = node.getInlinePlanNode(nodeType);
-                if (inlineNode == null) {
-                    return String.format("Expected inline node type %s but didn't find it "
-                                         + "at plan node id %d.",
-                                         nodeType.name(),
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            int idx;
+            NodeSchema schema = node.getOutputSchema();
+            for (idx = 0; idx < m_schema.length && idx < schema.size(); idx += 1) {
+                String name = m_schema[idx].m_columnName;
+                VoltType type = m_schema[idx].m_columnType;
+                int index = m_schema[idx].m_columnIndex;
+                if ( index < 0 || schema.size() <= index) {
+                    return String.format("Index %d is too big for Output Schema Column of %s node whose length is %d: fragment %d/%d, id %d",
+                                         index,
+                                         node.getPlanNodeType(),
+                                         schema.size(),
+                                         fragmentNo,
+                                         numFragments,
+                                         node.getPlanNodeId());
+                }
+
+                SchemaColumn col = schema.getColumn(index);
+                if (name != null &&
+                        ! ( name.equals(col.getColumnAlias())
+                                || name.equals(col.getColumnName()))) {
+                    return String.format("Expected schema column with name or alias %s , not name %s, alias %s at %d: fragment %d/%d, id %d",
+                                         name,
+                                         col.getColumnName(),
+                                         col.getColumnAlias(),
+                                         index,
+                                         fragmentNo,
+                                         numFragments,
+                                         node.getPlanNodeId());
+                }
+                if (col.getValueType() != type) {
+                    return String.format("Expected schema type %s, found %s in column %d: fragment %d/%d, id %d",
+                                         type,
+                                         col.getValueType(),
+                                         index,
+                                         fragmentNo,
+                                         numFragments,
                                          node.getPlanNodeId());
                 }
             }
-            if (m_branches.size() != node.getInlinePlanNodes().size()) {
+            return null;
+        }
+
+        @Override
+        public String matchName() {
+            return null;
+        }
+    }
+    /**
+     * This class matches a substring of the conventional
+     * explain plan string.  It's most often used with
+     * allOf.
+     */
+    protected static class ExplainStringMatcher implements PlanMatcher {
+        String m_expected;
+
+        public ExplainStringMatcher(String expected) {
+            m_expected = expected;
+        }
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            if (node.toExplainPlanString().contains(m_expected)) {
+                return null;
+            }
+            return String.format("Expected \"%s\" in plan explain string: fragment %d/%d, id %d. ",
+                                 m_expected,
+                                 fragmentNo,
+                                 numFragments,
+                                 node.getPlanNodeId());
+        }
+
+        @Override
+        public String matchName() {
+            return "ExplainPlanContain[" + m_expected + "]";
+        }
+    }
+    /**
+     * Match an aggregate node of some kind.  This can
+     * be hash, partial or serial aggregate.
+     */
+    protected static class AggregateNodeMatcher implements PlanMatcher {
+        private PlanMatcher m_mainMatcher;
+        private ExpressionType[] m_aggOps;
+
+        /**
+         * Create a plan matcher which will match a specific aggregate,
+         * with a set of aggregate operations.
+         * @param mainMatcher The node matcher.  This a plan matcher.
+         *                    Any node which matches this matcher must
+         *                    be an instance of AggregatePlanNode.
+         * @param aggOps An array of aggregate expressions.  This must
+         *               be a subset of the node's aggregate operations.
+         */
+        public AggregateNodeMatcher(PlanMatcher mainMatcher,
+                                    ExpressionType ... aggOps) {
+            m_mainMatcher = mainMatcher;
+            m_aggOps = aggOps;
+        }
+
+        /**
+         * Create a plan matcher which will match any aggregate
+         * plan node, but require that there are at least the given
+         * aggregate operations.
+         *
+         * @param aggOps
+         */
+        public AggregateNodeMatcher(ExpressionType ... aggOps) {
+            m_mainMatcher = null;
+            m_aggOps = aggOps;
+        }
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            // This is really a test failure.  The matcher
+            // should be something like an AggregatePlanNode.
+            assertTrue(String.format(
+                            "Expected an AggregatePlanNode, not %s: fragment %d/%d, id %d.",
+                            node.getPlanNodeType(),
+                            fragmentNo,
+                            numFragments,
+                            node.getPlanNodeId()),
+                       node instanceof AggregatePlanNode);
+            AggregatePlanNode pn = (AggregatePlanNode) node;
+            String err = null;
+            if (m_mainMatcher != null) {
+                err = m_mainMatcher.match(node, fragmentNo, numFragments);
+                if (err != null) {
+                    return err;
+                }
+            }
+            List<ExpressionType> expTypes = pn.getAggregateTypes();
+            for (ExpressionType type : m_aggOps) {
+                if ( ! expTypes.contains(type)) {
+                    return String.format("Expected aggregate %s here: fragment %d/%d, id %d",
+                                         type, fragmentNo, numFragments, node.getPlanNodeId());
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public String matchName() {
+            return String.format("AggregateNode(%s)",
+                                 m_mainMatcher.matchName());
+        }
+    }
+
+    protected interface NodeTester {
+        boolean match(AbstractPlanNode node);
+    }
+
+    /**
+     * This class is used most often with allOf.  It
+     * takes a description and a test function, which is
+     * a boolean predicate on nodes.  It is alot like
+     * the PlanMatcher interface, but it make things
+     * a bit more easy to read.
+     */
+    protected class NodeTestMatcher implements PlanMatcher {
+        String m_name;
+        NodeTester m_tester;
+
+        public NodeTestMatcher(String name,
+                               NodeTester tester) {
+            m_name = name;
+            m_tester = tester;
+        }
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            if (m_tester.match(node)) {
+                return null;
+            }
+            return String.format("NodeTest %s failed: fragment %d/%d, id %d",
+                                 m_name,
+                                 fragmentNo,
+                                 numFragments,
+                                 node.getPlanNodeId());
+        }
+
+        @Override
+        public String matchName() {
+            return m_name;
+        }
+    }
+    /**
+     * This is a plan node which is optional.  If the match
+     * function is applied to a node and fails we don't
+     * move on to the next node.  This just defers to
+     * the parameter node.  The magic happens in validatePlan.
+     *
+     * This is useful for writing a function which validates
+     * plan patterns.  For example, we may sometimes have two
+     * sql statements, S1 and S2, have similar plans, but one
+     * has an extra projection node.  We can write a function
+     * to match them, match the projection node if it
+     * shows up and just continue matching if the projection
+     * node does not show up.
+     */
+    protected static class OptionalPlanNode implements PlanMatcher {
+
+        private final PlanMatcher m_nodeMatcher;
+
+        public OptionalPlanNode(PlanMatcher nodeMatcher) {
+            m_nodeMatcher = nodeMatcher;
+        }
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            return m_nodeMatcher.match(node, fragmentNo, numFragments);
+        }
+
+        @Override
+        public String matchName() {
+            return m_nodeMatcher.matchName();
+        }
+    }
+
+    /**
+     * Match if a condition holds.  Otherwise treat this as
+     * OptionalPlanNode.  If
+     */
+    protected static class MatchIf extends OptionalPlanNode {
+        boolean m_condition;
+        public MatchIf(boolean condition, PlanMatcher matcher) {
+            super(matcher);
+            m_condition = condition;
+        }
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            if ( ! m_condition ) {
+                return "MatchIf fails";
+            } else {
+                String err = super.match(node, fragmentNo, numFragments);
+                if (err != null) {
+                    return err;
+                }
+                return null;
+            }
+        }
+
+        @Override
+        public String matchName() {
+            return "MatchIf";
+        }
+    }
+    /**
+     * Match a plan with inline nodes.  All inline nodes must be
+     * listed.  Optional inline nodes are not allowed here.
+     */
+    protected static class PlanWithInlineNodes implements PlanMatcher {
+        PlanMatcher m_type = null;
+
+        List<PlanMatcher> m_branches = new ArrayList<>();
+
+        /**
+         * Create a matcher for a plan node with inline nodes.
+         *
+         * @param mainType This is the matcher for the main node.
+         *                 It is typically a node type, but it coule
+         *                 be something like {@link IndexScanPlanMatcher}
+         *                 or the final static member AbstractJoinPlanNodeMatcher.
+         * @param nodes These are matchers for the inline nodes.  These are
+         *              typically node types, but they can be any PlanMatcher.
+         */
+        public PlanWithInlineNodes(PlanMatcher mainType, PlanMatcher ... nodes) {
+            m_type = mainType;
+            for (PlanMatcher node : nodes) {
+                m_branches.add(node);
+            }
+        }
+
+        private String branchNames() {
+            StringBuilder sb = new StringBuilder();
+            String sep = "";
+            for (PlanMatcher branch : m_branches) {
+                sb.append(sep).append(branch.matchName());
+                sep = ", ";
+            }
+            return sb.toString();
+        }
+
+        /**
+         * Find an inline plan node type whose node matches a PlanMatcher.
+         * Usually the PlanMatcher is a PlanNodeType, so we
+         * just look it up.  Otherwise we need to grovel through
+         * the inline plan node map.
+         *
+         * @param node The node containing inline nodes.
+         * @param pm The matcher
+         * @param fn The fragment number
+         * @param nf The number of fragments
+         * @return A plan node type or null
+         */
+        private PlanNodeType findMatchingNode(AbstractPlanNode node, PlanMatcher branch, int fn, int nf) {
+            if (branch instanceof PlanNodeType) {
+                PlanNodeType type = (PlanNodeType)branch;
+                if (node.getInlinePlanNode(type) != null) {
+                    return type;
+                }
+                return null;
+            }
+            // Try to match all the entries.  It's unfortunate
+            // that we have to do a search like this.
+            for (Map.Entry<PlanNodeType, AbstractPlanNode> entry : node.getInlinePlanNodes().entrySet()) {
+                // Null is a match.
+                if (null == branch.match(entry.getValue(), fn, nf)) {
+                    return entry.getKey();
+                }
+            }
+            return null;
+        }
+        @Override
+        public String match(AbstractPlanNode node, int fragmentNo, int numberFragments) {
+            String err = m_type.match(node, fragmentNo, numberFragments);
+            if (err != null) {
+                return err;
+            }
+
+            // This is the inline types we will try to match.
+            Set<PlanNodeType> inlineTypes = new HashSet<>();
+            inlineTypes.addAll(node.getInlinePlanNodes().keySet());
+            for (PlanMatcher branch : m_branches) {
+                AbstractPlanNode inlineNode = null;
+                PlanNodeType matchingType = findMatchingNode(node, branch, fragmentNo, numberFragments);
+                if (matchingType == null) {
+                    return String.format("Expected inline node type %s but didn't find it: "
+                                                 + "fragment %d/%d, id %d.",
+                                         branch.matchName(),
+                                         fragmentNo,
+                                         numberFragments,
+                                         node.getPlanNodeId());
+                }
+                inlineTypes.remove(matchingType);
+            }
+            if (! inlineTypes.isEmpty()) {
+                String expected = branchNames();
                 StringBuilder buf = new StringBuilder();
                 String sep = "";
-                for (PlanNodeType pnt : m_branches) {
-                    buf.append(sep).append(pnt.name());
-                }
-                String expected = buf.toString();
-                buf = new StringBuilder();
-                sep = "";
-                for (Map.Entry<PlanNodeType, AbstractPlanNode> entry : node.getInlinePlanNodes().entrySet()) {
+                for (Entry<PlanNodeType, AbstractPlanNode> entry : node.getInlinePlanNodes().entrySet()) {
                     buf.append(sep).append(entry.getKey().name());
                     sep = ", ";
                 }
                 String found = buf.toString();
-                return String.format("Expected %d inline nodes (%s), found %d (%s) at node id %d.",
+                return String.format("Expected %d inline nodes (%s), found %d (%s): fragment %d/%d, id %d",
                                      m_branches.size(),
                                      expected,
                                      node.getInlinePlanNodes().size(),
                                      found,
+                                     fragmentNo,
+                                     numberFragments,
                                      node.getPlanNodeId());
             }
             return null;
+        }
+
+        @Override
+        public String matchName() {
+            return m_type.toString() + "[" + branchNames() + "]";
         }
     }
 
@@ -787,16 +1196,24 @@ public class PlannerTestCase extends TestCase {
      */
     private static PlanMatcher makePlanMatcher(Object obj) {
         if (obj instanceof PlanNodeType) {
-            return (node) -> {
-                        PlanNodeType pnt = (PlanNodeType)obj;
-                        if (node.getPlanNodeType() != (PlanNodeType)obj) {
-                            return String.format("Expected Plan Node Type %s not %s at node id %d",
-                                                 pnt.name(),
-                                                 node.getPlanNodeType().name(),
-                                                 node.getPlanNodeId());
-                        }
-                        return null;
-                    };
+            return new PlanMatcher() {
+                public String match(AbstractPlanNode node, int fragmentNo, int numberFragments) {
+                    PlanNodeType pnt = (PlanNodeType)obj;
+                    if (node.getPlanNodeType() != (PlanNodeType)obj) {
+                        return String.format("Expected Plan Node Type %s not %s: fragment %d/%d, id %d",
+                                             pnt.name(),
+                                             node.getPlanNodeType().name(),
+                                             fragmentNo,
+                                             numberFragments,
+                                             node.getPlanNodeId());
+                    }
+                    return null;
+                }
+
+                public String matchName() {
+                    return ((PlanNodeType)obj).toString();
+                }
+            };
         }
         else if (obj instanceof PlanMatcher) {
             return (PlanMatcher)obj;
@@ -805,6 +1222,98 @@ public class PlannerTestCase extends TestCase {
             throw new PlanningErrorException("Bad fragment specification type.");
         }
     }
+
+    protected static PlanMatcher AbstractScanPlanNodeMatcher
+            = new PlanMatcher() {
+                public String match(AbstractPlanNode p, int fragmentNo, int numFragments) {
+                    if (p instanceof AbstractScanPlanNode) {
+                        return null;
+                    }
+                    return String.format("Expected AbstractScanPlanNode, not %s: fragment %d/%d, id %d",
+                                         p.getPlanNodeType(), fragmentNo, numFragments, p.getPlanNodeId());
+                }
+
+                public String matchName() {
+                    return "AbstractScanPlanNodeMatcher";
+                }
+            };
+
+    protected final static PlanMatcher AbstractJoinPlanNodeMatcher
+            = new PlanMatcher() {
+                    public String match(AbstractPlanNode p,
+                                        int fragmentNo,
+                                        int numFragments) {
+                        if (p instanceof AbstractJoinPlanNode) {
+                            return null;
+                        }
+                        return String.format("Expected AbstractJoinPlanNode, not %s: fragment %d/%d, id %d",
+                                             p.getPlanNodeType(), fragmentNo, numFragments, p.getPlanNodeId());
+                    }
+
+                    public String matchName() {
+                        return "AbstractJoinPlanNodeMatcher";
+                    }
+                };
+
+    /**
+     * A matcher that matches any kind of receive node.
+     */
+    protected final static PlanMatcher AbstractReceivePlanMatcher
+            = new PlanMatcher() {
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            switch (node.getPlanNodeType()) {
+                case RECEIVE:
+                    return null;
+                case MERGERECEIVE:
+                    if (node.getInlinePlanNode(PlanNodeType.ORDERBY) == null) {
+                        return String.format("MERGERECEIVE node expects an inline ORDERBY: fragment %d/%d, id %d",
+                                             fragmentNo, numFragments, node.getPlanNodeId());
+                    }
+                    return null;
+                default:
+                    return String.format("Expected some kind of receive node, not %s: fragment %d/%d, id %d",
+                                         node.getPlanNodeType(),
+                                         fragmentNo,
+                                         numFragments,
+                                         node.getPlanNodeId());
+            }
+        }
+
+        @Override
+        public String matchName() {
+            return "AbstractReceivePlanMatcher";
+        }
+    };
+
+    protected final PlanMatcher MergeReceivePlanMatcher = new PlanMatcher() {
+        @Override
+        public String match(AbstractPlanNode node, int fragmentNo, int numFragments) {
+            if (node.getPlanNodeType() != PlanNodeType.MERGERECEIVE) {
+                return String.format("Expected MERGERECEIVE node, not %s: fragment %d/d id %d",
+                        node.getPlanNodeType(),
+                        fragmentNo,
+                        numFragments,
+                        node.getPlanNodeId());
+            }
+            if (node.getInlinePlanNode(PlanNodeType.ORDERBY) == null) {
+                return String.format("MERGERECEIVE node expects an inline ORDERBY: fragment %d/%d, id %d",
+                        fragmentNo,
+                        numFragments,
+                        node.getPlanNodeId());
+            }
+            // Guess we are happy with this.
+            return null;
+        }
+
+        @Override
+        public String matchName() {
+            return "MergeReceivePlanMatcher";
+        }
+    };
 
     protected static class FragmentSpec implements PlanMatcher {
         private List<PlanMatcher> m_nodeSpecs = new ArrayList<>();
@@ -816,12 +1325,24 @@ public class PlannerTestCase extends TestCase {
         }
 
         @Override
-        public String match(AbstractPlanNode node) {
+        public String match(AbstractPlanNode node, int fragmentNo, int numberFragments) {
             int idx;
             for (idx = 0; node != null && idx < m_nodeSpecs.size(); idx += 1) {
                 PlanMatcher pm = m_nodeSpecs.get(idx);
-                String err = pm.match(node);
+                // Magic AnyFragment matches everything
+                // after this, with no testing.
+                if (pm instanceof AnyFragment) {
+                    return null;
+                }
+                String err = pm.match(node, fragmentNo, numberFragments);
                 if (err != null) {
+                    /*
+                     * This is the magic of OptionalPlanNode.
+                     * If this spec fails, then just ignore it.
+                     */
+                    if ( pm instanceof OptionalPlanNode ) {
+                        continue;
+                    }
                     return err;
                 }
                 // Nodes with multiple children, such as join
@@ -844,9 +1365,15 @@ public class PlannerTestCase extends TestCase {
                 return "Expected fewer nodes in plan at node "
                        + (idx + 1)
                        + ": "
-                       + node.getPlanNodeType();
+                       + node.getPlanNodeType()
+                       + ", id: "
+                       + node.getPlanNodeId();
             }
             return null;
+        }
+
+        public String matchName() {
+            return "fragmentSpec";
         }
     }
 
@@ -892,9 +1419,9 @@ public class PlannerTestCase extends TestCase {
         }
 
         @Override
-        public String match(AbstractPlanNode node) {
+        public String match(AbstractPlanNode node, int fragmentNo, int numFragments) {
             for (PlanMatcher pm : m_allMatchers) {
-                String error = pm.match(node);
+                String error = pm.match(node, fragmentNo, numFragments);
                 if (error != null) {
                     if (m_needAll) {
                         return error;
@@ -935,8 +1462,39 @@ public class PlannerTestCase extends TestCase {
                 return null;
             }
         }
+
+        @Override
+        public String matchName() {
+            if (m_needAll) {
+                return "allOf";
+            }
+            if (m_needSome) {
+                return "someOf";
+            }
+            return "noneOf";
+        }
+
     }
 
+    /**
+     * A matcher which will match any fragment.  This is
+     * all nodes of any fragment.  This is magic in the
+     * matching routine.
+     */
+    protected static class AnyFragment implements PlanMatcher {
+
+        @Override
+        public String match(AbstractPlanNode node,
+                            int fragmentNo,
+                            int numFragments) {
+            return null;
+        }
+
+        @Override
+        public String matchName() {
+            return "AnyFragment";
+        }
+    }
     /**
      * Match all the given node specifications.  Specifications
      * after the first failure are not evaluated.
@@ -995,38 +1553,59 @@ public class PlannerTestCase extends TestCase {
      */
     protected void validatePlan(String SQL,
                                 FragmentSpec ... spec) {
-        // All this System.out.printf nonsense should be changed
-        // to a log message somehow.
-        List<AbstractPlanNode> fragments;
-        if (spec.length > 1) {
-            fragments = compileToFragments(SQL);
-        } else {
-            fragments = new ArrayList<>();
-            fragments.add(compileForSinglePartition(SQL));
-        }
-        System.out.printf("SQL: %s\n", SQL);
-        for (int idx = 0; idx < fragments.size(); idx += 1) {
-            AbstractPlanNode node = fragments.get(idx);
-            System.out.printf("Node %d/%d:\n%s\n", idx + 1, fragments.size(), node.toExplainPlanString());
-            printJSONString(node);
-        }
+        validatePlan(SQL, true, spec);
+    }
+
+    /**
+     * Validate the plan of a SQL query.  We allow the possibility of printing
+     * the JSON and explain strings of the plan.
+     *
+     * @param SQL       A SQL query.
+     * @param printPlan If this is true we print the JSON plan before
+     *                  validating it.
+     * @param spec      The specifications of the plans.
+     */
+    protected void validatePlan(String SQL,
+                                boolean printPlan,
+                                FragmentSpec ... spec) {
+        List<AbstractPlanNode> fragments = compileToFragments(SQL);
+        printJSONPlan(printPlan, SQL, fragments);
         assertEquals(String.format("Expected %d fragments, not %d",
                                    spec.length,
                                    fragments.size()),
                      spec.length,
                      fragments.size());
         for (int idx = 0; idx < fragments.size(); idx += 1) {
-            String error = spec[idx].match(fragments.get(idx));
+            String error = spec[idx].match(fragments.get(idx), idx + 1, fragments.size());
             assertNull(error, error);
         }
     }
 
-    private void printJSONString(AbstractPlanNode node) {
-        try {
-            String jsonString = PlanSelector.outputPlanDebugString(node);
-            System.out.printf("Json:\n%s\n", jsonString);
-        } catch (Exception ex) {
-            ex.printStackTrace();
+    protected void printJSONPlan(boolean printPlan,
+                                 String SQL) {
+        if (printPlan) {
+            printJSONPlan(printPlan, SQL, compileToFragments(SQL));
         }
     }
+
+    protected void printJSONPlan(boolean printPlan,
+                                 String SQL,
+                                 List<AbstractPlanNode> fragments) {
+        if (printPlan) {
+            System.out.printf("SQL: %s\n", SQL);
+        }
+        if (printPlan) {
+            for (int idx = 0; idx < fragments.size(); idx += 1) {
+                AbstractPlanNode node = fragments.get(idx);
+                System.out.printf("Fragment %d/%d:\n%s\n", idx + 1, fragments.size(), node.toExplainPlanString());
+                printJSONString(node);
+            }
+        }
+    }
+
+    private void printJSONString(AbstractPlanNode node) {
+        String jsonString = node.toJSONExplainString(m_aide.m_planForLargeQueries);
+        System.out.printf("Json:\n%s\n", jsonString);
+    }
+
 }

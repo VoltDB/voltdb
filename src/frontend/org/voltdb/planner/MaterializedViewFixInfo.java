@@ -37,13 +37,9 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
-import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.plannodes.*;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -66,9 +62,6 @@ public class MaterializedViewFixInfo {
     private boolean m_needed = false;
     // materialized view table
     private StmtTableScan m_mvTableScan = null;
-
-    // Scan Node for join query.
-    AbstractScanPlanNode m_scanNode = null;
 
     // ENG-5386: Edge case query.
     private boolean m_edgeCaseQueryNoFixNeeded = true;
@@ -371,11 +364,20 @@ public class MaterializedViewFixInfo {
 
 
     /**
-     * Find the scan node on MV table, replace it with reAggNode for join query.
+     * Find the scan node on MV table.  We will eventually replace it, but not
+     * right now.  Just find out where it should go.  The reaggregation node we
+     * insert will be the ith child of the parent of the node we record.  Since
+     * this only happens in a join node, the scan node always has a parent.
+     *
      * This scan node can not be in-lined, so it should be as a child of a join node.
-     * @param node
+     * @param node  The send node under which we will start searching.
+     * @param onlyForProjection We may only want to insert a projection node into the child.
+     *                          We may not actually want to insert an aggregate node.
+     * @param insertionLocation A scratch pad to record what we need.
      */
-    public boolean processScanNodeWithReAggNode(AbstractPlanNode node, AbstractPlanNode reAggNode) {
+    public boolean locateMVFixAggNodeForScan(AbstractPlanNode node,
+                                             boolean onlyForProjection,
+                                             MVFixInsertionLocation insertionLocation) {
         // MV table scan node can not be in in-lined nodes.
         for (int i = 0; i < node.getChildCount(); i++) {
             AbstractPlanNode child = node.getChild(i);
@@ -385,18 +387,14 @@ public class MaterializedViewFixInfo {
                 if (!scanNode.getTargetTableName().equals(getMVTableName())) {
                     continue;
                 }
-                if (reAggNode != null) {
-                    // Join query case.
-                    node.setAndLinkChild(i, reAggNode);
+                if ( ! onlyForProjection ) {
+                    insertionLocation.setNode(child, m_scanInlinedProjectionNode);
                 }
-                // Process scan node.
-                // Set up the scan plan node's scan columns. Add in-line projection node for scan node.
-                scanNode.addInlinePlanNode(m_scanInlinedProjectionNode);
-                m_scanNode = scanNode;
+                child.addInlinePlanNode(m_scanInlinedProjectionNode);
                 return true;
             }
             else {
-                boolean replaced = processScanNodeWithReAggNode(child, reAggNode);
+                boolean replaced = locateMVFixAggNodeForScan(child, onlyForProjection, insertionLocation);
                 if (replaced) {
                     return true;
                 }
@@ -469,5 +467,45 @@ public class MaterializedViewFixInfo {
         AbstractExpression remaningFilters = ExpressionUtil.combinePredicates(remaningExprs);
         // Update new filters for the scanNode.
         return remaningFilters;
+    }
+
+    /**
+     * This holds the location into which we will insert an
+     * aggregation cluster for the MVFix.  We call this a
+     * cluster because we may insert an {@link AggregatePlanNode}
+     * with an {@link OrderByPlanNode} child below it, or we may
+     * insert a single {@link HashAggregatePlanNode}.  So, it
+     * might be one node or two related nodes.
+     *
+     * In the first case, the {@link AggregatePlanNode} will know how to make
+     * the {@link OrderByPlanNode}.  The {@link HashAggregatePlanNode}
+     * will just return null when it's asked for its {@link OrderByPlanNode},
+     * so nothing will be inserted.\
+     *
+     * This could be part of MateralizedViewFixInfo.  But objects of that
+     * class may be used for multiple plans.  This is just a small scratchpad
+     * useful for one plan.  We don't want to risk cross-plan data
+     * contamination.
+     */
+    static class MVFixInsertionLocation {
+        /**
+         * This is the node where we want to insert the new
+         * aggregation cluster.
+         */
+        private AbstractPlanNode     m_node;
+        private ProjectionPlanNode   m_inlineProjection;
+
+        public AbstractPlanNode getNode() {
+            return m_node;
+        }
+
+        public ProjectionPlanNode getInlineProjection() {
+            return m_inlineProjection;
+        }
+
+        public void setNode(AbstractPlanNode node, ProjectionPlanNode inlineProjection) {
+            m_node = node;
+            m_inlineProjection = inlineProjection;
+        }
     }
 }

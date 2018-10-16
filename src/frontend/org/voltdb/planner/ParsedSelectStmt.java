@@ -82,7 +82,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean m_hasPartitionColumnInGroupby = false;
     private boolean m_hasAggregateDistinct = false;
-    private boolean m_hasPartitionColumnInDistinctGroupby = false;
     private boolean m_isComplexOrderBy = false;
 
     // Limit plan node information.
@@ -161,8 +160,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param paramValues
      * @param db
      */
-    public ParsedSelectStmt(AbstractParsedStmt parent, String[] paramValues, Database db) {
-        super(parent, paramValues, db);
+    public ParsedSelectStmt(AbstractParsedStmt parent, String[] paramValues, Database db, boolean isLargeQuery) {
+        super(parent, paramValues, db, isLargeQuery);
     }
 
     // update table names, convert all expressions to TupleValueExpressions, and also update each expression's
@@ -1840,14 +1839,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_hasPartitionColumnInGroupby = true;
     }
 
-    public boolean hasPartitionColumnInDistinctGroupby() {
-        return m_hasPartitionColumnInDistinctGroupby;
-    }
-
-    public void setHasPartitionColumnInDistinctGroupby() {
-        m_hasPartitionColumnInDistinctGroupby = true;
-    }
-
     /**
      * Return true iff all windowed aggregate expressions have a
      * partition key in their partition by columns.
@@ -2331,6 +2322,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (size != m_orderColumns.size()) {
             return false;
         }
+        // Put some of the order by expressions and
+        // group by key expressions in hash sets, to test
+        // for equality.
+        //
+        // Note that we will not put the iith group by and
+        // the iith order by expression in the sets if
+        // they are equal.  If they are equal we know
+        // they are in both sets, and that's good enough.
         Set<AbstractExpression> orderPrefixExprs = new HashSet<>(size);
         Set<AbstractExpression> groupExprs = new HashSet<>(size);
         int ii = 0;
@@ -2348,6 +2347,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             groupExprs.add(gexpr);
             orderPrefixExprs.add(oexpr);
         }
+        // Test for set equality here.  This is potentially n^2.
         m_groupAndOrderByPermutationResult = groupExprs.equals(orderPrefixExprs);
         return m_groupAndOrderByPermutationResult;
     }
@@ -2655,7 +2655,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     protected AbstractParsedStmt parseCommonTableStatement(VoltXMLElement queryNode, boolean isBaseCase) {
-        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this, queryNode, m_paramValues, m_db);
+        AbstractParsedStmt commonTableStmt = AbstractParsedStmt.getParsedStmt(this,
+                                                                              queryNode,
+                                                                              m_paramValues,
+                                                                              m_db,
+                                                                              isLargeQuery());
         // Propagate parameters from the parent to the child
         commonTableStmt.m_paramsById.putAll(m_paramsById);
         commonTableStmt.setParamsByIndex(getParamsByIndex());
