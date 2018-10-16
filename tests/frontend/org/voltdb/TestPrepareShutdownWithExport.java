@@ -81,16 +81,7 @@ public class TestPrepareShutdownWithExport extends TestExportBase
 
         //push out export buffer and verify if there are any export queue.
         waitForExportAllocatedMemoryZero(client2);
-        exportVerify(false, 10000);
-
-        for (ClientConnectionHandler s : m_clients) {
-            s.stopClient();
-        }
-
-        m_clients.clear();
-        m_serverSocket.close();
-        m_serverSocket = null;
-        m_seenIds.clear();
+        verifyExportedTuples(10000);
 
         long sum = Long.MAX_VALUE;
         while (sum > 0) {

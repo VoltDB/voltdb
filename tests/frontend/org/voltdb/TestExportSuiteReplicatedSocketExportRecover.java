@@ -87,7 +87,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         }
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        exportVerify(false, 1000);
+        verifyExportedTuples(1000);
         client.close();
         config.overrideStartCommandVerb("recover");
         if (MiscUtils.isPro()) {
@@ -106,7 +106,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         }
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        exportVerify(false, 2000);
+        verifyExportedTuples(2000);
     }
 
     public TestExportSuiteReplicatedSocketExportRecover(final String name) {

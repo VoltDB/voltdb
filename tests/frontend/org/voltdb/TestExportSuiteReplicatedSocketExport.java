@@ -80,7 +80,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        exportVerify(false, 5000);
+        verifyExportedTuples(5000);
 
         for (int i=5000;i<10000;i++) {
             insertSql = new StringBuilder();
@@ -89,7 +89,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        exportVerify(false, 10000);
+        verifyExportedTuples(10000);
 
         for (int i=10000;i<15000;i++) {
             insertSql = new StringBuilder();
@@ -98,7 +98,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        exportVerify(false, 15000);
+        verifyExportedTuples(15000);
 
         for (int i=15000;i<30000;i++) {
             insertSql = new StringBuilder();
@@ -107,7 +107,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        exportVerify(false, 30000);
+        verifyExportedTuples(30000);
 
         for (int i=30000;i<45000;i++) {
             insertSql = new StringBuilder();
@@ -116,7 +116,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        exportVerify(false, 45000);
+        verifyExportedTuples(45000);
     }
 
     public void testExportReplicatedExportToSocketRejoin() throws Exception {
@@ -133,7 +133,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        exportVerify(false, 50);
+        verifyExportedTuples(50);
 
         config.killSingleHost(1);
         config.recoverOne(1, 0, "");
@@ -146,7 +146,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.drain();
         waitForExportAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
-        exportVerify(false, 100);
+        verifyExportedTuples(100);
 
         config.killSingleHost(2);
         config.recoverOne(2, 0, "");
@@ -159,7 +159,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.drain();
         waitForExportAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
-        exportVerify(false, 150);
+        verifyExportedTuples(150);
 
         //Kill host with all masters now.
         config.killSingleHost(0);
@@ -174,7 +174,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
         waitForExportAllocatedMemoryZero(client);
-        exportVerify(false, 2000);
+        verifyExportedTuples(2000);
     }
 
     public TestExportSuiteReplicatedSocketExport(final String name) {

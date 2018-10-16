@@ -31,9 +31,9 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ProcedurePartitionData;
@@ -303,25 +303,12 @@ public class TestExportBase extends RegressionSuite {
         assertTrue(passed);
     }
 
-    protected void exportVerify(boolean exact, int expsize) {
+    protected void verifyExportedTuples(int expsize) {
         assertTrue(m_seenIds.size() > 0);
-        long st = System.currentTimeMillis();
-        //Wait 2 mins only
-        long end = System.currentTimeMillis() + (2 * 60 * 1000);
+        long end = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(5);
         boolean passed = false;
         while (true) {
-            boolean passedThisTime = true;
-            for (Entry<Long, AtomicLong> l : m_seenIds.entrySet()) {
-                //If we have seen at least expectedTimes number
-                if (exact) {
-                    if (l.getValue().longValue() != m_copies) {
-                        System.out.println("[Exact] Invalid id: " + l.getKey() + " Count: " + l.getValue().longValue());
-                        passedThisTime = false;
-                        break;
-                    }
-                }
-            }
-            if (passedThisTime) {
+            if (m_seenIds.size() == expsize) {
                 passed = true;
                 break;
             }
@@ -330,23 +317,16 @@ public class TestExportBase extends RegressionSuite {
                 System.out.println("Waited too long...");
                 break;
             }
-            if (ctime - st > (3 * 60 * 1000)) {
-                st = System.currentTimeMillis();
-            }
             try {
                 Thread.sleep(5000);
             } catch (InterruptedException ex) {
-
             }
-            System.out.println("Failed this time wait for socket export to arrive.");
         }
         System.out.println("Seen Id size is: " + m_seenIds.size() + " expected:" + expsize + " Passed: " + passed);
-        assertTrue(m_seenIds.size() == expsize);
         assertTrue(passed);
     }
 
     protected final ConcurrentMap<Long, AtomicLong> m_seenIds = new ConcurrentHashMap<Long, AtomicLong>();
-    protected int m_copies = 3;
     public class ClientConnectionHandler extends Thread {
         private final Socket m_clientSocket;
         private boolean m_closed = false;
@@ -411,14 +391,13 @@ public class TestExportBase extends RegressionSuite {
 
         @Override
         public void run() {
-            while (!shuttingDown) {
+            while (!shuttingDown && m_clients.size() < 4) {
                 try {
                     Socket clientSocket = ssocket.accept();
                     ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket);
                     m_clients.add(ch);
                     ch.start();
                 } catch (IOException ex) {
-                    break;
                 }
             }
         }
