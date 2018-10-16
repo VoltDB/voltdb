@@ -130,7 +130,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     ::memset(m_currBlock->mutableDataPtr(), 0, streamHeaderSz);
 
     // the nullarray lives in rowheader after the 4 byte header length prefix + 4 bytes for column count +
-    // 4 partition index + a byte of hasSchema
+    // 4 partition index
     uint8_t *nullArray =
       reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr()
               + sizeof(int32_t)         // row length

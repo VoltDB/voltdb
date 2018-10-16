@@ -337,7 +337,6 @@ public class GuestProcessor implements ExportDataProcessor {
                             try {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
-                                buf.order(ByteOrder.LITTLE_ENDIAN);
                                 byte version = buf.get();
                                 assert(version == 1);
                                 long generation = buf.getLong();

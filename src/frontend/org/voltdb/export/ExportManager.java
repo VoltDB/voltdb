@@ -20,6 +20,7 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -595,6 +596,7 @@ public class ExportManager
                 }
                 return;
             }
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
             generation.pushExportBuffer(partitionId, signature, uso, buffer, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread

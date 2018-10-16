@@ -96,6 +96,7 @@ public class StreamBlockQueue {
         if (cont == null) {
             return null;
         } else {
+            cont.b().order(ByteOrder.LITTLE_ENDIAN);
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
             long uso = cont.b().getLong(0);
@@ -256,7 +257,6 @@ public class StreamBlockQueue {
             ByteBuffer b = bbc.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
             try {
-                final int headerSize = 4 + 4; // partition index + column count.
                 b.position(b.position() + 8);//Don't need the USO
                 byte version = b.get();
                 assert(version == 1);
@@ -265,9 +265,10 @@ public class StreamBlockQueue {
                 b.position(firstRowStart);
 
                 while (b.hasRemaining()) {
+                    final int rowStart = b.position();
                     int rowLength = b.getInt();
                     //Get partition col index
-                    b.getInt();
+                    b.position(b.position() + 4);
                     //Get column count includes metadata column count.
                     int columnCount = b.getInt();
 
@@ -286,7 +287,7 @@ public class StreamBlockQueue {
                         //The txnid of this row is the greater then the truncation txnid.
                         //Don't want this row, but want to preserve all rows before it.
                         //Move back before the row length prefix, txnId and header
-                        b.position(b.position() - (12 + headerSize + nullArrayLength));
+                        b.position(rowStart);
 
                         //If the truncation point was the first row in the block, the entire block is to be discard
                         //We know it is the first row if the position before the row is after the uso (8 bytes)
@@ -300,10 +301,8 @@ public class StreamBlockQueue {
                             return new ByteBufferTruncatorResponse(b);
                         }
                     } else {
-                        //Not the row we are looking to truncate at. Skip past it keeping in mind
-                        //we read the first 8 bytes for the txn id, the null array which
-                        //is included in the length prefix and the header size
-                        b.position(b.position() + (rowLength - (8 + headerSize + nullArrayLength)));
+                        //Not the row we are looking to truncate at. Skip past it (row length + row length field).
+                        b.position(rowStart + rowLength + 4);
                     }
                 }
             } finally {
