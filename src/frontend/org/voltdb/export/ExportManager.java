@@ -596,7 +596,6 @@ public class ExportManager
                 }
                 return;
             }
-            buffer.order(ByteOrder.LITTLE_ENDIAN);
             generation.pushExportBuffer(partitionId, signature, uso, buffer, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
