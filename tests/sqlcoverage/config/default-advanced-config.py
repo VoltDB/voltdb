@@ -52,7 +52,7 @@
                             "ddl": "compoundex-DDL.sql",
                             "template": "advanced.sql",
                             "normalizer": "nulls-lowest-normalizer.py"},
-# To test advanced IN/EXISTS
+    # To test advanced IN/EXISTS
     "advanced-inexists": {"schema": "schema.py",
                           "ddl": "DDL.sql",
                           "template": "advanced-inexists.sql",
@@ -67,4 +67,12 @@
 #                               "ddl": "DDL.sql",
 #                               "template": "advanced-decimal.sql",
 #                               "normalizer": "fuzzynormalizer.py"},
+
+    # This logically belongs in default-advanced-mv-subq-config.py, but is
+    # placed here to balance execution time.
+    # "ncs" is No Count Star, i.e., Materialized Views without an explicit COUNT(*)
+    "advanced-matview-ncs-join": {"schema": "matview-advanced-ncs-join-schema.py",
+                                  "ddl": "matview-DDL.sql",
+                                  "template": "advanced-matview-join.sql",
+                                  "normalizer": "nulls-lowest-normalizer.py"},
 }

@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
@@ -420,7 +421,13 @@ public class SyncBenchmark {
                     try {
                         ClientResponse response = client.callProcedure("Get",
                                 processor.generateRandomKeyForRetrieval());
-
+                        // callProcedure is expected to throw on anything but success, but check that.
+                        if (response.getStatus() != ClientResponse.SUCCESS) {
+                            ClientResponseImpl cri = (ClientResponseImpl) response;
+                            System.err.println(cri.toJSONString());
+                            System.out.println("ERROR: Bad Client response from SyncBenchmark Get");
+                            System.exit(1);
+                        }
                         final VoltTable pairData = response.getResults()[0];
                         // Cache miss (Key does not exist)
                         if (pairData.getRowCount() == 0)
@@ -442,7 +449,14 @@ public class SyncBenchmark {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        ClientResponse response = client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        // callProcedure is expected to throw on anything but success, but check that.
+                        if (response.getStatus() != ClientResponse.SUCCESS) {
+                            ClientResponseImpl cri = (ClientResponseImpl) response;
+                            System.err.println(cri.toJSONString());
+                            System.out.println("ERROR: Bad Client response from SyncBenchmark Put");
+                            System.exit(1);
+                        }
                         successfulPuts.incrementAndGet();
                     }
                     catch (Exception e) {
