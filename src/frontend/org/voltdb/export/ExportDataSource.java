@@ -1127,7 +1127,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (mbx != null && p.getSecond().size() > 0 && m_newLeaderHostId != null) {
             // msg type(1) + partition:int(4) + length:int(4) +
             // signaturesBytes.length + ackUSO:long(8) + tupleSent:int(4).
-            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
+            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 4;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.put(ExportManager.TAKE_MASTERSHIP);
