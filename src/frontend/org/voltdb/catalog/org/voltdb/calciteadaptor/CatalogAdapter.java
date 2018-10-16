@@ -19,8 +19,6 @@ package org.voltdb.catalog.org.voltdb.calciteadaptor;
 
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
-import org.voltdb.calciteadapter.rel.VoltDBIndex;
-import org.voltdb.calciteadapter.rel.VoltDBMatViewInfo;
 import org.voltdb.calciteadapter.rel.VoltTable;
 import org.voltdb.catalog.Database;
 
@@ -49,9 +47,6 @@ public class CatalogAdapter {
         // Get all tables from database
         db.getTables().forEach(table -> {
             rootSchema.add(table.getTypeName(), new VoltTable(table));
-            // Lift all table-associated catalog objects to global visible level, might be convenient for planning use.
-            table.getIndexes().forEach(index -> rootSchema.add(index.getTypeName(), new VoltDBIndex(index)));
-            table.getViews().forEach(mv -> rootSchema.add(mv.getTypeName(), new VoltDBMatViewInfo(mv)));
             // TODO: Get all functions, etc. from database
         });
         return rootSchema;
