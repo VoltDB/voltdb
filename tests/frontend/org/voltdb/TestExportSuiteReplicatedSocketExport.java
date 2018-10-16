@@ -24,13 +24,7 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.voltdb.client.Client;
@@ -53,8 +47,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
     private static ServerListener m_serverSocket;
     private static LocalCluster config;
     @Override
-    public void setUp() throws Exception
-    {
+    public void setUp() throws Exception {
         m_username = "default";
         m_password = "password";
         VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
@@ -63,63 +56,18 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         super.setUp();
         m_serverSocket = new ServerListener(5001);
         m_serverSocket.start();
-
     }
 
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
-        System.out.println("Shutting down client and server");
-        for (ClientConnectionHandler s : m_clients) {
-            s.stopClient();
-        }
-
-        m_clients.clear();
-        m_serverSocket.close();
-        m_serverSocket = null;
-        m_seenIds.clear();
-
-    }
-
-    private static final List<ClientConnectionHandler> m_clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
-
-    private class ServerListener extends Thread {
-
-        private ServerSocket ssocket;
-
-        public ServerListener(int port) {
-            try {
-                ssocket = new ServerSocket(port);
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-        }
-
-        public void close() throws IOException {
-            ssocket.close();
-        }
-
-        @Override
-        public void run() {
-            System.out.println("Server listener started.");
-            while (true) {
-                try {
-                    Socket clientSocket = ssocket.accept();
-                    ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket);
-                    m_clients.add(ch);
-                    ch.start();
-                    System.out.println("Client # of connections: " + m_clients.size());
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                    break;
-                }
-            }
-
-        }
+        try {
+            m_serverSocket.close();
+            m_serverSocket = null;
+        } catch (Exception e) {}
     }
 
     public void testExportReplicatedExportToSocket() throws Exception {
-        m_seenIds.clear();
         System.out.println("testExportReplicatedExportToSocket");
         final Client client = getClient();
 
@@ -131,7 +79,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         exportVerify(false, 5000);
 
         for (int i=5000;i<10000;i++) {
@@ -140,7 +88,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         exportVerify(false, 10000);
 
         for (int i=10000;i<15000;i++) {
@@ -149,7 +97,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         exportVerify(false, 15000);
 
         for (int i=15000;i<30000;i++) {
@@ -158,7 +106,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         exportVerify(false, 30000);
 
         for (int i=30000;i<45000;i++) {
@@ -167,12 +115,11 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         exportVerify(false, 45000);
     }
 
     public void testExportReplicatedExportToSocketRejoin() throws Exception {
-        m_seenIds.clear();
         ClientConfig cconfig = new ClientConfigForTest("ry@nlikesthe", "y@nkees");
         Client client = ClientFactory.createClient(cconfig);
         client.createConnection("localhost", config.port(0));
@@ -185,7 +132,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         exportVerify(false, 50);
 
         config.killSingleHost(1);
@@ -197,7 +144,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
         exportVerify(false, 100);
 
@@ -210,7 +157,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         //After recovery make sure we get exact 2 of each.
         exportVerify(false, 150);
 
@@ -226,7 +173,7 @@ public class TestExportSuiteReplicatedSocketExport extends TestExportBase {
         }
         client.callProcedure("@AdHoc", insertSql.toString());
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         exportVerify(false, 2000);
     }
 

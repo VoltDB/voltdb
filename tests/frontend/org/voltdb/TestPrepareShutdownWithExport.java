@@ -24,13 +24,7 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.voltdb.client.ArbitraryDurationProc;
@@ -47,8 +41,6 @@ import org.voltdb.utils.VoltFile;
 public class TestPrepareShutdownWithExport extends TestExportBase
 {
     private ServerListener m_serverSocket;
-    private final List<ClientConnectionHandler> m_clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
-
     public TestPrepareShutdownWithExport(String name) {
         super(name);
     }
@@ -65,6 +57,15 @@ public class TestPrepareShutdownWithExport extends TestExportBase
         m_serverSocket.start();
     }
 
+    @Override
+    public void tearDown() throws Exception {
+        super.tearDown();
+        try {
+            m_serverSocket.close();
+            m_serverSocket = null;
+        } catch (Exception e) {}
+    }
+
     public void testPrepareShutdown() throws Exception {
 
         final Client client2 = this.getClient();
@@ -73,13 +74,13 @@ public class TestPrepareShutdownWithExport extends TestExportBase
         for (int i= 0;i < 10000; i++) {
             client2.callProcedure("@AdHoc", "insert into ex values(" + i + ");");
         }
-
+        client2.drain();
         final Client client = getAdminClient();
         ClientResponse resp = client.callProcedure("@PrepareShutdown");
         assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
 
         //push out export buffer and verify if there are any export queue.
-        waitForStreamedAllocatedMemoryZero(client2);
+        waitForExportAllocatedMemoryZero(client2);
         exportVerify(false, 10000);
 
         for (ClientConnectionHandler s : m_clients) {
@@ -144,37 +145,5 @@ public class TestPrepareShutdownWithExport extends TestExportBase
         assertTrue(compile);
         builder.addServerConfig(config);
         return builder;
-    }
-
-    class ServerListener extends Thread {
-        private ServerSocket ssocket;
-        private boolean shuttingDown = false;
-        public ServerListener(int port) {
-            try {
-                ssocket = new ServerSocket(port);
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-        }
-
-        public void close() throws IOException {
-            shuttingDown = true;
-            ssocket.close();
-            ssocket = null;
-        }
-
-        @Override
-        public void run() {
-            while (!shuttingDown) {
-                try {
-                    Socket clientSocket = ssocket.accept();
-                    ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket);
-                    m_clients.add(ch);
-                    ch.start();
-                } catch (IOException ex) {
-                    break;
-                }
-            }
-        }
     }
 }

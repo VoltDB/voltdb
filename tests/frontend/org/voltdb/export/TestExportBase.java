@@ -26,7 +26,11 @@ package org.voltdb.export;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -159,6 +163,10 @@ public class TestExportBase extends RegressionSuite {
             new ProcedureInfo(InsertAddedTable.class,
                     new ProcedurePartitionData ("ADDED_TABLE", "PKEY", "1"), new String[]{"proc"})
     };
+
+    public TestExportBase(String s) {
+        super(s);
+    }
 
     /**
      * Wait for export processor to catch up and have nothing to be exported.
@@ -337,10 +345,6 @@ public class TestExportBase extends RegressionSuite {
         assertTrue(passed);
     }
 
-    public TestExportBase(String s) {
-        super(s);
-    }
-
     protected final ConcurrentMap<Long, AtomicLong> m_seenIds = new ConcurrentHashMap<Long, AtomicLong>();
     protected int m_copies = 3;
     public class ClientConnectionHandler extends Thread {
@@ -354,29 +358,27 @@ public class TestExportBase extends RegressionSuite {
         @Override
         public void run() {
             try {
-                while (true) {
-                    BufferedReader in = new BufferedReader(
-                            new InputStreamReader(m_clientSocket.getInputStream()));
-                    while (true) {
-                        String line = in.readLine();
-                        //You should convert your data to params here.
-                        if (line == null && m_closed) {
-                            break;
-                        }
-                        if (line == null) continue;
-                        String parts[] = m_parser.parseLine(line);
-                        if (parts == null) {
-                            continue;
-                        }
-                        Long i = Long.parseLong(parts[0]);
-                        if (m_seenIds.putIfAbsent(i, new AtomicLong(1)) != null) {
-                            synchronized(m_seenIds) {
-                                m_seenIds.get(i).incrementAndGet();
-                            }
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(m_clientSocket.getInputStream()));
+                while (!m_closed) {
+                    String line = in.readLine();
+                    //You should convert your data to params here.
+                    if (line == null && m_closed) {
+                        break;
+                    }
+                    if (line == null) continue;
+                    String parts[] = m_parser.parseLine(line);
+                    if (parts == null) {
+                        continue;
+                    }
+                    Long i = Long.parseLong(parts[0]);
+                    if (m_seenIds.putIfAbsent(i, new AtomicLong(1)) != null) {
+                        synchronized(m_seenIds) {
+                            m_seenIds.get(i).incrementAndGet();
                         }
                     }
-                    m_clientSocket.close();
                 }
+                m_clientSocket.close();
             } catch (IOException ioe) {
             }
         }
@@ -384,5 +386,51 @@ public class TestExportBase extends RegressionSuite {
         public void stopClient() {
             m_closed = true;
         }
+    }
+
+    protected final List<ClientConnectionHandler> m_clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
+
+    public class ServerListener extends Thread {
+        private ServerSocket ssocket;
+        private boolean shuttingDown = false;
+        public ServerListener(int port) {
+            try {
+                ssocket = new ServerSocket(port);
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+
+        public void close() throws IOException {
+            shuttingDown = true;
+            try {
+                ssocket.close();
+            } catch (Exception e) {}
+            ssocket = null;
+        }
+
+        @Override
+        public void run() {
+            while (!shuttingDown) {
+                try {
+                    Socket clientSocket = ssocket.accept();
+                    ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket);
+                    m_clients.add(ch);
+                    ch.start();
+                } catch (IOException ex) {
+                    break;
+                }
+            }
+        }
+    }
+
+    public void tearDown() throws Exception {
+        super.tearDown();
+        System.out.println("Shutting down client and server");
+        for (ClientConnectionHandler s : m_clients) {
+            s.stopClient();
+        }
+        m_clients.clear();
+        m_seenIds.clear();
     }
 }

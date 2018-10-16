@@ -24,13 +24,7 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.voltdb.client.Client;
@@ -68,61 +62,16 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
-        System.out.println("Shutting down client and server");
-        for (ClientConnectionHandler s : m_clients) {
-            s.stopClient();
-        }
-
-        m_clients.clear();
-        m_serverSocket.close();
-        m_serverSocket = null;
-        m_seenIds.clear();
-
+        try {
+            m_serverSocket.close();
+            m_serverSocket = null;
+        } catch (Exception e) {}
     }
-
-    private static final List<ClientConnectionHandler> m_clients = Collections.synchronizedList(new ArrayList<ClientConnectionHandler>());
-
-    private class ServerListener extends Thread {
-
-        private ServerSocket ssocket;
-
-        public ServerListener(int port) {
-            try {
-                ssocket = new ServerSocket(port);
-            } catch (IOException ex) {
-                ex.printStackTrace();
-            }
-        }
-
-        public void close() throws IOException {
-            ssocket.close();
-        }
-
-        @Override
-        public void run() {
-            System.out.println("Server listener started.");
-            while (true) {
-                try {
-                    Socket clientSocket = ssocket.accept();
-                    ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket);
-                    m_clients.add(ch);
-                    ch.start();
-                    System.out.println("Client # of connections: " + m_clients.size());
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                    break;
-                }
-            }
-
-        }
-    }
-
 
     public void testExportReplicatedExportToSocketRecover() throws Exception {
         if (config.isValgrind()) {
             return;
         }
-        m_seenIds.clear();
         System.out.println("testExportReplicatedExportToSocketRecover");
         Client client = getClient();
         Client adminClient = getAdminClient();
@@ -137,7 +86,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         exportVerify(false, 1000);
         client.close();
         config.overrideStartCommandVerb("recover");
@@ -156,7 +105,7 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
             client.callProcedure("@AdHoc", insertSql.toString());
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForExportAllocatedMemoryZero(client);
         exportVerify(false, 2000);
     }
 
