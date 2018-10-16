@@ -367,11 +367,12 @@ public class TestLeaderAppointer extends ZKTestBase {
         dutthread.join();
         // Now, delete the leader of partition 0 from ZK
         m_newAppointee.set(false);
+        long expectedNewLeader = m_cache.pointInTimeCache().get(0).equals(0L) ? 1L : 0L;
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         while (!m_newAppointee.get()) {
             Thread.sleep(0);
         }
-        assertEquals(1L, (long)m_cache.pointInTimeCache().get(0));
+        assertEquals(expectedNewLeader, m_cache.pointInTimeCache().get(0).longValue());
         // now, kill the other replica and watch everything BURN
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         while (!VoltDB.wasCrashCalled) {
@@ -407,6 +408,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         dutthread.join();
         // kill the appointer and delete one of the leaders
         m_dut.shutdown();
+        long expectedNewLeader = m_cache.pointInTimeCache().get(0).equals(0L) ? 1L : 0L;
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up
         createAppointer(false);
@@ -415,7 +417,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         while (!m_newAppointee.get()) {
             Thread.sleep(0);
         }
-        assertEquals(1L, (long)m_cache.pointInTimeCache().get(0));
+        assertEquals(expectedNewLeader, m_cache.pointInTimeCache().get(0).longValue());
 
         // Add a new partition with two replicas, see if the newly elected leader appointer picks up the new
         // partition and elects a new leader
