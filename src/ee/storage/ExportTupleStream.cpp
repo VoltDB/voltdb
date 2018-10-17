@@ -113,7 +113,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     }
     bool includeSchema = m_currBlock->needsSchema();
     if (includeSchema) {
-        ExportSerializeOutput blkhdr(m_currBlock->headerDataPtr(), m_currBlock->headerSize());
+        //ExportSerializeOutput blkhdr(m_currBlock->headerDataPtr(), m_currBlock->headerSize());
+        ExportSerializeOutput blkhdr(m_currBlock->headerDataPtr()+EXPORT_BUFFER_HEADER_SIZE, m_currBlock->headerSize() - (MAGIC_HEADER_SPACE_FOR_JAVA+EXPORT_BUFFER_HEADER_SIZE));
         // FIXED_BUFFER_HEADER
         // version and generation Id for the buffer
         blkhdr.writeByte(s_EXPORT_BUFFER_VERSION);
