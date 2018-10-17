@@ -81,6 +81,9 @@ public class SqlBatchImpl implements SqlBatch {
         // TODO: Calcite's error message (in SqlParseException) will contain line and column numbers.
         // This information is lost during the split. It will be helpful to develop a way to preserve it.
         List<String> sqlList = SQLLexer.splitStatements(sqlBlock).getCompletelyParsedStmts();
+        if (sqlList.size() == 0) {
+            throw new RuntimeException("Failed to plan, no SQL statement provided.");
+        }
         if (userParams != null && userParams.length > 0 && sqlList.size() != 1) {
             throw new UnsupportedOperationException(s_adHocErrorResponseMessage);
         }

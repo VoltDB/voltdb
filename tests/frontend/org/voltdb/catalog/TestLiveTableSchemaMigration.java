@@ -191,8 +191,8 @@ public class TestLiveTableSchemaMigration extends TestCase {
             TableHelper.loadTable(client, t1);
 
             if (alterText.trim().length() > 0) {
-                ClientResponseImpl response = (ClientResponseImpl) client.callProcedure(
-                        "@AdHoc", alterText, null);
+                ClientResponseImpl response =
+                        (ClientResponseImpl) client.callProcedure("@AdHoc", alterText);
                 System.out.println(response.toJSONString());
             }
 
