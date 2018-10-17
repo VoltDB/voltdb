@@ -44,8 +44,10 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
@@ -344,17 +346,29 @@ public class HTTPBenchmark {
                 if (rand.nextDouble() < config.getputratio) {
                     // Get a key/value pair, synchronously
                     try {
-                        HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
+                        HTTPUtils.Response response = HTTPUtils.callProcedure("Get", processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
+                        if (response.status != ClientResponse.SUCCESS) {
+                            System.err.println(response.statusString);
+                            System.out.println("ERROR: Bad Client response from HTTPBenchmark Get");
+                            System.exit(1);
+                        }
                     } catch (Exception e) {
                         e.printStackTrace(System.out);
+                        System.exit(1);
                     }
                 } else {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost);
+                        HTTPUtils.Response response = HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost);
+                        if (response.status != ClientResponse.SUCCESS) {
+                            System.err.println(response.statusString);
+                            System.out.println("ERROR: Bad Client response from HTTPBenchmark Put");
+                            System.exit(1);
+                        }
                     } catch (Exception e) {
                         e.printStackTrace(System.out);
+                        System.exit(1);
                     }
                 }
             }
@@ -366,6 +380,12 @@ public class HTTPBenchmark {
                     try {
                         HTTPUtils.Response response = HTTPUtils.callProcedure("Get",
                                 processor.generateRandomKeyForRetrieval(), m_httpClient, m_httpPost);
+
+                        if (response.status != ClientResponse.SUCCESS) {
+                            System.err.println(response.statusString);
+                            System.out.println("ERROR: Bad Client response from HTTPBenchmark Get");
+                            System.exit(1);
+                        }
 
                         if (response.results[0].advanceRow()) {
 
@@ -384,16 +404,23 @@ public class HTTPBenchmark {
                         }
                     } catch (Exception e) {
                         e.printStackTrace(System.out);
+                        System.exit(1);
                         failedGets.incrementAndGet();
                     }
                 } else {
                     // Put a key/value pair, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost);
+                        HTTPUtils.Response response = HTTPUtils.callProcedure("Put", pair.Key, pair.getStoreValue(), m_httpClient, m_httpPost);
+                        if (response.status != ClientResponse.SUCCESS) {
+                            System.err.println(response.statusString);
+                            System.out.println("ERROR: Bad Client response from HTTPBenchmark Get");
+                            System.exit(1);
+                        }
                         successfulPuts.incrementAndGet();
                     } catch (Exception e) {
                         e.printStackTrace(System.out);
+                        System.exit(1);
                         failedPuts.incrementAndGet();
                     }
                     networkPutData.addAndGet(pair.getStoreValueLength());
