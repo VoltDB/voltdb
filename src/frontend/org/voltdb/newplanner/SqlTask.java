@@ -48,6 +48,16 @@ public class SqlTask {
     }
 
     /**
+     * Create a {@link SqlTask} from a SQL query string and a parsed {@link SqlNode}.
+     * @param sql     the query string.
+     * @param sqlNode the parsed SqlNode
+     */
+    public SqlTask(String sql, SqlNode sqlNode) {
+        m_sqlString = sql;
+        m_parsedQuery = sqlNode;
+    }
+
+    /**
      * Tell if this {@link SqlTask} is a DDL task.
      * @return true if this {@code SqlTask} is a DDL task.
      */
