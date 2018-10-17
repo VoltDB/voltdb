@@ -1,0 +1,239 @@
+From 9b2249f969f096037861745d09d3e1064d3a30f4 Mon Sep 17 00:00:00 2001
+From: Yiqun Zhang <yzhang1991@users.noreply.github.com>
+Date: Mon, 1 Oct 2018 17:56:12 -0400
+Subject: [PATCH 1/2] ENG-14693 Support the 'bytes' keyword for VoltDB VARCHAR
+ type (#2)
+
+---
+ .travis.yml                                   |  3 +++
+ core/src/main/codegen/templates/Parser.jj     | 12 +++++++++-
+ .../apache/calcite/sql/SqlDataTypeSpec.java   | 22 +++++++++++++++----
+ site/_docs/reference.md                       |  1 +
+ 4 files changed, 33 insertions(+), 5 deletions(-)
+
+diff --git a/.travis.yml b/.travis.yml
+index 45a943034..c72c86cc2 100644
+--- a/.travis.yml
++++ b/.travis.yml
+@@ -31,6 +31,9 @@ branches:
+     - javadoc
+     - /^branch-.*$/
+     - /^[0-9]+-.*$/
++    # VoltDB extension branch and engineering ticket branches.
++    - voltdb
++    - ENG-.+
+ env:
+   global:
+   - DOCKERRUN="docker run -it --rm -v $PWD:/src -v $HOME/.m2:/root/.m2 -w /src"
+diff --git a/core/src/main/codegen/templates/Parser.jj b/core/src/main/codegen/templates/Parser.jj
+index be05d9c2e..bc6270c8a 100644
+--- a/core/src/main/codegen/templates/Parser.jj
++++ b/core/src/main/codegen/templates/Parser.jj
+@@ -4387,6 +4387,7 @@ SqlDataTypeSpec DataType() :
+     SqlIdentifier collectionTypeName = null;
+     int scale = -1;
+     int precision = -1;
++    boolean inBytes = false;
+     String charSetName = null;
+     final Span s;
+ }
+@@ -4401,6 +4402,12 @@ SqlDataTypeSpec DataType() :
+             <COMMA>
+             scale = UnsignedIntLiteral()
+         ]
++        [
++            <BYTES>
++            {
++               inBytes = true;
++            }
++        ]
+         <RPAREN>
+     ]
+     [
+@@ -4426,7 +4433,8 @@ SqlDataTypeSpec DataType() :
+             scale,
+             charSetName,
+             null,
+-            s.end(this));
++            s.end(this))
++        .setInBytes(inBytes);
+     }
+ }
+ 
+@@ -5503,6 +5511,7 @@ SqlPostfixOperator PostfixRowOperator() :
+ |   < BOTH: "BOTH" >
+ |   < BREADTH: "BREADTH" >
+ |   < BY: "BY" >
++|   < BYTES: "BYTES" >
+ |   < C: "C" >
+ |   < CALL: "CALL" >
+ |   < CALLED: "CALLED" >
+@@ -6151,6 +6160,7 @@ String CommonNonReservedKeyWord() :
+     |   <BEFORE>
+     |   <BERNOULLI>
+     |   <BREADTH>
++    |   <BYTES>
+     |   <C>
+     |   <CASCADE>
+     |   <CATALOG>
+diff --git a/core/src/main/java/org/apache/calcite/sql/SqlDataTypeSpec.java b/core/src/main/java/org/apache/calcite/sql/SqlDataTypeSpec.java
+index a6238a302..798a1cbd6 100644
+--- a/core/src/main/java/org/apache/calcite/sql/SqlDataTypeSpec.java
++++ b/core/src/main/java/org/apache/calcite/sql/SqlDataTypeSpec.java
+@@ -60,6 +60,9 @@
+   private final SqlIdentifier baseTypeName;
+   private final int scale;
+   private final int precision;
++  // Only applies to the VoltDB VARCHAR type, indicates whether the column size
++  // is specified in bytes.
++  private boolean inBytes = false;
+   private final String charSetName;
+   private final TimeZone timeZone;
+ 
+@@ -144,9 +147,9 @@ public SqlDataTypeSpec(
+   public SqlNode clone(SqlParserPos pos) {
+     return (collectionsTypeName != null)
+         ? new SqlDataTypeSpec(collectionsTypeName, typeName, precision, scale,
+-            charSetName, pos)
++            charSetName, pos).setInBytes(inBytes)
+         : new SqlDataTypeSpec(typeName, precision, scale, charSetName, timeZone,
+-            pos);
++            pos).setInBytes(inBytes);
+   }
+ 
+   public SqlMonotonicity getMonotonicity(SqlValidatorScope scope) {
+@@ -181,6 +184,15 @@ public Boolean getNullable() {
+     return nullable;
+   }
+ 
++  public boolean getInBytes() {
++    return inBytes;
++  }
++
++  public SqlDataTypeSpec setInBytes(boolean inBytes) {
++    this.inBytes = inBytes;
++    return this;
++  }
++
+   /** Returns a copy of this data type specification with a given
+    * nullability. */
+   public SqlDataTypeSpec withNullable(Boolean nullable) {
+@@ -188,7 +200,8 @@ public SqlDataTypeSpec withNullable(Boolean nullable) {
+       return this;
+     }
+     return new SqlDataTypeSpec(collectionsTypeName, typeName, precision, scale,
+-        charSetName, timeZone, nullable, getParserPosition());
++        charSetName, timeZone, nullable, getParserPosition())
++        .setInBytes(inBytes);
+   }
+ 
+   /**
+@@ -204,7 +217,8 @@ public SqlDataTypeSpec getComponentTypeSpec() {
+         scale,
+         charSetName,
+         timeZone,
+-        getParserPosition());
++        getParserPosition())
++       .setInBytes(inBytes);
+   }
+ 
+   public void unparse(
+diff --git a/site/_docs/reference.md b/site/_docs/reference.md
+index acf8f29be..a4ae949d2 100644
+--- a/site/_docs/reference.md
++++ b/site/_docs/reference.md
+@@ -341,6 +341,7 @@ BERNOULLI,
+ **BOTH**,
+ BREADTH,
+ **BY**,
++BYTES,
+ C,
+ **CALL**,
+ **CALLED**,
+-- 
+2.17.1 (Apple Git-112)
+
+
+From eb1131c8547b8222c773314d4b00fd8ae2d3027f Mon Sep 17 00:00:00 2001
+From: Chao Zhou <czhou@voltdb.com>
+Date: Mon, 15 Oct 2018 16:39:06 -0400
+Subject: [PATCH 2/2] ENG-14728: A new API to parameterize a SqlNode tree (#3)
+
+* add setOperand() to SqlOrderBy
+* make SqlParserPos startsBefore public
+* add comments
+---
+ .../org/apache/calcite/sql/SqlOrderBy.java    | 36 ++++++++++++++++---
+ .../calcite/sql/parser/SqlParserPos.java      |  2 +-
+ 2 files changed, 33 insertions(+), 5 deletions(-)
+
+diff --git a/core/src/main/java/org/apache/calcite/sql/SqlOrderBy.java b/core/src/main/java/org/apache/calcite/sql/SqlOrderBy.java
+index 421b9e21d..b08f1a02e 100644
+--- a/core/src/main/java/org/apache/calcite/sql/SqlOrderBy.java
++++ b/core/src/main/java/org/apache/calcite/sql/SqlOrderBy.java
+@@ -38,10 +38,13 @@
+     }
+   };
+ 
+-  public final SqlNode query;
+-  public final SqlNodeList orderList;
+-  public final SqlNode offset;
+-  public final SqlNode fetch;
++  public SqlNode query;
++  public SqlNodeList orderList;
++  public SqlNode offset;
++  /**
++   * The limit clause.
++   */
++  public SqlNode fetch;
+ 
+   //~ Constructors -----------------------------------------------------------
+ 
+@@ -68,6 +71,31 @@ public SqlOperator getOperator() {
+     return ImmutableNullableList.of(query, orderList, offset, fetch);
+   }
+ 
++  /**
++   * Update the operand in a given ordinal position.
++   *
++   * @param i operand ordinal index.
++   * @param operand operand value.
++   */
++  @Override public void setOperand(int i, SqlNode operand) {
++    switch (i) {
++    case 0:
++      query = operand;
++      break;
++    case 1:
++      orderList = (SqlNodeList) operand;
++      break;
++    case 2:
++      offset = operand;
++      break;
++    case 3:
++      fetch = operand;
++      break;
++    default:
++      throw new AssertionError(i);
++    }
++  }
++
+   /** Definition of {@code ORDER BY} operator. */
+   private static class Operator extends SqlSpecialOperator {
+     private Operator() {
+diff --git a/core/src/main/java/org/apache/calcite/sql/parser/SqlParserPos.java b/core/src/main/java/org/apache/calcite/sql/parser/SqlParserPos.java
+index b744e6475..69079486f 100644
+--- a/core/src/main/java/org/apache/calcite/sql/parser/SqlParserPos.java
++++ b/core/src/main/java/org/apache/calcite/sql/parser/SqlParserPos.java
+@@ -276,7 +276,7 @@ public boolean overlaps(SqlParserPos pos) {
+         || pos.startsBefore(this) && pos.endsAfter(this);
+   }
+ 
+-  private boolean startsBefore(SqlParserPos pos) {
++  public boolean startsBefore(SqlParserPos pos) {
+     return lineNumber < pos.lineNumber
+         || lineNumber == pos.lineNumber
+         && columnNumber <= pos.columnNumber;
+-- 
+2.17.1 (Apple Git-112)
+
