@@ -24,7 +24,7 @@ import java.util.List;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.newplanner.guards.AlwaysFail;
 import org.voltdb.newplanner.guards.AlwaysPassThrough;
-import org.voltdb.newplanner.guards.CalcitePass;
+import org.voltdb.newplanner.guards.CalciteCheck;
 import org.voltdb.newplanner.guards.NoLargeQuery;
 import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
@@ -35,7 +35,7 @@ import org.voltdb.parser.SQLLexer;
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class SqlBatchImpl extends SqlBatch {
+public class SqlBatchImpl implements SqlBatch {
 
     private final List<SqlTask> m_tasks;
     private final Boolean m_isDDLBatch;
@@ -46,8 +46,14 @@ public class SqlBatchImpl extends SqlBatch {
                     + "must be passed a single parameterized SQL statement as its first parameter. "
                     + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
 
-    static final CalcitePass s_calcitePass = new AlwaysPassThrough();
+    /**
+     * A chain of checks to determine whether a SQL statement should be routed to Calcite.
+     */
+    static final CalciteCheck s_calcitePass = new AlwaysPassThrough();
 
+    /**
+     * As we add more features to Calcite, this list should be expanded, and eventually removed.
+     */
     static {
         s_calcitePass.addNext(new NoLargeQuery())
                      .addNext(new AlwaysFail());
@@ -65,7 +71,8 @@ public class SqlBatchImpl extends SqlBatch {
      * @throws UnsupportedOperationException when the batch is a mixture of
      * DDL and non-DDL statements or has parameters and more than one query at the same time.
      */
-    public SqlBatchImpl(String sqlBlock, Object... userParams) throws SqlParseException, PlannerFallbackException {
+    public SqlBatchImpl(String sqlBlock, Object... userParams)
+            throws SqlParseException, PlannerFallbackException {
         // We can process batches of either all DDL or all DML/DQL, no mixed batch can be accepted.
         // Split the SQL statements, and process them one by one.
         // Currently (1.17.0), SqlParser only supports parsing single SQL statement.
@@ -74,6 +81,9 @@ public class SqlBatchImpl extends SqlBatch {
         // TODO: Calcite's error message (in SqlParseException) will contain line and column numbers.
         // This information is lost during the split. It will be helpful to develop a way to preserve it.
         List<String> sqlList = SQLLexer.splitStatements(sqlBlock).getCompletelyParsedStmts();
+        if (sqlList.size() == 0) {
+            throw new RuntimeException("Failed to plan, no SQL statement provided.");
+        }
         if (userParams != null && userParams.length > 0 && sqlList.size() != 1) {
             throw new UnsupportedOperationException(s_adHocErrorResponseMessage);
         }
@@ -83,7 +93,7 @@ public class SqlBatchImpl extends SqlBatch {
         // Iterate over the SQL string list and build SqlTasks out of the SQL strings.
         for (final String sql : sqlList) {
             if (! s_calcitePass.check(sql)) {
-                // The query cannot pass the compatibility check, throw a fallback exception
+                // The query cannot pass the compatibility check, throw a fall-back exception
                 // so that VoltDB will use the old parser and planner.
                 throw new PlannerFallbackException();
             }
