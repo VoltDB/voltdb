@@ -23,14 +23,18 @@ package org.voltdb.newplanner.guards;
  * @author Yiqun Zhang
  * @since 8.4
  */
-public abstract class CalcitePass {
-    CalcitePass m_next;
+public abstract class CalciteCheck {
 
     /**
-     * All the {@code CalcitePass} subclasses should implement this method to do
+     * The next check in the chain.
+     */
+    CalciteCheck m_next;
+
+    /**
+     * All the {@code CalciteCheck} subclasses should implement this method to do
      * their own checks and return a result.
      * @param sql the SQL statement to check.
-     * @return true if the statement passed the check.
+     * @return the check result.
      */
     protected abstract boolean doCheck(String sql);
 
@@ -63,7 +67,7 @@ public abstract class CalcitePass {
      * @param next the instance to append.
      * @return the instance appended.
      */
-    public final CalcitePass addNext(CalcitePass next) {
+    public final CalciteCheck addNext(CalciteCheck next) {
         m_next = next;
         return m_next;
     }
