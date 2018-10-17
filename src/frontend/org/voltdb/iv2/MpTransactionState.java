@@ -184,6 +184,7 @@ public class MpTransactionState extends TransactionState
         m_haveDistributedInitTask = false;
         m_isRestart = true;
         m_haveSentfragment = false;
+        m_drBufferChangedAgg = 0;
     }
 
     @Override
@@ -207,7 +208,6 @@ public class MpTransactionState extends TransactionState
         m_remoteWork = null;
         m_remoteDeps = null;
         m_remoteDepTables.clear();
-        m_drBufferChangedAgg = 0;
     }
 
     // I met this List at bandcamp...
