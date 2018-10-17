@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -50,8 +49,8 @@ import com.google_voltpatches.common.collect.ComparisonChain;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Iterables;
-import com.google_voltpatches.common.collect.LinkedListMultimap;
 import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.MultimapBuilder;
 import com.google_voltpatches.common.collect.Sets;
 
 public class AbstractTopology {
@@ -629,17 +628,25 @@ public class AbstractTopology {
         }
 
         RelationshipDescription getRelationshipTo(HAGroup other) {
-            int size = Math.min(m_tokenParts.size(), other.m_tokenParts.size());
+            return getRelationshipTo(other.m_tokenParts);
+        }
+
+        RelationshipDescription getRelationshipTo(String otherGroupToken) {
+            return getRelationshipTo(GROUP_SPLITTER.splitToList(otherGroupToken));
+        }
+
+        private RelationshipDescription getRelationshipTo(List<String> otherGroupTokenParts) {
+            int size = Math.min(m_tokenParts.size(), otherGroupTokenParts.size());
             int sharedAncestry = 0;
             while (sharedAncestry < size) {
-                if (!m_tokenParts.get(sharedAncestry).equals(other.m_tokenParts.get(sharedAncestry))) {
+                if (!m_tokenParts.get(sharedAncestry).equals(otherGroupTokenParts.get(sharedAncestry))) {
                     break;
                 }
                 sharedAncestry++;
             }
 
             // distance is the sum of the two diverting path lengths
-            int distance = m_tokenParts.size() + other.m_tokenParts.size() - 2 * sharedAncestry;
+            int distance = m_tokenParts.size() + otherGroupTokenParts.size() - 2 * sharedAncestry;
 
             return new RelationshipDescription(distance, sharedAncestry);
         }
@@ -759,7 +766,6 @@ public class AbstractTopology {
             for (int i = firstPartitionId + partitionsCount - 1; i >= firstPartitionId; --i) {
                 m_partitions.add(new PartitionBuilder(i));
             }
-            assert (m_partitions.size() == partitionsCount);
 
             // Select the ProtectionGroupSelector based on the ha groups
             if (groups.size() == 1) {
@@ -1097,28 +1103,6 @@ public class AbstractTopology {
         }
     }
 
-    /**
-     * Compute the tree-edge distance between any two ha group tokens
-     * Not the most efficient way to do this, but even n^2 for 100 nodes is computable
-     */
-    static int computeHADistance(String token1, String token2) {
-
-        // break into arrays of graph edges
-        String[] token1parts = token1.split("\\.");
-        String[] token2parts = token2.split("\\.");
-        int size = Math.min(token1parts.length, token2parts.length);
-        int index = 0;
-        while (index < size) {
-            if (!token1parts[index].equals(token2parts[index])) {
-                break;
-            }
-            index++;
-        }
-
-        // distance is the sum of the two diverting path lengths
-        return token1parts.length + token2parts.length - 2 * index;
-    }
-
     public int getHostCount() {
         return hostsById.size();
     }
@@ -1169,29 +1153,23 @@ public class AbstractTopology {
      * @param hostGroups a host id to group map
      * @return sorted grouped host ids from farthest to nearest
      */
-    @SuppressWarnings("unchecked")
     public static List<Collection<Integer>> sortHostIdByHGDistance(int hostId, Map<Integer, String> hostGroups) {
         String localHostGroup = hostGroups.get(hostId);
         Preconditions.checkArgument(localHostGroup != null);
 
+        HAGroup localHaGroup = new HAGroup(localHostGroup);
+
         // Memorize the distance, map the distance to host ids.
-        Multimap<Integer, Integer> distanceMap = LinkedListMultimap.create();
+        Multimap<Integer, Integer> distanceMap = MultimapBuilder.treeKeys(Comparator.<Integer>naturalOrder().reversed())
+                .arrayListValues().build();
         for (Map.Entry<Integer, String> entry : hostGroups.entrySet()) {
             if (hostId == entry.getKey()) {
                 continue;
             }
-            distanceMap.put(computeHADistance(localHostGroup, entry.getValue()), entry.getKey());
+            distanceMap.put(localHaGroup.getRelationshipTo(entry.getValue()).m_distance, entry.getKey());
         }
 
-        //sort the multipmap of distance to host ids by the distances in descending order
-        //and collect the host ids in lists.For example, if the distance map contains
-        //1=[0.2.3], 3=[1,4] 4=[5,6,7]. The results will be [5,6,7], [1,4], [0,2,3]
-        List<Collection<Integer>> result = distanceMap.asMap().entrySet().stream()
-                .sorted(Comparator.comparingInt(k->((Entry<Integer, Integer>) k).getKey()).reversed())
-                .map(x->x.getValue())
-                .collect(Collectors.toList());
-
-        return result;
+        return new ArrayList<>(distanceMap.asMap().values());
     }
 
     /**
