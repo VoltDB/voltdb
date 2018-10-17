@@ -51,16 +51,21 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.voltcore.messaging.HostMessenger.HostInfo;
+import org.voltcore.utils.Pair;
 import org.voltdb.AbstractTopology.Host;
 import org.voltdb.AbstractTopology.Partition;
 import org.voltdb.test.utils.RandomTestRule;
 
 import com.google.common.collect.Iterables;
+import com.google_voltpatches.common.collect.ContiguousSet;
+import com.google_voltpatches.common.collect.DiscreteDomain;
 import com.google_voltpatches.common.collect.HashMultimap;
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.Range;
 
 public class TestAbstractTopology {
 
@@ -643,8 +648,13 @@ public class TestAbstractTopology {
             // get another random topology that offsets hostids so they don't collide
             TestDescription td2 = getRandomBoringTestDescription(td1.hosts.values().iterator().next().m_localSitesCount,
                     td1.kfactor, td1.hosts.size());
-            topo = AbstractTopology.mutateAddNewHosts(topo, td2.hosts);
-            validate(topo);
+            Pair<AbstractTopology, ImmutableList<Integer>> result = AbstractTopology.mutateAddNewHosts(topo, td2.hosts);
+            validate(result.getFirst());
+            List<Integer> exptectedNewPartitions = ContiguousSet.create(
+                    Range.closedOpen(topo.getPartitionCount(),
+                            topo.getPartitionCount() + td2.hosts.size() * topo.getSitesPerHost() / (td2.kfactor + 1)),
+                    DiscreteDomain.integers()).asList();
+            assertEquals(exptectedNewPartitions, result.getSecond());
         }
     }
 
