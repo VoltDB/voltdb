@@ -943,7 +943,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (exportLog.isTraceEnabled()) {
                             exportLog.trace("AckingContainer.discard with uso: " + m_uso);
                         }
-                        assert(m_tuplesSent == 0 || m_startTime != 0);
+                        //assert(m_tuplesSent == 0 || m_startTime != 0);
                         long elapsedMS = System.currentTimeMillis() - m_startTime;
                         m_blocksSentSinceClear += 1;
                         m_totalLatencySinceClearInMS += elapsedMS;
