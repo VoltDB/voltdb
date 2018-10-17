@@ -278,6 +278,7 @@ public class FragmentTask extends TransactionTask
             }
         }
 
+        int drBufferChanged = 0;
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
             byte[] planHash = m_fragmentMsg.getPlanHash(frag);
@@ -347,8 +348,8 @@ public class FragmentTask extends TransactionTask
                     fragResult.readInt();
                     // read number of dependencies (1)
                     fragResult.readInt();
-                    // read the dependencyId() -1;
-                    fragResult.readInt();
+                    // read the size of the DR buffer used
+                    drBufferChanged = fragResult.readInt();
                     tableSize = fragResult.readInt();
                     fullBacking = new byte[tableSize];
                     // get a copy of the buffer
@@ -423,6 +424,8 @@ public class FragmentTask extends TransactionTask
                 }
             }
         }
+        // for multi fragments task, using the aggregated dr Buffer size
+        currentFragResponse.setDrBufferSize(drBufferChanged);
         return currentFragResponse;
     }
 
