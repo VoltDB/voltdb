@@ -71,6 +71,9 @@ public class FragmentResponseMessage extends VoltMessage {
     // multiple fragment transaction. m_currentBatchIndex > 0
     boolean m_isForOldLeader = false;
 
+    // Used by MPI for rollback empty or overBufferLimit DR txn
+    int m_drBufferSize = 0;
+
     /** Empty constructor for de-serialization */
     FragmentResponseMessage() {
         m_subject = Subject.DEFAULT.getId();
@@ -181,6 +184,14 @@ public class FragmentResponseMessage extends VoltMessage {
         return m_exception;
     }
 
+    public void setDrBufferSize(int drBufferSize) {
+        this.m_drBufferSize = drBufferSize;
+    }
+
+    public int getDRBufferSize() {
+        return m_drBufferSize;
+    }
+
     @Override
     public int getSerializedSize()
     {
@@ -194,8 +205,10 @@ public class FragmentResponseMessage extends VoltMessage {
             + 1 // dirty flag
             + 1 // node recovering flag
             + 2 // dependency count
-            + 4// partition id
-            + 1; //m_forLeader
+            + 4 // partition id
+            + 1 // m_forLeader
+            + 4;// drBuffer size
+
         // one int per dependency ID and table length (0 = null)
         msgsize += 8 * m_dependencyCount;
 
@@ -232,6 +245,7 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.putShort(m_dependencyCount);
         buf.putInt(m_partitionId);
         buf.put(m_isForOldLeader ? (byte) 1 : (byte) 0);
+        buf.putInt(m_drBufferSize);
         for (DependencyPair depPair : m_dependencies) {
             buf.putInt(depPair.depId);
 
@@ -266,6 +280,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_dependencyCount = buf.getShort();
         m_partitionId = buf.getInt();
         m_isForOldLeader = buf.get() == 1;
+        m_drBufferSize = buf.getInt();
         for (int i = 0; i < m_dependencyCount; i++) {
             int depId = buf.getInt();
             int depLen = buf.getInt(buf.position());
@@ -301,6 +316,7 @@ public class FragmentResponseMessage extends VoltMessage {
         sb.append(TxnEgo.txnIdToString(m_txnId));
         sb.append(", SP HANDLE: ");
         sb.append(TxnEgo.txnIdToString(m_spHandle));
+        sb.append(", DR Buffer Size: " + m_drBufferSize);
 
         if (m_status == SUCCESS)
             sb.append("\n  SUCCESS");
