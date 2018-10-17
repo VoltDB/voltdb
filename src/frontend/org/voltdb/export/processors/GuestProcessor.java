@@ -311,7 +311,6 @@ public class GuestProcessor implements ExportDataProcessor {
          * For JDBC we want a dedicated thread to block on calls to the remote database
          * so the data source thread can overflow data to disk.
          */
-
         if (fut == null) {
             return;
         }
@@ -340,35 +339,35 @@ public class GuestProcessor implements ExportDataProcessor {
                                 final ByteBuffer buf = cont.b();
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
-                                if (edb.isLegacy()) {
-                                    // It is too painful to collect the first Txn start time for legacy connectors so measure delivery time
-                                    cont.updateStartTime(System.currentTimeMillis());
-                                    while (buf.hasRemaining() && !m_shutdown) {
-                                        int length = buf.getInt();
-                                        byte[] rowdata = new byte[length];
-                                        buf.get(rowdata, 0, length);
-                                        edb.onBlockStart();
-                                        edb.processRow(length, rowdata);
-                                    }
-                                    edb.onBlockCompletion();
+                                byte version = buf.get();
+                                assert(version == 1);
+                                long generation = buf.getLong();
+                                int schemaSize = buf.getInt();
+                                ExportRow previousRow = edb.getPreviousRow();
+                                if (previousRow == null || previousRow.generation != generation) {
+                                    byte[] schemadata = new byte[schemaSize];
+                                    buf.get(schemadata, 0, schemaSize);
+                                    ByteBuffer sbuf = ByteBuffer.wrap(schemadata);
+                                    sbuf.order(ByteOrder.LITTLE_ENDIAN);
+                                    edb.setPreviousRow(ExportRow.decodeBufferSchema(sbuf, schemaSize, source.getPartitionId(), generation));
                                 }
                                 else {
-                                    long generation = -1L;
-                                    ExportRow row = null;
-                                    while (buf.hasRemaining() && !m_shutdown) {
-                                        int length = buf.getInt();
-                                        byte[] rowdata = new byte[length];
-                                        buf.get(rowdata, 0, length);
+                                    // Skip past the schema header because it has not changed.
+                                    buf.position(buf.position() + schemaSize);
+                                }
+                                ExportRow row = null;
+                                boolean firstRowOfBlock = true;
+                                while (buf.hasRemaining() && !m_shutdown) {
+                                    int length = buf.getInt();
+                                    byte[] rowdata = new byte[length];
+                                    buf.get(rowdata, 0, length);
+                                    if (edb.isLegacy()) {
+                                        edb.onBlockStart();
+                                        edb.processRow(length, rowdata);
+                                    } else {
                                         //New style connector.
                                         try {
-                                            if (row == null) {
-                                                // Decode first row of the block (and find transaction start time)
-                                                row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
-                                                cont.updateStartTime((long)row.values[1]);
-                                            }
-                                            else {
-                                                row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
-                                            }
+                                            row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
                                             edb.setPreviousRow(row);
                                         } catch (IOException ioe) {
                                             m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
@@ -376,22 +375,25 @@ public class GuestProcessor implements ExportDataProcessor {
                                             cont = null;
                                             break;
                                         }
-                                        if (generation == -1L) {
+                                        if (firstRowOfBlock) {
                                             edb.onBlockStart(row);
+                                            firstRowOfBlock = false;
                                         }
                                         edb.processRow(row);
-                                        if (generation != -1L && row.generation != generation) {
-                                            edb.onBlockCompletion(row);
-                                            edb.onBlockStart(row);
-                                        }
-                                        generation = row.generation;
-                                    }
-                                    if (row != null) {
-                                        edb.onBlockCompletion(row);
                                     }
                                 }
-                                //Make sure to discard after onBlockCompletion so that if completion wants to retry we dont lose block.
-                                if (cont != null) {
+                                if (edb.isLegacy()) {
+                                    edb.onBlockCompletion();
+                                }
+                                if (row != null) {
+                                    edb.onBlockCompletion(row);
+                                }
+                                // Make sure to discard after onBlockCompletion so that if completion
+                                // wants to retry we don't lose block.
+                                // Please note that if export manager is shutting down it's possible
+                                // that container isn't fully consumed. Discard the buffer prematurely
+                                // would cause missing rows in export stream.
+                                if (!m_shutdown && cont != null) {
                                     cont.discard();
                                     cont = null;
                                 }
@@ -415,7 +417,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                             }
                         }
-                        //Dont discard the block also set the start position to the begining.
+                        // Don't discard the block also set the start position to the begining.
+                        // TODO: it would be nice to keep the last position in the buffer so that
+                        //       next time connector can pick up from where it left last time and
+                        //       continue. It helps to reduce exporting duplicated rows.
                         if (m_shutdown && cont != null) {
                             if (m_logger.isDebugEnabled()) {
                                 // log message for debugging.

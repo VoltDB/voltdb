@@ -44,16 +44,22 @@ static const int COLUMN_COUNT = 5;
 
 //5 integers
 static const int TUPLE_SIZE = 20;
-//RowSize(int32_t)+Generation(int64_t)+PartitionIndex(int32_t)+ColumnCount(int32_t)+hasSchema(byte)+nullMaskLength(2)
-static const int STREAM_HEADER_SZ = 23;
-//ColumnNamesLength(5*int32_t)+TypeBytes(5*1)+ColumnLength(5*int32_t)+metadataColumnInfo(ExportTupleStream::m_mdSchemaSize)
-static const int SCHEMA_SIZE = 228;
-//MetadataDataSize 5*int64_t+1byte
+//RowSize(int32_t)+PartitionIndex(int32_t)+ColumnCount(int32_t)+nullMaskLength(2)
+static const int TUPLE_HEADER_SZ = 14;
+//ColumnNamesLength(5*int32_t)+ColumnNames(5)+TypeBytes(5*1)+ColumnLength(5*int32_t)+TableName(int32_t + 3)+metadataColumnInfo(ExportTupleStream::s_mdSchemaSize)
+static const int SCHEMA_SIZE = 20 + 5 + 5 + 20 + 7 + ExportTupleStream::s_mdSchemaSize; // 228
+//MetadataDataSize 5*int64_t+1byte (DB supplied columns)
 static const int METADATA_DATA_SIZE = 41;
+
 //Data size without schema information. = 84
 static const int MAGIC_TUPLE_SIZE = TUPLE_SIZE + STREAM_HEADER_SZ + METADATA_DATA_SIZE;
 //Buffer header size
-static const int BUFFER_HEADER_SIZE = 12;
+static const int BUFFER_HEADER_ROW_COUNT_SIZE = 4;
+
+//Data size without schema information. = 75
+static const int MAGIC_TUPLE_SIZE = TUPLE_HEADER_SZ + METADATA_DATA_SIZE + TUPLE_SIZE;
+// Size of Buffer header including schema and uso(ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA)
+static const int BUFFER_HEADER_SIZE = ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + SCHEMA_SIZE + BUFFER_HEADER_ROW_COUNT_SIZE;
 
 // 1k buffer
 static const int BUFFER_SIZE = 1024;
@@ -86,7 +92,7 @@ public:
                                          columnAllowNull);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new ExportTupleStream(1, 1, 0, "sign");
+        m_wrapper = new ExportTupleStream(1, 1, 0, "sign", m_tableName, m_columnNames);
 
         // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacityForTest(BUFFER_SIZE);
@@ -103,7 +109,7 @@ public:
         m_schemaSize = SCHEMA_SIZE;
         assert(m_wrapper->computeSchemaSize(m_tableName, m_columnNames) == SCHEMA_SIZE);
         m_tupleSize = MAGIC_TUPLE_SIZE;
-        m_tuplesToFill = (BUFFER_SIZE - m_schemaSize) / (m_tupleSize);
+        m_tuplesToFill = (BUFFER_SIZE - BUFFER_HEADER_SIZE) / (m_tupleSize);
 //        cout << "tuple size: " << m_tupleSize << " column name size: metadata - " << m_wrapper->getMDColumnNamesSerializedSize()
 //                << ", column names - " << columnNamesLength << std::endl;
     }
@@ -116,8 +122,7 @@ public:
         }
         // append into the buffer
         m_wrapper->appendTuple(lastCommittedTxnId,
-                               currentTxnId, 1, 1, 1, m_tableName, *m_tuple,
-                                m_columnNames,
+                               currentTxnId, 1, 1, 1, *m_tuple,
                                 1,
                                ExportTupleStream::INSERT);
     }
@@ -212,8 +217,8 @@ TEST_F(ExportTupleStreamTest, DoOneTuple) {
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     EXPECT_EQ(results->uso(), 0);
     std::ostringstream os;
-    os << "Offset mismatch. Expected: " << (m_tupleSize + m_schemaSize) << ", actual: " << results->offset();
-    ASSERT_TRUE_WITH_MESSAGE(results->offset() == (m_tupleSize + m_schemaSize), os.str().c_str());
+    os << "Offset mismatch. Expected: " << m_tupleSize << ", actual: " << results->offset();
+    ASSERT_TRUE_WITH_MESSAGE(results->offset() == m_tupleSize, os.str().c_str());
 }
 
 /**
@@ -233,23 +238,24 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
     }
 
     m_wrapper->periodicFlush(-1, 2);
-    allocatedByteCount = (m_tupleSize * 2) + BUFFER_HEADER_SIZE + m_schemaSize;
-    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
+    allocatedByteCount = (m_tupleSize * 2) + BUFFER_HEADER_SIZE;
+    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->allocatedByteCount();
+    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->allocatedByteCount(), os.str().c_str());
     os.str(""); os << "Blocks on top-end expected: " << 1 << ", actual: " << m_topend.blocks.size();
     ASSERT_TRUE_WITH_MESSAGE(m_topend.blocks.size() == 1, os.str().c_str());
     boost::shared_ptr<StreamBlock> results2 = m_topend.blocks.front();
     EXPECT_EQ(results2->uso(), 0);
 
+    // Push 3 rows
     for (cnt = 3; cnt < 6; cnt++) {
         appendTuple(cnt-1, cnt);
     }
     m_wrapper->periodicFlush(-1, 5);
 
     // 3 rows - 2 blocks (2, 3)
-    allocatedByteCount = (m_tupleSize * 5) + (BUFFER_HEADER_SIZE * 2) + (m_schemaSize * 2);
-    os.str(""); os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
+    allocatedByteCount = (m_tupleSize * 5) + (BUFFER_HEADER_SIZE * 2);
+    os.str(""); os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->allocatedByteCount();
+    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->allocatedByteCount(), os.str().c_str());
     os.str(""); os << "Blocks on top-end expected: " << 2 << ", actual: " << m_topend.blocks.size();
     ASSERT_TRUE_WITH_MESSAGE(m_topend.blocks.size() == 2, os.str().c_str());
 
@@ -258,16 +264,16 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (m_tupleSize * 2) + m_schemaSize);
+    EXPECT_EQ(results->offset(), (m_tupleSize * 2));
 
     // now get the second
     ASSERT_FALSE(m_topend.blocks.empty());
     results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
-    os.str(""); os << "Second block uso - expected: " << ((m_tupleSize * 2) + m_schemaSize) << ", actual: " << results->uso();
-    ASSERT_TRUE_WITH_MESSAGE(results->uso() == ((m_tupleSize * 2) + m_schemaSize), os.str().c_str());
-    os.str(""); os << "Second block offset - expected: " << ((m_tupleSize * 2 + m_schemaSize)) << ", actual: " << results->offset();
-    ASSERT_TRUE_WITH_MESSAGE(results->offset() == ((m_tupleSize * 3 + m_schemaSize)), os.str().c_str());
+    os.str(""); os << "Second block uso - expected: " << (m_tupleSize * 2) << ", actual: " << results->uso();
+    ASSERT_TRUE_WITH_MESSAGE(results->uso() == (m_tupleSize * 2), os.str().c_str());
+    os.str(""); os << "Second block offset - expected: " << (m_tupleSize * 2) << ", actual: " << results->offset();
+    ASSERT_TRUE_WITH_MESSAGE(results->offset() == (m_tupleSize * 3), os.str().c_str());
 
     // ack all of the data and re-verify block count
     os.str(""); os << "Allocated byte count - expected: " << 0 << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
@@ -295,17 +301,17 @@ TEST_F(ExportTupleStreamTest, FarFutureFlush) {
     m_topend.blocks.pop_front();
     os << "USO in first block - expected: " << 0 << ", actual " << results->uso();
     ASSERT_TRUE_WITH_MESSAGE(results->uso() == 0, os.str().c_str());
-    os.str(""); os << "Offset expected: " << (m_tupleSize * 2 + m_schemaSize) << ", actual " << results->offset();
-    ASSERT_TRUE_WITH_MESSAGE((results->offset() == m_tupleSize * 2 + m_schemaSize), os.str().c_str());
+    os.str(""); os << "Offset expected: " << (m_tupleSize * 2) << ", actual " << results->offset();
+    ASSERT_TRUE_WITH_MESSAGE((results->offset() == m_tupleSize * 2), os.str().c_str());
 
     // now get the second
     ASSERT_FALSE(m_topend.blocks.empty());
     results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
-    os << "uso in second block - expected: " << (m_tupleSize * 2 + m_schemaSize) << ", actual " << results->uso();
-    ASSERT_TRUE_WITH_MESSAGE(results->uso() == (m_tupleSize * 2 + m_schemaSize), os.str().c_str());
+    os << "uso in second block - expected: " << (m_tupleSize * 2) << ", actual " << results->uso();
+    ASSERT_TRUE_WITH_MESSAGE(results->uso() == (m_tupleSize * 2), os.str().c_str());
     os << "Offset expected: " << (m_tupleSize * 3) << ", actual " << results->offset();
-    ASSERT_TRUE_WITH_MESSAGE((results->offset() == m_tupleSize * 3 + m_schemaSize), os.str().c_str());
+    ASSERT_TRUE_WITH_MESSAGE((results->offset() == m_tupleSize * 3), os.str().c_str());
 }
 
 /**
@@ -328,7 +334,7 @@ TEST_F(ExportTupleStreamTest, Fill) {
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill + m_schemaSize));
+    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
 }
 
 /**
@@ -359,7 +365,7 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndAppend) {
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill + m_schemaSize));
+    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
 }
 
 
@@ -392,7 +398,7 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill + m_schemaSize));
+    EXPECT_EQ(results->offset(), (m_tupleSize * m_tuplesToFill));
 }
 
 /**
@@ -430,7 +436,7 @@ TEST_F(ExportTupleStreamTest, RollbackFirstTuple) {
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), m_tupleSize + m_schemaSize);
+    EXPECT_EQ(results->offset(), m_tupleSize);
 }
 
 
@@ -456,7 +462,7 @@ TEST_F(ExportTupleStreamTest, RollbackMiddleTuple) {
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), ((m_tuplesToFill - 1) * m_tupleSize + m_schemaSize));
+    EXPECT_EQ(results->offset(), ((m_tuplesToFill - 1) * m_tupleSize));
 }
 
 /**
@@ -483,7 +489,7 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBuffer)
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->offset(), (m_tupleSize * 3 + m_schemaSize));
+    EXPECT_EQ(results->offset(), (m_tupleSize * 3));
 }
 
 

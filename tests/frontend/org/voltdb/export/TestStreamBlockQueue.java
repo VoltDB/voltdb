@@ -57,6 +57,7 @@ public class TestStreamBlockQueue {
     private static ByteBuffer getFilledBuffer(byte fillValue) {
         //8 bytes is magic prefix space
         ByteBuffer buf = ByteBuffer.allocateDirect(1024 * 1024 * 2 + StreamBlock.HEADER_SIZE);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
         while (buf.hasRemaining()) {
             buf.put(fillValue);
         }
