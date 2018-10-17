@@ -27,11 +27,20 @@ namespace voltdb {
 
 class StreamBlock;
 
+//If you change this constant here change it in Java in the StreamBlockQueue where
+//it is used to calculate the number of bytes queued
+//I am not sure if the statements on the previous 2 lines are correct. I didn't see anything in SBQ that would care
+//It just reports the size of used bytes and not the size of the allocation
+//Add a 4k page at the end for bytes beyond the 2 meg row limit due to null mask and length prefix and so on
+//Necessary for very large rows
+const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
+
 class ExportTupleStream : public voltdb::TupleStreamBase {
 public:
     enum Type { INSERT, DELETE };
 
-    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature);
+    ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
+                      const std::string &tableName, const std::vector<std::string> &columnNames);
 
     virtual ~ExportTupleStream() {
     }
@@ -61,7 +70,7 @@ public:
     }
 
     // compute # of bytes needed to serialize the meta data column names
-    inline size_t getMDColumnNamesSerializedSize() const { return m_mdSchemaSize; }
+    inline size_t getMDColumnNamesSerializedSize() const { return s_mdSchemaSize; }
 
     int64_t allocatedByteCount() const {
         return (m_pendingBlocks.size() * (m_defaultCapacity - m_headerSpace)) +
@@ -77,32 +86,38 @@ public:
             int64_t seqNo,
             int64_t uniqueId,
             int64_t timestamp,
-            const std::string &tableName,
             const TableTuple &tuple,
-            const std::vector<std::string> &columnNames,
             int partitionColumn,
             ExportTupleStream::Type type);
 
     size_t computeOffsets(const TableTuple &tuple, size_t *rowHeaderSz) const;
     size_t computeSchemaSize(const std::string &tableName, const std::vector<std::string> &columnNames);
-    void writeSchema(ExportSerializeOutput &io, const TableTuple &tuple, const std::string &tableName, const std::vector<std::string> &columnNames);
+    void writeSchema(ExportSerializeOutput &hdr, const TableTuple &tuple);
 
     virtual int partitionId() { return m_partitionId; }
-    void setNew() { m_new = true; m_schemaSize = 0; }
+    void setNew() { m_new = true; }
+
+public:
+    // Computed size for metadata columns
+    static const size_t s_mdSchemaSize;
+    // Size of Fixed header (not including schema)
+    static const size_t s_FIXED_BUFFER_HEADER_SIZE;
 
 private:
     // cached catalog values
     const CatalogId m_partitionId;
     const int64_t m_siteId;
 
-    //This indicates that stream is new or has been marked as new after UAC so that we include schema in next export stream write.
+    // This indicates that stream is new or has been marked as new after UAC so that we include schema in next export stream write.
     bool m_new;
     std::string m_signature;
     int64_t m_generation;
-    size_t m_schemaSize;
+    const std::string &m_tableName;
+    const std::vector<std::string> &m_columnNames;
+    const int32_t m_ddlSchemaSize;
 
-    //Computed size for metadata columns
-    static const size_t m_mdSchemaSize;
+    // Buffer version (used for proper decoding of buffers by standalone processors)
+    static const uint8_t s_EXPORT_BUFFER_VERSION;
     // meta-data column count
     static const int METADATA_COL_CNT = 6;
 

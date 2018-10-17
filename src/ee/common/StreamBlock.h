@@ -187,6 +187,10 @@ namespace voltdb
             return m_data + m_offset;
         }
 
+        char* headerDataPtr() {
+            return m_data - (m_headerSize - MAGIC_HEADER_SPACE_FOR_JAVA);
+        }
+
         void consumed(size_t consumed) {
             assert ((m_offset + consumed) <= m_capacity);
             m_offset += consumed;

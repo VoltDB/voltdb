@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -461,6 +462,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.trace("pushExportBufferImpl with uso=" + uso + ", sync=" + sync + ", poll=" + poll);
         }
         if (buffer != null) {
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
             //There will be 8 bytes of no data that we can ignore, it is header space for storing
             //the USO in stream block
             if (buffer.capacity() > 8) {

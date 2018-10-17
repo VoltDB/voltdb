@@ -27,6 +27,7 @@ package org.voltdb.exportclient;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -167,7 +168,14 @@ public class TestExportDecoderBaseLegacy extends TestCase
         vtable.addRow(l, l, l, 0, l, l, (byte) 1, (short) 2, 3, 4, 5.5, 6, "xx", new BigDecimal(88), GEOG_POINT, GEOG);
         vtable.advanceRow();
         byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", 7, 1L);
-        ExportRowData rowdata = dut.decodeRow(rowBytes);
+        ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+        bb.order(ByteOrder.LITTLE_ENDIAN);
+        int schemaSize = bb.getInt();
+        ExportRow schemaRow = ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+        int size = bb.getInt(); // row size
+        byte[] rawRow = new byte[size];
+        bb.get(rawRow);
+        ExportRowData rowdata = dut.decodeRow(rawRow);
         Object[] rd = rowdata.values;
         assertEquals(rd[0], l);
         assertEquals(rd[1], l);
@@ -233,7 +241,14 @@ public class TestExportDecoderBaseLegacy extends TestCase
             //Check for bad values.
             dut.setPartitionColumnName("unknown");
             byte[] rowBytes = ExportEncoder.encodeRow(vtable, "mytable", -1, 1L);
-            ExportRowData rowdata = dut.decodeRow(rowBytes);
+            ByteBuffer bb = ByteBuffer.wrap(rowBytes);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            int schemaSize = bb.getInt();
+            ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+            int size = bb.getInt(); // row size
+            byte[] rawRow = new byte[size];
+            bb.get(rawRow);
+            ExportRowData rowdata = dut.decodeRow(rawRow);
             Object[] rd = rowdata.values;
             assertEquals(rd[0], l);
             assertEquals(rd[1], l);
@@ -249,7 +264,14 @@ public class TestExportDecoderBaseLegacy extends TestCase
             //After this I should get correct col set for partition value.
             int pidx = dut.setPartitionColumnName(pnames[i]);
             rowBytes = ExportEncoder.encodeRow(vtable, "mytable", pidx, 1L);
-            rowdata = dut.decodeRow(rowBytes);
+            bb = ByteBuffer.wrap(rowBytes);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            schemaSize = bb.getInt();
+            ExportRow.decodeBufferSchema(bb, schemaSize, 1, 0);
+            size = bb.getInt(); // row size
+            rawRow = new byte[size];
+            bb.get(rawRow);
+            rowdata = dut.decodeRow(rawRow);
             rd = rowdata.values;
             assertEquals(rd[0], l);
             assertEquals(rd[1], l);
