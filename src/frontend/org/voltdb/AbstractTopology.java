@@ -41,11 +41,13 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.messaging.HostMessenger.HostInfo;
+import org.voltcore.utils.Pair;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.Collections2;
 import com.google_voltpatches.common.collect.ComparisonChain;
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Iterables;
@@ -875,17 +877,22 @@ public class AbstractTopology {
      *
      * @param currentTopology to extend
      * @param newHostInfos    new hosts to add to topology
-     * @return update {@link AbstractTopology} with new hosts
+     * @return update {@link AbstractTopology} with new hosts and {@link ImmutableList} of new partition IDs
      * @throws RuntimeException if hosts are not valid for topology
      */
-    public static AbstractTopology mutateAddNewHosts(AbstractTopology currentTopology,
+    public static Pair<AbstractTopology, ImmutableList<Integer>> mutateAddNewHosts(AbstractTopology currentTopology,
             Map<Integer, HostInfo> newHostInfos) {
         int largestPartitionId = getNextFreePartitionId(currentTopology);
 
         TopologyBuilder topologyBuilder = addPartitionsToHosts(newHostInfos, Collections.emptySet(),
                 currentTopology.getReplicationFactor(), largestPartitionId);
 
-        return new AbstractTopology(currentTopology, topologyBuilder);
+        ImmutableList.Builder<Integer> newPartitions = ImmutableList.builder();
+        for (int i = topologyBuilder.m_partitions.size() - 1; i >= 0; --i) {
+            newPartitions.add(topologyBuilder.m_partitions.get(i).m_id);
+        }
+
+        return Pair.of(new AbstractTopology(currentTopology, topologyBuilder), newPartitions.build());
     }
 
     /**
