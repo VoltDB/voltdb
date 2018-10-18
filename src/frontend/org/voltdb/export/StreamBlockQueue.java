@@ -265,7 +265,7 @@ public class StreamBlockQueue {
                 byte version = b.get();
                 assert(version == EXPORT_BUFFER_VERSION);
                 b.getLong();  // generation
-                int firstRowStart = b.position() + b.getInt();
+                int firstRowStart = b.getInt() + b.position();
                 b.position(firstRowStart);
 
                 while (b.hasRemaining()) {
