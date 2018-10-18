@@ -261,7 +261,7 @@ public class StreamBlockQueue {
                 byte version = b.get();
                 assert(version == 1);
                 b.getLong();  // generation
-                int firstRowStart = b.position() + b.getInt();
+                int firstRowStart = b.getInt() + b.position();
                 b.position(firstRowStart);
 
                 while (b.hasRemaining()) {
