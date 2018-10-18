@@ -322,6 +322,7 @@ public class GuestProcessor implements ExportDataProcessor {
                     if (cont == null) {
                         return;
                     }
+                    cont.updateStartTime(System.currentTimeMillis());
                     try {
                         //Position to restart at on error
                         final int startPosition = cont.b().position();

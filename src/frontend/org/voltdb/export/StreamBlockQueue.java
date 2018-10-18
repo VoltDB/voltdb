@@ -44,6 +44,7 @@ import org.voltdb.utils.VoltFile;
 public class StreamBlockQueue {
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final int EXPORT_BUFFER_VERSION = 1;
 
     /**
      * Deque containing reference to stream blocks that are in memory. Some of these
@@ -260,9 +261,9 @@ public class StreamBlockQueue {
             ByteBuffer b = bbc.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
             try {
-                b.position(b.position() +  StreamBlock.HEADER_SIZE);//Don't need the USO, rowCount
+                b.position(b.position() + StreamBlock.HEADER_SIZE);//Don't need the USO, rowCount
                 byte version = b.get();
-                assert(version == 1);
+                assert(version == EXPORT_BUFFER_VERSION);
                 b.getLong();  // generation
                 int firstRowStart = b.position() + b.getInt();
                 b.position(firstRowStart);
@@ -284,8 +285,7 @@ public class StreamBlockQueue {
                     }
                     if (rowTxnId > txnId) {
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug(
-                                    "Export stream " + m_nonce + " found export data to truncate at txn " + rowTxnId);
+                            exportLog.debug("Export stream " + m_nonce + " found export data to truncate at txn " + rowTxnId);
                         }
                         //The txnid of this row is the greater then the truncation txnid.
                         //Don't want this row, but want to preserve all rows before it.
