@@ -391,7 +391,7 @@ def test_java_opts_override(verb = 'start', reportout = None):
     stdout, _ = run_voltcli(verb, [], environ=override_env)
     m = ignore_re.match(stdout)
     if m is None:
-      raise RuntimeError("No matches found in: '%s' % stdout)
+        raise RuntimeError("No matches found in: '%s'" % stdout)
     matched_java_opts = m.group('java_opts')
     reportout.write("Given: " + " ".join([k + '=' + v for k, v in volt_override.items()]) + "\n" +
                     "Got JVM Options: " + matched_java_opts + "\n")
