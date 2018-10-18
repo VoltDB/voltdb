@@ -27,6 +27,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.apache.calcite.schema.SchemaPlus;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
@@ -39,6 +40,7 @@ import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.settings.ClusterSettings;
@@ -117,6 +119,9 @@ public class CatalogContext {
     // database settings. contains both cluster and path settings
     private final DbSettings m_dbSettings;
 
+    // the SchemaPlus object
+    private final SchemaPlus m_schemaPlus;
+
     public final int catalogVersion;
     public final CatalogInfo m_catalogInfo;
     // prepared catalog information in non-blocking path
@@ -183,6 +188,8 @@ public class CatalogContext {
 
         m_catalogInfo = catalogInfo;
 
+        m_schemaPlus = CatalogAdapter.schemaPlusFromDatabase(database);
+
         // If there is no schema change, default procedures will not be changed.
         // Also, the planner tool can be almost reused except updating the catalog hash string.
         // When there is schema change, we just reload every default procedure and create new planner tool
@@ -192,7 +199,7 @@ public class CatalogContext {
             m_ptool = new PlannerTool(database, m_catalogInfo.m_catalogHash);
         } else {
             m_defaultProcs = defaultProcManager;
-            m_ptool = plannerTool.updateWhenNoSchemaChange(database, m_catalogInfo.m_catalogHash);;
+            m_ptool = plannerTool.updateWhenNoSchemaChange(database, m_catalogInfo.m_catalogHash);
         }
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_catalogInfo.m_jarfile);
