@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.calcite;
+package org.voltdb.newplanner;
 
 import static org.junit.Assert.assertEquals;
 
@@ -30,12 +30,12 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.junit.Test;
-import org.voltdb.parser.ParserFactory;
+import org.voltdb.parser.SqlParserFactory;
 
 public class TestCalciteParser {
 
     private void assertSqlNodeKind(String sql, SqlKind expectedSqlKind) throws SqlParseException {
-        SqlParser parser = ParserFactory.create(sql);
+        SqlParser parser = SqlParserFactory.create(sql);
         SqlNode sqlNode = parser.parseStmt();
         assertEquals(expectedSqlKind, sqlNode.getKind());
     }
@@ -44,5 +44,4 @@ public class TestCalciteParser {
     public void testSqlNodeKind() throws SqlParseException {
         assertSqlNodeKind("CREATE TABLE T (a INT)", SqlKind.CREATE_TABLE);
     }
-
 }

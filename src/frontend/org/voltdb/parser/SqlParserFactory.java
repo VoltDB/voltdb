@@ -25,7 +25,7 @@ import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class ParserFactory {
+public class SqlParserFactory {
 
     /**
      * Given a SQL statement (could be either a DDL or DQL/DML),

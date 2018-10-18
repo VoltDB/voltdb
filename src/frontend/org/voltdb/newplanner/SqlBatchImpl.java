@@ -97,7 +97,7 @@ public class SqlBatchImpl implements SqlBatch {
                 // so that VoltDB will use the old parser and planner.
                 throw new PlannerFallbackException();
             }
-            SqlTask sqlTask = SqlTaskFactory.createSqlTask(sql);
+            SqlTask sqlTask = SqlTask.create(sql);
             if (isDDLBatch == null) {
                 isDDLBatch = sqlTask.isDDL();
             } else if (isDDLBatch ^ sqlTask.isDDL()) { // True if isDDLBatch is different from isDDL

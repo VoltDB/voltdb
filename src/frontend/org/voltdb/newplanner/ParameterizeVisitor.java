@@ -17,29 +17,35 @@
 
 package org.voltdb.newplanner;
 
-import org.apache.calcite.sql.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlDynamicParam;
+import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.voltcore.utils.Pair;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Visitor that can replace all the {@link SqlLiteral} to {@link SqlDynamicParam} inplace.
- * It is used for parameterizing queries.
+ * The visitor that can replace all the {@link SqlLiteral} in the query to {@link SqlDynamicParam}.
+ * It is used for parameterizing a query.
  *
  * @author Chao Zhou
  * @since 8.4
  */
 public class ParameterizeVisitor extends SqlBasicVisitor<SqlNode> {
+
     private final List<SqlLiteral> m_sqlLiteralList = new ArrayList<>();
     private int m_dynamicParamIndex = 0;
 
     /**
-     * Get the List of parameter values.
-     *
-     * @return the List of parameter values.
+     * Get the list of parameter values.
+     * @return the list of parameter values.
      */
     public List<SqlLiteral> getSqlLiteralList() {
         return m_sqlLiteralList;
@@ -47,97 +53,86 @@ public class ParameterizeVisitor extends SqlBasicVisitor<SqlNode> {
 
     @Override
     public SqlNode visit(SqlLiteral literal) {
+        /*
+         * For SqlLiteral, we replace it with a SqlDynamicParam.
+         * There is a special case in SqlWindow.
+         * SqlWindow is for the OVER clause, for example: OVER (PARTITION BY cnt ORDER BY name).
+         * This kind of node does not have a chance to be parameterized,
+         * but its "isRows" flag's type is SqlLiteral, which will cause an error if
+         * we try to parameterize it.
+         */
+        if (literal.getTypeName() == SqlTypeName.BOOLEAN
+                || literal.getTypeName() == SqlTypeName.SYMBOL) {
+            return null;
+        }
         m_sqlLiteralList.add(literal);
-
         return new SqlDynamicParam(m_dynamicParamIndex++, literal.getParserPosition());
     }
 
     @Override
     public SqlNode visit(SqlDynamicParam param) {
-        return new SqlDynamicParam(m_dynamicParamIndex++, param.getParserPosition());
+        throw new RuntimeException("Shouldn't be parameterizing a query that already has parameters.");
     }
 
     @Override
     public SqlNode visit(SqlCall call) {
-        /*  SqlWindow is for the over clause, say: (PARTITION BY cnt ORDER BY name).
-            This kind of node don't have chance to be parameterized,
-            but its "isRows" flag's type is SqlLiteral, which will cause an error if
-            we try to  parameterize it.   */
-        if (call instanceof SqlWindow) {
-            return null;
-        }
-
-        List<SqlNode> operandList = call.getOperandList();
-        // before we sort the operands based on position, we need a new array copy
-        // together with the  operand's original index.
-        List<Pair<Integer, SqlNode>> operandPairs = new ArrayList<>();
-        for (int i = 0; i < operandList.size(); i++) {
-            SqlNode operand = operandList.get(i);
-            if (operand == null) {
-                continue;
-            }
-            operandPairs.add(new Pair<>(i, operand));
-        }
-
-        // sort the operands based on their position. We will ignore the equal case
+        // The parameters should be indexed in the order they appeared in the query.
+        // So we need to sort the operands by their parser positions here.
+        // We pair the operands with their original indexes before sorting, so those
+        // original indexes can still be retrieved later for operand update.
+        List<Pair<Integer, SqlNode>> indexedOperands = toIndexedPairList(call.getOperandList());
+        // Sort the operands based on their positions. We will ignore the equal cases
         // because the operands of the same parent node won't overlap.
-        operandPairs.sort((lhs, rhs) -> {
-            SqlParserPos lPos = lhs.getSecond().getParserPosition();
-            SqlParserPos rPos = rhs.getSecond().getParserPosition();
-            return lPos.startsBefore(rPos) ? -1 : 1;
-        });
+        indexedOperands.sort(PositionBasedIndexedSqlNodePairComparator.INSTANCE);
 
-        // visit the operands order by their position
-        for (Pair<Integer, SqlNode> operandPair : operandPairs) {
-            SqlNode operand = operandPair.getSecond();
-            SqlNode visitResult = operand.accept(this);
-            /* update the operands:
-             * 1. For SqlLiteral, we replace it with a SqlDynamicParam.
-             * 2. For SqlDynamicParam, we replace it with a new SqlDynamicParam with updated index.
-             */
-            if (operand instanceof SqlLiteral || operand instanceof SqlDynamicParam) {
-                call.setOperand(operandPair.getFirst(), visitResult);
+        // Visit the operands in the order of their parser positions.
+        for (Pair<Integer, SqlNode> indexedOperand : indexedOperands) {
+            SqlNode operand = indexedOperand.getSecond();
+            SqlNode convertedOperand = operand.accept(this);
+            if (operand instanceof SqlLiteral
+                    && convertedOperand != null) {
+                call.setOperand(indexedOperand.getFirst(), convertedOperand);
             }
         }
-
         return null;
     }
 
     @Override
     public SqlNode visit(SqlNodeList nodeList) {
-        List<SqlNode> operandList = nodeList.getList();
-        // before we sort the child nodes based on position, we need a new array copy
-        // together with the  child node's original index.
-        List<Pair<Integer, SqlNode>> operandPairs = new ArrayList<>();
-        for (int i = 0; i < operandList.size(); i++) {
-            SqlNode operand = operandList.get(i);
-            if (operand == null) {
-                continue;
-            }
-            operandPairs.add(new Pair<>(i, operand));
-        }
-
-        // sort the child nodes based on their position. We will ignore the equal case
-        // because the operands of the same parent node won't overlap.
-        operandPairs.sort((lhs, rhs) -> {
-            SqlParserPos lPos = lhs.getSecond().getParserPosition();
-            SqlParserPos rPos = rhs.getSecond().getParserPosition();
-            return lPos.startsBefore(rPos) ? -1 : 1;
-        });
-
-        // visit the child nodes order by their position
-        for (Pair<Integer, SqlNode> operandPair : operandPairs) {
-            SqlNode operand = operandPair.getSecond();
-            SqlNode visitResult = operand.accept(this);
-            /* update the operands:
-             * 1. For SqlLiteral, we replace it with a SqlDynamicParam.
-             * 2. For SqlDynamicParam, we replace it with a new SqlDynamicParam with updated index.
-             */
-            if (operand instanceof SqlLiteral || operand instanceof SqlDynamicParam) {
-                nodeList.set(operandPair.getFirst(), visitResult);
+        // This function is very similar to SqlNode visit(SqlCall call), see comments there.
+        // An example use case of the SqlNodeList is the IN clause: select * from t where a in (1, ?, 2);
+        List<Pair<Integer, SqlNode>> indexedNodes = toIndexedPairList(nodeList.getList());
+        indexedNodes.sort(PositionBasedIndexedSqlNodePairComparator.INSTANCE);
+        for (Pair<Integer, SqlNode> indexedNode : indexedNodes) {
+            SqlNode node = indexedNode.getSecond();
+            SqlNode convertedNode = node.accept(this);
+            if (node instanceof SqlLiteral) {
+                nodeList.set(indexedNode.getFirst(), convertedNode);
             }
         }
-
         return null;
+    }
+
+    private <T> List<Pair<Integer, T>> toIndexedPairList(List<T> originalList) {
+        List<Pair<Integer, T>> retval = new ArrayList<>();
+        int pos = 0;
+        for (T elem : originalList) {
+            if (elem != null) {
+                retval.add(new Pair<>(pos, elem));
+            }
+            ++pos;
+        }
+        return retval;
+    }
+
+    private static final class PositionBasedIndexedSqlNodePairComparator implements Comparator<Pair<Integer,SqlNode>> {
+        final static PositionBasedIndexedSqlNodePairComparator INSTANCE =
+                new PositionBasedIndexedSqlNodePairComparator();
+        @Override
+        public int compare(Pair<Integer,SqlNode> o1, Pair<Integer,SqlNode> o2) {
+            SqlParserPos lPos = o1.getSecond().getParserPosition();
+            SqlParserPos rPos = o2.getSecond().getParserPosition();
+            return lPos.startsBefore(rPos) ? -1 : 1;
+        }
     }
 }
