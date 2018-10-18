@@ -389,7 +389,10 @@ def test_java_opts_override(verb = 'start', reportout = None):
     haddiffs = False
     override_env = dict(os.environ.copy(), **volt_override)
     stdout, _ = run_voltcli(verb, [], environ=override_env)
-    matched_java_opts = ignore_re.match(stdout).group('java_opts')
+    m = ignore_re.match(stdout)
+    if m is None:
+      raise RuntimeError("No matches found in: '%s' % stdout)
+    matched_java_opts = m.group('java_opts')
     reportout.write("Given: " + " ".join([k + '=' + v for k, v in volt_override.items()]) + "\n" +
                     "Got JVM Options: " + matched_java_opts + "\n")
     if 'VOLTDB_HEAPMAX' in volt_override:
