@@ -196,10 +196,10 @@ public class CatalogContext {
         // by applying the existing schema, which are costly in the UAC MP blocking path.
         if (hasSchemaChange) {
             m_defaultProcs = new DefaultProcedureManager(database);
-            m_ptool = new PlannerTool(database, m_catalogInfo.m_catalogHash);
+            m_ptool = new PlannerTool(database, m_catalogInfo.m_catalogHash, m_schemaPlus);
         } else {
             m_defaultProcs = defaultProcManager;
-            m_ptool = plannerTool.updateWhenNoSchemaChange(database, m_catalogInfo.m_catalogHash);
+            m_ptool = plannerTool.updateWhenNoSchemaChange(database, m_catalogInfo.m_catalogHash, m_schemaPlus);
         }
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_catalogInfo.m_jarfile);
