@@ -591,7 +591,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 int len = m_nextDeserializer.readInt();
                 byte[] bufCopy = new byte[len];
                 m_nextDeserializer.readFully(bufCopy, 0, len);
-                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
+                // This Table should be readonly (true), but table stats need to be updated
+                // Stream stats until Stream stats are deprecated from Table stats
+                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), false);
             }
             return results;
         } catch (final IOException ex) {

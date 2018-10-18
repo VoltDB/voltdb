@@ -44,6 +44,7 @@ import org.voltdb.utils.VoltFile;
 public class StreamBlockQueue {
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    private static final int EXPORT_BUFFER_VERSION = 1;
 
     /**
      * Deque containing reference to stream blocks that are in memory. Some of these
@@ -100,10 +101,13 @@ public class StreamBlockQueue {
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
             long uso = cont.b().getLong(0);
+            int tupleCount = cont.b().getInt(8);
+            fcont.b().order(ByteOrder.BIG_ENDIAN);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
             StreamBlock block = new StreamBlock( fcont,
                 uso,
+                tupleCount,
                 true);
 
             //Optionally store a reference to the block in the in memory deque
@@ -229,7 +233,7 @@ public class StreamBlockQueue {
             memoryBlockUsage += b.unreleasedSize();
         }
         //Subtract USO from on disk size
-        return memoryBlockUsage + m_reader.sizeInBytes() - (8 * m_reader.getNumObjects());
+        return memoryBlockUsage + m_reader.sizeInBytes() - (StreamBlock.HEADER_SIZE * m_reader.getNumObjects());
     }
 
     public void close() throws IOException {
@@ -257,11 +261,11 @@ public class StreamBlockQueue {
             ByteBuffer b = bbc.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
             try {
-                b.position(b.position() + 8);//Don't need the USO
+                b.position(b.position() + StreamBlock.HEADER_SIZE);//Don't need the USO, rowCount
                 byte version = b.get();
-                assert(version == 1);
+                assert(version == EXPORT_BUFFER_VERSION);
                 b.getLong();  // generation
-                int firstRowStart = b.position() + b.getInt();
+                int firstRowStart = b.getInt() + b.position();
                 b.position(firstRowStart);
 
                 while (b.hasRemaining()) {
@@ -281,8 +285,7 @@ public class StreamBlockQueue {
                     }
                     if (rowTxnId > txnId) {
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug(
-                                    "Export stream " + m_nonce + " found export data to truncate at txn " + rowTxnId);
+                            exportLog.debug("Export stream " + m_nonce + " found export data to truncate at txn " + rowTxnId);
                         }
                         //The txnid of this row is the greater then the truncation txnid.
                         //Don't want this row, but want to preserve all rows before it.
@@ -337,4 +340,5 @@ public class StreamBlockQueue {
             }
         }
     }
+
 }

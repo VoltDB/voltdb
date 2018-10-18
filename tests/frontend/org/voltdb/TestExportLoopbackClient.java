@@ -93,7 +93,7 @@ public class TestExportLoopbackClient extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         response = client.callProcedure("@AdHoc", "select count(*) from LOOPBACK_NO_NULLS");
         assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         assertEquals(response.getResults()[0].asScalarLong(),10);
@@ -107,7 +107,7 @@ public class TestExportLoopbackClient extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         response = client.callProcedure("@AdHoc", "select count(*) from LOOPBACK_NO_NULLS");
         assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         assertEquals(response.getResults()[0].asScalarLong(),10);
@@ -135,7 +135,7 @@ public class TestExportLoopbackClient extends TestExportBaseSocketExport {
         quiesce(client);
 
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         response = client.callProcedure("@AdHoc", "select count(*) from LOOPBACK_NO_NULLS");
         assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         assertEquals(response.getResults()[0].asScalarLong(),20);

@@ -152,7 +152,7 @@ public class TestExportRollback extends TestExportBaseSocketExport {
         client.drain();
         System.out.println("Client Drained....");
 
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     public TestExportRollback(final String name) {

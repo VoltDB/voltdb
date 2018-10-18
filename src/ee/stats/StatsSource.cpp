@@ -123,7 +123,6 @@ TableTuple* StatsSource::getStatsTuple(int64_t siteId, int32_t partitionId, bool
     m_statsTuple.setNValue(3, ValueFactory::getIntegerValue(static_cast<int32_t>(siteId >> 32)));
     m_statsTuple.setNValue(4, ValueFactory::getBigIntValue(partitionId));
     updateStatsTuple(&m_statsTuple);
-
     // this was put in to collect history, but wasn't bounded so it leaked
     // also maybe better to collect history elsewhere
     //m_statsTable->insertTuple(m_statsTuple);

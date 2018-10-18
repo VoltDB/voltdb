@@ -152,7 +152,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       source,
                                       partitionColumn(),
                                       ExportTupleStream::INSERT);
-        m_tupleCount++;
+
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
         if (!uq) {
             // With no active UndoLog, there is no undo support.
@@ -205,9 +205,6 @@ size_t StreamedTable::allocatedBlockCount() const {
 }
 
 int64_t StreamedTable::allocatedTupleMemory() const {
-    if (m_wrapper) {
-        return m_wrapper->allocatedByteCount();
-    }
     return 0;
 }
 

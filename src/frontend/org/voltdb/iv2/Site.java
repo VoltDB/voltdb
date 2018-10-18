@@ -88,6 +88,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.jni.ExecutionEngine.TaskType;
@@ -1483,6 +1484,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     sequenceNumbers.getSecond(),
                     m_partitionId,
                     catalogTable.getSignature());
+            // assign the stats to the other partition's value
+            ExportManager.instance().updateInitialExportStateToTxnId(m_partitionId, tableEntry.getKey(),
+                    false, new Long(-1), sequenceNumbers.getSecond());
         }
 
         if (drSequenceNumbers != null) {

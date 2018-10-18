@@ -52,8 +52,10 @@ static const int SCHEMA_SIZE = 20 + 5 + 5 + 20 + 7 + ExportTupleStream::s_mdSche
 static const int METADATA_DATA_SIZE = 41;
 //Data size without schema information. = 75
 static const int MAGIC_TUPLE_SIZE = TUPLE_HEADER_SZ + METADATA_DATA_SIZE + TUPLE_SIZE;
-// Size of Buffer header including schema and uso(ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA)
-static const int BUFFER_HEADER_SIZE = ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + SCHEMA_SIZE;
+//Buffer row count size
+static const int BUFFER_HEADER_ROW_COUNT_SIZE = 4;
+// Size of Buffer header including schema and uso(ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + BUFFER_HEADER_ROW_COUNT_SIZE)
+static const int BUFFER_HEADER_SIZE = ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + SCHEMA_SIZE + BUFFER_HEADER_ROW_COUNT_SIZE;
 
 // 1k buffer
 static const int BUFFER_SIZE = 1024;
@@ -221,7 +223,7 @@ TEST_F(ExportTupleStreamTest, DoOneTuple) {
 TEST_F(ExportTupleStreamTest, BasicOps) {
 
     // verify the block count statistic.
-    size_t allocatedByteCount = m_wrapper->allocatedByteCount();
+    size_t allocatedByteCount = m_wrapper->debugAllocatedBytesInEE();
 
     EXPECT_TRUE(allocatedByteCount == 0);
     std::ostringstream os;
@@ -233,8 +235,8 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
 
     m_wrapper->periodicFlush(-1, 2);
     allocatedByteCount = (m_tupleSize * 2) + BUFFER_HEADER_SIZE;
-    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->allocatedByteCount();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->allocatedByteCount(), os.str().c_str());
+    os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
+    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
     os.str(""); os << "Blocks on top-end expected: " << 1 << ", actual: " << m_topend.blocks.size();
     ASSERT_TRUE_WITH_MESSAGE(m_topend.blocks.size() == 1, os.str().c_str());
     boost::shared_ptr<StreamBlock> results2 = m_topend.blocks.front();
@@ -248,8 +250,8 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
 
     // 3 rows - 2 blocks (2, 3)
     allocatedByteCount = (m_tupleSize * 5) + (BUFFER_HEADER_SIZE * 2);
-    os.str(""); os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->allocatedByteCount();
-    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->allocatedByteCount(), os.str().c_str());
+    os.str(""); os << "Allocated byte count - expected: " << allocatedByteCount << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
+    ASSERT_TRUE_WITH_MESSAGE( allocatedByteCount == m_wrapper->debugAllocatedBytesInEE(), os.str().c_str());
     os.str(""); os << "Blocks on top-end expected: " << 2 << ", actual: " << m_topend.blocks.size();
     ASSERT_TRUE_WITH_MESSAGE(m_topend.blocks.size() == 2, os.str().c_str());
 
@@ -270,8 +272,8 @@ TEST_F(ExportTupleStreamTest, BasicOps) {
     ASSERT_TRUE_WITH_MESSAGE(results->offset() == (m_tupleSize * 3), os.str().c_str());
 
     // ack all of the data and re-verify block count
-    os.str(""); os << "Allocated byte count - expected: " << 0 << ", actual: " << m_wrapper->allocatedByteCount();
-    EXPECT_TRUE(m_wrapper->allocatedByteCount()== 0);
+    os.str(""); os << "Allocated byte count - expected: " << 0 << ", actual: " << m_wrapper->debugAllocatedBytesInEE();
+    EXPECT_TRUE(m_wrapper->debugAllocatedBytesInEE()== 0);
 }
 
 /**

@@ -84,7 +84,7 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
             client.callProcedure("Insert", params);
             client.callProcedure("Insert", paramsGrp);
         }
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
         quiesce(client);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
@@ -113,7 +113,7 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
 
         // must still be able to verify the export data.
         // ENG-5708
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyStream(client, m_verifier);
     }
 
     public TestExportSnapshot(final String name) {
