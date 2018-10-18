@@ -489,7 +489,12 @@ public class ExportGeneration implements Generation {
     @Override
     public List<ExportStatsRow> getStats(boolean interval) {
         List<ListenableFuture<ExportStatsRow>> tasks = new ArrayList<ListenableFuture<ExportStatsRow>>();
-        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+        Map<Integer, Map<String, ExportDataSource>> dataSourcesByPartition
+            = new HashMap<Integer, Map<String, ExportDataSource>>();
+        synchronized(m_dataSourcesByPartition) {
+            dataSourcesByPartition.putAll(m_dataSourcesByPartition);
+        }
+        for (Map<String, ExportDataSource> dataSources : dataSourcesByPartition.values()) {
             for (ExportDataSource source : dataSources.values()) {
                 ListenableFuture<ExportStatsRow> syncFuture = source.getImmutableStatsRow(interval);
                 if (syncFuture != null)
