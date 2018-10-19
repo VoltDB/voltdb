@@ -41,8 +41,16 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.*;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
+import org.voltdb.RealVoltDB;
+import org.voltdb.SnapshotCompletionInterest;
+import org.voltdb.SnapshotCompletionMonitor;
+import org.voltdb.SystemProcedureCatalog;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
+import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
@@ -1663,6 +1671,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void scheduleRepairLogTruncateMsg()
     {
+        // skip schedule jobs if no TxnCommitInterests need to be notified
+        if (m_sendToHSIds.length == 0 && m_repairLog.hasNoTxnCommitInterests()) {
+            return;
+        }
+
         SiteTaskerRunnable r = new SiteTaskerRunnable() {
             @Override
             void run()
