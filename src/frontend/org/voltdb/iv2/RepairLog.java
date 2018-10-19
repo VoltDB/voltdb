@@ -148,6 +148,10 @@ public class RepairLog
         }
     }
 
+    public boolean hasNoTxnCommitInterests() {
+        return m_txnCommitInterests.isEmpty();
+    }
+
     public void notifyTxnCommitInterests(long handle) {
         for (TransactionCommitInterest interest : m_txnCommitInterests) {
             interest.transactionCommitted(handle);
