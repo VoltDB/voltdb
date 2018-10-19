@@ -1590,6 +1590,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void scheduleRepairLogTruncateMsg()
     {
+        // skip schedule jobs if no TxnCommitInterests need to be notified
+        if (m_sendToHSIds.length == 0 && m_repairLog.hasNoTxnCommitInterests()) {
+            return;
+        }
+
         SiteTaskerRunnable r = new SiteTaskerRunnable() {
             @Override
             void run()
