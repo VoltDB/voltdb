@@ -334,14 +334,11 @@ public class MatchChecks {
     protected static long getExportBacklog(Client client) {
         long backlog = 0;
         try {
-            VoltTable tableStats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            VoltTable tableStats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             while (tableStats.advanceRow()) {
-                String tableType = tableStats.getString("TABLE_TYPE");
-                Long allocatedMemory = tableStats.getLong("TUPLE_ALLOCATED_MEMORY");
-                if ( tableType.equals("StreamedTable") || tableType.contains("_EXPORT")) {
-                    if ( allocatedMemory > 0 ) {
+                Long allocatedMemory = tableStats.getLong("TUPLE_PENDING");
+                if ( allocatedMemory > 0 ) {
                         backlog = backlog + allocatedMemory;
-                    }
                 }
             }
         } catch (Exception e) {

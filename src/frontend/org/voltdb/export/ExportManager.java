@@ -20,12 +20,13 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,7 +37,11 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
+import org.voltdb.ExportStatsBase;
+import org.voltdb.RealVoltDB;
+import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
@@ -118,6 +123,7 @@ public class ExportManager
 
     /** Obtain the global ExportManager via its instance() method */
     private static ExportManager m_self;
+    private ExportStats m_exportStats;
     private final int m_hostId;
 
     // this used to be flexible, but no longer - now m_loaderClass is just null or default value
@@ -129,6 +135,73 @@ public class ExportManager
     private int m_exportTablesCount = 0;
     private int m_connCount = 0;
     private boolean m_startPolling = false;
+
+
+    public class ExportStats extends ExportStatsBase {
+        List<ExportStatsRow> m_stats;
+
+        ExportStats() {
+            super();
+        }
+
+        @Override
+        public Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+            m_stats = getStats(interval);
+            return buildIterator();
+        }
+
+        private Iterator<Object> buildIterator() {
+            return new Iterator<Object>() {
+                int index = 0;
+
+                @Override
+                public boolean hasNext() {
+                    return index < m_stats.size();
+                }
+
+                @Override
+                public Object next() {
+                    if (index < m_stats.size()) {
+                        return index++;
+                    }
+                    throw new NoSuchElementException();
+                }
+
+                @Override
+                public void remove() {
+                    throw new UnsupportedOperationException();
+                }
+
+            };
+        }
+
+        @Override
+        protected void updateStatsRow(Object rowKey, Object rowValues[]) {
+            super.updateStatsRow(rowKey, rowValues);
+            int rowIndex = (Integer) rowKey;
+            assert (rowIndex >= 0);
+            assert (rowIndex < m_stats.size());
+            ExportStatsRow stat = m_stats.get(rowIndex);
+            rowValues[columnNameToIndex.get(Columns.SITE_ID)] = stat.m_siteId;
+            rowValues[columnNameToIndex.get(Columns.PARTITION_ID)] = stat.m_partitionId;
+            rowValues[columnNameToIndex.get(Columns.STREAM_NAME)] = stat.m_streamName;
+            rowValues[columnNameToIndex.get(Columns.EXPORT_TARGET)] = stat.m_exportTarget;
+            rowValues[columnNameToIndex.get(Columns.TUPLE_COUNT)] = stat.m_tupleCount;
+            rowValues[columnNameToIndex.get(Columns.TUPLE_PENDING)] = stat.m_tuplesPending;
+            rowValues[columnNameToIndex.get(Columns.AVERAGE_LATENCY)] = stat.m_averageLatency;
+            rowValues[columnNameToIndex.get(Columns.MAX_LATENCY)] = stat.m_maxLatency;
+            rowValues[columnNameToIndex.get(Columns.GAP_COUNT)] = stat.m_gapCount;
+            rowValues[columnNameToIndex.get(Columns.STATUS)] = stat.m_status;
+        }
+
+        public ExportStatsRow getStatsRow(Object rowKey) {
+            int rowIndex = (Integer) rowKey;
+            assert (rowIndex >= 0);
+            assert (rowIndex < m_stats.size());
+            ExportStatsRow stat = m_stats.get(rowIndex);
+            return stat;
+        }
+    }
 
     /**
      * Construct ExportManager using catalog.
@@ -143,15 +216,20 @@ public class ExportManager
             boolean isRejoin,
             boolean forceCreate,
             HostMessenger messenger,
-            List<Integer> partitions)
+            List<Pair<Integer, Integer>> partitions)
             throws ExportManager.SetupException
     {
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger);
+        m_self = em;
         if (forceCreate) {
             em.clearOverflowData();
         }
         em.initialize(catalogContext, partitions, isRejoin);
-        m_self = em;
+
+        RealVoltDB db=(RealVoltDB)VoltDB.instance();
+        db.getStatsAgent().registerStatsSource(StatsSelector.EXPORT,
+                myHostId, // m_siteId,
+                em.getExportStats());
     }
 
     private CatalogMap<Connector> getConnectors(CatalogContext catalogContext) {
@@ -250,6 +328,7 @@ public class ExportManager
     {
         m_hostId = myHostId;
         m_messenger = messenger;
+        m_exportStats = new ExportStats();
 
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
         if (!hasEnabledConnectors(connectors)) {
@@ -354,7 +433,8 @@ public class ExportManager
     }
 
     /** Creates the initial export processor if export is enabled */
-    private void initialize(CatalogContext catalogContext, List<Integer> partitions, boolean isRejoin) {
+    private void initialize(CatalogContext catalogContext, List<Pair<Integer, Integer>> localPartitionsToSites,
+            boolean isRejoin) {
         try {
             CatalogMap<Connector> connectors = getConnectors(catalogContext);
             if (!hasEnabledConnectors(connectors)) {
@@ -369,7 +449,8 @@ public class ExportManager
 
             File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
             ExportGeneration generation = new ExportGeneration(exportOverflowDirectory);
-            generation.initialize(m_messenger, m_hostId, catalogContext, connectors, partitions, exportOverflowDirectory);
+            generation.initialize(m_messenger, m_hostId, catalogContext,
+                    connectors, localPartitionsToSites, exportOverflowDirectory);
 
             m_generation.set(generation);
             newProcessor.setExportGeneration(generation);
@@ -380,12 +461,13 @@ public class ExportManager
             throw new RuntimeException(e);
         }
         catch (final Exception e) {
+            exportLog.error("Initialize failed with:", e);
             throw new RuntimeException(e);
         }
     }
 
     public synchronized void updateCatalog(CatalogContext catalogContext, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean requiresNewExportGeneration, List<Integer> partitions)
+            boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -431,8 +513,8 @@ public class ExportManager
                 exportLog.debug("First stream created processor will be initialized: " + m_loaderClass);
             }
             try {
-                generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
-                generation.createAckMailboxesIfNeeded(m_messenger, partitions);
+                generation.initializeGenerationFromCatalog(catalogContext,
+                        connectors, m_hostId, m_messenger, localPartitionsToSites);
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Creating connector " + m_loaderClass);
                 }
@@ -467,7 +549,8 @@ public class ExportManager
             }
         }
         else {
-            swapWithNewProcessor(catalogContext, generation, connectors, partitions, m_processorConfig);
+            swapWithNewProcessor(catalogContext, generation,
+                    connectors, localPartitionsToSites, m_processorConfig);
         }
     }
 
@@ -476,7 +559,7 @@ public class ExportManager
             final CatalogContext catalogContext,
             ExportGeneration generation,
             CatalogMap<Connector> connectors,
-            List<Integer> partitions,
+            List<Pair<Integer, Integer>> partitions,
             Map<String, Pair<Properties, Set<String>>> config)
     {
         ExportDataProcessor oldProcessor = m_processor.get();
@@ -493,8 +576,8 @@ public class ExportManager
         }
         //Load any missing tables.
         generation.initializeGenerationFromCatalog(catalogContext, connectors, m_hostId, m_messenger, partitions);
-        for (int partition : partitions) {
-            generation.updateAckMailboxes(partition, null);
+        for (Pair<Integer, Integer> partition : partitions) {
+            generation.updateAckMailboxes(partition.getFirst(), null);
         }
 
         //We create processor even if we dont have any streams.
@@ -534,20 +617,17 @@ public class ExportManager
         }
     }
 
-    public static long getQueuedExportBytes(int partitionId, String signature) {
-        ExportManager instance = instance();
+    private List<ExportStatsRow> getStats(final boolean interval) {
         try {
-            ExportGeneration generation = instance.m_generation.get();
-            if (generation == null) {
-                //This is now fine as you could get a stats tick and have no generation if you dropped last table.
-                return 0;
+            ExportGeneration generation = m_generation.get();
+            if (generation != null) {
+                return generation.getStats(interval);
             }
-            return generation.getQueuedExportBytes( partitionId, signature);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Failed to get export queued bytes.", e);
         }
-        return 0;
+        return new ArrayList<ExportStatsRow>();
     }
 
     /*
@@ -584,7 +664,7 @@ public class ExportManager
             long uso,
             long bufferPtr,
             ByteBuffer buffer,
-            boolean sync) {
+            boolean sync, long tupleCount) {
         //For validating that the memory is released
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManager instance = instance();
@@ -596,22 +676,21 @@ public class ExportManager
                 }
                 return;
             }
-            generation.pushExportBuffer(partitionId, signature, uso, buffer, sync);
+            generation.pushExportBuffer(partitionId, signature, uso, buffer, sync, tupleCount);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
         }
     }
 
-    public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Truncating export data after txnId " + snapshotTxnId);
-        }
+    public void updateInitialExportStateToTxnId(int partitionId, String signature,
+            boolean isRecover, Long truncationPoint, long sequenceNumber) {
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();
         if (generation != null) {
-            generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
+            generation.updateInitialExportStateToTxnId(partitionId, signature,
+                    isRecover, truncationPoint, sequenceNumber);
         }
     }
 
@@ -623,5 +702,9 @@ public class ExportManager
         if (generation != null) {
             generation.sync(nofsync);
         }
+    }
+
+    public ExportStats getExportStats() {
+        return m_exportStats;
     }
 }

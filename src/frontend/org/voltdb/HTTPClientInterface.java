@@ -26,7 +26,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationListener;
@@ -55,8 +57,6 @@ import org.voltdb.utils.Encoder;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
 
 public class HTTPClientInterface {
 
@@ -370,7 +370,8 @@ public class HTTPClientInterface {
     }
 
     public boolean callProcedure(String hostname, final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
-        return m_invocationHandler.get().callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, args);
+        InternalConnectionHandler internal=m_invocationHandler.get();
+        return internal.callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, args);
     }
 
     public boolean callProcedure(String hostname, final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, Object...args) {

@@ -131,7 +131,7 @@ SET (VOLTDB_SRC
   catalog/table.cpp
   catalog/tableref.cpp
   common/Pool.cpp
-  common/debuglog.cpp
+  common/StackTrace.cpp
   common/ExecuteWithMpMemory.cpp
   common/executorcontext.cpp
   common/FatalException.cpp

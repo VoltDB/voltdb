@@ -43,8 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREDEBUGLOG_H
-#define HSTOREDEBUGLOG_H
+#pragma once
 
 /**
  * Debug logging functions for EE. Unlike the performance counters,
@@ -55,15 +54,13 @@
 */
 
 #include "common/ThreadLocalPool.h"
+#include "common/StackTrace.h"
 
 #include <string>
 #include <ctime>
 #include <cstdio>
-#include <vector>
 #include <chrono>
 #include <sys/time.h>
-
-namespace voltdb {
 
 // Log levels.
 #define VOLT_LEVEL_OFF    1000
@@ -220,35 +217,4 @@ struct _TimerLevels {
 #define STOP_TIMER(...) ((void)0)
 #endif
 
-class StackTrace {
-public:
-    StackTrace();
-    ~StackTrace();
-
-    static void printMangledAndUnmangledToFile(FILE *targetFile);
-
-    static void printStackTrace() {
-        StackTrace st;
-        for (int ii=1; ii < st.m_traces.size(); ii++) {
-            printf("   %s\n", st.m_traces[ii].c_str());
-        }
-    }
-
-    static std::string stringStackTrace();
-
-    void printLocalTrace() {
-        for (int ii=1; ii < m_traces.size(); ii++) {
-            printf("   %s\n", m_traces[ii].c_str());
-        }
-    }
-
-private:
-    char** m_traceSymbols;
-    std::vector<std::string> m_traces;
-};
-
 #define PRINT_STACK_TRACE() VOLT_LOG_STACK("UNKWN")
-
-} // namespace voltdb
-
-#endif // HSTOREDEBUGLOG_H

@@ -19,6 +19,9 @@
 #define THREADLOCALPOOL_H_
 
 #include "structures/CompactingPool.h"
+#ifdef VOLT_POOL_CHECKING
+#include "common/StackTrace.h"
+#endif
 
 #include "boost/pool/pool.hpp"
 #include "boost/shared_ptr.hpp"

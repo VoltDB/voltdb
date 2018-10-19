@@ -40,7 +40,7 @@ This node address
 Other node address (i.e. message sender)  
 Message type  
 
-*Latency Information:*  
+*Latency Information (in milliseconds):*  
 Max latency  
 Average Latency  
 99.0    percentile latency  

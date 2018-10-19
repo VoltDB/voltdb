@@ -33,7 +33,7 @@ class Topend;
 class TupleStreamBase {
 public:
 
-    TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace = 0, int maxBufferSize = -1);
+    TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace, int maxBufferSize = -1);
 
     virtual ~TupleStreamBase()
     {
@@ -61,7 +61,7 @@ public:
     virtual void periodicFlush(int64_t timeInMillis,
                                int64_t lastComittedSpHandle);
 
-    virtual void extendBufferChain(size_t minLength);
+    void extendBufferChain(size_t minLength);
     virtual void pushStreamBuffer(StreamBlock *block, bool sync) = 0;
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
@@ -111,6 +111,12 @@ public:
     int64_t m_committedUniqueId;
 
     size_t m_headerSpace;
+
+    /**
+     * The number of Export Tuples applied to the Export Stream Block in the current txn;
+     * Note that before the Export Tuples are only committed by the *next* Txn that updates the StreamBLock
+     */
+    int64_t m_uncommittedTupleCount;
 };
 
 }

@@ -17,18 +17,19 @@
 
 // For backtrace and backtrace_symbols
 // These do not appear to work on the Mac in a JNI library
-#include <cxxabi.h>
 #include <execinfo.h>
 #include <cstring>
 #include <cxxabi.h>   // for abi
 #include <cstdlib>    // for malloc/free
 #include <sstream>    // for std::ostringstream
 
-#include "common/debuglog.h"
+#include "common/StackTrace.h"
+
+#ifdef MACOSX
 #include "common/executorcontext.hpp"
 #include "common/Topend.h"
-
 #include "execution/JNITopend.h"
+#endif
 
 namespace voltdb {
 

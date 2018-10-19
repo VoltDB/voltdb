@@ -160,7 +160,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(ILjava/lang/String;JJLjava/nio/ByteBuffer;Z)V");
+            "(ILjava/lang/String;JJLjava/nio/ByteBuffer;ZJ)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
@@ -173,16 +173,6 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     if (m_pushExportEOFMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportEOFMID != NULL);
-        throw std::exception();
-    }
-
-    m_getQueuedExportBytesMID = m_jniEnv->GetStaticMethodID(
-            m_exportManagerClass,
-            "getQueuedExportBytes",
-            "(ILjava/lang/String;)J");
-    if (m_getQueuedExportBytesMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_getQueuedExportBytesMID != NULL);
         throw std::exception();
     }
 
@@ -543,16 +533,6 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_decompressionClass);
 }
 
-int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
-    jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
-    int64_t retval = m_jniEnv->CallStaticLongMethod(
-            m_exportManagerClass,
-            m_getQueuedExportBytesMID,
-            partitionId,
-            signatureString);
-    m_jniEnv->DeleteLocalRef(signatureString);
-    return retval;
-}
 
 void JNITopend::pushExportBuffer(
         int32_t partitionId,
@@ -560,6 +540,7 @@ void JNITopend::pushExportBuffer(
         StreamBlock *block,
         bool sync) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
+
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
@@ -575,19 +556,21 @@ void JNITopend::pushExportBuffer(
                 block->uso(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
-                sync ? JNI_TRUE : JNI_FALSE);
+                sync ? JNI_TRUE : JNI_FALSE,
+                block->getRowCountforExport());
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
 
         m_jniEnv->CallStaticVoidMethod(
-                        m_exportManagerClass,
-                        m_pushExportBufferMID,
-                        partitionId,
-                        signatureString,
-                        static_cast<int64_t>(0),
-                        NULL,
-                        NULL,
-                        sync ? JNI_TRUE : JNI_FALSE);
+                m_exportManagerClass,
+                m_pushExportBufferMID,
+                partitionId,
+                signatureString,
+                static_cast<int64_t>(0),
+                NULL,
+                NULL,
+                sync ? JNI_TRUE : JNI_FALSE,
+                static_cast<int64_t>(0));
     }
     m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {

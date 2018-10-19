@@ -91,7 +91,7 @@ public class TestExportRejoin extends TestExportBaseSocketExport {
 
         client = getClient();
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     public TestExportRejoin(final String name) {

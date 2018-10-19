@@ -26,11 +26,11 @@ package org.voltdb;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.HashinatorLite;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestExpectedData;
@@ -83,7 +83,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
      * @param tuple2 Expected tuple count on partition 1
      * @throws Exception if an assumption is violated or the test times out
      */
-    private void checkForExpectedStats(Client client, String tableName, int mem1, int tuple1, int mem2, int tuple2) throws Exception {
+    private void checkForExpectedStats(Client client, String tableName, int mem1, int tuple1, int mem2, int tuple2, boolean isPersistent) throws Exception {
         boolean passed = false;
         boolean zpassed, opassed;
         zpassed = opassed = false;
@@ -91,9 +91,10 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         VoltTable stats = null;
         long st = System.currentTimeMillis();
         //Wait 10 mins only
-        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        long maxWait = TimeUnit.MINUTES.toMillis(10);
+        long end = System.currentTimeMillis() + maxWait;
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            stats = client.callProcedure("@Statistics", isPersistent ? "table" : "export", 0).getResults()[0];
             boolean passedThisTime = false;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -101,22 +102,25 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
                 System.out.println(stats);
                 break;
             }
-            if (ctime - st > (3 * 60 * 1000)) {
+            if (ctime - st > maxWait) {
                 System.out.println(stats);
                 st = System.currentTimeMillis();
             }
             while (stats.advanceRow()) {
-                if (stats.getString("TABLE_NAME").equalsIgnoreCase(tableName)) {
+                String memoryColumnName = isPersistent ? "TUPLE_ALLOCATED_MEMORY" : "TUPLE_PENDING";
+                String tableColumnName = isPersistent ? "TABLE_NAME": "STREAM_NAME";
+                if (stats.getString(tableColumnName).equalsIgnoreCase(tableName)) {
                     if (stats.getLong("PARTITION_ID") == 0 && !zpassed) {
                         if (tuple1 == stats.getLong("TUPLE_COUNT")
-                                && ((mem1 == SKIP_MEMORY_CHECK) || (mem1 == stats.getLong("TUPLE_ALLOCATED_MEMORY")))) {
+                                && ((mem1 == SKIP_MEMORY_CHECK) || (mem1 == stats.getLong(memoryColumnName)))) {
                             zpassed = true;
                             System.out.println("Partition Zero passed.");
                         }
+                        System.out.println("tuple1:"+tuple1+" TUPLE_COUNT:"+stats.getLong("TUPLE_COUNT")+" mem1:"+mem1+" "+memoryColumnName+":"+stats.getLong(memoryColumnName));
                     }
                     if (stats.getLong("PARTITION_ID") == 1 && !opassed) {
                         if (tuple2 == stats.getLong("TUPLE_COUNT")
-                                && ((mem2 == SKIP_MEMORY_CHECK) || (mem2 == stats.getLong("TUPLE_ALLOCATED_MEMORY")))) {
+                                && ((mem2 == SKIP_MEMORY_CHECK) || (mem2 == stats.getLong(memoryColumnName)))) {
                             opassed = true;
                             System.out.println("Partition One passed.");
                         }
@@ -167,11 +171,11 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         callAdHocExpectSuccess(client,
                 "INSERT INTO tuple_count_persist VALUES ( 2 ); " +
                 "INSERT INTO tuple_count_export VALUES ( 2 );");
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         // Verify that table stats show both insertions.
-        checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1);
-        checkForExpectedStats(client, "tuple_count_export", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1);
+        checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, true);
+        checkForExpectedStats(client, "tuple_count_export", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, false);
 
         // Memory statistics need to show the persistent table but not the export.
         // We can assume no other tables have tuples since any catalog update clears the stats.
@@ -217,18 +221,18 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
+        checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
         System.out.println("Quiesce client....");
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
+        checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         //Resume will put flg on onserver export to start consuming.
         startListener();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         for (int i = 40; i < 50; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -242,14 +246,9 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
             assertEquals(responseGrp.getStatus(), ClientResponse.SUCCESS);
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         m_config.shutDown();
-        if (isNewCli) {
-            m_config.startUp(true);
-        } else {
-            m_config.startUp(false);
-        }
-
+        m_config.startUp(false);
         client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
@@ -260,11 +259,11 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         client.drain();
 
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
 
         //Allocated memory should go to 0
         //If this is failing watch out for ENG-5708
-        checkForExpectedStats(client, "NO_NULLS", 0, 24, 0, 16);
+        checkForExpectedStats(client, "NO_NULLS", 0, 24, 0, 16, false);
     }
 
     public TestExportStatsSuite(final String name) {

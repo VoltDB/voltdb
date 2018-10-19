@@ -17,6 +17,7 @@ import sys
 import time
 import voltdbclient
 
+
 def check_exporter(runner):
     runner.info('Completing outstanding exporter transactions...')
     last_table_stat_time = 0
@@ -47,6 +48,7 @@ def check_exporter(runner):
                     print_export_pending(runner, export_tables_with_data)
         lastUpdatedTime = monitorStatisticsProgress(last_export_tables_with_data, export_tables_with_data, lastUpdatedTime, runner, 'Exporter')
         last_export_tables_with_data = export_tables_with_data.copy()
+
 
 def check_dr_producer(runner):
     runner.info('Completing outstanding DR producer transactions...')
@@ -81,24 +83,26 @@ def check_dr_producer(runner):
         last_partition_min = partition_min.copy()
         last_partition_max = partition_max.copy()
 
+
 def monitorDRProducerStatisticsProgress(lastPartitionMin, lastPartitionMax, currentPartitionMin,
                              currentPartitionMax, lastUpdatedTime, runner):
     currentTime = time.time()
     timeout = runner.opts.timeout
-    #any stats progress?
+    # any stats progress?
     partitionMinProgressed = cmp(lastPartitionMin, currentPartitionMin)
     partitionMaxprogressed = cmp(lastPartitionMax, currentPartitionMax)
-    #stats moved
+    # stats moved
     if partitionMinProgressed <> 0 or partitionMaxprogressed <> 0:
         return currentTime
 
     timeSinceLastUpdate = currentTime - lastUpdatedTime
-    #stats timeout
+    # stats timeout
     if timeSinceLastUpdate > timeout:
          msg = "The cluster has not drained any transactions for DRPRODUCER in last %d seconds. There are outstanding transactions."
-         raise StatisticsProcedureException( msg % (timeout), 1)
-    #stats has not been moved but not timeout yet
+         raise StatisticsProcedureException(msg % (timeout), 1)
+    # stats has not been moved but not timeout yet
     return lastUpdatedTime
+
 
 def get_stats(runner, component):
     retry = 5
@@ -109,13 +113,14 @@ def get_stats(runner, component):
         status = resp.status()
         if status == 1:
             return resp
-        #procedure timeout, retry
+        # procedure timeout, retry
         if status == -6:
             time.sleep(1)
         else:
             raise StatisticsProcedureException("Unexpected errors to collect statistics for %s: %s." % (component, resp.response.statusString), 1, False)
         if retry == 0:
             raise StatisticsProcedureException("Unable to collect statistics for %s after 5 attempts." % component, 1, False)
+
 
 def dr_producer_stats(runner, partition_min_host, partition_min, partition_max, partition_gap_min):
     resp = get_stats(runner, 'DRPRODUCER')
@@ -183,6 +188,7 @@ def dr_producer_stats(runner, partition_min_host, partition_min, partition_max, 
             else:
                 partition_max[pid] = last_acked
 
+
 def print_dr_pending(runner, partition_min_host, partition_min, partition_max, partition_gap_min):
     runner.info('The following partitions have pending DR transactions that the consumer cluster has not processed:')
     summarylineUnacked = "    Partition %i needs acknowledgement for drIds %i to %i on hosts: %s."
@@ -191,10 +197,11 @@ def print_dr_pending(runner, partition_min_host, partition_min, partition_max, p
         if pid in partition_gap_min and partition_gap_min[pid] > 0:
             runner.info(summarylineGap % (pid, partition_gap_min[pid]))
         else:
-            runner.info(summarylineUnacked % (pid, partition_min[pid]+1, partition_max[pid], ', '.join(partition_min_host[pid])))
+            runner.info(summarylineUnacked % (pid, partition_min[pid] + 1, partition_max[pid], ', '.join(partition_min_host[pid])))
+
 
 def check_export_stats(runner, export_tables_with_data, last_collection_time):
-    resp = get_stats(runner, 'TABLE')
+    resp = get_stats(runner, 'EXPORT')
     export_tables = 0
     collection_time = 0
     if not resp.table_count() > 0:
@@ -212,34 +219,32 @@ def check_export_stats(runner, export_tables_with_data, last_collection_time):
             collection_time = firsttuple.column(0)
 
     for r in tablestats.tuples():
-        # first look for streaming (export) tables
-        #table type
-        if str(r[6]) == 'StreamedTable':
-            #TUPLE_ALLOCATED_MEMORY
-            pendingData = r[8]
-            #table name
-            tablename = str(r[5])
-            #partition id
-            pid = r[4]
-            #host name
-            hostname = str(r[2])
-            if pendingData > 0:
-                if not tablename in export_tables_with_data:
-                    export_tables_with_data[tablename] = dict()
+        # TUPLE_ALLOCATED_MEMORY
+        pendingData = r[8]
+        # table name
+        tablename = str(r[4])
+        # partition id...
+        pid = r[3]
+        # host name
+        hostname = str(r[2])
+        if pendingData > 0:
+            if not tablename in export_tables_with_data:
+                export_tables_with_data[tablename] = dict()
+            tabledata = export_tables_with_data[tablename]
+            if not hostname in tabledata:
+                tabledata[hostname] = set()
+            tabledata[hostname].add(pid)
+        else:
+            if tablename in export_tables_with_data:
                 tabledata = export_tables_with_data[tablename]
-                if not hostname in tabledata:
-                    tabledata[hostname] = set()
-                tabledata[hostname].add(pid)
-            else:
-                if tablename in export_tables_with_data:
-                    tabledata = export_tables_with_data[tablename]
-                    if hostname in tabledata:
-                        tabledata[hostname].discard(pid)
-                        if not tabledata[hostname]:
-                            del tabledata[hostname]
-                            if not export_tables_with_data[tablename]:
-                                del export_tables_with_data[tablename]
+                if hostname in tabledata:
+                    tabledata[hostname].discard(pid)
+                    if not tabledata[hostname]:
+                        del tabledata[hostname]
+                        if not export_tables_with_data[tablename]:
+                            del export_tables_with_data[tablename]
     return collection_time
+
 
 def print_export_pending(runner, export_tables_with_data):
     runner.info('\tThe following export tables have unacknowledged transactions:')
@@ -249,8 +254,9 @@ def print_export_pending(runner, export_tables_with_data):
         hostlist = list(export_tables_with_data[table].keys())
         for host in hostlist:
             pidlist = pidlist | export_tables_with_data[table][host]
-        partlist = reduce(lambda a,x: a+","+str(x), list(pidlist), "")[1:]
+        partlist = reduce(lambda a, x: a + "," + str(x), list(pidlist), "")[1:]
         runner.info(summaryline % (table, ', '.join(hostlist), partlist))
+
 
 def check_clients(runner):
      runner.info('Completing outstanding client transactions...')
@@ -261,7 +267,7 @@ def check_clients(runner):
         resp = get_stats(runner, 'LIVECLIENTS')
         trans = 0
         bytes = 0
-        msgs  = 0
+        msgs = 0
         for r in resp.table(0).tuples():
             bytes += r[6]
             msgs += r[7]
@@ -269,13 +275,14 @@ def check_clients(runner):
             notifyInterval -= 1
             if notifyInterval == 0:
                 notifyInterval = 10
-                runner.info('\tOutstanding transactions=%d, Outstanding request bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
+                runner.info('\tOutstanding transactions=%d, Outstanding request bytes=%d, Outstanding response messages=%d' % (trans, bytes, msgs))
         if trans == 0 and bytes == 0 and msgs == 0:
             return
         currentValidationParams = [trans, bytes, msgs]
         lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, runner, 'LIVECLIENTS')
         lastValidationParamms = [trans, bytes, msgs]
         time.sleep(1)
+
 
 def check_importer(runner):
      runner.info('Completing outstanding importer requests...')
@@ -293,13 +300,14 @@ def check_importer(runner):
         notifyInterval -= 1
         if notifyInterval == 0:
             notifyInterval = 10
-            runner.info('\tOutstanding importer requests=%d' %(outstanding))
+            runner.info('\tOutstanding importer requests=%d' % (outstanding))
         if outstanding == 0:
             return
         currentValidationParams = [outstanding]
         lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, runner, 'IMPORTER')
         lastValidationParamms = [outstanding]
         time.sleep(1)
+
 
 def check_dr_consumer(runner):
      runner.info('Completing outstanding DR consumer transactions...')
@@ -320,9 +328,9 @@ def check_dr_consumer(runner):
         for r in resp.table(1).tuples():
             if r[8] <> r[9]:
                 outstanding += 1
-                currentValidationParams[str(r[1]) + '-' +  str(r[5])] = "%s-%s" %(r[8], r[9])
+                currentValidationParams[str(r[1]) + '-' + str(r[5])] = "%s-%s" % (r[8], r[9])
                 if notifyInterval == 0:
-                    runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[5], r[1], r[8], r[9]))
+                    runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' % (r[5], r[1], r[8], r[9]))
         if outstanding == 0:
             return
         if notifyInterval == 0:
@@ -330,6 +338,7 @@ def check_dr_consumer(runner):
         lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, runner, 'DRCONSUMER')
         lastValidationParamms = currentValidationParams.copy()
         time.sleep(1)
+
 
 def check_no_dr_consumer(runner, forDrop=True):
     runner.info('Checking dr consumers...')
@@ -352,11 +361,13 @@ def check_no_dr_consumer(runner, forDrop=True):
         last_node_dispatcher = node_dispatcher[:]
         time.sleep(1)
 
+
 def print_dr_consumer(runner, node_dispatcher):
     runner.info('The following dispatchers haven\'t successfully received acknowledgment of reset:')
     summaryline = "    Dispatcher on host id % s for remote cluster %i."
     for dispatcher in node_dispatcher:
         runner.info(summaryline % (dispatcher[0], dispatcher[3]))
+
 
 def check_command_log(runner):
     runner.info('Completing outstanding Command Log transactions...')
@@ -381,37 +392,40 @@ def check_command_log(runner):
             return
         if notifyInterval == 0:
             notifyInterval = 10
-            runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
+            runner.info('\tOutstanding command log bytes = %d and transactions = %d.' % (outstandingByte, outstandingTxn))
         currentValidationParams = [outstandingByte, outstandingTxn]
         lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, runner, 'COMMANDLOG')
         lastValidationParamms = [outstandingByte, outstandingTxn]
         time.sleep(1)
 
-def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component, msg = "The cluster has not drained any transactions for %s in last %d seconds. There are outstanding transactions."):
+
+def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component, msg="The cluster has not drained any transactions for %s in last %d seconds. There are outstanding transactions."):
     currentTime = time.time()
     timeout = runner.opts.timeout
     statsProgressed = True
     if isinstance(lastUpdatedParams, dict):
-        statsProgressed = (cmp(lastUpdatedParams,currentParams) <> 0)
+        statsProgressed = (cmp(lastUpdatedParams, currentParams) <> 0)
     else :
         statsProgressed = (lastUpdatedParams <> currentParams)
 
-    #stats progressed, update lastUpdatedTime
+    # stats progressed, update lastUpdatedTime
     if statsProgressed:
         return currentTime
 
-    #stats has not made any progress since last check
+    # stats has not made any progress since last check
     timeSinceLastUpdate = currentTime - lastUpdatedTime
 
-    #stats timeout
+    # stats timeout
     if timeout > 0 and timeSinceLastUpdate > timeout:
-         raise StatisticsProcedureException( msg % (component, timeout), 1)
+         raise StatisticsProcedureException(msg % (component, timeout), 1)
 
-    #not timeout yet
+    # not timeout yet
     return lastUpdatedTime
 
+
 class StatisticsProcedureException(Exception):
-    def __init__(self, message, exitCode, isTimeout = True):
+
+    def __init__(self, message, exitCode, isTimeout=True):
        self.message = message
        self.exitCode = exitCode
        self.isTimeout = isTimeout

@@ -92,7 +92,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
             client.callProcedure("InsertAddedTable", paramsGrp);
         }
 
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     //  Test Export of a DROPPED table.  Queues some data to a table.
@@ -124,7 +124,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         client = getClient();
 
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     public TestExportV2SuitePro(final String name) {

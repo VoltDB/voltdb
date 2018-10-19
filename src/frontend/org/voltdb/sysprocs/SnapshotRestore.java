@@ -1541,12 +1541,24 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         // Choose the lowest site ID on this host to truncate export data
         if (isRecover && context.isLowestSiteId()) {
-            ExportManager.instance().
-                    truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
+            final VoltLogger exportLog = new VoltLogger("EXPORT");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Truncating export data after snapshot txnId " +
+                        TxnEgo.txnIdSeqToString(snapshotTxnId));
+            }
         }
 
         Database db = context.getDatabase();
         Integer myPartitionId = context.getPartitionId();
+        Long myPartitionTxnId = null;
+        if (isRecover) {
+            for (long txnId : perPartitionTxnIds) {
+                if (TxnEgo.getPartitionId(txnId) == myPartitionId) {
+                    myPartitionTxnId = txnId;
+                    break;
+                }
+            }
+        }
 
         //Iterate the export tables
         for (Table t : db.getTables()) {
@@ -1588,6 +1600,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     sequenceNumber,
                     myPartitionId,
                     signature);
+            // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
+            ExportManager.instance().updateInitialExportStateToTxnId(myPartitionId, signature,
+                    isRecover, myPartitionTxnId, sequenceNumber);
         }
     }
 
