@@ -117,7 +117,8 @@ public class ParameterizeVisitor extends SqlBasicVisitor<SqlNode> {
         for (Pair<Integer, SqlNode> indexedNode : indexedNodes) {
             SqlNode node = indexedNode.getSecond();
             SqlNode convertedNode = node.accept(this);
-            if (node instanceof SqlLiteral) {
+            if (node instanceof SqlLiteral
+                    && convertedNode != null) {
                 nodeList.set(indexedNode.getFirst(), convertedNode);
             }
         }
