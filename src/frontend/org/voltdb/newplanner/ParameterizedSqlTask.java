@@ -20,7 +20,6 @@ package org.voltdb.newplanner;
 import java.util.List;
 
 import org.apache.calcite.sql.SqlDynamicParam;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.util.Util.FoundOne;
@@ -43,8 +42,7 @@ public class ParameterizedSqlTask extends AbstractSqlTaskDecorator {
     public ParameterizedSqlTask(SqlTask taskToDecorate) {
         super(taskToDecorate);
         // DDL statements and EXPLAIN statements cannot be parameterized.
-        boolean cannotParameterize = taskToDecorate.isDDL()
-                || taskToDecorate.getParsedQuery().getKind() == SqlKind.EXPLAIN;
+        boolean cannotParameterize = taskToDecorate.isDDL();
         try {
             getParsedQuery().accept(DynamicParamFinder.INSTANCE);
         } catch (FoundOne found) {

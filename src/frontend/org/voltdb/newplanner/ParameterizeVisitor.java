@@ -55,11 +55,22 @@ public class ParameterizeVisitor extends SqlBasicVisitor<SqlNode> {
     public SqlNode visit(SqlLiteral literal) {
         /*
          * For SqlLiteral, we replace it with a SqlDynamicParam.
-         * There is a special case in SqlWindow.
-         * SqlWindow is for the OVER clause, for example: OVER (PARTITION BY cnt ORDER BY name).
-         * This kind of node does not have a chance to be parameterized,
-         * but its "isRows" flag's type is SqlLiteral, which will cause an error if
-         * we try to parameterize it.
+         * There are special cases where some classes have SqlLiteral to
+         * store internal states:
+         * * SqlWindow.isRows, allowPartial - BOOLEAN SqlLiteral
+         * * SqlExplain.detailLevel, depth, format are SYMBOL SqlLiterals.
+         *   The explain command in Calcite is different. I ticketed it as ENG-14838.
+         * * SqlJoin.natrual - BOOLEAN, joinType - SYMBOL, conditionType - SYMBOL
+         * * SqlMatchRecognize.strictStart, strictEnd - BOOLEAN, rowsPerMatch - SYMBOL
+         *     SqlMatchRecognize.interval - SqlIntervalQualifier.typeName()
+         *     This involves many interval types, which makes guarding them in
+         *     parameterization really hard. The good side is that this is not
+         *     something that we currently support in VoltDB.
+         *     A ticket (ENG-14839) is created to note this.
+         *
+         * In summary, we will need to ignore BOOLEAN and SYMBOL types in
+         * parameterization. This place is noted in ENG-6840 for adding support of
+         * BOOLEAN type into VoltDB. We need to invent a new strategy then.
          */
         if (literal.getTypeName() == SqlTypeName.BOOLEAN
                 || literal.getTypeName() == SqlTypeName.SYMBOL) {
@@ -85,7 +96,7 @@ public class ParameterizeVisitor extends SqlBasicVisitor<SqlNode> {
         // because the operands of the same parent node won't overlap.
         indexedOperands.sort(PositionBasedIndexedSqlNodePairComparator.INSTANCE);
 
-        // Visit the operands in the order of their parser positions.
+        // Visit the operands in the order of their positions in the query.
         for (Pair<Integer, SqlNode> indexedOperand : indexedOperands) {
             SqlNode operand = indexedOperand.getSecond();
             SqlNode convertedOperand = operand.accept(this);
@@ -113,6 +124,12 @@ public class ParameterizeVisitor extends SqlBasicVisitor<SqlNode> {
         return null;
     }
 
+    /**
+     * Pair the list elements with their ordinal indexes, then put the pairs into
+     * another list.
+     * @param originalList the list of elements.
+     * @return the generated list of pairs.
+     */
     private <T> List<Pair<Integer, T>> toIndexedPairList(List<T> originalList) {
         List<Pair<Integer, T>> retval = new ArrayList<>();
         int pos = 0;
