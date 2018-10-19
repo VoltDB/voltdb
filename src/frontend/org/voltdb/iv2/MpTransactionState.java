@@ -482,13 +482,14 @@ public class MpTransactionState extends TransactionState
                         if (!((TransactionRestartException) se).isMisrouted()) {
                             setNeedsRollback(true);
                             throw se;
-                        } else {
+                        }
+                        if (((TransactionRestartException) se).isMisrouted()) {
                             restartFragment(msg, ((TransactionRestartException) se).getMasterList(), ((TransactionRestartException) se).getPartitionMasterMap());
                             msg = null;
                         }
                     }
                     // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
-                    if (m_restartTimestamp != msg.getRestartTimestamp()) {
+                    if (msg != null && m_restartTimestamp != msg.getRestartTimestamp()) {
                         if (tmLog.isDebugEnabled()) {
                             tmLog.debug("Receives unmatched fragment response, expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
                                     " actually receives: " + msg);
