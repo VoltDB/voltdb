@@ -41,15 +41,23 @@ public class ParameterizedSqlTask extends AbstractSqlTaskDecorator {
      */
     public ParameterizedSqlTask(SqlTask taskToDecorate) {
         super(taskToDecorate);
-        // DDL statements and EXPLAIN statements cannot be parameterized.
-        boolean cannotParameterize = taskToDecorate.isDDL();
-        try {
-            getParsedQuery().accept(DynamicParamFinder.INSTANCE);
-        } catch (FoundOne found) {
-            // If the SqlTask already has parameters, do not parameterize it.
-            cannotParameterize = true;
+        // Re-decorating another ParameterizedSqlTask is not what we want to see.
+        // But, be robust.
+        if (taskToDecorate instanceof ParameterizedSqlTask) {
+            m_sqlLiteralList = ((ParameterizedSqlTask) taskToDecorate).m_sqlLiteralList;
+            return;
         }
-        if (cannotParameterize) {
+        // DDL statements cannot be parameterized.
+        boolean doNotParameterize = taskToDecorate.isDDL();
+        if (! doNotParameterize) {
+            try {
+                getParsedQuery().accept(DynamicParamFinder.INSTANCE);
+            } catch (FoundOne found) {
+                // If the SqlTask already has parameters, do not parameterize it.
+                doNotParameterize = true;
+            }
+        }
+        if (doNotParameterize) {
             m_sqlLiteralList = null;
         } else {
             ParameterizeVisitor visitor = new ParameterizeVisitor();
