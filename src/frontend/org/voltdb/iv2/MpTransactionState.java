@@ -1,20 +1,3 @@
-/* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
@@ -469,32 +452,37 @@ public class MpTransactionState extends TransactionState
                     m_mbox.send(m_mbox.getHSId(), new DumpMessage());
                 }
 
-                if (msg != null) {
-                    SerializableException se = msg.getException();
-                    if (se != null && se instanceof TransactionRestartException) {
-                        if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("Transaction exception, txnid: " + TxnEgo.txnIdToString(msg.getTxnId()) + " status:" + msg.getStatusCode()  + " isMisrouted:"+ ((TransactionRestartException) se).isMisrouted()
-                                    + " msg: " + msg);
-                        }
+                SerializableException se = msg.getException();
+                if (se instanceof TransactionRestartException) {
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug("Transaction exception, txnid: " + TxnEgo.txnIdToString(msg.getTxnId()) + " status:" + msg.getStatusCode()  + " isMisrouted:"+ ((TransactionRestartException) se).isMisrouted()
+                                + " msg: " + msg);
+                    }
 
-                        // If this is a restart exception from the inject poison pill, we don't need to match up the DependencyId
-                        // Don't rely on the restartTimeStamp check since it's not reliable for poison
-                        if (!((TransactionRestartException) se).isMisrouted()) {
-                            setNeedsRollback(true);
-                            throw se;
-                        }
+                    // If this is a restart exception from the inject poison pill, we don't need to match up the DependencyId
+                    // Don't rely on the restartTimeStamp check since it's not reliable for poison
+                    if (!((TransactionRestartException) se).isMisrouted()) {
+                        setNeedsRollback(true);
+                        throw se;
+                    }
+                }
+
+                // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
+                if (m_restartTimestamp != msg.getRestartTimestamp()) {
+                    if (tmLog.isDebugEnabled()) {
+                        tmLog.debug("Receives unmatched fragment response, expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
+                                " actually receives: " + msg);
+                    }
+                    msg = null;
+                }
+
+                if (msg != null) {
+                    if (se instanceof TransactionRestartException) {
+                        // If this is an misrouted exception, rerouted only this fragment
                         if (((TransactionRestartException) se).isMisrouted()) {
                             restartFragment(msg, ((TransactionRestartException) se).getMasterList(), ((TransactionRestartException) se).getPartitionMasterMap());
                             msg = null;
                         }
-                    }
-                    // Filter out stale responses due to the transaction restart, normally the timestamp is Long.MIN_VALUE
-                    if (msg != null && m_restartTimestamp != msg.getRestartTimestamp()) {
-                        if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("Receives unmatched fragment response, expect timestamp " + MpRestartSequenceGenerator.restartSeqIdToString(m_restartTimestamp) +
-                                    " actually receives: " + msg);
-                        }
-                        msg = null;
                     }
                 }
             }
