@@ -1256,7 +1256,6 @@ public class DDLCompiler {
                 hasCreated.set(true);
             }
         });
-        //assert(hasCreated.get()) : "All tables should have been created for CalciteSchema.";
         if (hasCreated.get()) {
             return;
         }       // Code below this point is not executed any more.
@@ -1997,7 +1996,6 @@ public class DDLCompiler {
             if (deleteStmt != null) {
                 Statement catStmt = table.getTuplelimitdeletestmt().add("limit_delete");
                 catStmt.setSqltext(deleteStmt);
-                System.err.println(deleteStmt);
                 validateTupleLimitDeleteStmt(catStmt);
             }
             return;

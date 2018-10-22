@@ -24,19 +24,8 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
-import java.util.NavigableSet;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -78,7 +67,6 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
-import org.voltdb.sysprocs.AdHoc;
 import org.voltdb.sysprocs.org.voltdb.calciteutils.CreateTableUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -563,7 +551,7 @@ public class VoltCompiler {
                 inMemoryUserJar = new InMemoryJarfile();
             }
             // NOTE/TODO: this is not from AdHoc code branch. We use the old code path here, and don't update CalciteSchema from VoltDB catalog.
-            if (compileInternal(null, null, ddlReaderList, new ArrayList<>(), inMemoryUserJar) == null) {
+            if (compileInternal(null, null, ddlReaderList, Collections.emptyList(), inMemoryUserJar) == null) {
                 return false;
             }
         } catch (IOException e) {
@@ -709,7 +697,7 @@ public class VoltCompiler {
         // Or step OVER to debug just the catalog diff process, retried with verbose output --
         // maybe it's just being too sensitive to immaterial changes?
         Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(null, null,
-                autogenReaderList, new ArrayList<>(), autoGenJarOutput);
+                autogenReaderList, Collections.emptyList(), autoGenJarOutput);
         return autoGenCatalog;
     }
 
@@ -735,7 +723,7 @@ public class VoltCompiler {
         }
 
         // NOTE/TODO: All the callers of this is not from AdHoc code branch. We use the old code path here, and don't update CalciteSchema from VoltDB catalog.
-        InMemoryJarfile jarOutput = compileInternal(cannonicalDDLIfAny, previousCatalogIfAny, ddlReaderList, new ArrayList<>(), jarOutputRet);
+        InMemoryJarfile jarOutput = compileInternal(cannonicalDDLIfAny, previousCatalogIfAny, ddlReaderList, Collections.emptyList(), jarOutputRet);
         if (jarOutput == null) {
             return false;
         }
@@ -918,7 +906,7 @@ public class VoltCompiler {
     {
         InMemoryJarfile jarOutput = new InMemoryJarfile();
         // NOTE/TODO: this is not from AdHoc code branch. We use the old code path here, and don't update CalciteSchema from VoltDB catalog.
-        return compileCatalogInternal(null, null, DDLPathsToReaderList(ddlFilePaths), new ArrayList<>(), jarOutput);
+        return compileCatalogInternal(null, null, DDLPathsToReaderList(ddlFilePaths), Collections.emptyList(), jarOutput);
     }
 
     /**
@@ -1036,7 +1024,7 @@ public class VoltCompiler {
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
         // NOTE/TODO: this is not from AdHoc code branch. We use the old code path here, and don't update CalciteSchema from VoltDB catalog.
-        compileDatabase(db, hsql, voltDdlTracker, null, null, ddlReaderList, new ArrayList<>(), null, whichProcs, jarOutput);
+        compileDatabase(db, hsql, voltDdlTracker, null, null, ddlReaderList, Collections.emptyList(), null, whichProcs, jarOutput);
 
         return m_catalog;
     }

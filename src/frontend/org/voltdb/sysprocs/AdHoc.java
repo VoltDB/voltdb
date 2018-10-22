@@ -17,13 +17,7 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -125,7 +119,7 @@ public class AdHoc extends AdHocNTBase {
         // at this point assume all DDL
         assert(mix == AdHocSQLMix.ALL_DDL);
         // Since we are not going through Calcite, there is no need to update CalciteSchema.
-        return runDDLBatch(sqlStatements, new ArrayList<>());
+        return runDDLBatch(sqlStatements, Collections.emptyList());
     }
 
     /**
@@ -148,8 +142,8 @@ public class AdHoc extends AdHocNTBase {
 
     private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes) {
         // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
-        SortedSet<String> conflictTables = new TreeSet<String>();
-        Set<String> createdTables = new HashSet<String>();
+        SortedSet<String> conflictTables = new TreeSet<>();
+        Set<String> createdTables = new HashSet<>();
 
         for (String stmt : sqlStatements) {
             // check that the DDL is allowed
@@ -202,17 +196,18 @@ public class AdHoc extends AdHocNTBase {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
                     "Cluster is configured to use @UpdateApplicationCatalog " +
-                    "to change application schema.  AdHoc DDL is forbidden.");
+                            "to change application schema.  AdHoc DDL is forbidden.");
         }
 
         logCatalogUpdateInvocation("@AdHoc");
 
         return updateApplication("@AdHoc",
-                                null,
-                                null,
-                                sqlStatements.toArray(new String[0]), sqlNodes,
-                                null,
-                                false,
-                                true);
+                null,
+                null,
+                sqlStatements.toArray(new String[0]),
+                sqlNodes,
+                null,
+                false,
+                true);
     }
 }

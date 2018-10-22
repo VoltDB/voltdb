@@ -96,22 +96,6 @@ public class CreateTableUtils {
         }
     }
 
-    private static Optional<SqlKind> isColumnIndexed(SqlDataTypeSpec dspec) {
-        if (dspec.getIsUnique() || dspec.getIsPKey() || dspec.getIsAssumeUnique()) {
-            final SqlKind dtype;
-            if (dspec.getIsPKey()) {
-                dtype = SqlKind.PRIMARY_KEY;
-            } else if (dspec.getIsUnique()) {
-                dtype = SqlKind.UNIQUE;
-            } else {
-                dtype = SqlKind.ASSUME_UNIQUE;
-            }
-            return Optional.of(dtype);
-        } else {
-            return Optional.empty();
-        }
-    }
-
     private static int addColumn(SqlColumnDeclarationWithExpression col, Table t, String tableName,
                                  AtomicInteger index, Map<Integer, VoltType> columnTypes, Map<String, Index> indexes) {
         final List<SqlNode> nameAndType = col.getOperandList();
@@ -155,11 +139,11 @@ public class CreateTableUtils {
         } else {
             column.setDefaultvalue(null);
         }
-        isColumnIndexed(dspec).ifPresent(dtype -> {
+        /*isColumnIndexed(dspec).ifPresent(dtype -> {
             final List<Column> cols = Collections.singletonList(column);
             final String indexName = genIndexName(dtype, tableName, cols, false);
             indexes.put(indexName, genIndex(dtype, t, indexName, vt == VoltType.GEOGRAPHY, cols, new ArrayList<>()));
-        });
+        });*/
         if (vt.isVariableLength()) {
             return  4 + colSize * (inBytes ? 4 : 1);
         } else {

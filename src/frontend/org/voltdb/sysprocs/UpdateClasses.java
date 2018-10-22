@@ -17,7 +17,7 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltcore.logging.VoltLogger;
@@ -50,7 +50,8 @@ public class UpdateClasses extends UpdateApplicationBase {
         return updateApplication("@UpdateClasses",
                                 jarfileBytes,
                                 classesToDeleteSelector,
-                                new String[0], new ArrayList<>(),
+                                new String[0],
+                                Collections.emptyList(),
                                 null,
                                 false, /* isPromotion */
                                 useDDLSchema);

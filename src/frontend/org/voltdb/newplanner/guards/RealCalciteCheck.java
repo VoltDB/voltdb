@@ -18,8 +18,7 @@
 package org.voltdb.newplanner.guards;
 
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.voltdb.newplanner.SqlTask;
-import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.newplanner.SqlTaskImpl;
 
 /**
  * A check that always fail.
@@ -28,12 +27,22 @@ import org.voltdb.planner.PlanningErrorException;
  */
 public class RealCalciteCheck extends CalciteCheck {
 
+    private static String truncate(String src, int max) {
+        if (src.length() <= max) {
+            return src;
+        } else {
+            return src.substring(0, 100) + "...";
+        }
+    }
+
     @Override
     protected boolean doCheck(String sql) {
         try {
-            return new SqlTask(sql).isDDL();
+            return new SqlTaskImpl(sql).isDDL();
         } catch (SqlParseException e) {
-            throw new PlanningErrorException(e.getMessage());
+            // For all Calcite unsupported syntax, fall back to VoltDB implementation
+            System.err.println(truncate(e.getMessage(), 100));  // print Calcite's parse error
+            return false;
         }
     }
 

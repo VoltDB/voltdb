@@ -173,25 +173,27 @@ public class OperatorExpression extends AbstractExpression {
 
     @Override       // NOTE: this method does similar job of what Calcite.unparse does: to canonicalize a query, but the name is misleading. Refer to CatalogSchemaTools.toSchema().
     public String explain(String impliedTableName) {
+        final String explainLeftTableName = m_left.explain(impliedTableName);
         switch(getExpressionType()) {
             case OPERATOR_IS_NULL:
-                return "(" + m_left.explain(impliedTableName) + " IS NULL)";
+                return String.format("(%s IS NULL)", explainLeftTableName);
             case OPERATOR_NOT:
-                return "(NOT " + m_left.explain(impliedTableName) + ")";
+                return String.format("(NOT %s)", explainLeftTableName);
             case OPERATOR_CAST:
-                return "(CAST (" + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + "))";
+                return String.format("(CAST (%s AS %s))", explainLeftTableName, m_valueType.toSQLString());
             case OPERATOR_EXISTS:
-                return "(EXISTS " + m_left.explain(impliedTableName) + ")";
+                return String.format("(EXISTS %s)", explainLeftTableName);
             case OPERATOR_CASE_WHEN:
-                return "(CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
-                        m_right.m_left.explain(impliedTableName) + " ELSE " +
-                        m_right.m_right.explain(impliedTableName) + " END)";
+                return String.format("(CASE WHEN %s THEN %s ELSE %s END)",
+                        explainLeftTableName, m_right.m_left.explain(impliedTableName),
+                        m_right.m_right.explain(impliedTableName));
             case OPERATOR_UNARY_MINUS:
-                return "-" + m_left.explain(impliedTableName);
+                return String.format("-%s", explainLeftTableName);
             default:
-                return "(" + m_left.explain(impliedTableName) +
-                        " " + getExpressionType().symbol() + " " +
-                        m_right.explain(impliedTableName) + ")";
+                return String.format("(%s %s %s)",
+                        explainLeftTableName,
+                        getExpressionType().symbol(),
+                        m_right.explain(impliedTableName));
         }
     }
 
