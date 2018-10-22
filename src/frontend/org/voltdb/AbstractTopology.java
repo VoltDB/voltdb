@@ -36,6 +36,9 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import com.google_voltpatches.common.collect.Range;
+import com.google_voltpatches.common.collect.RangeMap;
+import com.google_voltpatches.common.collect.TreeRangeMap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -54,6 +57,8 @@ import com.google_voltpatches.common.collect.Iterables;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.MultimapBuilder;
 import com.google_voltpatches.common.collect.Sets;
+
+import static org.junit.Assert.assertEquals;
 
 public class AbstractTopology {
 
@@ -983,6 +988,52 @@ public class AbstractTopology {
         }
 
         return new AbstractTopology(topology, hostsByIdBuilder.build(), partitionsById);
+    }
+
+    /**
+     * Best effort to find the matching host on the existing topology from ZK Use the placement group of the recovering
+     * host to match a lost node in the topology
+     *
+     * @param topology       The topology
+     * @param liveHosts      The live host ids
+     * @param localHostId    The rejoining host id
+     * @param placementGroup The rejoining placement group
+     * @return recovered topology if a matching node is found
+     */
+    public static RangeMap<Integer, Set<Integer>> getPartitionGroupsFromTopology(AbstractTopology topo) {
+        Set<Integer> visited = new HashSet<>();
+        RangeMap<Integer, Set<Integer>> protectionGroups = TreeRangeMap.create();
+        for (AbstractTopology.Host host : topo.hostsById.values()) {
+            if (visited.contains(host.id) || host.partitions.isEmpty()) {
+                continue;
+            }
+            Set<Integer> hosts = new HashSet<>();
+            @SuppressWarnings("unchecked")
+            Range<Integer>[] partitionRange = new Range[1];
+            buildProtectionGroup(topo, visited, host, partitionRange, hosts);
+            assertEquals(hosts.size() * topo.getSitesPerHost() / (topo.getReplicationFactor() + 1),
+                    partitionRange[0].upperEndpoint() - partitionRange[0].lowerEndpoint() + 1);
+            protectionGroups.put(partitionRange[0], hosts);
+        }
+        return protectionGroups;
+    }
+
+    private static void buildProtectionGroup(AbstractTopology topo, Set<Integer> visited, AbstractTopology.Host host,
+                                             Range<Integer>[] partitionRange, Set<Integer> hosts) {
+        if (!visited.add(host.id) || host.partitions.isEmpty()) {
+            return;
+        }
+
+        Range<Integer> hostRange = Range.closed(host.partitions.first().id, host.partitions.last().id);
+        partitionRange[0] = partitionRange[0] == null ? hostRange : partitionRange[0].span(hostRange);
+
+        for (AbstractTopology.Partition partition : host.partitions) {
+            for (Integer hostId : partition.hostIds) {
+                if (hosts.add(hostId)) {
+                    buildProtectionGroup(topo, visited, topo.hostsById.get(hostId), partitionRange, hosts);
+                }
+            }
+        }
     }
 
     /////////////////////////////////////

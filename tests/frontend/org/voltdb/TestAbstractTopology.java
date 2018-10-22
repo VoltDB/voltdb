@@ -208,20 +208,7 @@ public class TestAbstractTopology {
         }
 
         // collect distinct peer groups
-        Set<Integer> visited = new HashSet<>();
-        RangeMap<Integer, Set<Integer>> protectionGroups = TreeRangeMap.create();
-        for (AbstractTopology.Host host : topo.hostsById.values()) {
-            if (visited.contains(host.id) || host.partitions.isEmpty()) {
-                continue;
-            }
-            Set<Integer> hosts = new HashSet<>();
-            @SuppressWarnings("unchecked")
-            Range<Integer>[] partitionRange = new Range[1];
-            buildProtectionGroup(topo, visited, host, partitionRange, hosts);
-            assertEquals(hosts.size() * topo.getSitesPerHost() / (topo.getReplicationFactor() + 1),
-                    partitionRange[0].upperEndpoint() - partitionRange[0].lowerEndpoint() + 1);
-            protectionGroups.put(partitionRange[0], hosts);
-        }
+        RangeMap<Integer, Set<Integer>> protectionGroups = AbstractTopology.getPartitionGroupsFromTopology(topo);
         metrics.distinctPeerGroups = protectionGroups.asMapOfRanges().size();
 
         // Validate that the protection groups get smaller or stay the same size as partitions IDs get higher
@@ -253,23 +240,7 @@ public class TestAbstractTopology {
         return metrics;
     }
 
-    private void buildProtectionGroup(AbstractTopology topo, Set<Integer> visited, AbstractTopology.Host host,
-            Range<Integer>[] partitionRange, Set<Integer> hosts) {
-        if (!visited.add(host.id) || host.partitions.isEmpty()) {
-            return;
-        }
 
-        Range<Integer> hostRange = Range.closed(host.partitions.first().id, host.partitions.last().id);
-        partitionRange[0] = partitionRange[0] == null ? hostRange : partitionRange[0].span(hostRange);
-
-        for (AbstractTopology.Partition partition : host.partitions) {
-            for (Integer hostId : partition.hostIds) {
-                if (hosts.add(hostId)) {
-                    buildProtectionGroup(topo, visited, topo.hostsById.get(hostId), partitionRange, hosts);
-                }
-            }
-        }
-    }
 
     @Test
     public void testOneNode() throws JSONException {
