@@ -119,7 +119,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private Set<Long> m_responseHSIds = new HashSet<>();
 
     private volatile boolean m_closed = false;
+
+    // FIXME: all access to the StreamBlockQueue must be synchronized on ExportDataSource.this
+    // to protect it against concurrent access in pullData()
+    // FIXME: this is a temporary symchronization policy for prototyping b4 refactoring StreamBlockQueue
     private final StreamBlockQueue m_committedBuffers;
+
     private Runnable m_onMastership;
     // m_pollFuture is used for a common case to improve efficiency, export decoder thread creates
     // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
@@ -497,7 +502,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return es.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    return m_committedBuffers.sizeInBytes();
+                    Long byteCount = 0L;
+                    synchronized(ExportDataSource.this) {
+                        byteCount = m_committedBuffers.sizeInBytes();
+                    }
+                    return byteCount;
                 }
             }).get();
         } catch (RejectedExecutionException e) {
@@ -596,7 +605,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                     m_tupleCount += tupleCount;
                     m_tuplesPending.addAndGet(tupleCount);
-                    m_committedBuffers.offer(sb);
+                    synchronized(this) {
+                        m_committedBuffers.offer(sb);
+                    }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
                 }
@@ -620,7 +631,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 //Don't do a real sync, just write the in memory buffers
                 //to a file. @Quiesce or blocking snapshot will do the sync
-                m_committedBuffers.sync(true);
+                synchronized(this) {
+                    m_committedBuffers.sync(true);
+                }
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
             }
@@ -698,7 +711,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     m_partitionId);
                         }
                         else {
-                            m_committedBuffers.truncateToTxnId(truncationPoint);
+                            synchronized(ExportDataSource.this) {
+                                m_committedBuffers.truncateToTxnId(truncationPoint);
+                            }
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Truncating to txnId: " + TxnEgo.txnIdToString(truncationPoint));
                             }
@@ -721,7 +736,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         @Override
         public void run() {
             try {
-                m_committedBuffers.sync(m_nofsync);
+                synchronized(ExportDataSource.this) {
+                    m_committedBuffers.sync(m_nofsync);
+                }
             } catch (IOException e) {
                 exportLog.error("failed to sync export overflow", e);
             }
@@ -742,7 +759,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    m_committedBuffers.closeAndDelete();
+                    synchronized(ExportDataSource.this) {
+                        m_committedBuffers.closeAndDelete();
+                    }
                     m_adFile.delete();
                     m_ackMailboxRefs.set(null);
                 } catch(IOException e) {
@@ -762,7 +781,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 try {
-                    m_committedBuffers.close();
+                    synchronized(ExportDataSource.this) {
+                        m_committedBuffers.close();
+                    }
                     m_ackMailboxRefs.set(null);
                 } catch (IOException e) {
                     exportLog.error(e.getMessage(), e);
