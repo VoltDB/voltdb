@@ -20,6 +20,8 @@ package org.voltdb.compiler;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.sql.SqlNode;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
@@ -33,6 +35,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.newplanner.NonDdlBatch;
 import org.voltdb.newplanner.SqlTask;
+import org.voltdb.newplanner.VoltSqlValidator;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
@@ -57,6 +60,7 @@ public class PlannerTool {
     private Database m_database;
     private byte[] m_catalogHash;
     private AdHocCompilerCache m_cache;
+    private SchemaPlus m_schemaPlus;
     private long m_adHocLargeFallbackCount = 0;
     private long m_adHocLargeModeCount = 0;
 
@@ -114,10 +118,16 @@ public class PlannerTool {
         }
     }
 
-    public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash) {
+    public PlannerTool(final Database database, byte[] catalogHash, SchemaPlus schemaPlus) {
+        this(database, catalogHash);
+        m_schemaPlus = schemaPlus;
+    }
+
+    public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash, SchemaPlus schemaPlus) {
         m_database = database;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+        m_schemaPlus = schemaPlus;
 
         return this;
     }
@@ -193,6 +203,10 @@ public class PlannerTool {
      * @return a planned statement.
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
+        // create VoltSqlValidator from SchemaPlus.
+        VoltSqlValidator validator = new VoltSqlValidator(m_schemaPlus);
+        // validate the task's SqlNode.
+        SqlNode validatedNode = validator.validate(task.getParsedQuery());
         return null;
     }
 
