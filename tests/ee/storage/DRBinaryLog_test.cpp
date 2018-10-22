@@ -1207,20 +1207,6 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWritesWithReplicatedStream) {
     EXPECT_EQ(3, committed.seqNum);
 }
 
-// ENG-13685: this test seems to fail due to an issue
-// with how the tuple stream is created on the master cluster.
-//TEST_F(DRBinaryLogTest, ReplicatedTableWritesNoReplicatedStream) {
-//    // Use the NO_REPLICATED_STREAM protocol version so that dr replicated stream won't be used
-//    m_drStream.setDrProtocolVersion(DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION);
-//    m_drReplicatedStream.setDrProtocolVersion(DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION);
-//    replicatedTableWritesCommon();
-//
-//    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-//    EXPECT_EQ(3, committed.seqNum);
-//    committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
-//    EXPECT_EQ(0, committed.seqNum);
-//}
-
 TEST_F(DRBinaryLogTest, SerializeNulls) {
     beginTxn(m_engine, 109, 99, 98, 70);
     TableTuple first_tuple = insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable));
