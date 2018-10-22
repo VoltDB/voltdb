@@ -17,57 +17,42 @@
 
 package org.voltdb.newplanner;
 
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.apache.calcite.sql.parser.SqlParser;
-import org.voltdb.parser.ParserFactory;
 
 /**
- * SqlTask stores a parsed query.
+ * SqlTask stores a parsed query tree.
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class SqlTask {
-    private final String m_sqlString;
-    private final SqlNode m_parsedQuery;
+public interface SqlTask {
 
     /**
-     * Create a {@link SqlTask} from a SQL query string.
-     * @param sql the query string.
-     * @throws SqlParseException when the parsing goes wrong.
-     * @throws IllegalArgumentException if the SQL string is null or empty.
-     */
-    public SqlTask(String sql) throws SqlParseException {
-        if ((sql == null) || (sql = sql.trim()).isEmpty()) { // remove any spaces or newlines
-            throw new IllegalArgumentException("Can't plan empty or null SQL.");
-        }
-        m_sqlString = sql;
-        SqlParser parser = ParserFactory.create(sql);
-        m_parsedQuery = parser.parseStmt();
-    }
-
-    /**
-     * Tell if this {@link SqlTask} is a DDL task.
+     * Tell if this {@link SqlTaskImpl} is a DDL task.
      * @return true if this {@code SqlTask} is a DDL task.
      */
-    public boolean isDDL() {
-        return m_parsedQuery.isA(SqlKind.DDL);
-    }
+    public boolean isDDL();
 
     /**
      * Get the original SQL query text.
      * @return the original SQL query text.
      */
-    public String getSQL() {
-        return m_sqlString;
-    }
+    public String getSQL();
 
     /**
      * Get the parsed query node tree.
      * @return the parsed query node tree.
      */
-    public SqlNode getParsedQuery() {
-        return m_parsedQuery;
+    public SqlNode getParsedQuery();
+
+    /**
+     * Create a default {@link SqlTask} from a SQL query.
+     * @param sql the SQL query
+     * @return the created SqlTask.
+     * @throws SqlParseException when the parsing goes wrong.
+     * @throws IllegalArgumentException if the SQL string is null or empty.
+     */
+    public static SqlTask create(String sql) throws SqlParseException {
+        return new SqlTaskImpl(sql);
     }
 }

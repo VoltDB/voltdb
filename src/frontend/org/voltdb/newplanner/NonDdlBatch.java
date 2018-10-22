@@ -59,7 +59,7 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
     /**
      * Build a non-DDL SQL batch from a basic SQL batch, adding default
      * contextual information.
-     * @param batch the {@link SqlBatch} that this is built from.
+     * @param batchToDecorate the {@link SqlBatch} that this is built from.
      * @throws IllegalArgumentException if the given batch is not a non-DDL batch.
      */
     public NonDdlBatch(SqlBatch batchToDecorate) {
