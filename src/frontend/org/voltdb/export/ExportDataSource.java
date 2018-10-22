@@ -1265,8 +1265,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public synchronized void unacceptMastership() {
         if (exportLog.isDebugEnabled()) {
+            // Avoid NPE when running JUnits with debug logging turned on
+            Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+            Mailbox mbx = p.getFirst();
+            String hsidStr = "(no mailbox)";
+            if (mbx != null) {
+                hsidStr = CoreUtils.hsIdToString(m_ackMailboxRefs.get().getFirst().getHSId());
+            }
             exportLog.debug("Export table " + getTableName() + " for partition " + getPartitionId() + " mailbox hsid (" +
-                    CoreUtils.hsIdToString(m_ackMailboxRefs.get().getFirst().getHSId()) + ") gave up export mastership");
+                    hsidStr + ") gave up export mastership");
         }
         m_mastershipAccepted.set(false);
         m_isInCatalog = false;

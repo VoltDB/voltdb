@@ -121,7 +121,7 @@ public class ExecutorFactory {
                 m_maxThreads = localSitesCount;
             }
         }
-        trace("Export Data Sources running with %d executor threads", m_maxThreads);
+        exportLog.info("Export Data Sources running with " + m_maxThreads + " executor threads");
 
         m_nextAlloc = 0;
         m_executors = new ArrayList<>(m_maxThreads);
