@@ -219,7 +219,7 @@ public class GuestProcessor implements ExportDataProcessor {
             detectDecoder(m_client, edb);
             Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
             m_decoders.add(pair);
-            final ListenableFuture<AckingContainer> fut = m_source.poll();
+            final ListenableFuture<ExportDataSource.POLL_STATUS> fut = m_source.poll();
             addBlockListener(m_source, fut, edb);
         }
 
@@ -303,7 +303,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     private void addBlockListener(
             final ExportDataSource source,
-            final ListenableFuture<AckingContainer> fut,
+            final ListenableFuture<ExportDataSource.POLL_STATUS> fut,
             final ExportDecoderBase edb) {
         /*
          * The listener runs in the thread specified by the EDB.
@@ -318,123 +318,15 @@ public class GuestProcessor implements ExportDataProcessor {
             @Override
             public void run() {
                 try {
-                    AckingContainer cont = fut.get();
-                    if (cont == null) {
+                    ExportDataSource.POLL_STATUS pStatus = fut.get();
+                    if (ExportDataSource.POLL_STATUS.END_OF_STREAM.equals(pStatus)) {
                         return;
                     }
-                    cont.updateStartTime(System.currentTimeMillis());
-                    try {
-                        //Position to restart at on error
-                        final int startPosition = cont.b().position();
 
-                        //Track the amount of backoff to use next time, will be updated on repeated failure
-                        int backoffQuantity = 10 + (int)(10 * ThreadLocalRandom.current().nextDouble());
-
-                        /*
-                         * If there is an error processing the block the decoder thinks is recoverable
-                         * start the block from the beginning and repeat until it is processed.
-                         * Also allow the decoder to request exponential backoff
-                         */
-                        while (!m_shutdown) {
-                            try {
-                                final ByteBuffer buf = cont.b();
-                                buf.position(startPosition);
-                                buf.order(ByteOrder.LITTLE_ENDIAN);
-                                byte version = buf.get();
-                                assert(version == 1);
-                                long generation = buf.getLong();
-                                int schemaSize = buf.getInt();
-                                ExportRow previousRow = edb.getPreviousRow();
-                                if (previousRow == null || previousRow.generation != generation) {
-                                    byte[] schemadata = new byte[schemaSize];
-                                    buf.get(schemadata, 0, schemaSize);
-                                    ByteBuffer sbuf = ByteBuffer.wrap(schemadata);
-                                    sbuf.order(ByteOrder.LITTLE_ENDIAN);
-                                    edb.setPreviousRow(ExportRow.decodeBufferSchema(sbuf, schemaSize, source.getPartitionId(), generation));
-                                }
-                                else {
-                                    // Skip past the schema header because it has not changed.
-                                    buf.position(buf.position() + schemaSize);
-                                }
-                                ExportRow row = null;
-                                boolean firstRowOfBlock = true;
-                                while (buf.hasRemaining() && !m_shutdown) {
-                                    int length = buf.getInt();
-                                    byte[] rowdata = new byte[length];
-                                    buf.get(rowdata, 0, length);
-                                    if (edb.isLegacy()) {
-                                        edb.onBlockStart();
-                                        edb.processRow(length, rowdata);
-                                    } else {
-                                        //New style connector.
-                                        try {
-                                            row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
-                                            edb.setPreviousRow(row);
-                                        } catch (IOException ioe) {
-                                            m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
-                                            cont.discard();
-                                            cont = null;
-                                            break;
-                                        }
-                                        if (firstRowOfBlock) {
-                                            edb.onBlockStart(row);
-                                            firstRowOfBlock = false;
-                                        }
-                                        edb.processRow(row);
-                                    }
-                                }
-                                if (edb.isLegacy()) {
-                                    edb.onBlockCompletion();
-                                }
-                                if (row != null) {
-                                    edb.onBlockCompletion(row);
-                                }
-                                // Make sure to discard after onBlockCompletion so that if completion
-                                // wants to retry we don't lose block.
-                                // Please note that if export manager is shutting down it's possible
-                                // that container isn't fully consumed. Discard the buffer prematurely
-                                // would cause missing rows in export stream.
-                                if (!m_shutdown && cont != null) {
-                                    cont.discard();
-                                    cont = null;
-                                }
-                                break;
-                            } catch (RestartBlockException e) {
-                                if (m_shutdown) {
-                                    if (m_logger.isDebugEnabled()) {
-                                        // log message for debugging.
-                                        m_logger.debug("Shutdown detected, ignore restart exception. " + e);
-                                    }
-                                    break;
-                                }
-                                if (e.requestBackoff) {
-                                    Thread.sleep(backoffQuantity);
-                                    //Cap backoff to 8 seconds, then double modulo some randomness
-                                    if (backoffQuantity < 8000) {
-                                        backoffQuantity += (backoffQuantity * .5);
-                                        backoffQuantity +=
-                                                (backoffQuantity * .5 * ThreadLocalRandom.current().nextDouble());
-                                    }
-                                }
-                            }
-                        }
-                        // Don't discard the block also set the start position to the begining.
-                        // TODO: it would be nice to keep the last position in the buffer so that
-                        //       next time connector can pick up from where it left last time and
-                        //       continue. It helps to reduce exporting duplicated rows.
-                        if (m_shutdown && cont != null) {
-                            if (m_logger.isDebugEnabled()) {
-                                // log message for debugging.
-                                m_logger.debug("Shutdown detected, queue block to pending");
-                            }
-                            cont.b().position(startPosition);
-                            source.setPendingContainer(cont);
-                            cont = null;
-                        }
-                    } finally {
-                        if (cont != null) {
-                            cont.discard();
-                        }
+                    // Nonempty fut signifies that data might be present for reading
+                    AckingContainer cont = null;
+                    while ((cont = source.pullData()) != null) {
+                        processData(cont, source, edb);
                     }
                 } catch (Exception e) {
                     m_logger.error("Error processing export block", e);
@@ -444,6 +336,126 @@ public class GuestProcessor implements ExportDataProcessor {
                 }
             }
         }, edb.getExecutor());
+    }
+
+    private void processData(AckingContainer cont,
+            final ExportDataSource source,
+            final ExportDecoderBase edb) throws IOException, InterruptedException {
+
+        cont.updateStartTime(System.currentTimeMillis());
+        try {
+            //Position to restart at on error
+            final int startPosition = cont.b().position();
+
+            //Track the amount of backoff to use next time, will be updated on repeated failure
+            int backoffQuantity = 10 + (int)(10 * ThreadLocalRandom.current().nextDouble());
+
+            /*
+             * If there is an error processing the block the decoder thinks is recoverable
+             * start the block from the beginning and repeat until it is processed.
+             * Also allow the decoder to request exponential backoff
+             */
+            while (!m_shutdown) {
+                try {
+                    final ByteBuffer buf = cont.b();
+                    buf.position(startPosition);
+                    buf.order(ByteOrder.LITTLE_ENDIAN);
+                    byte version = buf.get();
+                    assert(version == 1);
+                    long generation = buf.getLong();
+                    int schemaSize = buf.getInt();
+                    ExportRow previousRow = edb.getPreviousRow();
+                    if (previousRow == null || previousRow.generation != generation) {
+                        byte[] schemadata = new byte[schemaSize];
+                        buf.get(schemadata, 0, schemaSize);
+                        ByteBuffer sbuf = ByteBuffer.wrap(schemadata);
+                        sbuf.order(ByteOrder.LITTLE_ENDIAN);
+                        edb.setPreviousRow(ExportRow.decodeBufferSchema(sbuf, schemaSize, source.getPartitionId(), generation));
+                    }
+                    else {
+                        // Skip past the schema header because it has not changed.
+                        buf.position(buf.position() + schemaSize);
+                    }
+                    ExportRow row = null;
+                    boolean firstRowOfBlock = true;
+                    while (buf.hasRemaining() && !m_shutdown) {
+                        int length = buf.getInt();
+                        byte[] rowdata = new byte[length];
+                        buf.get(rowdata, 0, length);
+                        if (edb.isLegacy()) {
+                            edb.onBlockStart();
+                            edb.processRow(length, rowdata);
+                        } else {
+                            //New style connector.
+                            try {
+                                row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
+                                edb.setPreviousRow(row);
+                            } catch (IOException ioe) {
+                                m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
+                                cont.discard();
+                                cont = null;
+                                break;
+                            }
+                            if (firstRowOfBlock) {
+                                edb.onBlockStart(row);
+                                firstRowOfBlock = false;
+                            }
+                            edb.processRow(row);
+                        }
+                    }
+                    if (edb.isLegacy()) {
+                        edb.onBlockCompletion();
+                    }
+                    if (row != null) {
+                        edb.onBlockCompletion(row);
+                    }
+                    // Make sure to discard after onBlockCompletion so that if completion
+                    // wants to retry we don't lose block.
+                    // Please note that if export manager is shutting down it's possible
+                    // that container isn't fully consumed. Discard the buffer prematurely
+                    // would cause missing rows in export stream.
+                    if (!m_shutdown && cont != null) {
+                        cont.discard();
+                        cont = null;
+                    }
+                    break;
+                } catch (RestartBlockException e) {
+                    if (m_shutdown) {
+                        if (m_logger.isDebugEnabled()) {
+                            // log message for debugging.
+                            m_logger.debug("Shutdown detected, ignore restart exception. " + e);
+                        }
+                        break;
+                    }
+                    if (e.requestBackoff) {
+                        Thread.sleep(backoffQuantity);
+                        //Cap backoff to 8 seconds, then double modulo some randomness
+                        if (backoffQuantity < 8000) {
+                            backoffQuantity += (backoffQuantity * .5);
+                            backoffQuantity +=
+                                    (backoffQuantity * .5 * ThreadLocalRandom.current().nextDouble());
+                        }
+                    }
+                }
+            }
+            // Don't discard the block also set the start position to the beginning.
+            // TODO: it would be nice to keep the last position in the buffer so that
+            //       next time connector can pick up from where it left last time and
+            //       continue. It helps to reduce exporting duplicated rows.
+            if (m_shutdown && cont != null) {
+                if (m_logger.isDebugEnabled()) {
+                    // log message for debugging.
+                    m_logger.debug("Shutdown detected, queue block to pending");
+                }
+                cont.b().position(startPosition);
+                source.setPendingContainer(cont);
+                cont = null;
+            }
+        } finally {
+            if (cont != null) {
+                cont.discard();
+            }
+        }
     }
 
     @Override

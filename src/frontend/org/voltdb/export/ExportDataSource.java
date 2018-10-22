@@ -125,7 +125,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
     // is assigned to m_pollFuture. When site thread pushes buffer to EDS executor thread, m_pollFuture
     // is reused to notify export decoder to stop waiting.
-    private SettableFuture<AckingContainer> m_pollFuture;
+    private SettableFuture<POLL_STATUS> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
@@ -152,6 +152,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         PAUSED
     }
     private STREAM_STATUS m_status = STREAM_STATUS.ACTIVE;
+
+    // FIXME: merge with stream status?
+    public enum POLL_STATUS {
+        MORE_DATA,
+        END_OF_STREAM
+    }
 
     /**
      * Create a new data source.
@@ -773,8 +779,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_pendingContainer.set(container);
     }
 
-    public ListenableFuture<AckingContainer> poll() {
-        final SettableFuture<AckingContainer> fut = SettableFuture.create();
+    public ListenableFuture<POLL_STATUS> poll() {
+        final SettableFuture<POLL_STATUS> fut = SettableFuture.create();
         try {
             m_es.execute(new Runnable() {
                 @Override
@@ -789,14 +795,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //
                     // Add following check to eliminate this window.
                     if (!m_mastershipAccepted.get()) {
-                        fut.set(null);
+                        fut.set(POLL_STATUS.END_OF_STREAM);
                         return;
                     }
 
                     try {
                         //If we have anything pending set that before moving to next block.
                         if (m_pendingContainer.get() != null) {
-                            fut.set(m_pendingContainer.getAndSet(null));
+                            fut.set(POLL_STATUS.MORE_DATA);
                             if (m_pollFuture != null) {
                                 if (exportLog.isDebugEnabled()) {
                                     exportLog.debug("picked up work from pending container, set poll future to null");
@@ -839,19 +845,25 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_firstUnpolledUso;
     }
 
-    private synchronized void pollImpl(SettableFuture<AckingContainer> fut) {
+    /**
+     * Poll for first unpolled block in StreamBlockQueue, set fut if present.
+     *
+     * HACK: set fut with empty AckContainer to signal that data is present,
+     * client is supposed to call pullData() to pull data out of StreamBlockQueue.
+     *
+     * @param fut
+     */
+    private synchronized void pollImpl(SettableFuture<POLL_STATUS> fut) {
         if (fut == null) {
             return;
         }
 
         try {
-            StreamBlock first_unpolled_block = null;
-
             if (!this.m_isInCatalog && m_eos && m_committedBuffers.isEmpty()) {
                 //Returning null indicates end of stream
                 m_pollFuture = null;
                 try {
-                    fut.set(null);
+                    fut.set(POLL_STATUS.END_OF_STREAM);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source.
                 }
@@ -860,50 +872,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_generation.onSourceDone(m_partitionId, m_signature);
                 return;
             }
-            //Assemble a list of blocks to delete so that they can be deleted
-            //outside of the m_committedBuffers critical section
-            ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
-            //Inside this critical section do the work to find out
-            //what block should be returned by the next poll.
-            //Copying and sending the data will take place outside the critical section
-            try {
-                Iterator<StreamBlock> iter = m_committedBuffers.iterator();
-                long fuso = getFirstUnpolledUso();
-                while (iter.hasNext()) {
-                    StreamBlock block = iter.next();
-                    // find the first block that has unpolled data
-                    if (fuso < block.uso() + block.totalSize()) {
-                        first_unpolled_block = block;
-                        m_firstUnpolledUso = (block.uso() + block.totalSize());
-                        break;
-                    } else {
-                        blocksToDelete.add(block);
-                        iter.remove();
-                    }
-                }
-            } catch (RuntimeException e) {
-                if (e.getCause() instanceof IOException) {
-                    VoltDB.crashLocalVoltDB("Error attempting to find unpolled export data", true, e);
-                } else {
-                    throw e;
-                }
-            } finally {
-                //Try hard not to leak memory
-                for (StreamBlock sb : blocksToDelete) {
-                    sb.discard();
-                }
-            }
 
-            //If there are no unpolled blocks return the firstUnpolledUSO with no data
+            StreamBlock first_unpolled_block = getFirstUnpolledBlock(false);
+
+            //If there are no unpolled blocks then put the fut aside for next exported buffer
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
             } else {
-                final AckingContainer ackingContainer =
-                        new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                first_unpolled_block.uso() + first_unpolled_block.totalSize() - 1,
-                                first_unpolled_block.rowCount());
                 try {
-                    fut.set(ackingContainer);
+                    fut.set(POLL_STATUS.MORE_DATA);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source dont discard next processor will pick it up.
                 }
@@ -911,6 +888,81 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         } catch (Throwable t) {
             fut.setException(t);
+        }
+    }
+
+    /**
+     * Return the first unpolled block in StreamBlockQueue or null if none
+     *
+     * @param remove true if Acked blocks should be removed.
+     * @return
+     */
+    private synchronized StreamBlock getFirstUnpolledBlock(boolean remove) {
+
+        StreamBlock first_unpolled_block = null;
+
+        //Assemble a list of blocks to delete so that they can be deleted
+        //outside of the m_committedBuffers critical section
+        ArrayList<StreamBlock> blocksToDelete = null;
+        if (remove) blocksToDelete = new ArrayList<>();
+
+        //Inside this critical section do the work to find out
+        //what block should be returned by the next poll.
+        //Copying and sending the data will take place outside the critical section
+        try {
+            Iterator<StreamBlock> iter = m_committedBuffers.iterator();
+            long fuso = getFirstUnpolledUso();
+            while (iter.hasNext()) {
+                StreamBlock block = iter.next();
+                // find the first block that has unpolled data
+                if (fuso < block.uso() + block.totalSize()) {
+                    first_unpolled_block = block;
+                    if (remove) {
+                        m_firstUnpolledUso = (block.uso() + block.totalSize());
+                    }
+                    break;
+                } else if (remove) {
+                    blocksToDelete.add(block);
+                    iter.remove();
+                }
+            }
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException) {
+                VoltDB.crashLocalVoltDB("Error attempting to find unpolled export data", true, e);
+            } else {
+                throw e;
+            }
+        } finally {
+            if (remove) {
+                //Try hard not to leak memory
+                for (StreamBlock sb : blocksToDelete) {
+                    sb.discard();
+                }
+            }
+        }
+        return first_unpolled_block;
+    }
+
+    /**
+     * Client pulls data, gets AckingContainer or null if no data
+     *
+     * @return AckingContainer with first unpolled data or null if no unpolled data
+     */
+    public synchronized AckingContainer pullData() {
+
+        if (m_pendingContainer.get() != null) {
+            return m_pendingContainer.getAndSet(null);
+        }
+
+        // Get first unpolled block, removing acknowledged buffers
+        StreamBlock first_unpolled_block = getFirstUnpolledBlock(true);
+
+        if (first_unpolled_block == null) {
+            return null;
+        } else {
+            return new AckingContainer(first_unpolled_block.unreleasedContainer(),
+                    first_unpolled_block.uso() + first_unpolled_block.totalSize() - 1,
+                    first_unpolled_block.rowCount());
         }
     }
 
@@ -938,7 +990,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
-                        if (exportLog.isTraceEnabled()) {
+                    if (exportLog.isTraceEnabled()) {
                             exportLog.trace("AckingContainer.discard with uso: " + m_uso);
                         }
                         assert(m_tuplesSent == 0 || m_startTime != 0);

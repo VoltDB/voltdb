@@ -204,7 +204,8 @@ public class TestExportGeneration {
                     false,
                     1
                     );
-            AckingContainer cont = (AckingContainer)m_expDs.poll().get();
+            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, m_expDs.poll().get());
+            AckingContainer cont = m_expDs.pullData();
             cont.updateStartTime(System.currentTimeMillis());
 
             m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_tableSignature, uso + foo.capacity() - StreamBlock.HEADER_SIZE - 1));

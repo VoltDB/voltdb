@@ -51,7 +51,6 @@ import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.MockVoltDB;
@@ -233,7 +232,8 @@ public class TestExportDataSource extends TestCase {
 
             assertEquals( 60, s.sizeInBytes());
 
-            AckingContainer cont = s.poll().get();
+            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+            AckingContainer cont = s.pullData();
             cont.updateStartTime(System.currentTimeMillis());
             //No change in size because the buffers are flattened to disk, until the whole
             //file is polled/acked it won't shrink
@@ -250,7 +250,9 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = s.poll().get();
+
+            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+            cont = s.pullData();
             cont.updateStartTime(System.currentTimeMillis());
 
             //Should lose 20 bytes for the stuff in memory
@@ -262,7 +264,9 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            cont = s.poll().get();
+
+            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+            cont = s.pullData();
             cont.updateStartTime(System.currentTimeMillis());
 
             //No more buffers on disk, so the + 8 is gone, just the last one pulled in memory
@@ -273,9 +277,9 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            ListenableFuture<AckingContainer> fut = s.poll();
+            ListenableFuture<ExportDataSource.POLL_STATUS> fut = s.poll();
             try {
-                cont = fut.get(100,TimeUnit.MILLISECONDS);
+                ExportDataSource.POLL_STATUS ps = fut.get(100,TimeUnit.MILLISECONDS);
                 fail("did not get expected timeout");
             }
             catch( TimeoutException ignoreIt) {}
@@ -346,7 +350,8 @@ public class TestExportDataSource extends TestCase {
         //flattened size
         assertEquals( 60, s.sizeInBytes());
 
-        AckingContainer cont = (AckingContainer)s.poll().get();
+        assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+        AckingContainer cont = s.pullData();
         cont.updateStartTime(System.currentTimeMillis());
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
@@ -370,7 +375,8 @@ public class TestExportDataSource extends TestCase {
                 );
 
         // Poll and discard buffer 63, too
-        cont = s.poll().get();
+        assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+        cont = s.pullData();
         cont.updateStartTime(System.currentTimeMillis());
         cont.discard();
 
@@ -381,7 +387,8 @@ public class TestExportDataSource extends TestCase {
         // 20, no overhead because it was pulled back in
         assertEquals( 20, s.sizeInBytes());
 
-        cont = (AckingContainer)s.poll().get();
+        assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+        cont = s.pullData();
         cont.updateStartTime(System.currentTimeMillis());
         assertEquals(s.sizeInBytes(), 20);
         assertEquals(82, cont.m_uso);
@@ -454,7 +461,8 @@ public class TestExportDataSource extends TestCase {
             cdl.await();
 
             //Poll and check before and after discard segment files.
-            AckingContainer cont = (AckingContainer) s.poll().get();
+            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+            AckingContainer cont = s.pullData();
             cont.updateStartTime(System.currentTimeMillis());
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
