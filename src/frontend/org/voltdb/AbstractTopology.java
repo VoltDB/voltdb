@@ -762,10 +762,9 @@ public class AbstractTopology {
                         replicaCount, hosts.size()));
             }
 
-            // Populate the list of partitions in reverse order so that the highest partition IDs are given out first
             final int partitionsCount = sitesPerHost * hosts.size() / replicaCount;
             m_partitions = new ArrayList<>(partitionsCount);
-            for (int i = firstPartitionId + partitionsCount - 1; i >= firstPartitionId; --i) {
+            for (int i = firstPartitionId; i < firstPartitionId + partitionsCount; ++i) {
                 m_partitions.add(new PartitionBuilder(i));
             }
 
@@ -786,19 +785,19 @@ public class AbstractTopology {
          */
         TopologyBuilder addPartitionsToHosts() {
             int hostsNotInAGroup = m_hosts.size();
-            Iterator<PartitionBuilder> partitionIter = m_partitions.iterator();
             BalancedPartitionChecker bpc = m_selector.getBalancedPartitionChecker();
 
-            while (partitionIter.hasNext()) {
-                int protectionGoupCount = (hostsNotInAGroup / m_replicaCount);
+            List<HostBuilder[]> protectionGroups = new ArrayList<>(hostsNotInAGroup / m_replicaCount);
+
+            do {
+                int protectionGroupCount = (hostsNotInAGroup / m_replicaCount);
                 /*
                  * Calculate how many hosts should be in each group. Ideally this is replica count but with some host
                  * counts, sites per host and replica count values that is not possible. When it isn't possible try to
                  * make the groups as small as possible with the largest groups selected last to have the partitions
                  * with the lowest IDs
                  */
-                int hostsInGroup = m_replicaCount
-                        + ((hostsNotInAGroup % m_replicaCount) / protectionGoupCount);
+                int hostsInGroup = m_replicaCount + ((hostsNotInAGroup % m_replicaCount) / protectionGroupCount);
 
                 // Keep adding hosts to group until the number of sites it can hold is a multiple of m_replicaCount
                 while (hostsInGroup < hostsNotInAGroup && hostsInGroup * m_sitesPerHost % m_replicaCount != 0) {
@@ -811,15 +810,22 @@ public class AbstractTopology {
                 hostsNotInAGroup -= hostsInGroup;
                 if (hostsNotInAGroup > 0 && hostsNotInAGroup < m_replicaCount) {
                     hostsInGroup += hostsNotInAGroup;
+                    hostsNotInAGroup = 0;
                 }
 
-                int maxMissing = m_missingCount / protectionGoupCount;
+                // Accidentally created a protection group which is a multiple of m_replicaCount break it up
+                if (hostsInGroup >= (m_replicaCount << 1) && hostsInGroup % m_replicaCount == 0) {
+                    hostsNotInAGroup += (hostsInGroup - m_replicaCount);
+                    hostsInGroup = m_replicaCount;
+                }
+
+                int maxMissing = m_missingCount / protectionGroupCount;
                 if (maxMissing >= hostsInGroup) {
                     throw new RuntimeException("Too many missing hosts for configuration");
                 }
 
                 HostBuilder[] protectionGroup = m_selector.getNextProtectionGroup(hostsInGroup, maxMissing);
-                int partitionsInGroup = hostsInGroup * m_sitesPerHost / m_replicaCount;
+                protectionGroups.add(protectionGroup);
 
                 if (maxMissing > 0) {
                     for (HostBuilder host : protectionGroup) {
@@ -828,13 +834,23 @@ public class AbstractTopology {
                         }
                     }
                 }
+            } while (hostsNotInAGroup > 0);
+
+            // Sort the protection groups biggest to smallest
+            Collections.sort(protectionGroups, (pg1, pg2) -> Integer.compare(pg2.length, pg1.length));
+
+            Iterator<PartitionBuilder> partitionIter = m_partitions.iterator();
+            for (HostBuilder[] protectionGroup : protectionGroups) {
+                int partitionsInGroup = protectionGroup.length * m_sitesPerHost / m_replicaCount;
 
                 int counter = 0;
                 List<HostBuilder> eligibleLeaders = new ArrayList<>(m_replicaCount);
                 for (int i = 0; i < partitionsInGroup; ++i) {
                     PartitionBuilder partition = partitionIter.next();
                     for (int j = 0; j < m_replicaCount; ++j) {
-                        HostBuilder host = protectionGroup[counter++ % hostsInGroup];
+                        HostBuilder host = protectionGroup[counter++ % protectionGroup.length];
+                        assert (host.m_partitions.size() < m_sitesPerHost) : "host " + host + " already has at least "
+                                + m_sitesPerHost + " partitions";
                         host.m_partitions.add(partition);
                         partition.m_hosts.add(host);
                         if (!host.m_missing) {
@@ -852,6 +868,8 @@ public class AbstractTopology {
                     eligibleLeaders.clear();
                 }
             }
+
+            assert !partitionIter.hasNext();
 
             return this;
         }
@@ -888,8 +906,8 @@ public class AbstractTopology {
                 currentTopology.getReplicationFactor(), largestPartitionId);
 
         ImmutableList.Builder<Integer> newPartitions = ImmutableList.builder();
-        for (int i = topologyBuilder.m_partitions.size() - 1; i >= 0; --i) {
-            newPartitions.add(topologyBuilder.m_partitions.get(i).m_id);
+        for (PartitionBuilder pb : topologyBuilder.m_partitions) {
+            newPartitions.add(pb.m_id);
         }
 
         return Pair.of(new AbstractTopology(currentTopology, topologyBuilder), newPartitions.build());
