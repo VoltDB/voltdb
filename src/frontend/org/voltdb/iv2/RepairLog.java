@@ -25,6 +25,7 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
@@ -58,7 +59,7 @@ public class RepairLog
 
     // Truncation point
     long m_truncationHandle = Long.MIN_VALUE;
-    final List<TransactionCommitInterest> m_txnCommitInterests = new ArrayList<>();
+    final List<TransactionCommitInterest> m_txnCommitInterests = new CopyOnWriteArrayList<>();
 
     // is this a partition leader?
     boolean m_isLeader = false;
@@ -148,13 +149,13 @@ public class RepairLog
         }
     }
 
-    public boolean hasNoTxnCommitInterests() {
+    boolean hasNoTxnCommitInterests() {
         return m_txnCommitInterests.isEmpty();
     }
 
-    public void notifyTxnCommitInterests(long handle) {
-        for (TransactionCommitInterest interest : m_txnCommitInterests) {
-            interest.transactionCommitted(handle);
+    void notifyTxnCommitInterests(long handle) {
+        for (TransactionCommitInterest txnCommitInterest : m_txnCommitInterests) {
+            txnCommitInterest.transactionCommitted(handle);
         }
     }
 
@@ -320,7 +321,7 @@ public class RepairLog
         return responses;
     }
 
-    public void registerTransactionCommitInterest(TransactionCommitInterest interest)
+    void registerTransactionCommitInterest(TransactionCommitInterest interest)
     {
         m_txnCommitInterests.add(interest);
     }
