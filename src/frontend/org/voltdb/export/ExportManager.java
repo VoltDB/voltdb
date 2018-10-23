@@ -707,4 +707,11 @@ public class ExportManager
     public ExportStats getExportStats() {
         return m_exportStats;
     }
+
+    public String updateExportFlowControl(String stream, String target, String op) {
+        if (m_generation.get() != null) {
+           return  m_generation.get().updateExportFlowControl(stream, target, op);
+        }
+        return null;
+    }
 }

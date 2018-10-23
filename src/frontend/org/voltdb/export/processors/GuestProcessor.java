@@ -322,7 +322,6 @@ public class GuestProcessor implements ExportDataProcessor {
                     if (cont == null) {
                         return;
                     }
-                    cont.updateStartTime(System.currentTimeMillis());
                     try {
                         //Position to restart at on error
                         final int startPosition = cont.b().position();
@@ -363,11 +362,13 @@ public class GuestProcessor implements ExportDataProcessor {
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
                                     if (edb.isLegacy()) {
+                                        cont.updateStartTime(System.currentTimeMillis());
                                         edb.onBlockStart();
                                         edb.processRow(length, rowdata);
                                     } else {
                                         //New style connector.
                                         try {
+                                            cont.updateStartTime(System.currentTimeMillis());
                                             row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
                                             edb.setPreviousRow(row);
                                         } catch (IOException ioe) {

@@ -813,6 +813,23 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
+    public String updateExportFlowControl(String stream, String target, String op) {
+        synchronized (m_dataSourcesByPartition) {
+            for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
+                Map<String, ExportDataSource> sources = it.next();
+                for (ExportDataSource src : sources.values()) {
+                    if (src.getTableName().equalsIgnoreCase(stream) && target.equalsIgnoreCase(src.getTarget())) {
+                        String message = src.updateExportFlowControl(op);
+                        if (message != null) {
+                            return message;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     @Override
     public String toString() {
         return "Export Generation";

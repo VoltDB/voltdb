@@ -59,6 +59,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.sysprocs.ExportControl.EXPORT_CONTROL_OP;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -149,9 +150,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     static enum STREAM_STATUS {
         ACTIVE,
         DROPPED,
-        PAUSED
+        PAUSED,
+        BLOCKED
     }
-    private STREAM_STATUS m_status = STREAM_STATUS.ACTIVE;
+    private AtomicReference<STREAM_STATUS> m_status = new AtomicReference<>();
 
     /**
      * Create a new data source.
@@ -256,6 +258,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
         m_tableName + " partition " + m_partitionId, 1);
+        m_status.set(STREAM_STATUS.ACTIVE);
     }
 
     public ExportDataSource(Generation generation, File adFile, List<Pair<Integer, Integer>> localPartitionsToSites) throws IOException {
@@ -320,6 +323,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                 m_tableName + " partition " + m_partitionId, 1);
+        m_status.set(STREAM_STATUS.ACTIVE);
     }
 
     public void setReadyForPolling(boolean readyForPolling) {
@@ -1363,11 +1367,46 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void setStatus(STREAM_STATUS status) {
-        this.m_status = status;
+        this.m_status.set(status);
     }
 
     public void setGapCount(long gapCount) {
         m_gapCount = gapCount;
+    }
+
+    public String getTarget() {
+        return m_exportTargetName;
+    }
+
+    public String updateExportFlowControl(String op) {
+        EXPORT_CONTROL_OP operation = EXPORT_CONTROL_OP.valueOf(op.toUpperCase());
+        boolean success = false;
+        switch (operation) {
+        case SKIP:
+            if (m_status.get().equals(STREAM_STATUS.BLOCKED)) {
+                setStatus(STREAM_STATUS.ACTIVE);
+                success = true;
+            }
+            break;
+        case PAUSE:
+            if (m_status.get().equals(STREAM_STATUS.ACTIVE)) {
+                setStatus(STREAM_STATUS.PAUSED);
+                success = true;
+            }
+            break;
+        case RESUME:
+            if (!m_status.get().equals(STREAM_STATUS.PAUSED)) {
+                setStatus(STREAM_STATUS.ACTIVE);
+                success = true;
+            }
+            break;
+        default:
+
+        }
+        if (success) {
+            return null;
+        }
+        return "The export target is in " + m_status.get()+ " state. The operation " + operation + " is not valid.";
     }
 
     @Override
