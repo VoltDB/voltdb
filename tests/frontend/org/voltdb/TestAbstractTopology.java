@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,10 +63,13 @@ import com.google_voltpatches.common.collect.DiscreteDomain;
 import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Iterators;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Range;
+import com.google_voltpatches.common.collect.RangeMap;
+import com.google_voltpatches.common.collect.TreeRangeMap;
 
 public class TestAbstractTopology {
 
@@ -128,6 +132,10 @@ public class TestAbstractTopology {
     }
 
     Metrics validate(AbstractTopology topo) throws JSONException {
+        return validate(topo, Iterators.singletonIterator(0));
+    }
+
+    Metrics validate(AbstractTopology topo, Iterator<Integer> firstPartitionsOnNewHosts) throws JSONException {
         Metrics metrics = new Metrics();
 
         // technically valid
@@ -152,16 +160,6 @@ public class TestAbstractTopology {
             // check k+1 copies of partition
             assertEquals(topo.getReplicationFactor() + 1, p.hostIds.size());
         });
-
-        // collect distinct peer groups
-        Set<Host> unseenHosts = new HashSet<>(topo.hostsById.values());
-        Set<Partition> unseenPartitions = new HashSet<>(topo.partitionsById.values());
-        while (unseenPartitions.size() > 0) {
-            Partition starterPartition = unseenPartitions.iterator().next();
-            unseenPartitions.remove(starterPartition);
-            collectConnectedPartitions(starterPartition, unseenHosts, unseenPartitions, topo.hostsById);
-            metrics.distinctPeerGroups++;
-        }
 
         // examine ha group placement
         Multimap<String, Host> haGroupToHosts = HashMultimap.create();
@@ -209,6 +207,41 @@ public class TestAbstractTopology {
                     .min().getAsInt();
         }
 
+        // collect distinct peer groups
+        Set<Integer> visited = new HashSet<>();
+        RangeMap<Integer, Set<Integer>> protectionGroups = TreeRangeMap.create();
+        for (AbstractTopology.Host host : topo.hostsById.values()) {
+            if (visited.contains(host.id) || host.partitions.isEmpty()) {
+                continue;
+            }
+            Set<Integer> hosts = new HashSet<>();
+            @SuppressWarnings("unchecked")
+            Range<Integer>[] partitionRange = new Range[1];
+            buildProtectionGroup(topo, visited, host, partitionRange, hosts);
+            assertEquals(hosts.size() * topo.getSitesPerHost() / (topo.getReplicationFactor() + 1),
+                    partitionRange[0].upperEndpoint() - partitionRange[0].lowerEndpoint() + 1);
+            protectionGroups.put(partitionRange[0], hosts);
+        }
+        metrics.distinctPeerGroups = protectionGroups.asMapOfRanges().size();
+
+        // Validate that the protection groups get smaller or stay the same size as partitions IDs get higher
+        int groupSize = 0;
+        for (Map.Entry<Range<Integer>, Set<Integer>> entry : protectionGroups.asMapOfRanges().entrySet()) {
+            Set<Integer> hosts = entry.getValue();
+            if (groupSize < hosts.size()) {
+                Integer firstPartition;
+                do {
+                    assertTrue("groupSize decreased from " + groupSize + " to " + hosts.size(),
+                            firstPartitionsOnNewHosts.hasNext());
+                    firstPartition = firstPartitionsOnNewHosts.next();
+                } while (firstPartition.compareTo(entry.getKey().lowerEndpoint()) < 0);
+
+                assertTrue("groupSize decreased from " + groupSize + " to " + hosts.size(),
+                        entry.getKey().lowerEndpoint().equals(firstPartition));
+            }
+            groupSize = hosts.size();
+        }
+
         JSONObject json = topo.topologyToJSON();
         AbstractTopology deserialized = AbstractTopology.topologyFromJSON(json);
         assertEquals(topo.getHostCount(), deserialized.getHostCount());
@@ -220,19 +253,20 @@ public class TestAbstractTopology {
         return metrics;
     }
 
-    private static void collectConnectedPartitions(Partition starterPartition, Set<Host> unseenHosts, Set<Partition> unseenPartitions, Map<Integer, Host> hostsById) {
-        for (int hostId : starterPartition.hostIds) {
-            Host host = hostsById.get(hostId);
-            if (!unseenHosts.contains(host)) {
-                continue;
-            }
-            unseenHosts.remove(host);
-            for (Partition partition : host.partitions) {
-                if (!unseenPartitions.contains(partition)) {
-                    continue;
+    private void buildProtectionGroup(AbstractTopology topo, Set<Integer> visited, AbstractTopology.Host host,
+            Range<Integer>[] partitionRange, Set<Integer> hosts) {
+        if (!visited.add(host.id) || host.partitions.isEmpty()) {
+            return;
+        }
+
+        Range<Integer> hostRange = Range.closed(host.partitions.first().id, host.partitions.last().id);
+        partitionRange[0] = partitionRange[0] == null ? hostRange : partitionRange[0].span(hostRange);
+
+        for (AbstractTopology.Partition partition : host.partitions) {
+            for (Integer hostId : partition.hostIds) {
+                if (hosts.add(hostId)) {
+                    buildProtectionGroup(topo, visited, topo.hostsById.get(hostId), partitionRange, hosts);
                 }
-                unseenPartitions.remove(partition);
-                collectConnectedPartitions(partition, unseenHosts, unseenPartitions, hostsById);
             }
         }
     }
@@ -649,7 +683,7 @@ public class TestAbstractTopology {
             TestDescription td2 = getRandomBoringTestDescription(td1.hosts.values().iterator().next().m_localSitesCount,
                     td1.kfactor, td1.hosts.size());
             Pair<AbstractTopology, ImmutableList<Integer>> result = AbstractTopology.mutateAddNewHosts(topo, td2.hosts);
-            validate(result.getFirst());
+            validate(result.getFirst(), Iterators.forArray(0, result.getSecond().get(0)));
             List<Integer> exptectedNewPartitions = ContiguousSet.create(
                     Range.closedOpen(topo.getPartitionCount(),
                             topo.getPartitionCount() + td2.hosts.size() * topo.getSitesPerHost() / (td2.kfactor + 1)),
