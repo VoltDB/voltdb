@@ -30,6 +30,7 @@ import java.util.Map;
 import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -100,6 +101,19 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             client.callProcedure("Insert", paramsGrp);
         }
         quiesceAndVerifyTarget(client, m_verifier);
+    }
+
+    public void testFlowControl() throws Exception {
+        System.out.println("testFlowControl");
+        final Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
+        VoltTable[] tables = client.callProcedure("@ExportControl", "ALLOW_NULL", "custom", "pause").getResults();
+        for (VoltTable t : tables) {
+            System.out.println(t.toFormattedString());
+        }
     }
 
     public TestExportV2Suite(final String name) {

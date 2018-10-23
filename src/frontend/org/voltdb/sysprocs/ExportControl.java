@@ -31,20 +31,20 @@ import org.voltdb.export.ExportManager;
 public class ExportControl extends VoltSystemProcedure {
 
     // support operations
-    public static enum EXPORT_CONTROL_OP{
-        SKIP,
-        PAUSE,
-        RESUME
-    }
+    public static enum OperationMode{ SKIP, PAUSE, RESUME }
+
     @Override
     public long[] getPlanFragmentIds() {
-        return null;
+        return new long[]{};
     }
 
     @Override
-    public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId,
-            ParameterSet params, SystemProcedureExecutionContext context) {
-        return null;
+    public DependencyPair executePlanFragment(
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params, SystemProcedureExecutionContext context)
+    {
+        throw new RuntimeException("ExportControl was given an " +
+                                   "invalid fragment id: " + String.valueOf(fragmentId));
     }
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String stream, String target, String op) {
@@ -52,7 +52,7 @@ public class ExportControl extends VoltSystemProcedure {
                 new ColumnInfo("STATUS", VoltType.BIGINT),
                 new ColumnInfo("MESSAGE", VoltType.STRING));
         try {
-            EXPORT_CONTROL_OP.valueOf(op.toUpperCase());
+            OperationMode.valueOf(op.toUpperCase());
         } catch (IllegalArgumentException e){
             t.addRow(VoltSystemProcedure.STATUS_FAILURE, "Invalide operation");
             return (new VoltTable[] {t});

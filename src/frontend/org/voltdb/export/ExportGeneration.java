@@ -215,9 +215,9 @@ public class ExportGeneration implements Generation {
             for (String signature : sources.keySet()) {
                 ExportDataSource src = sources.get(signature);
                 if (exportSignatures.contains(src)) {
-                    src.setStatus(ExportDataSource.STREAM_STATUS.ACTIVE);
+                    src.setStatus(ExportDataSource.streamStatus.ACTIVE);
                 } else {
-                    src.setStatus(ExportDataSource.STREAM_STATUS.DROPPED);
+                    src.setStatus(ExportDataSource.streamStatus.DROPPED);
                 }
             }
         }
