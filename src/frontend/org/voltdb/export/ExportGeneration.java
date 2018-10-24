@@ -818,7 +818,8 @@ public class ExportGeneration implements Generation {
             for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
                 Map<String, ExportDataSource> sources = it.next();
                 for (ExportDataSource src : sources.values()) {
-                    if (src.getTableName().equalsIgnoreCase(exportStream) && exportTargets.contains(src.getTarget())) {
+                    if (("None".equalsIgnoreCase(exportStream) || src.getTableName().equalsIgnoreCase(exportStream)) && (
+                            exportTargets.contains(src.getTarget()) || exportTargets.isEmpty())) {
                         String message = src.updateExportFlowControl(opMode);
                         if (message != null) {
                             return message;

@@ -17,11 +17,6 @@ import sys
 import time
 
 def release(runner):
-    if not runner.opts.targets:
-        runner.abort_with_help('You must specify the --targets option.')
-    if not runner.opts.source:
-        runner.abort_with_help('You must specify the --source option.')
-
     json_opts = ['{source:"%s",targets:%s,command:"release"}' % (runner.opts.source, runner.opts.targets)]
     response = runner.call_proc('@ExportControl', [VOLT.FastSerializer.VOLTTYPE_STRING], json_opts)
     print response.table(0).format_table(caption = 'Snapshot Restore Results')
@@ -30,8 +25,8 @@ def release(runner):
     bundles = VOLT.AdminBundle(),
     description = 'Export control command.',
     options = (
-            VOLT.StringOption(None, '--source', 'source', 'The stream source', default = None),
-            VOLT.StringListOption(None, '--targets', 'targets', 'The export target on the stream', default = None)
+            VOLT.StringOption('s', '--source', 'source', 'The stream source', default = None),
+            VOLT.StringListOption('t', '--target', 'targets', 'The export target on the stream', default = None)
     ),
     modifiers = (
             VOLT.Modifier('release', release, 'move past gaps in the export stream.')

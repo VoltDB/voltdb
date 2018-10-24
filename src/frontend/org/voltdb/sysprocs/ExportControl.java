@@ -77,7 +77,7 @@ public class ExportControl extends VoltSystemProcedure {
         for(int i=0 ; i<targetList.length(); i++) {
             try {
                 String s = targetList.getString(i).trim().toUpperCase();
-                if(s.length() > 0) {
+                if(s.length() > 0 && !"none".equalsIgnoreCase(s)) {
                     exportTargets.add(s.toString());
                 }
             } catch (JSONException e) {
