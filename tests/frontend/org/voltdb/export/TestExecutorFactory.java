@@ -53,6 +53,10 @@ public class TestExecutorFactory {
 
         ExecutorFactory tested = new ExecutorFactory() {
             @Override
+            int getMinThreads() {
+                return 1;
+            }
+            @Override
             Integer getConfigMaxThreads() {
                 return maxRequested;
             }

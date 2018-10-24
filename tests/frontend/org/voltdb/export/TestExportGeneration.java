@@ -204,7 +204,7 @@ public class TestExportGeneration {
                     false,
                     1
                     );
-            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, m_expDs.poll().get());
+            assertEquals(ExportDataSource.PollStatus.MORE_DATA, m_expDs.poll().get());
             AckingContainer cont = m_expDs.pullData();
             cont.updateStartTime(System.currentTimeMillis());
 

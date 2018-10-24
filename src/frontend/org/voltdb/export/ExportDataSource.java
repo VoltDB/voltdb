@@ -130,7 +130,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // future and passes to EDS executor thread, if EDS executor has no new buffer to poll, the future
     // is assigned to m_pollFuture. When site thread pushes buffer to EDS executor thread, m_pollFuture
     // is reused to notify export decoder to stop waiting.
-    private SettableFuture<POLL_STATUS> m_pollFuture;
+    private SettableFuture<PollStatus> m_pollFuture;
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
@@ -158,8 +158,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
     private STREAM_STATUS m_status = STREAM_STATUS.ACTIVE;
 
-    // FIXME: merge with stream status?
-    public enum POLL_STATUS {
+    public enum PollStatus {
         MORE_DATA,
         END_OF_STREAM
     }
@@ -800,8 +799,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_pendingContainer.set(container);
     }
 
-    public ListenableFuture<POLL_STATUS> poll() {
-        final SettableFuture<POLL_STATUS> fut = SettableFuture.create();
+    public ListenableFuture<PollStatus> poll() {
+        final SettableFuture<PollStatus> fut = SettableFuture.create();
         try {
             m_es.execute(new Runnable() {
                 @Override
@@ -816,14 +815,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //
                     // Add following check to eliminate this window.
                     if (!m_mastershipAccepted.get()) {
-                        fut.set(POLL_STATUS.END_OF_STREAM);
+                        fut.set(PollStatus.END_OF_STREAM);
                         return;
                     }
 
                     try {
                         //If we have anything pending set that before moving to next block.
                         if (m_pendingContainer.get() != null) {
-                            fut.set(POLL_STATUS.MORE_DATA);
+                            fut.set(PollStatus.MORE_DATA);
                             if (m_pollFuture != null) {
                                 if (exportLog.isDebugEnabled()) {
                                     exportLog.debug("picked up work from pending container, set poll future to null");
@@ -874,7 +873,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      *
      * @param fut
      */
-    private synchronized void pollImpl(SettableFuture<POLL_STATUS> fut) {
+    private synchronized void pollImpl(SettableFuture<PollStatus> fut) {
         if (fut == null) {
             return;
         }
@@ -884,7 +883,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //Returning null indicates end of stream
                 m_pollFuture = null;
                 try {
-                    fut.set(POLL_STATUS.END_OF_STREAM);
+                    fut.set(PollStatus.END_OF_STREAM);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source.
                 }
@@ -901,7 +900,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_pollFuture = fut;
             } else {
                 try {
-                    fut.set(POLL_STATUS.MORE_DATA);
+                    fut.set(PollStatus.MORE_DATA);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source dont discard next processor will pick it up.
                 }
@@ -915,17 +914,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     /**
      * Return the first unpolled block in StreamBlockQueue or null if none
      *
-     * @param remove true if Acked blocks should be removed.
-     * @return
+     * Note: we used to remove buffers before the first unpolled block, but
+     * this is incorrect: the polling logic should not remove buffers (they
+     * might still be unacknowledged). Buffers should only be removed in the
+     * acking path,
+     *
+     * @param udateFirstUnpolledUso  true if m_firstUnpolledUso must be updated
+     * @return first unpolled block or null if none
      */
-    private synchronized StreamBlock getFirstUnpolledBlock(boolean remove) {
+    private synchronized StreamBlock getFirstUnpolledBlock(boolean udateFirstUnpolledUso) {
 
         StreamBlock first_unpolled_block = null;
-
-        //Assemble a list of blocks to delete so that they can be deleted
-        //outside of the m_committedBuffers critical section
-        ArrayList<StreamBlock> blocksToDelete = null;
-        if (remove) blocksToDelete = new ArrayList<>();
 
         //Inside this critical section do the work to find out
         //what block should be returned by the next poll.
@@ -938,13 +937,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // find the first block that has unpolled data
                 if (fuso < block.uso() + block.totalSize()) {
                     first_unpolled_block = block;
-                    if (remove) {
+                    if (udateFirstUnpolledUso) {
                         m_firstUnpolledUso = (block.uso() + block.totalSize());
                     }
                     break;
-                } else if (remove) {
-                    blocksToDelete.add(block);
-                    iter.remove();
                 }
             }
         } catch (RuntimeException e) {
@@ -952,13 +948,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Error attempting to find unpolled export data", true, e);
             } else {
                 throw e;
-            }
-        } finally {
-            if (remove) {
-                //Try hard not to leak memory
-                for (StreamBlock sb : blocksToDelete) {
-                    sb.discard();
-                }
             }
         }
         return first_unpolled_block;

@@ -39,6 +39,7 @@ import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportDataSource.AckingContainer;
+import org.voltdb.export.ExportDataSource.PollStatus;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -219,7 +220,7 @@ public class GuestProcessor implements ExportDataProcessor {
             detectDecoder(m_client, edb);
             Pair<ExportDecoderBase, AdvertisedDataSource> pair = Pair.of(edb, ads);
             m_decoders.add(pair);
-            final ListenableFuture<ExportDataSource.POLL_STATUS> fut = m_source.poll();
+            final ListenableFuture<PollStatus> fut = m_source.poll();
             addBlockListener(m_source, fut, edb);
         }
 
@@ -303,7 +304,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     private void addBlockListener(
             final ExportDataSource source,
-            final ListenableFuture<ExportDataSource.POLL_STATUS> fut,
+            final ListenableFuture<PollStatus> fut,
             final ExportDecoderBase edb) {
         /*
          * The listener runs in the thread specified by the EDB.
@@ -318,12 +319,12 @@ public class GuestProcessor implements ExportDataProcessor {
             @Override
             public void run() {
                 try {
-                    ExportDataSource.POLL_STATUS pStatus = fut.get();
-                    if (ExportDataSource.POLL_STATUS.END_OF_STREAM.equals(pStatus)) {
+                    PollStatus pStatus = fut.get();
+                    if (PollStatus.END_OF_STREAM.equals(pStatus)) {
                         return;
                     }
 
-                    // Nonempty fut signifies that data might be present for reading
+                    // As long as buffers can be read, process them.
                     AckingContainer cont = null;
                     while ((cont = source.pullData()) != null) {
                         processData(cont, source, edb);

@@ -103,17 +103,18 @@ public class ExecutorFactory {
 
         // Note - this theoretically could throw on permissions
         m_maxThreads = getConfigMaxThreads();
+        int minThreads = getMinThreads();
         if (m_maxThreads < 1) {
             exportLog.warn("Parameter \"" + MAX_EXPORT_THREADS
-                    + "\" should have a positive value, forcing to default value of 1");
-            m_maxThreads = 1;
+                    + "\" should have a positive value, forcing to default value of " + minThreads);
+            m_maxThreads = minThreads;
         }
         else {
             int localSitesCount = getLocalSitesCount();
             if (localSitesCount == 0) {
                 exportLog.warn("Parameter \"" + MAX_EXPORT_THREADS
-                        + "\" cannot be checked, forcing to default value of 1");
-                m_maxThreads = 1;
+                        + "\" cannot be checked, forcing to default value of " + minThreads);
+                m_maxThreads = minThreads;
             }
             else if (m_maxThreads > localSitesCount) {
                 exportLog.warn("Parameter \"" + MAX_EXPORT_THREADS
@@ -130,10 +131,17 @@ public class ExecutorFactory {
     }
 
     /**
+     * @return the minimal number of threads to use (same as {@link DRProducer}
+     */
+    int getMinThreads() {
+        return Math.max(2, CoreUtils.availableProcessors() / 4);
+    }
+
+    /**
      * @return max threads configured, package private for JUnit tests
      */
     Integer getConfigMaxThreads() {
-        return Integer.getInteger(MAX_EXPORT_THREADS, 1);
+        return Integer.getInteger(MAX_EXPORT_THREADS, getMinThreads());
     }
 
     /**

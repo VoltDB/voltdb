@@ -58,6 +58,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.AckingContainer;
+import org.voltdb.export.ExportDataSource.PollStatus;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -232,7 +233,7 @@ public class TestExportDataSource extends TestCase {
 
             assertEquals( 60, s.sizeInBytes());
 
-            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+            assertEquals(PollStatus.MORE_DATA, s.poll().get());
             AckingContainer cont = s.pullData();
             cont.updateStartTime(System.currentTimeMillis());
             //No change in size because the buffers are flattened to disk, until the whole
@@ -251,7 +252,7 @@ public class TestExportDataSource extends TestCase {
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
 
-            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+            assertEquals(ExportDataSource.PollStatus.MORE_DATA, s.poll().get());
             cont = s.pullData();
             cont.updateStartTime(System.currentTimeMillis());
 
@@ -265,7 +266,7 @@ public class TestExportDataSource extends TestCase {
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
 
-            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+            assertEquals(ExportDataSource.PollStatus.MORE_DATA, s.poll().get());
             cont = s.pullData();
             cont.updateStartTime(System.currentTimeMillis());
 
@@ -277,15 +278,109 @@ public class TestExportDataSource extends TestCase {
             cont.discard();
             cont = null;
             System.gc(); System.runFinalization(); Thread.sleep(200);
-            ListenableFuture<ExportDataSource.POLL_STATUS> fut = s.poll();
+            ListenableFuture<ExportDataSource.PollStatus> fut = s.poll();
             try {
-                ExportDataSource.POLL_STATUS ps = fut.get(100,TimeUnit.MILLISECONDS);
+                ExportDataSource.PollStatus ps = fut.get(100,TimeUnit.MILLISECONDS);
                 fail("did not get expected timeout");
             }
             catch( TimeoutException ignoreIt) {}
 //            s.pushExportBuffer(83, null, true);
 //            assertNull(fut.get());
         } finally {
+            s.close();
+        }
+    }
+
+    public void testPollsThenAcks() throws Exception {
+
+        System.out.println("Running testPollsThenAcks");
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new ExportDataSource(null, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                table.getSignature(),
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            final CountDownLatch cdl = new CountDownLatch(1);
+            Runnable cdlWaiter = new Runnable() {
+
+                @Override
+                public void run() {
+                    cdl.countDown();
+                }
+            };
+            s.setOnMastership(cdlWaiter, false);
+            s.acceptMastership();
+            cdl.await();
+
+            // push 3 buffers of 20 useful bytes
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+
+            ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(23, foo, false, 1);
+            assertEquals(s.sizeInBytes(), 20 );
+
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(43, foo, false, 1);
+            assertEquals(s.sizeInBytes(), 40);
+
+            foo = ByteBuffer.allocateDirect(buffSize);
+            foo.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(63, foo, false, 1);
+
+            assertEquals(s.sizeInBytes(), 60);
+
+            // poll without acking and verify unacknowledged buffers are still around
+
+            assertEquals(PollStatus.MORE_DATA, s.poll().get());
+            AckingContainer cont1 = s.pullData();
+            cont1.updateStartTime(System.currentTimeMillis());
+
+            assertEquals( 60, s.sizeInBytes());
+            assertEquals( 42, cont1.m_uso);
+
+            assertEquals(PollStatus.MORE_DATA, s.poll().get());
+            AckingContainer cont2 = s.pullData();
+            cont2.updateStartTime(System.currentTimeMillis());
+
+            assertEquals( 60, s.sizeInBytes());
+            assertEquals( 62, cont2.m_uso);
+
+            assertEquals(PollStatus.MORE_DATA, s.poll().get());
+            AckingContainer cont3 = s.pullData();
+            cont3.updateStartTime(System.currentTimeMillis());
+
+            assertEquals( 60, s.sizeInBytes());
+            assertEquals( 82, cont3.m_uso);
+
+            // Discard all 3 buffers and verify the pending tuples are down to 0
+
+            cont1.discard();
+            cont1 = null;
+
+            cont2.discard();
+            cont2 = null;
+
+            cont3.discard();
+            cont3 = null;
+
+            ExportStatsRow stats = s.getImmutableStatsRow(false).get();
+            assertEquals(stats.m_tuplesPending, 0);
+        }
+        catch (Throwable t) {
+            // Why could I only see assertEquals failures in a catch block like this??
+            // Apparently the m_mockVoltDB.shutdown(null) ubn tearDown() is generatjng
+            // exceptions on unfreed buffers that mask the failure.
+            t.printStackTrace();
+            throw t;
+        }
+        finally {
             s.close();
         }
     }
@@ -350,7 +445,7 @@ public class TestExportDataSource extends TestCase {
         //flattened size
         assertEquals( 60, s.sizeInBytes());
 
-        assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+        assertEquals(ExportDataSource.PollStatus.MORE_DATA, s.poll().get());
         AckingContainer cont = s.pullData();
         cont.updateStartTime(System.currentTimeMillis());
         //No change in size because the buffers are flattened to disk, until the whole
@@ -375,7 +470,7 @@ public class TestExportDataSource extends TestCase {
                 );
 
         // Poll and discard buffer 63, too
-        assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+        assertEquals(ExportDataSource.PollStatus.MORE_DATA, s.poll().get());
         cont = s.pullData();
         cont.updateStartTime(System.currentTimeMillis());
         cont.discard();
@@ -387,7 +482,7 @@ public class TestExportDataSource extends TestCase {
         // 20, no overhead because it was pulled back in
         assertEquals( 20, s.sizeInBytes());
 
-        assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+        assertEquals(ExportDataSource.PollStatus.MORE_DATA, s.poll().get());
         cont = s.pullData();
         cont.updateStartTime(System.currentTimeMillis());
         assertEquals(s.sizeInBytes(), 20);
@@ -461,7 +556,7 @@ public class TestExportDataSource extends TestCase {
             cdl.await();
 
             //Poll and check before and after discard segment files.
-            assertEquals(ExportDataSource.POLL_STATUS.MORE_DATA, s.poll().get());
+            assertEquals(ExportDataSource.PollStatus.MORE_DATA, s.poll().get());
             AckingContainer cont = s.pullData();
             cont.updateStartTime(System.currentTimeMillis());
             listing = getSortedDirectoryListingSegments();
