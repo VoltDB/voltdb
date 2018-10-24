@@ -16,17 +16,28 @@
 import sys
 import time
 
-@VOLT.Command(
+def release(runner):
+    if not runner.opts.targets:
+        runner.abort_with_help('You must specify the --targets option.')
+    if not runner.opts.source:
+        runner.abort_with_help('You must specify the --source option.')
+
+    json_opts = ['{source:"%s",targets:%s,command:"release"}' % (runner.opts.source, runner.opts.targets)]
+    response = runner.call_proc('@ExportControl', [VOLT.FastSerializer.VOLTTYPE_STRING], json_opts)
+    print response.table(0).format_table(caption = 'Snapshot Restore Results')
+
+@VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
-    description = 'Pause, skip or resume an export stream.',
-    arguments = (
-        VOLT.StringArgument('stream', 'The name of stream'),
-        VOLT.StringArgument('target', 'The name of target for the stream'),
-        VOLT.StringArgument('operation', 'The operation, skip, pause, or resume')
+    description = 'Export control command.',
+    options = (
+            VOLT.StringOption(None, '--source', 'source', 'The stream source', default = None),
+            VOLT.StringListOption(None, '--targets', 'targets', 'The export target on the stream', default = None)
+    ),
+    modifiers = (
+            VOLT.Modifier('release', release, 'move past gaps in the export stream.')
     )
 )
+
 def export(runner):
-    columns = [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING]
-    params = [runner.opts.stream, runner.opts.target, runner.opts.operation]
-    status = runner.call_proc('@ExportControl', columns, params)
+     runner.go()
 
