@@ -254,7 +254,6 @@ public class CreateTableUtils {
     private static Index genIndex(SqlKind type, Table t, String indexName, boolean hasGeog,
                                   List<Column> indexCols, List<AbstractExpression> exprs) {
         final Index index = t.getIndexes().add(indexName);
-        index.setIssafewithnonemptysources(false);    // TODO
         if (hasGeog) {
             index.setCountable(false);
             index.setType(IndexType.COVERING_CELL_INDEX.getValue());
@@ -280,6 +279,9 @@ public class CreateTableUtils {
                         indexName, t.getTypeName(), e.toString()));
             }
         }
+        final AbstractExpression.UnsafeOperatorsForDDL unsafeOp = new AbstractExpression.UnsafeOperatorsForDDL();
+        exprs.forEach(expr -> expr.findUnsafeOperatorsForDDL(unsafeOp));
+        index.setIssafewithnonemptysources(! unsafeOp.isUnsafe());
         return index;
     }
 

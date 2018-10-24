@@ -19,6 +19,7 @@ package org.voltdb.newplanner.guards;
 
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.newplanner.SqlTaskImpl;
+import org.voltdb.planner.PlanningErrorException;
 
 /**
  * A check that always fail.
@@ -31,7 +32,7 @@ public class RealCalciteCheck extends CalciteCheck {
         if (src.length() <= max) {
             return src;
         } else {
-            return src.substring(0, 100) + "...";
+            return src.substring(0, max) + "...";
         }
     }
 
@@ -40,8 +41,12 @@ public class RealCalciteCheck extends CalciteCheck {
         try {
             return new SqlTaskImpl(sql).isDDL();
         } catch (SqlParseException e) {
-            // For all Calcite unsupported syntax, fall back to VoltDB implementation
-            System.err.println(truncate(e.getMessage(), 100));  // print Calcite's parse error
+            if (e.getCause() instanceof StackOverflowError) {
+                throw new PlanningErrorException("Encountered stack overflow error. " +
+                        "Try reducing the number of predicate expressions in the query.");
+            } else { // For all Calcite unsupported syntax, fall back to VoltDB implementation
+                System.err.println(truncate(e.getMessage(), 100));  // print Calcite's parse error
+            }
             return false;
         }
     }
