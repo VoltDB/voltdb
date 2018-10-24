@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.calciteadapter;
+package org.voltdb.newplanner;
 
 import java.util.Map;
 
@@ -35,7 +35,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlannerType;
 
-public abstract class TestCalciteBase extends PlannerTestCase {
+public abstract class CalcitePlannerTestCase extends PlannerTestCase {
 
     /**
      * Compile a plan using the Calcite Planner
