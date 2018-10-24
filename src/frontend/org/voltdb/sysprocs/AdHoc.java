@@ -135,6 +135,10 @@ public class AdHoc extends AdHocNTBase {
                 StreamSupport.stream(batch.spliterator(), false)
                 .map(task -> Pair.of(task.getSQL(), task.getParsedQuery()))
                 .collect(Collectors.toList());
+        // NOTE: need to exercise the processAdHocSQLStmtTypes() method, because some tests
+        // (i.e. ENG-7653, TestAdhocCompilerException.java) rely on the code path.
+        // But, we might not need to call it? Certainly it involves some refactory for the check and simulation.
+        args.forEach(pair -> processAdHocSQLStmtTypes(pair.getFirst(), new ArrayList<>()));
         return runDDLBatch(args.stream().map(Pair::getFirst).collect(Collectors.toList()),
                 args.stream().map(Pair::getSecond).collect(Collectors.toList()));
     }
