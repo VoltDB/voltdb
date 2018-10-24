@@ -1374,33 +1374,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_exportTargetName;
     }
 
-    public String updateExportFlowControl(String op) {
-        OperationMode operation = OperationMode.valueOf(op.toUpperCase());
-        boolean success = false;
-        switch (operation) {
-        case SKIP:
+    public String updateExportFlowControl(String opMode) {
+        OperationMode operation = OperationMode.valueOf(opMode.toUpperCase());
+         switch (operation) {
+        case RELEASE:
             if (m_status.get().equals(streamStatus.BLOCKED)) {
                 setStatus(streamStatus.ACTIVE);
-                success = true;
+                return null;
             }
             break;
-        case PAUSE:
-            if (m_status.get().equals(streamStatus.ACTIVE)) {
-                setStatus(streamStatus.PAUSED);
-                success = true;
-            }
-            break;
-        case RESUME:
-            if (!m_status.get().equals(streamStatus.PAUSED)) {
-                setStatus(streamStatus.ACTIVE);
-                success = true;
-            }
-            break;
-        default:
-
-        }
-        if (success) {
-            return null;
         }
         return "The export target is in " + m_status.get()+ " state. The operation " + operation + " is not valid.";
     }

@@ -21,11 +21,11 @@ import time
     description = 'Pause, skip or resume an export stream.',
     arguments = (
         VOLT.StringArgument('stream', 'The name of stream'),
-        VOLT.StringArgument('target', 'The name of targte for the stream'),
+        VOLT.StringArgument('target', 'The name of target for the stream'),
         VOLT.StringArgument('operation', 'The operation, skip, pause, or resume')
     )
 )
-def exporter(runner):
+def export(runner):
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING]
     params = [runner.opts.stream, runner.opts.target, runner.opts.operation]
     status = runner.call_proc('@ExportControl', columns, params)

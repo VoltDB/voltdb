@@ -813,13 +813,13 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    public String updateExportFlowControl(String stream, String target, String op) {
+    public String updateExportFlowControl(String exportStream, List<String> exportTargets, String opMode) {
         synchronized (m_dataSourcesByPartition) {
             for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
                 Map<String, ExportDataSource> sources = it.next();
                 for (ExportDataSource src : sources.values()) {
-                    if (src.getTableName().equalsIgnoreCase(stream) && target.equalsIgnoreCase(src.getTarget())) {
-                        String message = src.updateExportFlowControl(op);
+                    if (src.getTableName().equalsIgnoreCase(exportStream) && exportTargets.contains(src.getTarget())) {
+                        String message = src.updateExportFlowControl(opMode);
                         if (message != null) {
                             return message;
                         }

@@ -16,6 +16,7 @@
  */
 package org.voltdb.sysprocs;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -31,7 +32,9 @@ import org.voltdb.export.ExportManager;
 public class ExportControl extends VoltSystemProcedure {
 
     // support operations
-    public static enum OperationMode{ SKIP, PAUSE, RESUME }
+    public static enum OperationMode{ RELEASE
+                       //PAUSE, RESUME, TRUNCATE //for future use
+    }
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -41,25 +44,23 @@ public class ExportControl extends VoltSystemProcedure {
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
-            ParameterSet params, SystemProcedureExecutionContext context)
-    {
+            ParameterSet params, SystemProcedureExecutionContext context) {
         throw new RuntimeException("ExportControl was given an " +
                                    "invalid fragment id: " + String.valueOf(fragmentId));
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, String stream, String target, String op) {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String exportStream, String[] exportTargets, String operationMode) {
         VoltTable t = new VoltTable(
                 new ColumnInfo("STATUS", VoltType.BIGINT),
                 new ColumnInfo("MESSAGE", VoltType.STRING));
         try {
-            OperationMode.valueOf(op.toUpperCase());
+            OperationMode.valueOf(operationMode.toUpperCase());
         } catch (IllegalArgumentException e){
             t.addRow(VoltSystemProcedure.STATUS_FAILURE, "Invalide operation");
             return (new VoltTable[] {t});
         }
-
         if (ctx.isLowestSiteId()) {
-            String error= ExportManager.instance().updateExportFlowControl(stream, target, op);
+            String error= ExportManager.instance().updateExportFlowControl(exportStream, Arrays.asList(exportTargets), operationMode);
             if (error != null) {
                 t.addRow(VoltSystemProcedure.STATUS_FAILURE, error);
                 return (new VoltTable[] {t});
