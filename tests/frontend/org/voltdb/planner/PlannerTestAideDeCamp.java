@@ -45,6 +45,7 @@ import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.types.PlannerType;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 
@@ -92,24 +93,24 @@ public class PlannerTestAideDeCamp {
      * @param sql
      * @param detMode
      */
-    CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode) {
-        compile(sql, 0, null, true, false, detMode);
+    CompiledPlan compileAdHocPlan(PlannerType plannerType, String sql, DeterminismMode detMode) {
+        compile(plannerType, sql, 0, null, true, false, detMode);
         return m_currentPlan;
     }
 
-    CompiledPlan compileAdHocPlan(String sql, boolean inferPartitioning, boolean singlePartition, DeterminismMode detMode) {
-        compile(sql, 0, null, inferPartitioning, singlePartition, detMode);
+    CompiledPlan compileAdHocPlan(PlannerType plannerType, String sql, boolean inferPartitioning, boolean singlePartition, DeterminismMode detMode) {
+        compile(plannerType, sql, 0, null, inferPartitioning, singlePartition, detMode);
         return m_currentPlan;
     }
 
-    List<AbstractPlanNode> compile(String sql, int paramCount, boolean inferPartitioning, boolean singlePartition, String joinOrder) {
-        return compile(sql, paramCount, joinOrder, inferPartitioning, singlePartition, DeterminismMode.SAFER);
+    List<AbstractPlanNode> compile(PlannerType plannerType, String sql, int paramCount, boolean inferPartitioning, boolean singlePartition, String joinOrder) {
+        return compile(plannerType, sql, paramCount, joinOrder, inferPartitioning, singlePartition, DeterminismMode.SAFER);
     }
 
     /**
      * Compile and cache the statement and plan and return the final plan graph.
      */
-    private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, boolean inferPartitioning, boolean forceSingle, DeterminismMode detMode)
+    private List<AbstractPlanNode> compile(PlannerType plannerType, String sql, int paramCount, String joinOrder, boolean inferPartitioning, boolean forceSingle, DeterminismMode detMode)
     {
         String stmtLabel = "stmt-" + String.valueOf(compileCounter++);
 
@@ -155,8 +156,12 @@ public class PlannerTestAideDeCamp {
                 partitioning, hsql, estimates, false,
                 costModel, null, joinOrder, detMode, false)) {
 
-            planner.parse();
-            plan = planner.plan();
+            if (PlannerType.VOLTDB == plannerType) {
+                planner.parse();
+                plan = planner.plan();
+            } else if (PlannerType.CALCITE == plannerType) {
+                // TODO: plan using the calcite planner
+            }
             assert(plan != null);
         }
 
