@@ -50,7 +50,7 @@ import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 
-    private PlannerTestAideDeCamp m_aide;
+    protected PlannerTestAideDeCamp m_aide;
     private boolean m_byDefaultInferPartitioning = true;
     private boolean m_byDefaultPlanForSinglePartition;
     final private int m_defaultParamCount = 0;
@@ -139,35 +139,6 @@ public class PlannerTestCase extends TestCase {
             fail();
         }
         return cp;
-    }
-
-    protected CompiledPlan compileAdHocCalcitePlan(String sql,
-            boolean inferPartitioning,
-            boolean forcedSP,
-            DeterminismMode detMode) {
-        CompiledPlan cp = null;
-        try {
-            cp = m_aide.compileAdHocPlan(PlannerType.CALCITE, sql, inferPartitioning, forcedSP, detMode);
-            assertTrue(cp != null);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        return cp;
-    }
-
-    /**
-     * Used by the TestCalciteBase to compile a plan using the VoltDB Planner
-     * @param sql
-     * @param inferPartitioning
-     * @param forcedSP
-     * @return
-     */
-    protected CompiledPlan compileAdHocPlan(String sql,
-                                            boolean inferPartitioning,
-                                            boolean forcedSP) {
-        return compileAdHocPlan(sql, inferPartitioning, forcedSP, DeterminismMode.SAFER);
     }
 
     /**
