@@ -131,7 +131,14 @@ public class CreateTableUtils {
             } else if (expr instanceof SqlIdentifier) {
                 column.setDefaultvalue(defaultFunctionValue(vt, ((SqlIdentifier) expr).getSimple(), colName));
             } else if (expr.getKind() == SqlKind.LITERAL) {
-                column.setDefaultvalue(expr.toString());
+                final String defaultValue;
+                if (expr instanceof SqlNumericLiteral) {
+                    defaultValue = ((SqlNumericLiteral) expr).getValue().toString();
+                } else {
+                    assert expr instanceof SqlCharStringLiteral;
+                    defaultValue = ((SqlCharStringLiteral) expr).toValue();
+                }
+                column.setDefaultvalue(defaultValue);
             } else {
                 throw new PlanningErrorException(String.format(
                         "Unsupported default expression for column \"%s\": \"%s\"", colName, expr.toString()));
@@ -139,13 +146,8 @@ public class CreateTableUtils {
         } else {
             column.setDefaultvalue(null);
         }
-        /*isColumnIndexed(dspec).ifPresent(dtype -> {
-            final List<Column> cols = Collections.singletonList(column);
-            final String indexName = genIndexName(dtype, tableName, cols, false);
-            indexes.put(indexName, genIndex(dtype, t, indexName, vt == VoltType.GEOGRAPHY, cols, new ArrayList<>()));
-        });*/
         if (vt.isVariableLength()) {
-            return  4 + colSize * (inBytes ? 4 : 1);
+            return  4 + colSize * (vt != VoltType.STRING || inBytes ? 1 : 4);
         } else {
             return colSize;
         }
@@ -439,6 +441,7 @@ public class CreateTableUtils {
         t.setTuplelimit(rowCount);
         final Statement stmt = t.getTuplelimitdeletestmt().add("limit_delete");
         stmt.setSqltext(sql);
+        // TODO: "user defined function calls are not supported:" from DDLCompiler: waits to get function Id from HSQL
         try { // Note: this ugliness came from how StatementCompiler.compileStatementAndUpdateCatalog()
             // does its bidding; and from how HSQLInterface.getXMLCompiledStatement() needs the HSQL session
             // for its work.
