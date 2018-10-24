@@ -110,7 +110,9 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
         }
-        VoltTable[] tables = client.callProcedure("@ExportControl", "ALLOW_NULL", "custom", "pause").getResults();
+
+        String s = "{source:\"ALLOW_NULL\",targets:['custom'],command:\"release\"}";
+        VoltTable[] tables = client.callProcedure("@ExportControl", s).getResults();
         for (VoltTable t : tables) {
             System.out.println(t.toFormattedString());
         }
