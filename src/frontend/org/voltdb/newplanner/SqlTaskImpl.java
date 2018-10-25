@@ -44,18 +44,7 @@ public class SqlTaskImpl implements SqlTask {
             throw new IllegalArgumentException("Can't plan empty or null SQL.");
         }
         m_sqlString = sql;
-        SqlParser parser = SqlParserFactory.create(sql);
-        m_parsedQuery = parser.parseStmt();
-    }
-
-    /**
-     * Create a {@link SqlTaskImpl} from a SQL query string and a parsed {@link SqlNode}.
-     * @param sql     the query string.
-     * @param sqlNode the parsed SqlNode
-     */
-    SqlTaskImpl(String sql, SqlNode sqlNode) {
-        m_sqlString = sql;
-        m_parsedQuery = sqlNode;
+        m_parsedQuery = SqlParserFactory.parse(sql);
     }
 
     /**
