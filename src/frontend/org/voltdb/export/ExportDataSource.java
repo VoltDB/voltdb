@@ -1374,17 +1374,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_exportTargetName;
     }
 
-    public String updateExportFlowControl(String opMode) {
+    public void applyExportControl(String opMode) {
         OperationMode operation = OperationMode.valueOf(opMode.toUpperCase());
-         switch (operation) {
+        switch (operation) {
         case RELEASE:
             if (m_status.get().equals(streamStatus.BLOCKED)) {
                 setStatus(streamStatus.ACTIVE);
-                return null;
             }
             break;
+        default:
+            throw new IllegalArgumentException("The export target is in " + m_status.get()+ " state. The operation " + operation + " is not valid.");
         }
-        return "The export target is in " + m_status.get()+ " state. The operation " + operation + " is not valid.";
     }
 
     @Override

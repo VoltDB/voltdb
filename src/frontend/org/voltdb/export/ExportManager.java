@@ -708,10 +708,9 @@ public class ExportManager
         return m_exportStats;
     }
 
-    public String updateExportFlowControl(String exportStream, List<String> exportTargets, String opMode) {
+    public void applyExportControl(String exportStream, List<String> exportTargets, String opMode) {
         if (m_generation.get() != null) {
-           return  m_generation.get().updateExportFlowControl(exportStream, exportTargets, opMode);
+           m_generation.get().applyExportControl(exportStream, exportTargets, opMode);
         }
-        return null;
     }
 }

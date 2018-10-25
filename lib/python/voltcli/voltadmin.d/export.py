@@ -19,14 +19,14 @@ import time
 def release(runner):
     json_opts = ['{source:"%s",targets:%s,command:"release"}' % (runner.opts.source, runner.opts.targets)]
     response = runner.call_proc('@ExportControl', [VOLT.FastSerializer.VOLTTYPE_STRING], json_opts)
-    print response.table(0).format_table(caption = 'Snapshot Restore Results')
+    print response.table(0).format_table(caption = 'Export Release Results')
 
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
     description = 'Export control command.',
     options = (
-            VOLT.StringOption('s', '--source', 'source', 'The stream source', default = None),
-            VOLT.StringListOption('t', '--target', 'targets', 'The export target on the stream', default = None)
+            VOLT.StringOption('-s', '--source', 'source', 'The stream source', default = ''),
+            VOLT.StringListOption('-t', '--target', 'targets', 'The export target on the stream', default = '')
     ),
     modifiers = (
             VOLT.Modifier('release', release, 'move past gaps in the export stream.')

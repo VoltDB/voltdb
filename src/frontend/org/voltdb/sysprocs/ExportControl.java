@@ -19,7 +19,6 @@ package org.voltdb.sysprocs;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -54,43 +53,34 @@ public class ExportControl extends VoltSystemProcedure {
                                    "invalid fragment id: " + String.valueOf(fragmentId));
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, String json) throws JSONException {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String json) {
         VoltTable t = new VoltTable(
                 new ColumnInfo("STATUS", VoltType.BIGINT),
                 new ColumnInfo("MESSAGE", VoltType.STRING));
-        JSONObject jsObj = new JSONObject(json);
-        String operationMode = jsObj.getString("command");
-        String exportStream = jsObj.getString("source");
-        JSONArray targetList = jsObj.optJSONArray("targets");
         try {
+            JSONObject jsObj = new JSONObject(json);
+            String operationMode = jsObj.getString("command");
             OperationMode.valueOf(operationMode.toUpperCase());
-        } catch (IllegalArgumentException e){
-            t.addRow(VoltSystemProcedure.STATUS_FAILURE, "Invalide operation");
-            return (new VoltTable[] {t});
-        }
-        if (!ctx.isLowestSiteId()) {
-            t.addRow(VoltSystemProcedure.STATUS_OK, "");
-            return (new VoltTable[] {t});
-        }
 
-        List<String> exportTargets = new ArrayList<>();
-        for(int i=0 ; i<targetList.length(); i++) {
-            try {
-                String s = targetList.getString(i).trim().toUpperCase();
-                if(s.length() > 0 && !"none".equalsIgnoreCase(s)) {
-                    exportTargets.add(s.toString());
+            String exportSource = jsObj.getString("source");
+            if (ctx.isLowestSiteId()) {
+                JSONArray jsonArray = jsObj.optJSONArray("targets");
+                List<String> exportTargets = new ArrayList<>();
+                if (jsonArray != null) {
+                    for(int i=0; i < jsonArray.length(); i++) {
+                        String s = jsonArray.getString(i).trim();
+                        if(s.length() > 0) {
+                            exportTargets.add(s.toString());
+                        }
+                    }
                 }
-            } catch (JSONException e) {
-                throw new RuntimeException(e.getMessage());
+                LOG.info("Export " + operationMode + " source:" + exportSource + " targets:" + exportTargets);
+                ExportManager.instance().applyExportControl(exportSource, exportTargets, operationMode);
             }
-        }
-        LOG.info("Export stream:" + exportStream + " targets:" + exportTargets + " action:" + operationMode);
-        String error= ExportManager.instance().updateExportFlowControl(exportStream, exportTargets, operationMode);
-        if (error != null) {
-            t.addRow(VoltSystemProcedure.STATUS_FAILURE, error);
+        } catch (IllegalArgumentException | JSONException e){
+            t.addRow(VoltSystemProcedure.STATUS_FAILURE, e.getMessage());
             return (new VoltTable[] {t});
         }
-
         t.addRow(VoltSystemProcedure.STATUS_OK, "");
         return (new VoltTable[] {t});
     }
