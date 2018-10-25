@@ -180,8 +180,9 @@ public class ExportSequenceNumberTracker {
      *         exist return null
      */
     public Pair<Long, Long> getFirstGap() {
-        assert (!m_map.isEmpty());
-        if (size() < 2) return null;
+        if (m_map.isEmpty() || size() < 2) {
+            return null;
+        }
         Iterator<Range<Long>> iter = m_map.asRanges().iterator();
         long start = end(iter.next()) + 1;
         long end = start(iter.next()) - 1;

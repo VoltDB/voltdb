@@ -85,7 +85,11 @@ public:
     /** max allowed buffer capacity */
     size_t m_maxCapacity;
 
-    /** Universal stream offset. Total bytes appended to this stream. */
+    /**
+     * Universal stream offset. Total bytes appended to this stream.
+     * This is only used in TABLE stats while rest of the export system use
+     * sequence number to track rows.
+     * */
     size_t m_uso;
 
     /** Current block */

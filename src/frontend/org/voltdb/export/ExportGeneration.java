@@ -363,6 +363,9 @@ public class ExportGeneration implements Generation {
                     // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
                     // master stream resends the event when the export mailbox is aware of new streams.
                     eds.forwardAckToNewJoinedReplicas(newHSIds);
+                    // After rejoin, new data source may contain the data which current master doesn't have,
+                    //  only on master stream if it is blocked by the gap
+                    eds.queryForBestCandidate();
                 }
             }
         }

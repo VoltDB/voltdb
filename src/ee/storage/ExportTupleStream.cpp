@@ -113,7 +113,6 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
         //If we can not fit the data get a new block with size that includes schemaSize as well.
         extendBufferChain(tupleMaxLength);
     }
-    m_currBlock->recordStartExportSequenceNumber(seqNo);
     bool includeSchema = m_currBlock->needsSchema();
     if (includeSchema) {
         ExportSerializeOutput blkhdr(m_currBlock->headerDataPtr()+EXPORT_BUFFER_HEADER_SIZE,

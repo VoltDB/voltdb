@@ -613,6 +613,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 return;
             }
             m_gapTracker.append(startSequenceNumber, lastSequenceNumber);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Append [" + startSequenceNumber + "," + lastSequenceNumber +"] to gap tracker.");
+            }
 
             try {
                 StreamBlock sb = new StreamBlock(
@@ -734,10 +737,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Truncate tracker via snapshot truncation to " + sequenceNumber + " now is " + m_gapTracker.toString());
                     }
-                    // Truncation is called on every host.
-                    // After rejoin, new data source may contain the data which current master doesn't have,
-                    // do a gap detection only on master stream if it is paused by the missing data
-                    queryForBestCandidate();
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -1207,41 +1206,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         unacceptMastership();
     }
 
-    private void sendGapQuery() {
-        if (m_gapTracker.size() == 0) return;
-        m_queryResponses.clear();
-        Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
-        Mailbox mbx = p.getFirst();
-        m_currentRequestId = System.nanoTime();
-        if (mbx != null && p.getSecond().size() > 0) {
-            // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
-            // requestId(8) + gapStart(8)
-            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 8;
-            ByteBuffer buf = ByteBuffer.allocate(msgLen);
-            buf.put(ExportManager.GAP_QUERY);
-            buf.putInt(m_partitionId);
-            buf.putInt(m_signatureBytes.length);
-            buf.put(m_signatureBytes);
-            buf.putLong(m_currentRequestId);
-            buf.putLong(m_gapTracker.getSafePoint() + 1);
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
-            for( Long siteId: p.getSecond()) {
-                mbx.send(siteId, bpm);
-            }
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Send GAP_QUERY message(" + m_currentRequestId + "," + (m_gapTracker.getSafePoint() + 1) +
-                        ") for partition " + m_partitionId + "source signature " + m_tableName +
-                        " from " + CoreUtils.hsIdToString(mbx.getHSId()) +
-                        " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
-            }
-        } else {
-            setStatus(StreamStatus.BLOCKED);
-            Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-            exportLog.error(toString() + " is unable to proceed because of missing data cluster-wise from " + gap.getFirst() +
-                    " to " + gap.getSecond());
-        }
-    }
-
     private void sendTaskMastershipMessage() {
         m_queryResponses.clear();
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
@@ -1387,16 +1351,52 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_es;
     }
 
-    private void queryForBestCandidate() {
+    private void sendGapQuery() {
         // Should be the master and the master was stuck on a gap
         if (m_mastershipAccepted.get() && m_gapTracker.getFirstGap() != null) {
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug(toString() + " hits a gap (" +
-                        m_gapTracker.getFirstGap().getFirst() + "," + m_gapTracker.getFirstGap().getSecond() +
-                        ") so it queries for candidates who can cover the gap.");
+            if (m_gapTracker.isEmpty()) {
+                return;
             }
-            sendGapQuery();
+            m_queryResponses.clear();
+            Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
+            Mailbox mbx = p.getFirst();
+            m_currentRequestId = System.nanoTime();
+            if (mbx != null && p.getSecond().size() > 0) {
+                // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
+                // requestId(8) + gapStart(8)
+                final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 8;
+                ByteBuffer buf = ByteBuffer.allocate(msgLen);
+                buf.put(ExportManager.GAP_QUERY);
+                buf.putInt(m_partitionId);
+                buf.putInt(m_signatureBytes.length);
+                buf.put(m_signatureBytes);
+                buf.putLong(m_currentRequestId);
+                buf.putLong(m_gapTracker.getSafePoint() + 1);
+                BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
+                for( Long siteId: p.getSecond()) {
+                    mbx.send(siteId, bpm);
+                }
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Send GAP_QUERY message(" + m_currentRequestId + "," + (m_gapTracker.getSafePoint() + 1) +
+                            ") for partition " + m_partitionId + "source signature " + m_tableName +
+                            " from " + CoreUtils.hsIdToString(mbx.getHSId()) +
+                            " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
+                }
+            } else {
+                setStatus(StreamStatus.BLOCKED);
+                Pair<Long, Long> gap = m_gapTracker.getFirstGap();
+                exportLog.warn(toString() + " is blocked because of data from sequence number " + gap.getFirst() +
+                        " to " + gap.getSecond() + " is missing.");
+            }
         }
+    }
+
+    public void queryForBestCandidate() {
+        m_es.execute(new Runnable() {
+            public void run() {
+                sendGapQuery();
+            }
+        });
     }
 
     void takeMastership() {
@@ -1449,7 +1449,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
                             if (voltdb.isClusterComplete()) {
                                 Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                                exportLog.warn(toString() + " is blocked because stream hits a gap from sequence number " +
+                                exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
                                         gap.getFirst() + " to " + gap.getSecond());
                             }
                         }
@@ -1549,9 +1549,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void mastershipCheckpoint(long seq) {
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Export table " + getTableName() + " prepared to give away mastership to"  +
-                    " the new master on Host " + m_newLeaderHostId + " m_seqNoToDrain " + m_seqNoToDrain +
+        if (exportLog.isTraceEnabled()) {
+            exportLog.trace("Export table " + getTableName() + " mastership checkpoint "  +
+                    " m_newLeaderHostId " + m_newLeaderHostId + " m_seqNoToDrain " + m_seqNoToDrain +
                     " m_lastReleasedSeqNo " + m_lastReleasedSeqNo + " m_lastPushedSeqNo " + m_lastPushedSeqNo);
         }
         // time to give away leadership
@@ -1559,7 +1559,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (m_newLeaderHostId != null) {
                 sendGiveMastershipMessage(m_newLeaderHostId, seq);
             } else {
-                queryForBestCandidate();
+                sendGapQuery();
             }
         }
     }
