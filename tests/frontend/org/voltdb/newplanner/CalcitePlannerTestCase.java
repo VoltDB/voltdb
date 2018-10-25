@@ -35,6 +35,10 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlannerType;
 
+/**
+ * An abstract base class for implementing tests against CalcitePlanner.
+ * Most of the implementations is taken from Mike A.
+ */
 public abstract class CalcitePlannerTestCase extends PlannerTestCase {
 
     /**

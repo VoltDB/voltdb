@@ -23,7 +23,6 @@
 
 package org.voltdb.newplanner;
 
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -35,9 +34,20 @@ import org.voltdb.planner.PlannerTestCase;
 
 import java.util.Objects;
 
+/**
+ * A base class for implementing tests against {@link VoltSqlValidator}.
+ *
+ * @author Chao Zhou
+ * @since 8.4
+ */
 public class VoltSqlValidatorTestCase extends PlannerTestCase {
     private VoltSqlValidator m_validator;
 
+    /**
+     * Set up m_validator from SchemaPlus.
+     *
+     * @param schemaPlus
+     */
     protected void setupValidator(SchemaPlus schemaPlus) {
         m_validator = new VoltSqlValidator(schemaPlus);
     }
@@ -62,12 +72,6 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         return m_validator.validate(sqlNode);
     }
 
-    protected RelDataType getResultType(String sql) {
-        SqlNode node = parseAndValidate(sql);
-
-        return m_validator.getValidatedNodeType(node);
-    }
-
     private void checkParseEx(Throwable e, String expectedMsgPattern, String sql) {
         try {
             throw e;
@@ -86,6 +90,12 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         }
     }
 
+    /**
+     * Assert the expected error message is thrown when validating the sql string.
+     *
+     * @param sql
+     * @param expectedMsgPattern
+     */
     protected void assertExceptionIsThrown(String sql, String expectedMsgPattern) {
         final SqlNode sqlNode;
         final SqlParserUtil.StringAndPos sap = SqlParserUtil.findPos(sql);
@@ -106,7 +116,12 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         SqlTests.checkEx(thrown, expectedMsgPattern, sap, SqlTests.Stage.VALIDATE);
     }
 
-    public void assertValid(String sql) {
+    /**
+     * Assert no error occurs in the validate phase.
+     *
+     * @param sql
+     */
+    protected void assertValid(String sql) {
         assertExceptionIsThrown(sql, null);
     }
 }
