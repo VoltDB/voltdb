@@ -72,9 +72,8 @@ public class StreamBlockQueue {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
         }
-        if (DISABLE_COMPRESSION) {
-            exportLog.info(m_nonce + " has compression disabled in " + path);
-        }
+        exportLog.info(m_nonce + " has compression "
+                + (DISABLE_COMPRESSION ? "disabled" : "enabled") + " in " + path);
     }
 
     public boolean isEmpty() throws IOException {
