@@ -62,7 +62,6 @@ public class StreamBlockQueue {
     private final String m_nonce;
     private final String m_path;
     private BinaryDequeReader m_reader;
-    private final boolean m_compress = !DISABLE_COMPRESSION;
 
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
         m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path), exportLog);
@@ -73,7 +72,7 @@ public class StreamBlockQueue {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
         }
-        if (!m_compress) {
+        if (DISABLE_COMPRESSION) {
             exportLog.info(m_nonce + " has compression disabled in " + path);
         }
     }
@@ -212,7 +211,7 @@ public class StreamBlockQueue {
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
     public void offer(StreamBlock streamBlock) throws IOException {
-        m_persistentDeque.offer(streamBlock.asBBContainer(), m_compress);
+        m_persistentDeque.offer(streamBlock.asBBContainer(), !DISABLE_COMPRESSION);
         long unreleasedUso = streamBlock.unreleasedUso();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);
