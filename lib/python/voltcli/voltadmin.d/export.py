@@ -18,7 +18,7 @@ import time
 
 def release(runner):
     json_opts = ['{source:"%s",targets:%s,command:"release"}' % (runner.opts.source, runner.opts.targets)]
-    response = runner.call_proc('@ExportControl', [VOLT.FastSerializer.VOLTTYPE_STRING], json_opts)
+    response = runner.call_proc('@ExportControlNT', [VOLT.FastSerializer.VOLTTYPE_STRING], json_opts)
     print response.table(0).format_table(caption = 'Export Release Results')
 
 @VOLT.Multi_Command(
