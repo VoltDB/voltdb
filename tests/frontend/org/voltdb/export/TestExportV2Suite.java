@@ -103,7 +103,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         quiesceAndVerifyTarget(client, m_verifier);
     }
 
-    public void testFlowControl() throws Exception {
+    public void testExportControl() throws Exception {
         System.out.println("testFlowControl");
         final Client client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
@@ -112,7 +112,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         }
 
         String s = "{source:\"ALLOW_NULL\",targets:['custom'],command:\"release\"}";
-        VoltTable[] tables = client.callProcedure("@ExportControl", s).getResults();
+        VoltTable[] tables = client.callProcedure("@ExportControlNT", s).getResults();
         for (VoltTable t : tables) {
             System.out.println(t.toFormattedString());
         }

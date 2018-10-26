@@ -54,23 +54,22 @@ public class ExportControlNT extends VoltNTSystemProcedure {
                 OperationMode.valueOf(operationMode.toUpperCase());
 
                 String exportSource = jsObj.getString("source");
-                    JSONArray jsonArray = jsObj.optJSONArray("targets");
-                    List<String> exportTargets = new ArrayList<>();
-                    if (jsonArray != null) {
-                        for(int i=0; i < jsonArray.length(); i++) {
-                            String s = jsonArray.getString(i).trim();
-                            if(s.length() > 0) {
-                                exportTargets.add(s.toString());
-                            }
+                JSONArray jsonArray = jsObj.optJSONArray("targets");
+                List<String> exportTargets = new ArrayList<>();
+                if (jsonArray != null) {
+                    for(int i=0; i < jsonArray.length(); i++) {
+                        String s = jsonArray.getString(i).trim();
+                        if(s.length() > 0) {
+                            exportTargets.add(s.toString());
                         }
                     }
-                    LOG.info("Export " + operationMode + " source:" + exportSource + " targets:" + exportTargets);
-                    ExportManager.instance().applyExportControl(exportSource, exportTargets, operationMode);
+                }
+                LOG.info("Export " + operationMode + " source:" + exportSource + " targets:" + exportTargets);
+                ExportManager.instance().applyExportControl(exportSource, exportTargets, operationMode);
             } catch (IllegalArgumentException | JSONException e){
                 t.addRow(VoltSystemProcedure.STATUS_FAILURE, e.getMessage());
                 return t;
             }
-            t.addRow(VoltSystemProcedure.STATUS_OK, "");
             return t;
         }
     }
@@ -83,12 +82,16 @@ public class ExportControlNT extends VoltNTSystemProcedure {
         Map<Integer, ClientResponse> cr;
         try {
             cr = pf.get();
-            cr.entrySet().stream()
-            .forEach(e -> {
-                t.add(e.getValue().getResults()[0].fetchRow(0));
-            });
-        } catch (InterruptedException | ExecutionException e1) {
+            for (ClientResponse rs: cr.values()) {
+                if( rs.getResults()[0].getRowCount() > 0) {
+                    return rs.getResults()[0];
+
+                }
+            };
+        } catch (InterruptedException | ExecutionException e) {
+            t.addRow(VoltSystemProcedure.STATUS_FAILURE, e.getMessage());
         }
+        t.addRow(VoltSystemProcedure.STATUS_OK, "");
         return t;
     }
 }
