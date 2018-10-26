@@ -229,23 +229,27 @@ public class CreateTableUtils {
      * @return generated (IndexName, ConstraintName)
      */
     private static Pair<String, String> genIndexAndConstraintName(
-            SqlKind type, String tableName, List<Column> cols, boolean hasExpression) {
-        final String suffix,
-                type_str = type == SqlKind.PRIMARY_KEY ? "PK" : "CT",
-                index = cols.stream().map(Column::getName)
-                        .reduce(String.format("VOLTDB_AUTOGEN_IDX_%s_%s", type_str, tableName),
-                                (acc, colName) -> acc + "_" + colName),
-                constr = cols.stream().map(Column::getName)
-                        .reduce(String.format("VOLTDB_AUTOGEN_CT__%s_%s", type_str, tableName),
-                                (acc, colName) -> acc + "_" + colName);
-        if (hasExpression) {        // For index involving expression(s), generate a UID string as suffix, and pretending that
-            // expression-groups for different constraints are never the same
-            // (If they are, user will suffer some additional time cost when upserting table.)
-            suffix = String.format("_%s", UUID.randomUUID().toString()).replace('-', '_');
+            SqlNode constraintName, SqlKind type, String tableName, List<Column> cols, boolean hasExpression) {
+        if (constraintName != null) {
+            return Pair.of("VOLTDB_AUTOGEN_CONSTRAINT_IDX_" + constraintName.toString(), constraintName.toString());
         } else {
-            suffix = "";
+            final String suffix,
+                    type_str = type == SqlKind.PRIMARY_KEY ? "PK" : "CT",
+                    index = cols.stream().map(Column::getName)
+                            .reduce(String.format("VOLTDB_AUTOGEN_IDX_%s_%s", type_str, tableName),
+                                    (acc, colName) -> acc + "_" + colName),
+                    constr = cols.stream().map(Column::getName)
+                            .reduce(String.format("VOLTDB_AUTOGEN_CT__%s_%s", type_str, tableName),
+                                    (acc, colName) -> acc + "_" + colName);
+            if (hasExpression) {        // For index involving expression(s), generate a UID string as suffix, and pretending that
+                // expression-groups for different constraints are never the same
+                // (If they are, user will suffer some additional time cost when upserting table.)
+                suffix = String.format("_%s", UUID.randomUUID().toString()).replace('-', '_');
+            } else {
+                suffix = "";
+            }
+            return Pair.of(index + suffix, constr + suffix);
         }
-        return Pair.of(index + suffix, constr + suffix);
     }
 
     private static void updateConstraint(Constraint cons, Index index, SqlKind type, String indexName, String tableName) {
@@ -445,6 +449,24 @@ public class CreateTableUtils {
         }
     }
 
+    private static List<SqlBasicCall> collectFilterFunctions(SqlNode sql, List<SqlBasicCall> init) {
+        if (sql instanceof SqlBasicCall) {
+            final SqlBasicCall call = (SqlBasicCall) sql;
+            init.add(call);
+            call.getOperandList().forEach(op -> collectFilterFunctions(op, init));
+        }
+        return init;
+    }
+
+    private static List<SqlBasicCall> collectFilterFunctions(SqlDelete delete) {
+        final SqlNode condition = delete.getCondition();
+        if (condition == null) {
+            return Collections.emptyList();
+        } else {
+            return collectFilterFunctions(condition, new ArrayList<>());
+        }
+    }
+
     private static Pair<Statement, VoltXMLElement> addLimitPartitionRowsConstraint(
             Table t, HSQLInterface hsql, SqlLimitPartitionRowsConstraint constraint) {
         final int rowCount = constraint.getRowCount();
@@ -455,7 +477,19 @@ public class CreateTableUtils {
         t.setTuplelimit(rowCount);
         final Statement stmt = t.getTuplelimitdeletestmt().add("limit_delete");
         stmt.setSqltext(sql);
-        // TODO: "user defined function calls are not supported:" from DDLCompiler: waits to get function Id from HSQL
+        collectFilterFunctions(delete).stream().filter(call -> {
+            if (call.getOperator() instanceof SqlFunction) {
+                return ((SqlFunction) call.getOperator()).getFunctionType() == SqlFunctionCategory.USER_DEFINED_FUNCTION;
+            } else {
+                return false;
+            }
+        }).map(call -> ((SqlFunction) call.getOperator()).getSqlIdentifier().getSimple())
+                .findFirst().ifPresent(name -> {
+            throw new PlanningErrorException(String.format(
+                    "Error: table %s has invalid DELETE statement for LIMIT PARTITION ROWS constraint: " +
+                            "user defined function calls are not supported: \"%s\"",
+                    t.getTypeName(), name.toLowerCase()));
+        });
         try { // Note: this ugliness came from how StatementCompiler.compileStatementAndUpdateCatalog()
             // does its bidding; and from how HSQLInterface.getXMLCompiledStatement() needs the HSQL session
             // for its work.
@@ -513,9 +547,9 @@ public class CreateTableUtils {
                     final List<Column> pkCols = cols.stream()
                             .map(c -> t.getColumns().get(c.toString()))
                             .collect(Collectors.toList());
-                    final Pair<String, String> indexAndConstraintNames =
-                            genIndexAndConstraintName(col.getKind(), tableName, pkCols, ! voltExprs.isEmpty());
-                    final String indexName = nodes.get(0) == null ? indexAndConstraintNames.getFirst() : nodes.get(0).toString();
+                    final Pair<String, String> indexAndConstraintNames = genIndexAndConstraintName(
+                            nodes.get(0), col.getKind(), tableName, pkCols, ! voltExprs.isEmpty());
+                    final String indexName = indexAndConstraintNames.getFirst(), constraintName = indexAndConstraintNames.getSecond();
                     if (nodes.get(1) != null && indexMap.containsKey(indexName)) {  // On detection of duplicated constraint name: bail
                         throw new PlanningErrorException(String.format(
                                 "A constraint named %s already exists on table %s.", indexName, tableName));
@@ -531,7 +565,7 @@ public class CreateTableUtils {
                     final boolean hasGeogType =
                             pkCols.stream().anyMatch(column -> column.getType() == VoltType.GEOGRAPHY.getValue()) ||
                                     voltExprs.stream().anyMatch(expr -> expr.getValueType() == VoltType.GEOGRAPHY);
-                    final Index indexConstraint = genIndex(col.getKind(), t, indexName, indexAndConstraintNames.getSecond(),
+                    final Index indexConstraint = genIndex(col.getKind(), t, indexName, constraintName,
                             hasGeogType, pkCols, voltExprs);
                     if (indexMap.values().stream()       // find dup index
                             .noneMatch(
