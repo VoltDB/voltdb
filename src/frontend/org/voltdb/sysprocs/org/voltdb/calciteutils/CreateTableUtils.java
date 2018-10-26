@@ -217,13 +217,27 @@ public class CreateTableUtils {
                 .collect(Collectors.toList());
     }
 
-    private static String genIndexName(SqlKind type, String tableName, List<Column> cols, boolean hasExpression) {
-        final String prefix = type == SqlKind.PRIMARY_KEY ? "VOLTDB_AUTOGEN_IDX_PK" : "SYS_IDX";
-        final String s =
-                cols.stream().map(Column::getName).reduce(
-                        String.format("%s_%s", prefix, tableName),
-                        (acc, colName) -> acc + "_" + colName),
-                suffix;
+    /**
+     * Generate index name and constraint name for the given SqlTyppe and, either a list of columns, or an expresssion.
+     * We need two names here to be compatible with what VoltDB had been doing; but having the index and constraint to
+     * be the same name does not seems to cause any trouble: indexes and constraints are in different catalog spaces.
+     * We need two names with same naming scheme to pass all Jenkins tests.
+     * @param type constraint type
+     * @param tableName name of table of the constraint
+     * @param cols list of columns for the index
+     * @param hasExpression whether the constraint is an expression
+     * @return generated (IndexName, ConstraintName)
+     */
+    private static Pair<String, String> genIndexAndConstraintName(
+            SqlKind type, String tableName, List<Column> cols, boolean hasExpression) {
+        final String suffix,
+                type_str = type == SqlKind.PRIMARY_KEY ? "PK" : "CT",
+                index = cols.stream().map(Column::getName)
+                        .reduce(String.format("VOLTDB_AUTOGEN_IDX_%s_%s", type_str, tableName),
+                                (acc, colName) -> acc + "_" + colName),
+                constr = cols.stream().map(Column::getName)
+                        .reduce(String.format("VOLTDB_AUTOGEN_CT__%s_%s", type_str, tableName),
+                                (acc, colName) -> acc + "_" + colName);
         if (hasExpression) {        // For index involving expression(s), generate a UID string as suffix, and pretending that
             // expression-groups for different constraints are never the same
             // (If they are, user will suffer some additional time cost when upserting table.)
@@ -231,7 +245,7 @@ public class CreateTableUtils {
         } else {
             suffix = "";
         }
-        return s + suffix;
+        return Pair.of(index + suffix, constr + suffix);
     }
 
     private static void updateConstraint(Constraint cons, Index index, SqlKind type, String indexName, String tableName) {
@@ -253,7 +267,7 @@ public class CreateTableUtils {
         cons.setType(constraintType.getValue());
     }
 
-    private static Index genIndex(SqlKind type, Table t, String indexName, boolean hasGeog,
+    private static Index genIndex(SqlKind type, Table t, String indexName, String constraintName, boolean hasGeog,
                                   List<Column> indexCols, List<AbstractExpression> exprs) {
         final Index index = t.getIndexes().add(indexName);
         if (hasGeog) {
@@ -265,7 +279,7 @@ public class CreateTableUtils {
         }
         index.setUnique(true);
         index.setAssumeunique(type == SqlKind.ASSUME_UNIQUE);
-        updateConstraint(t.getConstraints().add(indexName), index, type, indexName, t.getTypeName());
+        updateConstraint(t.getConstraints().add(constraintName), index, type, constraintName, t.getTypeName());
         AtomicInteger i = new AtomicInteger(0);
         indexCols.forEach(column -> {
             final ColumnRef cref = index.getColumns().add(column.getName());
@@ -499,9 +513,9 @@ public class CreateTableUtils {
                     final List<Column> pkCols = cols.stream()
                             .map(c -> t.getColumns().get(c.toString()))
                             .collect(Collectors.toList());
-                    final String indexName = nodes.get(0) == null ?
-                            genIndexName(col.getKind(), tableName, pkCols, ! voltExprs.isEmpty()) :
-                            nodes.get(0).toString();
+                    final Pair<String, String> indexAndConstraintNames =
+                            genIndexAndConstraintName(col.getKind(), tableName, pkCols, ! voltExprs.isEmpty());
+                    final String indexName = nodes.get(0) == null ? indexAndConstraintNames.getFirst() : nodes.get(0).toString();
                     if (nodes.get(1) != null && indexMap.containsKey(indexName)) {  // On detection of duplicated constraint name: bail
                         throw new PlanningErrorException(String.format(
                                 "A constraint named %s already exists on table %s.", indexName, tableName));
@@ -517,7 +531,8 @@ public class CreateTableUtils {
                     final boolean hasGeogType =
                             pkCols.stream().anyMatch(column -> column.getType() == VoltType.GEOGRAPHY.getValue()) ||
                                     voltExprs.stream().anyMatch(expr -> expr.getValueType() == VoltType.GEOGRAPHY);
-                    final Index indexConstraint = genIndex(col.getKind(), t, indexName, hasGeogType, pkCols, voltExprs);
+                    final Index indexConstraint = genIndex(col.getKind(), t, indexName, indexAndConstraintNames.getSecond(),
+                            hasGeogType, pkCols, voltExprs);
                     if (indexMap.values().stream()       // find dup index
                             .noneMatch(
                                     other -> other.getType() == indexConstraint.getType() &&
