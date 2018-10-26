@@ -163,7 +163,7 @@ public class StoredProcedureInvocation implements JSONString {
     Object getParameterAtIndex(int partitionIndex) {
         try {
             if (serializedParams != null) {
-                return ParameterSet.getParameterAtIndex(partitionIndex, serializedParams.duplicate());
+                return ParameterSet.getParameterAtIndex(partitionIndex, serializedParams.duplicate().order(serializedParams.order()));
             } else {
                 return params.get().getParam(partitionIndex);
             }
@@ -233,7 +233,7 @@ public class StoredProcedureInvocation implements JSONString {
             {
                 // duplicate for thread-safety
                 assert(serializedParams.position() == 0);
-                ByteBuffer dup = serializedParams.duplicate();
+                ByteBuffer dup = serializedParams.duplicate().order(serializedParams.order());
                 dup.rewind();
                 buf.put(dup);
             }
@@ -322,7 +322,7 @@ public class StoredProcedureInvocation implements JSONString {
      */
     public ByteBuffer getSerializedParams() {
         if (serializedParams != null) {
-            return serializedParams.duplicate();
+            return serializedParams.duplicate().order(serializedParams.order());
         }
         return null;
     }
