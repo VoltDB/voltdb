@@ -284,13 +284,6 @@ public class ExportGeneration implements Generation {
                     } else if (msgType == ExportManager.GIVE_MASTERSHIP) {
                         final long ackSeqNo = buf.getLong();
                         int tuplesSent = 0;
-//                        if (tuplesSent < 0 ) {
-//                            exportLog.warn("Received an export ack for " + eds.toString());
-//                            tuplesSent = 0;
-//                        }
-//                        if (m_mbox.getHSId() == message.m_sourceHSId) {
-//                            tuplesSent = 0;
-//                        }
                         try {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received GIVE_MASTERSHIP message for " + eds.toString() +
@@ -315,18 +308,14 @@ public class ExportGeneration implements Generation {
                         eds.handleQueryMessage(message.m_sourceHSId, requestId, gapStart);
                     } else if (msgType == ExportManager.QUERY_RESPONSE) {
                         final long requestId = buf.getLong();
-                        final boolean canCover = buf.get() == 1 ? true : false;
-                        long lastSeq = Long.MIN_VALUE;
-                        if (canCover) {
-                            lastSeq = buf.getLong();
-                        }
+                        final long lastSeq = buf.getLong();
                         if (exportLog.isDebugEnabled()) {
                             exportLog.debug("Received QUERY_RESPONSE message(" + requestId +
-                                    ") for " + eds.toString() +
+                                    "," + lastSeq + ") for " + eds.toString() +
                                     " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                     " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                         }
-                        eds.handleQueryResponse(message.m_sourceHSId, requestId, canCover, lastSeq);
+                        eds.handleQueryResponse(message.m_sourceHSId, requestId, lastSeq);
                     } else if (msgType == ExportManager.TASK_MASTERSHIP) {
                         final long requestId = buf.getLong();
                         if (exportLog.isDebugEnabled()) {

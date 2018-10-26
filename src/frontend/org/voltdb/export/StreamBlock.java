@@ -45,7 +45,7 @@ import org.voltdb.VoltDB;
  */
 public class StreamBlock {
 
-    public static final int HEADER_SIZE = 12; //uso + row count
+    public static final int HEADER_SIZE = 12; //sequence number + row count
 
     StreamBlock(BBContainer cont, long startSequenceNumber, int rowCount, boolean isPersisted) {
         m_buffer = cont;
@@ -94,7 +94,7 @@ public class StreamBlock {
     }
 
     /**
-     * Returns the total amount of data in the USO stream
+     * Returns the total amount of bytes in the stream
      * @return
      */
     long totalSize() {

@@ -150,17 +150,18 @@ public class ExportSequenceNumberTracker {
     }
 
     /**
-     * Get end sequence number of the range that contains given sequence number
+     * Get range that contains given sequence number
      * @param seq
-     * @return end sequence number of the range if exists, otherwise return Long.MIN_VALUE
+     * @return a pair of start and end sequence number of the range if it exists,
+     *         otherwise return null
      */
-    public long getRangeContaining(long seq) {
+    public Pair<Long, Long> getRangeContaining(long seq) {
         assert (!m_map.isEmpty());
         Range<Long> range = m_map.rangeContaining(seq);
         if (range != null) {
-            return end(range);
+            return new Pair<Long, Long>(start(range), end(range));
         }
-        return Long.MIN_VALUE;
+        return null;
     }
 
     /**

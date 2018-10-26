@@ -38,14 +38,25 @@ import org.voltdb.utils.VoltFile;
  * overflow to disk when more then two stream blocks are stored
  * as well as persist to disk when sync is invoked. Right now sync doesn't actually do an fsync on
  * the file unless it is specifically requested. It just pushed the two in memory blocks to the persistent
+ * portion of the queue.
  *
- * portion of the queue
+ * Export PBD buffer layout:
+ *    --- Buffer Header   ---
+ *    seqNo(8) + tupleCount(4) +
+ *    --- Row Header      ---
+ *    rowLength(4) + genId(8) + partitionColumnIndex(4) + columnCount(4) + hasSchemaFlag(1) +
+ *    nullArrayLength(4) + nullArray(var length)
+ *    --- Optional Schema ---
+ *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
+ *    --- Row Data        ---
+ *    RowTxnId(8) + rowData(var length)
  *
+ *    repeat row header, optional schema and row data...
  */
 public class StreamBlockQueue {
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-    private static final int EXPORT_BUFFER_VERSION = 1;
+    public static final int EXPORT_BUFFER_VERSION = 1;
 
     public static final String EXPORT_DISABLE_COMPRESSION_OPTION = "EXPORT_DISABLE_COMPRESSION";
     private static final boolean DISABLE_COMPRESSION = Boolean.getBoolean(EXPORT_DISABLE_COMPRESSION_OPTION);
@@ -105,7 +116,6 @@ public class StreamBlockQueue {
             cont.b().order(ByteOrder.LITTLE_ENDIAN);
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
-            cont.b().order(ByteOrder.LITTLE_ENDIAN);
             long seqNo = cont.b().getLong(0);
             int tupleCount = cont.b().getInt(8);
             //Pass the stream block a subset of the bytes, provide
@@ -216,7 +226,6 @@ public class StreamBlockQueue {
             if ((streamBlock.startSequenceNumber() == fromPBD.startSequenceNumber()) &&
                     (unreleasedSeqNo > streamBlock.startSequenceNumber())) {
                 fromPBD.releaseTo(unreleasedSeqNo - 1);
-                assert(fromPBD.unreleasedSequenceNumber() <= fromPBD.lastSequenceNumber());
             }
         }
     }
@@ -230,10 +239,11 @@ public class StreamBlockQueue {
         }
     }
 
+    // Only used in tests, should be removed.
     public long sizeInBytes() throws IOException {
         long memoryBlockUsage = 0;
         for (StreamBlock b : m_memoryDeque) {
-            //Use only unreleased size, but throw in the USO
+            //Use only total size, but throw in the USO
             //to make book keeping consistent when flushed to disk
             //Also dont count persisted blocks.
             memoryBlockUsage += b.totalSize();
@@ -258,20 +268,7 @@ public class StreamBlockQueue {
         }
     }
 
-    /*
-     * Export PBD buffer layout:
-     *    --- Buffer Header   ---
-     *    seqNo(8) + tupleCount(4) +
-     *    --- Row Header      ---
-     *    rowLength(4) + genId(8) + partitionColumnIndex(4) + columnCount(4) + hasSchemaFlag(1) +
-     *    nullArrayLength(4) + nullArray(var length)
-     *    --- Optional Schema ---
-     *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
-     *    --- Row Data        ---
-     *    RowTxnId(8) + rowData(var length)
-     *
-     *    repeat row header, optional schema and row data...
-     */
+    // See PDB segment layout at beginning of this file.
     public void truncateToSequenceNumber(final long truncationSeqNo) throws IOException {
         assert(m_memoryDeque.isEmpty());
         m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
@@ -281,7 +278,7 @@ public class StreamBlockQueue {
                 ByteBuffer b = bbc.b();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
-                // If the truncation point was the first row in the block, the entire block is to be discard
+                // If the truncation point was the first row in the block, the entire block is to be discarded
                 // We know it is the first row if the start sequence number of buffer is the truncation point
                 if (startSequenceNumber >= truncationSeqNo) {
                     return PersistentBinaryDeque.fullTruncateResponse();
@@ -323,7 +320,7 @@ public class StreamBlockQueue {
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
     }
 
-    public ExportSequenceNumberTracker scanPersistentLog() throws IOException {
+    public ExportSequenceNumberTracker scanForGap() throws IOException {
         assert(m_memoryDeque.isEmpty());
         return m_persistentDeque.scanForGap(new BinaryDequeScanner() {
 

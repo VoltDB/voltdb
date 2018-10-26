@@ -109,9 +109,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private long m_firstUnpolledSeqNo = 1L; // sequence number starts from 1
     private long m_lastReleasedSeqNo = 0L;
-    // End uso of most recently pushed export buffer
+    // End sequence number of most recently pushed export buffer
     private long m_lastPushedSeqNo = 0L;
-    // Relinquish export master after this uso
+    // Relinquish export master after this sequence number
     private long m_seqNoToDrain = Long.MAX_VALUE;
     //This is released when all mailboxes are set.
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
@@ -165,16 +165,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private StreamStatus m_status = StreamStatus.ACTIVE;
 
     static class QueryResponse implements Comparable<QueryResponse>{
-        boolean canCover;
         long lastSeq;
-        public QueryResponse(boolean canCover, long lastSeq) {
-            this.canCover = canCover;
+        public QueryResponse(long lastSeq) {
             this.lastSeq = lastSeq;
         }
 
         @Override
         public int compareTo(QueryResponse o) {
             return (int)(this.lastSeq - o.lastSeq);
+        }
+
+        public boolean canCoverGap() {
+            return lastSeq != Long.MIN_VALUE;
         }
 
     }
@@ -209,7 +211,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         String nonce = m_tableName + "_" + crc.getValue() + "_" + partitionId;
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
-        m_gapTracker = m_committedBuffers.scanPersistentLog();
+        m_gapTracker = m_committedBuffers.scanForGap();
         m_firstUnpolledSeqNo = m_gapTracker.isEmpty() ? 1L : m_gapTracker.getFirstSeqNo();
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " reads gap tracker from PBD:" + m_gapTracker.toString());
@@ -346,7 +348,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         crc.update(m_signatureBytes);
         final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
-        m_gapTracker = m_committedBuffers.scanPersistentLog();
+        m_gapTracker = m_committedBuffers.scanForGap();
         m_firstUnpolledSeqNo = m_gapTracker.isEmpty() ? 1L : m_gapTracker.getFirstSeqNo();
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " reads gap tracker from PBD:" + m_gapTracker.toString());
@@ -585,6 +587,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
+    private long calcEndSequenceNumber(long startSeq, int tupleCount) {
+        return startSeq + tupleCount - 1;
+    }
+
+    private boolean isAcked(long seqNo) {
+        return m_lastReleasedSeqNo > 0 && seqNo <= m_lastReleasedSeqNo ;
+    }
+
     private void pushExportBufferImpl(
             long startSequenceNumber,
             int tupleCount,
@@ -601,8 +611,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buffer.order(ByteOrder.LITTLE_ENDIAN);
             // Drop already acked buffer
             final BBContainer cont = DBBPool.wrapBB(buffer);
-            long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
-            if (m_lastReleasedSeqNo > 0 && m_lastReleasedSeqNo >= lastSequenceNumber) {
+            long lastSequenceNumber = calcEndSequenceNumber(startSequenceNumber, tupleCount);
+            if (isAcked(lastSequenceNumber)) {
                 m_tupleCount += tupleCount;
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Dropping already acked buffer. " +
@@ -629,7 +639,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }, startSequenceNumber, tupleCount, false);
 
                 // Mark release sequence number to partially acked buffer.
-                if (m_lastReleasedSeqNo > 0 && m_lastReleasedSeqNo >= sb.startSequenceNumber()) {
+                if (isAcked(sb.startSequenceNumber())) {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Setting releaseSeqNo as " + m_lastReleasedSeqNo +
                                 " for SB with sequence number " + sb.startSequenceNumber() +
@@ -725,12 +735,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (sequenceNumber < 0) {
                             exportLog.error("Snapshot does not include valid truncation point for partition " +
                                     m_partitionId);
+                            return;
                         }
-                        else {
-                            m_committedBuffers.truncateToSequenceNumber(sequenceNumber);
-                            if (exportLog.isDebugEnabled()) {
-                                exportLog.debug("Truncating export pdb files to sequence number " + sequenceNumber);
-                            }
+                        m_committedBuffers.truncateToSequenceNumber(sequenceNumber);
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Truncating export pdb files to sequence number " + sequenceNumber);
                         }
                     }
                     m_gapTracker.truncate(sequenceNumber);
@@ -973,14 +982,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public class AckingContainer extends BBContainer {
         final long m_seqNo;
-        final int m_tuplesSent;
+        final int m_tuplesCount;
         final BBContainer m_backingCont;
         long m_startTime = 0;
 
         public AckingContainer(BBContainer cont, long seq, int tuplesSent) {
             super(cont.b());
             m_seqNo = seq;
-            m_tuplesSent = tuplesSent;
+            m_tuplesCount = tuplesSent;
             m_backingCont = cont;
         }
 
@@ -996,9 +1005,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     @Override
                     public void run() {
                         if (exportLog.isTraceEnabled()) {
-                            exportLog.trace("AckingContainer.discard with sequence number: " + m_seqNo + " tuples sent: " + m_tuplesSent);
+                            exportLog.trace("AckingContainer.discard with sequence number: " + m_seqNo + " tuples count: " + m_tuplesCount);
                         }
-                        assert(m_tuplesSent == 0 || m_startTime != 0);
+                        assert(m_tuplesCount == 0 || m_startTime != 0);
                         long elapsedMS = System.currentTimeMillis() - m_startTime;
                         m_blocksSentSinceClear += 1;
                         m_totalLatencySinceClearInMS += elapsedMS;
@@ -1011,10 +1020,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                              m_backingCont.discard();
                             try {
                                 if (!m_es.isShutdown()) {
-                                    ackImpl(m_seqNo, m_tuplesSent);
+                                    ackImpl(m_seqNo, m_tuplesCount);
                                 }
                             } finally {
-                                forwardAckToOtherReplicas(m_seqNo, m_tuplesSent);
+                                forwardAckToOtherReplicas(m_seqNo, m_tuplesCount);
                             }
                         } catch (Exception e) {
                             exportLog.error("Error acking export buffer", e);
@@ -1139,11 +1148,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-     private void ackImpl(long seq, int tuplesSent) {
+     private void ackImpl(long seq, int tupleCount) {
         //Process the ack if any and add blocks to the delete list or move the released sequence number
         if (seq > 0) {
             try {
-                releaseExportBytes(seq, tuplesSent);
+                releaseExportBytes(seq, tupleCount);
                 mastershipCheckpoint(seq);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
@@ -1237,33 +1246,26 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void sendQueryResponse(long senderHSId, long requestId, boolean canCover, long lastSeq) {
+    private void sendQueryResponse(long senderHSId, long requestId, long lastSeq) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0 && p.getSecond().contains(senderHSId)) {
             // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
-            // requestId(8) + canCover(1) + lastSeq(8, optional)
-            int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 1;
-            if (canCover) {
-                msgLen += 8;
-            }
+            // requestId(8) + lastSeq(8)
+            int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 8;
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.put(ExportManager.QUERY_RESPONSE);
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(requestId);
-            buf.put(canCover? (byte)1 : (byte)0);
-            if (canCover) {
-                buf.putLong(lastSeq);
-            }
+            buf.putLong(lastSeq);
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
             mbx.send(senderHSId, bpm);
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Partition " + m_partitionId + " mailbox hsid (" +
                         CoreUtils.hsIdToString(mbx.getHSId()) + ") send QUERY_RESPONSE message(" +
-                        requestId + "," + m_mastershipAccepted.get() + "," + canCover +
-                        ") to " + CoreUtils.hsIdToString(senderHSId));
+                        requestId + "," + lastSeq + ") to " + CoreUtils.hsIdToString(senderHSId));
             }
         }
     }
@@ -1421,25 +1423,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_es.execute(new Runnable() {
                 @Override
                 public void run() {
-                    boolean canCover = canCoverNextSequenceNumber(gapStart);
-                    long lastSeq = m_gapTracker.getRangeContaining(gapStart);
-                    sendQueryResponse(senderHSId, requestId, canCover, lastSeq);
+                    long lastSeq = Long.MIN_VALUE;
+                    Pair<Long, Long> range = m_gapTracker.getRangeContaining(gapStart);
+                    if (range != null) {
+                        lastSeq = range.getSecond();
+                    }
+                    sendQueryResponse(senderHSId, requestId, lastSeq);
                 }
             });
     }
 
-    public void handleQueryResponse(long sendHsId, long requestId, boolean canCover, long lastSeq) {
+    public void handleQueryResponse(long sendHsId, long requestId, long lastSeq) {
         if (m_currentRequestId == requestId && m_mastershipAccepted.get()) {
             m_es.execute(new Runnable() {
                 @Override
                 public void run() {
-                    m_queryResponses.put(sendHsId, new QueryResponse(canCover, lastSeq));
+                    m_queryResponses.put(sendHsId, new QueryResponse(lastSeq));
                     Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
                     if (p.getSecond().stream().allMatch(hsid -> m_queryResponses.containsKey(hsid))) {
                         Entry<Long, QueryResponse> bestCandidate = null;
                         try {
                             bestCandidate = m_queryResponses.entrySet().stream()
-                                           .filter(s -> s.getValue().canCover)
+                                           .filter(s -> s.getValue().canCoverGap())
                                            .sorted()
                                            .findFirst()
                                            .get();
@@ -1539,13 +1544,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     @Override
     public String toString() {
         return "ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId();
-    }
-
-    private boolean canCoverNextSequenceNumber(long nextSeq) {
-        if (m_gapTracker.size() == 0) {
-            return true;
-        }
-        return m_gapTracker.contains(nextSeq, nextSeq);
     }
 
     private void mastershipCheckpoint(long seq) {

@@ -95,7 +95,7 @@ public interface BinaryDeque {
 
     public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException;
 
-    public ExportSequenceNumberTracker scanForGap(BinaryDequeScanner scaner) throws IOException;
+    public ExportSequenceNumberTracker scanForGap(BinaryDequeScanner scanner) throws IOException;
     /**
      * Release all resources (open files) held by the back store of the queue. Continuing to use the deque
      * will result in an exception

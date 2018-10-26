@@ -40,6 +40,7 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportGeneration;
+import org.voltdb.export.StreamBlockQueue;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
@@ -342,7 +343,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
                                 byte version = buf.get();
-                                assert(version == 1);
+                                assert(version == StreamBlockQueue.EXPORT_BUFFER_VERSION);
                                 long generation = buf.getLong();
                                 int schemaSize = buf.getInt();
                                 ExportRow previousRow = edb.getPreviousRow();
