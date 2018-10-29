@@ -46,7 +46,8 @@ public class StreamBlockQueue {
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     private static final int EXPORT_BUFFER_VERSION = 1;
 
-    static final boolean DISABLE_COMPRESSION = Boolean.getBoolean("EXPORT_DISABLE_COMPRESSION");
+    public static final String EXPORT_DISABLE_COMPRESSION_OPTION = "EXPORT_DISABLE_COMPRESSION";
+    private static final boolean DISABLE_COMPRESSION = Boolean.getBoolean(EXPORT_DISABLE_COMPRESSION_OPTION);
 
     /**
      * Deque containing reference to stream blocks that are in memory. Some of these
@@ -72,8 +73,6 @@ public class StreamBlockQueue {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
         }
-        exportLog.info(m_nonce + " has compression "
-                + (DISABLE_COMPRESSION ? "disabled" : "enabled") + " in " + path);
     }
 
     public boolean isEmpty() throws IOException {

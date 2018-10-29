@@ -38,10 +38,10 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
-import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
@@ -329,6 +329,10 @@ public class ExportManager
         m_hostId = myHostId;
         m_messenger = messenger;
         m_exportStats = new ExportStats();
+
+        boolean compress = !Boolean.getBoolean(StreamBlockQueue.EXPORT_DISABLE_COMPRESSION_OPTION);
+        exportLog.info("Export has compression "
+                + (compress ? "enabled" : "disabled") + " in " + VoltDB.instance().getExportOverflowPath());
 
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
         if (!hasEnabledConnectors(connectors)) {
