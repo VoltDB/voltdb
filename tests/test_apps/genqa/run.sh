@@ -37,7 +37,10 @@ CLASSPATH=$({ \
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
 ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
 RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
-CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar:vertica-jdbc.jar"
+MYSQLLIB=${MYSQLLIB:-"/home/opt/mysql.jar"}
+VERTICALIB=${VERTICALIB:-"/home/opt/vertica-jdbc.jar"}
+POSTGRESLIB=${POSTGRESLIB:="/home/opt/postgresql.jar"}
+CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar:vertica-jdbc.jar:$MYSQLLIB"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -73,14 +76,22 @@ function catalog() {
     srccompile
     #cmd="$VOLTDB compile --classpath obj -o $APPNAME_EXPORT.jar ddl-nocat.sql"
     #echo $cmd; $cmd
+    let rc=0
     cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql"
     echo $cmd; $cmd
+    if [ $? != 0 ]; then exit $?; fi
+
     cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME2.jar ddl2.sql"
     echo $cmd; $cmd
+    if [ $? != 0 ]; then exit $?; fi
+
     cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME3.jar ddl3.sql"
     echo $cmd; $cmd
+    if [ $? != 0 ]; then exit $?; fi
+
     cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME4.jar ddl4.sql"
     echo $cmd; $cmd
+    if [ $? != 0 ]; then exit $?; fi
     #jar cvf sp.jar obj/*
 
     # stop if compilation fails
@@ -88,7 +99,7 @@ function catalog() {
     mkdir $EXPORTDATA
     rm -fR $CLIENTLOG
     mkdir $CLIENTLOG
-    if [ $? != 0 ]; then exit; fi
+    if [ $? != 0 ]; then exit -1; fi
 }
 
 function wait-for-create() {
@@ -101,43 +112,39 @@ function wait-for-create() {
 }
 
 # run the voltdb server locally
+function startvolt() {
+    $VOLTDB init -C $1 -s $2 -j $3 --force
+    $VOLTDB start  -l $LICENSE &
+    wait-for-create
+}
+
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    startvolt deployment.xml ddl-nocat.sql sp.jar
+
 }
 
 # run the voltdb server locally with kafka connector
 function server-kafka() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment-kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
+    startvolt deployment-kafka.xml ddl-nocat.sql sp.jar
 }
 
 function server-rabbitmq() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment-rabbitmq.xml -l $LICENSE -H $HOST $APPNAME.jar
+    cp $RBMQ/rabbitmq.jar $VOLTDB_LIB/extension/
+    cp ../../../../export-rabbitmq/voltdb-rabbitmq.jar $VOLTDB_LIB/extension/
+    startvolt deployment-rabbitmq.xml ddl-nocat.sql sp.jar
 }
 
 # run the voltdb server locally with mysql connector
 function server-mysql() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_mysql.xml -l $LICENSE -H $HOST $APPNAME.jar
+    cp $MYSQLLIB $VOLTDB_LIB/extension/
+    startvolt deployment_mysql.xml ddl-nocat.sql sp.jar
 }
 
 
 # run the voltdb server locally with vertica connector
 function server-vertica() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_vertica.xml -l $LICENSE -H $HOST $APPNAME.jar
+    cp $VERTICALIB $VOLTDB_LIB/extension/
+    startvolt deployment_vertica.xml ddl-nocat.sql sp.jar
 }
 
 # run the voltdb server locally with postgresql connector
@@ -151,16 +158,8 @@ function server-vertica() {
 # ./run.sh stop-postgres;
 
 function server-pg() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-
-    #$VOLTDB create --force -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
-
-    $VOLTDB create --force -d deployment_pg_nocat.xml -l $LICENSE -H $HOST &
-    sleep 5
-    wait-for-create
-    $VOLTDB_BIN/sqlcmd < ddl-nocat.sql
+    cp $POSTGRESLIB $VOLTDB_LIB/extension/
+    startvolt deployment_pg_nocat.xml ddl-nocat.sql sp.jar
 }
 
 # to run the postgres jdbc geo export test manually:
@@ -173,25 +172,9 @@ function server-pg() {
 # ./run.sh stop-postgres;
 
 function server-pg-geo() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
+    cp $POSTGRESLIB $VOLTDB_LIB/extension/
+    startvolt deployment_pg_nocat.xml ddl-nocat-geo.sql sp.jar
 
-    #$VOLTDB create --force -d deployment_pg.xml -l $LICENSE -H $HOST $APPNAME.jar
-
-    $VOLTDB create --force -d deployment_pg_nocat.xml -l $LICENSE -H $HOST &
-    sleep 5
-    wait-for-create
-    $VOLTDB_BIN/sqlcmd < ddl-nocat-geo.sql
-
-}
-
-# run the voltdb server locally
-function server-legacy() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_legacy.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 function server-custom() {
@@ -203,31 +186,9 @@ function server-custom() {
     cd ..
     cp customexport.jar $VOLTDB_LIB/extension/customexport.jar
     # run the server
-    $VOLTDB create -d deployment_custom.xml -l $LICENSE -H $HOST $APPNAME.jar
+    #$VOLTDB create -d deployment_custom.xml -l $LICENSE -H $HOST $APPNAME.jar
+    startvolt deployment_custom.xml ddl-nocat.sql sp.jar
 }
-
-# run the voltdb server locally
-function server1() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:3021 --internalport=3024 $APPNAME.jar
-}
-
-function server2() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:21216 --adminport=21215 --internalport=3022 --zkport=2182 $APPNAME.jar
-}
-
-function server3() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create -d deployment_multinode.xml -l $LICENSE -H $HOST:3021 --internalport==3023 --adminport=21213 --port=21214 --zkport=2183 $APPNAME.jar
-}
-
 
 # run the client that drives the example
 function client() {
@@ -243,7 +204,7 @@ function async-benchmark-help() {
 
 function async-benchmark() {
     # srccompile
-    echo java -classpath obj:$CLASSPATH:obj genqa.AsyncBenchmark \
+    java -classpath obj:$CLASSPATH:obj genqa.AsyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -327,7 +288,7 @@ function jdbc-benchmark-help() {
 
 function jdbc-benchmark() {
     # srccompile
-    echo jdbc-benchmark: java -classpath obj:$CLASSPATH:obj genqa.JDBCBenchmark \
+    java -classpath obj:$CLASSPATH:obj genqa.JDBCBenchmark \
         --threads=40 \
         --displayinterval=5 \
         --duration=120 \
