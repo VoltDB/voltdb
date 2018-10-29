@@ -28,9 +28,6 @@ import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
  * @author Yiqun Zhang
  */
 public class SqlParserFactory {
-    private static final SqlParser PARSER =
-            SqlParser.create("", SqlParser.configBuilder()
-            .setParserFactory(SqlDdlParserImpl.FACTORY).build());
     /**
      * Given a SQL statement (could be either a DDL or DQL/DML),
      * create a {@link SqlParser} for it.
@@ -38,6 +35,8 @@ public class SqlParserFactory {
      * @return a SQL parser created from the SQL statement.
      */
     public static SqlNode parse(String sql) throws SqlParseException {
-        return PARSER.parseQuery(sql);
+        return SqlParser.create(sql,
+                SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build())
+                .parseQuery(sql);
     }
 }
