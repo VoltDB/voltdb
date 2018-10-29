@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import static org.voltdb.DRLogSegmentId.isEmptyDRId;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -37,8 +39,6 @@ import com.google_voltpatches.common.collect.DiscreteDomain;
 import com.google_voltpatches.common.collect.Range;
 import com.google_voltpatches.common.collect.RangeSet;
 import com.google_voltpatches.common.collect.TreeRangeSet;
-
-import static org.voltdb.DRLogSegmentId.isEmptyDRId;
 
 /*
  * WARNING:
@@ -89,6 +89,7 @@ public class DRConsumerDrIdTracker implements Serializable {
             return obj;
         }
 
+        @Override
         public String toShortString() {
             if (m_map.isEmpty()) {
                 return "Empty Map";
@@ -332,7 +333,9 @@ public class DRConsumerDrIdTracker implements Serializable {
      * @param newTruncationPoint    New safe point
      */
     public void truncate(long newTruncationPoint) {
-        if (newTruncationPoint < getFirstDrId()) return;
+        if (newTruncationPoint < getFirstDrId()) {
+            return;
+        }
         final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
         while (iter.hasNext()) {
             final Range<Long> next = iter.next();
@@ -445,7 +448,7 @@ public class DRConsumerDrIdTracker implements Serializable {
     }
 
     protected void toShortString(StringBuilder sb) {
-        sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
+        sb.append("lastSpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastSpUniqueId)).append(" ");
         sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
         sb.append("producerPartitionId ").append(m_producerPartitionId).append(" ");
         sb.append("span [").append(DRLogSegmentId.getSequenceNumberFromDRId(getFirstDrId())).append("-");
