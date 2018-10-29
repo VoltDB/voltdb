@@ -163,6 +163,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         if (asyncCommandLogEnabled) {
             configureDurableUniqueIdListener(drGateway, true);
         }
+        m_repairLog.registerTransactionCommitInterest(drGateway);
 
         final PartitionDRGateway mpPDRG;
         if (createMpDRGateway) {
@@ -170,6 +171,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             if (asyncCommandLogEnabled) {
                 configureDurableUniqueIdListener(mpPDRG, true);
             }
+            m_repairLog.registerTransactionCommitInterest(mpPDRG);
         } else {
             mpPDRG = null;
         }
