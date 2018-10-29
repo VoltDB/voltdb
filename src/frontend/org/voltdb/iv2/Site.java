@@ -565,7 +565,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                     Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
                     clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
                 }
-                int oldProducerPartitionCount = clusterSources.size() - (clusterSources.containsKey(MpInitiator.MP_INIT_PID) ? 1 : 0);
+                int oldProducerPartitionCount = clusterSources.size() - 1;
                 int newProducerPartitionCount = entry.getValue();
                 assert(oldProducerPartitionCount >= 0);
                 assert(newProducerPartitionCount != -1);
@@ -1809,19 +1809,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId) {
-//        Enable this code and fix up generateDREvent in DRTuplestream once the DR ReplicatedTable Stream has been removed
-//        if (m_partitionId >= oldPartitionCnt) {
-//            generateDREvent(
-//                    EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
-//        }
-//        else {
-            ByteBuffer paramBuffer = ByteBuffer.allocate(8);
-            paramBuffer.putInt(oldPartitionCnt);
-            paramBuffer.putInt(newPartitionCnt);
-            generateDREvent(
-                    EventType.DR_ELASTIC_CHANGE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
-//        }
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle,
+            long uniqueId) {
+        ByteBuffer paramBuffer = ByteBuffer.allocate(8);
+        paramBuffer.putInt(oldPartitionCnt);
+        paramBuffer.putInt(newPartitionCnt);
+        generateDREvent(EventType.DR_ELASTIC_CHANGE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle,
+                paramBuffer.array());
     }
 
     @Override
