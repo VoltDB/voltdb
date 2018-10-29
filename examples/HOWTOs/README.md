@@ -10,6 +10,7 @@ Development:
  * [Configure Logging](ConfigureLogging.md)
  * [Use the BulkLoader API from a java client to load a table](bulkloader/README.md)
  * [Export Stream data to a Procedure](StreamToProcedure.md)
+ * [Configure Kafka Export Connector and Kafka Importer](kafka/KafkaExample.md)
  * [Start and Maintain an XDCR Cluster](xdcr_tutorial.md)
 
 Administration:
