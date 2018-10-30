@@ -26,8 +26,9 @@ package org.voltdb.regressionsuites;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -45,26 +46,31 @@ import junit.framework.TestSuite;
 public class MultiConfigSuiteBuilder extends TestSuite {
 
     /** The class that contains the JUnit test methods to run */
-    Class<? extends TestCase> m_testClass = null;
+    final Class<? extends TestCase> m_testClass;
+    // Collection of test method names to be ignored and not executed
+    final Collection<String> m_ignoredTests;
 
     /**
      * Get the JUnit test methods for a given class. These methods have no
      * parameters, return void and start with "test".
      *
-     * @param testCls The class that contains the JUnit test methods to run.
      * @return A list of the names of each JUnit test method.
      */
-    static List<String> getTestMethodNames(Class<? extends TestCase> testCls) {
+    List<String> getTestMethodNames() {
         ArrayList<String> retval = new ArrayList<>();
 
-        for (Method m : testCls.getMethods()) {
-            if (m.getReturnType() != void.class)
+        for (Method m : m_testClass.getMethods()) {
+            if (m.getReturnType() != void.class) {
                 continue;
-            if (m.getParameterTypes().length > 0)
+            }
+            if (m.getParameterCount() > 0) {
                 continue;
-            if (m.getName().startsWith("test") == false)
+            }
+            String name = m.getName();
+            if (!name.startsWith("test") || m_ignoredTests.contains(name)) {
                 continue;
-            retval.add(m.getName());
+            }
+            retval.add(name);
         }
 
         return retval;
@@ -76,7 +82,19 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param testClass The class that contains the JUnit test methods to run.
      */
     public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass) {
+        this(testClass, Collections.emptySet());
+    }
+
+    /**
+     * Initialize by passing in a class that contains JUnit test methods to run.
+     *
+     * @param testClass The class that contains the JUnit test methods to run.
+     * @param ignoredTests {@link Collection} of test names to be skipped. A test will be skipped if
+     *                  {@code skipTest.contains(methodName)} returns {@code true}
+     */
+    public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass, Collection<String> ignoredTests) {
         m_testClass = testClass;
+        m_ignoredTests = ignoredTests;
     }
 
     /**
@@ -136,7 +154,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         }
 
         // get the set of test methods
-        List<String> methods = getTestMethodNames(m_testClass);
+        List<String> methods = getTestMethodNames();
 
         // add a test case instance for each method for the specified
         // server config
