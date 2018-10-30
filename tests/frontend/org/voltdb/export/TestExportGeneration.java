@@ -192,7 +192,7 @@ public class TestExportGeneration {
         promoted.await(5, TimeUnit.SECONDS);
 
         int retries = 4000;
-        long seqNo = 0L;
+        long seqNo = 1L;
         boolean active = false;
 
         while( --retries >= 0 && ! active) {
@@ -228,7 +228,7 @@ public class TestExportGeneration {
         m_exportGeneration.pushExportBuffer(
                 m_part,
                 m_tableSignature,
-                /*seqNo*/0L,
+                /*seqNo*/1L,
                 1,
                 foo.duplicate(),
                 false
@@ -252,7 +252,7 @@ public class TestExportGeneration {
 
         m_mbox.send(
                 hsid,
-                new AckPayloadMessage(m_part, m_tableSignature, 0L, 1).asVoltMessage()
+                new AckPayloadMessage(m_part, m_tableSignature, 1L, 1).asVoltMessage()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {

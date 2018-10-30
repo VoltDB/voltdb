@@ -316,17 +316,24 @@ public class ExportGeneration implements Generation {
                                     " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                         }
                         eds.handleQueryResponse(message.m_sourceHSId, requestId, lastSeq);
-                    } else if (msgType == ExportManager.TASK_MASTERSHIP) {
+                    } else if (msgType == ExportManager.TAKE_MASTERSHIP) {
                         final long requestId = buf.getLong();
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Received TASK_MASTERSHIP message(" + requestId +
+                            exportLog.debug("Received TAKE_MASTERSHIP message(" + requestId +
                                     ") for " + eds.toString() +
                                     " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                     " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                         }
                         eds.handleTakeMastershipMessage(message.m_sourceHSId, requestId);
-                    } else if (msgType == ExportManager.TASK_MASTERSHIP_RESPONSE) {
-
+                    } else if (msgType == ExportManager.TAKE_MASTERSHIP_RESPONSE) {
+                        final long requestId = buf.getLong();
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Received TAKE_MASTERSHIP_RESPONSE message(" + requestId +
+                                    ") for " + eds.toString() +
+                                    " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
+                                    " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
+                        }
+                        eds.handleTakeMastershipResponse(message.m_sourceHSId, requestId);
                     } else {
                         exportLog.error("Receive unsupported message type " + message + " in export subsystem");
                     }

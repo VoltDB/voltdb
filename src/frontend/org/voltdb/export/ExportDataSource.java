@@ -622,10 +622,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 cont.discard();
                 return;
             }
-            m_gapTracker.append(startSequenceNumber, lastSequenceNumber);
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Append [" + startSequenceNumber + "," + lastSequenceNumber +"] to gap tracker.");
-            }
 
             try {
                 StreamBlock sb = new StreamBlock(
@@ -646,6 +642,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 " for partition " + m_partitionId);
                     }
                     sb.releaseTo(m_lastReleasedSeqNo);
+                    m_gapTracker.append(m_lastReleasedSeqNo + 1, lastSequenceNumber);
+                } else {
+                    m_gapTracker.append(startSequenceNumber, lastSequenceNumber);
+                }
+
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Append [" +
+                            (isAcked(sb.startSequenceNumber()) ? m_lastReleasedSeqNo + 1 : startSequenceNumber) +
+                            "," + lastSequenceNumber +"] to gap tracker.");
                 }
 
                 m_lastPushedSeqNo = lastSequenceNumber;
@@ -912,6 +917,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             try {
                 Iterator<StreamBlock> iter = m_committedBuffers.iterator();
                 long firstUnpolledSeq = m_firstUnpolledSeqNo;
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("polling data from seqNo " + firstUnpolledSeq);
+                }
                 while (iter.hasNext()) {
                     StreamBlock block = iter.next();
                     // find the first block that has unpolled data
@@ -1215,7 +1223,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         unacceptMastership();
     }
 
-    private void sendTaskMastershipMessage() {
+    private void sendTakeMastershipMessage() {
         m_queryResponses.clear();
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
@@ -1225,7 +1233,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // requestId(8)
             final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
-            buf.put(ExportManager.TASK_MASTERSHIP);
+            buf.put(ExportManager.TAKE_MASTERSHIP);
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
@@ -1235,8 +1243,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 mbx.send(siteId, bpm);
             }
             if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Send TASK_MASTERSHIP message(" + m_currentRequestId +
-                        ") for partition " + m_partitionId + "source signature " + m_tableName +
+                exportLog.debug("Send TAKE_MASTERSHIP message(" + m_currentRequestId +
+                        ") for partition " + m_partitionId + " source signature " + m_tableName +
                         " from " + CoreUtils.hsIdToString(mbx.getHSId()) +
                         " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
             }
@@ -1410,10 +1418,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     return;
                 }
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug(toString() + " decides to claw mastership back from other node.");
+                    exportLog.debug(ExportDataSource.this.toString() + " decides to claw mastership back from other node.");
                 }
                 // Query export membership if current stream is not the master
-                sendTaskMastershipMessage();
+                sendTakeMastershipMessage();
             }
         });
     }
@@ -1495,7 +1503,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             // requestId(8)
             int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
-            buf.put(ExportManager.TASK_MASTERSHIP_RESPONSE);
+            buf.put(ExportManager.TAKE_MASTERSHIP_RESPONSE);
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
@@ -1505,7 +1513,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Partition " + m_partitionId + " mailbox hsid (" +
                         CoreUtils.hsIdToString(mbx.getHSId()) +
-                        ") send TASK_MASTERSHIP_RESPONSE message(" +
+                        ") send TAKE_MASTERSHIP_RESPONSE message(" +
                         requestId + ") to " + CoreUtils.hsIdToString(senderHsId));
             }
         }

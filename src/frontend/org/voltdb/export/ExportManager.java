@@ -119,13 +119,13 @@ public class ExportManager
      * sends TASK_MASTERSHIP to all nodes to ask master to transfer leadership back.
      * If master doesn't exist promote itself to be master.
      */
-    public static final byte TASK_MASTERSHIP = 5;
+    public static final byte TAKE_MASTERSHIP = 5;
 
     /**
-     * Node that receives TASK_MASTERSHIP sends back TASK_MASTERSHIP_RESPONSE to indicate
+     * Node that receives TAKE_MASTERSHIP sends back TAKE_MASTERSHIP_RESPONSE to indicate
      * it's not master.
      */
-    public static final byte TASK_MASTERSHIP_RESPONSE = 6;
+    public static final byte TAKE_MASTERSHIP_RESPONSE = 6;
 
     /**
      * Thrown if the initial setup of the loader fails
