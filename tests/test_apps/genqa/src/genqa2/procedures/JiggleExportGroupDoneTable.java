@@ -26,8 +26,8 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
 public class JiggleExportGroupDoneTable extends VoltProcedure {
-    public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
-    public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_table_foo (txnid) VALUES (?)");
+    public final SQLStmt export = new SQLStmt("INSERT INTO export_done_stream (txnid) VALUES (?)");
+    public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_stream_foo (txnid) VALUES (?)");
 
     public long run(long txid)
     {

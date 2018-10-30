@@ -255,9 +255,9 @@ public class ExportKafkaOnServerVerifier {
 
     //Submit consumer tasks to executor and wait for EOS message then continue on.
     void createAndConsumeKafkaStreams(String topicPrefix, boolean skinny) throws Exception {
-        final String topic = topicPrefix + "EXPORT_PARTITIONED_TABLE";
-        final String topic2 = topicPrefix + "EXPORT_PARTITIONED_TABLE2";
-        final String doneTopic = topicPrefix + "EXPORT_DONE_TABLE";
+        final String topic = topicPrefix + "EXPORT_PARTITIONED_STREAM";
+        final String topic2 = topicPrefix + "EXPORT_PARTITIONED_STREAM2";
+        final String doneTopic = topicPrefix + "EXPORT_DONE_STREAM";
 
         List<Future<Long>> doneFutures = new ArrayList<>();
 
@@ -378,7 +378,7 @@ public class ExportKafkaOnServerVerifier {
         }
 
         if ( missingCnt > 0 ) {
-            System.err.println("ERROR There are '" + missingCnt + "' missing rows");
+            System.err.println("\nERROR There are '" + missingCnt + "' missing rows");
             testGood.set(false);
         } else {
             System.out.println("There were no missing rows");

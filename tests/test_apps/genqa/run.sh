@@ -57,8 +57,12 @@ function clean() {
 
 # compile the source code for procedures and the client
 function srccompile() {
+    # this will create a sp.jar file
     ant -f build.xml
+
+    # this is needed for the customexporter
     mkdir -p obj
+
     javac -classpath $CLASSPATH -d obj \
         src/$APPNAME/*.java \
         src/$APPNAME/procedures/*.java
@@ -72,27 +76,8 @@ function srccompile() {
 }
 
 # build an application catalog
-function catalog() {
+function jars() {
     srccompile
-    #cmd="$VOLTDB compile --classpath obj -o $APPNAME_EXPORT.jar ddl-nocat.sql"
-    #echo $cmd; $cmd
-    let rc=0
-    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo $cmd; $cmd
-    if [ $? != 0 ]; then exit $?; fi
-
-    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME2.jar ddl2.sql"
-    echo $cmd; $cmd
-    if [ $? != 0 ]; then exit $?; fi
-
-    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME3.jar ddl3.sql"
-    echo $cmd; $cmd
-    if [ $? != 0 ]; then exit $?; fi
-
-    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME4.jar ddl4.sql"
-    echo $cmd; $cmd
-    if [ $? != 0 ]; then exit $?; fi
-    #jar cvf sp.jar obj/*
 
     # stop if compilation fails
     rm -rf $EXPORTDATA
@@ -178,8 +163,7 @@ function server-pg-geo() {
 }
 
 function server-custom() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    if [ ! -f $APPNAME.jar ]; then jars; fi
     # Get custom class in jar
     cd obj
     jar cvf ../customexport.jar customexport/*
@@ -218,7 +202,7 @@ function async-benchmark() {
 }
 
 function clean-vertica() {
-    echo "drop table export_partitioned_table" | ssh volt15d /opt/vertica/bin/vsql -U dbadmin test1
+    echo "drop stream export_partitioned_stream" | ssh volt15d /opt/vertica/bin/vsql -U dbadmin test1
 }
 
 function async-export() {
@@ -234,7 +218,6 @@ function async-export() {
         --procedure=JiggleExportSinglePartition \
         --poolsize=100000 \
         --autotune=false \
-        --catalogswap=false \
         --latencytarget=10 \
         --ratelimit=500 \
         --timeout=300
@@ -253,7 +236,6 @@ function async-export-geo() {
         --procedure=JiggleExportGeoSinglePartition \
         --poolsize=100000 \
         --autotune=false \
-        --catalogswap=false \
         --latencytarget=10 \
         --ratelimit=500 \
         --timeout=300
@@ -408,13 +390,8 @@ function stop-postgres() {
     fi
 }
 
-# compile the source code for procedures and the client into jarfiles
-function jars() {
-    ant all
-}
-
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|async-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|jars|server|async-benchmark|async-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 

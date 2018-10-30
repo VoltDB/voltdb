@@ -48,7 +48,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_partitioned_stream PARTITION ON COLUMN rowid EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -104,7 +104,7 @@ CREATE TABLE export_mirror_partitioned_table
 );
 PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE STREAM export_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
+CREATE STREAM export_done_stream PARTITION ON COLUMN txnid EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 );
@@ -154,7 +154,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Replicated Data Table deletions
-CREATE STREAM  export_replicated_table EXPORT TO TARGET abc
+CREATE STREAM  export_replicated_stream EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -181,7 +181,7 @@ CREATE STREAM  export_replicated_table EXPORT TO TARGET abc
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM export_skinny_partitioned_table  PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_skinny_partitioned_stream  PARTITION ON COLUMN rowid EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -202,7 +202,7 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
 
 
 -- Export Stream with extra Geo columns
-CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_geo_partitioned_stream PARTITION ON COLUMN rowid EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -268,14 +268,13 @@ CREATE TABLE export_geo_mirror_partitioned_table
 );
 PARTITION TABLE export_geo_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
+CREATE STREAM export_geo_done_stream PARTITION ON COLUMN txnid EXPORT TO TARGET abc
 (
   txnid                     BIGINT        NOT NULL
 );
 
-
 -- this is analogous to JiggleExportSinglePartition to insert tuples, but has the extra 4 geo columns
-CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_stream COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
 
 -- this is used by the verifier inside JDBCGetData, re-point to the geo tables
 -- DROP PROCEDURE SelectwithLimit IF EXISTS;

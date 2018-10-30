@@ -28,7 +28,7 @@ import org.voltdb.DeprecatedProcedureAPIAccess;
 
 public class JiggleSkinnyExportSinglePartition extends VoltProcedure {
     public final SQLStmt export = new SQLStmt(
-            "INSERT INTO export_skinny_partitioned_table2 (rowid, txnid) VALUES (?,?)"
+            "INSERT INTO export_skinny_partitioned_stream2 (rowid, txnid) VALUES (?,?)"
             );
 
     public long run(long rowid, int reversed) {

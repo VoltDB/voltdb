@@ -238,7 +238,6 @@ public class AsyncExportClient
     // Initialize some common constants and variables
     private static final AtomicLongArray TrackingResults = new AtomicLongArray(2);
 
-    private static File[] catalogs = {new File("genqa.jar"), new File("genqa2.jar")};
     private static File deployment = new File("deployment.xml");
 
     // Connection reference
@@ -282,7 +281,6 @@ public class AsyncExportClient
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
-                .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "true")
                 .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .setArguments(args)
@@ -291,7 +289,6 @@ public class AsyncExportClient
             config = new ConnectionConfig(apph);
 
             // Retrieve parameters
-            final boolean catalogSwap  = apph.booleanValue("catalogswap");
             final String csv           = apph.stringValue("statsfile");
 
             TxnIdWriter writer = new TxnIdWriter("dude", "clientlog");
@@ -355,13 +352,6 @@ public class AsyncExportClient
                     System.exit(-1);
                 }
 
-                swap_count++;
-                if (((swap_count % CATALOG_SWAP_INTERVAL) == 0) && catalogSwap)
-                {
-                    System.out.println("Changing catalogs...");
-                    clientRef.get().updateApplicationCatalog(catalogs[first_cat ? 0 : 1], deployment);
-                    first_cat = !first_cat;
-                }
             }
             shutdown.compareAndSet(false, true);
 

@@ -35,8 +35,8 @@ import genqa.VerifierUtils.Config;
 
 public class JDBCGetData {
     static Connection conn;
-    static String selectSql = "SELECT * FROM \"EXPORT_PARTITIONED_TABLE\" where \"ROWID\" = ?;";
-    static String selectGeoSql = "SELECT * FROM \"EXPORT_GEO_PARTITIONED_TABLE\" where \"ROWID\" = ?;";
+    static String selectSql = "SELECT * FROM \"EXPORT_PARTITIONED_STREAM\" where \"ROWID\" = ?;";
+    static String selectGeoSql = "SELECT * FROM \"EXPORT_GEO_PARTITIONED_STREAM\" where \"ROWID\" = ?;";
     static PreparedStatement selectStmt = null;
 
     /**

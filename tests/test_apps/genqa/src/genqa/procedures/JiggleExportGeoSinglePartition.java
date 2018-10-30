@@ -30,7 +30,7 @@ import org.voltdb.VoltProcedure;
 
 public class JiggleExportGeoSinglePartition extends VoltProcedure {
     public final SQLStmt export = new SQLStmt(
-            "INSERT INTO export_geo_partitioned_table "
+            "INSERT INTO export_geo_partitioned_stream "
             + "(txnid, rowid, rowid_group, type_null_tinyint, "
             + "type_not_null_tinyint, type_null_smallint, "
             + "type_not_null_smallint, type_null_integer, type_not_null_integer, "
