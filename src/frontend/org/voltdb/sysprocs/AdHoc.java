@@ -26,16 +26,14 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import org.apache.calcite.sql.SqlNode;
-import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.newplanner.SqlBatch;
+import org.voltdb.newplanner.SqlTask;
 import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
 
@@ -137,17 +135,20 @@ public class AdHoc extends AdHocNTBase {
      * @author Yiqun Zhang
      */
     private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(SqlBatch batch) {
-        // We batch SqlNode with original SQL DDL stmts together, because we need both.
-        final List<Pair<String, SqlNode>> args =
-                StreamSupport.stream(batch.spliterator(), false)
-                .map(task -> Pair.of(task.getSQL(), task.getParsedQuery()))
-                .collect(Collectors.toList());
-        // NOTE: need to exercise the processAdHocSQLStmtTypes() method, because some tests
-        // (i.e. ENG-7653, TestAdhocCompilerException.java) rely on the code path.
-        // But, we might not need to call it? Certainly it involves some refactory for the check and simulation.
-        args.forEach(pair -> processAdHocSQLStmtTypes(pair.getFirst(), new ArrayList<>()));
-        return runDDLBatch(args.stream().map(Pair::getFirst).collect(Collectors.toList()),
-                args.stream().map(Pair::getSecond).collect(Collectors.toList()));
+        final List<String> sqls = new ArrayList<>(batch.getTaskCount()),
+                validated = new ArrayList<>();
+        final List<SqlNode> nodes = new ArrayList<>(batch.getTaskCount());
+        for (SqlTask task : batch) {
+            final String sql = task.getSQL();
+            sqls.add(sql);
+            nodes.add(task.getParsedQuery());
+            processAdHocSQLStmtTypes(sql, validated);
+            // NOTE: need to exercise the processAdHocSQLStmtTypes() method, because some tests
+            // (i.e. ENG-7653, TestAdhocCompilerException.java) rely on the code path.
+            // But, we might not need to call it? Certainly it involves some refactory for the check and simulation.
+            validated.clear();
+        }
+        return runDDLBatch(sqls, nodes);
     }
 
 

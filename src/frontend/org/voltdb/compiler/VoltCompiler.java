@@ -766,8 +766,10 @@ public class VoltCompiler {
     /**
      * Internal method for compiling with and without a project.xml file or DDL files.
      *
-     * @param projectReader Reader for project file or null if a project file is not used.
-     * @param ddlFilePaths The list of DDL files to compile (when no project is provided).
+     * @param cannonicalDDLIfAny ???
+     * @param previousCatalogIfAny
+     * @param ddlReaderList The list of DDL files to read and compile ??? (when no project is provided).
+     * @param sqlNodes Calcite SqlNodes for DDL stmts
      * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
      * @return The InMemoryJarfile containing the compiled catalog if
      * successful, null if not.  If the caller provided an InMemoryJarfile, the
@@ -912,8 +914,10 @@ public class VoltCompiler {
     /**
      * Internal method for compiling the catalog.
      *
-     * @param database catalog-related info parsed from a project file
+     * @param cannonicalDDLIfAny catalog-related info parsed from a project file ???
+     * @param previousCatalogIfAny previous catalog object, null if not exists
      * @param ddlReaderList Reader objects for ddl files.
+     * @param sqlNodes Calcite SqlNodes for DDL stmts
      * @param jarOutput The in-memory jar to populate or null if the caller doesn't provide one.
      * @return true if successful
      */
@@ -1032,7 +1036,7 @@ public class VoltCompiler {
     /**
      * Load a ddl file with full support for VoltDB extensions (partitioning, procedures,
      * export), AND full support for input via a project xml file's "database" node.
-     * @param database catalog-related info parsed from a project file
+     * @param cannonicalDDLIfAny catalog-related info parsed from a project file
      * @param ddlReaderList Reader objects for ddl files.
      * @param jarOutput The in-memory jar to populate or null if the caller doesn't provide one.
      * @throws VoltCompilerException
@@ -1062,8 +1066,9 @@ public class VoltCompiler {
      * @param db the database entry in the catalog
      * @param hsql an interface to the hsql frontend, initialized and potentially reused by the caller.
      * @param voltDdlTracker non-standard VoltDB schema annotations, initially those from a project file
-     * @param schemas the ddl input files
-     * @param export optional export connector configuration (from the project file)
+     * @param cannonicalDDLIfAny ???
+     * @param previousDBIfAny previous db catalog object, null if not exists???
+     * @param sqlNodes Calcite SqlNodes for DDL stmts
      * @param classDependencies optional additional jar files required by procedures
      * @param whichProcs indicates which ddl-defined procedures to load: none, single-statement, or all
      * @param jarOutput The in-memory jar to populate or null if the caller doesn't provide one.
@@ -1239,9 +1244,11 @@ public class VoltCompiler {
     /**
      * @param db the database entry in the catalog
      * @param hsql an interface to the hsql frontend, initialized and potentially reused by the caller.
-     * @param classDependencies
-     * @param voltDdlTracker non-standard VoltDB schema annotations
+     * @param allProcs ???
+     * @param classDependencies ???
      * @param whichProcs indicates which ddl-defined procedures to load: none, single-statement, or all
+     * @param prevProcsIfAny ???
+     * @param jarOutput The in-memory jar to populate or null if the caller doesn't provide one.
      * @throws VoltCompilerException
      */
     private void compileProcedures(Database db,

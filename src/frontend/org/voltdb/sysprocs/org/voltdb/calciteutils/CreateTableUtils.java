@@ -80,12 +80,26 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 /**
  * Util class to help with "CREATE TABLE" DDL statements through Calcite.
  */
 public class CreateTableUtils {
+    /**
+     * Validate a column with variable length, e.g. VARCHAR/VARBINARY/GEOGRAPHY.
+     * Checks that the length of the column is reasonable.
+     *
+     * @param vt column type
+     * @param tableName table name
+     * @param colName column name
+     * @param size user provided size of the column, as VARCHAR(1024)
+     * @param inBytes whether VARCHAR was specified to be in BYTES, as `VARCHAR(1024 BYTES)`. May get set even when user
+     *                did not explicitly state that the column is in bytes: when user provided length exceeds maximum
+     *                number of CHARACTERs a VARCHAR column could hold.
+     * @return column size and whether the column is in bytes.
+     */
     private static Pair<Integer, Boolean> validateVarLenColumn(VoltType vt, String tableName, String colName, int size, boolean inBytes) {
         if (size < 0) {        // user did not provide, e.g. CREATE TABLE t(i VARCHAR);
             size = vt.defaultLengthForVariableLengthType();
@@ -116,7 +130,14 @@ public class CreateTableUtils {
         return Pair.of(size, inBytes);
     }
 
-    // Allow only NOW/CURRENT_TIMESTAMP functions w/o parenthesis on TIMESTAMP column
+    /**
+     * Checks that the function expression for DEFAULT expr is allowed, and translates into format FUNCTION_NAME:FUNCTION_ID
+     * that is understood by EE. Only "NOW"/"CURRENT_TIMESTAMP" functions w/o parenthesis are allowed.
+     * @param vt column type
+     * @param funName name of function for DEFAULT expr
+     * @param colName name of the column with DEFAULT expr
+     * @return EE-understood form of function call.
+     */
     private static String defaultFunctionValue(VoltType vt, String funName, String colName) {
         if (! funName.equals("NOW") && ! funName.equals("CURRENT_TIMESTAMP")) {
             throw new PlanningErrorException(String.format(
@@ -131,15 +152,23 @@ public class CreateTableUtils {
         }
     }
 
+    /**
+     * Add a column to the table under construction
+     * @param col column declaration
+     * @param t Table containing the column
+     * @param tableName name of the table
+     * @param index 0-based index of the column
+     * @param columnTypes column index -> column type pair that gets inserted per successful column addition
+     * @return size of the column that affects the size of the whole table
+     */
     private static int addColumn(SqlColumnDeclarationWithExpression col, Table t, String tableName,
-                                 AtomicInteger index, Map<Integer, VoltType> columnTypes, Map<String, Index> indexes) {
+                                 AtomicInteger index, Map<Integer, VoltType> columnTypes) {
         final List<SqlNode> nameAndType = col.getOperandList();
         final String colName = nameAndType.get(0).toString();
         final Column column = t.getColumns().add(colName);
         column.setName(colName);
 
         final SqlDataTypeSpec type = (SqlDataTypeSpec) nameAndType.get(1);
-        //final int scale = type.getScale();
         int colSize = type.getPrecision();       // -1 when user did not provide.
         final VoltType vt = ColumnType.getVoltType(type.getTypeName().toString());
         column.setType(vt.getValue());
@@ -188,6 +217,11 @@ public class CreateTableUtils {
         }
     }
 
+    /**
+     * Validate that a column declared to be PRIMARY KEY is actually capable of being a PRIMARY KEY
+     * @param pkeyName name of the primary key
+     * @param col column declared to be primary key
+     */
     private static void validatePKeyColumnType(String pkeyName, Column col) {
         final VoltType vt = VoltType.get((byte) col.getType());
         if (! vt.isIndexable()) {
@@ -201,6 +235,11 @@ public class CreateTableUtils {
         }
     }
 
+    /**
+     * Validate that a UNIQUE or ASSUMEUNIQUE column/expression is actually capable of assuming such index.
+     * @param indexName name of the index
+     * @param e expression containing the list of column(s) that is UNIQUE or ASSUMEUNIQUE
+     */
     private static void validateIndexColumnType(String indexName, AbstractExpression e) {
         StringBuffer sb = new StringBuffer();
         if (! e.isValueTypeIndexable(sb)) {
@@ -214,6 +253,12 @@ public class CreateTableUtils {
         }
     }
 
+    /**
+     * Validate that the list of columns declared to be primary key, when containing more than one column, shall not
+     * contain any GEOGRAPHY column.
+     * @param pkeyName primary key name
+     * @param cols list of columns declared to be primary key
+     */
     private static void validateGeogPKey(String pkeyName, List<Column> cols) {
         if (cols.size() > 1) {
             cols.stream()
@@ -226,6 +271,13 @@ public class CreateTableUtils {
         }
     }
 
+    /**
+     * Validate that the **expression** declared to be UNIQUE or ASSUMEUNIQUE cannot contain any GEOGRAPHY column.
+     * e.g. CREATE TABLE foo(i smallint, j bigint, unique(i + j)) is OK; while
+     * CREATE TABLE foo(i GEOGRAPHY, UNIQUE(NumInteriorRings(i)) is not
+     * @param indexName index name
+     * @param exprs UNIQUE/ASSUMEUNIQUE expression
+     */
     private static void validateGeogIndex(String indexName, List<AbstractExpression> exprs) {
         exprs.stream()
                 .filter(expr -> expr.getValueType() == VoltType.GEOGRAPHY)
@@ -243,6 +295,13 @@ public class CreateTableUtils {
                 });
     }
 
+    /**
+     * Get the list of columns that an index is on. Used in index dedup upon index creation time.
+     * Remember that an index on column a, b is different from an index on column b, a.
+     * @param index catalog index object
+     * @return a list of columns, possibly empty (when index is purely made up of expressions),
+     * that is contained by the index.
+     */
     private static List<Integer> colIndicesOfIndex(Index index) {
         final Iterable<ColumnRef> iterCref = () -> index.getColumns().iterator();
         return StreamSupport
@@ -253,14 +312,14 @@ public class CreateTableUtils {
     }
 
     /**
-     * Generate index name and constraint name for the given SqlTyppe and, either a list of columns, or an expresssion.
+     * Generate index name and constraint name for the given SqlTyppe and, either a list of columns, or an expression.
      * We need two names here to be compatible with what VoltDB had been doing; but having the index and constraint to
      * be the same name does not seems to cause any trouble: indexes and constraints are in different catalog spaces.
      * We need two names with same naming scheme to pass all Jenkins tests.
      * @param type constraint type
      * @param tableName name of table of the constraint
      * @param cols list of columns for the index
-     * @param hasExpression whether the constraint is an expression
+     * @param hasExpression whether the constraint contains an expression, e.g. CREATE TABLE foo(i SMALLINT, j BIGINT, UNIQUE(i, j - i));
      * @return generated (IndexName, ConstraintName)
      */
     private static Pair<String, String> genIndexAndConstraintName(
@@ -287,7 +346,16 @@ public class CreateTableUtils {
         }
     }
 
-    private static void updateConstraint(Constraint cons, Index index, SqlKind type, String indexName, String tableName) {
+    /**
+     * Sets the type of constraint depending on SqlNode content.
+     * @param cons Catalog object for the constraint
+     * @param index Catalog object for the index
+     * @param type Calcite SqlKind specifying the nature of the constraint
+     * @param indexName name of the catalog index
+     * @param tableName name of the catalog table
+     */
+    private static void setConstraintType(
+            Constraint cons, Index index, SqlKind type, String indexName, String tableName) {
         cons.setIndex(index);
         final ConstraintType constraintType;
         switch (type) {
@@ -306,8 +374,21 @@ public class CreateTableUtils {
         cons.setType(constraintType.getValue());
     }
 
+    /**
+     * Create a catalog object for the constraint given all its details
+     * @param type constraint type, used for checking whether it is ASSUMEUNIQUE.
+     * @param t table for the index.
+     * @param indexName name of the index.
+     * @param constraintName name of the constraint. Different from name of the index, as constraint and index
+     *                       are separate catalog objects.
+     * @param hasGeog whether the index contains a Geography column.
+     * @param indexCols list of columns contained in the index. e.g. CREATE TABLE foo(int i, bigint j, UNIQUE(i, j - i)); ==> [i]
+     * @param exprs List of expressions contained in the index. e.g. ... => [j - i]
+     * @return the catalog object for the index
+     */
     private static Index genIndex(SqlKind type, Table t, String indexName, String constraintName, boolean hasGeog,
                                   List<Column> indexCols, List<AbstractExpression> exprs) {
+        // ENG-12475: Hash index is not officially removed.
         final Index index = t.getIndexes().add(indexName);
         if (hasGeog) {
             index.setCountable(false);
@@ -318,7 +399,7 @@ public class CreateTableUtils {
         }
         index.setUnique(true);
         index.setAssumeunique(type == SqlKind.ASSUME_UNIQUE);
-        updateConstraint(t.getConstraints().add(constraintName), index, type, constraintName, t.getTypeName());
+        setConstraintType(t.getConstraints().add(constraintName), index, type, constraintName, t.getTypeName());
         AtomicInteger i = new AtomicInteger(0);
         indexCols.forEach(column -> {
             final ColumnRef cref = index.getColumns().add(column.getName());
@@ -340,7 +421,12 @@ public class CreateTableUtils {
         return index;
     }
 
-    // NOTE/TODO: we get function ID from HSql, which we aim to get rid of.
+    /**
+     * Get the SQL function id recognized by EE.
+     * TODO: Now we get function ID from HSql, which we should get rid of eventually.
+     * @param funName name of SQL function
+     * @return function ID, or -1 if not found.
+     */
     private static int getSqlFunId(String funName) {
         int funId = FunctionSQL.regularFuncMap.get(funName, -1);
         if (funId < 0) {
@@ -349,13 +435,24 @@ public class CreateTableUtils {
         return funId;
     }
 
-    private static TupleValueExpression genIndexFromExpr(SqlIdentifier id, Table t) {
+    /**
+     * Convert a Calcite SqlIdentifier referring to a columne, and the table, to a TupleValueExpression.
+     * @param id identifier for the column
+     * @param t table Catalog object
+     * @return create TVE object
+     */
+    private static TupleValueExpression toTVE(SqlIdentifier id, Table t) {
         final String colName = id.toString();
         assert(t.getColumns().get(colName) != null);
         return new TupleValueExpression(t.getTypeName(), colName, t.getColumns().get(colName).getIndex());
     }
 
-    // Generate index from an expression
+    /**
+     * Convert Calcite expression on a table (e.g. default/unique/pkey expression) to a VoltDB expression.
+     * @param call Calcite expression
+     * @param t the table that the expression is based on
+     * @return VoltDB expression
+     */
     private static AbstractExpression genIndexFromExpr(SqlBasicCall call, Table t) {
         final SqlOperator operator = call.getOperator();
         final AbstractExpression result;
@@ -364,12 +461,13 @@ public class CreateTableUtils {
             final FunctionExpression expr = new FunctionExpression();
             final String funName = operator.getName();
             final int funId = getSqlFunId(funName);
+            assert funId > 0 : String.format("Unrecognized function %s", funName);
             expr.setAttributes(funName, null, funId);
             expr.setArgs(call.getOperandList().stream().map(node -> {
                 if (node instanceof SqlBasicCall) {
                     return genIndexFromExpr((SqlBasicCall) node, t);
                 } else if (node instanceof SqlIdentifier){
-                    return genIndexFromExpr((SqlIdentifier) node, t);
+                    return toTVE((SqlIdentifier) node, t);
                 } else {
                     throw new PlanningErrorException(String.format("Error parsing the function for index: %s",
                             node.toString()));
@@ -395,7 +493,7 @@ public class CreateTableUtils {
         } else {
             List<AbstractExpression> exprs = call.getOperandList().stream().map(node -> {
                 if (node instanceof SqlIdentifier) {
-                    return genIndexFromExpr((SqlIdentifier) node, t);
+                    return toTVE((SqlIdentifier) node, t);
                 } else if (node instanceof SqlNumericLiteral) {
                     final SqlNumericLiteral literal = (SqlNumericLiteral) node;
                     final ConstantValueExpression e = new ConstantValueExpression();
@@ -452,6 +550,11 @@ public class CreateTableUtils {
         return result;
     }
 
+    /**
+     * Process a TTL statement in CREATE TABLE, e.g. CREATE TABLE foo(i int, ...) USING TTL 5 hours on COLUMN i;
+     * @param t table for the TTL statement
+     * @param constraint Calcite object containing all we need to know for the TTL constraint
+     */
     public static void procTTLStmt(Table t, SqlCreateTable.TtlConstraint constraint) {
         if (constraint == null) {
             return;
@@ -484,6 +587,12 @@ public class CreateTableUtils {
         }
     }
 
+    /**
+     *
+     * @param sql
+     * @param init
+     * @return
+     */
     private static List<SqlBasicCall> collectFilterFunctions(SqlNode sql, List<SqlBasicCall> init) {
         if (sql instanceof SqlBasicCall) {
             final SqlBasicCall call = (SqlBasicCall) sql;
@@ -502,40 +611,57 @@ public class CreateTableUtils {
         }
     }
 
+    /**
+     * Add a LIMIT PARTITION ROWS constraint to table, as in
+     * CREATE TABLE foo(i int, .., LIMIT PARTITION ROWS 1000 EXECUTE(DELETE FROM foo WHERE i > 500));
+     * @param t Source table for the constraint
+     * @param hsql HSQL session. We should eventually get rid of this; but the call stack is deeply winded how it is
+     *             passed down and used.
+     * @param constraint Calcite constraint for LIMIT PARTITION ROWS
+     * @return values necessary to pass down to the call chain to do the actual settings for the constraint.
+     */
     private static Pair<Statement, VoltXMLElement> addLimitPartitionRowsConstraint(
             Table t, HSQLInterface hsql, SqlLimitPartitionRowsConstraint constraint) {
-        final int rowCount = constraint.getRowCount();
         final SqlDelete delete = constraint.getDelStmt();
-        final String sql = delete.toSqlString(VoltSqlDialect.DEFAULT)
-                .toString().replace('\n', ' ');
-        assert (delete.getTargetTable().toString().equals(t.getTypeName()));
-        t.setTuplelimit(rowCount);
-        final Statement stmt = t.getTuplelimitdeletestmt().add("limit_delete");
-        stmt.setSqltext(sql);
-        collectFilterFunctions(delete).stream().filter(call -> {
-            if (call.getOperator() instanceof SqlFunction) {
-                return ((SqlFunction) call.getOperator()).getFunctionType() == SqlFunctionCategory.USER_DEFINED_FUNCTION;
+        final String sql = delete.toSqlString(VoltSqlDialect.DEFAULT).toString().replace('\n', ' ');
+        if (! delete.getTargetTable().toString().equals(t.getTypeName())) {
+            throw new PlanningErrorException(String.format(
+                    "Error: the source table (%s) of DELETE statement of LIMIT PARTITION constraint (%s) does not match" +
+                            " the table being created (%s)", delete.getTargetTable().toString(), t.getTypeName(), sql));
+        }
+        collectFilterFunctions(delete).stream().flatMap(call -> {
+            if (call.getOperator() instanceof SqlFunction &&
+                ((SqlFunction) call.getOperator()).getFunctionType() == SqlFunctionCategory.USER_DEFINED_FUNCTION) {
+                final SqlFunction function = (SqlFunction) call.getOperator();
+                return Stream.of(function.getSqlIdentifier().getSimple());
             } else {
-                return false;
+                return Stream.empty();
             }
-        }).map(call -> ((SqlFunction) call.getOperator()).getSqlIdentifier().getSimple())
-                .findFirst().ifPresent(name -> {
+        }).findAny().ifPresent(name -> {
             throw new PlanningErrorException(String.format(
                     "Error: table %s has invalid DELETE statement for LIMIT PARTITION ROWS constraint: " +
                             "user defined function calls are not supported: \"%s\"",
                     t.getTypeName(), name.toLowerCase()));
         });
+        t.setTuplelimit(constraint.getRowCount());
+        final Statement stmt = t.getTuplelimitdeletestmt().add("limit_delete");
+        stmt.setSqltext(sql);
         try { // Note: this ugliness came from how StatementCompiler.compileStatementAndUpdateCatalog()
             // does its bidding; and from how HSQLInterface.getXMLCompiledStatement() needs the HSQL session
             // for its work.
-            return Pair.of(stmt, hsql.getXMLCompiledStatement(stmt.getSqltext()));
+            return Pair.of(stmt, hsql.getXMLCompiledStatement(sql));
         } catch (HSQLInterface.HSQLParseException ex) {
             throw new PlanningErrorException(ex.getMessage());
         }
     }
 
-    private static void addTableAnnotation(Table t) {
+    /**
+     * Set table annotation
+     * @param t source table
+     */
+    private static void addAnnotation(Table t) {
         // TODO: assuming that no mat view is associated with t; and t is not a streaming table
+        // The matview need to reset annotation.ddl with the query, yada yada yada.
         final TableAnnotation annotation = new TableAnnotation();
         annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(), t,
                 null, false, null, null);
@@ -543,6 +669,15 @@ public class CreateTableUtils {
     }
 
     // NOTE: sadly, HSQL is pretty deeply ingrained and it's hard to make this method independent of HSQL.
+
+    /**
+     * API to use for CREATE TABLE ddl stmt.
+     * @param node Calcite SqlNode for parsed CREATE TABLE stmt
+     * @param hsql HSQL session used for LIMIT PARTITION ROWS constraint
+     * @param db catalog database object to insert created table
+     * @return brand new SchemaPlus object containing the table, together with all other pre-existing catalog objects
+     * found in the database; and arguments needed by DDLCompiler.addTableToCatalog() method as this API's only caller.
+     */
     public static Pair<SchemaPlus, Pair<Statement, VoltXMLElement>> addTable(
             SqlNode node, HSQLInterface hsql, Database db) {
         if (node.getKind() != SqlKind.CREATE_TABLE) {           // for now, only partially support CREATE TABLE stmt
@@ -618,7 +753,7 @@ public class CreateTableUtils {
                     break;
                 case COLUMN_DECL:
                     rowSize += addColumn(new SqlColumnDeclarationWithExpression((SqlColumnDeclaration) col),
-                            t, tableName, index, columnTypes, indexMap);
+                            t, tableName, index, columnTypes);
                     if (rowSize > DDLCompiler.MAX_ROW_SIZE) {       // fails when the accumulative row size exeeds limit
                         throw new PlanningErrorException(String.format(
                                 "Error: table %s has a maximum row size of %s but the maximum supported size is %s",
@@ -630,7 +765,7 @@ public class CreateTableUtils {
         }
         t.setSignature(CatalogUtil.getSignatureForTable(tableName, columnTypes));
         procTTLStmt(t, ((SqlCreateTable) node).getTtlConstraint());
-        addTableAnnotation(t);
+        addAnnotation(t);
         return Pair.of(CatalogAdapter.schemaPlusFromDatabase(db), limitRowCatalogUpdate);
     }
 }
