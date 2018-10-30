@@ -41,8 +41,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -91,7 +89,7 @@ public class LeaderAppointer implements Promotable
     private final LeaderCache m_iv2masters;
     private final Map<Integer, PartitionCallback> m_callbacks;
     private final int m_kfactor;
-    private final JSONObject m_topo;
+    private final AbstractTopology m_topo;
     private final MpInitiator m_MPI;
     private final AtomicReference<AppointerState> m_state =
         new AtomicReference<AppointerState>(AppointerState.INIT);
@@ -171,36 +169,13 @@ public class LeaderAppointer implements Promotable
                 // but for now we just look to see how many replicas of this partition we actually expect
                 // and gate leader assignment on that many copies showing up.
                 int replicaCount = m_kfactor + 1;
-                JSONArray parts;
-                Set<Integer> missingHosts = Sets.newHashSet();
-                try {
-                    //A cluster may be started or recovered with missing hosts.
-                    //find all missing hosts, exclude the replica on this missing hosts
-                    JSONArray hosts = m_topo.getJSONArray(AbstractTopology.TOPO_HOSTS);
-                    for (int h = 0; h < hosts.length(); h++) {
-                        JSONObject host = hosts.getJSONObject(h);
-                        boolean isMissing = host.getBoolean(AbstractTopology.TOPO_HOST_MISSING);
-                        if (isMissing) {
-                            missingHosts.add(host.getInt(AbstractTopology.TOPO_HOST_ID));
-                        }
+
+                // A cluster may be started or recovered with missing hosts.
+                // find all missing hosts, exclude the replica on this missing hosts
+                for (Integer peer : m_topo.partitionsById.get(m_partitionId).hostIds) {
+                    if (m_topo.hostsById.get(peer).isMissing) {
+                        --replicaCount;
                     }
-                    parts = m_topo.getJSONArray(AbstractTopology.TOPO_PARTITIONS);
-                    for (int p = 0; p < parts.length(); p++) {
-                        JSONObject aPartition = parts.getJSONObject(p);
-                        if (m_partitionId == aPartition.getInt(AbstractTopology.TOPO_PARTITION_ID)) {
-                            JSONArray replicas = aPartition.getJSONArray(AbstractTopology.TOPO_REPLICA);
-                            replicaCount = replicas.length();
-                            //replica may be placed on a missing node. do not wait for the replica on missing hosts
-                            for (int r = 0; r < replicas.length(); r++) {
-                                if (missingHosts.contains(replicas.getInt(r))) {
-                                    replicaCount--;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                } catch (JSONException e) {
-                    // Ignore and just assume the normal number of replicas
                 }
                 if (children.size() == replicaCount) {
                     m_currentLeader = assignLeader(m_partitionId, Long.MAX_VALUE, updatedHSIds);
@@ -265,21 +240,7 @@ public class LeaderAppointer implements Promotable
             // which has successfully overridden it.
             int masterHostId = -1;
             if (m_state.get() == AppointerState.CLUSTER_START) {
-                try {
-                    // find master in topo
-                    JSONArray parts = m_topo.getJSONArray(AbstractTopology.TOPO_PARTITIONS);
-                    for (int p = 0; p < parts.length(); p++) {
-                        JSONObject aPartition = parts.getJSONObject(p);
-                        int pid = aPartition.getInt(AbstractTopology.TOPO_PARTITION_ID);
-                        if (pid == partitionId) {
-                            masterHostId = aPartition.getInt(AbstractTopology.TOPO_MASTER);
-                            break;
-                        }
-                    }
-                } catch (JSONException jse) {
-                    tmLog.error("Failed to find master for partition " + partitionId + ", defaulting to 0");
-                    masterHostId = -1;
-                }
+                masterHostId = m_topo.partitionsById.get(partitionId).leaderHostId;
             } else {
                 // promote new partition leader when nodes are down
                 masterHostId = newLeaderHostId;
@@ -409,7 +370,7 @@ public class LeaderAppointer implements Promotable
     public LeaderAppointer(HostMessenger hm,
                            int numberOfPartitions,
                            int kfactor,
-                           JSONObject topology,
+                           AbstractTopology topology,
                            MpInitiator mpi,
                            KSafetyStats stats,
                            boolean expectingDrSnapshot)

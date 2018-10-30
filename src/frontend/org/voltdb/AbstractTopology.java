@@ -58,18 +58,18 @@ import com.google_voltpatches.common.collect.Sets;
 public class AbstractTopology {
 
     //Topology JSON keys
-    public final static String TOPO_PARTITIONS = "partitions";
-    public final static String TOPO_PARTITION_ID = "partition_id";
-    public final static String TOPO_MASTER = "master";
-    public final static String TOPO_REPLICA = "replicas";
-    public final static String TOPO_HOST_ID = "host_id";
-    public final static String TOPO_VERSION = "version";
-    public final static String TOPO_HAGROUP = "haGroup";
-    public final static String TOPO_HOSTS = "hosts";
-    public final static String TOPO_HOST_MISSING = "missing";
-    public final static String TOPO_SITES_PER_HOST = "sitesPerHost";
-    public final static String TOPO_REPLICATION_FACTOR = "replicationFactor";
-    public final static String TOPO_UNBALANCED_PART_COUNT = "unbalancedPartitionCount";
+    final static String TOPO_PARTITIONS = "partitions";
+    final static String TOPO_PARTITION_ID = "partition_id";
+    final static String TOPO_MASTER = "master";
+    final static String TOPO_REPLICA = "replicas";
+    final static String TOPO_HOST_ID = "host_id";
+    final static String TOPO_VERSION = "version";
+    final static String TOPO_HAGROUP = "haGroup";
+    final static String TOPO_HOSTS = "hosts";
+    final static String TOPO_HOST_MISSING = "missing";
+    final static String TOPO_SITES_PER_HOST = "sitesPerHost";
+    final static String TOPO_REPLICATION_FACTOR = "replicationFactor";
+    final static String TOPO_UNBALANCED_PART_COUNT = "unbalancedPartitionCount";
 
     public final static String PLACEMENT_GROUP_DEFAULT="0";
 

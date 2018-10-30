@@ -1463,7 +1463,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         m_messenger,
                         m_configuredNumberOfPartitions,
                         m_catalogContext.getDeployment().getCluster().getKfactor(),
-                        topo.topologyToJSON(),
+                        topo,
                         m_MPI,
                         kSafetyStats,
                         expectSyncSnapshot
@@ -2095,12 +2095,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         AbstractTopology topology = null;
         if (startAction == StartAction.JOIN) {
             assert(joinCoordinator != null);
-            JSONObject topoJson = joinCoordinator.getTopology();
-            try {
-                topology = AbstractTopology.topologyFromJSON(topoJson);
-            } catch (JSONException e) {
-                VoltDB.crashLocalVoltDB("Unable to get topology from Json object", true, e);
-            }
+            topology = joinCoordinator.getTopology();
         } else if (startAction.doesRejoin()) {
             topology = TopologyZKUtils.readTopologyFromZK(m_messenger.getZK());
         } else {
