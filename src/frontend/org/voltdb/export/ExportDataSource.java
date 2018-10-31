@@ -1366,6 +1366,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         this.m_status.set(status);
     }
 
+    public boolean isBlocked() {
+        return m_status.get() == streamStatus.BLOCKED;
+    }
+
+    public boolean isMastershipAccepted() {
+        return m_mastershipAccepted.get();
+    }
+
     public void setGapCount(long gapCount) {
         m_gapCount = gapCount;
     }
@@ -1380,6 +1388,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         case RELEASE:
             if (m_status.get().equals(streamStatus.BLOCKED)) {
                 setStatus(streamStatus.ACTIVE);
+                //TO DO: find the new m_firstUnpolledUso from gap tracker.
+                //m_firstUnpolledUso
             }
             break;
         default:

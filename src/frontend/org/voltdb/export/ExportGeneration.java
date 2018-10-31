@@ -46,14 +46,18 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
+import org.voltdb.RealVoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 
@@ -813,14 +817,28 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    public void applyExportControl(String exportSource, List<String> exportTargets, String opMode) {
+    public void applyExportControl(String exportSource, List<String> exportTargets, String opMode, VoltTable results) {
+        exportLog.info("Export " + opMode + " source:" + exportSource + " targets:" + exportTargets);
         synchronized (m_dataSourcesByPartition) {
-            for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
-                Map<String, ExportDataSource> sources = it.next();
-                for (ExportDataSource src : sources.values()) {
-                    if (("".equals(exportSource) || src.getTableName().equalsIgnoreCase(exportSource)) && (
-                            exportTargets.contains(src.getTarget()) || exportTargets.isEmpty())) {
-                        src.applyExportControl(opMode);
+            RealVoltDB volt = (RealVoltDB) VoltDB.instance();
+            for (Iterator<Integer> pIt = m_dataSourcesByPartition.keySet().iterator(); pIt.hasNext();) {
+                // apply to partition leaders only
+                Integer partition = pIt.next();
+                boolean isLeader = ((SpInitiator)volt.getInitiator(partition)).isLeader();
+                Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partition);
+                for (Iterator<ExportDataSource> it = sources.values().iterator(); it.hasNext();) {
+                    ExportDataSource eds = it.next();
+                    if (("".equals(exportSource) || eds.getTableName().equalsIgnoreCase(exportSource)) && (
+                            exportTargets.contains(eds.getTarget()) || exportTargets.isEmpty())) {
+                        if (eds.isBlocked() && eds.isMastershipAccepted()) {
+                            if (isLeader) {
+                                eds.applyExportControl(opMode);
+                                results.addRow(partition, eds.getTableName(), eds.getTarget(), VoltSystemProcedure.STATUS_OK, "");
+                            } else {
+                                results.addRow(partition, eds.getTableName(), eds.getTarget(), VoltSystemProcedure.STATUS_FAILURE,
+                                        "Stream is blocked on partition replica. Waiting for export mastership transfer.");
+                            }
+                        }
                     }
                 }
             }

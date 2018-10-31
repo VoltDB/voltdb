@@ -220,8 +220,7 @@ public class SystemProcedureCatalog {
         builder.put("@NibbleDeleteSP",          new Config("org.voltdb.sysprocs.NibbleDeleteSP",           true,  false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            true,         true ));
         builder.put("@NibbleDeleteMP",          new Config("org.voltdb.sysprocs.NibbleDeleteMP",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            true,         true ));
         builder.put("@LowImpactDeleteNT",       new Config("org.voltdb.sysprocs.LowImpactDeleteNT",        true,  false, false, 0,    VoltType.INVALID,   false, false, false, true,      false,  false,            false,        false ));
-        builder.put("@ExportControlTaskNT",     new Config("org.voltdb.sysprocs.ExportControlNT$ExportControlTaskNT",false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,         false ));
-        builder.put("@ExportControlNT",         new Config("org.voltdb.sysprocs.ExportControlNT",          false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,         false ));
+        builder.put("@ExportControl",           new Config("org.voltdb.sysprocs.ExportControl",            false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
 
         listing = builder.build();
     }

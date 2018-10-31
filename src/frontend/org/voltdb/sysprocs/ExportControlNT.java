@@ -65,7 +65,7 @@ public class ExportControlNT extends VoltNTSystemProcedure {
                     }
                 }
                 LOG.info("Export " + operationMode + " source:" + exportSource + " targets:" + exportTargets);
-                ExportManager.instance().applyExportControl(exportSource, exportTargets, operationMode);
+//                ExportManager.instance().applyExportControl(exportSource, exportTargets, operationMode);
             } catch (IllegalArgumentException | JSONException e){
                 t.addRow(VoltSystemProcedure.STATUS_FAILURE, e.getMessage());
                 return t;

@@ -41,6 +41,7 @@ import org.voltdb.ExportStatsBase;
 import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -708,9 +709,9 @@ public class ExportManager
         return m_exportStats;
     }
 
-    public void applyExportControl(String exportStream, List<String> exportTargets, String opMode) {
+    public void applyExportControl(String exportStream, List<String> exportTargets, String opMode, VoltTable results) {
         if (m_generation.get() != null) {
-           m_generation.get().applyExportControl(exportStream, exportTargets, opMode);
+           m_generation.get().applyExportControl(exportStream, exportTargets, opMode, results);
         }
     }
 }

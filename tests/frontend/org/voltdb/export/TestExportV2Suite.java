@@ -67,7 +67,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
     /**
      * Multi-table test
      */
-    public void testExportMultiTable() throws Exception
+    private void testExportMultiTable() throws Exception
     {
         System.out.println("testExportMultiTable");
         final Client client = getClient();
@@ -111,8 +111,8 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             System.out.println("Waiting for hashinator to be initialized...");
         }
 
-        String s = "{source:\"ALLOW_NULL\",targets:['custom'],command:\"release\"}";
-        VoltTable[] tables = client.callProcedure("@ExportControlNT", s).getResults();
+        String s = "{source:\"ALLOW_NULLS\",targets:['custom'],command:\"release\"}";
+        VoltTable[] tables = client.callProcedure("@ExportControl", s).getResults();
         for (VoltTable t : tables) {
             System.out.println(t.toFormattedString());
         }
@@ -162,7 +162,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         /*
          * compile the catalog all tests start with
          */
-        config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, k_factor,
+        config = new LocalCluster("export-ddl-cluster-rep.jar", 6, 3, k_factor,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);
