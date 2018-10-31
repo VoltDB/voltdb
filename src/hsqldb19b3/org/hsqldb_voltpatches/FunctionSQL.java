@@ -133,7 +133,7 @@ public class FunctionSQL extends Expression {
 
     //
     static IntValueHashMap valueFuncMap   = new IntValueHashMap();
-    static IntValueHashMap regularFuncMap = new IntValueHashMap();
+    public static IntValueHashMap regularFuncMap = new IntValueHashMap();
 
     static {
         regularFuncMap.put(Tokens.T_POSITION, FUNC_POSITION_CHAR);

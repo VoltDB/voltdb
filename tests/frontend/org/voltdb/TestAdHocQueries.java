@@ -605,7 +605,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost", config.m_port);
-
         try {
             for (int len = 2000; len < 100000; len += 1000) {
                 String sql = getQueryForLongQueryTable(len);
@@ -614,13 +613,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
             fail("Query was expected to generate stack overflow error");
         }
         catch (Exception exception) {
-            System.out.println(exception.getMessage());
-            String expectedMsg;
-            expectedMsg = "Encountered stack overflow error. " +
+            final String expectedMsg = "Encountered stack overflow error. " +
                           "Try reducing the number of predicate expressions in the query.";
-            boolean foundMsg = exception.getMessage().contains(expectedMsg);
             assertTrue("Expected text \"" + expectedMsg + "\" did not appear in exception "
-                    + "\"" + exception.getMessage() + "\"", foundMsg);
+                    + "\"" + exception.getMessage() + "\"", exception.getMessage().contains(expectedMsg));
         }
         finally {
             if (m_client != null) {

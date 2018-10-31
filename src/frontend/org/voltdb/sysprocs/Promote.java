@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.ReplicationRole;
@@ -47,6 +48,7 @@ public class Promote extends UpdateApplicationBase {
                                 null,
                                 null,
                                 new String[0],
+                                Collections.emptyList(),
                                 null,
                                 true, /* isPromotion */
                                 useDDLSchema);

@@ -31,19 +31,19 @@ public interface SqlTask {
      * Tell if this {@link SqlTaskImpl} is a DDL task.
      * @return true if this {@code SqlTask} is a DDL task.
      */
-    public boolean isDDL();
+    boolean isDDL();
 
     /**
      * Get the original SQL query text.
      * @return the original SQL query text.
      */
-    public String getSQL();
+    String getSQL();
 
     /**
      * Get the parsed query node tree.
      * @return the parsed query node tree.
      */
-    public SqlNode getParsedQuery();
+    SqlNode getParsedQuery();
 
     /**
      * Create a default {@link SqlTask} from a SQL query.
@@ -52,7 +52,7 @@ public interface SqlTask {
      * @throws SqlParseException when the parsing goes wrong.
      * @throws IllegalArgumentException if the SQL string is null or empty.
      */
-    public static SqlTask create(String sql) throws SqlParseException {
+    static SqlTask create(String sql) throws SqlParseException {
         return new SqlTaskImpl(sql);
     }
 }

@@ -267,6 +267,7 @@ public abstract class CatalogUtil {
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler(isXDCR);
+        // NOTE/TODO: this is not AdHoc code branch. We use the old code path here, and don't update CalciteSchema from VoltDB catalog.
         String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
         return new Pair<>(jarfile, upgradedFromVersion);
     }

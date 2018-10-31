@@ -1212,6 +1212,7 @@ JAVA COMPILATION
    <exec executable="patch" dir="${build.calcite.dir}" failonerror="true" input="${vendor.tar.dir}/commits.patch">
       <arg value="-p1"/>
    </exec>
+   <delete file="${vendor.tar.dir}/commits.patch"/>
    <echo message="Untarred and patched Calcite. Prepare to build." />
    <exec executable="mvn" dir="${build.calcite.dir}" failonerror="true">
       <arg value="install"/>
