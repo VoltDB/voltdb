@@ -88,15 +88,8 @@ import java.util.stream.StreamSupport;
  */
 public class CreateTableUtils {
 
-    /**
-     * Mimick user-observable error message from VoltCompiler.VoltCompilerException, by
-     * clearing stack traces.
-     */
-    private static final class DDLException extends PlanningErrorException {
-        public DDLException(String msg) {
-            super(msg);
-            setStackTrace(new StackTraceElement[0]);
-        }
+    private static void except(String msg) {
+        throw new PlanningErrorException(msg, 0);
     }
     /**
      * Validate a column with variable length, e.g. VARCHAR/VARBINARY/GEOGRAPHY.
@@ -111,11 +104,12 @@ public class CreateTableUtils {
      *                number of CHARACTERs a VARCHAR column could hold.
      * @return column size and whether the column is in bytes.
      */
-    private static Pair<Integer, Boolean> validateVarLenColumn(VoltType vt, String tableName, String colName, int size, boolean inBytes) {
+    private static Pair<Integer, Boolean> validateVarLenColumn(
+            VoltType vt, String tableName, String colName, int size, boolean inBytes) {
         if (size < 0) {        // user did not provide, e.g. CREATE TABLE t(i VARCHAR);
             size = vt.defaultLengthForVariableLengthType();
         } else if (size > VoltType.MAX_VALUE_LENGTH) {
-            throw new DDLException(String.format("%s column %s in table %s has unsupported length %s",
+            except(String.format("%s column %s in table %s has unsupported length %s",
                     vt.toSQLString(), colName, tableName, VoltType.humanReadableSize(size)));
         } else if (vt == VoltType.STRING && size > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
             System.err.println(String.format(       // in place of giving a warning
@@ -126,13 +120,13 @@ public class CreateTableUtils {
                     VoltType.humanReadableSize(size)));
             inBytes = true;
         } else if (size < vt.getMinLengthInBytes()) {
-            throw new DDLException(String.format(
+            except(String.format(
                     "%s column %s in table %s has length of %d which is shorter than %d, the minimum length allowed for the type.",
                     vt.toSQLString(), colName, tableName, size, vt.getMinLengthInBytes()));
         }
         if (vt == VoltType.STRING && ! inBytes &&
                 size * DDLCompiler.MAX_BYTES_PER_UTF8_CHARACTER > VoltType.MAX_VALUE_LENGTH) {
-            throw new DDLException(String.format(
+            except(String.format(
                     "Column %s.%s specifies a maixmum size of %d characters but the maximum supported size is %s characters or %s bytes",
                     tableName, colName, size,
                     VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH / DDLCompiler.MAX_BYTES_PER_UTF8_CHARACTER),
@@ -151,16 +145,12 @@ public class CreateTableUtils {
      */
     private static String defaultFunctionValue(VoltType vt, String funName, String colName) {
         if (! funName.equals("NOW") && ! funName.equals("CURRENT_TIMESTAMP")) {
-            throw new DDLException(String.format(
-                    "Function %s not allowed for DEFAULT value of column declaration",
-                    funName));
+            except(String.format("Function %s not allowed for DEFAULT value of column declaration", funName));
         } else if (vt != VoltType.TIMESTAMP) {
-            throw new DDLException(String.format(
-                    "Function %s not allowed for DEFAULT value of column \"%s\" of %s type",
+            except(String.format("Function %s not allowed for DEFAULT value of column \"%s\" of %s type",
                     funName, colName, vt.getName()));
-        } else {
-            return "CURRENT_TIMESTAMP:43";
         }
+        return "CURRENT_TIMESTAMP:43";
     }
 
     /**
@@ -215,7 +205,7 @@ public class CreateTableUtils {
                 }
                 column.setDefaultvalue(defaultValue);
             } else {
-                throw new DDLException(String.format(
+                except(String.format(
                         "Unsupported default expression for column \"%s\": \"%s\"", colName, expr.toString()));
             }
         } else {
@@ -236,11 +226,11 @@ public class CreateTableUtils {
     private static void validatePKeyColumnType(String pkeyName, Column col) {
         final VoltType vt = VoltType.get((byte) col.getType());
         if (! vt.isIndexable()) {
-            throw new DDLException(String.format("Cannot create index \"%s\" because %s values " +
+            except(String.format("Cannot create index \"%s\" because %s values " +
                             "are not currently supported as index keys: \"%s\"",
                     pkeyName, vt.getName(), col.getName()));
         } else if (! vt.isUniqueIndexable()) {
-            throw new DDLException(String.format("Cannot create index \"%s\" because %s values " +
+            except(String.format("Cannot create index \"%s\" because %s values " +
                             "are not currently supported as unique index keys: \"%s\"",
                     pkeyName, vt.getName(), col.getName()));
         }
@@ -254,11 +244,11 @@ public class CreateTableUtils {
     private static void validateIndexColumnType(String indexName, AbstractExpression e) {
         StringBuffer sb = new StringBuffer();
         if (! e.isValueTypeIndexable(sb)) {
-            throw new DDLException(String.format(
+            except(String.format(
                     "Cannot create index \"%s\" because it contains %s, which is not supported.",
                     indexName, sb));
         } else if (! e.isValueTypeUniqueIndexable(sb)) {
-            throw new DDLException(String.format(
+            except(String.format(
                     "Cannot create unique index \"%s\" because it contains %s, which is not supported",
                     indexName, sb));
         }
@@ -275,7 +265,7 @@ public class CreateTableUtils {
             cols.stream()
                     .filter(column -> column.getType() == VoltType.GEOGRAPHY.getValue()).findFirst()
                     .ifPresent(column -> {
-                        throw new DDLException(String.format(
+                        except(String.format(
                                 "Cannot create index %s because %s values must be the only component of an index key: \"%s\"",
                                 pkeyName, VoltType.GEOGRAPHY.getName(), column.getName()));
                     });
@@ -295,11 +285,11 @@ public class CreateTableUtils {
                 .findFirst()
                 .ifPresent(expr -> {
                     if (exprs.size() > 1) {
-                        throw new DDLException(String.format(
+                        except(String.format(
                                 "Cannot create index \"%s\" because %s values must be the only component of an index key.",
                                 indexName, expr.getValueType().getName()));
                     } else if (! (expr instanceof TupleValueExpression)) {
-                        throw new DDLException(String.format(
+                        except(String.format(
                                 "Cannot create index \"%s\" because %s expressions must be simple value expressions.",
                                 indexName, expr.getValueType().getName()));
                     }
@@ -378,7 +368,8 @@ public class CreateTableUtils {
                 constraintType = ConstraintType.UNIQUE;
                 break;
             default:
-                throw new DDLException(String.format("Unsupported index type %s of index %s on table %s",
+                constraintType = null;
+                except(String.format("Unsupported index type %s of index %s on table %s",
                         type.name(), indexName, tableName));
         }
         cons.setType(constraintType.getValue());
@@ -420,7 +411,7 @@ public class CreateTableUtils {
             try {
                 index.setExpressionsjson(DDLCompiler.convertToJSONArray(exprs));
             } catch (JSONException e) {
-                throw new DDLException(String.format(
+                except(String.format(
                         "Unexpected error serializing non-column expressions for index '%s' on type '%s': %s",
                         indexName, t.getTypeName(), e.toString()));
             }
@@ -473,14 +464,14 @@ public class CreateTableUtils {
             final int funId = getSqlFunId(funName);
             assert funId > 0 : String.format("Unrecognized function %s", funName);
             expr.setAttributes(funName, null, funId);
-            expr.setArgs(call.getOperandList().stream().map(node -> {
+            expr.setArgs(call.getOperandList().stream().flatMap(node -> {
                 if (node instanceof SqlBasicCall) {
-                    return genIndexFromExpr((SqlBasicCall) node, t);
+                    return Stream.of(genIndexFromExpr((SqlBasicCall) node, t));
                 } else if (node instanceof SqlIdentifier){
-                    return toTVE((SqlIdentifier) node, t);
+                    return Stream.of(toTVE((SqlIdentifier) node, t));
                 } else {
-                    throw new DDLException(String.format("Error parsing the function for index: %s",
-                            node.toString()));
+                    except(String.format("Error parsing the function for index: %s", node.toString()));
+                    return Stream.empty();
                 }
             }).collect(Collectors.toList()));
             final VoltType returnType;
@@ -495,7 +486,8 @@ public class CreateTableUtils {
                     returnType = VoltType.TIMESTAMP;
                     break;
                 default:
-                    throw new DDLException(String.format("Unsupported function return type %s for function %s",
+                    returnType = null;
+                    except(String.format("Unsupported function return type %s for function %s",
                             calciteFunc.getFunctionType().toString(), funName));
             }
             expr.setValueType(returnType);
@@ -534,7 +526,8 @@ public class CreateTableUtils {
                         op = ExpressionType.OPERATOR_MOD;
                         break;
                     default:
-                        throw new DDLException(String.format("Found unexpected binary expression operator \"%s\" in %s",
+                        op = null;
+                        except(String.format("Found unexpected binary expression operator \"%s\" in %s",
                                 call.getOperator().getName(), call.toString()));
                 }
                 result = new OperatorExpression(op, exprs.get(0), exprs.get(1));
@@ -547,11 +540,13 @@ public class CreateTableUtils {
                         result = exprs.get(0);
                         break;
                     default:
-                        throw new DDLException(String.format("Found unexpected unary expression operator \"%s\" in %s",
+                        result = null;
+                        except(String.format("Found unexpected unary expression operator \"%s\" in %s",
                                 call.getOperator().getName(), call.toString()));
                 }
             } else {
-                throw new DDLException(String.format("Found Unknown expression operator \"%s\" in %s",
+                result = null;
+                except(String.format("Found Unknown expression operator \"%s\" in %s",
                         call.getOperator().getName(), call.toString()));
             }
         }
@@ -569,25 +564,26 @@ public class CreateTableUtils {
         if (constraint == null) {
             return;
         } else if (constraint.getDuration() <= 0) {
-            throw new DDLException(String.format("Error: TTL on table %s must be positive: got %d",
+            except(String.format("Error: TTL on table %s must be positive: got %d",
                     t.getTypeName(), constraint.getDuration()));
         } else {
             final String ttlColumnName = constraint.getColumn().toString();
             final Column ttlColumn = t.getColumns().get(ttlColumnName);
             if (ttlColumn == null) {
-                throw new DDLException(String.format(
+                except(String.format(
                         "Error: TTL column %s does not exist in table %s", ttlColumnName, t.getTypeName()));
             } else if (! VoltType.get((byte) ttlColumn.getType()).isBackendIntegerType()) {
-                throw new DDLException(String.format(
+                except(String.format(
                         "Error: TTL column %s of type %s in table %s is not allowed. Allowable column types are: %s, %s, %s or %s.",
                         ttlColumnName, VoltType.get((byte) ttlColumn.getType()).getName(), t.getTypeName(),
                         VoltType.INTEGER.getName(), VoltType.TINYINT.getName(),
                         VoltType.BIGINT.getName(), VoltType.TIMESTAMP.getName()));
             } else if (ttlColumn.getNullable()) {
-                throw new DDLException(String.format(
+                except(String.format(
                         "Error: TTL column %s in table %s is required to be NOT NULL.", ttlColumnName, t.getTypeName()));
             }
-            final TimeToLive ttl = t.getTimetolive().add("ttl"); // was set to TimeToLiveVoltDB.TTL_NAME: TimeToLiveVoltDB was a patch to HSQL
+            // was set to TimeToLiveVoltDB.TTL_NAME: TimeToLiveVoltDB was a patch to HSQL
+            final TimeToLive ttl = t.getTimetolive().add("ttl");
             ttl.setTtlcolumn(ttlColumn);
             ttl.setTtlvalue(constraint.getDuration());
             // The TTL batch size and max frequencies were set by HSQL to be these fixed values, and are never used anywhere.
@@ -598,10 +594,10 @@ public class CreateTableUtils {
     }
 
     /**
-     *
-     * @param sql
-     * @param init
-     * @return
+     * Helper function
+     * @param sql Calcite SQL node under inspection
+     * @param init accumulator
+     * @return collected SQL function calls in the Calcite SQL node
      */
     private static List<SqlBasicCall> collectFilterFunctions(SqlNode sql, List<SqlBasicCall> init) {
         if (sql instanceof SqlBasicCall) {
@@ -612,6 +608,11 @@ public class CreateTableUtils {
         return init;
     }
 
+    /**
+     * Collect all SQL function calls contained inside DELETE statement of LIMIT PARTITION ROWS constraint.
+     * @param delete the DELETE statement of LIMIT PARTITION ROWS constraint
+     * @return a list of all SQL function calls in the DELETE statement.
+     */
     private static List<SqlBasicCall> collectFilterFunctions(SqlDelete delete) {
         final SqlNode condition = delete.getCondition();
         if (condition == null) {
@@ -635,7 +636,7 @@ public class CreateTableUtils {
         final SqlDelete delete = constraint.getDelStmt();
         final String sql = delete.toSqlString(VoltSqlDialect.DEFAULT).toString().replace('\n', ' ');
         if (! delete.getTargetTable().toString().equals(t.getTypeName())) {
-            throw new DDLException(String.format(
+            except(String.format(
                     "Error: the source table (%s) of DELETE statement of LIMIT PARTITION constraint (%s) does not match" +
                             " the table being created (%s)", delete.getTargetTable().toString(), t.getTypeName(), sql));
         }
@@ -648,7 +649,7 @@ public class CreateTableUtils {
                 return Stream.empty();
             }
         }).findAny().ifPresent(name -> {
-            throw new DDLException(String.format(
+            except(String.format(
                     "Error: Table %s has invalid DELETE statement for LIMIT PARTITION ROWS constraint: " +
                             "user defined function calls are not supported: \"%s\"",
                     t.getTypeName(), name.toLowerCase()));
@@ -661,7 +662,8 @@ public class CreateTableUtils {
             // for its work.
             return Pair.of(stmt, hsql.getXMLCompiledStatement(sql));
         } catch (HSQLInterface.HSQLParseException ex) {
-            throw new PlanningErrorException(ex.getMessage());
+            except(ex.getMessage());
+            return null;
         }
     }
 
@@ -702,8 +704,7 @@ public class CreateTableUtils {
 
         final int numCols = nodeTableList.getList().size();
         if (numCols > DDLCompiler.MAX_COLUMNS) {
-            throw new PlanningErrorException(String.format("Table %s has %d columns (max is %d)",
-                    tableName, numCols, DDLCompiler.MAX_COLUMNS));
+            except(String.format("Table %s has %d columns (max is %d)", tableName, numCols, DDLCompiler.MAX_COLUMNS));
         }
         int rowSize = 0;
         final AtomicInteger index = new AtomicInteger(0);
@@ -731,7 +732,7 @@ public class CreateTableUtils {
                             nodes.get(0), col.getKind(), tableName, pkCols, ! voltExprs.isEmpty());
                     final String indexName = indexAndConstraintNames.getFirst(), constraintName = indexAndConstraintNames.getSecond();
                     if (nodes.get(1) != null && indexMap.containsKey(indexName)) {  // On detection of duplicated constraint name: bail
-                        throw new PlanningErrorException(String.format(
+                        except(String.format(
                                 "A constraint named %s already exists on table %s.", indexName, tableName));
                     }
                     pkCols.forEach(column -> validatePKeyColumnType(indexName, column));
@@ -739,7 +740,7 @@ public class CreateTableUtils {
                     voltExprs.forEach(e -> validateIndexColumnType(indexName, e));
                     final StringBuffer sb = new StringBuffer(String.format("index %s", indexName));
                     if (! AbstractExpression.validateExprsForIndexesAndMVs(voltExprs, sb, false)) {
-                        throw new PlanningErrorException(sb.toString());
+                        except(sb.toString());
                     }
                     validateGeogIndex(indexName, voltExprs);
                     final boolean hasGeogType =
@@ -765,7 +766,7 @@ public class CreateTableUtils {
                     rowSize += addColumn(new SqlColumnDeclarationWithExpression((SqlColumnDeclaration) col),
                             t, tableName, index, columnTypes);
                     if (rowSize > DDLCompiler.MAX_ROW_SIZE) {       // fails when the accumulative row size exeeds limit
-                        throw new PlanningErrorException(String.format(
+                        except(String.format(
                                 "Error: table %s has a maximum row size of %s but the maximum supported size is %s",
                                 tableName, VoltType.humanReadableSize(rowSize), VoltType.humanReadableSize(DDLCompiler.MAX_ROW_SIZE)));
                     }
