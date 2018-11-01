@@ -48,7 +48,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE STREAM export_partitioned_stream PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_partitioned_stream PARTITION ON COLUMN rowid EXPORT TO TARGET default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -104,7 +104,7 @@ CREATE TABLE export_mirror_partitioned_table
 );
 PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE STREAM export_done_stream PARTITION ON COLUMN txnid EXPORT TO TARGET abc
+CREATE STREAM export_done_stream PARTITION ON COLUMN txnid EXPORT TO TARGET default
 (
   txnid                     BIGINT        NOT NULL
 );
@@ -154,7 +154,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Replicated Data Table deletions
-CREATE STREAM  export_replicated_stream EXPORT TO TARGET abc
+CREATE STREAM  export_replicated_stream EXPORT TO TARGET default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -181,7 +181,7 @@ CREATE STREAM  export_replicated_stream EXPORT TO TARGET abc
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE STREAM export_skinny_partitioned_stream  PARTITION ON COLUMN rowid EXPORT TO TARGET abc
+CREATE STREAM export_skinny_partitioned_stream  PARTITION ON COLUMN rowid EXPORT TO TARGET default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -277,7 +277,7 @@ CREATE STREAM export_geo_done_stream PARTITION ON COLUMN txnid EXPORT TO TARGET 
 CREATE PROCEDURE PARTITION ON TABLE export_geo_partitioned_stream COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGeoSinglePartition;
 
 -- this is used by the verifier inside JDBCGetData, re-point to the geo tables
--- DROP PROCEDURE SelectwithLimit IF EXISTS;
+DROP PROCEDURE SelectwithLimit IF EXISTS;
 CREATE PROCEDURE SelectwithLimit as select * from export_geo_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 END_OF_BATCH
