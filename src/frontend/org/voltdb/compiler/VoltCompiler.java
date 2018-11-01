@@ -828,7 +828,7 @@ public class VoltCompiler {
         }
 
         // WRITE CATALOG TO JAR HERE
-        final String catalogCommands = catalog.serialize();
+        final String catalogCommands = catalog.getOperator().serialize();
 
         byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
 
@@ -2040,7 +2040,7 @@ public class VoltCompiler {
         generateCatalogReport(catalog, canonicalDDL, standaloneCompiler, m_warnings, jarOutput);
 
         // WRITE CATALOG TO JAR HERE
-        final String catalogCommands = catalog.serialize();
+        final String catalogCommands = catalog.getOperator().serialize();
 
         byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
 

@@ -1426,7 +1426,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Configure and start all the IV2 sites
              */
             try {
-                final String serializedCatalog = m_catalogContext.catalog.serialize();
+                final String serializedCatalog = m_catalogContext.catalog.getOperator().serialize();
                 for (Initiator iv2init : m_iv2Initiators.values()) {
                     iv2init.configure(
                             getBackendTargetType(),

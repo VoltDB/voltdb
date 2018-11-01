@@ -95,7 +95,7 @@ public class TestFragmentProgressUpdate extends TestCase {
 
     @SuppressWarnings("deprecation")
     public void testFragmentProgressUpdate() throws Exception {
-        m_ee.loadCatalog( 0, m_catalog.serialize());
+        m_ee.loadCatalog( 0, m_catalog.getOperator().serialize());
 
         int tableSize = 5001;
         int longOpthreshold = 10000;
@@ -151,7 +151,7 @@ public class TestFragmentProgressUpdate extends TestCase {
 
     @SuppressWarnings("deprecation")
     public void testTwoUpdates() throws Exception {
-        m_ee.loadCatalog( 0, m_catalog.serialize());
+        m_ee.loadCatalog( 0, m_catalog.getOperator().serialize());
 
         int tableSize = 10000;
         int longOpthreshold = 10000;
@@ -270,7 +270,7 @@ public class TestFragmentProgressUpdate extends TestCase {
 
     @SuppressWarnings("deprecation")
     public void testPeakLargerThanCurr() throws Exception {
-        m_ee.loadCatalog( 0, m_catalog.serialize());
+        m_ee.loadCatalog( 0, m_catalog.getOperator().serialize());
 
         int tableSize = 20000;
         int longOpthreshold = 10000;
@@ -437,7 +437,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             boolean readOnly,
             SqlTextExpectation sqlTextExpectation) {
 
-        m_ee.loadCatalog( 0, m_catalog.serialize());
+        m_ee.loadCatalog( 0, m_catalog.getOperator().serialize());
 
         m_itemData.clearRowData();
         for (int i = 0; i < numRowsToInsert; ++i) {

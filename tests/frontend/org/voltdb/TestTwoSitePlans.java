@@ -157,7 +157,7 @@ public class TestTwoSitePlans extends TestCase {
         Future<?> loadComplete = site1Thread.submit(new Runnable() {
             @Override
             public void run() {
-                ee1.loadCatalog( 0, catalog.serialize());
+                ee1.loadCatalog( 0, catalog.getOperator().serialize());
             }
         });
 
@@ -165,7 +165,7 @@ public class TestTwoSitePlans extends TestCase {
         site2Thread.submit(new Runnable() {
             @Override
             public void run() {
-                ee2.loadCatalog( 0, catalog.serialize());
+                ee2.loadCatalog( 0, catalog.getOperator().serialize());
             }
         }).get();
         loadComplete.get();

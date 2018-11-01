@@ -957,7 +957,7 @@ public class TestVoltCompiler extends TestCase {
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         Catalog c2 = new Catalog();
         c2.getOperator().execute(catalogContents);
-        assertTrue(c2.serialize().equals(c1.serialize()));
+        assertTrue(c2.getOperator().serialize().equals(c1.getOperator().serialize()));
     }
 
     public void testDdlProcVarbinary() throws IOException {
@@ -984,7 +984,7 @@ public class TestVoltCompiler extends TestCase {
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         Catalog c2 = new Catalog();
         c2.getOperator().execute(catalogContents);
-        assertTrue(c2.serialize().equals(c1.serialize()));
+        assertTrue(c2.getOperator().serialize().equals(c1.getOperator().serialize()));
     }
 
     //

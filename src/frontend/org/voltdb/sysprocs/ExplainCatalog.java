@@ -30,7 +30,7 @@ public class ExplainCatalog extends AdHocNTBase {
 
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
         VoltTable[] ret = new VoltTable[] { new VoltTable(new VoltTable.ColumnInfo("CATALOG", VoltType.STRING)) };
-        ret[0].addRow(VoltDB.instance().getCatalogContext().catalog.serialize());
+        ret[0].addRow(VoltDB.instance().getCatalogContext().catalog.getOperator().serialize());
         ClientResponseImpl response =
                 new ClientResponseImpl(ClientResponseImpl.SUCCESS, ret, null);
         CompletableFuture<ClientResponse> fut = new CompletableFuture<>();

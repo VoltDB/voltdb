@@ -24,9 +24,10 @@
 package org.voltdb.utils;
 
 import java.io.IOException;
-import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+
+import junit.framework.TestCase;
 
 public class TestCompressionService extends TestCase {
 
@@ -39,7 +40,7 @@ public class TestCompressionService extends TestCase {
     }
 
     public void testB64WithBigness() throws IOException {
-        String someText = TPCCProjectBuilder.getTPCCSchemaCatalog().serialize();
+        String someText = TPCCProjectBuilder.getTPCCSchemaCatalog().getOperator().serialize();
 
         String b64Text = CompressionService.compressAndBase64Encode(someText);
         String result = CompressionService.decodeBase64AndDecompress(b64Text);

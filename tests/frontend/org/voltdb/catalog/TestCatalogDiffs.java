@@ -158,8 +158,8 @@ public class TestCatalogDiffs extends TestCase {
             assertEquals(expectedNewGeneration.booleanValue(), diff.requiresNewExportGeneration());
         }
         if (execute) {
-            String updatedOriginalSerialized = catOriginal.serialize();
-            assertEquals(updatedOriginalSerialized, catUpdated.serialize());
+            String updatedOriginalSerialized = catOriginal.getOperator().serialize();
+            assertEquals(updatedOriginalSerialized, catUpdated.getOperator().serialize());
         }
 
         assertEquals(expectedSecurityChange, diff.hasSecurityUserChanges());
@@ -177,16 +177,16 @@ public class TestCatalogDiffs extends TestCase {
             Catalog catUpdated)
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        String originalSerialized = catOriginal.serialize();
+        String originalSerialized = catOriginal.getOperator().serialize();
         catOriginal.getOperator().execute(diff.commands());
-        String updatedOriginalSerialized = catOriginal.serialize();
+        String updatedOriginalSerialized = catOriginal.getOperator().serialize();
         if (diff.supported()) {
             System.out.println("TCD DEBUG Unexpectedly accepted difference:\n");
             System.out.println("TCD DEBUG BEFORE: " + originalSerialized);
             System.out.println("TCD DEBUG  AFTER: " + updatedOriginalSerialized);
         }
         assertFalse(diff.supported());
-        assertEquals(updatedOriginalSerialized, catUpdated.serialize());
+        assertEquals(updatedOriginalSerialized, catUpdated.getOperator().serialize());
     }
 
     private void verifyDiffIfEmptyTable(
@@ -195,10 +195,10 @@ public class TestCatalogDiffs extends TestCase {
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
         catOriginal.getOperator().execute(diff.commands());
-        String updatedOriginalSerialized = catOriginal.serialize();
+        String updatedOriginalSerialized = catOriginal.getOperator().serialize();
         assertTrue(diff.supported());
         assertTrue(diff.tablesThatMustBeEmpty()[0].length > 0);
-        assertEquals(updatedOriginalSerialized, catUpdated.serialize());
+        assertEquals(updatedOriginalSerialized, catUpdated.getOperator().serialize());
     }
 
 
@@ -427,8 +427,8 @@ public class TestCatalogDiffs extends TestCase {
         // don't reach this point.
         c3.getOperator().execute(diff.commands());
         assertTrue(diff.supported());
-        String updatedOriginalSerialized = c3.serialize();
-        assertEquals(updatedOriginalSerialized, c4.serialize());
+        String updatedOriginalSerialized = c3.getOperator().serialize();
+        assertEquals(updatedOriginalSerialized, c4.getOperator().serialize());
     }
 
     // N.B. Some of the testcases assume this exact table structure... if you change it,

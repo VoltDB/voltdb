@@ -597,7 +597,7 @@ public class TestCatalogUtil extends TestCase {
 
         CatalogUtil.compileDeployment(catalog, depPath, false);
 
-        String commands = catalog.serialize();
+        String commands = catalog.getOperator().serialize();
         System.out.println(commands);
 
     }

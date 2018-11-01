@@ -219,6 +219,6 @@ public class PlannerTestAideDeCamp {
         return db.getCatalog();
     }
     public String getCatalogString() {
-        return db.getCatalog().serialize();
+        return db.getCatalog().getOperator().serialize();
     }
 }

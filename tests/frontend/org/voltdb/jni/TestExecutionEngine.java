@@ -65,7 +65,7 @@ public class TestExecutionEngine extends TestCase {
 
     public void testLoadCatalogs() throws Exception {
         initializeSourceEngine(1);
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+        sourceEngine.loadCatalog( 0, m_catalog.getOperator().serialize());
         terminateSourceEngine();
     }
 
@@ -76,7 +76,7 @@ public class TestExecutionEngine extends TestCase {
          * loaded. We are really expecting an ERROR message on the terminal in
          * this case.
          */
-        String badCatalog = m_catalog.serialize().replaceFirst("set", "bad");
+        String badCatalog = m_catalog.getOperator().serialize().replaceFirst("set", "bad");
         try {
             sourceEngine.loadCatalog( 0, badCatalog);
         } catch (final EEException e) {
@@ -152,7 +152,7 @@ public class TestExecutionEngine extends TestCase {
 
     public void testLoadTable() throws Exception {
         initializeSourceEngine(1);
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+        sourceEngine.loadCatalog( 0, m_catalog.getOperator().serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
@@ -172,7 +172,7 @@ public class TestExecutionEngine extends TestCase {
         project.addLiteralSchema("create table test (msg VARCHAR(200 bytes));");
         Catalog catalog = project.compile("ENG-14346.jar", 1, 1, 0, null);
         assert(catalog != null);
-        sourceEngine.loadCatalog(0, catalog.serialize());
+        sourceEngine.loadCatalog(0, catalog.getOperator().serialize());
 
         int TEST_TABLEID = catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("TEST").getRelativeIndex();
         VoltTable testTable = new VoltTable(new VoltTable.ColumnInfo("MSG", VoltType.STRING));
@@ -230,13 +230,13 @@ public class TestExecutionEngine extends TestCase {
         es.execute(new Runnable() {
             @Override
             public void run() {
-                source2Engine.get().loadCatalog( 0, m_twoSiteCatalog.serialize());
+                source2Engine.get().loadCatalog( 0, m_twoSiteCatalog.getOperator().serialize());
             }
         });
 
         initializeSourceEngine(2);
 
-        sourceEngine.loadCatalog( 0, m_twoSiteCatalog.serialize());
+        sourceEngine.loadCatalog( 0, m_twoSiteCatalog.getOperator().serialize());
 
         Future<byte[]> ft = es.submit(new Callable<byte[]>() {
             @Override
@@ -322,13 +322,13 @@ public class TestExecutionEngine extends TestCase {
         es.execute(new Runnable() {
             @Override
             public void run() {
-                destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+                destinationEngine.get().loadCatalog( 0, m_catalog.getOperator().serialize());
             }
         });
 
         initializeSourceEngine(2);
 
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+        sourceEngine.loadCatalog( 0, m_catalog.getOperator().serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
@@ -428,7 +428,7 @@ public class TestExecutionEngine extends TestCase {
 
     public void testGetStats() throws Exception {
         initializeSourceEngine(1);
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+        sourceEngine.loadCatalog( 0, m_catalog.getOperator().serialize());
 
         final int WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
         final int STOCK_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
@@ -472,12 +472,12 @@ public class TestExecutionEngine extends TestCase {
         es.execute(new Runnable() {
             @Override
             public void run() {
-                destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+                destinationEngine.get().loadCatalog( 0, m_catalog.getOperator().serialize());
             }
         });
 
         initializeSourceEngine(2);
-        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+        sourceEngine.loadCatalog( 0, m_catalog.getOperator().serialize());
 
         int STOCK_TABLEID = stockTableId(m_catalog);
 
