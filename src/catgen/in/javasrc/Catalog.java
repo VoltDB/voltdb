@@ -78,21 +78,6 @@ public class Catalog extends CatalogType {
         return null;
     }
 
-    /**
-     * Serialize the catalog to a string representation. This actually
-     * creates a set of catalog commands which, re-run in order on an
-     * empty catalog, will recreate this catalog exactly.
-     * @return The serialized string representation of the catalog.
-     */
-    public String serialize() {
-        StringBuilder sb = new StringBuilder();
-
-        writeFieldCommands(sb, null);
-        writeChildCommands(sb);
-
-        return sb.toString();
-    }
-
     public Catalog deepCopy() {
         Catalog copy = new Catalog();
         // Note that CatalogType.deepCopy isn't called on the catalog node.
@@ -160,10 +145,5 @@ public class Catalog extends CatalogType {
         if ((m_clusters != null) && !m_clusters.equals(other.m_clusters)) return false;
 
         return true;
-    }
-
-    @Override
-    void writeCreationCommand(StringBuilder sb) {
-        return;
     }
 }

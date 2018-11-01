@@ -78,7 +78,7 @@ public class CatalogOperator {
      * @param path the path from the parent node to the wanted node.
      * @return the catalog item at the specified path under the parent node.
      */
-    static CatalogType getItemForPathPart(CatalogType parent, String path) {
+    private static CatalogType getItemForPathPart(CatalogType parent, String path) {
         if (path.length() == 0) {
             return parent;
         }
@@ -101,7 +101,7 @@ public class CatalogOperator {
      * Execute one catalog command.
      * @param cmdStr the catalog command string.
      */
-    void executeOne(String cmdStr) {
+    private void executeOne(String cmdStr) {
         CatalogCommand catCmd = new CatalogCommand(cmdStr);
 
         // Resolve the ref to a node in the catalog
@@ -160,5 +160,17 @@ public class CatalogOperator {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Serialize the catalog to a string representation. This actually
+     * creates a set of catalog commands which, re-run in order on an
+     * empty catalog, will recreate this catalog exactly.
+     * @return The serialized string representation of the catalog.
+     */
+    public String serialize() {
+        CatalogSerializer serializer = new CatalogSerializer();
+        m_catalog.accept(serializer);
+        return serializer.getResult();
     }
 }

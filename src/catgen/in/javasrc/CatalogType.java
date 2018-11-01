@@ -113,6 +113,14 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     Object m_attachment = null;
 
     /**
+     * Accept a {@link CatalogVisitor}.
+     * @param visitor the visitor.
+     */
+    public void accept(CatalogVisitor visitor) {
+        visitor.visit(this);
+    }
+
+    /**
      * Gets any annotation added to this instance.
      * @return Annotation object or null.
      */
@@ -181,10 +189,10 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     public Catalog getCatalog() {
         return m_parentMap.m_catalog;
     }
-    
+
     /**
      * Get the operator for the root catalog object for this item.
-     * @return the operator for the base catalog object. 
+     * @return the operator for the base catalog object.
      */
     public CatalogOperator getOperator() {
         return getCatalog().getOperator();
@@ -241,70 +249,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     }
 
     abstract void set(String field, String value);
-
-    void writeCreationCommand(StringBuilder sb) {
-        sb.append("add ");
-        m_parentMap.m_parent.getCatalogPath(sb);
-        sb.append(' ');
-        sb.append(m_parentMap.m_name);
-        sb.append(' ');
-        sb.append(m_typename);
-        sb.append("\n");
-    }
-
-    void writeCommandForField(StringBuilder sb, String field, boolean printFullPath) {
-        sb.append("set ");
-        if (printFullPath) {
-            getCatalogPath(sb);
-            sb.append(' ');
-        }
-        else {
-            sb.append("$PREV "); // use caching to shrink output + speed parsing
-        }
-        sb.append(field).append(' ');
-        Object value = getField(field);
-        if (value == null) {
-            sb.append("null");
-        }
-        else if (value.getClass() == Integer.class)
-            sb.append(value);
-        else if (value.getClass() == Boolean.class)
-            sb.append(Boolean.toString((Boolean)value));
-        else if (value.getClass() == String.class)
-            sb.append("\"").append(value).append("\"");
-        else if (value instanceof CatalogType)
-            ((CatalogType)value).getCatalogPath(sb);
-        else
-            throw new CatalogException("Unsupported field type '" + value + "'");
-        sb.append("\n");
-    }
-
-    void writeFieldCommands(StringBuilder sb, Set<String> whiteListFields) {
-        int i = 0;
-        for (String field : getFields()) {
-            if (whiteListFields == null || whiteListFields.contains(field)) {
-                writeCommandForField(sb, field, i == 0);
-                ++i;
-            }
-        }
-    }
-
-    void writeChildCommands(StringBuilder sb)  {
-        writeChildCommands(sb, null, null);
-    }
-
-    /**
-     * Write catalog commands of the children in the white list.
-     * @param whiteList A white list of CatalogType classes
-     */
-    void writeChildCommands(StringBuilder sb, Collection<Class<? extends CatalogType> > whiteList, Set<String> whiteListFields)  {
-        for (String childCollection : getChildCollections()) {
-            CatalogMap<? extends CatalogType> map = getCollection(childCollection);
-            if (whiteList == null || whiteList.contains(map.m_cls)) {
-                map.writeCommandsForMembers(sb, whiteListFields);
-            }
-        }
-    }
 
     @Override
     public int compareTo(CatalogType o) {

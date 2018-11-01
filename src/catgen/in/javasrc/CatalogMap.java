@@ -197,11 +197,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         m_items.clear();
     }
 
-    void writeCommandsForMembers(StringBuilder sb, Set<String> whiteListFields) {
-        for (T type : this) {
-            type.writeCreationCommand(sb);
-            type.writeFieldCommands(sb, whiteListFields);
-            type.writeChildCommands(sb);
+    void accept(CatalogVisitor visitor) {
+        for (T item : this) {
+            item.accept(visitor);
         }
     }
 

@@ -73,6 +73,8 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     os.system( interp( "cp $prepath/CatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/CatalogOperator.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/CatalogCommand.java $postpath", locals() ) )
+    os.system( interp( "cp $prepath/CatalogVisitor.java $postpath", locals() ) )
+    os.system( interp( "cp $prepath/CatalogSerializer.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/FilteredCatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/DRCatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/DRCatalogCommands.java $postpath", locals() ) )
