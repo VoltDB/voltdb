@@ -1395,11 +1395,15 @@ public class LocalCluster extends VoltServerConfig {
 
     //create a new node and join to the cluster via rejoin
     public void rejoinOne(int hostId) {
+        rejoinOne(hostId, true);
+    }
+
+    public void rejoinOne(int hostId, boolean clearLocalDataDirectories) {
         try {
             if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
                 initLocalServer(hostId, true);
             }
-            startOne(hostId, true, StartAction.REJOIN, true, null);
+            startOne(hostId, clearLocalDataDirectories, StartAction.REJOIN, true, null);
         }
         catch (IOException ioe) {
             throw new RuntimeException(ioe);

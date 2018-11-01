@@ -213,6 +213,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
         m_firstUnpolledSeqNo = m_gapTracker.isEmpty() ? 1L : m_gapTracker.getFirstSeqNo();
+        m_lastReleasedSeqNo = m_firstUnpolledSeqNo - 1;
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " reads gap tracker from PBD:" + m_gapTracker.toString());
         }
@@ -350,8 +351,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
         m_firstUnpolledSeqNo = m_gapTracker.isEmpty() ? 1L : m_gapTracker.getFirstSeqNo();
+        m_lastReleasedSeqNo = m_firstUnpolledSeqNo - 1;
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug(toString() + " reads gap tracker from PBD:" + m_gapTracker.toString());
+            exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
         }
         //EDS created from adfile is always from disk.
         m_isInCatalog = false;
@@ -602,8 +604,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             boolean sync,
             boolean poll) throws Exception {
         final java.util.concurrent.atomic.AtomicBoolean deleted = new java.util.concurrent.atomic.AtomicBoolean(false);
+        long lastSequenceNumber = calcEndSequenceNumber(startSequenceNumber, tupleCount);
         if (exportLog.isTraceEnabled()) {
-            exportLog.trace("pushExportBufferImpl with seq=" + startSequenceNumber + ", sync=" + sync + ", poll=" + poll);
+            exportLog.trace("pushExportBufferImpl [" + startSequenceNumber + "," +
+                    lastSequenceNumber + "], sync=" + sync + ", poll=" + poll);
         }
         if (buffer != null) {
             // header space along is 8 bytes
@@ -611,7 +615,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buffer.order(ByteOrder.LITTLE_ENDIAN);
             // Drop already acked buffer
             final BBContainer cont = DBBPool.wrapBB(buffer);
-            long lastSequenceNumber = calcEndSequenceNumber(startSequenceNumber, tupleCount);
             if (isAcked(lastSequenceNumber)) {
                 m_tupleCount += tupleCount;
                 if (exportLog.isDebugEnabled()) {
@@ -621,6 +624,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 cont.discard();
                 return;
+            }
+
+            m_gapTracker.addRange(startSequenceNumber, lastSequenceNumber);
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Append [" + startSequenceNumber + "," + lastSequenceNumber +"] to gap tracker.");
             }
 
             try {
@@ -642,15 +650,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 " for partition " + m_partitionId);
                     }
                     sb.releaseTo(m_lastReleasedSeqNo);
-                    m_gapTracker.append(m_lastReleasedSeqNo + 1, lastSequenceNumber);
-                } else {
-                    m_gapTracker.append(startSequenceNumber, lastSequenceNumber);
-                }
-
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Append [" +
-                            (isAcked(sb.startSequenceNumber()) ? m_lastReleasedSeqNo + 1 : startSequenceNumber) +
-                            "," + lastSequenceNumber +"] to gap tracker.");
                 }
 
                 m_lastPushedSeqNo = lastSequenceNumber;
@@ -1410,6 +1409,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     void takeMastership() {
+        // Skip current master
+        if (m_mastershipAccepted.get()) {
+            return;
+        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {

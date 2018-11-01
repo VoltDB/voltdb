@@ -1697,7 +1697,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 handleHostsFailedForMigratePartitionLeader(failedHosts);
-                takeExportStreamMastership();
+                checkExportStreamMastership();
 
                 // Send KSafety trap - BTW the side effect of
                 // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
@@ -1804,15 +1804,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private void takeExportStreamMastership() {
+    // Check to see if stream master is colocated with partition leader, if not ask stream master to
+    // move back to partition leader's node.
+    private void checkExportStreamMastership() {
         for (Initiator initiator : m_iv2Initiators.values()) {
             if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
                 SpInitiator spInitiator = (SpInitiator)initiator;
                 if (spInitiator.isLeader()) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Export Manager has been notified that local partition " +
-                                  spInitiator.getPartitionId() + " to reevaluate export stream master.");
-                    }
                     ExportManager.instance().takeMastership(spInitiator.getPartitionId());
                 }
             }
@@ -2231,6 +2229,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
         }, 0, 6, TimeUnit.MINUTES));
+
+        // export stream master check
+        m_periodicWorks.add(scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                checkExportStreamMastership();
+            }
+        }, 0, 1, TimeUnit.MINUTES));
 
         // other enterprise setup
         EnterpriseMaintenance em = EnterpriseMaintenance.get();
