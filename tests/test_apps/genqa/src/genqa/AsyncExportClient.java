@@ -350,7 +350,7 @@ public class AsyncExportClient
                                                   0);
                 }
                 catch (Exception e) {
-                    System.err.println("Exception: " + e);
+                    System.err.println("FATAL Exception: " + e);
                     e.printStackTrace();
                     System.exit(-1);
                 }
