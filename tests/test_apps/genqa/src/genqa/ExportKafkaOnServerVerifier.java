@@ -359,7 +359,6 @@ public class ExportKafkaOnServerVerifier {
                 System.err.println("out of sequence id: "+id+ " > " + lastId);
             }
             if ( id == lastId ) {
-                System.err.println("duplicate id: "+id );
                 duplicateCnt++;
                 continue;
             }
@@ -368,11 +367,6 @@ public class ExportKafkaOnServerVerifier {
                 missingCnt++;
                 System.out.print(currVal+",");
                 currVal++;
-            }
-            if ( currVal > id ) {
-                // this should happen unless they are out of order.
-                System.err.println("oops currVal > id "+currVal + " > " + id);
-                continue;
             }
             currVal++;
         }
