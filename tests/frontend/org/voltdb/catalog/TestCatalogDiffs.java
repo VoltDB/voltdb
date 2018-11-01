@@ -96,7 +96,7 @@ public class TestCatalogDiffs extends TestCase {
                 CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
-        c.execute(serializedCatalog);
+        c.getOperator().execute(serializedCatalog);
         return c;
     }
 
@@ -141,7 +141,7 @@ public class TestCatalogDiffs extends TestCase {
         System.out.println(commands);
         //If we want to just compare catalogs back and forth keep catalog intact.
         if (execute) {
-            catOriginal.execute(commands);
+            catOriginal.getOperator().execute(commands);
         }
         assertTrue(diff.supported());
         assertEquals(0, diff.tablesThatMustBeEmpty()[0].length);
@@ -178,7 +178,7 @@ public class TestCatalogDiffs extends TestCase {
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
         String originalSerialized = catOriginal.serialize();
-        catOriginal.execute(diff.commands());
+        catOriginal.getOperator().execute(diff.commands());
         String updatedOriginalSerialized = catOriginal.serialize();
         if (diff.supported()) {
             System.out.println("TCD DEBUG Unexpectedly accepted difference:\n");
@@ -194,7 +194,7 @@ public class TestCatalogDiffs extends TestCase {
             Catalog catUpdated)
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        catOriginal.execute(diff.commands());
+        catOriginal.getOperator().execute(diff.commands());
         String updatedOriginalSerialized = catOriginal.serialize();
         assertTrue(diff.supported());
         assertTrue(diff.tablesThatMustBeEmpty()[0].length > 0);
@@ -425,7 +425,7 @@ public class TestCatalogDiffs extends TestCase {
 
         CatalogDiffEngine diff = new CatalogDiffEngine(c3, c4);
         // don't reach this point.
-        c3.execute(diff.commands());
+        c3.getOperator().execute(diff.commands());
         assertTrue(diff.supported());
         String updatedOriginalSerialized = c3.serialize();
         assertEquals(updatedOriginalSerialized, c4.serialize());

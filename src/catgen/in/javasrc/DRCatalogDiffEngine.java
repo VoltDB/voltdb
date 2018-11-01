@@ -101,7 +101,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         Catalog deserializedMasterCatalog = new Catalog();
         Cluster c = deserializedMasterCatalog.getClusters().add("cluster");
         Database db = c.getDatabases().add("database");
-        deserializedMasterCatalog.execute(catalogCommands);
+        deserializedMasterCatalog.getOperator().execute(catalogCommands);
 
         if (db.getIsactiveactivedred()) {
             // The catalog came from an old version, set DR role here

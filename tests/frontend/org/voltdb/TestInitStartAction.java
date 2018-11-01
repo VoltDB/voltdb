@@ -279,14 +279,14 @@ final public class TestInitStartAction {
         assertEquals(true, success);
         InMemoryJarfile referenceCatalogJar = new InMemoryJarfile(referenceFile);
         Catalog referenceCatalog = new Catalog();
-        referenceCatalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(referenceCatalogJar));
+        referenceCatalog.getOperator().execute(CatalogUtil.getSerializedCatalogStringFromJar(referenceCatalogJar));
 
         // verify that the staged catalog is identical
         File stagedJarFile = new VoltFile(RealVoltDB.getStagedCatalogPath(rootDH.getPath() + File.separator + "voltdbroot"));
         assertEquals(true, stagedJarFile.isFile());
         InMemoryJarfile stagedCatalogJar = new InMemoryJarfile(stagedJarFile);
         Catalog stagedCatalog = new Catalog();
-        stagedCatalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(stagedCatalogJar));
+        stagedCatalog.getOperator().execute(CatalogUtil.getSerializedCatalogStringFromJar(stagedCatalogJar));
 
         assertEquals(true, referenceCatalog.equals(stagedCatalog));
         assertEquals(true, stagedCatalog.equals(referenceCatalog));

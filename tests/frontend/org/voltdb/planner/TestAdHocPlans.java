@@ -58,7 +58,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
         byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
         String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
+        catalog.getOperator().execute(serializedCatalog);
         DbSettings dbSettings = new DbSettings(
                 config.asClusterSettings().asSupplier(),
                 NodeSettings.create(config.asPathSettingsMap()));

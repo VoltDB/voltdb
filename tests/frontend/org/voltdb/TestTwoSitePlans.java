@@ -96,7 +96,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // create the catalog (that will be passed to the ClientInterface
         catalog = new Catalog();
-        catalog.execute(serializedCatalog);
+        catalog.getOperator().execute(serializedCatalog);
 
         // update the catalog with the data from the deployment file
         String pathToDeployment = pb.getPathToDeployment();

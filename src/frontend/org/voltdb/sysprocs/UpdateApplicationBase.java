@@ -210,7 +210,7 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
             retval.upgradedFromVersion = loadResults.getSecond();
 
             Catalog newCatalog = new Catalog();
-            newCatalog.execute(newCatalogCommands);
+            newCatalog.getOperator().execute(newCatalogCommands);
 
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {

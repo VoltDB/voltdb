@@ -400,7 +400,7 @@ public class Inits {
 
             /* N.B. node recovery requires discovering the current catalog version. */
             Catalog catalog = new Catalog();
-            catalog.execute(serializedCatalog);
+            catalog.getOperator().execute(serializedCatalog);
             serializedCatalog = null;
 
             // note if this fails it will print an error first

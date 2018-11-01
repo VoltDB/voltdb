@@ -54,7 +54,7 @@ public class TestLiveDDLCompiler extends TestCase {
         assertTrue("Compilation failed unexpectedly", success);
 
         Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
+        catalog.getOperator().execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         Table t = db.getTables().get("T");
@@ -78,7 +78,7 @@ public class TestLiveDDLCompiler extends TestCase {
         assertTrue("Compilation failed unexpectedly", success);
 
         Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
+        catalog.getOperator().execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         Table t = db.getTables().get("T");
@@ -101,7 +101,7 @@ public class TestLiveDDLCompiler extends TestCase {
         assertTrue("Compilation failed unexpectedly", success);
 
         Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
+        catalog.getOperator().execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         Table t = db.getTables().get("T");

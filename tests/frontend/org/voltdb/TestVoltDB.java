@@ -285,7 +285,7 @@ final public class TestVoltDB {
         assertNotNull("Error loading catalog from jar", serializedCatalog);
 
         Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
+        catalog.getOperator().execute(serializedCatalog);
 
         // this should succeed even though group "bar" does not exist
         assertTrue("Deployment file should have been able to validate",
