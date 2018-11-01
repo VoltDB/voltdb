@@ -24,32 +24,31 @@ import org.voltdb.ParameterSet;
 import org.voltdb.newplanner.guards.PlannerFallbackException;
 
 /**
- * The abstract class for a SQL query batch containing one or more {@link SqlTask}s. </br>
- * This class implemented the {@code Iterable<SqlTask>} interface, so
- * one can use a Java for-each loop to enumerate the contained {@code SqlTask}s.
+ * The interface for defining a SQL query batch containing one or more {@link SqlTask}s.</br>
+ * It provides the {@code Iterable<SqlTask>} interface to give access to its contained tasks.
  * @since 8.4
  * @author Yiqun Zhang
  */
-public abstract class SqlBatch implements Iterable<SqlTask>  {
+public interface SqlBatch extends Iterable<SqlTask>  {
 
     /**
      * Check if the batch is purely comprised of DDL statements.
      * @return true if the batch is comprised of DDL statements only.
      */
-    public abstract boolean isDDLBatch();
+    public boolean isDDLBatch();
 
 
     /**
      * Get the user parameters.
      * @return the user parameter array.
      */
-    public abstract Object[] getUserParameters();
+    public Object[] getUserParameters();
 
     /**
      * Get the number of tasks in this batch.
      * @return the count of tasks in this batch.
      */
-    public abstract int getTaskCount();
+    public int getTaskCount();
 
     /**
      * Build a {@link SqlBatch} from a {@link ParameterSet} passed through the {@code @AdHoc}

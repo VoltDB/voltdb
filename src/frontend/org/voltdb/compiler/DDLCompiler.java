@@ -22,8 +22,6 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +33,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
@@ -107,7 +106,7 @@ public class DDLCompiler {
     public static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
     // These constants should be consistent with the definitions in VoltType.java
     protected static final int MAX_VALUE_LENGTH = 1024 * 1024;
-    private static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
+    public static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
     private final HSQLInterface m_hsql;
     private final VoltCompiler m_compiler;
@@ -815,7 +814,6 @@ public class DDLCompiler {
         // note this will need to be decompressed to be used
         String binDDL = CompressionService.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
-
         // output the xml catalog to disk
         //* enable to debug */ System.out.println("DEBUG: " + m_schema);
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
@@ -836,12 +834,12 @@ public class DDLCompiler {
         // 5.) Start processing materialized views.
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("ud_function")) {
-                addUserDefinedFunctionToCatalog(db, node, isXDCR);
+                addUserDefinedFunctionToCatalog(db, node);
             }
         }
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("table")) {
-                addTableToCatalog(db, node, isXDCR);
+                addTableToCatalog(db, node, isXDCR);        // Inside the function, it skips when a table catalog had already been created.
             }
         }
 
@@ -851,8 +849,7 @@ public class DDLCompiler {
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
     }
 
-    private void addUserDefinedFunctionToCatalog(Database db, VoltXMLElement XMLfunc, boolean isXDCR)
-                        throws VoltCompilerException {
+    private void addUserDefinedFunctionToCatalog(Database db, VoltXMLElement XMLfunc) {
         // Fetch out the functions, find the function name and define
         // the function object.
         CatalogMap<Function> catalogFunctions = db.getFunctions();
@@ -1249,7 +1246,17 @@ public class DDLCompiler {
         HashMap<String, Index> indexMap = new HashMap<>();
 
         final String name = node.attributes.get("name");
-
+        final AtomicBoolean hasCreated = new AtomicBoolean(false);
+        // Skip "CREATE TABLE" in here, since we have already added it using Calcite parser.
+        db.getTables().forEach(tbl -> {
+            if (tbl.getTypeName().equals(name)) {
+                System.err.println("Table " + name + " has already been created!");
+                hasCreated.set(true);
+            }
+        });
+        if (hasCreated.get()) {
+            return;
+        }       // Code below this point is not executed any more.
         // create a table node in the catalog
         final Table table = db.getTables().add(name);
         // set max value before return for view table
@@ -1878,7 +1885,7 @@ public class DDLCompiler {
         indexMap.put(name, index);
     }
 
-    protected static String convertToJSONArray(List<AbstractExpression> exprs) throws JSONException {
+    public static String convertToJSONArray(List<AbstractExpression> exprs) throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.array();
         for (AbstractExpression abstractExpression : exprs) {
@@ -1947,8 +1954,8 @@ public class DDLCompiler {
     }
 
     /** Accessor */
-    Collection<Map.Entry<Statement, VoltXMLElement>> getLimitDeleteStmtToXmlEntries() {
-        return Collections.unmodifiableCollection(m_limitDeleteStmtToXml.entrySet());
+    Map<Statement, VoltXMLElement> getLimitDeleteStmtToXmlEntries() {
+        return m_limitDeleteStmtToXml;
     }
 
     /**

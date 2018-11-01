@@ -17,7 +17,7 @@
 
 package org.voltdb.newplanner.guards;
 
-public class AcceptAllSelect extends CalcitePass {
+public class AcceptAllSelect extends CalciteCheck {
 
     @Override
     protected final boolean doCheck(String sql) {

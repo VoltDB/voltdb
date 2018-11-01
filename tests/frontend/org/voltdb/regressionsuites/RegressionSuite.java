@@ -153,7 +153,7 @@ public class RegressionSuite extends TestCase {
                 if (diff.commands().split("\n").length > 1) {
                     fail("Catalog changed in test " + getName() +
                             " while the regression suite optimization is on: \n" +
-                            diff.getDescriptionOfChanges(false));
+                            diff.getDescriptionOfChanges(false) + "\n<" + diff.commands() + ">");
                 }
             }
 

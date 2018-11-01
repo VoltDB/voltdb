@@ -22,7 +22,7 @@ package org.voltdb.newplanner.guards;
  * @author Yiqun Zhang
  * @since 8.4
  */
-public class AlwaysPassThrough extends CalcitePass {
+public class AlwaysPassThrough extends CalciteCheck {
 
     @Override
     protected final boolean doCheck(String sql) {

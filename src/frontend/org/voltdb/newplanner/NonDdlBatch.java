@@ -18,7 +18,6 @@
 package org.voltdb.newplanner;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.voltdb.CatalogContext;
@@ -32,12 +31,7 @@ import org.voltdb.planner.StatementPartitioning;
  * @since 8.4
  * @author Yiqun Zhang
  */
-public final class NonDdlBatch extends SqlBatch {
-
-    /**
-     * The {@link SqlBatch} to be decorated.
-     */
-    private final SqlBatch m_base;
+public final class NonDdlBatch extends AbstractSqlBatchDecorator {
 
     /**
      * Record the catalog version that the queries are planned against.
@@ -51,6 +45,9 @@ public final class NonDdlBatch extends SqlBatch {
      */
     private List<Object> m_userPartitionKeys;
 
+    /**
+     * Whether the planner should try to infer partitioning during planning.
+     */
     private boolean m_inferPartitioning;
 
     /**
@@ -62,14 +59,14 @@ public final class NonDdlBatch extends SqlBatch {
     /**
      * Build a non-DDL SQL batch from a basic SQL batch, adding default
      * contextual information.
-     * @param batch the {@link SqlBatch} that this is built from.
+     * @param batchToDecorate the {@link SqlBatch} that this is built from.
      * @throws IllegalArgumentException if the given batch is not a non-DDL batch.
      */
-    public NonDdlBatch(SqlBatch batch) {
-        if (batch.isDDLBatch()) {
+    public NonDdlBatch(SqlBatch batchToDecorate) {
+        super(batchToDecorate);
+        if (batchToDecorate.isDDLBatch()) {
             throw new IllegalArgumentException("Cannot create a non-DDL batch from a batch of DDL statements.");
         }
-        m_base = batch;
         m_catalogContext = VoltDB.instance().getCatalogContext();
         m_userPartitionKeys = null;
         setInferPartitioning(true);
@@ -82,7 +79,7 @@ public final class NonDdlBatch extends SqlBatch {
      * @return this {@link NonDdlBatch} instance itself.
      */
     public NonDdlBatch setInferPartitioning(boolean value) {
-        m_inferPartitioning = m_base.getTaskCount() == 1 && value;
+        m_inferPartitioning = m_batchToDecorate.getTaskCount() == 1 && value;
         updateStatementPartitioning();
         return this;
     }
@@ -149,25 +146,5 @@ public final class NonDdlBatch extends SqlBatch {
         else {
             return m_userPartitionKeys.toArray();
         }
-    }
-
-    @Override
-    public Iterator<SqlTask> iterator() {
-        return m_base.iterator();
-    }
-
-    @Override
-    public boolean isDDLBatch() {
-        return m_base.isDDLBatch();
-    }
-
-    @Override
-    public Object[] getUserParameters() {
-        return m_base.getUserParameters();
-    }
-
-    @Override
-    public int getTaskCount() {
-        return m_base.getTaskCount();
     }
 }
