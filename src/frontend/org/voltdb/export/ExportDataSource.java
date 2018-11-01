@@ -401,10 +401,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         long lastSeqNo = 0;
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
-            if (releaseSeqNo >= sb.startSequenceNumber() + sb.rowCount() - 1) {
+            if (releaseSeqNo >= sb.lastSequenceNumber()) {
                 m_committedBuffers.pop();
                 try {
-                    lastSeqNo = sb.startSequenceNumber() + sb.rowCount() - 1;
+                    lastSeqNo = sb.lastSequenceNumber();
                 } finally {
                     sb.discard();
                 }
@@ -923,11 +923,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     StreamBlock block = iter.next();
                     // find the first block that has unpolled data
                     if (firstUnpolledSeq >= block.startSequenceNumber() &&
-                            firstUnpolledSeq < block.startSequenceNumber() + block.rowCount()) {
+                            firstUnpolledSeq <= block.lastSequenceNumber()) {
                         first_unpolled_block = block;
-                        m_firstUnpolledSeqNo = block.startSequenceNumber() + block.rowCount();
+                        m_firstUnpolledSeqNo = block.lastSequenceNumber() + 1;
                         break;
-                    } else if (firstUnpolledSeq >= block.startSequenceNumber() + block.rowCount()) {
+                    } else if (firstUnpolledSeq > block.lastSequenceNumber()) {
                         blocksToDelete.add(block);
                         iter.remove();
                     } else {
@@ -944,8 +944,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     "], start looking for other nodes that has the data.");
                             // If another mastership migration in progress and is before the gap,
                             // don't bother to start another
-                            if (m_seqNoToDrain >= firstUnpolledSeq -1) {
-                                m_seqNoToDrain = Math.min(m_seqNoToDrain, firstUnpolledSeq - 1);
+                            if (firstUnpolledSeq -1 <= m_seqNoToDrain ) {
+                                m_seqNoToDrain = firstUnpolledSeq - 1;
                                 mastershipCheckpoint(firstUnpolledSeq - 1);
                             }
                         }
@@ -968,6 +968,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
             } else {
+                // If stream was previously blocked by a gap, now it skips/fulfills the gap
+                // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
                     setStatus(StreamStatus.ACTIVE);
                 }
@@ -1363,9 +1365,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private void sendGapQuery() {
         // Should be the master and the master was stuck on a gap
         if (m_mastershipAccepted.get() && m_gapTracker.getFirstGap() != null) {
-            if (m_gapTracker.isEmpty()) {
-                return;
-            }
             m_queryResponses.clear();
             Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
             Mailbox mbx = p.getFirst();
@@ -1544,7 +1543,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_lastReleasedSeqNo;
     }
 
-    public void setStatus(StreamStatus status) {
+    // Status is accessed by multiple threads
+    public synchronized void setStatus(StreamStatus status) {
         this.m_status = status;
     }
 
