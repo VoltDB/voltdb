@@ -17,6 +17,8 @@
 
 package org.voltdb.parser;
 
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
 
@@ -26,16 +28,15 @@ import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
  * @author Yiqun Zhang
  */
 public class SqlParserFactory {
-
     /**
      * Given a SQL statement (could be either a DDL or DQL/DML),
      * create a {@link SqlParser} for it.
      * @param sql the SQL statement to parse.
      * @return a SQL parser created from the SQL statement.
      */
-    public static SqlParser create(String sql) {
-        return SqlParser.create(sql, SqlParser.configBuilder()
-                                              .setParserFactory(SqlDdlParserImpl.FACTORY)
-                                              .build());
+    public static SqlNode parse(String sql) throws SqlParseException {
+        return SqlParser.create(sql,
+                SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build())
+                .parseQuery(sql);
     }
 }
