@@ -212,8 +212,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        m_firstUnpolledSeqNo = m_gapTracker.isEmpty() ? 1L : m_gapTracker.getFirstSeqNo();
-        m_lastReleasedSeqNo = m_firstUnpolledSeqNo - 1;
+        resetStateInRejoinOrRecover();
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " reads gap tracker from PBD:" + m_gapTracker.toString());
         }
@@ -350,8 +349,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        m_firstUnpolledSeqNo = m_gapTracker.isEmpty() ? 1L : m_gapTracker.getFirstSeqNo();
-        m_lastReleasedSeqNo = m_firstUnpolledSeqNo - 1;
+        resetStateInRejoinOrRecover();
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
         }
@@ -747,6 +745,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                     }
                     m_gapTracker.truncate(sequenceNumber);
+                    resetStateInRejoinOrRecover();
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Truncate tracker via snapshot truncation to " + sequenceNumber + " now is " + m_gapTracker.toString());
                     }
@@ -1571,5 +1570,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 sendGapQuery();
             }
         }
+    }
+
+    private void resetStateInRejoinOrRecover() {
+        m_lastReleasedSeqNo = m_gapTracker.isEmpty() ? 0L : m_gapTracker.getFirstSeqNo();
+        m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
     }
 }

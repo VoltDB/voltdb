@@ -112,7 +112,11 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
         System.out.println("Insert Data is done...........");
 
         // must still be able to verify the export data.
-        // ENG-5708
+        // ENG-570
+        client.drain();
+        Thread.sleep(2000);
+        quiesce(client);
+        Thread.sleep(2000);
         quiesceAndVerifyStream(client, m_verifier);
     }
 

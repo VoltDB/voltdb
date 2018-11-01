@@ -107,11 +107,15 @@ public class ExportSequenceNumberTracker {
     /**
      * Truncate the tracker to the given safe point. After truncation, the new
      * safe point will be the first sequence number of the tracker. If the new safe point
-     * is before the first sequence number of the tracker, it's a no-op.
+     * is before the first sequence number of the tracker, it's a no-op. If the
+     * map is empty, truncation point will be the new safe point of tracker.
      * @param newTruncationPoint    New safe point
      */
     public void truncate(long newTruncationPoint) {
-        if (size() == 0) return;
+        if (size() == 0) {
+            m_map.add(range(newTruncationPoint, newTruncationPoint));
+            return;
+        }
         if (newTruncationPoint < getFirstSeqNo()) return;
         final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
         while (iter.hasNext()) {
