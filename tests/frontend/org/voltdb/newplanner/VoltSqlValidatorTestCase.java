@@ -56,16 +56,11 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         return m_validator;
     }
 
-    private SqlNode parseQuery(String sql) throws SqlParseException {
-        SqlParser parser = SqlParserFactory.create(sql);
-        return parser.parseStmt();
-    }
-
     protected SqlNode parseAndValidate(String sql) {
         Objects.requireNonNull(m_validator, "m_validator");
         SqlNode sqlNode;
         try {
-            sqlNode = parseQuery(sql);
+            sqlNode = SqlParserFactory.parse(sql);
         } catch (Throwable e) {
             throw new RuntimeException("Error while parsing query: " + sql, e);
         }
@@ -100,7 +95,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         final SqlNode sqlNode;
         final SqlParserUtil.StringAndPos sap = SqlParserUtil.findPos(sql);
         try {
-            sqlNode = parseQuery(sap.sql);
+            sqlNode = SqlParserFactory.parse(sap.sql);
         } catch (Throwable e) {
             checkParseEx(e, expectedMsgPattern, sap.sql);
             return;

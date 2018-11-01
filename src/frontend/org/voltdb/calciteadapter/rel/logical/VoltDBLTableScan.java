@@ -29,13 +29,13 @@ import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 public class VoltDBLTableScan extends AbstractVoltDBTableScan implements VoltDBLRel {
 
     public VoltDBLTableScan(RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelOptTable table,
-            VoltTable voltDBTable) {
-          super(cluster,
-                  traitSet,
-                  table,
-                  voltDBTable);
+                            RelTraitSet traitSet,
+                            RelOptTable table,
+                            VoltTable voltDBTable) {
+        super(cluster,
+                traitSet,
+                table,
+                voltDBTable);
     }
 
     @Override

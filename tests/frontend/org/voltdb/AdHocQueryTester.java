@@ -27,6 +27,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 
+import com.google_voltpatches.common.base.Strings;
 import org.voltcore.utils.PortGenerator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.NoConnectionsException;
@@ -270,15 +271,12 @@ public abstract class AdHocQueryTester extends JUnit4LocalClusterTest {
     }
 
     protected static String getQueryForLongQueryTable(int numberOfPredicates) {
-        StringBuilder string = new StringBuilder("SELECT count(*) FROM long_query_table ");
+        StringBuilder sb = new StringBuilder("SELECT count(*) FROM long_query_table ");
         if (numberOfPredicates > 0) {
-            string.append("WHERE ID = 123 ");
-            for (int i = 1; i < numberOfPredicates; i++) {
-                string.append("AND ID > 100 ");
-            }
+            sb.append("WHERE ID = 123 ").append(Strings.repeat("AND ID > 100 ", numberOfPredicates - 1));
         }
-        string.append(";");
-        return string.toString();
+        sb.append(";");
+        return sb.toString();
     }
 
 }

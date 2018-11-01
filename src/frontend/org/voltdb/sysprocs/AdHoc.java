@@ -19,6 +19,7 @@ package org.voltdb.sysprocs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -26,11 +27,13 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
+import org.apache.calcite.sql.SqlNode;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.newplanner.SqlBatch;
+import org.voltdb.newplanner.SqlTask;
 import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
 
@@ -120,8 +123,8 @@ public class AdHoc extends AdHocNTBase {
 
         // at this point assume all DDL
         assert(mix == AdHocSQLMix.ALL_DDL);
-
-        return runDDLBatch(sqlStatements);
+        // Since we are not going through Calcite, there is no need to update CalciteSchema.
+        return runDDLBatch(sqlStatements, Collections.emptyList());
     }
 
     /**
@@ -132,13 +135,27 @@ public class AdHoc extends AdHocNTBase {
      * @author Yiqun Zhang
      */
     private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(SqlBatch batch) {
-        return null;
+        final List<String> sqls = new ArrayList<>(batch.getTaskCount()),
+                validated = new ArrayList<>();
+        final List<SqlNode> nodes = new ArrayList<>(batch.getTaskCount());
+        for (SqlTask task : batch) {
+            final String sql = task.getSQL();
+            sqls.add(sql);
+            nodes.add(task.getParsedQuery());
+            processAdHocSQLStmtTypes(sql, validated);
+            // NOTE: need to exercise the processAdHocSQLStmtTypes() method, because some tests
+            // (i.e. ENG-7653, TestAdhocCompilerException.java) rely on the code path.
+            // But, we might not need to call it? Certainly it involves some refactory for the check and simulation.
+            validated.clear();
+        }
+        return runDDLBatch(sqls, nodes);
     }
 
-    private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements) {
+
+    private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes) {
         // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
-        SortedSet<String> conflictTables = new TreeSet<String>();
-        Set<String> createdTables = new HashSet<String>();
+        SortedSet<String> conflictTables = new TreeSet<>();
+        Set<String> createdTables = new HashSet<>();
 
         for (String stmt : sqlStatements) {
             // check that the DDL is allowed
@@ -191,17 +208,18 @@ public class AdHoc extends AdHocNTBase {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
                     "Cluster is configured to use @UpdateApplicationCatalog " +
-                    "to change application schema.  AdHoc DDL is forbidden.");
+                            "to change application schema.  AdHoc DDL is forbidden.");
         }
 
         logCatalogUpdateInvocation("@AdHoc");
 
         return updateApplication("@AdHoc",
-                                null,
-                                null,
-                                sqlStatements.toArray(new String[0]),
-                                null,
-                                false,
-                                true);
+                null,
+                null,
+                sqlStatements.toArray(new String[0]),
+                sqlNodes,
+                null,
+                false,
+                true);
     }
 }
