@@ -30,10 +30,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.lang.Throwable;
+import java.util.Arrays;
 
 import org.voltdb.VoltDB;
 
 import java.util.Properties;
+import java.util.Collections;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorCompletionService;
@@ -43,6 +46,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
@@ -65,10 +69,11 @@ public class ExportKafkaOnServerVerifier {
     public static long VALIDATION_REPORT_INTERVAL = 1000;
 
     private VoltKafkaConsumerConfig m_kafkaConfig;
-    private long expectedRows = 0;
+    private final AtomicLong expectedRows = new AtomicLong(0);
     private final AtomicLong consumedRows = new AtomicLong(0);
     private final AtomicLong verifiedRows = new AtomicLong(0);
     private final AtomicBoolean testGood = new AtomicBoolean(true);
+    private final ConcurrentLinkedQueue<Long> foundRowIds = new ConcurrentLinkedQueue<Long>();
 
     private static class VoltKafkaConsumerConfig {
         final String m_zkhost;
@@ -201,12 +206,12 @@ public class ExportKafkaOnServerVerifier {
                     try {
                         if (m_doneStream) {
                             System.out.println("EOS Consumed: " + smsg + " Expected Rows: " + row[6]);
-                            expectedRows = Long.parseLong(row[6]);
+                            expectedRows.set(Long.parseLong(row[6]));
                             break;
                         }
                         consumedRows.incrementAndGet();
                         if (m_skinny) {
-                            if (expectedRows != 0 && consumedRows.get() >= expectedRows) {
+                            if (expectedRows.get() != 0 && consumedRows.get() >= expectedRows.get()) {
                                 break;
                             }
                         }
@@ -214,25 +219,29 @@ public class ExportKafkaOnServerVerifier {
                         if (err != null) {
                             System.out.println("ERROR in validation: " + err.toString());
                         }
+
+                        Long rowTxnId = Long.parseLong(row[6].trim());
+                        Long rowNum = Long.parseLong(row[7]);
+                        foundRowIds.add(rowNum);
                         if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
-                            System.out.println("Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get());
+                            System.out.println("Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get() + " Last row num: " + row[5] + "," + row[6] + "," + row[7] + "," + row[8]+","+ row[9] +" foundsize:"+foundRowIds.size());
                         }
 
                         Integer partition = Integer.parseInt(row[3].trim());
-                        Long rowTxnId = Long.parseLong(row[6].trim());
 
                         if (TxnEgo.getPartitionId(rowTxnId) != partition) {
-                            System.err.println("ERROR: mismatched exported partition for txid " + rowTxnId +
+                            System.err.println("ERROR mismatched exported partition for txid " + rowTxnId +
                                     ", tx says it belongs to " + TxnEgo.getPartitionId(rowTxnId) +
                                     ", while export record says " + partition);
                         }
-                        if (expectedRows != 0 && consumedRows.get() >= expectedRows) {
-                            break;
-                        }
+                        //if (expectedRows != 0 && consumedRows.get() >= expectedRows) {
+                        //    break;
+                        //}
                     } catch (ExportOnServerVerifier.ValidationErr ex) {
-                        System.out.println("Validation ERROR: " + ex);
+                        System.out.println("Validation ERROR " + ex);
                     }
                 }
+
             } catch (Exception ex) {
                 ex.printStackTrace();
             } finally {
@@ -246,9 +255,9 @@ public class ExportKafkaOnServerVerifier {
 
     //Submit consumer tasks to executor and wait for EOS message then continue on.
     void createAndConsumeKafkaStreams(String topicPrefix, boolean skinny) throws Exception {
-        final String topic = topicPrefix + "EXPORT_PARTITIONED_TABLE";
-        final String topic2 = topicPrefix + "EXPORT_PARTITIONED_TABLE2";
-        final String doneTopic = topicPrefix + "EXPORT_DONE_TABLE";
+        final String topic = topicPrefix + "EXPORT_PARTITIONED_STREAM";
+        final String topic2 = topicPrefix + "EXPORT_PARTITIONED_STREAM2";
+        final String doneTopic = topicPrefix + "EXPORT_DONE_STREAM";
 
         List<Future<Long>> doneFutures = new ArrayList<>();
 
@@ -326,13 +335,82 @@ public class ExportKafkaOnServerVerifier {
         m_kafkaConfig.stop();
         consumersLatch.await();
         consumersLatch2.await();
-        System.out.println("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows);
-        if (consumedRows.get() < expectedRows) {
-            System.out.println("ERROR: Exported row count does not match consumed rows.");
+        System.out.println("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows.get());
+        if ( consumedRows.get() == 0 ) {
+            System.out.println("ERROR No rows were consumed.");
+        } else if (consumedRows.get() < expectedRows.get() ) {
+            System.out.println("ERROR Consumed row count: '"+ consumedRows.get() + "' is less then expected: '" + expectedRows.get() + "'");
             testGood.set(false);
         }
+
+        System.out.println("Checking for missing rows");
+
+        List<Long> missingRowIds = new ArrayList<Long>();
+        Long[] sortedIds = foundRowIds.toArray(new Long[0]);
+        Arrays.sort(sortedIds);
+        List<Long> ids = Arrays.asList(sortedIds);
+        long currVal = 1;
+        long missingCnt = 0;
+        long duplicateCnt = 0;
+        long lastId = 0;
+        for (Long id : ids) {
+            if ( lastId > id ) {
+                // double check the sequence.
+                System.err.println("out of sequence id: "+id+ " > " + lastId);
+            }
+            if ( id == lastId ) {
+                System.err.println("duplicate id: "+id );
+                duplicateCnt++;
+                continue;
+            }
+            lastId = id;
+            while ( currVal < id ) {
+                missingCnt++;
+                System.out.print(currVal+",");
+                currVal++;
+            }
+            if ( currVal > id ) {
+                // this should happen unless they are out of order.
+                System.err.println("oops currVal > id "+currVal + " > " + id);
+                continue;
+            }
+            currVal++;
+        }
+
+        if ( missingCnt > 0 ) {
+            System.err.println("\nERROR There are '" + missingCnt + "' missing rows");
+            testGood.set(false);
+        } else {
+            System.out.println("There were no missing rows");
+        }
+
+        // duplicates may be expected in some situations
+        if ( duplicateCnt > 0 ) {
+            System.out.println("WARN there were '" + duplicateCnt + "' duplicate ids");
+        }
+        /*
+        for ( long x = 0; x < expectedRows.get() ; x++ ) {
+            if ( x % 10000 == 0) {
+                System.out.println("Checking for missing rows 2.1 while " + x + " < " + expectedRows.get());
+            }
+            if (! foundRowIds.contains(x) ) {
+                missingRowIds.add(x);
+            }
+       }
+       System.out.println("Checking for missing rows 3 ");
+       if (missingRowIds.size() > 0) {
+            System.err.println("ERROR missing " + missingRowIds.size() + " rows, found "+foundRowIds.size()+ " rows" );
+            for (Long rowid : missingRowIds ) {
+                System.err.print(String.valueOf(rowid)+",");
+            }
+       } else {
+            System.out.println("There are no missing rows");
+       }
+        */
+
         //For shutdown hook to not stop twice.
         m_kafkaConfig = null;
+
     }
 
     String m_topicPrefix = null;
@@ -352,6 +430,7 @@ public class ExportKafkaOnServerVerifier {
         final ExportKafkaOnServerVerifier verifier = new ExportKafkaOnServerVerifier();
         try
         {
+            /*
             Runtime.getRuntime().addShutdownHook(
                     new Thread() {
                         @Override
@@ -361,6 +440,7 @@ public class ExportKafkaOnServerVerifier {
                         }
                     });
 
+            */
             boolean skinny = verifier.verifySetup(args);
 
             if (skinny) {
@@ -368,18 +448,22 @@ public class ExportKafkaOnServerVerifier {
             } else {
                 verifier.verifyFat();
             }
-        }
-        catch(IOException e) {
+        } catch(IOException e) {
+            System.err.println("ERROR " + e.toString());
             e.printStackTrace(System.err);
             System.exit(-1);
-        }
-        catch (ValidationErr e ) {
-            System.err.println("Validation error: " + e.toString());
+        } catch (ValidationErr e ) {
+            System.err.println("ERROR in Validation: " + e.toString());
+            System.exit(-1);
+        } catch (Exception e) {
+            System.err.println("ERROR in Application: " + e.toString());
             System.exit(-1);
         }
+
         if (verifier.testGood.get())
             System.exit(0);
         else
+            System.err.println("ERROR There were missing records");
             System.exit(-1);
     }
 

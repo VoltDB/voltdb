@@ -422,8 +422,13 @@ public class AsyncExportClient
         }
         catch(Exception x)
         {
-            System.err.println("Exception: " + x);
+            System.err.println("FATAL Exception: " + x);
             x.printStackTrace();
+        }
+        // if we didn't get any successes we need to fail
+        if ( TrackingResults.get(0) == 0 ) {
+            System.err.println("ERROR No successful transactions");
+            System.exit(-1);
         }
     }
 
@@ -490,6 +495,7 @@ public class AsyncExportClient
         else {
             clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
         }
+        clientConfig.setTopologyChangeAware(true);
         Client client = ClientFactory.createClient(clientConfig);
         clientRef.set(client);
 
