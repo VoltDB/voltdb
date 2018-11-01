@@ -67,7 +67,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
     /**
      * Multi-table test
      */
-    private void testExportMultiTable() throws Exception
+    public void testExportMultiTable() throws Exception
     {
         System.out.println("testExportMultiTable");
         final Client client = getClient();

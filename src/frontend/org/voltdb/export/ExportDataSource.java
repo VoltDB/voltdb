@@ -59,7 +59,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.TxnEgo;
-import org.voltdb.sysprocs.ExportControlNT.OperationMode;
+import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
