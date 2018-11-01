@@ -1067,7 +1067,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_joining = m_config.m_startAction == StartAction.JOIN;
 
             if (m_rejoining || m_joining) {
-                m_statusTracker.setNodeState(NodeState.REJOINING);
+                m_statusTracker.set(NodeState.REJOINING);
             }
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);
@@ -3044,7 +3044,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .hostCountSupplier(hostCountSupplier)
                 .kfactor(clusterType.getKfactor())
                 .paused(m_config.m_isPaused)
-                .nodeStateSupplier(m_statusTracker.getNodeStateSupplier())
+                .nodeStateSupplier(m_statusTracker.getSupplier())
                 .addAllowed(m_config.m_enableAdd)
                 .safeMode(m_config.m_safeMode)
                 .terminusNonce(getTerminusNonce())
@@ -3365,7 +3365,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // Start the rejoin coordinator
         if (m_joinCoordinator != null) {
             try {
-                m_statusTracker.setNodeState(NodeState.REJOINING);
+                m_statusTracker.set(NodeState.REJOINING);
                 if (!m_joinCoordinator.startJoin(m_catalogContext.database)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
@@ -3682,7 +3682,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             synchronized(m_catalogUpdateLock) {
                 final ReplicationRole oldRole = getReplicationRole();
 
-                m_statusTracker.setNodeState(NodeState.UPDATING);
+                m_statusTracker.set(NodeState.UPDATING);
                 if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
                     if (m_catalogContext.catalogVersion < expectedCatalogVersion) {
                         throw new RuntimeException("Trying to update main catalog context with diff " +
@@ -3852,7 +3852,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         } finally {
             //Set state back to UP
-            m_statusTracker.setNodeState(NodeState.UP);
+            m_statusTracker.set(NodeState.UP);
         }
     }
 
@@ -4160,7 +4160,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
         hostLog.info("Logging host rejoin completion to ZK");
-        m_statusTracker.setNodeState(NodeState.UP);
+        m_statusTracker.set(NodeState.UP);
         Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
@@ -4185,13 +4185,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (mode == OperationMode.PAUSED)
             {
                 m_config.m_isPaused = true;
-                m_statusTracker.setNodeState(NodeState.PAUSED);
+                m_statusTracker.set(NodeState.PAUSED);
                 hostLog.info("Server is entering admin mode and pausing.");
             }
             else if (m_mode == OperationMode.PAUSED)
             {
                 m_config.m_isPaused = false;
-                m_statusTracker.setNodeState(NodeState.UP);
+                m_statusTracker.set(NodeState.UP);
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
         }
@@ -4362,7 +4362,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
-            m_statusTracker.setNodeState(NodeState.UP);
+            m_statusTracker.set(NodeState.UP);
         } else {
             // Set m_mode to RUNNING
             databaseIsRunning();
