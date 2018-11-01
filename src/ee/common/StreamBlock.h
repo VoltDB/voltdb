@@ -18,6 +18,7 @@
 #define STREAMBLOCK_H_
 
 #include "common/FatalException.hpp"
+#include "common/types.h"
 
 #include <cassert>
 #include <cstring>
