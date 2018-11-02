@@ -251,16 +251,16 @@ public class AbstractTopology {
     }
 
     /**
-     * Selects the hosts to be part of a protection group. Taking in consideration the ha group layout for the cluster.
+     * Selects the hosts to be part of a partition group. Taking in consideration the ha group layout for the cluster.
      */
-    private interface ProtectionGroupSelector {
+    private interface PartitionGroupSelector {
         /**
-         * Request the next protection group from the selector with {@code size} nodes in the group
+         * Request the next partition group from the selector with {@code size} nodes in the group
          *
-         * @param size number of nodes that should be in the next protection group
+         * @param size number of nodes that should be in the next partition group
          * @return an array of {@link HostBuilder}
          */
-        HostBuilder[] getNextProtectionGroup(int size, int maxMissing);
+        HostBuilder[] getNextPartitionGroup(int size, int maxMissing);
 
         /**
          * @return a {@link BalancedPartitionChecker} implementation which works with this selector implementation
@@ -287,20 +287,20 @@ public class AbstractTopology {
     }
 
     /**
-     * A simple implementation of {@link ProtectionGroupSelector} where there is only one ha group. With only one group
+     * A simple implementation of {@link PartitionGroupSelector} where there is only one ha group. With only one group
      * the hosts can just be pulled from the group one after the other. Also, because there is only one group the
      * partitions are considered to be balanced.
      */
-    private static class SingleGroupProtectionGroupSelector implements ProtectionGroupSelector {
+    private static class SingleGroupPartitionGroupSelector implements PartitionGroupSelector {
         final HAGroup m_haGroup;
 
-        SingleGroupProtectionGroupSelector(HAGroup group) {
+        SingleGroupPartitionGroupSelector(HAGroup group) {
             super();
             this.m_haGroup = group;
         }
 
         @Override
-        public HostBuilder[] getNextProtectionGroup(int size, int maxMissing) {
+        public HostBuilder[] getNextPartitionGroup(int size, int maxMissing) {
             HostBuilder[] hostBuilders = new HostBuilder[size];
             for (int i = 0; i < size; ++i) {
                 hostBuilders[i] = m_haGroup.pollHost(maxMissing > 0);
@@ -318,24 +318,24 @@ public class AbstractTopology {
     }
 
     /**
-     * An implementation of {@link ProtectionGroupSelector} which handles the case that there are multple ha groups but
+     * An implementation of {@link PartitionGroupSelector} which handles the case that there are multple ha groups but
      * they are all the same distance away from each other. This means that all groups are equal and there is no reason
      * to favor selection from one group over another.
      * <p>
      * Groups are stored in a queue and removed from the queue until {@code size} of group is met or queue is empty.
      * When the queue is empty the already used groups are put back in the queue to be selected again.
      */
-    private static class EqualDistantHaGroupsProtectionGroupSelector implements ProtectionGroupSelector {
+    private static class EqualDistantHaGroupsPartitionGroupSelector implements PartitionGroupSelector {
         final NavigableSet<HAGroup> m_groups = new TreeSet<>();
         final BalancedPartitionChecker m_balancedPartitionChecker;
 
-        EqualDistantHaGroupsProtectionGroupSelector(Collection<HAGroup> groups, int replicaCount) {
+        EqualDistantHaGroupsPartitionGroupSelector(Collection<HAGroup> groups, int replicaCount) {
             m_groups.addAll(groups);
             m_balancedPartitionChecker = new MinimumGroupBalancedPartitionChecker(groups.size(), replicaCount);
         }
 
         @Override
-        public HostBuilder[] getNextProtectionGroup(int size, int maxMissing) {
+        public HostBuilder[] getNextPartitionGroup(int size, int maxMissing) {
             HostBuilder[] hostBuilders = new HostBuilder[size];
             List<HAGroup> usedGroups = new ArrayList<>(size);
 
@@ -374,7 +374,7 @@ public class AbstractTopology {
     }
 
     /**
-     * A complex {@link ProtectionGroupSelector} which handles multiple ha groups with varying distances and overlapping
+     * A complex {@link PartitionGroupSelector} which handles multiple ha groups with varying distances and overlapping
      * ancestry.
      * <p>
      * The distance and shared ancestry is calculated for every pair of groups and then the groups are sorted by the
@@ -385,12 +385,12 @@ public class AbstractTopology {
      * group that has the highest distance and the lowest ancestry overlap is chosen as the next group. This is repeated
      * until {@code size} groups have been selected.
      */
-    private static class ComplexHaGroupsProtectionGroupSelector implements ProtectionGroupSelector {
+    private static class ComplexHaGroupsPartitionGroupSelector implements PartitionGroupSelector {
         final NavigableSet<HAGroupWithRelationships> m_groupRelationships = new TreeSet<>();
         final Map<String, HAGroupRelationship> m_eligibleGroupsByToken = new HashMap<>();
         final BalancedPartitionChecker m_balancedPartitionChecker;
 
-        ComplexHaGroupsProtectionGroupSelector(Collection<HAGroup> groups, int replicaCount) {
+        ComplexHaGroupsPartitionGroupSelector(Collection<HAGroup> groups, int replicaCount) {
             List<HAGroupWithRelationships> tempGroups = new ArrayList<>(groups.size());
             for (HAGroup newGroup : groups) {
                 HAGroupWithRelationships newGroupDistances = new HAGroupWithRelationships(newGroup);
@@ -406,7 +406,7 @@ public class AbstractTopology {
         }
 
         @Override
-        public HostBuilder[] getNextProtectionGroup(int size, int maxMissing) {
+        public HostBuilder[] getNextPartitionGroup(int size, int maxMissing) {
             HostBuilder[] hostBuilders = new HostBuilder[size];
 
             do {
@@ -702,7 +702,7 @@ public class AbstractTopology {
 
     /**
      * Builder class for {@link AbstractTopology}. Determines which partitions should be placed on which hosts. Hosts
-     * are grouped together into protection groups. Each group is as small as possible with the larger groups attempted
+     * are grouped together into partition groups. Each group is as small as possible with the larger groups attempted
      * to be selected first and contain the partitions with the lowest IDs.
      */
     private static class TopologyBuilder {
@@ -710,7 +710,7 @@ public class AbstractTopology {
         final List<PartitionBuilder> m_partitions;
         final int m_replicaCount;
         final int m_sitesPerHost;
-        final ProtectionGroupSelector m_selector;
+        final PartitionGroupSelector m_selector;
         int m_missingCount;
         int m_unbalancedPartitionCount = 0;
 
@@ -768,13 +768,13 @@ public class AbstractTopology {
                 m_partitions.add(new PartitionBuilder(i));
             }
 
-            // Select the ProtectionGroupSelector based on the ha groups
+            // Select the PartitionGroupSelector based on the ha groups
             if (groups.size() == 1) {
-                m_selector = new SingleGroupProtectionGroupSelector(groups.values().iterator().next());
+                m_selector = new SingleGroupPartitionGroupSelector(groups.values().iterator().next());
             } else if (equalDistance) {
-                m_selector = new EqualDistantHaGroupsProtectionGroupSelector(groups.values(), replicaCount);
+                m_selector = new EqualDistantHaGroupsPartitionGroupSelector(groups.values(), replicaCount);
             } else {
-                m_selector = new ComplexHaGroupsProtectionGroupSelector(groups.values(), replicaCount);
+                m_selector = new ComplexHaGroupsPartitionGroupSelector(groups.values(), replicaCount);
             }
         }
 
@@ -787,17 +787,17 @@ public class AbstractTopology {
             int hostsNotInAGroup = m_hosts.size();
             BalancedPartitionChecker bpc = m_selector.getBalancedPartitionChecker();
 
-            List<HostBuilder[]> protectionGroups = new ArrayList<>(hostsNotInAGroup / m_replicaCount);
+            List<HostBuilder[]> partitionGroups = new ArrayList<>(hostsNotInAGroup / m_replicaCount);
 
             do {
-                int protectionGroupCount = (hostsNotInAGroup / m_replicaCount);
+                int partitionGroupCount = (hostsNotInAGroup / m_replicaCount);
                 /*
                  * Calculate how many hosts should be in each group. Ideally this is replica count but with some host
                  * counts, sites per host and replica count values that is not possible. When it isn't possible try to
                  * make the groups as small as possible with the largest groups selected last to have the partitions
                  * with the lowest IDs
                  */
-                int hostsInGroup = m_replicaCount + ((hostsNotInAGroup % m_replicaCount) / protectionGroupCount);
+                int hostsInGroup = m_replicaCount + ((hostsNotInAGroup % m_replicaCount) / partitionGroupCount);
 
                 // Keep adding hosts to group until the number of sites it can hold is a multiple of m_replicaCount
                 while (hostsInGroup < hostsNotInAGroup && hostsInGroup * m_sitesPerHost % m_replicaCount != 0) {
@@ -813,22 +813,22 @@ public class AbstractTopology {
                     hostsNotInAGroup = 0;
                 }
 
-                // Accidentally created a protection group which is a multiple of m_replicaCount break it up
+                // Accidentally created a partition group which is a multiple of m_replicaCount break it up
                 if (hostsInGroup >= (m_replicaCount << 1) && hostsInGroup % m_replicaCount == 0) {
                     hostsNotInAGroup += (hostsInGroup - m_replicaCount);
                     hostsInGroup = m_replicaCount;
                 }
 
-                int maxMissing = m_missingCount / protectionGroupCount;
+                int maxMissing = m_missingCount / partitionGroupCount;
                 if (maxMissing >= hostsInGroup) {
                     throw new RuntimeException("Too many missing hosts for configuration");
                 }
 
-                HostBuilder[] protectionGroup = m_selector.getNextProtectionGroup(hostsInGroup, maxMissing);
-                protectionGroups.add(protectionGroup);
+                HostBuilder[] partitionGroup = m_selector.getNextPartitionGroup(hostsInGroup, maxMissing);
+                partitionGroups.add(partitionGroup);
 
                 if (maxMissing > 0) {
-                    for (HostBuilder host : protectionGroup) {
+                    for (HostBuilder host : partitionGroup) {
                         if (host.m_missing) {
                             --m_missingCount;
                         }
@@ -836,19 +836,19 @@ public class AbstractTopology {
                 }
             } while (hostsNotInAGroup > 0);
 
-            // Sort the protection groups biggest to smallest
-            Collections.sort(protectionGroups, (pg1, pg2) -> Integer.compare(pg2.length, pg1.length));
+            // Sort the partition groups biggest to smallest
+            Collections.sort(partitionGroups, (pg1, pg2) -> Integer.compare(pg2.length, pg1.length));
 
             Iterator<PartitionBuilder> partitionIter = m_partitions.iterator();
-            for (HostBuilder[] protectionGroup : protectionGroups) {
-                int partitionsInGroup = protectionGroup.length * m_sitesPerHost / m_replicaCount;
+            for (HostBuilder[] partitionGroup : partitionGroups) {
+                int partitionsInGroup = partitionGroup.length * m_sitesPerHost / m_replicaCount;
 
                 int counter = 0;
                 List<HostBuilder> eligibleLeaders = new ArrayList<>(m_replicaCount);
                 for (int i = 0; i < partitionsInGroup; ++i) {
                     PartitionBuilder partition = partitionIter.next();
                     for (int j = 0; j < m_replicaCount; ++j) {
-                        HostBuilder host = protectionGroup[counter++ % protectionGroup.length];
+                        HostBuilder host = partitionGroup[counter++ % partitionGroup.length];
                         assert (host.m_partitions.size() < m_sitesPerHost) : "host " + host + " already has at least "
                                 + m_sitesPerHost + " partitions";
                         host.m_partitions.add(partition);
