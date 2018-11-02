@@ -87,7 +87,7 @@ namespace voltdb {
     }
 
     // only used for EE Test, ignore the committedSpHandle for now
-    int64_t DummyTopend::pushDRBuffer(int32_t partitionId, int64_t committedSpHandle, voltdb::StreamBlock *block) {
+    int64_t DummyTopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
         receivedDRBuffer = true;
         partitionIds.push(partitionId);
         blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));

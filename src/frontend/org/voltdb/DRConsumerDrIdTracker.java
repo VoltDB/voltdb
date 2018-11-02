@@ -50,6 +50,11 @@ import com.google_voltpatches.common.collect.TreeRangeSet;
 public class DRConsumerDrIdTracker implements Serializable {
     private static final long serialVersionUID = -4057397384030151271L;
 
+    /** The offset at which {@link #m_lastSpUniqueId} can be found in the result of {@link #serialize(ByteBuffer)} */
+    public static final int LAST_SP_UNIQUE_ID_OFFSET = 0;
+    /** The offset at which {@link #m_lastMpUniqueId} can be found in the result of {@link #serialize(ByteBuffer)} */
+    public static final int LAST_MP_UNIQUE_ID_OFFSET = LAST_SP_UNIQUE_ID_OFFSET + Long.BYTES;
+
     protected RangeSet<Long> m_map;
     private long m_lastSpUniqueId;
     private long m_lastMpUniqueId;
