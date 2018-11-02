@@ -41,7 +41,7 @@ import java.util.Objects;
  * @since 8.4
  */
 public class VoltSqlValidatorTestCase extends PlannerTestCase {
-    private VoltSqlValidator m_validator;
+    VoltSqlValidator m_validator;
 
     /**
      * Set up m_validator from SchemaPlus.

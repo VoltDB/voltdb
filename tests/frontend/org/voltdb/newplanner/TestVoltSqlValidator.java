@@ -23,6 +23,8 @@
 
 package org.voltdb.newplanner;
 
+import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.sql.SqlNode;
 import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
 
 public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
@@ -101,6 +103,15 @@ public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
                 "Cannot apply 'NOT' to arguments of type 'NOT<VARCHAR\\(32\\)>'.*");
         assertExceptionIsThrown("select ^True or i^ from R2",
                 "Cannot apply 'OR' to arguments of type '<BOOLEAN> OR <INTEGER>'.*");
+    }
+
+    public void testConverter() {
+        SqlNode node = parseAndValidate("select i from R2");
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(m_validator, CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
+        RelRoot root = converter.convertQuery(node, false, true);
+        root = root.withRel(converter.decorrelate(node, root.rel));
+        assertEquals("Root {kind: SELECT, rel: LogicalProject#1, rowType: RecordType(INTEGER I), fields: [<0, I>], collation: []}",
+                root.toString());
     }
 
 }

@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -35,6 +36,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.newplanner.NonDdlBatch;
 import org.voltdb.newplanner.SqlTask;
+import org.voltdb.newplanner.VoltSqlToRelConverter;
 import org.voltdb.newplanner.VoltSqlValidator;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
@@ -207,6 +209,11 @@ public class PlannerTool {
         VoltSqlValidator validator = new VoltSqlValidator(m_schemaPlus);
         // validate the task's SqlNode.
         SqlNode validatedNode = validator.validate(task.getParsedQuery());
+        // convert SqlNode to RelNode.
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, m_schemaPlus);
+        RelRoot root = converter.convertQuery(validatedNode, false, true);
+        root = root.withRel(converter.decorrelate(validatedNode, root.rel));
+
         return null;
     }
 
