@@ -28,22 +28,19 @@ import java.util.Set;
 public class CatalogSerializer implements CatalogVisitor {
 
     private final StringBuilder m_builder;
-    private Set<String> m_fieldFilter;
-    private Set<Class<? extends CatalogType>> m_childFilter;
+    private final Set<String> m_fieldFilter;
+    private final Set<Class<? extends CatalogType>> m_childFilter;
 
 
-    public CatalogSerializer() {
+    CatalogSerializer() {
+        this(null, null);
+    }
+
+    CatalogSerializer(Set<String> fieldFilter,
+            Set<Class<? extends CatalogType>> childFilter) {
         m_builder = new StringBuilder();
-    }
-
-    public CatalogSerializer withChildFilter(Set<Class<? extends CatalogType>> childFilter) {
-        m_childFilter = childFilter;
-        return this;
-    }
-
-    public CatalogSerializer withFieldFilter(Set<String> fieldFilter) {
         m_fieldFilter = fieldFilter;
-        return this;
+        m_childFilter = childFilter;
     }
 
     @Override
@@ -53,11 +50,11 @@ public class CatalogSerializer implements CatalogVisitor {
         writeChildCommands(ct);
     }
 
-    public String getResult() {
+    String getResult() {
         return m_builder.toString();
     }
 
-    void writeCreationCommand(CatalogType ct) {
+    private void writeCreationCommand(CatalogType ct) {
         // Catalog does not need a creation command.
         if (ct instanceof Catalog) {
             return;
@@ -71,7 +68,7 @@ public class CatalogSerializer implements CatalogVisitor {
         m_builder.append("\n");
     }
 
-    void writeFieldCommands(CatalogType ct) {
+    private void writeFieldCommands(CatalogType ct) {
         int i = 0;
         for (String field : ct.getFields()) {
             if (m_fieldFilter == null || m_fieldFilter.contains(field)) {
@@ -79,7 +76,6 @@ public class CatalogSerializer implements CatalogVisitor {
                 ++i;
             }
         }
-        m_fieldFilter = null;
     }
 
     void writeCommandForField(CatalogType ct, String field, boolean printFullPath) {
@@ -109,7 +105,7 @@ public class CatalogSerializer implements CatalogVisitor {
         m_builder.append("\n");
     }
 
-    void writeChildCommands(CatalogType ct) {
+    private void writeChildCommands(CatalogType ct) {
         String[] childCollections = ct.getChildCollections();
         List<CatalogMap<? extends CatalogType>> mapsToVisit =
                 new ArrayList<>(childCollections.length);
@@ -120,7 +116,6 @@ public class CatalogSerializer implements CatalogVisitor {
                 mapsToVisit.add(map);
             }
         }
-        m_childFilter = null;
         for (CatalogMap<? extends CatalogType> map : mapsToVisit) {
             map.accept(this);
         }

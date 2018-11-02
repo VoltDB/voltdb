@@ -45,6 +45,10 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
        This is used only in serialize commands for DR method.
        There are duplicates added to the set because it lists all the fields per type */
     private static final Set<String> s_whiteListFields = Sets.newHashSet(
+            /* Table */
+            "isreplicated", "partitioncolumn", "materializer", "signature", "tuplelimit", "isDRed",
+            /* ColumnRef */
+            "index", "column",
             /* Column */
             "index", "type", "size", "nullable", "name", "defaultvalue", "defaulttype",
             "aggregatetype", "matviewsource", "matview", "inbytes",
@@ -60,7 +64,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
 
     @SuppressWarnings("unchecked")
     private static final Set<Class<? extends CatalogType>> s_whiteListChildren =
-            Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class);
+            Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class, ColumnRef.class);
 
     private boolean m_isXDCR;
     private byte m_remoteClusterId;
@@ -78,7 +82,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     public static DRCatalogCommands serializeCatalogCommandsForDr(Catalog catalog, int protocolVersion) {
         Cluster cluster = catalog.getClusters().get("cluster");
         Database db = cluster.getDatabases().get("database");
-        CatalogSerializer serializer = new CatalogSerializer();
+        CatalogSerializer serializer = new CatalogSerializer(s_whiteListFields, s_whiteListChildren);
 
         if (protocolVersion == -1 || protocolVersion >= DRProtocol.MULTICLUSTER_PROTOCOL_VERSION) {
             serializer.writeCommandForField(cluster, "drRole", true);
@@ -91,11 +95,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
 
         for (Table t : db.getTables()) {
             if (t.getIsdred() && t.getMaterializer() == null && ! CatalogUtil.isTableExportOnly(db, t)) {
-                serializer.writeCreationCommand(t);
-                serializer.writeFieldCommands(t);
-                serializer.withChildFilter(s_whiteListChildren)
-                          .withFieldFilter(s_whiteListFields)
-                          .writeChildCommands(t);
+                t.accept(serializer);
             }
         }
         String catalogCommands = serializer.getResult();
