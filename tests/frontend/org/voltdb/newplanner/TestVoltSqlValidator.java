@@ -26,6 +26,7 @@ package org.voltdb.newplanner;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
@@ -37,6 +38,7 @@ import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.sql.SqlNode;
 import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
 import org.voltdb.newplanner.rules.PlannerPhase;
+import org.voltdb.types.CalcitePlannerType;
 
 public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
 
@@ -138,6 +140,9 @@ public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
         planner.setRoot(root.rel);
         root = root.withRel(planner.findBestExp());
         System.out.println(RelOptUtil.toString(root.rel));
+//        RelNode tNode = CalcitePlanner.transform(CalcitePlannerType.HEP, PlannerPhase.CALCITE_LOGICAL,
+//                root.rel);
+//        System.out.println(RelOptUtil.toString(tNode));
     }
 
 }
