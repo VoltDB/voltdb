@@ -43,7 +43,7 @@ public class CatalogAdapter {
      */
     public static SchemaPlus schemaPlusFromDatabase(Database db) {
         final SchemaPlus rootSchema =
-                CalciteSchema.createRootSchema(false, false, db.getSchema()).plus();
+                CalciteSchema.createRootSchema(false, false, "catalog").plus();
         // Get all tables from database
         db.getTables().forEach(table -> {
             rootSchema.add(table.getTypeName(), new VoltTable(table));

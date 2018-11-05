@@ -23,9 +23,20 @@
 
 package org.voltdb.newplanner;
 
+import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.rules.CalcMergeRule;
+import org.apache.calcite.rel.rules.FilterCalcMergeRule;
+import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
+import org.apache.calcite.rel.rules.FilterToCalcRule;
+import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
+import org.apache.calcite.rel.rules.ProjectMergeRule;
+import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.sql.SqlNode;
 import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
+import org.voltdb.newplanner.rules.PlannerPhase;
 
 public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
 
@@ -112,6 +123,21 @@ public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
         root = root.withRel(converter.decorrelate(node, root.rel));
         assertEquals("Root {kind: SELECT, rel: LogicalProject#1, rowType: RecordType(INTEGER I), fields: [<0, I>], collation: []}",
                 root.toString());
+
+        final HepProgram program = HepProgram.builder()
+                .addRuleInstance(CalcMergeRule.INSTANCE)
+                .addRuleInstance(FilterCalcMergeRule.INSTANCE)
+                .addRuleInstance(FilterToCalcRule.INSTANCE)
+                .addRuleInstance(ProjectCalcMergeRule.INSTANCE)
+                .addRuleInstance(ProjectToCalcRule.INSTANCE)
+                .addRuleInstance(ProjectMergeRule.INSTANCE)
+                .addRuleInstance(FilterProjectTransposeRule.INSTANCE)
+                .build();
+
+        HepPlanner planner = new HepPlanner(program);
+        planner.setRoot(root.rel);
+        root = root.withRel(planner.findBestExp());
+        System.out.println(RelOptUtil.toString(root.rel));
     }
 
 }
