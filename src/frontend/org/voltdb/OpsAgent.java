@@ -18,6 +18,7 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -270,6 +271,16 @@ public abstract class OpsAgent
                     collectStatsImpl(c, clientHandle, selector, params);
                 } catch (Exception e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
+                    if (e instanceof ConcurrentModificationException) {
+                        sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE,
+                                "Statistics are unavailable, try again (" + e.getMessage() + ").",
+                                clientHandle);
+                    }
+                    else {
+                        sendErrorResponse(c, ClientResponse.OPERATIONAL_FAILURE,
+                                "Failed to get statistics (" + e.getMessage() + ").",
+                                clientHandle);
+                    }
                 }
             }
         });
