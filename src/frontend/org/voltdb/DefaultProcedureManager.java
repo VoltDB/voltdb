@@ -20,9 +20,9 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Catalog;
@@ -49,7 +49,7 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class DefaultProcedureManager {
 
-    Map<String, Procedure> m_defaultProcMap = new HashMap<>();
+    Map<String, Procedure> m_defaultProcMap = new ConcurrentHashMap<>();
 
     private final Database m_db;
     // fake db makes it easy to create procedures that aren't
