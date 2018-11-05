@@ -2160,7 +2160,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
                 final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
                 m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
-                        () -> {startMigratePartitionLeader();},
+                        () -> {startMigratePartitionLeader(message.isOneHostMigration());},
                         delay, interval, TimeUnit.SECONDS);
             }
             hostLog.info("MigratePartitionLeader task is started.");
@@ -2183,10 +2183,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * send MigratePartitionLeaderMessage to the host with older partition leader to initiate @MigratePartitionLeader
      * Repeatedly call this task until no qualified partition is available.
      */
-    void startMigratePartitionLeader() {
+    void startMigratePartitionLeader(boolean onlyMoveLeadersOnThisHost) {
         RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
         final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
-        Pair<Integer, Integer> target = m_cartographer.getPartitionForMigratePartitionLeader(voltDB.getHostCount(), hostId);
+        Pair<Integer, Integer> target = null;
+        if (onlyMoveLeadersOnThisHost) {
+            target = m_cartographer.getCandidatePartitionForMigratePartitionLeader(hostId);
+        } else {
+            target = m_cartographer.getPartitionForMigratePartitionLeader(voltDB.getHostCount(), hostId);
+        }
 
         //The host does not have any thing to do this time. It does not mean that the host does not
         //have more partition leaders than expected. Other hosts may have more partition leaders

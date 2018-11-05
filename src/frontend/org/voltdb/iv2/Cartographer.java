@@ -51,6 +51,7 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
 import org.voltdb.MailboxNodeContent;
+import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -720,6 +721,46 @@ public class Cartographer extends StatsSource
         }
     }
 
+    public String canMovePartitonLeaderForStopNode(final int ihid) {
+        if (m_configuredReplicationFactor == 0) {
+            return "Stopping individual nodes is only allowed on a K-safe cluster";
+        }
+        // check if any node still in rejoin status
+        try {
+            if (m_zk.exists(CoreZK.rejoin_node_blocker, false) != null) {
+                return "All rejoin nodes must be completed";
+            }
+            //Otherwise we do check replicas for host
+            Set<Integer> otherStoppedHids = new HashSet<Integer>();
+            List<String> children = m_zk.getChildren(VoltZK.host_ids_be_stopped, false);
+            for (String child : children) {
+                int hostId = Integer.parseInt(child);
+                otherStoppedHids.add(hostId);
+            }
+            otherStoppedHids.remove(ihid); /* don't count self */
+            String message = doPartitionsHaveReplicas(ihid, otherStoppedHids);
+            if (message != null) {
+                return message;
+            }
+            final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false"));
+            if (disableSpiTask) {
+                return null;
+            }
+
+            RealVoltDB db = (RealVoltDB) VoltDB.instance();
+            if(db.isClusterComplete()) {
+                Pair<Integer, Integer> pair = getPartitionForMigratePartitionLeader(db.getHostCount(),-1);
+                //Partition leader migration in progress. don't mess up
+                if (pair.getFirst() > -1 ) {
+                    return "Cann't move partition leaders since leader migration is in progress";
+                }
+            }
+        } catch (KeeperException | InterruptedException e) {
+            return "Error: " + e.getMessage();
+        }
+        return null;
+    }
+
     // Check if partitions on host hid will have enough replicas after losing host hid.
     // If nodesBeingStopped was set, it means there are concurrent @StopNode running,
     // don't count replicas on those to-be-stopped nodes.
@@ -916,7 +957,7 @@ public class Cartographer extends StatsSource
 
         //@MigratePartitionLeader is initiated on the host with the old leader to facilitate DR integration
         //If current host does not have the most partition leaders, give it up.
-        if (srcHost.m_hostId != localHostId) {
+        if (srcHost.m_hostId != localHostId && localHostId != -1) {
             return null;
         }
 
@@ -960,6 +1001,40 @@ public class Cartographer extends StatsSource
             }
         }
         return -1;
+    }
+
+    public Pair<Integer, Integer> getCandidatePartitionForMigratePartitionLeader(int localHostId) {
+
+        //collect host and partition info
+        Map<Integer, Host> hostsMap = Maps.newHashMap();
+        Set<Integer> allMasters = new HashSet<Integer>();
+        allMasters.addAll(m_iv2Masters.pointInTimeCache().keySet());
+        for ( Iterator<Integer> it = allMasters.iterator(); it.hasNext();) {
+            Integer partitionId = it.next();
+            int leaderHostId = CoreUtils.getHostIdFromHSId(m_iv2Masters.pointInTimeCache().get(partitionId));
+            if (leaderHostId != localHostId) {
+                continue;
+            }
+            Host leaderHost = hostsMap.get(leaderHostId);
+            if (leaderHost == null) {
+                leaderHost = new Host(leaderHostId);
+                hostsMap.put(leaderHostId, leaderHost);
+            }
+            List<Long> sites = getReplicasForPartition(partitionId);
+            for (long site : sites) {
+                int hostId = CoreUtils.getHostIdFromHSId(site);
+                Host host = hostsMap.get(hostId);
+                if (host == null) {
+                    host = new Host(hostId);
+                    hostsMap.put(hostId, host);
+                }
+                host.addPartition(partitionId, (leaderHostId == hostId));
+            }
+        }
+
+        //indicate that all the partition leaders have been relocated.
+        Pair<Integer, Integer> pair = new Pair<Integer, Integer> (-1, -1);
+        return pair;
     }
 
     //return the number of masters on a host

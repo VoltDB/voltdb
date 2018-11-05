@@ -97,4 +97,8 @@ public class MigratePartitionLeaderMessage extends VoltMessage {
     public boolean isStatusReset() {
         return m_resetStatus;
     }
+
+    public boolean isOneHostMigration() {
+        return (m_startingService && m_newLeaderHSID == -1);
+    }
 }
