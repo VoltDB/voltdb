@@ -29,7 +29,7 @@ import com.google_voltpatches.common.cache.CacheBuilder;
  * instances of CatalogType objects, accessed by paths globally, and child
  * names when given a parent.
  */
-public class Catalog extends CatalogType {
+public final class Catalog extends CatalogType {
 
     public static final char MAP_SEPARATOR = '#';
 
@@ -58,6 +58,10 @@ public class Catalog extends CatalogType {
         return this;
     }
 
+    /**
+     * Get the operator that can make changes to this catalog object.
+     * @return the catalog operator.
+     */
     @Override
     public CatalogOperator getOperator() {
         return m_operator;

@@ -27,5 +27,10 @@ package org.voltdb.catalog;
  * @since 8.4
  */
 public interface CatalogVisitor {
+
+    /**
+     * Visit the specified {@link CatalogType} object. 
+     * @param ct the {@link CatalogType} object to visit.
+     */
     void visit(CatalogType ct);
 }

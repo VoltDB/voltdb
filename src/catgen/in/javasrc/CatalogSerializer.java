@@ -25,17 +25,29 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-public class CatalogSerializer implements CatalogVisitor {
+/**
+ * Helps serialize the VoltDB catalog.
+ * @author Yiqun Zhang
+ * @since 8.4
+ */
+public final class CatalogSerializer implements CatalogVisitor {
 
     private final StringBuilder m_builder;
     private final Set<String> m_fieldFilter;
     private final Set<Class<? extends CatalogType>> m_childFilter;
 
-
+    /**
+     * Create a default catalog serializer.
+     */
     CatalogSerializer() {
         this(null, null);
     }
 
+    /**
+     * Create a catalog serializer with a field filter and a child filter.
+     * @param fieldFilter only fields included in this set will be serialized.
+     * @param childFilter only children included in this set will be serialized.
+     */
     CatalogSerializer(Set<String> fieldFilter,
             Set<Class<? extends CatalogType>> childFilter) {
         m_builder = new StringBuilder();
@@ -50,6 +62,10 @@ public class CatalogSerializer implements CatalogVisitor {
         writeChildCommands(ct);
     }
 
+    /**
+     * Return the serialized catalog.
+     * @return
+     */
     String getResult() {
         return m_builder.toString();
     }

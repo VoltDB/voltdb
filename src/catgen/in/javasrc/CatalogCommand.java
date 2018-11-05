@@ -21,25 +21,31 @@
 
 package org.voltdb.catalog;
 
-public class CatalogCommand {
+/**
+ * Command to make changes to a catalog.
+ * @author Yiqun Zhang
+ * @since 8.4
+ */
+public final class CatalogCommand {
     public final char cmd;
     public final String path;
     public final String arg1;
     public final String arg2;
 
+    /**
+     * Create a catalog command from a serialized string.
+     * @param cmdStr serialized command string.
+     */
     public CatalogCommand(String cmdStr) {
         int pos = 0;
         cmdStr = cmdStr.trim();
-        // Command comes before the first space (add or set)
         cmd = cmdStr.charAt(pos++);
         while (cmdStr.charAt(pos++) != ' ');
 
-        // Path to a catalog node between first two spaces
         int pathStart = pos;
         while (cmdStr.charAt(pos++) != ' ');
         path = cmdStr.substring(pathStart, pos - 1);
 
-        // spaces 2 & 3 separate the two arguments
         int argStart = pos;
         while (cmdStr.charAt(pos++) != ' ');
         arg1 = cmdStr.substring(argStart, pos - 1);
