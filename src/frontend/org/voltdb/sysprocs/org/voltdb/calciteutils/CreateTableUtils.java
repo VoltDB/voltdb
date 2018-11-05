@@ -92,7 +92,7 @@ public class CreateTableUtils {
         throw new PlanningErrorException(msg, 0);
     }
 
-    private static void exceptWhen(boolean when, String reason) {
+    static void exceptWhen(boolean when, String reason) {
         if (when) {
             throw new PlanningErrorException(reason, 0);
         }
@@ -201,7 +201,10 @@ public class CreateTableUtils {
                 column.setDefaultvalue(defaultFunctionValue(vt, ((SqlIdentifier) expr).getSimple(), colName));
             } else if (expr.getKind() == SqlKind.LITERAL) {
                 final String defaultValue;
-                if (expr instanceof SqlNumericLiteral) {
+                if (((SqlLiteral) expr).getValue() == null) {
+                    column.setDefaulttype(VoltType.NULL.getValue());        // reset default type to NULL
+                    defaultValue = null;
+                } else if (expr instanceof SqlNumericLiteral) {
                     defaultValue = ((SqlNumericLiteral) expr).getValue().toString();
                 } else {
                     assert expr instanceof SqlCharStringLiteral;
