@@ -45,14 +45,4 @@ public class CatalogCommand {
         arg1 = cmdStr.substring(argStart, pos - 1);
         arg2 = cmdStr.substring(pos);
     }
-
-    boolean isProcedureRelatedCmd() {
-        if (path.indexOf("procedures#") != -1) {
-            return true;
-        }
-        if ("procedures".equals(arg1) && path.endsWith("#database")) {
-            return true;
-        }
-        return false;
-    }
 }
