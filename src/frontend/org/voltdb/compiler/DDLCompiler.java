@@ -35,7 +35,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
-
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -84,6 +83,7 @@ import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.sysprocs.org.voltdb.calciteutils.DropTableUtils;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -374,16 +374,29 @@ public class DDLCompiler {
      * @param whichProcs  which type(s) of procedures to load
      * @throws VoltCompiler.VoltCompilerException
      */
-    void loadSchema(Reader reader, Database db, DdlProceduresToLoad whichProcs)
-            throws VoltCompiler.VoltCompilerException {
+    void loadSchema(Reader reader, Database db, Database prevDb, DdlProceduresToLoad whichProcs)
+            throws VoltCompilerException {
         int currLineNo = 1;
 
         DDLStatement stmt = getNextStatement(reader, m_compiler, currLineNo);
+        final StringBuilder ddls = new StringBuilder();
+        boolean isBatch = false;        // When reader contains multiple stmts, set it to indicate we are in batch mode.
         while (stmt != null) {
-            // Some statements are processed by VoltDB and the rest are handled by HSQL.
-            processVoltDBStatements(db, whichProcs, stmt);
+            final String encodedDropTable;
+            if (isBatch) {      // We cannot query previous database for existing tables in batch mode, as
+                encodedDropTable = null;    // current DDL batch may contain CREATE statements, that is later dropped.
+            } else {
+                encodedDropTable = DropTableUtils.run(prevDb, stmt.statement, m_schema, m_compiler);
+            }
+            if (encodedDropTable == null) {
+                processVoltDBStatements(db, whichProcs, stmt);
+            } else {        // matched & executed DROP TABLE stmt
+                ddls.append(encodedDropTable);
+            }
             stmt = getNextStatement(reader, m_compiler, stmt.endLineNo);
+            isBatch = true;
         }
+        m_fullDDL += ddls;
 
         try {
             reader.close();
@@ -484,7 +497,7 @@ public class DDLCompiler {
             DdlProceduresToLoad whichProcs, boolean isCurrentXDCR)
             throws VoltCompilerException {
         Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny, isCurrentXDCR));
-        loadSchema(reader, db, whichProcs);
+        loadSchema(reader, db, previousDBIfAny, whichProcs);
     }
 
     private void applyDiff(VoltXMLDiff stmtDiff)
@@ -2111,14 +2124,14 @@ public class DDLCompiler {
 
         if (! processed) {
             try {
+                // figure out what table this DDL might affect to minimize diff processing
+                HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
+
                 //* enable to debug */ System.out.println("DEBUG: " + stmt.statement);
                 // kind of ugly.  We hex-encode each statement so we can
                 // avoid embedded newlines so we can delimit statements
                 // with newline.
                 m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-
-                // figure out what table this DDL might affect to minimize diff processing
-                HSQLDDLInfo ddlStmtInfo = HSQLLexer.preprocessHSQLDDL(stmt.statement);
 
                 // Get the diff that results from applying this statement and apply it
                 // to our local tree (with Volt-specific additions)
@@ -2127,7 +2140,6 @@ public class DDLCompiler {
                 if (thisStmtDiff != null) {
                     applyDiff(thisStmtDiff);
                 }
-
                 // special treatment for stream syntax
                 if (ddlStmtInfo.creatStream) {
                     processCreateStreamStatement(stmt, db, whichProcs);

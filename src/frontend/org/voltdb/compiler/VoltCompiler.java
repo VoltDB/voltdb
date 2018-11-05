@@ -510,7 +510,7 @@ public class VoltCompiler {
             compilerLog.error("Unable to open DDL file.", e);
             return false;
         }
-        // NOTE/TODO: this is not from AdHoc code path, that does not update CalciteSchema for catalog updates.
+        // NOTE: batch compiles from DDL sql files, not in AdHoc path.
         return compileInternalToFile(jarOutputPath, null, null, ddlReaderList, null);
     }
 
@@ -1104,7 +1104,7 @@ public class VoltCompiler {
             if (cannonicalDDLIfAny != null) {
                 // add the file object's path to the list of files for the jar
                 m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
-                ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
+                ddlcompiler.loadSchema(cannonicalDDLIfAny, db, previousDBIfAny, whichProcs);
             }
 
             m_dirtyTables.clear();
@@ -1123,7 +1123,7 @@ public class VoltCompiler {
                         ddlcompiler.loadSchemaWithFiltering(schemaReader, db, whichProcs, fi);
                     }
                     else {
-                        ddlcompiler.loadSchema(schemaReader, db, whichProcs);
+                        ddlcompiler.loadSchema(schemaReader, db, previousDBIfAny, whichProcs);
                     }
                 }
                 finally {
