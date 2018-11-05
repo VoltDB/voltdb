@@ -654,6 +654,7 @@ public final class InvocationDispatcher {
             String dumpDir = new File(VoltDB.instance().getVoltDBRootPath(), "thread_dumps").getAbsolutePath();
             String fileName =  hostMessenger.getHostname() + "_host-" + hostMessenger.getHostId() + "_" + System.currentTimeMillis()+".jstack";
             success = VoltDB.dumpThreadTraceToFile(dumpDir, fileName );
+            liveHids.remove(hostMessenger.getHostId());
             hostMessenger.sendPoisonPill(liveHids, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
         } else if (ihid == hostMessenger.getHostId()) { // only local
             //collect thread dumps
@@ -667,7 +668,7 @@ public final class InvocationDispatcher {
             return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
         }
         return gracefulFailureResponse(
-                "Failed to create the thread dump of localhost.",
+                "Failed to create the thread dump of " + ((ihid < 0) ? "all hosts." : "Host Id " + ihid + "."),
                 task.clientHandle);
     }
 
