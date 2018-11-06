@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
@@ -34,10 +35,12 @@ import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
+import org.voltdb.newplanner.CalcitePlanner;
 import org.voltdb.newplanner.NonDdlBatch;
 import org.voltdb.newplanner.SqlTask;
 import org.voltdb.newplanner.VoltSqlToRelConverter;
 import org.voltdb.newplanner.VoltSqlValidator;
+import org.voltdb.newplanner.rules.PlannerPhase;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
@@ -46,6 +49,7 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
+import org.voltdb.types.CalcitePlannerType;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
@@ -213,6 +217,9 @@ public class PlannerTool {
         VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, m_schemaPlus);
         RelRoot root = converter.convertQuery(validatedNode, false, true);
         root = root.withRel(converter.decorrelate(validatedNode, root.rel));
+        // apply calcite logical rules
+        RelNode nodeAfterCalciteLogical = CalcitePlanner.transform(CalcitePlannerType.HEP, PlannerPhase.CALCITE_LOGICAL,
+                root.rel);
 
         return null;
     }

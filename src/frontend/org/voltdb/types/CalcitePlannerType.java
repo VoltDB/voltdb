@@ -18,5 +18,5 @@
 package org.voltdb.types;
 
 public enum CalcitePlannerType {
-    HEP, HEP_BOTTOM_UP, VOLCANO
+    HEP, VOLCANO
 }
