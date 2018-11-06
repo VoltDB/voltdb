@@ -49,6 +49,7 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class DefaultProcedureManager {
 
+    // ENG-14639, made concurrent to support LoadedProcedureSet.getNibbleDeleteProc
     Map<String, Procedure> m_defaultProcMap = new ConcurrentHashMap<>();
 
     private final Database m_db;
