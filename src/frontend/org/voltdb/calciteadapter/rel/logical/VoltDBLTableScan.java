@@ -23,7 +23,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.calciteadapter.rel.VoltDBTable;
+import org.voltdb.calciteadapter.rel.VoltTable;
 import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 
 public class VoltDBLTableScan extends AbstractVoltDBTableScan implements VoltDBLRel {
@@ -31,7 +31,7 @@ public class VoltDBLTableScan extends AbstractVoltDBTableScan implements VoltDBL
     public VoltDBLTableScan(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelOptTable table,
-            VoltDBTable voltDBTable) {
+            VoltTable voltDBTable) {
           super(cluster,
                   traitSet,
                   table,

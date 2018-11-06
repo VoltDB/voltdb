@@ -19,7 +19,7 @@ package org.voltdb.catalog.org.voltdb.calciteadaptor;
 
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
-import org.voltdb.calciteadapter.rel.VoltDBTable;
+import org.voltdb.calciteadapter.rel.VoltTable;
 import org.voltdb.catalog.Database;
 
 
@@ -46,8 +46,8 @@ public class CatalogAdapter {
                 CalciteSchema.createRootSchema(false, false, db.getSchema()).plus();
         // Get all tables from database
         db.getTables().forEach(table -> {
-            rootSchema.add(table.getTypeName(), new VoltDBTable(table));
-            // TODO: Get all functions, stored procedures, etc. from database
+            rootSchema.add(table.getTypeName(), new VoltTable(table));
+            // TODO: Get all functions, etc. from database
         });
         return rootSchema;
     }

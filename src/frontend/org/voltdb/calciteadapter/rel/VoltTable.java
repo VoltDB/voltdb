@@ -45,24 +45,38 @@ import org.voltdb.catalog.Column;
 import org.voltdb.utils.CatalogUtil;
 
 /**
- * This comes from Mike A. It is an adaptor between VoltDB catalog table and
- * {@code org.apache.calcite.schema.TranslateableTable}
- * A Calcite table that is <em>translatable</em> can be translated into a relational expression
- * ({@code org.apache.calcite.rel.RelNode}), which fulfills roles to be:
- * sortable, join-able, project-able, filterable, scan-able and sample-able.
+ * An adaptor between a {@link org.voltdb.catalog.Table} and a {@link TranslateableTable}
+ * which can be translated into a relational expression ({@link org.apache.calcite.rel.RelNode}).
+ * A relational expression can fulfill roles to be sort-able, join-able, project-able,
+ * filter-able, scan-able, and sample-able.
+ * @since 8.4
+ * @author Michael Alexeev
  */
-public class VoltDBTable implements TranslatableTable {
+public class VoltTable implements TranslatableTable {
 
     final private org.voltdb.catalog.Table m_catTable;
 
-    public VoltDBTable(org.voltdb.catalog.Table table) {
-        assert(table != null) : "Null voltdb.catalog.Table";
-        m_catTable = table;
+    /**
+     * Build a {@code VoltTable} from a catalog table.
+     * @param catTable the catalog table.
+     */
+    public VoltTable(org.voltdb.catalog.Table catTable) {
+        assert(catTable != null) : "Null voltdb.catalog.Table";
+        m_catTable = catTable;
     }
 
+    /**
+     *
+     * @param typeFactory
+     * @param vt
+     * @param prec
+     * @return
+     */
     public static RelDataType toRelDataType(RelDataTypeFactory typeFactory, VoltType vt, int prec) {
         SqlTypeName sqlTypeName = SqlTypeName.get(vt.toSQLString().toUpperCase());
         RelDataType rdt;
+        // This doesn't seem quite right. Build a VoltDB TypeSystem inherits from RelDataTypeSystemImpl,
+        // ENG-14727
         switch (vt) {
             case STRING:
                 // This doesn't seem quite right...

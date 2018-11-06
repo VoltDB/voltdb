@@ -32,12 +32,12 @@ import org.apache.calcite.rel.type.RelDataType;
  */
 public abstract class AbstractVoltDBTableScan extends TableScan {
 
-    protected final VoltDBTable m_voltDBTable;
+    protected final VoltTable m_voltDBTable;
 
     protected AbstractVoltDBTableScan(RelOptCluster cluster,
                                       RelTraitSet traitSet,
                                       RelOptTable table,
-                                      VoltDBTable voltDBTable) {
+                                      VoltTable voltDBTable) {
         super(cluster, traitSet, table);
         assert(voltDBTable != null) : "VoltDB Table is null";
         this.m_voltDBTable = voltDBTable;
@@ -56,23 +56,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan {
         return dg + "_" + m_voltDBTable.getCatTable().getTypeName();
     }
 
-    public VoltDBTable getVoltDBTable() {
+    public VoltTable getVoltDBTable() {
         return m_voltDBTable;
     }
-
-    @Override
-    public RelDataType deriveRowType() {
-        return table.getRowType();
-    }
-
-    @Override
-    public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                      RelMetadataQuery mq) {
-        double dRows = estimateRowCount(mq);
-        double dCpu = dRows + 1; // ensure non-zero cost
-        double dIo = 0;
-        RelOptCost cost = planner.getCostFactory().makeCost(dRows, dCpu, dIo);
-        return cost;
-    }
-
 }
