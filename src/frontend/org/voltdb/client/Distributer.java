@@ -796,11 +796,7 @@ class Distributer {
                 m_connections.remove(this);
                 //Notify listeners that a connection has been lost
                 for (ClientStatusListenerExt s : m_listeners) {
-                    s.connectionLost(
-                            m_connection.getHostnameOrIP(),
-                            m_connection.getRemotePort(),
-                            m_connections.size(),
-                            m_closeCause);
+                    s.connectionLost(m_connection.connectionId(), m_closeCause);
                 }
 
                 /*
@@ -858,7 +854,7 @@ class Distributer {
         }
 
         @Override
-        public Runnable offBackPressure() {
+        public Runnable offBackPressure(final long connectionId) {
             return new Runnable() {
                 @Override
                 public void run() {
@@ -869,7 +865,7 @@ class Distributer {
                      */
                     synchronized (Distributer.this) {
                         for (final ClientStatusListenerExt csl : m_listeners) {
-                            csl.backpressure(false);
+                            csl.perConnectionBackpressure(connectionId, false);
                         }
                     }
                 }
@@ -877,7 +873,7 @@ class Distributer {
         }
 
         @Override
-        public Runnable onBackPressure() {
+        public Runnable onBackPressure(final long connectionId) {
             return null;
         }
 
@@ -1122,6 +1118,22 @@ class Distributer {
         }
     }
 
+    static class PerConnectionBackpressure {
+        private NodeConnection m_nc;
+        private boolean m_backpressure;
+        public PerConnectionBackpressure(NodeConnection cxn, boolean flag) {
+            assert (cxn != null);
+            m_nc = cxn;
+            m_backpressure = flag;
+        }
+        public boolean inBackpressure() {
+            return m_backpressure;
+        }
+        public long getKey() {
+            return m_nc.m_connection.connectionId();
+        }
+    }
+
     /**
      * Queue invocation on first node connection without backpressure. If there is none with without backpressure
      * then return false and don't queue the invocation
@@ -1130,10 +1142,13 @@ class Distributer {
      * @param ignoreBackpressure If true the invocation will be queued even if there is backpressure
      * @param nowNanos Current time in nanoseconds using System.nanoTime
      * @param timeoutNanos nanoseconds from nowNanos where timeout should fire
-     * @return True if the message was queued and false if the message was not queued due to backpressure
+     * @return PerConnectionBackpressure, backpressure flag is true if the message was
+     * queued and false if the message was not queued due to backpressure. If backpressure flag is true,
+     * NodeConnection is the connection that will be blocked until backpressure is ceased. If NodeConnection
+     * is null, the connection was already under backpressure and was blocked.
      * @throws NoConnectionsException
      */
-    boolean queue(
+    PerConnectionBackpressure queue(
             ProcedureInvocation invocation,
             ProcedureCallback cb,
             final boolean ignoreBackpressure, final long nowNanos, final long timeoutNanos)
@@ -1198,6 +1213,12 @@ class Distributer {
                             if (!cxn.hadBackPressure() || ignoreBackpressure) {
                                 backpressure = false;
                             }
+                        } else {
+                            // For FAST reads, choose master if no viable replica found
+                            cxn = m_partitionMasters.get(hashedPartition);
+                            if (cxn != null && !cxn.hadBackPressure() || ignoreBackpressure) {
+                                backpressure = false;
+                            }
                         }
                     } else {
                         /*
@@ -1240,7 +1261,7 @@ class Distributer {
                 }
             }
             if (cxn == null) {
-                for (int i=0; i < totalConnections; ++i) {
+                for (int i = 0; i < totalConnections; ++i) {
                     cxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
                     if (!cxn.hadBackPressure() || ignoreBackpressure) {
                         // serialize and queue the invocation
@@ -1249,11 +1270,12 @@ class Distributer {
                     }
                 }
             }
+            assert (cxn != null);
 
+            // If all connections are in backpressure, don't bother to notify backpressure listener again.
             if (backpressure) {
-                cxn = null;
                 for (ClientStatusListenerExt s : m_listeners) {
-                    s.backpressure(true);
+                    s.perConnectionBackpressure(cxn.m_connection.connectionId(), true);
                 }
             }
         }
@@ -1262,7 +1284,7 @@ class Distributer {
          * Do the heavy weight serialization outside the synchronized block.
          * createWork synchronizes on an individual connection which allows for more concurrency
          */
-        if (cxn != null) {
+        if (!backpressure) {
             ByteBuffer buf = null;
             try {
                 buf = serializeSPI(invocation);
@@ -1274,7 +1296,7 @@ class Distributer {
         if (m_topologyChangeAware) {
             createConnectionsUponTopologyChange();
         }
-        return !backpressure;
+        return new PerConnectionBackpressure(cxn, backpressure);
     }
 
     /**
@@ -1585,7 +1607,8 @@ class Distributer {
                 latch = new CountDownLatch(1);
             }
             PartitionUpdateCallback cb = new PartitionUpdateCallback(latch);
-            if (!queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT)) {
+            PerConnectionBackpressure connection = queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
+            if (connection.inBackpressure()) {
                 m_partitionUpdateStatus.set(new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
                         "Fails to queue the partition update query, please try later."));
             }

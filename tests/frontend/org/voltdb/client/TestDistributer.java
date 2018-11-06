@@ -142,7 +142,7 @@ public class TestDistributer extends TestCase {
         AtomicInteger roundTrips = new AtomicInteger();
 
         @Override
-        public Runnable offBackPressure() {
+        public Runnable offBackPressure(long connectionId) {
             return new Runnable() {
                 @Override
                 public void run() {}
@@ -150,7 +150,7 @@ public class TestDistributer extends TestCase {
         }
 
         @Override
-        public Runnable onBackPressure() {
+        public Runnable onBackPressure(long connectionId) {
             return new Runnable() {
                 @Override
                 public void run() {}

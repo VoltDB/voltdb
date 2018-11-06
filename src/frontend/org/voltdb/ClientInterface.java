@@ -865,7 +865,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * are only intended to enable/disable backpressure for the specific connection
          */
         @Override
-        public Runnable offBackPressure() {
+        public Runnable offBackPressure(long connectionId) {
             return new Runnable() {
                 @Override
                 public void run() {
@@ -877,7 +877,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public Runnable onBackPressure() {
+        public Runnable onBackPressure(long connectionId) {
             return new Runnable() {
                 @Override
                 public void run() {

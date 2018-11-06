@@ -23,6 +23,9 @@
 
 package org.voltdb.client;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -39,6 +42,7 @@ import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
+import org.voltdb.client.Distributer.PerConnectionBackpressure;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 
@@ -425,12 +429,17 @@ public class TestClientFeatures extends TestCase {
 
     public void testBackpressureTimeout() throws Exception {
         final ClientImpl client = (ClientImpl)ClientFactory.createClient();
+        long connectionId = 123456789L;
         client.createConnection("localhost");
-        client.backpressureBarrier(System.nanoTime(), TimeUnit.DAYS.toNanos(1));
-        client.m_listener.backpressure(true);
+
+        PerConnectionBackpressure connection = mock(PerConnectionBackpressure.class);
+        doReturn(123456789L).when(connection).getKey();
+        doReturn(true).when(connection).inBackpressure();
+        client.backpressureBarrier(connection, System.nanoTime(), TimeUnit.DAYS.toNanos(1));
+        client.m_listener.perConnectionBackpressure(connectionId, true);
 
         long start = System.nanoTime();
-        assertTrue(client.backpressureBarrier(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(200)));
+        assertTrue(client.backpressureBarrier(connection, System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(200)));
         long delta = System.nanoTime() - start;
         assertTrue(delta > TimeUnit.MILLISECONDS.toNanos(200));
         assertTrue(delta < TimeUnit.MINUTES.toNanos(1));
@@ -447,7 +456,7 @@ public class TestClientFeatures extends TestCase {
                 }
             }
         }.start();
-        assertFalse(client.backpressureBarrier(System.nanoTime(), TimeUnit.MINUTES.toNanos(1)));
+        assertFalse(client.backpressureBarrier(connection, System.nanoTime(), TimeUnit.MINUTES.toNanos(1)));
         assertTrue(delta < TimeUnit.MINUTES.toNanos(1));
         assertTrue(delta > TimeUnit.MILLISECONDS.toNanos(20));
     }

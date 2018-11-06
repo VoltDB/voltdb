@@ -57,6 +57,8 @@ public class ClientStatusListenerExt {
      */
     public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {}
 
+    public void connectionLost(long connectionId, DisconnectCause cause) {}
+
     /**
      * Notify listeners that the client tried to create connection to unconnected nodes upon topology change.
      * When both client affinity and topology aware are enabled, connections to newly joined nodes or other unconnected nodes
@@ -75,6 +77,8 @@ public class ClientStatusListenerExt {
      * @param status <code>true</code> if there is backpressure and <code>false</code> otherwise.
      */
     public void backpressure(boolean status) {}
+
+    public void perConnectionBackpressure(long connectionId, boolean status) {}
 
     /**
      * Called when a {@link ProcedureCallback#clientCallback(ClientResponse)} invocation throws

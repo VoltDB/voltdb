@@ -105,9 +105,9 @@ public interface InputHandler
      */
     public void stopped(Connection c);
 
-    public Runnable onBackPressure();
+    public Runnable onBackPressure(long connectionId);
 
-    public Runnable offBackPressure();
+    public Runnable offBackPressure(long connectionId);
 
     public QueueMonitor writestreamMonitor();
 

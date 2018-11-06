@@ -116,7 +116,7 @@ public class ForeignHost {
         }
 
         @Override
-        public Runnable offBackPressure() {
+        public Runnable offBackPressure(long connectionId) {
             return new Runnable() {
                 @Override
                 public void run() {}
@@ -124,7 +124,7 @@ public class ForeignHost {
         }
 
         @Override
-        public Runnable onBackPressure() {
+        public Runnable onBackPressure(long connectionId) {
             return new Runnable() {
                 @Override
                 public void run() {}

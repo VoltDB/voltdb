@@ -26,6 +26,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -43,6 +45,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.client.Distributer.PerConnectionBackpressure;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
@@ -493,7 +496,9 @@ public final class ClientImpl implements Client {
         final long nowNanos = System.nanoTime();
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
-        while (!m_distributer.queue(invocation, callback, isBlessed, nowNanos, clientTimeoutNanos)) {
+        PerConnectionBackpressure connection =
+                m_distributer.queue(invocation, callback, isBlessed, nowNanos, clientTimeoutNanos);
+        while (connection.inBackpressure()) {
             if ( ! m_blockingQueue) {
                 return false;
             }
@@ -506,7 +511,7 @@ public final class ClientImpl implements Client {
                     clientTimeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT ?
                             m_distributer.getProcedureTimeoutNanos() : clientTimeoutNanos;
             try {
-                if (backpressureBarrier(nowNanos, timeout - delta)) {
+                if (backpressureBarrier(connection, nowNanos, timeout - delta)) {
                     final ClientResponse response = new ClientResponseImpl(
                             ClientResponse.CONNECTION_TIMEOUT,
                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
@@ -525,6 +530,8 @@ public final class ClientImpl implements Client {
             catch (InterruptedException e) {
                 throw new java.io.InterruptedIOException("Interrupted while invoking procedure asynchronously");
             }
+            // requeue the invocation once backpressure is ceased
+            connection = m_distributer.queue(invocation, callback, isBlessed, nowNanos, clientTimeoutNanos);
         }
         return true;
     }
@@ -621,9 +628,13 @@ public final class ClientImpl implements Client {
                     " without deadlocking the client library");
         }
         m_isShutdown = true;
-        synchronized (m_backpressureLock) {
-            m_backpressureLock.notifyAll();
+        for (BackpressureLock lock : m_cxnsInBackPressure.values()) {
+            synchronized (lock) {
+                lock.m_hasBackpressure = false;
+                lock.notifyAll();
+            }
         }
+        m_cxnsInBackPressure.clear();
 
         if (m_reconnectStatusListener != null) {
             m_distributer.removeClientStatusListener(m_reconnectStatusListener);
@@ -644,7 +655,7 @@ public final class ClientImpl implements Client {
 
     @Override
     public void backpressureBarrier() throws InterruptedException {
-        backpressureBarrier( 0, 0);
+        backpressureBarrier(new PerConnectionBackpressure(null, false), 0, 0);
     }
 
     /**
@@ -652,7 +663,10 @@ public final class ClientImpl implements Client {
      * Timeout nanos is the initial timeout quantity which will be adjusted to reflect remaining
      * time on spurious wakeups
      */
-    public boolean backpressureBarrier(final long start, long timeoutNanos) throws InterruptedException {
+    public boolean backpressureBarrier(
+            PerConnectionBackpressure connection,
+            final long start,
+            long timeoutNanos) throws InterruptedException {
         if (m_isShutdown) {
             return false;
         }
@@ -660,10 +674,13 @@ public final class ClientImpl implements Client {
             throw new RuntimeException("Can't invoke backpressureBarrier from within the client callback thread " +
                     " without deadlocking the client library");
         }
-        if (m_backpressure) {
-            synchronized (m_backpressureLock) {
-                if (m_backpressure) {
-                    while (m_backpressure && !m_isShutdown) {
+
+        BackpressureLock connectionLock = m_cxnsInBackPressure.get(connection.getKey());
+        if (connectionLock != null && connectionLock.m_hasBackpressure) {
+            synchronized (connectionLock) {
+                // if backpressure for this connection is ended here
+                if (connectionLock.m_hasBackpressure) {
+                    while (!m_isShutdown) {
                        if (start != 0) {
                            if (timeoutNanos <= 0) {
                                // timeout nano value is negative or zero, indicating it timed out.
@@ -671,10 +688,11 @@ public final class ClientImpl implements Client {
                            }
 
                             //Wait on the condition for the specified timeout remaining
-                            m_backpressureLock.wait(timeoutNanos / TimeUnit.MILLISECONDS.toNanos(1), (int)(timeoutNanos % TimeUnit.MILLISECONDS.toNanos(1)));
+                            connectionLock.wait(timeoutNanos / TimeUnit.MILLISECONDS.toNanos(1),
+                                    (int)(timeoutNanos % TimeUnit.MILLISECONDS.toNanos(1)));
 
                             //Condition is true, break and return false
-                            if (!m_backpressure) break;
+                            if (!connectionLock.m_hasBackpressure) break;
 
                             //Calculate whether the timeout should be triggered
                             final long nowNanos = System.nanoTime();
@@ -686,7 +704,7 @@ public final class ClientImpl implements Client {
                             //Reassigning timeout nanos with remainder of timeout
                             timeoutNanos -= deltaNanos;
                        } else {
-                           m_backpressureLock.wait();
+                           connectionLock.wait();
                        }
                     }
                 }
@@ -723,27 +741,31 @@ public final class ClientImpl implements Client {
         boolean m_adminPortChecked = false;
         boolean m_connectionSuccess = false;
         AtomicInteger connectionTaskCount = new AtomicInteger(0);
+
         @Override
-        public void backpressure(boolean status) {
-            synchronized (m_backpressureLock) {
-                if (status) {
-                    m_backpressure = true;
-                } else {
-                    m_backpressure = false;
-                    m_backpressureLock.notifyAll();
+        public void perConnectionBackpressure(long connectionId, boolean enableBackpressure) {
+            BackpressureLock backpressureLock = m_cxnsInBackPressure.remove(connectionId);
+            if (backpressureLock != null) {
+                synchronized (backpressureLock) {
+                    backpressureLock.m_hasBackpressure = false;
+                    backpressureLock.notifyAll();
                 }
+            }
+            if (enableBackpressure) {
+                m_cxnsInBackPressure.put(connectionId, new BackpressureLock());
             }
         }
 
         @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft,
-                ClientStatusListenerExt.DisconnectCause cause) {
-            if (connectionsLeft == 0) {
-                //Wake up client and let it attempt to queue work
-                //and then fail with a NoConnectionsException
-                synchronized (m_backpressureLock) {
-                    m_backpressure = false;
-                    m_backpressureLock.notifyAll();
+        public void connectionLost(long connectionId,
+                                   ClientStatusListenerExt.DisconnectCause cause) {
+            //Wake up client and let it attempt to queue work
+            //and then fail with a NoConnectionsException
+            BackpressureLock backpressureLock = m_cxnsInBackPressure.remove(connectionId);
+            if (backpressureLock != null) {
+                synchronized (backpressureLock) {
+                    backpressureLock.m_hasBackpressure = false;
+                    backpressureLock.notifyAll();
                 }
             }
         }
@@ -868,12 +890,14 @@ public final class ClientImpl implements Client {
                         Implementation
      ****************************************************/
 
-
+    private class BackpressureLock {
+        public boolean m_hasBackpressure = true;
+    }
 
     static final Logger LOG = Logger.getLogger(ClientImpl.class.getName());  // Logger shared by client package.
     private final Distributer m_distributer;                             // de/multiplexes connections to a cluster
-    private final Object m_backpressureLock = new Object();
-    private boolean m_backpressure = false;
+    // Each connection owns a backpressure lock
+    private ConcurrentMap<Long, BackpressureLock> m_cxnsInBackPressure = new ConcurrentHashMap<>();
 
     private boolean m_blockingQueue = true;
 

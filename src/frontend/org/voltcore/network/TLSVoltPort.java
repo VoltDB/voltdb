@@ -51,8 +51,8 @@ public class TLSVoltPort extends VoltPort  {
         m_readStream = new NIOReadStream();
         m_writeStream = new VoltTLSNIOWriteStream(
                 this,
-                m_handler.offBackPressure(),
-                m_handler.onBackPressure(),
+                m_handler.offBackPressure(connectionId()),
+                m_handler.onBackPressure(connectionId()),
                 m_handler.writestreamMonitor(),
                 m_sslEngine, m_cipherExecutor);
         m_interestOps = key.interestOps();

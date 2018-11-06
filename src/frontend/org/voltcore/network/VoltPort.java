@@ -141,8 +141,8 @@ public class VoltPort implements Connection
         m_readStream = new NIOReadStream();
         m_writeStream = new VoltNIOWriteStream(
                 this,
-                m_handler.offBackPressure(),
-                m_handler.onBackPressure(),
+                m_handler.offBackPressure(connectionId()),
+                m_handler.onBackPressure(connectionId()),
                 m_handler.writestreamMonitor());
         m_interestOps = key.interestOps();
     }
