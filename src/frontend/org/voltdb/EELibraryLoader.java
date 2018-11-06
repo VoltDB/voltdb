@@ -30,7 +30,7 @@ import org.voltcore.logging.VoltLogger;
 public class EELibraryLoader {
 
     public static final String USE_JAVA_LIBRARY_PATH = "use.javalib";
-    private static boolean voltSharedLibraryLoaded = false;
+    private static char s_voltSharedLibraryLoaded = 2;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -47,60 +47,62 @@ public class EELibraryLoader {
     }
 
     /**
-     * Load the shared native library if not yet loaded. Returns true if the library was loaded
-     **/
+     * Load VoltDB shared native libraries if not yet loaded.
+     * @param mustSucceed
+     * @return true if the library was loaded.
+     */
     public synchronized static boolean loadExecutionEngineLibrary(boolean mustSucceed) {
-        if (!voltSharedLibraryLoaded) {
-            if (VoltDB.getLoadLibVOLTDB()) {
-                test64bit();
+        return loadExecutionEngineLibrary("voltdb", mustSucceed)
+                && loadExecutionEngineLibrary("catalog", mustSucceed);
+    }
 
-                try {
-                    final VoltLogger hostLog = new VoltLogger("HOST");
-                    String versionString = VoltDB.instance().getEELibraryVersionString();
-                    // this fallback is for test code only
-                    if (versionString == null) {
-                        versionString = VoltDB.instance().getVersionString();
-                    }
-                    assert(versionString != null);
-                    final String libname = "voltdb-" + versionString;
-                    hostLog.info("Loading native VoltDB code ("+libname+"). A confirmation message will follow if the loading is successful.");
-                    if (Boolean.getBoolean(USE_JAVA_LIBRARY_PATH)) {
-                        System.loadLibrary(libname);
-                    } else {
-                        File libFile = getNativeLibraryFile(libname);
-                        System.load(libFile.getAbsolutePath());
-                    }
-                    voltSharedLibraryLoaded = true;
-                    hostLog.info("Successfully loaded native VoltDB library " + libname + ".");
-                } catch (Throwable e) {
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("Error loading VoltDB JNI shared library", e);
-                    }
-                    if (mustSucceed) {
-                        String msg = "Library VOLTDB JNI shared library loading failed with error: " + e.getMessage() + "\n";
-                        msg += "Library path " + System.getProperty("java.library.path") + ", " +
-                               USE_JAVA_LIBRARY_PATH + "=" + System.getProperty(USE_JAVA_LIBRARY_PATH) + "\n";
-                        msg += "The library may have failed to load because it can't be found in your " +
-                                "load library path, or because it is not compatible with the current " +
-                                "platform.\n";
-                        msg +=  "VoltDB provides builds on our website for 64-bit OSX systems >= 10.6, " +
-                                "and 64-bit Linux systems with kernels >= 2.6.18.";
-                        if (e instanceof UnsatisfiedLinkError) {
-                            msg += "\nOr the library may have failed to load because java.io.tmpdir should be set to a different directory. " +
-                                   "Use VOLTDB_OPTS='-Djava.io.tmpdir=<dirpath>' to set it.";
-                        }
-                        VoltDB.crashLocalVoltDB(msg, false, null);
-                    } else {
-                        hostLog.info("Library VOLTDB JNI shared library loading failed. Library path "
-                                + System.getProperty("java.library.path"));
-                    }
-                    return false;
-                }
-            } else {
-                return false;
-            }
+    private static boolean loadExecutionEngineLibrary(String libName, boolean mustSucceed) {
+        if (s_voltSharedLibraryLoaded == 0 || ! VoltDB.getLoadLibVOLTDB()) {
+            return false;
         }
-        return voltSharedLibraryLoaded;
+        test64bit();
+        String versionString = VoltDB.instance().getEELibraryVersionString();
+        // This fallback is for test code only.
+        if (versionString == null) {
+            versionString = VoltDB.instance().getVersionString();
+        }
+        assert(versionString != null);
+        String fullLibName = libName + "-" + versionString;
+        hostLog.info("Loading native VoltDB code (" + fullLibName +
+                "). A confirmation message will follow if the loading is successful.");
+        try {
+            if (Boolean.getBoolean(USE_JAVA_LIBRARY_PATH)) {
+                System.loadLibrary(fullLibName);
+            } else {
+                File libFile = getNativeLibraryFile(fullLibName);
+                System.load(libFile.getAbsolutePath());
+            }
+            --s_voltSharedLibraryLoaded;
+            hostLog.info("Successfully loaded native VoltDB library " + fullLibName + ".");
+            return true;
+        } catch (Throwable e) {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("Error loading VoltDB JNI shared library", e);
+            }
+            if (mustSucceed) {
+                String msg = "Failed to load shared library " + fullLibName + ": " + e.getMessage() + "\n";
+                msg += "Library path " + System.getProperty("java.library.path") + ", " +
+                       USE_JAVA_LIBRARY_PATH + "=" + System.getProperty(USE_JAVA_LIBRARY_PATH) + "\n";
+                msg += "The library may have failed to load because it can't be found in your " +
+                       "load library path, or because it is not compatible with the current platform.\n";
+                msg += "VoltDB provides builds on our website for 64-bit OS X systems >= 10.6, " +
+                       "and 64-bit Linux systems with kernels >= 2.6.18.";
+                if (e instanceof UnsatisfiedLinkError) {
+                    msg += "\nOr the library may have failed to load because java.io.tmpdir should be set to a different directory. " +
+                           "Use VOLTDB_OPTS='-Djava.io.tmpdir=<dirpath>' to set it.";
+                }
+                VoltDB.crashLocalVoltDB(msg, false, null);
+            } else {
+                hostLog.info("Failed to load shared library " + fullLibName + "\nLibrary path "
+                        + System.getProperty("java.library.path"));
+            }
+            return false;
+        }
     }
 
     /*
@@ -143,7 +145,7 @@ public class EELibraryLoader {
     }
 
     private static File loadLibraryFile(String libFolder, String libFileName, String tmpFolder) throws IOException {
-        hostLog.debug("Loading library from jar using path=" + libFolder + "/" + libFileName);
+        hostLog.debug("Loading library from jar using path = " + libFolder + "/" + libFileName);
 
         // Using UUID as in Snappy, but we probably don't need it?
         String uuid = UUID.randomUUID().toString();

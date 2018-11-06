@@ -627,6 +627,8 @@ DISTRIBUTION
             <exclude name="lib/python" />
             <exclude name="doc/tutorials/**" />
             <exclude name="voltdb/libvoltdb*" />
+            <exclude name="voltdb/libcatalog*" />
+            <exclude name="lib/libcatalog*" />
         </fileset>
     </copy>
 
@@ -782,6 +784,7 @@ DISTRIBUTION
             <exclude name=".gitignore"/>
             <include name="bin/sqlcmd"/>
             <exclude name="voltdb/libvoltdb*"/>
+            <exclude name="voltdb/libcatalog*"/>
             <exclude name="voltdb/voltdb-*.jar"/>
         </fileset>
     </copy>
@@ -829,7 +832,10 @@ DISTRIBUTION
 
     <copy todir="${jar.nativelib.dir}">
         <fileset dir="${base.dir}/voltdb">
-            <include name="libvoltdb*" />
+            <include name="libvoltdb-${dist.version}.*"/>
+        </fileset>
+        <fileset dir="${base.dir}/lib">
+            <include name="libcatalog-${dist.version}.*"/>
         </fileset>
     </copy>
 
@@ -855,7 +861,7 @@ DISTRIBUTION
 
     <!-- save the symbols from the shared library -->
     <exec dir='${base.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
+        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so voltdb-${dist.version}.sym'" />
     </exec>
 
     <!-- strip the voltbin shared library (~40x size reduction) -->
