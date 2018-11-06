@@ -2188,7 +2188,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
         Pair<Integer, Integer> target = null;
         if (onlyMoveLeadersOnThisHost) {
-            target = m_cartographer.getCandidatePartitionForMigratePartitionLeader(hostId);
+            target = m_cartographer.getCandidateForMigratePartitionLeader(hostId);
         } else {
             target = m_cartographer.getPartitionForMigratePartitionLeader(voltDB.getHostCount(), hostId);
         }
