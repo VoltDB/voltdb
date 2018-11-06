@@ -35,14 +35,19 @@ import java.util.List;
 
 /**
  * Returns RuleSet for concrete planner phase.
+ *
+ * @author Chao Zhou
+ * @since 8.4
  */
 public enum PlannerPhase {
     CALCITE_LOGICAL("Calcite logical rules") {
-        public RuleSet getRules () {
+        public RuleSet getRules() {
             return getCalciteLogicalRules();
         }
     };
+
     public final String description;
+
     PlannerPhase(String description) {
         this.description = description;
     }
@@ -50,6 +55,22 @@ public enum PlannerPhase {
     public abstract RuleSet getRules();
 
     static RuleSet getCalciteLogicalRules() {
+        /*
+        LogicalCalc
+        calc = proj & filter
+        A relational expression which computes project expressions and also filters.
+        This relational expression combines the functionality of LogicalProject and LogicalFilter.
+        It should be created in the later stages of optimization,
+        by merging consecutive LogicalProject and LogicalFilter nodes together.
+
+        The following rules relate to LogicalCalc:
+
+        FilterToCalcRule creates this from a LogicalFilter
+        ProjectToCalcRule creates this from a LogicalFilter
+        FilterCalcMergeRule merges this with a LogicalFilter
+        ProjectCalcMergeRule merges this with a LogicalProject
+        CalcMergeRule merges two LogicalCalcs
+        */
         final List<RelOptRule> ruleList = new ArrayList<>();
         ruleList.add(CalcMergeRule.INSTANCE);
         ruleList.add(FilterCalcMergeRule.INSTANCE);

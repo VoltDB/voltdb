@@ -32,18 +32,109 @@ import org.voltdb.newplanner.metadata.VoltDBDefaultRelMetadataProvider;
 import org.voltdb.newplanner.rules.PlannerPhase;
 import org.voltdb.types.CalcitePlannerType;
 
+/**
+ * Some quick notes about "How Calcite Planner work".
+ * reference https://www.slideshare.net/JordanHalterman/introduction-to-apache-calcite
+ * steps:
+ * 1. Optimize logical plan (the SQL query can directly translate to a initial logical plan,
+ * then we optimize it to a better logical plan)
+ * 2. Convert logical plan into a physical plan (represents the physical execution stages)
+ *
+ * common optimizations:
+ * Prune unused fields, Merge projections, Convert subqueries to joins, Reorder joins,
+ * Push down projections, Push down filters
+ *
+ * Key Concepts:
+ *
+ * # {@link org.apache.calcite.rel.RelNode} represents a relational expression
+ * Sort, Join, Project, Filter, Scan...
+ * Exp:
+ * select col1 as id, col2 as name from foo where col1=21;
+ *
+ * Project ( id = [$0], name = [$1] ) <-- expression
+ * Filter (condition=[= ($0, 21)])   <-- children/input
+ * TableScan (table = [foo])
+ *
+ * # {@link org.apache.calcite.rex.RexNode} represents a row-level expression:
+ * = scalar expr
+ * Projection fields, conditions
+ * Input column reference  -->  RexInputRef
+ * Literal                 -->  RexLiteral
+ * Struct field access     -->  RexFieldAccess
+ * Function call           -->  RexCall
+ * Window expression       -->  RexOver
+ *
+ * # traits
+ * Defined by the {@link org.apache.calcite.plan.RelTrait} interface
+ * Traits are used to validate plan output
+ * {@link org.apache.calcite.plan.Convention}
+ * {@link org.apache.calcite.rel.RelCollation}
+ * {@link org.apache.calcite.rel.RelDistribution}
+ *
+ * ## Convention
+ * Convention is a type of RelTrait, it is associated with a
+ * RelNode interface
+ *
+ * Conventions are used to represent a single data source.
+ *
+ * describing how the expression passes data to its consuming relational expression
+ *
+ * Inputs to a relational expression must be in the same convention.
+ *
+ * # Rules
+ * Rules are used to modify query plans.
+ *
+ * Defined by the {@link org.apache.calcite.plan.RelOptRule} interface
+ *
+ * Rules are matched to elements of a query plan using pattern matching
+ * {@link org.apache.calcite.plan.RelOptRuleOperand}
+ *
+ * ## Converter
+ * {@link org.apache.calcite.rel.convert.ConverterRule}
+ * convert() is called for matched rules
+ *
+ * {@link org.apache.calcite.rel.convert.Converter}
+ * can convert from one convention to another
+ * via convert()
+ *
+ * Q: when ConverterRule and when Converter?
+ *
+ * ## Transformer
+ * onMatch() is called for matched rules
+ *
+ * call.transformTo()
+ *
+ * # Planners
+ * {@link org.apache.calcite.plan.volcano.VolcanoPlanner}
+ * {@link org.apache.calcite.plan.hep.HepPlanner}
+ *
+ * # Program
+ * {@link org.apache.calcite.tools.Program}
+ *
+ * Program that transforms a relational expression into another relational expression.
+ * A planner is a sequence of programs, each of which is sometimes called a "phase".
+ *
+ * The most typical program is an invocation of the volcano planner with a particular RuleSet.
+ */
+
+/**
+ * Util class to provide Calcite Planning methods.
+ *
+ * @author Chao Zhou
+ * @since 8.4
+ */
 public class CalcitePlanner {
     /**
      * Transform RelNode to a new RelNode, targeting the provided set of traits.
      *
-     * @param plannerType The type of Planner to use.
-     * @param phase The transformation phase we're running.
-     * @param input The origianl RelNode
+     * @param plannerType  The type of Planner to use.
+     * @param phase        The transformation phase we're running.
+     * @param input        The origianl RelNode
      * @param targetTraits The traits we are targeting for output.
      * @return The transformed RelNode.
      */
     static public RelNode transform(CalcitePlannerType plannerType, PlannerPhase phase, RelNode input,
-                             RelTraitSet targetTraits) {
+                                    RelTraitSet targetTraits) {
         final RelTraitSet toTraits = targetTraits.simplify();
         final RelNode output;
         switch (plannerType) {
@@ -81,12 +172,9 @@ public class CalcitePlanner {
     /**
      * Transform RelNode to a new RelNode without changing any traits. Also will log the outcome.
      *
-     * @param plannerType
-     *          The type of Planner to use.
-     * @param phase
-     *          The transformation phase we're running.
-     * @param input
-     *          The origianl RelNode
+     * @param plannerType The type of Planner to use.
+     * @param phase       The transformation phase we're running.
+     * @param input       The origianl RelNode
      * @return The transformed RelNode.
      */
     static public RelNode transform(CalcitePlannerType plannerType, PlannerPhase phase, RelNode input) {
