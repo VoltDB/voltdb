@@ -773,7 +773,8 @@ public final class InvocationDispatcher {
         }
         int ihid = (Integer) params[0];
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
-        if (ihid != hostMessenger.getHostId()) {
+        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+        if (!liveHids.contains(ihid)) {
             return gracefulFailureResponse("@PrepairStopNode: " + ihid + " is not valid.", task.clientHandle);
         }
 
