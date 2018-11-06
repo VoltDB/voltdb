@@ -1723,7 +1723,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             if (it.hasNext()) {
                 ForeignHost fh = it.next();
                 if (fh.isUp()) {
-                    fh.sendPoisonPill(err, ForeignHost.CRASH_SPECIFIED);
+                    fh.sendPoisonPill(err, cause);
                 }
             }
         }
@@ -1741,7 +1741,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    public void sendPoisonPill(String err, int targetHostId, int cause) {
+    public void sendPoisonPill(int targetHostId, String err, int cause) {
         Iterator<ForeignHost> it = m_foreignHosts.get(targetHostId).iterator();
         if (it.hasNext()) {
             ForeignHost fh = it.next();

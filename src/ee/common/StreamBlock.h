@@ -18,6 +18,7 @@
 #define STREAMBLOCK_H_
 
 #include "common/FatalException.hpp"
+#include "common/types.h"
 
 #include <cassert>
 #include <cstring>
@@ -40,9 +41,7 @@ namespace voltdb
             : m_data(data + headerSize), m_capacity(capacity - headerSize),
               m_headerSize(headerSize), m_offset(0),
               m_uso(uso),
-              m_startSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
+              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::min()),
               m_lastDRBeginTxnOffset(0),
               m_hasDRBeginTxn(false),
               m_rowCountForDR(0),
@@ -61,9 +60,7 @@ namespace voltdb
             : m_data(other->m_data), m_capacity(other->m_capacity),
               m_headerSize(other->m_headerSize), m_offset(other->m_offset),
               m_uso(other->m_uso),
-              m_startSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
+              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::min()),
               m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
               m_hasDRBeginTxn(other->m_hasDRBeginTxn),
               m_rowCountForDR(other->m_rowCountForDR),
@@ -153,6 +150,10 @@ namespace voltdb
             return m_lastMpUniqueId;
         }
 
+        int64_t lastCommittedSpHandle() {
+            return m_lastCommittedSpHandle;
+        }
+
         void recordCompletedSequenceNumForDR(int64_t lastDRSequenceNumber) {
             m_lastDRSequenceNumber = lastDRSequenceNumber;
         }
@@ -163,6 +164,10 @@ namespace voltdb
 
         void recordCompletedMpTxnForDR(int64_t lastMpUniqueId) {
             m_lastMpUniqueId = lastMpUniqueId;
+        }
+
+        void recordLastCommittedSpHandle(int64_t spHandle) {
+            m_lastCommittedSpHandle = spHandle;
         }
 
         void markAsEventBuffer(DREventType type) {
@@ -245,9 +250,7 @@ namespace voltdb
         const size_t m_headerSize;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
-        int64_t m_startSpHandle;
-        int64_t m_lastSpHandle;
-        int64_t m_lastCommittedSpHandle;
+        int64_t m_lastCommittedSpHandle; // for record last CommittedSpHandle for Sp Txn in this block
         size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
         bool m_hasDRBeginTxn;    // only used for DR Buffer
         size_t m_rowCountForDR;

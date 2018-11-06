@@ -193,7 +193,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "pushDRBuffer",
-            "(IJJJJILjava/nio/ByteBuffer;)J");
+            "(IJJJJJILjava/nio/ByteBuffer;)J");
 
     m_pushPoisonPillMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
@@ -609,6 +609,7 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
                 m_partitionDRGatewayClass,
                 m_pushDRBufferMID,
                 partitionId,
+                block->lastCommittedSpHandle(),
                 block->startDRSequenceNumber(),
                 block->lastDRSequenceNumber(),
                 block->lastSpUniqueId(),

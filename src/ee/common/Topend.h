@@ -136,7 +136,7 @@ public:
     virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync);
     virtual void pushEndOfStream(int32_t partitionId, std::string signature);
 
-    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
     void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
 
