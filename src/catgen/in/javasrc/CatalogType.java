@@ -22,8 +22,6 @@
 package org.voltdb.catalog;
 
 import java.lang.reflect.Field;
-import java.util.Collection;
-import java.util.Set;
 
 
 /**
@@ -60,7 +58,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         T resolve() {
             synchronized (m_lock) {
                 if (m_unresolvedPath != null) {
-                    m_value = (T) getOperator().getItemForPath(m_unresolvedPath);
+                    m_value = (T) getCatalog().m_operator.getItemForPath(m_unresolvedPath);
                     m_unresolvedPath = null;
                 }
                 return m_value;
@@ -188,14 +186,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     */
     public Catalog getCatalog() {
         return m_parentMap.m_catalog;
-    }
-
-    /**
-     * Get the operator for the root catalog object for this item.
-     * @return the operator for the base catalog object.
-     */
-    public CatalogOperator getOperator() {
-        return getCatalog().getOperator();
     }
 
     /**

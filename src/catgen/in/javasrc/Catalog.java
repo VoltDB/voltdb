@@ -37,7 +37,7 @@ public final class Catalog extends CatalogType {
 
     CatalogMap<Cluster> m_clusters;
 
-    private final CatalogOperator m_operator = new CatalogOperator(this);
+    final CatalogOperator m_operator = new CatalogOperator(this);
 
     /**
      * Create a new Catalog hierarchy.
@@ -56,15 +56,6 @@ public final class Catalog extends CatalogType {
     @Override
     public Catalog getCatalog() {
         return this;
-    }
-
-    /**
-     * Get the operator that can make changes to this catalog object.
-     * @return the catalog operator.
-     */
-    @Override
-    public CatalogOperator getOperator() {
-        return m_operator;
     }
 
     /**
