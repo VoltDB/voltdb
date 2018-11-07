@@ -19,12 +19,17 @@
 
 from voltcli.hostinfo import Host
 from voltcli.hostinfo import Hosts
+from voltcli import checkstats
+from voltcli.checkstats import StatisticsProcedureException
 from voltcli import utility
 import sys
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
     description = 'Stop one host of a running VoltDB cluster.',
+    options=(
+        VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default=False)
+        ),
     arguments = (
         VOLT.StringArgument('target_host', 'the target hostname[:port] or address[:port]. (default port=3021)'),
     ),
@@ -63,6 +68,25 @@ def stop(runner):
                           runner.opts.username, runner.opts.password,
                           runner.opts.ssl_config, runner.opts.kerberos)
 
+    if not runner.opts.forcing:
+        stateMessage = 'The node shutdown process has stopped.'
+        actionMessage = 'You may shutdown the node with the "voltadmin stop --force" command.'
+        try:
+            runner.info('Preparing for shutdown...')
+            response = runner.call_proc('@PrepairStopNode',
+                                    [VOLT.FastSerializer.VOLTTYPE_INTEGER],
+                                    [thost.id],
+                                    check_status=False)
+            checkstats.check_partition_leaders_on_host(runner,thost.id)
+        except StatisticsProcedureException as proex:
+             runner.info(stateMessage)
+             runner.error(proex.message)
+             if proex.isTimeout:
+                 runner.info(actionMessage)
+             sys.exit(proex.exitCode)
+        except (KeyboardInterrupt, SystemExit):
+            runner.info(stateMessage)
+            runner.abort(actionMessage)
     # Stop the requested host using exec @StopNode HOST_ID
     runner.info('Stopping host %d: %s:%s' % (thost.id, thost.hostname, thost.internalport))
     if not runner.opts.dryrun:

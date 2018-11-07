@@ -422,6 +422,44 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
     # not timeout yet
     return lastUpdatedTime
 
+def check_partition_leaders_on_host(runner, hostid):
+    runner.info('Monitoring partition leader migration...')
+    lastUpdatedTime = time.time()
+    notifyInterval = 10
+    timeout = runner.opts.timeout
+    lastLeaders = 1000;
+    while True:
+        resp = get_stats(runner, 'TOPO')
+        if len(resp.table(0).tuples()) == 0:
+            return
+        # TOPO stats
+        # column 1: partition id
+        # column 3: partition leader
+        leaders = 0;
+        for r in resp.table(0).tuples():
+            if r[1] == 16383:
+                continue
+            leader = r[3].split(":")[0]
+            if leader == hostid:
+                leaders +=1
+
+        # all partition leaders have been moved
+        if leaders == 0:
+            return
+
+        notifyInterval -= 1
+        # Any leader moved?
+        if lastLeaders == leaders:
+            # stats has not made any progress since last check
+            timeSinceLastUpdate = currentTime = time.time() - lastUpdatedTime
+            if timeout > 0 and timeSinceLastUpdate > timeout:
+                raise StatisticsProcedureException('Partition leaders have not been moved after %d' % (timeout), 1)
+        else :
+            lastLeaders = leaders
+            if notifyInterval == 0:
+                runner.info('\t%d partition leaders have not been moved on host %d.' % (leaders, hostid))
+
+        time.sleep(1)
 
 class StatisticsProcedureException(Exception):
 
