@@ -142,16 +142,16 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         m_attachment = attachment;
     }
 
-    int getDepth() {
-        return m_parentMap.m_depth;
-    }
-
     /**
      * Get the full catalog path of this CatalogType instance
      * @return The full catalog path of this CatalogType instance
      */
     String getCatalogPath() {
         return m_parentMap.getPath() + Catalog.MAP_SEPARATOR + m_typename;
+    }
+
+    String getParentMapName() {
+        return m_parentMap.m_name;
     }
 
     /**

@@ -79,9 +79,9 @@ public final class CatalogSerializer implements CatalogVisitor {
         m_builder.append("add ");
         m_builder.append(ct.getParent().getCatalogPath());
         m_builder.append(' ');
-        m_builder.append(ct.m_parentMap.m_name);
+        m_builder.append(ct.getParentMapName());
         m_builder.append(' ');
-        m_builder.append(ct.m_typename);
+        m_builder.append(ct.getTypeName());
         m_builder.append("\n");
     }
 
