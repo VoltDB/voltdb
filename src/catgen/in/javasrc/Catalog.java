@@ -66,7 +66,7 @@ public final class Catalog extends CatalogType {
     public CatalogOperator getOperator() {
         return m_operator;
     }
-    
+
     /**
      * Run one or more single-line catalog commands separated by newlines.
      * See the docs for more info on catalog statements.
@@ -76,7 +76,7 @@ public final class Catalog extends CatalogType {
     public void execute(final String commands) {
         m_operator.execute(commands);
     }
-    
+
     /**
      * Serialize the catalog to a string representation. This actually
      * creates a set of catalog commands which, re-run in order on an
