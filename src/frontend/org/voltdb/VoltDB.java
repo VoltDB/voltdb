@@ -1207,12 +1207,8 @@ public class VoltDB {
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
 
-        //collect thread dumps
-        String threadDump = generateThreadDump();
-
         if (exitAfterMessage) {
             System.err.println(errMsg);
-            System.err.println(threadDump);
             VoltDB.exit(-1);
         }
         try {
@@ -1340,7 +1336,6 @@ public class VoltDB {
             finally {
                 System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
                 System.err.println("The log may contain additional information.");
-                System.err.println(threadDump);
             }
         }
         finally {
