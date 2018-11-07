@@ -819,6 +819,10 @@ DISTRIBUTION
         <fileset dir="${build.dir}/nativelibs">
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
+        <!-- Debugging in Eclipse will need this catalog library in the voltdb folder. -->
+        <fileset dir="${base.dir}/lib">
+            <include name="libcatalog-${dist.version}.*"/>
+        </fileset>
     </copy>
 
     <antcall target="call_strip_lib" />
