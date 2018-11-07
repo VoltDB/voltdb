@@ -44,7 +44,7 @@ public class ExportRabbitMQVerifier {
     private final ConnectionFactory m_connFactory;
     private volatile long m_verifiedRows = 0;
     private String m_exchangeName;
-
+    private boolean success = true;
     public ExportRabbitMQVerifier(String host, String username, String password, String vhost, String exchangename)
             throws IOException, InterruptedException
     {
@@ -89,11 +89,15 @@ public class ExportRabbitMQVerifier {
             while (expectedRows > m_verifiedRows) {
                 Thread.sleep(1000);
                 System.err.println("Expected " + expectedRows + " " + m_verifiedRows);
+                success = false;
             }
         } finally {
             tearDown(channel);
             channel.close();
             connection.close();
+        }
+        if ( ! success ) {
+            System.exit(1);
         }
     }
 
@@ -121,6 +125,7 @@ public class ExportRabbitMQVerifier {
                 }
                 if (err != null) {
                     System.out.println("ERROR in validation: " + err.toString());
+                    success = false;
                 }
 
                 if (++m_verifiedRows % VALIDATION_REPORT_INTERVAL == 0) {
@@ -146,7 +151,7 @@ public class ExportRabbitMQVerifier {
     {
         if (args.length != 5) {
             usage();
-            System.exit(-1);
+            System.exit(1);
         }
 
         final ExportRabbitMQVerifier verifier =
