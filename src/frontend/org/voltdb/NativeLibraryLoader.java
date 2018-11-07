@@ -28,7 +28,7 @@ import java.util.UUID;
 
 import org.voltcore.logging.VoltLogger;
 
-import com.google.common.collect.Sets;
+import com.google_voltpatches.common.collect.Sets;
 
 public class NativeLibraryLoader {
 
@@ -67,7 +67,7 @@ public class NativeLibraryLoader {
      * @param useJavaLib whether load the library from the system library location.
      * @return true if the library was loaded.
      */
-    static boolean load(String name, boolean mustSucceed, boolean useJavaLib) {
+    private static boolean load(String name, boolean mustSucceed, boolean useJavaLib) {
         if (s_loadedLibs.contains(name) || ! VoltDB.getLoadLibVOLTDB()) {
             return false;
         }
@@ -107,7 +107,7 @@ public class NativeLibraryLoader {
             }
             if (useJavaLib) {
                 s_hostLog.info("Retry loading from file.");
-                return load(name, false, mustSucceed);
+                return load(name, mustSucceed, false);
             }
             if (mustSucceed) {
                 msgBuilder.setLength(0);

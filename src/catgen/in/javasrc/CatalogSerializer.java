@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.voltdb.NativeLibraryLoader;
+
 /**
  * Helps serialize the VoltDB catalog.
  * @author Yiqun Zhang
@@ -35,6 +37,10 @@ public final class CatalogSerializer implements CatalogVisitor {
     private final StringBuilder m_builder;
     private final Set<String> m_fieldFilter;
     private final Set<Class<? extends CatalogType>> m_childFilter;
+
+    static {
+        NativeLibraryLoader.loadCatalogAPIs();
+    }
 
     /**
      * Create a default catalog serializer.
@@ -70,20 +76,7 @@ public final class CatalogSerializer implements CatalogVisitor {
         return m_builder.toString();
     }
 
-//    private native void writeCreationCommand(CatalogType ct);
-    private void writeCreationCommand(CatalogType ct) {
-        // Catalog does not need a creation command.
-        if (ct instanceof Catalog) {
-            return;
-        }
-        m_builder.append("add ");
-        m_builder.append(ct.getParent().getCatalogPath());
-        m_builder.append(' ');
-        m_builder.append(ct.getParentMapName());
-        m_builder.append(' ');
-        m_builder.append(ct.getTypeName());
-        m_builder.append("\n");
-    }
+    private native void writeCreationCommand(CatalogType ct);
 
     private void writeFieldCommands(CatalogType ct) {
         int i = 0;
