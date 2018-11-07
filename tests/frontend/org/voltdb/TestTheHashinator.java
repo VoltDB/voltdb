@@ -71,7 +71,7 @@ public class TestTheHashinator {
     @Before
     public void setUp() {
         ElasticHashinator.DEFAULT_TOTAL_TOKENS = 1024;
-        EELibraryLoader.loadExecutionEngineLibrary(true);
+        NativeLibraryLoader.loadVoltDB();
         VoltDB.instance().readBuildInfo("Test");
     }
 

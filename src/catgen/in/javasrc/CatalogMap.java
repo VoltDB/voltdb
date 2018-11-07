@@ -23,7 +23,6 @@ package org.voltdb.catalog;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -61,20 +60,12 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         if (m_cachedPath != null) {
             return m_cachedPath;
         }
-        // if parent is the catalog root, don't add an extra slash to the existing one
-        return m_parent == m_catalog ? ("/" + m_name) : (m_parent.getCatalogPath() + "/" + m_name);
-    }
-
-    public void getPath(StringBuilder sb) {
-        if (m_cachedPath != null) {
-            sb.append(m_cachedPath);
-            return;
+        // If parent is the catalog root, don't add an extra slash to the existing one.
+        if (m_parent == m_catalog) {
+            return "/" + m_name;
+        } else {
+            return m_parent.getCatalogPath() + "/" + m_name;
         }
-        // if parent is the catalog root, don't add an extra slash to the existing one
-        if (m_parent != m_catalog) {
-            sb.append(m_parent.getCatalogPath()).append('/');
-        }
-        sb.append(m_name);
     }
 
     /**

@@ -127,7 +127,7 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 
         // create the catalog (that will be passed to the ClientInterface
         Catalog catalog = new Catalog();
-        catalog.getOperator().execute(serializedCatalog);
+        catalog.execute(serializedCatalog);
 
         return catalog;
     }

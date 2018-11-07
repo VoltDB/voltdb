@@ -35,19 +35,19 @@ public class TestCatalogSerialization extends TestCase {
     {
         Catalog catalog1 = TPCCProjectBuilder.getTPCCSchemaCatalog();
 
-        String commands = catalog1.getOperator().serialize();
+        String commands = catalog1.serialize();
         // System.out.println(commands);
 
         Catalog catalog2 = new Catalog();
         try {
-            catalog2.getOperator().execute(commands);
+            catalog2.execute(commands);
         } catch (Exception e) {
             e.printStackTrace();
         }
-        String commands2 = catalog2.getOperator().serialize();
+        String commands2 = catalog2.serialize();
 
         Catalog catalog3 = catalog2.deepCopy();
-        String commands3 = catalog3.getOperator().serialize();
+        String commands3 = catalog3.serialize();
 
         assertTrue(commands.equals(commands2));
         assertTrue(commands.equals(commands3));

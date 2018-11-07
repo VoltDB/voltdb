@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.voltdb.NativeLibraryLoader;
+
 /**
  * Helps serialize the VoltDB catalog.
  * @author Yiqun Zhang
@@ -35,6 +37,10 @@ public final class CatalogSerializer implements CatalogVisitor {
     private final StringBuilder m_builder;
     private final Set<String> m_fieldFilter;
     private final Set<Class<? extends CatalogType>> m_childFilter;
+
+    static {
+        NativeLibraryLoader.loadCatalogAPIs();
+    }
 
     /**
      * Create a default catalog serializer.
@@ -70,20 +76,6 @@ public final class CatalogSerializer implements CatalogVisitor {
         return m_builder.toString();
     }
 
-    private void writeCreationCommand(CatalogType ct) {
-        // Catalog does not need a creation command.
-        if (ct instanceof Catalog) {
-            return;
-        }
-        m_builder.append("add ");
-        ct.m_parentMap.m_parent.getCatalogPath(m_builder);
-        m_builder.append(' ');
-        m_builder.append(ct.m_parentMap.m_name);
-        m_builder.append(' ');
-        m_builder.append(ct.m_typename);
-        m_builder.append("\n");
-    }
-
     private void writeFieldCommands(CatalogType ct) {
         int i = 0;
         for (String field : ct.getFields()) {
@@ -94,32 +86,9 @@ public final class CatalogSerializer implements CatalogVisitor {
         }
     }
 
-    void writeCommandForField(CatalogType ct, String field, boolean printFullPath) {
-        m_builder.append("set ");
-        if (printFullPath) {
-            ct.getCatalogPath(m_builder);
-            m_builder.append(' ');
-        }
-        else {
-            m_builder.append("$PREV "); // use caching to shrink output + speed parsing
-        }
-        m_builder.append(field).append(' ');
-        Object value = ct.getField(field);
-        if (value == null) {
-            m_builder.append("null");
-        }
-        else if (value.getClass() == Integer.class)
-            m_builder.append(value);
-        else if (value.getClass() == Boolean.class)
-            m_builder.append(Boolean.toString((Boolean)value));
-        else if (value.getClass() == String.class)
-            m_builder.append("\"").append(value).append("\"");
-        else if (value instanceof CatalogType)
-            ((CatalogType)value).getCatalogPath(m_builder);
-        else
-            throw new CatalogException("Unsupported field type '" + value + "'");
-        m_builder.append("\n");
-    }
+    private native void writeCreationCommand(CatalogType ct);
+    native void writeCommandForField(CatalogType ct, String field, boolean printFullPath);
+    native void writeDeleteDiffStatement(CatalogType ct, String parentName);
 
     private void writeChildCommands(CatalogType ct) {
         String[] childCollections = ct.getChildCollections();
@@ -135,11 +104,6 @@ public final class CatalogSerializer implements CatalogVisitor {
         for (CatalogMap<? extends CatalogType> map : mapsToVisit) {
             map.accept(this);
         }
-    }
-
-    void writeDeleteDiffStatement(CatalogType ct, String parentName) {
-        m_builder.append("delete ").append(ct.getParent().getCatalogPath()).append(" ")
-                 .append(parentName).append(" ").append(ct.getTypeName()).append("\n");
     }
 
     public static String getDeleteDiffStatement(CatalogType ct, String parentName) {

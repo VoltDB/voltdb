@@ -32,13 +32,11 @@ FUNCTION (VOLTDB_ADD_LIBRARY NAME KIND)
   SET_TARGET_PROPERTIES(${NAME}
     PROPERTIES
     COMPILE_FLAGS "${VOLTDB_COMPILE_OPTIONS}"
-      )
-   # Make shared libraries be .jnilib on the mac.
-   IF ((${KIND} STREQUAL "SHARED") AND (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" ))
-       SET_TARGET_PROPERTIES(${NAME}
-                             PROPERTIES
-                             SUFFIX ".jnilib")
-   ENDIF()
+  )
+  # Make shared libraries be .jnilib on the mac.
+  IF ((${KIND} STREQUAL "SHARED") AND (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" ))
+    SET_TARGET_PROPERTIES(${NAME} PROPERTIES SUFFIX ".jnilib")
+  ENDIF()
 ENDFUNCTION()
 
 FUNCTION (VOLTDB_ADD_EXECUTABLE NAME)
@@ -203,7 +201,7 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   ELSE()
     message(FATAL_ERROR "GNU Compiler version ${CMAKE_CXX_COMPILER_VERSION} is too old to build VoltdB.  Try at least ${VOLTDB_COMPILER_CXX0X}.")
   ENDIF()
-ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   # All versions of clang use C++11.
   SET (CXX_VERSION_FLAG -std=c++11)
   MESSAGE("CXX_VERSION_FLAG is ${CXX_VERSION_FLAG}")

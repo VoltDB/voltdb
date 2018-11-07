@@ -62,7 +62,7 @@ public class TestTableSaveFile extends TestCase {
     private static long TIMESTAMP = System.currentTimeMillis();
 
     static {
-        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        org.voltdb.NativeLibraryLoader.loadVoltDB();
     }
 
     private TableSaveFile savefile;

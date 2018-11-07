@@ -219,7 +219,7 @@ public class TestClientInterface {
             CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
-        catalog.getOperator().execute(serializedCat);
+        catalog.execute(serializedCat);
 
         String deploymentPath = builder.getPathToDeployment();
         CatalogUtil.compileDeployment(catalog, deploymentPath, false);

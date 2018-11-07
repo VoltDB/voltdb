@@ -366,7 +366,7 @@ public class TestVoltCompiler extends TestCase {
             String catalogContents =
                 VoltCompilerUtils.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             Catalog cat = new Catalog();
-            cat.getOperator().execute(catalogContents);
+            cat.execute(catalogContents);
             CatalogUtil.compileDeployment(cat, builder.getPathToDeployment(), false);
             SnapshotSchedule schedule =
                 cat.getClusters().get("cluster").getDatabases().
@@ -392,7 +392,7 @@ public class TestVoltCompiler extends TestCase {
             String catalogContents =
                 VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             Catalog cat = new Catalog();
-            cat.getOperator().execute(catalogContents);
+            cat.execute(catalogContents);
 
             Connector connector = cat.getClusters().get("cluster").getDatabases().
                 get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
@@ -421,7 +421,7 @@ public class TestVoltCompiler extends TestCase {
             String catalogContents =
                 VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             Catalog cat = new Catalog();
-            cat.getOperator().execute(catalogContents);
+            cat.execute(catalogContents);
             CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
                 get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
@@ -956,8 +956,8 @@ public class TestVoltCompiler extends TestCase {
         Catalog c1 = compiler.getCatalog();
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         Catalog c2 = new Catalog();
-        c2.getOperator().execute(catalogContents);
-        assertTrue(c2.getOperator().serialize().equals(c1.getOperator().serialize()));
+        c2.execute(catalogContents);
+        assertTrue(c2.serialize().equals(c1.serialize()));
     }
 
     public void testDdlProcVarbinary() throws IOException {
@@ -983,8 +983,8 @@ public class TestVoltCompiler extends TestCase {
         Catalog c1 = compiler.getCatalog();
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         Catalog c2 = new Catalog();
-        c2.getOperator().execute(catalogContents);
-        assertTrue(c2.getOperator().serialize().equals(c1.getOperator().serialize()));
+        c2.execute(catalogContents);
+        assertTrue(c2.serialize().equals(c1.serialize()));
     }
 
     //
@@ -3117,7 +3117,7 @@ public class TestVoltCompiler extends TestCase {
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
         Catalog c2 = new Catalog();
-        c2.getOperator().execute(catalogContents);
+        c2.execute(catalogContents);
 
         Database db = c2.getClusters().get("cluster").getDatabases().get("database");
         Procedure addBook = db.getProcedures().get("AddBook");
@@ -3140,7 +3140,7 @@ public class TestVoltCompiler extends TestCase {
 
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         Catalog c2 = new Catalog();
-        c2.getOperator().execute(catalogContents);
+        c2.execute(catalogContents);
         Database db = c2.getClusters().get("cluster").getDatabases().get("database");
         Procedure addBook = db.getProcedures().get("NotAnnotatedAddBook");
         assertTrue(addBook.getSinglepartition());

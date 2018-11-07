@@ -96,7 +96,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // create the catalog (that will be passed to the ClientInterface
         catalog = new Catalog();
-        catalog.getOperator().execute(serializedCatalog);
+        catalog.execute(serializedCatalog);
 
         // update the catalog with the data from the deployment file
         String pathToDeployment = pb.getPathToDeployment();
@@ -157,7 +157,7 @@ public class TestTwoSitePlans extends TestCase {
         Future<?> loadComplete = site1Thread.submit(new Runnable() {
             @Override
             public void run() {
-                ee1.loadCatalog( 0, catalog.getOperator().serialize());
+                ee1.loadCatalog( 0, catalog.serialize());
             }
         });
 
@@ -165,7 +165,7 @@ public class TestTwoSitePlans extends TestCase {
         site2Thread.submit(new Runnable() {
             @Override
             public void run() {
-                ee2.loadCatalog( 0, catalog.getOperator().serialize());
+                ee2.loadCatalog( 0, catalog.serialize());
             }
         }).get();
         loadComplete.get();

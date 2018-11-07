@@ -132,6 +132,8 @@ public class CatalogOperator {
         case 's': // set
             resolved.set(catCmd.arg1, catCmd.arg2);
             break;
+        default:
+            throw new CatalogException("Unrecognized command: " + catCmd.cmd);
         }
     }
 
@@ -160,17 +162,5 @@ public class CatalogOperator {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    /**
-     * Serialize the catalog to a string representation. This actually
-     * creates a set of catalog commands which, re-run in order on an
-     * empty catalog, will recreate this catalog exactly.
-     * @return The serialized string representation of the catalog.
-     */
-    public String serialize() {
-        CatalogSerializer serializer = new CatalogSerializer();
-        m_catalog.accept(serializer);
-        return serializer.getResult();
     }
 }

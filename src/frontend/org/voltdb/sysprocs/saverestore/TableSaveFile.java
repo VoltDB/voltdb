@@ -43,7 +43,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.EELibraryLoader;
+import org.voltdb.NativeLibraryLoader;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.PosixAdvise;
@@ -107,7 +107,7 @@ public class TableSaveFile
                 m_fd = fis.getFD();
                 FileChannel dataIn = fis.getChannel();
         try {
-            EELibraryLoader.loadExecutionEngineLibrary(true);
+            NativeLibraryLoader.loadVoltDB();
             if (relevantPartitionIds == null) {
                 m_relevantPartitionIds = null;
             } else {

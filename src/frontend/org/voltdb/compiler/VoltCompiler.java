@@ -828,7 +828,7 @@ public class VoltCompiler {
         }
 
         // WRITE CATALOG TO JAR HERE
-        final String catalogCommands = catalog.getOperator().serialize();
+        final String catalogCommands = catalog.serialize();
 
         byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
 
@@ -926,7 +926,7 @@ public class VoltCompiler {
     {
         m_catalog = new Catalog();
         // Initialize the catalog for one cluster
-        m_catalog.getOperator().execute("add / clusters cluster");
+        m_catalog.execute("add / clusters cluster");
         m_catalog.getClusters().get("cluster").setSecurityenabled(false);
 
         // shutdown and make a new hsqldb
@@ -971,7 +971,7 @@ public class VoltCompiler {
 
     private static Database initCatalogDatabase(Catalog catalog) {
         // create the database in the catalog
-        catalog.getOperator().execute("add /clusters#cluster databases database");
+        catalog.execute("add /clusters#cluster databases database");
         addDefaultRoles(catalog);
         return getCatalogDatabase(catalog);
     }
@@ -987,12 +987,12 @@ public class VoltCompiler {
     private static void addDefaultRoles(Catalog catalog)
     {
         // admin
-        catalog.getOperator().execute("add /clusters#cluster/databases#database groups administrator");
+        catalog.execute("add /clusters#cluster/databases#database groups administrator");
         Permission.setPermissionsInGroup(getCatalogDatabase(catalog).getGroups().get("administrator"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")));
 
         // user
-        catalog.getOperator().execute("add /clusters#cluster/databases#database groups user");
+        catalog.execute("add /clusters#cluster/databases#database groups user");
         Permission.setPermissionsInGroup(getCatalogDatabase(catalog).getGroups().get("user"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("SQL", "ALLPROC")));
     }
@@ -1018,7 +1018,7 @@ public class VoltCompiler {
                               String... ddlFilePaths) throws VoltCompilerException
     {
         m_catalog = new Catalog(); //
-        m_catalog.getOperator().execute("add / clusters cluster");
+        m_catalog.execute("add / clusters cluster");
         Database db = initCatalogDatabase(m_catalog);
         List<VoltCompilerReader> ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
@@ -2040,7 +2040,7 @@ public class VoltCompiler {
         generateCatalogReport(catalog, canonicalDDL, standaloneCompiler, m_warnings, jarOutput);
 
         // WRITE CATALOG TO JAR HERE
-        final String catalogCommands = catalog.getOperator().serialize();
+        final String catalogCommands = catalog.serialize();
 
         byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
 

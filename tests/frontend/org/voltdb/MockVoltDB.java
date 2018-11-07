@@ -127,8 +127,8 @@ public class MockVoltDB implements VoltDBInterface
             m_localMetadata = obj.toString(4);
 
             m_catalog = new Catalog();
-            m_catalog.getOperator().execute(String.format("add / clusters %s", m_clusterName));
-            m_catalog.getOperator().execute(String.format("add /clusters#%s databases %s", m_clusterName, m_databaseName));
+            m_catalog.execute(String.format("add / clusters %s", m_clusterName));
+            m_catalog.execute(String.format("add /clusters#%s databases %s", m_clusterName, m_databaseName));
             Cluster cluster = m_catalog.getClusters().get(m_clusterName);
             // Set a sane default for TestMessaging (at least)
             cluster.setHeartbeattimeout(10000);

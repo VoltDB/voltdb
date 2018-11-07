@@ -129,7 +129,7 @@ public class RegressionSuite extends TestCase {
         String serializedCatalogString = CatalogUtil.getSerializedCatalogStringFromJar(currentCatalogJar);
         assertNotNull(serializedCatalogString);
         Catalog c = new Catalog();
-        c.getOperator().execute(serializedCatalogString);
+        c.execute(serializedCatalogString);
         return c;
     }
 
