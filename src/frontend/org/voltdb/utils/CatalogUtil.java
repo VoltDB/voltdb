@@ -2621,7 +2621,7 @@ public abstract class CatalogUtil {
         Set<String> fullTableNames = new HashSet<>();
         Set<String> optionalTableNames = new HashSet<>();
         Catalog catalog = new Catalog();
-        catalog.getOperator().execute(getSerializedCatalogStringFromJar(jarfile));
+        catalog.execute(getSerializedCatalogStringFromJar(jarfile));
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         Pair<List<Table>, Set<String>> ret;
 

@@ -23,6 +23,7 @@ VoltDB catalog code generator.
 from catalog_utils import *
 from string import Template
 from subprocess import Popen
+import shutil
 
 #
 # Code generation (shared).
@@ -63,22 +64,22 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     # SETUP
     ##########
     pkgdir = package.replace('.', '/')
-    os.system( interp( "rm -rf $postpath/*", locals() ) )
-    os.system( interp( "mkdir -p $postpath/", locals() ) )
-    os.system( interp( "cp $prepath/Catalog.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogType.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogMap.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogException.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogChangeGroup.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogDiffEngine.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogOperator.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogCommand.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogVisitor.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/CatalogSerializer.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/FilteredCatalogDiffEngine.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/DRCatalogDiffEngine.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/DRCatalogCommands.java $postpath", locals() ) )
-    os.system( interp( "cp $prepath/DatabaseConfiguration.java $postpath", locals() ) )
+    shutil.rmtree(postpath, ignore_errors=True)
+    os.makedirs(postpath)
+    shutil.copy(prepath + "/Catalog.java", postpath)
+    shutil.copy(prepath + "/CatalogType.java", postpath)
+    shutil.copy(prepath + "/CatalogMap.java", postpath)
+    shutil.copy(prepath + "/CatalogException.java", postpath)
+    shutil.copy(prepath + "/CatalogChangeGroup.java", postpath)
+    shutil.copy(prepath + "/CatalogDiffEngine.java", postpath)
+    shutil.copy(prepath + "/CatalogOperator.java", postpath)
+    shutil.copy(prepath + "/CatalogCommand.java", postpath)
+    shutil.copy(prepath + "/CatalogVisitor.java", postpath)
+    shutil.copy(prepath + "/CatalogSerializer.java", postpath)
+    shutil.copy(prepath + "/FilteredCatalogDiffEngine.java", postpath)
+    shutil.copy(prepath + "/DRCatalogDiffEngine.java", postpath)
+    shutil.copy(prepath + "/DRCatalogCommands.java", postpath)
+    shutil.copy(prepath + "/DatabaseConfiguration.java", postpath)
 
     ##########
     # WRITE THE SOURCE FILES
@@ -299,13 +300,13 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
     ##########
     # SETUP
     ##########
-    os.system( interp( "rm -rf $postpath/*", locals() ) )
-    os.system( interp( "mkdir -p $postpath/", locals() ) )
-    os.system( interp( "cp $prepath/catalog.h $postpath", locals() ) )
-    os.system( interp( "cp $prepath/catalogtype.h $postpath", locals() ) )
-    os.system( interp( "cp $prepath/catalogmap.h $postpath", locals() ) )
-    os.system( interp( "cp $prepath/catalog.cpp $postpath", locals() ) )
-    os.system( interp( "cp $prepath/catalogtype.cpp $postpath", locals() ) )
+    shutil.rmtree(postpath, ignore_errors=True)
+    os.makedirs(postpath)
+    shutil.copy(prepath + "/catalog.h", postpath)
+    shutil.copy(prepath + "/catalogtype.h", postpath)
+    shutil.copy(prepath + "/catalogmap.h", postpath)
+    shutil.copy(prepath + "/catalog.cpp", postpath)
+    shutil.copy(prepath + "/catalogtype.cpp", postpath)
 
     ##########
     # WRITE THE SOURCE FILES

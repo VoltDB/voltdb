@@ -31,7 +31,7 @@ import org.voltdb.dr2.DRProtocol;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
-import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Specialized CatalogDiffEngine that checks the following conditions:
@@ -44,7 +44,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     /* White list of fields that we care about for DR for table children classes.
        This is used only in serialize commands for DR method.
        There are duplicates added to the set because it lists all the fields per type */
-    private static final Set<String> s_whiteListFields = Sets.newHashSet(
+    private static final Set<String> s_whiteListFields = ImmutableSet.of(
             /* Table */
             "isreplicated", "partitioncolumn", "materializer", "signature", "tuplelimit", "isDRed",
             /* ColumnRef */
@@ -62,9 +62,8 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             "seqscancount", "explainplan", "tablesread", "tablesupdated", "indexesused", "cachekeyprefix"
             );
 
-    @SuppressWarnings("unchecked")
     private static final Set<Class<? extends CatalogType>> s_whiteListChildren =
-            Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class, ColumnRef.class);
+            ImmutableSet.of(Column.class, Index.class, Constraint.class, Statement.class, ColumnRef.class);
 
     private boolean m_isXDCR;
     private byte m_remoteClusterId;
@@ -111,7 +110,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         Catalog deserializedMasterCatalog = new Catalog();
         Cluster c = deserializedMasterCatalog.getClusters().add("cluster");
         Database db = c.getDatabases().add("database");
-        deserializedMasterCatalog.getOperator().execute(catalogCommands);
+        deserializedMasterCatalog.execute(catalogCommands);
 
         if (db.getIsactiveactivedred()) {
             // The catalog came from an old version, set DR role here

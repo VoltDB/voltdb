@@ -97,7 +97,7 @@ public class TestInMemoryJarfile extends TestCase {
      *
      */
     public void testReadFileFromJarfile() throws IOException {
-        String catalog0 = this.m_catalog.getOperator().serialize();
+        String catalog0 = this.m_catalog.serialize();
         assertTrue(catalog0.length() > 0);
 
         InMemoryJarfile jarfile = new InMemoryJarfile(m_jarPath.getAbsolutePath());

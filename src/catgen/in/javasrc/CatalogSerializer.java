@@ -113,7 +113,7 @@ public final class CatalogSerializer implements CatalogVisitor {
         else if (value.getClass() == Boolean.class)
             m_builder.append(Boolean.toString((Boolean)value));
         else if (value.getClass() == String.class)
-            m_builder.append("\"").append(value).append("\"");
+            m_builder.append('"').append(value).append('"');
         else if (value instanceof CatalogType)
             ((CatalogType)value).getCatalogPath(m_builder);
         else
@@ -138,8 +138,8 @@ public final class CatalogSerializer implements CatalogVisitor {
     }
 
     void writeDeleteDiffStatement(CatalogType ct, String parentName) {
-        m_builder.append("delete ").append(ct.getParent().getCatalogPath()).append(" ")
-                 .append(parentName).append(" ").append(ct.getTypeName()).append("\n");
+        m_builder.append("delete ").append(ct.getParent().getCatalogPath()).append(' ')
+                 .append(parentName).append(' ').append(ct.getTypeName()).append("\n");
     }
 
     public static String getDeleteDiffStatement(CatalogType ct, String parentName) {

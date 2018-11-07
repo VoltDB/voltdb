@@ -252,7 +252,7 @@ public class CatalogContext {
 
     public Catalog getNewCatalog(String diffCommands) {
         Catalog newCatalog = catalog.deepCopy();
-        newCatalog.getOperator().execute(diffCommands);
+        newCatalog.execute(diffCommands);
         return newCatalog;
     }
 

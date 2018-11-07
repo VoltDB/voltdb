@@ -827,7 +827,7 @@ public class TestDRCatalogDiffs {
         assertTrue("Compilation failed unexpectedly", success);
 
         Catalog catalog = new Catalog();
-        catalog.getOperator().execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
+        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
         return catalog;
     }
 }

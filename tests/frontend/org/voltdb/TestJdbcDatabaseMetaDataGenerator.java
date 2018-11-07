@@ -81,7 +81,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create stream Export2 export to target foo (Column1 integer);" +
             "create procedure sample as select * from Table1;";
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().getOperator().serialize());
+        System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable tables = dut.getMetaData("tables");
@@ -322,7 +322,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create procedure sample as select * from Table1;";
 
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().getOperator().serialize());
+        System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable columns = dut.getMetaData("ColUmns");
@@ -346,7 +346,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create procedure sample as select * from Table1;";
 
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().getOperator().serialize());
+        System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable indexes = dut.getMetaData("IndexInfo");
@@ -418,7 +418,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create procedure sample as select * from Table1;";
 
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().getOperator().serialize());
+        System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable pkeys = dut.getMetaData("PrimaryKeys");
@@ -453,7 +453,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create procedure proc2 as select * from Table1 where Column2=?;";
 
         VoltCompiler c = compileForDDLTest2(schema);
-        System.out.println(c.getCatalog().getOperator().serialize());
+        System.out.println(c.getCatalog().serialize());
         DefaultProcedureManager defaultProcs = new DefaultProcedureManager(c.getCatalogDatabase());
         JdbcDatabaseMetaDataGenerator dut =
             new JdbcDatabaseMetaDataGenerator(c.getCatalog(), defaultProcs, new InMemoryJarfile(testout_jar));

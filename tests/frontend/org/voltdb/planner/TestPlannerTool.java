@@ -65,7 +65,7 @@ public class TestPlannerTool extends TestCase {
         byte[] bytes = MiscUtils.fileToBytes(new File("tpcc-oop.jar"));
         String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         Catalog catalog = new Catalog();
-        catalog.getOperator().execute(serializedCatalog);
+        catalog.execute(serializedCatalog);
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(),NodeSettings.create());
         CatalogContext context = new CatalogContext(catalog, settings, 0, 0, bytes, null, new byte[] {}, mock(HostMessenger.class));
 
@@ -161,7 +161,7 @@ public class TestPlannerTool extends TestCase {
         String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
-        c.getOperator().execute(serializedCatalog);
+        c.execute(serializedCatalog);
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
         CatalogContext context = new CatalogContext(c, settings, 0, 0, bytes, null, new byte[] {}, mock(HostMessenger.class));
 
