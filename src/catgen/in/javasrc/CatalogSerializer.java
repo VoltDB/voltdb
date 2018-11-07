@@ -70,13 +70,14 @@ public final class CatalogSerializer implements CatalogVisitor {
         return m_builder.toString();
     }
 
+//    private native void writeCreationCommand(CatalogType ct);
     private void writeCreationCommand(CatalogType ct) {
         // Catalog does not need a creation command.
         if (ct instanceof Catalog) {
             return;
         }
         m_builder.append("add ");
-        ct.m_parentMap.m_parent.getCatalogPath(m_builder);
+        m_builder.append(ct.getParent().getCatalogPath());
         m_builder.append(' ');
         m_builder.append(ct.m_parentMap.m_name);
         m_builder.append(' ');
@@ -97,7 +98,7 @@ public final class CatalogSerializer implements CatalogVisitor {
     void writeCommandForField(CatalogType ct, String field, boolean printFullPath) {
         m_builder.append("set ");
         if (printFullPath) {
-            ct.getCatalogPath(m_builder);
+            m_builder.append(ct.getCatalogPath());
             m_builder.append(' ');
         }
         else {
@@ -115,7 +116,7 @@ public final class CatalogSerializer implements CatalogVisitor {
         else if (value.getClass() == String.class)
             m_builder.append('"').append(value).append('"');
         else if (value instanceof CatalogType)
-            ((CatalogType)value).getCatalogPath(m_builder);
+            m_builder.append(((CatalogType)value).getCatalogPath());
         else
             throw new CatalogException("Unsupported field type '" + value + "'");
         m_builder.append("\n");

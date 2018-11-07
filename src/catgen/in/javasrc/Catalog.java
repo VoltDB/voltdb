@@ -86,11 +86,6 @@ public final class Catalog extends CatalogType {
     }
 
     @Override
-    public void getCatalogPath(StringBuilder sb) {
-        sb.append('/');
-    }
-
-    @Override
     public CatalogType getParent() {
         return null;
     }

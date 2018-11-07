@@ -151,15 +151,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * @return The full catalog path of this CatalogType instance
      */
     String getCatalogPath() {
-        StringBuilder sb = new StringBuilder();
-        getCatalogPath(sb);
-        return sb.toString();
-    }
-
-    void getCatalogPath(StringBuilder sb) {
-        m_parentMap.getPath(sb);
-        sb.append(Catalog.MAP_SEPARATOR);
-        sb.append(m_typename);
+        return m_parentMap.getPath() + Catalog.MAP_SEPARATOR + m_typename;
     }
 
     /**
