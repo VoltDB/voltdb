@@ -257,7 +257,7 @@ public class ExportKafkaOnServerVerifier {
     void createAndConsumeKafkaStreams(String topicPrefix, boolean skinny) throws Exception {
         final String topic = topicPrefix + "EXPORT_PARTITIONED_TABLE";
         final String topic2 = topicPrefix + "EXPORT_PARTITIONED_TABLE2";
-        final String doneTopic = topicPrefix + "EXPORT_DONE_STREAM";
+        final String doneTopic = topicPrefix + "EXPORT_DONE_TABLE";
 
         List<Future<Long>> doneFutures = new ArrayList<>();
 
