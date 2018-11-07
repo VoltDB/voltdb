@@ -33,7 +33,7 @@ import junit.framework.TestCase;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.junit.Test;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.EELibraryLoader;
+import org.voltdb.NativeLibraryLoader;
 import org.voltdb.utils.Encoder;
 
 public class TestMurmur3 extends TestCase {
@@ -46,7 +46,7 @@ public class TestMurmur3 extends TestCase {
         final long seed = ByteBuffer.wrap(SecureRandom.getSeed(8)).getInt();
         Random r = new Random(seed);
         System.out.println("Seed is " + seed);
-        EELibraryLoader.loadExecutionEngineLibrary(true);
+        NativeLibraryLoader.loadVoltDB();
 
         for (int ii = 0; ii < iterations; ii++) {
             final long nextValue = r.nextLong();
@@ -66,7 +66,7 @@ public class TestMurmur3 extends TestCase {
         final long seed = ByteBuffer.wrap(SecureRandom.getSeed(8)).getInt();
         Random r = new Random(seed);
         System.out.println("Seed is " + seed);
-        EELibraryLoader.loadExecutionEngineLibrary(true);
+        NativeLibraryLoader.loadVoltDB();
         BBContainer c = DBBPool.allocateDirect(4096);
         try {
             c.b().order(ByteOrder.LITTLE_ENDIAN);

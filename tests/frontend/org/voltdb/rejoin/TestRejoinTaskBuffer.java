@@ -32,14 +32,14 @@ import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.EELibraryLoader;
+import org.voltdb.NativeLibraryLoader;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class TestRejoinTaskBuffer {
     @BeforeClass
     public static void classInit() throws Exception{
-        EELibraryLoader.loadExecutionEngineLibrary(true);
+        NativeLibraryLoader.loadVoltDB();
     }
 
     @Test

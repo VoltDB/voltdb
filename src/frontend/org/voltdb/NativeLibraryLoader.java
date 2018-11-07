@@ -23,16 +23,18 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Set;
 import java.util.UUID;
 
 import org.voltcore.logging.VoltLogger;
 
-public class EELibraryLoader {
+import com.google.common.collect.Sets;
+
+public class NativeLibraryLoader {
 
     public static final String USE_JAVA_LIBRARY_PATH = "use.javalib";
-    private static char s_voltSharedLibraryLoaded = 2;
-
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final Set<String> s_loadedLibs = Sets.newHashSet();
+    private static final VoltLogger s_hostLog = new VoltLogger("HOST");
 
     static private boolean test64bit() {
         // Sun JVMs are nice and chatty on this topic.
@@ -40,24 +42,33 @@ public class EELibraryLoader {
         if (sun_arch_data_model.contains("64")) {
             return true;
         }
-        hostLog.info("Unable to positively confirm a 64-bit JVM. VoltDB requires" +
+        s_hostLog.info("Unable to positively confirm a 64-bit JVM. VoltDB requires" +
                 " a 64-bit JVM. A 32-bit JVM will fail to load the native VoltDB" +
                 " library.");
         return false;
     }
 
-    /**
-     * Load VoltDB shared native libraries if not yet loaded.
-     * @param mustSucceed
-     * @return true if the library was loaded.
-     */
-    public synchronized static boolean loadExecutionEngineLibrary(boolean mustSucceed) {
-        return loadExecutionEngineLibrary("voltdb", mustSucceed)
-                && loadExecutionEngineLibrary("catalog", mustSucceed);
+    public synchronized static boolean loadVoltDB() {
+        return load("voltdb", true, Boolean.getBoolean(USE_JAVA_LIBRARY_PATH));
     }
 
-    private static boolean loadExecutionEngineLibrary(String libName, boolean mustSucceed) {
-        if (s_voltSharedLibraryLoaded == 0 || ! VoltDB.getLoadLibVOLTDB()) {
+    public synchronized static boolean loadVoltDB(boolean mustSucceed) {
+        return load("voltdb", mustSucceed, Boolean.getBoolean(USE_JAVA_LIBRARY_PATH));
+    }
+
+    public synchronized static boolean loadCatalogAPIs() {
+        return load("catalog", true, true);
+    }
+
+    /**
+     * Load VoltDB shared native libraries if not yet loaded.
+     * @param name the library name.
+     * @param mustSucceed whether a loading failure is fatal.
+     * @param useJavaLib whether load the library from the system library location.
+     * @return true if the library was loaded.
+     */
+    static boolean load(String name, boolean mustSucceed, boolean useJavaLib) {
+        if (s_loadedLibs.contains(name) || ! VoltDB.getLoadLibVOLTDB()) {
             return false;
         }
         test64bit();
@@ -67,46 +78,64 @@ public class EELibraryLoader {
             versionString = VoltDB.instance().getVersionString();
         }
         assert(versionString != null);
-        String fullLibName = libName + "-" + versionString;
-        hostLog.info("Loading native VoltDB code (" + fullLibName +
-                "). A confirmation message will follow if the loading is successful.");
+        String fullLibName = name + "-" + versionString;
+        StringBuilder msgBuilder = new StringBuilder("Loading VoltDB native library ");
+        msgBuilder.append(fullLibName);
         try {
-            if (Boolean.getBoolean(USE_JAVA_LIBRARY_PATH)) {
+            File libFile = null;
+            if (useJavaLib) {
+                msgBuilder.append(" from the system library location. ");
+            } else {
+                libFile = getNativeLibraryFile(fullLibName);
+                msgBuilder.append(" from file ");
+                msgBuilder.append(libFile.getAbsolutePath());
+                msgBuilder.append(". ");
+            }
+            msgBuilder.append("A confirmation message will follow if the loading is successful.");
+            s_hostLog.info(msgBuilder.toString());
+            if (useJavaLib) {
                 System.loadLibrary(fullLibName);
             } else {
-                File libFile = getNativeLibraryFile(fullLibName);
                 System.load(libFile.getAbsolutePath());
             }
-            --s_voltSharedLibraryLoaded;
-            hostLog.info("Successfully loaded native VoltDB library " + fullLibName + ".");
+            s_loadedLibs.add(name);
+            s_hostLog.info("Successfully loaded VoltDB native library " + fullLibName + ".");
             return true;
         } catch (Throwable e) {
-            if (hostLog.isDebugEnabled()) {
-                hostLog.debug("Error loading VoltDB JNI shared library", e);
+            if (s_hostLog.isDebugEnabled()) {
+                s_hostLog.debug("Error loading VoltDB JNI shared library", e);
+            }
+            if (useJavaLib) {
+                s_hostLog.info("Retry loading from file.");
+                return load(name, false, mustSucceed);
             }
             if (mustSucceed) {
-                String msg = "Failed to load shared library " + fullLibName + ": " + e.getMessage() + "\n";
-                msg += "Library path " + System.getProperty("java.library.path") + ", " +
-                       USE_JAVA_LIBRARY_PATH + "=" + System.getProperty(USE_JAVA_LIBRARY_PATH) + "\n";
-                msg += "The library may have failed to load because it can't be found in your " +
-                       "load library path, or because it is not compatible with the current platform.\n";
-                msg += "VoltDB provides builds on our website for 64-bit OS X systems >= 10.6, " +
-                       "and 64-bit Linux systems with kernels >= 2.6.18.";
+                msgBuilder.setLength(0);
+                msgBuilder.append("Failed to load shared library ").append(fullLibName).append(": ");
+                msgBuilder.append(e.getMessage()).append('\n');
+                msgBuilder.append("Library path: ").append(System.getProperty("java.library.path")).append('\n');
+                msgBuilder.append("The library may have failed to load because it cannot be found in your ");
+                msgBuilder.append("load library path, or because it is not compatible with the current platform.\n");
+                msgBuilder.append("VoltDB provides builds on our website for 64-bit OS X systems >= 10.6, ");
+                msgBuilder.append("and 64-bit Linux systems with kernels >= 2.6.18.");
                 if (e instanceof UnsatisfiedLinkError) {
-                    msg += "\nOr the library may have failed to load because java.io.tmpdir should be set to a different directory. " +
-                           "Use VOLTDB_OPTS='-Djava.io.tmpdir=<dirpath>' to set it.";
+                    msgBuilder.append("\nOr the library may have failed to load because java.io.tmpdir should be set ");
+                    msgBuilder.append("to a different directory. Use VOLTDB_OPTS='-Djava.io.tmpdir=<dirpath>' to set it.");
                 }
-                VoltDB.crashLocalVoltDB(msg, false, null);
+                VoltDB.crashLocalVoltDB(msgBuilder.toString(), false, null);
             } else {
-                hostLog.info("Failed to load shared library " + fullLibName + "\nLibrary path "
+                s_hostLog.info("Failed to load shared library " + fullLibName + "\nLibrary path: "
                         + System.getProperty("java.library.path"));
             }
             return false;
         }
     }
 
-    /*
+
+    /**
      * Returns the native library file copied into a readable location.
+     * @param libname the library name.
+     * @return the native library file copied into a readable location.
      */
     private static File getNativeLibraryFile(String libname) {
 
@@ -120,32 +149,32 @@ public class EELibraryLoader {
         }
 
         String libFileName = System.mapLibraryName(libname);
-        if (EELibraryLoader.class.getResource(libPath + "/" + libFileName) == null) {
+        if (NativeLibraryLoader.class.getResource(libPath + "/" + libFileName) == null) {
             // mapLibraryName does not give us the correct name on mac sometimes
             if (System.getProperty("os.name").toLowerCase().contains("mac")) {
                 libFileName = "lib" + libname + ".jnilib";
             }
-            if (EELibraryLoader.class.getResource(libPath + "/" + libFileName) == null) {
+            if (NativeLibraryLoader.class.getResource(libPath + "/" + libFileName) == null) {
                 String msg = "Could not find library resource using path: " + libPath + "/" + libFileName;
-                hostLog.warn(msg);
+                s_hostLog.warn(msg);
                 throw new RuntimeException(msg);
             }
         }
 
         File tmpFilePath = new File(System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir")));
-        if (hostLog.isDebugEnabled()) {
-            hostLog.debug("Temp directory to which shared libs are extracted is: " + tmpFilePath.getAbsolutePath());
+        if (s_hostLog.isDebugEnabled()) {
+            s_hostLog.debug("Temp directory to which shared libs are extracted is: " + tmpFilePath.getAbsolutePath());
         }
         try {
             return loadLibraryFile(libPath, libFileName, tmpFilePath.getAbsolutePath());
         } catch(IOException e) {
-            hostLog.error("Error loading Volt library file from jar", e);
+            s_hostLog.error("Error loading Volt library file from jar", e);
             throw new RuntimeException(e);
         }
     }
 
     private static File loadLibraryFile(String libFolder, String libFileName, String tmpFolder) throws IOException {
-        hostLog.debug("Loading library from jar using path = " + libFolder + "/" + libFileName);
+        s_hostLog.debug("Loading library from jar using path = " + libFolder + "/" + libFileName);
 
         // Using UUID as in Snappy, but we probably don't need it?
         String uuid = UUID.randomUUID().toString();
@@ -157,7 +186,7 @@ public class EELibraryLoader {
         InputStream reader = null;
         FileOutputStream writer = null;
         try {
-            reader = EELibraryLoader.class.getResourceAsStream(libPath);
+            reader = NativeLibraryLoader.class.getResourceAsStream(libPath);
             try {
                 writer = new FileOutputStream(extractedLibFile);
 
@@ -188,7 +217,7 @@ public class EELibraryLoader {
                 extractedLibFile.setExecutable(true);
         if (!success) {
             String msg = "Could not update extracted lib file " + extractedLibFile + " to be rwx";
-            hostLog.warn(msg);
+            s_hostLog.warn(msg);
             throw new RuntimeException(msg);
         }
 

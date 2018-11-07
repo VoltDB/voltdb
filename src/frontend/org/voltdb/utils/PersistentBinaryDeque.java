@@ -33,7 +33,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
-import org.voltdb.EELibraryLoader;
+import org.voltdb.NativeLibraryLoader;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.PBDSegment.PBDSegmentReader;
 
@@ -279,7 +279,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
      * @throws IOException
      */
     public PersistentBinaryDeque(final String nonce, final File path, VoltLogger logger, final boolean deleteEmpty) throws IOException {
-        EELibraryLoader.loadExecutionEngineLibrary(true);
+        NativeLibraryLoader.loadVoltDB();
         m_path = path;
         m_nonce = nonce;
         m_usageSpecificLog = logger;
