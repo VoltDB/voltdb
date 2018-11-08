@@ -66,6 +66,10 @@ public class VoltZK {
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
 
+    // localMetadata json property names
+    public static final String drPublicHostProp = "drPublicHost";
+    public static final String drPublicPortProp = "drPublicPort";
+
     /*
      * mailboxes
      *
@@ -323,7 +327,7 @@ public class VoltZK {
             // - drPublic
             // - drInterface
             // - 0th element in interfaces
-            String hostName = obj.getString("drPublicHost");
+            String hostName = obj.getString(drPublicHostProp);
             if (hostName == null || hostName.isEmpty()) {
                 hostName = obj.getString("drInterface");
             }
@@ -333,7 +337,7 @@ public class VoltZK {
             assert(hostName != null);
             assert(hostName.length() > 0);
 
-            int port = obj.getInt("drPublicPort");
+            int port = obj.getInt(drPublicPortProp);
             if (port == VoltDB.DISABLED_PORT) {
                 port = obj.getInt("drPort");
             }
