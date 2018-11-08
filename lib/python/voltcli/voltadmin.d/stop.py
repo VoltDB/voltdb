@@ -78,8 +78,11 @@ def stop(runner):
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER],
                                     [thost.id],
                                     check_status=False)
+            # monitor partition leader migration
             checkstats.check_partition_leaders_on_host(runner,thost.id)
-#            checkstats.check_export_mastership_on_host(runner,thost.id)
+
+            # monitor export mastership transfer
+            checkstats.check_export_mastership_on_host(runner,thost.id)
         except StatisticsProcedureException as proex:
              runner.info(stateMessage)
              runner.error(proex.message)

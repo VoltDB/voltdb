@@ -452,12 +452,42 @@ def check_partition_leaders_on_host(runner, hostid):
             runner.info('\t%d partition leaders have not been moved on host %d.' % (leaders, hostid))
 
         lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, [leaders], lastUpdatedTime, runner, str(hostid),
-                                                    msg="Partition leader migration on host %s have not been progressed in %d seconds.")
+                                                    msg="The cluster has not moved any partition leaders away from host %s in %d seconds.")
         lastValidationParamms = [leaders]
         time.sleep(1)
 
 def check_export_mastership_on_host(runner, hostid):
-    runner.info('Monitoring export mastership migration...')
+    runner.info('Monitoring export mastership transfer...')
+    lastUpdatedTime = time.time()
+    notifyInterval = 10
+    lastValidationParamms = [sys.maxint]
+    while True:
+        resp = get_stats(runner, 'EXPORT')
+        if len(resp.table(0).tuples()) == 0:
+            return
+        # EXPORT stats
+        # column 0: site id
+        # column 3: role
+        mastershipCount = 0;
+        for r in resp.table(0).tuples():
+            host = int(r[0].split(":")[0])
+            role = r[3]
+            if host == hostid and role == 'MASTER':
+                mastershipCount +=1
+
+        # all partition leaders have been moved
+        if mastershipCount == 0:
+            return
+
+        notifyInterval -= 1
+        if notifyInterval == 0:
+            notifyInterval = 10
+            runner.info('\t%d export masters have not been transferred on host %d.' % (mastershipCount, hostid))
+
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, [mastershipCount], lastUpdatedTime, runner, str(hostid),
+                                                    msg="The cluster has not moved any export masters away from host %s in %d seconds.")
+        lastValidationParamms = [mastershipCount]
+        time.sleep(1)
 
 class StatisticsProcedureException(Exception):
 
