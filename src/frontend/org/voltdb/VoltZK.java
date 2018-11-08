@@ -315,20 +315,30 @@ public class VoltZK {
         }
     }
 
-    public static Pair<String, Integer> getDRInterfaceAndPortFromMetadata(String metadata)
+    public static Pair<String, Integer> getDRPublicInterfaceAndPortFromMetadata(String metadata)
     throws IllegalArgumentException {
         try {
             JSONObject obj = new JSONObject(metadata);
-            //Pick drInterface if specified...it will be empty if none specified.
-            //we should pick then from the "interfaces" array and use 0th element.
-            String hostName = obj.getString("drInterface");
+            // Precedence order for host:port on which consumers should connect:
+            // - drPublic
+            // - drInterface
+            // - 0th element in interfaces
+            String hostName = obj.getString("drPublicHost");
+            if (hostName == null || hostName.isEmpty()) {
+                hostName = obj.getString("drInterface");
+            }
             if (hostName == null || hostName.length() <= 0) {
                 hostName = obj.getJSONArray("interfaces").getString(0);
             }
             assert(hostName != null);
             assert(hostName.length() > 0);
 
-            return Pair.of(hostName, obj.getInt("drPort"));
+            int port = obj.getInt("drPublicPort");
+            if (port == VoltDB.DISABLED_PORT) {
+                port = obj.getInt("drPort");
+            }
+
+            return Pair.of(hostName, port);
         } catch (JSONException e) {
             throw new IllegalArgumentException("Error parsing host metadata", e);
         }
