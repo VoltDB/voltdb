@@ -115,6 +115,8 @@ public class LocalCluster extends VoltServerConfig {
     private boolean m_expectedToCrash = false;
     private boolean m_expectedToInitialize = true;
     int m_replicationPort = -1;
+    private String m_drPublicHost;
+    private int m_drPublicPort = -1;
 
     // log message pattern match results by host
     private Map<Integer, Set<String>> m_logMessageMatchResults = new ConcurrentHashMap<>();
@@ -619,6 +621,14 @@ public class LocalCluster extends VoltServerConfig {
         m_replicationPort = port;
     }
 
+    public void setDrPublicHost(String host) {
+        m_drPublicHost = host;
+    }
+
+    public void setDrPublicPort(int port) {
+        m_drPublicPort = port;
+    }
+
     private void startLocalServer(int hostId, boolean clearLocalDataDirectories) throws IOException {
         startLocalServer(hostId, clearLocalDataDirectories, templateCmdLine.m_startAction);
     }
@@ -668,6 +678,7 @@ public class LocalCluster extends VoltServerConfig {
         cmdln.httpPort(portGenerator.nextHttp());
         // replication port and its two automatic followers.
         cmdln.drAgentStartPort(m_replicationPort != -1 ? m_replicationPort : portGenerator.nextReplicationPort());
+        setDrPublicInterface(cmdln);
         portGenerator.nextReplicationPort();
         portGenerator.nextReplicationPort();
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
@@ -1174,6 +1185,8 @@ public class LocalCluster extends VoltServerConfig {
                 portGenerator.next();
             }
 
+            setDrPublicInterface(cmdln);
+
             // add the ipc ports
             if (m_target == BackendTarget.NATIVE_EE_IPC) {
                 // set 1 port for the EE process
@@ -1335,6 +1348,15 @@ public class LocalCluster extends VoltServerConfig {
         if (hostId > (m_hostCount - 1)) {
             m_hostCount++;
             this.m_compiled = false; //Host count changed, should recompile
+        }
+    }
+
+    private void setDrPublicInterface(CommandLine cmdln) {
+        if (m_drPublicHost != null) {
+            cmdln.m_drPublicHost = m_drPublicHost;
+        }
+        if (m_drPublicPort != -1) {
+            cmdln.m_drPublicPort = m_drPublicPort;
         }
     }
 
@@ -2250,6 +2272,31 @@ public class LocalCluster extends VoltServerConfig {
         }
         else {
             valgrindOutputFile.delete();
+        }
+    }
+
+    public static LocalCluster createOnly(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
+                                          int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+                                          DrRoleType drRole, boolean hasLocalServer) throws IOException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
+                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, null);
+        lc.setHasLocalServer(hasLocalServer);
+        lc.overrideAnyRequestForValgrind();
+        lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
+        lc.setJavaProperty("DR_RECV_TIMEOUT", "5000");
+        if (!lc.isNewCli()) {
+            lc.setDeploymentAndVoltDBRoot(builder.getPathToDeployment(), pathToVoltDBRoot);
+        }
+
+        return lc;
+    }
+
+    public void startCluster() {
+        if (!isNewCli()) {
+            startUp(false);
+        } else {
+            startUp(true);
         }
     }
 
