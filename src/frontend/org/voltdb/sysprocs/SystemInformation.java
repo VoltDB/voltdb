@@ -69,8 +69,8 @@ import org.voltdb.utils.VoltTableUtil;
  */
 public class SystemInformation extends VoltSystemProcedure
 {
-    public static String DR_PUBLIC_INTF_COL = "DRPUBLICINTERFACE";
-    public static String DR_PUBLIC_PORT_COL = "DRPUBLICPORT";
+    public static final String DR_PUBLIC_INTF_COL = "DRPUBLICINTERFACE";
+    public static final String DR_PUBLIC_PORT_COL = "DRPUBLICPORT";
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     static final int DEP_DISTRIBUTE = (int)
