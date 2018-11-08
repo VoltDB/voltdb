@@ -29,6 +29,11 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
+import org.voltdb.newplanner.rules.logical.VoltDBLAggregateRule;
+import org.voltdb.newplanner.rules.logical.VoltDBLCalcRule;
+import org.voltdb.newplanner.rules.logical.VoltDBLJoinRule;
+import org.voltdb.newplanner.rules.logical.VoltDBLSortRule;
+import org.voltdb.newplanner.rules.logical.VoltDBLTableScanRule;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +48,12 @@ public enum PlannerPhase {
     CALCITE_LOGICAL("Calcite logical rules") {
         public RuleSet getRules() {
             return getCalciteLogicalRules();
+        }
+    },
+
+    VOLT_LOGICAL("VoltDB logical rules") {
+        public RuleSet getRules() {
+            return getVoltLogicalRules();
         }
     };
 
@@ -79,6 +90,24 @@ public enum PlannerPhase {
         ruleList.add(ProjectToCalcRule.INSTANCE);
         ruleList.add(ProjectMergeRule.INSTANCE);
         ruleList.add(FilterProjectTransposeRule.INSTANCE);
+
+//        ruleList.add(VoltDBLSortRule.INSTANCE);
+//        ruleList.add(VoltDBLTableScanRule.INSTANCE);
+//        ruleList.add(VoltDBLCalcRule.INSTANCE);
+//        ruleList.add(VoltDBLAggregateRule.INSTANCE);
+//        ruleList.add(VoltDBLJoinRule.INSTANCE);
+
+        return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
+    }
+
+    static RuleSet getVoltLogicalRules() {
+        final List<RelOptRule> ruleList = new ArrayList<>();
+
+        ruleList.add(VoltDBLSortRule.INSTANCE);
+        ruleList.add(VoltDBLTableScanRule.INSTANCE);
+        ruleList.add(VoltDBLCalcRule.INSTANCE);
+        ruleList.add(VoltDBLAggregateRule.INSTANCE);
+        ruleList.add(VoltDBLJoinRule.INSTANCE);
 
         return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
     }
