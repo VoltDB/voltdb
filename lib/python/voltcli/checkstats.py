@@ -426,20 +426,19 @@ def check_partition_leaders_on_host(runner, hostid):
     runner.info('Monitoring partition leader migration...')
     lastUpdatedTime = time.time()
     notifyInterval = 10
-    timeout = runner.opts.timeout
-    lastLeaders = 1000;
+    lastValidationParamms = [sys.maxint]
     while True:
         resp = get_stats(runner, 'TOPO')
         if len(resp.table(0).tuples()) == 0:
             return
         # TOPO stats
-        # column 1: partition id
-        # column 3: partition leader
+        # column 0: partition id
+        # column 2: partition leader
         leaders = 0;
         for r in resp.table(0).tuples():
-            if r[1] == 16383:
+            if r[0] == 16383:
                 continue
-            leader = r[3].split(":")[0]
+            leader = int(r[2].split(":")[0])
             if leader == hostid:
                 leaders +=1
 
@@ -448,18 +447,17 @@ def check_partition_leaders_on_host(runner, hostid):
             return
 
         notifyInterval -= 1
-        # Any leader moved?
-        if lastLeaders == leaders:
-            # stats has not made any progress since last check
-            timeSinceLastUpdate = currentTime = time.time() - lastUpdatedTime
-            if timeout > 0 and timeSinceLastUpdate > timeout:
-                raise StatisticsProcedureException('Partition leaders have not been moved after %d' % (timeout), 1)
-        else :
-            lastLeaders = leaders
-            if notifyInterval == 0:
-                runner.info('\t%d partition leaders have not been moved on host %d.' % (leaders, hostid))
+        if notifyInterval == 0:
+            notifyInterval = 10
+            runner.info('\t%d partition leaders have not been moved on host %d.' % (leaders, hostid))
 
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, [leaders], lastUpdatedTime, runner, str(hostid),
+                                                    msg="Partition leader migration on host %s have not been progressed in %d seconds.")
+        lastValidationParamms = [leaders]
         time.sleep(1)
+
+def check_export_mastership_on_host(runner, hostid):
+    runner.info('Monitoring export mastership migration...')
 
 class StatisticsProcedureException(Exception):
 

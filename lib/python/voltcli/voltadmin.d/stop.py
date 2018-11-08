@@ -28,7 +28,8 @@ import sys
     bundles = VOLT.AdminBundle(),
     description = 'Stop one host of a running VoltDB cluster.',
     options=(
-        VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default=False)
+        VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default=False),
+        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default=120),
         ),
     arguments = (
         VOLT.StringArgument('target_host', 'the target hostname[:port] or address[:port]. (default port=3021)'),
@@ -78,6 +79,7 @@ def stop(runner):
                                     [thost.id],
                                     check_status=False)
             checkstats.check_partition_leaders_on_host(runner,thost.id)
+#            checkstats.check_export_mastership_on_host(runner,thost.id)
         except StatisticsProcedureException as proex:
              runner.info(stateMessage)
              runner.error(proex.message)
