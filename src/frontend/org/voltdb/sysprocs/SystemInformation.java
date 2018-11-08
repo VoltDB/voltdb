@@ -46,6 +46,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.CommandLog;
 import org.voltdb.catalog.Connector;
@@ -68,6 +69,8 @@ import org.voltdb.utils.VoltTableUtil;
  */
 public class SystemInformation extends VoltSystemProcedure
 {
+    public static final String DR_PUBLIC_INTF_COL = "DRPUBLICINTERFACE";
+    public static final String DR_PUBLIC_PORT_COL = "DRPUBLICPORT";
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     static final int DEP_DISTRIBUTE = (int)
@@ -354,6 +357,8 @@ public class SystemInformation extends VoltSystemProcedure
         String drInterface = null;
         int drPort = VoltDB.DEFAULT_DR_PORT;
         String publicInterface = null;
+        String drPublicInterface = null;
+        int drPublicPort = 0;
         try {
             String localMetadata = VoltDB.instance().getLocalMetadata();
             JSONObject jsObj = new JSONObject(localMetadata);
@@ -373,6 +378,8 @@ public class SystemInformation extends VoltSystemProcedure
             drPort = jsObj.getInt("drPort");
             drInterface = jsObj.getString("drInterface");
             publicInterface = jsObj.getString("publicInterface");
+            drPublicInterface = jsObj.getString(VoltZK.drPublicHostProp);
+            drPublicPort = jsObj.getInt(VoltZK.drPublicPortProp);
         } catch (JSONException e) {
             hostLog.info("Failed to get local metadata, falling back to first resolvable IP address.");
         } catch (UnknownHostException e) {
@@ -398,6 +405,8 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "DRINTERFACE", drInterface);
         vt.addRow(hostId, "DRPORT", Integer.toString(drPort));
         vt.addRow(hostId, "PUBLICINTERFACE", publicInterface);
+        vt.addRow(hostId, DR_PUBLIC_INTF_COL, drPublicInterface);
+        vt.addRow(hostId, DR_PUBLIC_PORT_COL, Integer.toString(drPublicPort));
 
         // build string
         vt.addRow(hostId, "BUILDSTRING", VoltDB.instance().getBuildString());

@@ -185,6 +185,10 @@ public class VoltDB {
         public int m_drAgentPortStart = DISABLED_PORT;
         public String m_drInterface = "";
 
+        /** interface and port used for consumers to connect to DR on this cluster. Used in hosted env primarily **/
+        public String m_drPublicHost;
+        public int m_drPublicPort = DISABLED_PORT;
+
         /** HTTP port can't be set here, but eventually value will be reflected here */
         public int m_httpPort = Constants.HTTP_PORT_DISABLED;
         public String m_httpPortInterface = "";
@@ -412,6 +416,15 @@ public class VoltDB {
                         m_internalPort = hap.getPort();
                     } else {
                         m_internalPort = Integer.parseInt(portStr);
+                    }
+                } else if (arg.equals("drpublic")) {
+                    String publicStr = args[++i];
+                    if (publicStr.indexOf(':') != -1) {
+                        HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(publicStr, VoltDB.DEFAULT_DR_PORT);
+                        m_drPublicHost = hap.getHost();
+                        m_drPublicPort = hap.getPort();
+                    } else {
+                        m_drPublicHost = publicStr;
                     }
                 } else if (arg.equals("replicationport")) {
                     String portStr = args[++i];
@@ -1455,6 +1468,15 @@ public class VoltDB {
      */
     public static void replaceVoltDBInstanceForTest(VoltDBInterface testInstance) {
         singleton = testInstance;
+    }
+
+    public static String getPublicReplicationInterface() {
+        return (m_config.m_drPublicHost == null || m_config.m_drPublicHost.isEmpty()) ?
+                "" : m_config.m_drPublicHost;
+    }
+
+    public static int getPublicReplicationPort() {
+        return m_config.m_drPublicPort;
     }
 
     /**
