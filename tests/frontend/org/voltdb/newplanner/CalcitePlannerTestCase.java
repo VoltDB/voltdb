@@ -60,10 +60,9 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
         CompiledPlan cp = null;
         try {
             cp = m_aide.compileAdHocPlan(PlannerType.CALCITE, sql, inferPartitioning, forcedSP, detMode);
-            assertTrue(cp != null);
+            assertNotNull(cp);
         } catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
+            fail(ex.getMessage());
         }
         return cp;
     }
@@ -105,7 +104,6 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
     protected void comparePlans(String sql, Map<String, String> ignoreMap) {
 
         CompiledPlan calcitePlan = compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER);
-        System.out.println(calcitePlan.explainedPlan);
         CompiledPlan voltdbPlan = compileAdHocPlan(sql, true, true);
 
         // Compare roots
@@ -114,23 +112,10 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
         if (calcitePlan.subPlanGraph != null && voltdbPlan.subPlanGraph != null) {
             comparePlanTree(calcitePlan.subPlanGraph, voltdbPlan.subPlanGraph, ignoreMap);
         } else if (calcitePlan.subPlanGraph != null || voltdbPlan.subPlanGraph != null) {
-            fail("Two-part MP plans mismatch");
+            fail(String.format("Two-part MP plans mismatch.\n\nVoltDB plan: %s\n\nCalcite plan:%s\n", voltdbPlan.subPlanGraph.toExplainPlanString(), calcitePlan.subPlanGraph.toExplainPlanString()));
         }
         // Compare CompiledPlan attributes
         compareCompiledPlans(calcitePlan, voltdbPlan);
-    }
-
-    private void compareJSONPlans(String calciteJSON, String voltdbJSON, Map<String, String> ignoreMap) {
-        System.out.println("VoltDB : " + voltdbJSON);
-        System.out.println("Calcite: " + calciteJSON);
-        if (ignoreMap != null) {
-            for (Map.Entry<String, String> ignore : ignoreMap.entrySet()) {
-                calciteJSON = calciteJSON.replace(ignore.getKey(), ignore.getValue());
-            }
-            System.out.println("Calcite: " + calciteJSON);
-        }
-        assertEquals(voltdbJSON, calciteJSON);
-
     }
 
     private void comparePlanTree(AbstractPlanNode calcitePlanNode, AbstractPlanNode voltdbPlanNode, Map<String, String> ignoreMap) {
@@ -140,20 +125,25 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
         String calcitePlanTreeJSON = calcitePlanTree.toJSONString();
         String voltdbPlanTreeJSON = voltdbPlanTree.toJSONString();
 
-        compareJSONPlans(calcitePlanTreeJSON, voltdbPlanTreeJSON, ignoreMap);
+        if (ignoreMap != null) {
+            for (Map.Entry<String, String> ignore : ignoreMap.entrySet()) {
+                calcitePlanTreeJSON = calcitePlanTreeJSON.replace(ignore.getKey(), ignore.getValue());
+            }
+        }
+        assertEquals(voltdbPlanTreeJSON, calcitePlanTreeJSON);
     }
 
     private void compareCompiledPlans(CompiledPlan calcitePlan, CompiledPlan voltdbPlan) {
         // Compare LIMIT/OFFSET
-        assertEquals(voltdbPlan.hasLimitOrOffset(), calcitePlan.hasLimitOrOffset());
+        assertEquals("Plans with different limit or offset", voltdbPlan.hasLimitOrOffset(), calcitePlan.hasLimitOrOffset());
         // Determinism
-        assertEquals(voltdbPlan.hasDeterministicStatement(), calcitePlan.hasDeterministicStatement());
+        assertEquals("Plans with different determinism", voltdbPlan.hasDeterministicStatement(), calcitePlan.hasDeterministicStatement());
         // Params
         ParameterValueExpression[] voltdbParams = voltdbPlan.getParameters();
         ParameterValueExpression[] calciteParams = calcitePlan.getParameters();
         assertEquals(voltdbParams.length, calciteParams.length);
         for (int i = 0; i < voltdbParams.length; ++i) {
-            assertEquals(voltdbParams[i].getParameterIndex(), calciteParams[i].getParameterIndex());
+            assertEquals("The " + i + "-th parameter differ", voltdbParams[i].getParameterIndex(), calciteParams[i].getParameterIndex());
         }
     }
 
@@ -164,7 +154,7 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
      * @param plannerType the planner type
      * @return the JSON string representation of the plan tree
      */
-    protected String testPlan(String sql, PlannerType plannerType) {
+    protected String toJSONPlan(String sql, PlannerType plannerType) {
         CompiledPlan compiledPlan = (plannerType == PlannerType.CALCITE) ?
                 compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER) :
                 compileAdHocPlan(sql, true, true);
@@ -176,7 +166,6 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
             String subPlanTreeJSON = subPlanTree.toJSONString();
             planTreeJSON += subPlanTreeJSON;
         }
-        System.out.println(plannerType.toString() + " : " + planTreeJSON);
         return planTreeJSON;
     }
 
@@ -188,8 +177,6 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
      */
     protected void verifyRelNode(String expectedRelNodeStr, RelNode relNode) {
         String relNodeStr = RelOptUtil.toString(relNode);
-        System.out.println(relNodeStr);
-        relNodeStr = relNodeStr.replaceAll("\\s", "");
         assertEquals(expectedRelNodeStr, relNodeStr);
     }
 }

@@ -26,7 +26,6 @@ package org.voltdb.newplanner;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.parser.SqlParserFactory;
@@ -67,22 +66,19 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         return m_validator.validate(sqlNode);
     }
 
-    private void checkParseEx(Throwable e, String expectedMsgPattern, String sql) {
-        try {
-            throw e;
-        } catch (SqlParseException spe) {
-            String errMessage = spe.getMessage();
+    private RuntimeException mapException(Throwable e, String expectedMsgPattern, String sql) {
+        if (e instanceof SqlParseException) {
+            String errMessage = e.getMessage();
             if (expectedMsgPattern == null) {
-                throw new RuntimeException("Error while parsing query:" + sql, spe);
+                return new RuntimeException("Error while parsing query:" + sql, e);
             } else if (errMessage == null
                     || !errMessage.matches(expectedMsgPattern)) {
-                throw new RuntimeException("Error did not match expected ["
+                return new RuntimeException("Error did not match expected ["
                         + expectedMsgPattern + "] while parsing query ["
-                        + sql + "]", spe);
+                        + sql + "]", e);
             }
-        } catch (Throwable t) {
-            throw new RuntimeException("Error while parsing query: " + sql, t);
         }
+        return new RuntimeException("Error while parsing query: " + sql, e);
     }
 
     /**
@@ -97,8 +93,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         try {
             sqlNode = SqlParserFactory.parse(sap.sql);
         } catch (Throwable e) {
-            checkParseEx(e, expectedMsgPattern, sap.sql);
-            return;
+            throw mapException(e, expectedMsgPattern, sap.sql);
         }
 
         Throwable thrown = null;
@@ -108,6 +103,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
             thrown = ex;
         }
 
+        // if expectedMsgPattern is set to null, we check that no exception should be thrown.
         SqlTests.checkEx(thrown, expectedMsgPattern, sap, SqlTests.Stage.VALIDATE);
     }
 
