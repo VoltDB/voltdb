@@ -19,28 +19,21 @@ package org.voltdb.newplanner;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
-import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.TableFunctionScan;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalValues;
-import org.apache.calcite.rel.metadata.CachingRelMetadataProvider;
 import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
-import org.apache.calcite.tools.Planner;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.newplanner.metadata.VoltDBDefaultRelMetadataProvider;
 import org.voltdb.newplanner.rules.PlannerPhase;
 import org.voltdb.types.CalcitePlannerType;
@@ -179,16 +172,6 @@ public class CalcitePlanner {
                 Preconditions.checkArgument(planner instanceof VolcanoPlanner,
                         "Cluster is expected to be constructed using VolcanoPlanner. Was actually of type %s.", planner.getClass()
                                 .getName());
-//                JaninoRelMetadataProvider relMetadataProvider = JaninoRelMetadataProvider.of(
-//                        VoltDBDefaultRelMetadataProvider.INSTANCE);
-//                RelMetadataQuery.THREAD_PROVIDERS.set(relMetadataProvider);
-//
-//                // Modify RelMetaProvider for every RelNode in the SQL operator Rel tree.
-//                input.accept(new MetaDataProviderModifier(relMetadataProvider));
-//                input.getCluster().setMetadataProvider(
-//                        new CachingRelMetadataProvider(
-//                                input.getCluster().getMetadataProvider(),
-//                                input.getCluster().getPlanner()));
                 output = program.run(planner, input, toTraits,
                         ImmutableList.of(), ImmutableList.of());
                 break;

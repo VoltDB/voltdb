@@ -113,7 +113,20 @@ public enum PlannerPhase {
         return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
     }
 
-    // VoltDBLogical Conversion Rules
+    /**
+     * VoltDBLogical Conversion Rules.
+     * <p>
+     * Use to convert the convention from {@link org.apache.calcite.plan.Convention#NONE} to
+     * {@link org.voltdb.calciteadapter.rel.logical.VoltDBLRel#VOLTDB_LOGICAL}.
+     * <p>
+     * <b>Why?</b>
+     * <p>
+     * {@link org.apache.calcite.plan.Convention#NONE} is not implementable, and has to be transformed to
+     * something else in order to be implemented. Otherwise, the Volcano Planner will throw a
+     * CannotPlanException.
+     *
+     * @return
+     */
     static RuleSet getVoltLogicalRules() {
         final List<RelOptRule> ruleList = new ArrayList<>();
 

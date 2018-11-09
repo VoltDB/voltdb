@@ -23,16 +23,9 @@
 
 package org.voltdb.newplanner;
 
-import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.RelTrait;
-import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.tools.Planner;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
 import org.voltdb.newplanner.rules.PlannerPhase;
 import org.voltdb.types.CalcitePlannerType;
@@ -53,23 +46,9 @@ public class TestCalciteLogicalRules extends PlanRulesTestCase {
     @Override
     void assertPlanMatch(String sql, String expectedPlan) {
         RelRoot root = parseValidateAndConvert(sql);
-//        RelNode t = root.rel;
-        RelNode t = root.project();
-        RelTraitSet logicalTraits = t.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
-//        RelTrait collationTrait = t.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
-//        if (collationTrait instanceof RelCollation) {
-//            logicalTraits = logicalTraits.plus(collationTrait);
-//        }
-//        RelNode node = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.CALCITE_LOGICAL,
-//                t, logicalTraits);
         RelNode node = CalcitePlanner.transform(CalcitePlannerType.HEP, PlannerPhase.CALCITE_LOGICAL,
                 root.rel);
-//        String actualPlan = RelOptUtil.toString(node);
-//        assertEquals(expectedPlan, actualPlan);
-
-        RelNode nnode = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.VOLT_LOGICAL,
-                node, logicalTraits);
-        String actualPlan = RelOptUtil.toString(nnode);
+        String actualPlan = RelOptUtil.toString(node);
         assertEquals(expectedPlan, actualPlan);
     }
 
