@@ -77,6 +77,10 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         if (m_items == null) return null;
         return m_items.get(name.toUpperCase());
     }
+    
+    private Object get1(String name) {
+        return get(name);
+    }
 
     public T getExact(String name) {
         if (m_items == null) return null;
@@ -123,10 +127,6 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         return m_items.values().iterator();
     }
 
-    private void add1(String name) {
-        add(name);
-    }
-
     /**
      * Create a new instance of a CatalogType as a child of this map with a
      * given name. Note: this just makes a catalog command and calls
@@ -159,6 +159,10 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
+    }
+    
+    private void add1(String name) {
+        add(name);
     }
 
     /**

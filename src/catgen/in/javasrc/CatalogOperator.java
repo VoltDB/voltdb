@@ -34,8 +34,6 @@ public class CatalogOperator {
         NativeLibraryLoader.loadCatalogAPIs();
     }
 
-    static final char MAP_SEPARATOR = '#';
-
     final Catalog m_catalog;
 
     private CatalogType m_prevUsedPath = null;
@@ -79,24 +77,7 @@ public class CatalogOperator {
      * @param path the path from the parent node to the wanted node.
      * @return the catalog item at the specified path under the parent node.
      */
-    private static CatalogType getItemForPathPart(CatalogType parent, String path) {
-        if (path.length() == 0) {
-            return parent;
-        }
-
-        boolean hasStartSlash = path.charAt(0) == '/';
-        // The path is just "/"
-        if ((path.length() == 1) && hasStartSlash) {
-            return parent;
-        }
-        int mapSeparatorIndex = path.lastIndexOf(MAP_SEPARATOR);
-        assert(mapSeparatorIndex > 0);
-
-        String collectionPath = path.substring(hasStartSlash ? 1 : 0, mapSeparatorIndex);
-        String entryName = path.substring(mapSeparatorIndex + 1, path.length());
-
-        return parent.getCollection(collectionPath).get(entryName);
-    }
+    private native static CatalogType getItemForPathPart(CatalogType parent, String path);
 
     /**
      * Run one or more single-line catalog commands separated by newlines.
