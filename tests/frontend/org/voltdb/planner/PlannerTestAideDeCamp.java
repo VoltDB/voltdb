@@ -33,6 +33,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.Assert;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
@@ -162,7 +163,7 @@ public class PlannerTestAideDeCamp {
             } else if (PlannerType.CALCITE == plannerType) {
                 // TODO: plan using the calcite planner
             }
-            assert(plan != null);
+            Assert.assertNotNull(plan);
         }
 
         // Partitioning optionally inferred from the planning process.
