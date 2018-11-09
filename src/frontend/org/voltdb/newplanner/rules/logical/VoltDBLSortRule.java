@@ -28,41 +28,47 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLLimit;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLSort;
 
+/**
+ * VoltDB logical rule that transform {@link LogicalSort} to {@link VoltDBLSort} or {@link VoltDBLLimit}.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBLSortRule extends RelOptRule {
 
-        public static final VoltDBLSortRule INSTANCE = new VoltDBLSortRule();
+    public static final VoltDBLSortRule INSTANCE = new VoltDBLSortRule();
 
-        // declare want kind of operand we should match
-        VoltDBLSortRule() {
-            super(operand(LogicalSort.class, Convention.NONE, any()));
-        }
+    // declare want kind of operand we should match
+    VoltDBLSortRule() {
+        super(operand(LogicalSort.class, Convention.NONE, any()));
+    }
 
-        @Override
-        public void onMatch(RelOptRuleCall call) {
-            LogicalSort sort = (LogicalSort) call.rel(0);
-            RelNode input = sort.getInput();
-            RelTraitSet convertedTraits = sort.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
-            RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL));
-            RelNode logicalRel = null;
-            RelCollation sortCollation = sort.getCollation();
-            if (!sortCollation.getFieldCollations().isEmpty()) {
-                logicalRel = new VoltDBLSort(
-                        sort.getCluster(),
-                        convertedTraits,
-                        convertedInput,
-                        sort.getCollation());
-            }
-            // why split it to two phases? why instead of single VoltDBLSort we need VoltDBLSort and VoltDBLLimit
-            if (sort.offset != null || sort.fetch != null) {
-                RelNode limitInput = (logicalRel != null) ? logicalRel : convertedInput;
-                logicalRel = new VoltDBLLimit(
-                        sort.getCluster(),
-                        convertedTraits,
-                        limitInput,
-                        sort.offset,
-                        sort.fetch);
-            }
-            assert(logicalRel != null);
-            call.transformTo(logicalRel);
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+        LogicalSort sort = call.rel(0);
+        RelNode input = sort.getInput();
+        RelTraitSet convertedTraits = sort.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
+        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL));
+        RelNode logicalRel = null;
+        RelCollation sortCollation = sort.getCollation();
+        if (!sortCollation.getFieldCollations().isEmpty()) {
+            logicalRel = new VoltDBLSort(
+                    sort.getCluster(),
+                    convertedTraits,
+                    convertedInput,
+                    sort.getCollation());
         }
+        // why split it to two phases? why instead of single VoltDBLSort we need VoltDBLSort and VoltDBLLimit
+        if (sort.offset != null || sort.fetch != null) {
+            RelNode limitInput = (logicalRel != null) ? logicalRel : convertedInput;
+            logicalRel = new VoltDBLLimit(
+                    sort.getCluster(),
+                    convertedTraits,
+                    limitInput,
+                    sort.offset,
+                    sort.fetch);
+        }
+        assert (logicalRel != null);
+        call.transformTo(logicalRel);
+    }
 }

@@ -11,6 +11,12 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLJoin;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 
+/**
+ * VoltDB logical rule that transform {@link LogicalJoin} to {@link VoltDBLJoin}.
+ *
+ * @author Chao Zhou
+ * @since 8.4
+ */
 public class VoltDBLJoinRule extends RelOptRule {
     public static final VoltDBLJoinRule INSTANCE = new VoltDBLJoinRule();
 

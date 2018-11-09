@@ -26,9 +26,17 @@ import org.apache.calcite.util.ImmutableBitSet;
 
 import java.util.List;
 
+/**
+ * Logical Aggregate with <code>VOLTDB_LOGICAL</code> convention trait.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBLAggregate extends Aggregate implements VoltDBLRel {
 
-    /** Constructor */
+    /**
+     * Constructor
+     */
     private VoltDBLAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
@@ -37,7 +45,7 @@ public class VoltDBLAggregate extends Aggregate implements VoltDBLRel {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls) {
-      super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
+        super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
     }
 
     @Override

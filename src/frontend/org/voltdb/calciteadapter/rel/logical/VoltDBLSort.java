@@ -24,6 +24,12 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rex.RexNode;
 
+/**
+ * Logical Sort with <code>VOLTDB_LOGICAL</code> convention trait.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBLSort extends Sort implements VoltDBLRel {
 
     public VoltDBLSort(

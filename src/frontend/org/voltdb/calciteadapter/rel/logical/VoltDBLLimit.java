@@ -26,6 +26,12 @@ import org.apache.calcite.rex.RexNode;
 
 import java.util.List;
 
+/**
+ * Limit operator with <code>VOLTDB_LOGICAL</code> convention trait.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBLLimit extends SingleRel implements VoltDBLRel {
 
     private RexNode m_offset;

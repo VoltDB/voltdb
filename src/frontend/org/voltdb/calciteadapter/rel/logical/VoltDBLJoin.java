@@ -18,7 +18,6 @@
 package org.voltdb.calciteadapter.rel.logical;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -26,7 +25,6 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 
@@ -34,6 +32,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * Logical Join with <code>VOLTDB_LOGICAL</code> convention trait.
+ *
+ * @author Chao Zhou
+ * @since 8.4
+ */
 public class VoltDBLJoin extends Join implements VoltDBLRel {
     private final boolean semiJoinDone;
 

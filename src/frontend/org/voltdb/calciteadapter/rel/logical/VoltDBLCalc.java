@@ -23,6 +23,12 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rex.RexProgram;
 
+/**
+ * Logical Calc with <code>VOLTDB_LOGICAL</code> convention trait.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBLCalc extends Calc implements VoltDBLRel {
 
     public VoltDBLCalc(

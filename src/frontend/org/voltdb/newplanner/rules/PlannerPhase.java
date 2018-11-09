@@ -18,6 +18,7 @@
 package org.voltdb.newplanner.rules;
 
 
+import com.google_voltpatches.common.collect.ImmutableCollection;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.CalcMergeRule;
@@ -55,6 +56,13 @@ public enum PlannerPhase {
         public RuleSet getRules() {
             return getVoltLogicalRules();
         }
+    },
+
+    LOGICAL("Calcite and VoltDB logical rules") {
+        public RuleSet getRules() {
+            return mergedRuleSets(getCalciteLogicalRules(),
+                    getVoltLogicalRules());
+        }
     };
 
     public final String description;
@@ -65,6 +73,17 @@ public enum PlannerPhase {
 
     public abstract RuleSet getRules();
 
+    static RuleSet mergedRuleSets(RuleSet... ruleSets) {
+        final ImmutableCollection.Builder<RelOptRule> relOptRuleSetBuilder = ImmutableSet.builder();
+        for (final RuleSet ruleSet : ruleSets) {
+            for (final RelOptRule relOptRule : ruleSet) {
+                relOptRuleSetBuilder.add(relOptRule);
+            }
+        }
+        return RuleSets.ofList(relOptRuleSetBuilder.build());
+    }
+
+    // Calcite's Logical Rules
     static RuleSet getCalciteLogicalRules() {
         /*
         LogicalCalc
@@ -91,15 +110,10 @@ public enum PlannerPhase {
         ruleList.add(ProjectMergeRule.INSTANCE);
         ruleList.add(FilterProjectTransposeRule.INSTANCE);
 
-//        ruleList.add(VoltDBLSortRule.INSTANCE);
-//        ruleList.add(VoltDBLTableScanRule.INSTANCE);
-//        ruleList.add(VoltDBLCalcRule.INSTANCE);
-//        ruleList.add(VoltDBLAggregateRule.INSTANCE);
-//        ruleList.add(VoltDBLJoinRule.INSTANCE);
-
         return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
     }
 
+    // VoltDBLogical Conversion Rules
     static RuleSet getVoltLogicalRules() {
         final List<RelOptRule> ruleList = new ArrayList<>();
 

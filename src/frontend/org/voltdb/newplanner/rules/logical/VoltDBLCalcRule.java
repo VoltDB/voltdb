@@ -26,24 +26,30 @@ import org.apache.calcite.rel.logical.LogicalCalc;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLCalc;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 
+/**
+ * VoltDB logical rule that transform {@link LogicalCalc} to {@link VoltDBLCalc}.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBLCalcRule extends RelOptRule {
 
-        public static final VoltDBLCalcRule INSTANCE = new VoltDBLCalcRule();
+    public static final VoltDBLCalcRule INSTANCE = new VoltDBLCalcRule();
 
-        VoltDBLCalcRule() {
-            super(operand(LogicalCalc.class, Convention.NONE, any()));
-        }
+    VoltDBLCalcRule() {
+        super(operand(LogicalCalc.class, Convention.NONE, any()));
+    }
 
-        @Override
-        public void onMatch(RelOptRuleCall call) {
-            LogicalCalc calc = (LogicalCalc) call.rel(0);
-            RelNode input = calc.getInput();
-            RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
-            RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL));
-            call.transformTo(new VoltDBLCalc(
-                    calc.getCluster(),
-                    convertedTraits,
-                    convertedInput,
-                    calc.getProgram()));
-        }
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+        LogicalCalc calc = call.rel(0);
+        RelNode input = calc.getInput();
+        RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
+        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL));
+        call.transformTo(new VoltDBLCalc(
+                calc.getCluster(),
+                convertedTraits,
+                convertedInput,
+                calc.getProgram()));
+    }
 }
