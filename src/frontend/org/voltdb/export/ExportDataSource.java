@@ -95,7 +95,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final int m_siteId;
     private String m_exportTargetName = "";
     private long m_tupleCount = 0;
-    private long m_gapCount = 0;
     private AtomicInteger m_tuplesPending = new AtomicInteger(0);
     private long m_averageLatency = 0; // for current counting-session
     private long m_maxLatency = 0; // for current counting-session
@@ -582,7 +581,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 ExportRole role = m_mastershipAccepted.get() ? ExportRole.MASTER : ExportRole.REPLICA;
 
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, role.toString(), m_exportTargetName,
-                        m_tupleCount, m_tuplesPending.get(), avgLatency, maxLatency, m_gapCount, m_status.toString());
+                        m_tupleCount, m_tuplesPending.get(), avgLatency, maxLatency, m_status.toString());
             }
         });
     }
@@ -1545,10 +1544,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     // Status is accessed by multiple threads
     public synchronized void setStatus(StreamStatus status) {
         this.m_status = status;
-    }
-
-    public void setGapCount(long gapCount) {
-        m_gapCount = gapCount;
     }
 
     @Override
