@@ -23,6 +23,7 @@
 
 package org.voltdb.newplanner;
 
+import java.util.Collections;
 import java.util.Map;
 
 import org.apache.calcite.plan.RelOptUtil;
@@ -90,7 +91,7 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
      * @param sql the SQL statement to plan
      */
     protected void comparePlans(String sql) {
-        comparePlans(sql, null);
+        comparePlans(sql, Collections.emptyMap());
     }
 
     /**
@@ -125,10 +126,8 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
         String calcitePlanTreeJSON = calcitePlanTree.toJSONString();
         String voltdbPlanTreeJSON = voltdbPlanTree.toJSONString();
 
-        if (ignoreMap != null) {
-            for (Map.Entry<String, String> ignore : ignoreMap.entrySet()) {
-                calcitePlanTreeJSON = calcitePlanTreeJSON.replace(ignore.getKey(), ignore.getValue());
-            }
+        for (Map.Entry<String, String> ignore : ignoreMap.entrySet()) {
+            calcitePlanTreeJSON = calcitePlanTreeJSON.replace(ignore.getKey(), ignore.getValue());
         }
         assertEquals(voltdbPlanTreeJSON, calcitePlanTreeJSON);
     }
@@ -141,7 +140,7 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
         // Params
         ParameterValueExpression[] voltdbParams = voltdbPlan.getParameters();
         ParameterValueExpression[] calciteParams = calcitePlan.getParameters();
-        assertEquals(voltdbParams.length, calciteParams.length);
+        assertEquals("Plans with different parameter number", voltdbParams.length, calciteParams.length);
         for (int i = 0; i < voltdbParams.length; ++i) {
             assertEquals("The " + i + "-th parameter differ", voltdbParams[i].getParameterIndex(), calciteParams[i].getParameterIndex());
         }
@@ -158,7 +157,7 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
         CompiledPlan compiledPlan = (plannerType == PlannerType.CALCITE) ?
                 compileAdHocCalcitePlan(sql, true, true, DeterminismMode.SAFER) :
                 compileAdHocPlan(sql, true, true);
-        assert (compiledPlan.rootPlanGraph != null);
+        assertNotNull("Root plan graph is null", compiledPlan.rootPlanGraph);
         PlanNodeTree planTree = new PlanNodeTree(compiledPlan.rootPlanGraph);
         String planTreeJSON = planTree.toJSONString();
         if (compiledPlan.subPlanGraph != null) {

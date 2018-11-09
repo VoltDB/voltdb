@@ -58,6 +58,7 @@ public class PlannerTestCase extends TestCase {
     private PlannerType m_plannerType = PlannerType.VOLTDB;
 
     public PlannerTestCase() {
+        super();
     }
 
     PlannerTestCase(PlannerType plannerType) {

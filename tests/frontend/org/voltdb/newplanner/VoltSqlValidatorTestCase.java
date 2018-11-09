@@ -56,7 +56,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
     }
 
     protected SqlNode parseAndValidate(String sql) {
-        Objects.requireNonNull(m_validator, "m_validator");
+        assertNotNull("m_validator is null", m_validator);
         SqlNode sqlNode;
         try {
             sqlNode = SqlParserFactory.parse(sql);
