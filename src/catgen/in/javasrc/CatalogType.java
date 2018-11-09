@@ -33,6 +33,8 @@ import java.lang.reflect.Field;
  */
 public abstract class CatalogType implements Comparable<CatalogType> {
 
+    private static final char MAP_SEPARATOR = '#';
+
     class CatalogReference<T extends CatalogType> {
 
         T m_value = null;
@@ -147,7 +149,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * @return The full catalog path of this CatalogType instance
      */
     String getCatalogPath() {
-        return m_parentMap.getPath() + Catalog.MAP_SEPARATOR + m_typename;
+        return m_parentMap.getPath() + MAP_SEPARATOR + m_typename;
     }
 
     String getParentMapName() {

@@ -31,8 +31,6 @@ import com.google_voltpatches.common.cache.CacheBuilder;
  */
 public final class Catalog extends CatalogType {
 
-    public static final char MAP_SEPARATOR = '#';
-
     private Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(8).build();
 
     CatalogMap<Cluster> m_clusters;
@@ -58,10 +56,12 @@ public final class Catalog extends CatalogType {
         return this;
     }
 
+    @SuppressWarnings("unused")
     private CatalogType getFromCache(String path) {
         return m_pathCache.getIfPresent(path);
     }
 
+    @SuppressWarnings("unused")
     private void cache(String path, CatalogType ct) {
         m_pathCache.put(path, ct);
     }
