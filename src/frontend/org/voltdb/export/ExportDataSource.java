@@ -31,7 +31,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
@@ -39,6 +38,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -163,17 +163,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
     private StreamStatus m_status = StreamStatus.ACTIVE;
 
-    static class QueryResponse implements Comparable<QueryResponse>{
+    static class QueryResponse {
         long lastSeq;
         public QueryResponse(long lastSeq) {
             this.lastSeq = lastSeq;
         }
-
-        @Override
-        public int compareTo(QueryResponse o) {
-            return (int)(this.lastSeq - o.lastSeq);
-        }
-
         public boolean canCoverGap() {
             return lastSeq != Long.MIN_VALUE;
         }
@@ -1449,14 +1443,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_queryResponses.put(sendHsId, new QueryResponse(lastSeq));
                     Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
                     if (p.getSecond().stream().allMatch(hsid -> m_queryResponses.containsKey(hsid))) {
+                        List<Entry<Long, QueryResponse>> candidates =
+                                m_queryResponses.entrySet().stream()
+                                       .filter(s -> s.getValue().canCoverGap())
+                                       .collect(Collectors.toList());
                         Entry<Long, QueryResponse> bestCandidate = null;
-                        try {
-                            bestCandidate = m_queryResponses.entrySet().stream()
-                                           .filter(s -> s.getValue().canCoverGap())
-                                           .sorted()
-                                           .findFirst()
-                                           .get();
-                        } catch (NoSuchElementException e) {
+                        for (Entry<Long, QueryResponse> candidate : candidates) {
+                            if (bestCandidate == null) {
+                                bestCandidate = candidate;
+                            } else if (candidate.getValue().lastSeq > bestCandidate.getValue().lastSeq) {
+                                bestCandidate = candidate;
+                            }
+                        }
+                        if (bestCandidate == null) {
                             setStatus(StreamStatus.BLOCKED);
                             // Show warning only in full cluster.
                             RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
@@ -1465,9 +1464,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
                                         gap.getFirst() + " to " + gap.getSecond());
                             }
-                        }
-                        // time to give up master and give it to the best candidate
-                        if (bestCandidate != null) {
+                        } else {
+                            // time to give up master and give it to the best candidate
                             m_newLeaderHostId = CoreUtils.getHostIdFromHSId(bestCandidate.getKey());
                             exportLog.info("Stream master is going to switch to host " + m_newLeaderHostId + " to jump the gap.");
                             // drainedTo sequence number should haven't been changed.
