@@ -213,9 +213,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
         resetStateInRejoinOrRecover();
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug(toString() + " reads gap tracker from PBD:" + m_gapTracker.toString());
-        }
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates
@@ -225,6 +222,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_partitionId = partitionId;
 
         m_siteId = siteId;
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug(toString() + " reads gap tracker from PBD:" + m_gapTracker.toString());
+        }
 
         // Add the Export meta-data columns to the schema followed by the
         // catalog columns for this table.

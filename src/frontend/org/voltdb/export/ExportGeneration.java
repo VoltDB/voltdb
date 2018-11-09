@@ -616,7 +616,7 @@ public class ExportGeneration implements Generation {
                             m_directory.getPath());
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Creating ExportDataSource for table in catalog " + table.getTypeName() +
-                                " signature " + key + " partition id " + partition);
+                                " signature " + key + " partition " + partition + " site " + siteId);
                     }
 
 

@@ -42,16 +42,20 @@ import org.voltdb.utils.VoltFile;
  *
  * Export PBD buffer layout:
  *    --- Buffer Header   ---
- *    seqNo(8) + tupleCount(4) +
+ *    seqNo(8) + tupleCount(4) + exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length)
+ *    {
+ *          ---Inside schema---
+ *          tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
+ *    }
  *    --- Row Header      ---
- *    rowLength(4) + genId(8) + partitionColumnIndex(4) + columnCount(4) + hasSchemaFlag(1) +
+ *    rowLength(4) + partitionColumnIndex(4) + columnCount(4, includes metadata columns) +
  *    nullArrayLength(4) + nullArray(var length)
- *    --- Optional Schema ---
- *    tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
+ *    --- Metadata        ---
+ *    TxnId(8) + timestamp(8) + seqNo(8) + partitionId(8) + siteId(8) + exportOperation(1)
  *    --- Row Data        ---
- *    RowTxnId(8) + rowData(var length)
+ *    rowData(var length)
  *
- *    repeat row header, optional schema and row data...
+ *    repeat row header, meta data and row data...
  */
 public class StreamBlockQueue {
 
@@ -283,20 +287,22 @@ public class StreamBlockQueue {
                 if (startSequenceNumber >= truncationSeqNo) {
                     return PersistentBinaryDeque.fullTruncateResponse();
                 }
+                final int tupleCountPos = b.position();
                 final int tupleCount = b.getInt();
                 // There is nothing to do with this buffer
                 final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
                 if (lastSequenceNumber < truncationSeqNo) {
                     return null;
                 }
+                byte version = b.get(); // export version
+                assert(version == EXPORT_BUFFER_VERSION);
+                b.getLong(); // generation id
+                int firstRowStart = b.getInt() + b.position();
+                b.position(firstRowStart);
+
                 // Partial truncation
                 int offset = 0;
                 while (b.hasRemaining()) {
-                    final int rowLength = b.getInt();
-                    // Not the row we are looking to truncate at. Skip past it keeping in mind
-                    // we read the first 4 bytes for the row length
-                    b.position(b.position() + rowLength - 4);
-                    offset++;
                     if (startSequenceNumber + offset > truncationSeqNo) {
                         // The sequence number of this row is the greater then the truncation sequence number.
                         // Don't want this row, but want to preserve all rows before it.
@@ -304,9 +310,18 @@ public class StreamBlockQueue {
                         // Return everything in the block before the truncation point.
                         // Indicate this is the end of the interesting data.
                         b.limit(b.position());
+                        // update tuple count in the header
+                        b.putInt(tupleCountPos, offset - 1);
                         b.position(0);
                         return new ByteBufferTruncatorResponse(b);
                     }
+                    offset++;
+                    // Not the row we are looking to truncate at. Skip past it (row length + row length field).
+                    final int rowLength = b.getInt();
+                    if (b.position() + rowLength > b.limit()) {
+                        System.out.println(rowLength);
+                    }
+                    b.position(b.position() + rowLength);
                 }
                 return null;
             }
