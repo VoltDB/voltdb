@@ -47,37 +47,7 @@ public class CatalogOperator {
      * @param path the absolute path to the wanted node.
      * @return the catalog item at the specified path.
      */
-    CatalogType getItemForPath(String path) {
-        CatalogType retval = m_catalog.m_pathCache.getIfPresent(path);
-        if (retval != null) {
-            return retval;
-        }
-
-        int lastSlash = path.lastIndexOf('/');
-        if (lastSlash == -1) {
-            return getItemForPathPart(m_catalog, path);
-        }
-
-        // The recursive case
-        String immediateParentPath = path.substring(0, lastSlash);
-        String subPath = path.substring(lastSlash);
-        CatalogType immediateParent = getItemForPath(immediateParentPath);
-        if (immediateParent == null) {
-            return null;
-        }
-        // Cache all parents
-        m_catalog.m_pathCache.put(immediateParentPath, immediateParent);
-
-        return getItemForPathPart(immediateParent, subPath);
-    }
-
-    /**
-     * Get a catalog item under a given parent node using a path string.
-     * @param parent the parent node.
-     * @param path the path from the parent node to the wanted node.
-     * @return the catalog item at the specified path under the parent node.
-     */
-    private native static CatalogType getItemForPathPart(CatalogType parent, String path);
+    native CatalogType getItemForPath(String path);
 
     /**
      * Run one or more single-line catalog commands separated by newlines.

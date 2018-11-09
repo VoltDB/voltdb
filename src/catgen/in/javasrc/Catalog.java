@@ -33,7 +33,7 @@ public final class Catalog extends CatalogType {
 
     public static final char MAP_SEPARATOR = '#';
 
-    Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(8).build();
+    private Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(8).build();
 
     CatalogMap<Cluster> m_clusters;
 
@@ -56,6 +56,14 @@ public final class Catalog extends CatalogType {
     @Override
     public Catalog getCatalog() {
         return this;
+    }
+
+    private CatalogType getFromCache(String path) {
+        return m_pathCache.getIfPresent(path);
+    }
+
+    private void cache(String path, CatalogType ct) {
+        m_pathCache.put(path, ct);
     }
 
     /**
