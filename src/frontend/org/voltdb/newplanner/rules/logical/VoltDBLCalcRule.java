@@ -26,12 +26,6 @@ import org.apache.calcite.rel.logical.LogicalCalc;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLCalc;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 
-/**
- * VoltDB logical rule that transform {@link LogicalCalc} to {@link VoltDBLCalc}.
- *
- * @author Michael Alexeev
- * @since 8.4
- */
 public class VoltDBLCalcRule extends RelOptRule {
 
     public static final VoltDBLCalcRule INSTANCE = new VoltDBLCalcRule();

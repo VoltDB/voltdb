@@ -29,7 +29,7 @@ import org.apache.calcite.rex.RexProgram;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLCalc extends Calc implements VoltDBLRel {
+public class VoltDBLCalc extends Calc implements VoltDBLRel{
 
     public VoltDBLCalc(
             RelOptCluster cluster,
