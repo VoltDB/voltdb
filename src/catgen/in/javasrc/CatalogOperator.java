@@ -24,6 +24,8 @@ package org.voltdb.catalog;
 import java.io.IOException;
 import java.io.StringReader;
 
+import org.voltdb.NativeLibraryLoader;
+
 import com.google_voltpatches.common.io.LineReader;
 
 /**
@@ -32,6 +34,10 @@ import com.google_voltpatches.common.io.LineReader;
  * @since 8.4
  */
 public class CatalogOperator {
+    
+    static {
+        NativeLibraryLoader.loadCatalogAPIs();
+    }
 
     static final char MAP_SEPARATOR = '#';
 
@@ -96,46 +102,12 @@ public class CatalogOperator {
 
         return parent.getCollection(collectionPath).get(entryName);
     }
-
+    
     /**
      * Execute one catalog command.
      * @param cmdStr the catalog command string.
      */
-    private void executeOne(String cmdStr) {
-        CatalogCommand catCmd = new CatalogCommand(cmdStr);
-
-        // Resolve the ref to a node in the catalog
-        CatalogType resolved = null;
-        if (catCmd.path.startsWith("$")) { // $PREV
-            if (m_prevUsedPath == null) {
-                throw new CatalogException("$PREV reference was not preceded by a cached reference.");
-            }
-            resolved = m_prevUsedPath;
-        }
-        else {
-            resolved = getItemForPath(catCmd.path);
-            if (resolved == null) {
-                throw new CatalogException("Unable to find reference for catalog item '" + catCmd.path + "'");
-            }
-            m_prevUsedPath = resolved;
-        }
-
-        switch (catCmd.cmd) {
-        case 'a': // add
-            resolved.getCollection(catCmd.arg1).add(catCmd.arg2);
-            break;
-        case 'd': // delete
-            resolved.getCollection(catCmd.arg1).delete(catCmd.arg2);
-            String toDelete = catCmd.path + "/" + catCmd.arg1 + MAP_SEPARATOR + catCmd.arg2;
-            m_catalog.m_pathCache.invalidate(toDelete);
-            break;
-        case 's': // set
-            resolved.set(catCmd.arg1, catCmd.arg2);
-            break;
-        default:
-            throw new CatalogException("Unrecognized command: " + catCmd.cmd);
-        }
-    }
+    private native void executeOne(String cmdStr);
 
     /**
      * Run one or more single-line catalog commands separated by newlines.
@@ -150,7 +122,9 @@ public class CatalogOperator {
         try {
             while ((line = lines.readLine()) != null) {
                 try {
-                    if (line.length() > 0) executeOne(line);
+                    if (line.length() > 0) {
+                        executeOne(line);
+                    }
                 }
                 catch (Exception ex) {
                     String msg = "Invalid catalog command on line " + lineNum + "\n" +

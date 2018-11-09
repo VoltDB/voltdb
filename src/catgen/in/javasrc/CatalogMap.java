@@ -122,6 +122,10 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         }
         return m_items.values().iterator();
     }
+    
+    private void add1(String name) {
+        add(name);
+    }
 
     /**
      * Create a new instance of a CatalogType as a child of this map with a

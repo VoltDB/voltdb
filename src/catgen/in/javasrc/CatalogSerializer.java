@@ -38,10 +38,6 @@ public final class CatalogSerializer implements CatalogVisitor {
     private final Set<String> m_fieldFilter;
     private final Set<Class<? extends CatalogType>> m_childFilter;
 
-    static {
-        NativeLibraryLoader.loadCatalogAPIs();
-    }
-
     /**
      * Create a default catalog serializer.
      */
