@@ -21,12 +21,7 @@
 
 package org.voltdb.catalog;
 
-import java.io.IOException;
-import java.io.StringReader;
-
 import org.voltdb.NativeLibraryLoader;
-
-import com.google_voltpatches.common.io.LineReader;
 
 /**
  * The operator class to make changes to the catalog.
@@ -34,7 +29,7 @@ import com.google_voltpatches.common.io.LineReader;
  * @since 8.4
  */
 public class CatalogOperator {
-    
+
     static {
         NativeLibraryLoader.loadCatalogAPIs();
     }
@@ -102,12 +97,6 @@ public class CatalogOperator {
 
         return parent.getCollection(collectionPath).get(entryName);
     }
-    
-    /**
-     * Execute one catalog command.
-     * @param cmdStr the catalog command string.
-     */
-    private native void executeOne(String cmdStr);
 
     /**
      * Run one or more single-line catalog commands separated by newlines.
@@ -115,26 +104,5 @@ public class CatalogOperator {
      * @param commands a string containing one or more catalog commands
      * separated by newlines.
      */
-    public void execute(final String commands) {
-        LineReader lines = new LineReader(new StringReader(commands));
-        int lineNum = 0;
-        String line = null;
-        try {
-            while ((line = lines.readLine()) != null) {
-                try {
-                    if (line.length() > 0) {
-                        executeOne(line);
-                    }
-                }
-                catch (Exception ex) {
-                    String msg = "Invalid catalog command on line " + lineNum + "\n" +
-                        "Contents: '" + line + "'\n";
-                    throw new RuntimeException(msg, ex);
-                }
-                lineNum++;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+    public native void execute(final String commands);
 }
