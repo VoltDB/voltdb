@@ -295,7 +295,7 @@ public class Catalog extends CatalogType {
     }
 
     @Override
-    void copyFields(CatalogType obj) {
+    public void copyFields(CatalogType obj) {
         // no fields to copy
         // also not used as Catalog overrides the calling method of CatalogType
     }
