@@ -84,6 +84,8 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_internalInterface = m_internalInterface;
         cl.m_drAgentPortStart = m_drAgentPortStart;
         cl.m_httpPort = m_httpPort;
+        cl.m_drPublicHost = m_drPublicHost;
+        cl.m_drPublicPort = m_drPublicPort;
         // final in baseclass: cl.m_isEnterprise = m_isEnterprise;
         cl.m_deadHostTimeoutMS = m_deadHostTimeoutMS;
         cl.m_startMode = m_startMode;
@@ -698,6 +700,15 @@ public class CommandLine extends VoltDB.Configuration
         if (m_drAgentPortStart != -1)
         {
             cmdline.add("replicationport"); cmdline.add(Integer.toString(m_drAgentPortStart));
+        }
+        if (m_drPublicHost != null || m_drPublicPort != VoltDB.DISABLED_PORT) {
+            cmdline.add("drpublic");
+            String param = (m_drPublicHost != null && !m_drPublicHost.isEmpty()) ? m_drPublicHost : "";
+            if (m_drPublicPort != VoltDB.DISABLED_PORT) {
+                param = (param.isEmpty()) ? Integer.toString(m_drPublicPort)
+                                          : param + ":" + Integer.toString(m_drPublicPort);
+            }
+            cmdline.add(param);
         }
 
         if (target() == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
