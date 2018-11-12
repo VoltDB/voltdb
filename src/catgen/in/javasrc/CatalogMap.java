@@ -167,6 +167,25 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     }
 
     /**
+     * Adds a new instance of CatalogType to the map. The instance must be **a clone**
+     * from a different catalog instance. For use of this function, refer to
+     * org.voltdb.calciteutils.CreateIndexUtils.addTableToDatabase.
+     * @param name The name of the new instance to add.
+     * @param object the instance to add to map.
+     */
+    public void unsafeAdd(String name, T object) {
+        if (m_items == null) {
+            m_items = new TreeMap<>();
+        }
+        String mapKey = name.toUpperCase();
+        if (m_items.containsKey(mapKey)) {
+            throw new CatalogException("Catalog item '" + mapKey + "' already exists for " + m_parent);
+        } else {
+            m_items.put(mapKey, object);
+        }
+    }
+
+    /**
      * Remove a {@link CatalogType} object from this collection.
      * @param name The name of the object to remove.
      */

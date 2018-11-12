@@ -919,6 +919,8 @@ public class CatalogDiffEngine {
         // Support any modification of these
         // I added Statement and PlanFragment for the need of materialized view recalculation plan updates.
         // ENG-8641, yzhang.
+        // I added Index because HSQL process "CREATE INDEX" stmt by recreating the target table from scratch,
+        // while the only change should be additional index.
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
@@ -928,7 +930,8 @@ public class CatalogDiffEngine {
             suspect instanceof ColumnRef ||
             suspect instanceof Statement ||
             suspect instanceof PlanFragment ||
-            suspect instanceof TimeToLive) {
+            suspect instanceof TimeToLive ||
+            suspect instanceof Index) {
             return null;
         }
 

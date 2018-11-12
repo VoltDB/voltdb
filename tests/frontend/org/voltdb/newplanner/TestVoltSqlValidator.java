@@ -23,7 +23,7 @@
 
 package org.voltdb.newplanner;
 
-import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
+import org.voltdb.calciteadapter.CatalogAdapter;
 
 public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
 
