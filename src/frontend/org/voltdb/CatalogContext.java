@@ -40,7 +40,7 @@ import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
+import org.voltdb.calciteadapter.CatalogAdapter;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.settings.ClusterSettings;

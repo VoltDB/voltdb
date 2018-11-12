@@ -126,6 +126,11 @@ public class TupleValueExpression extends AbstractValueExpression {
         this(tableName, null, columnName, null, columnIndex, -1);
     }
 
+    public TupleValueExpression(Column column) {
+        this(column.getParent().getTypeName(), column.getTypeName(), column.getIndex());
+        setValueType(VoltType.get((byte) column.getType()));
+    }
+
     public TupleValueExpression() {
         super(ExpressionType.VALUE_TUPLE);
     }

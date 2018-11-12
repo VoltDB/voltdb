@@ -83,7 +83,7 @@ import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
-import org.voltdb.sysprocs.org.voltdb.calciteutils.DropTableUtils;
+import org.voltdb.calciteutils.DropTableUtils;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -1910,7 +1910,7 @@ public class DDLCompiler {
         return stringer.toString();
     }
 
-    private static String convertToJSONObject(AbstractExpression expr) throws JSONException {
+    public static String convertToJSONObject(AbstractExpression expr) throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.object();
         expr.toJSONString(stringer);

@@ -410,7 +410,7 @@ public abstract class AbstractParsedStmt {
 
         XMLElementExpressionParser parser = m_exprParsers.get(elementName);
         if (parser == null) {
-            throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
+            throw new PlanningErrorException("Unsupported expression node '" + elementName + "'", 0);
         }
         retval = parser.parse(this, exprNode);
         assert("asterisk".equals(elementName) || retval != null);

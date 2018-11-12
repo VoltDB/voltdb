@@ -232,7 +232,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
 
         # copyFields
         write(                     '    @Override' )
-        write(                     '    void copyFields(CatalogType obj) {' )
+        write(                     '    public void copyFields(CatalogType obj) {' )
         if len(cls.fields) > 0:
             write(                 '        // this is safe from the caller' )
             write( interp(         '        $clsname other = ($clsname) obj;\n', locals() ) )
