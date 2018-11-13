@@ -44,7 +44,8 @@ public class TransactionTaskQueue
 
     public static class CompletionCounter {
         long txnId = 0L;
-        int  completionCount = 0;;
+        int completionCount = 0;
+        long timestamp = 0L;
     }
     private static class RelativeSiteOffset {
         private SiteTaskerQueue[] m_stashedMpQueues;
@@ -302,8 +303,7 @@ public class TransactionTaskQueue
                         }
                         fragmentScore++;
                     }
-                }
-                else {
+                } else {
                     for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
                         if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
                             break;
@@ -350,15 +350,13 @@ public class TransactionTaskQueue
             while (!done) {
                 int completionScore = 0;
                 for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
-                    if (sb.hasCompletionTask()) {
-                        if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
-                            break;
-                        }
-                        // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
-                        // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
-                        // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
-                        completionScore++;
+                    if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
+                        break;
                     }
+                    // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
+                    // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
+                    // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
+                    completionScore++;
                 }
 
                 if (hostLog.isDebugEnabled()) {

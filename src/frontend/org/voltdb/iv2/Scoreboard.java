@@ -70,19 +70,20 @@ public class Scoreboard {
 
     public Pair<CompleteTransactionTask, Boolean> pollFirstCompletionTask(CompletionCounter nextTaskCounter) {
         Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.pollFirstEntry().getValue();
-        if (!m_compTasks.isEmpty()) {
+
+        // check next inline for completion
+        Pair<CompleteTransactionTask, Boolean> next = peekFirst();
+        if (next != null) {
             if (nextTaskCounter.txnId == 0L) {
-                nextTaskCounter.txnId = m_compTasks.firstKey();
+                nextTaskCounter.txnId = next.getFirst().getMsgTxnId();
                 nextTaskCounter.completionCount++;
-            } else if (nextTaskCounter.txnId == m_compTasks.firstKey()) {
+                nextTaskCounter.timestamp = next.getFirst().getTimestamp();
+            } else if (nextTaskCounter.txnId == next.getFirst().getMsgTxnId() &&
+                    nextTaskCounter.timestamp == next.getFirst().getTimestamp()) {
                 nextTaskCounter.completionCount++;
             }
         }
         return pair;
-    }
-
-    public boolean hasCompletionTask() {
-       return !m_compTasks.isEmpty();
     }
 
     public Pair<CompleteTransactionTask, Boolean> peekFirst() {
