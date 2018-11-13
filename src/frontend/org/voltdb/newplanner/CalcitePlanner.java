@@ -140,7 +140,11 @@ public class CalcitePlanner {
         switch (plannerType) {
             case HEP: {
                 final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+
+                // add the ruleset to group, otherwise each rules will only apply once in order.
+                hepProgramBuilder.addGroupBegin();
                 phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+                hepProgramBuilder.addGroupEnd();
 
                 // create the HepPlanner.
                 final HepPlanner planner = new HepPlanner(hepProgramBuilder.build());

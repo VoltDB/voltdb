@@ -362,25 +362,21 @@ public class TestCalciteLogicalRules extends PlanRulesTestCase {
                         "    VoltDBLTableScan(table=[[catalog, R1]])\n" +
                         "    VoltDBLTableScan(table=[[catalog, R2]])\n");
 
-        // TODO: this one can be improved
         assertPlanMatch("select R1.i, R2.v from R1 inner join R2 " +
                         "on R2.si = R1.i where R2.v = 'foo'",
-                "LogicalCalc(expr#0..11=[{inputs}], expr#12=['foo'], expr#13=[=($t11, $t12)], I=[$t0], V=[$t11], $condition=[$t13])\n" +
-                        "  LogicalCalc(expr#0..12=[{inputs}], proj#0..11=[{exprs}])\n" +
-                        "    LogicalJoin(condition=[=($12, $0)], joinType=[inner])\n" +
-                        "      VoltDBLTableScan(table=[[catalog, R1]])\n" +
-                        "      LogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}])\n" +
-                        "        VoltDBLTableScan(table=[[catalog, R2]])\n");
+                "LogicalCalc(expr#0..12=[{inputs}], expr#13=['foo'], expr#14=[=($t11, $t13)], I=[$t0], V=[$t11], $condition=[$t14])\n" +
+                        "  LogicalJoin(condition=[=($12, $0)], joinType=[inner])\n" +
+                        "    VoltDBLTableScan(table=[[catalog, R1]])\n" +
+                        "    LogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}])\n" +
+                        "      VoltDBLTableScan(table=[[catalog, R2]])\n");
 
-        // TODO: this one can be improved
         assertPlanMatch("select R2.si, R1.i from R1 inner join " +
                         "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i",
-                "LogicalCalc(expr#0..11=[{inputs}], expr#12=['foo'], expr#13=[=($t11, $t12)], expr#14=[4], expr#15=[>($t1, $t14)], expr#16=[>($t2, $t6)], expr#17=[AND($t13, $t15, $t16)], SI=[$t7], I=[$t0], $condition=[$t17])\n" +
-                        "  LogicalCalc(expr#0..12=[{inputs}], proj#0..5=[{exprs}], I0=[$t7], SI1=[$t8], TI0=[$t9], BI0=[$t10], F0=[$t11], V0=[$t12])\n" +
-                        "    LogicalJoin(condition=[=($7, $6)], joinType=[inner])\n" +
-                        "      LogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}])\n" +
-                        "        VoltDBLTableScan(table=[[catalog, R1]])\n" +
-                        "      VoltDBLTableScan(table=[[catalog, R2]])\n");
+                "LogicalCalc(expr#0..12=[{inputs}], expr#13=['foo'], expr#14=[=($t12, $t13)], expr#15=[4], expr#16=[>($t1, $t15)], expr#17=[>($t2, $t7)], expr#18=[AND($t14, $t16, $t17)], SI=[$t8], I=[$t0], $condition=[$t18])\n" +
+                        "  LogicalJoin(condition=[=($7, $6)], joinType=[inner])\n" +
+                        "    LogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}])\n" +
+                        "      VoltDBLTableScan(table=[[catalog, R1]])\n" +
+                        "    VoltDBLTableScan(table=[[catalog, R2]])\n");
 
         assertPlanMatch("select R1.i from R1 inner join " +
                         "R2  on R1.si = R2.si where R1.I + R2.ti = 5",
@@ -391,20 +387,17 @@ public class TestCalciteLogicalRules extends PlanRulesTestCase {
     }
 
     public void testThreeWayJoin() {
-        // TODO: this one can be improved
         assertPlanMatch("select R1.i from R1 inner join " +
                         "R2  on R1.si = R2.i inner join " +
                         "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'",
-                "LogicalCalc(expr#0..14=[{inputs}], expr#15=[4], expr#16=[>($t1, $t15)], expr#17=['foo'], expr#18=[<>($t13, $t17)], expr#19=[AND($t16, $t18)], I=[$t0], $condition=[$t19])\n" +
-                        "  LogicalCalc(expr#0..15=[{inputs}], proj#0..11=[{exprs}], PK=[$t13], VC=[$t14], II=[$t15])\n" +
-                        "    LogicalJoin(condition=[=($12, $14)], joinType=[inner])\n" +
-                        "      LogicalCalc(expr#0..11=[{inputs}], expr#12=[CAST($t11):VARCHAR(256) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], proj#0..12=[{exprs}])\n" +
-                        "        LogicalCalc(expr#0..12=[{inputs}], proj#0..5=[{exprs}], I0=[$t7], SI1=[$t8], TI0=[$t9], BI0=[$t10], F0=[$t11], V0=[$t12])\n" +
-                        "          LogicalJoin(condition=[=($6, $7)], joinType=[inner])\n" +
-                        "            LogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}])\n" +
-                        "              VoltDBLTableScan(table=[[catalog, R1]])\n" +
-                        "            VoltDBLTableScan(table=[[catalog, R2]])\n" +
-                        "      VoltDBLTableScan(table=[[catalog, R3]])\n");
+                "LogicalCalc(expr#0..15=[{inputs}], expr#16=[4], expr#17=[>($t1, $t16)], expr#18=['foo'], expr#19=[<>($t14, $t18)], expr#20=[AND($t17, $t19)], I=[$t0], $condition=[$t20])\n" +
+                        "  LogicalJoin(condition=[=($12, $14)], joinType=[inner])\n" +
+                        "    LogicalCalc(expr#0..12=[{inputs}], expr#13=[CAST($t12):VARCHAR(256) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], proj#0..5=[{exprs}], I0=[$t7], SI1=[$t8], TI0=[$t9], BI0=[$t10], F0=[$t11], V0=[$t12], V00=[$t13])\n" +
+                        "      LogicalJoin(condition=[=($6, $7)], joinType=[inner])\n" +
+                        "        LogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}])\n" +
+                        "          VoltDBLTableScan(table=[[catalog, R1]])\n" +
+                        "        VoltDBLTableScan(table=[[catalog, R2]])\n" +
+                        "    VoltDBLTableScan(table=[[catalog, R3]])\n");
     }
 
     public void testSubqueriesJoin() {
