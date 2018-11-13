@@ -77,7 +77,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         if (m_items == null) return null;
         return m_items.get(name.toUpperCase());
     }
-    
+
     private Object get1(String name) {
         return get(name);
     }
@@ -160,7 +160,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             throw new RuntimeException(ex);
         }
     }
-    
+
     private void add1(String name) {
         add(name);
     }
