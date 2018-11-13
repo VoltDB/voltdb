@@ -1635,12 +1635,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         if (newHandle > m_repairLogTruncationHandle) {
             m_repairLogTruncationHandle = newHandle;
+            // ENG-14553: release buffered reads regardless of leadership status
+            m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
             // We have to advance the local truncation point on the replica. It's important for
             // node promotion when there are no missing repair log transactions on the replica.
             // Because we still want to release the reads if no following writes will come to this replica.
             // Also advance the truncation point if this is not a leader but the response message is for leader.
             if (m_isLeader || isForLeader) {
-                m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
                 scheduleRepairLogTruncateMsg();
             }
         } else {
