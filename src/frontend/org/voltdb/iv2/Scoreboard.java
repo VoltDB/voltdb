@@ -17,11 +17,11 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.TreeMap;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.iv2.TransactionTaskQueue.CompletionCounter;
 import org.voltdb.messaging.CompleteTransactionMessage;
 
 /*
@@ -35,7 +35,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
  * a transaction that has been processed as well as an abort for the actual transaction in progress.
  */
 public class Scoreboard {
-    private Deque<Pair<CompleteTransactionTask, Boolean>> m_compTasks = new ArrayDeque<>(2);
+    private TreeMap<Long, Pair<CompleteTransactionTask, Boolean>> m_compTasks = new TreeMap<>();
     private FragmentTaskBase m_fragTask;
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
@@ -53,57 +53,50 @@ public class Scoreboard {
             m_fragTask = null;
         }
 
-        // special case, scoreboard is empty
-        if (m_compTasks.peekFirst() == null) {
-            m_compTasks.addFirst(Pair.of(task, missingTxn));
-            return;
-        }
-
-        // scoreboard has one completion
-        if (m_compTasks.size() == 1) {
-            Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();
-            if (head.getFirst().getMsgTxnId() < task.getMsgTxnId()) {
-                // Completion with higher txnId adds to tail
-                m_compTasks.addLast(Pair.of(task, missingTxn));
-            } else if (head.getFirst().getMsgTxnId() > task.getMsgTxnId()) {
-                // Completion with lower txnId goes to head
-                m_compTasks.removeFirst();
-                m_compTasks.addFirst(Pair.of(task, missingTxn));
-                m_compTasks.addLast(head);
-            } else {
-                // Only keep the completion with latest timestamp if txnId is same
-                if (head.getFirst().getTimestamp() < task.getTimestamp() && isComparable(head.getFirst(), task)) {
-                    m_compTasks.removeFirst();
-                    m_compTasks.addFirst(Pair.of(task, missingTxn));
-                }
-                // Ignore stale completion
-            }
+        Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.get(task.getMsgTxnId());
+        if ( pair == null) {
+            m_compTasks.put(task.getMsgTxnId(), Pair.of(task, missingTxn));
         } else {
-            // scoreboard has two completions
-            Pair<CompleteTransactionTask, Boolean> head = m_compTasks.peekFirst();
-            Pair<CompleteTransactionTask, Boolean> tail = m_compTasks.peekLast();
-            // scoreboard can take completions from two transactions at most
-            assert (task.getMsgTxnId() == head.getFirst().getMsgTxnId() || task.getMsgTxnId() == tail.getFirst().getMsgTxnId());
-
-            // Keep newer completion, discard the older one
-            if ( task.getTimestamp() > head.getFirst().getTimestamp() && isComparable(head.getFirst(), task)) {
-                m_compTasks.removeFirst();
-                m_compTasks.addFirst(Pair.of(task, missingTxn));
-            } else if ( task.getTimestamp() > tail.getFirst().getTimestamp() && isComparable(tail.getFirst(), task)) {
-                m_compTasks.removeLast();
-                m_compTasks.addLast(Pair.of(task, missingTxn));
+            if ( task.getTimestamp() > pair.getFirst().getTimestamp() && isComparable(pair.getFirst(), task)) {
+                m_compTasks.remove(task.getMsgTxnId());
+                m_compTasks.put(task.getMsgTxnId(), Pair.of(task, missingTxn));
             }
-            // Ignore stale completion
         }
-
     }
 
     public void addFragmentTask(FragmentTaskBase task) {
         m_fragTask = task;
     }
 
-    public Deque<Pair<CompleteTransactionTask, Boolean>> getCompletionTasks() {
-        return m_compTasks;
+    public Pair<CompleteTransactionTask, Boolean> pollFirstCompletionTask(CompletionCounter nextTaskCounter) {
+        Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.pollFirstEntry().getValue();
+        if (!m_compTasks.isEmpty()) {
+            if (nextTaskCounter.txnId == 0L) {
+                nextTaskCounter.txnId = m_compTasks.firstKey();
+                nextTaskCounter.completionCount++;
+            } else if (nextTaskCounter.txnId == m_compTasks.firstKey()) {
+                nextTaskCounter.completionCount++;
+            }
+        }
+        return pair;
+    }
+
+    public boolean hasCompletionTask() {
+       return !m_compTasks.isEmpty();
+    }
+
+    public Pair<CompleteTransactionTask, Boolean> peekFirst() {
+        if (!m_compTasks.isEmpty()) {
+            return m_compTasks.firstEntry().getValue();
+        }
+        return null;
+    }
+
+    public Pair<CompleteTransactionTask, Boolean> peekLast() {
+        if (!m_compTasks.isEmpty()) {
+            return m_compTasks.lastEntry().getValue();
+        }
+        return null;
     }
 
     public FragmentTaskBase getFragmentTask() {
@@ -126,14 +119,10 @@ public class Scoreboard {
     }
 
     private boolean hasRestartCompletion(CompleteTransactionTask task) {
-        if (m_compTasks.peekFirst() != null &&
-                MpRestartSequenceGenerator.isForRestart(m_compTasks.peekFirst().getFirst().getTimestamp()) &&
-                task.getMsgTxnId() < m_compTasks.peekFirst().getFirst().getMsgTxnId()) {
-            return true;
-        } else if (m_compTasks.size() == 2 &&
-                MpRestartSequenceGenerator.isForRestart(m_compTasks.peekLast().getFirst().getTimestamp()) &&
-                task.getMsgTxnId() < m_compTasks.peekLast().getFirst().getMsgTxnId()) {
-            return true;
+        Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.get(task.getMsgTxnId());
+        if (pair != null) {
+            return (MpRestartSequenceGenerator.isForRestart(pair.getFirst().getTimestamp()) &&
+                task.getMsgTxnId() < pair.getFirst().getMsgTxnId());
         }
         return false;
     }
@@ -144,25 +133,26 @@ public class Scoreboard {
 
     // Only match CompleteTransactionTask at head of the queue
     public boolean matchCompleteTransactionTask(long txnId, long timestamp) {
-        return !m_compTasks.isEmpty() &&
-                m_compTasks.peekFirst().getFirst().getMsgTxnId() == txnId &&
-                m_compTasks.peekFirst().getFirst().getTimestamp() == timestamp;
+        if (!m_compTasks.isEmpty()) {
+            long lowestTxnId = m_compTasks.firstKey();
+            if (txnId == lowestTxnId) {
+                Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.get(lowestTxnId);
+                return timestamp == pair.getFirst().getTimestamp();
+            }
+        }
+        return false;
     }
 
     public boolean isTransactionMissing(long txnId) {
-        if (m_compTasks.peekFirst().getSecond() && txnId == m_compTasks.peekFirst().getFirst().getMsgTxnId()) {
-            return true;
-        }
-
-        return (m_compTasks.size() == 2 && m_compTasks.peekLast().getSecond() &&
-                txnId == m_compTasks.peekLast().getFirst().getMsgTxnId());
+        Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.get(txnId);
+        return (pair != null && pair.getSecond());
     }
 
     public String toString() {
         StringBuilder builder = new StringBuilder();
         if (!m_compTasks.isEmpty()){
-            builder.append("CompleteTransactionTasks: " + m_compTasks.peekFirst() +
-                    (m_compTasks.size() == 2 ? "\n" + m_compTasks.peekLast() : ""));
+            for (Pair<CompleteTransactionTask, Boolean> pair : m_compTasks.values())
+            builder.append("CompleteTransactionTasks: " + pair);
             builder.append("\n");
         }
         if (m_fragTask != null) {
