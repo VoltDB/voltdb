@@ -705,7 +705,7 @@ public class Cartographer extends StatsSource
                             VoltDB.instance().halt();
                         } else {
                             //Send poison pill with target to kill
-                            m_hostMessenger.sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
+                            m_hostMessenger.sendPoisonPill(ihid, "@StopNode", ForeignHost.CRASH_ME);
                         }
                     } else {
                         // unsafe, clear the indicator

@@ -312,8 +312,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_outstandingTxns.remove(key.m_txnId);
                 // for MP write txns, we should use it's first SpHandle in the TransactionState
                 // for SP write txns, we can just use the SpHandle from the DuplicateCounterKey
-                long m_safeSpHandle = txn == null ? key.m_spHandle: txn.m_spHandle;
-                setRepairLogTruncationHandle(m_safeSpHandle, false);
+                long safeSpHandle = txn == null ? key.m_spHandle: txn.m_spHandle;
+                setRepairLogTruncationHandle(safeSpHandle, false);
             }
 
             VoltMessage resp = counter.getLastResponse();
@@ -570,7 +570,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
 
             // The leader will be responsible to replicate messages to replicas.
-            // Don't replicate reads, not matter FAST or SAFE.
+            // Don't replicate reads, no matter FAST or SAFE.
             if (m_isLeader && (!msg.isReadOnly()) && IS_KSAFE_CLUSTER ) {
                 for (long hsId : m_sendToHSIds) {
                     Iv2InitiateTaskMessage finalMsg = msg;
@@ -1671,7 +1671,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void scheduleRepairLogTruncateMsg()
     {
-        if (m_sendToHSIds.length == 0) {
+        // skip schedule jobs if no TxnCommitInterests need to be notified
+        if (m_sendToHSIds.length == 0 && m_repairLog.hasNoTxnCommitInterests()) {
             return;
         }
 
@@ -1682,6 +1683,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 synchronized (m_lock) {
                     if (m_lastSentTruncationHandle < m_repairLogTruncationHandle) {
                         m_lastSentTruncationHandle = m_repairLogTruncationHandle;
+                        m_repairLog.notifyTxnCommitInterests(m_lastSentTruncationHandle);
+                        if (m_sendToHSIds.length == 0) {
+                            return;
+                        }
+
                         final RepairLogTruncationMessage truncMsg = new RepairLogTruncationMessage(m_repairLogTruncationHandle);
                         // Also keep the local repair log's truncation point up-to-date
                         // so that it can trigger the callbacks.

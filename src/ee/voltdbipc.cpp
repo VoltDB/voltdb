@@ -1691,7 +1691,7 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     }
 }
 
-int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
+int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();
     }

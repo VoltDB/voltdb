@@ -535,6 +535,8 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     else {
         m_lastCommittedSpUniqueId = uniqueId;
         m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+        // for sp, update the last Committed SpHandle
+        m_currBlock->recordLastCommittedSpHandle(m_openSpHandle);
     }
     m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
 

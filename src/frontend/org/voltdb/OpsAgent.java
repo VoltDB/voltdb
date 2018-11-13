@@ -270,6 +270,10 @@ public abstract class OpsAgent
                     collectStatsImpl(c, clientHandle, selector, params);
                 } catch (Exception e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
+                    // ENG-14639, prevent clients like sqlcmd from hanging on exception
+                    sendErrorResponse(c, ClientResponse.OPERATIONAL_FAILURE,
+                            "Failed to get statistics (" + e.getMessage() + ").",
+                            clientHandle);
                 }
             }
         });

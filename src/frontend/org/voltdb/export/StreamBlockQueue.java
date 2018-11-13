@@ -46,6 +46,9 @@ public class StreamBlockQueue {
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     private static final int EXPORT_BUFFER_VERSION = 1;
 
+    public static final String EXPORT_DISABLE_COMPRESSION_OPTION = "EXPORT_DISABLE_COMPRESSION";
+    private static final boolean DISABLE_COMPRESSION = Boolean.getBoolean(EXPORT_DISABLE_COMPRESSION_OPTION);
+
     /**
      * Deque containing reference to stream blocks that are in memory. Some of these
      * stream blocks may still be persisted to disk others are stored completely in memory
@@ -66,8 +69,10 @@ public class StreamBlockQueue {
         m_path = path;
         m_nonce = nonce;
         m_reader = m_persistentDeque.openForRead(m_nonce);
-        // temporary debug stmt
-        exportLog.info(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
+
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
+        }
     }
 
     public boolean isEmpty() throws IOException {
@@ -204,7 +209,7 @@ public class StreamBlockQueue {
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
     public void offer(StreamBlock streamBlock) throws IOException {
-        m_persistentDeque.offer(streamBlock.asBBContainer());
+        m_persistentDeque.offer(streamBlock.asBBContainer(), !DISABLE_COMPRESSION);
         long unreleasedUso = streamBlock.unreleasedUso();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);

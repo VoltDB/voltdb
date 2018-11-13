@@ -565,6 +565,7 @@ public class StatsAgent extends OpsAgent
             stats = collectStats(StatsSelector.COMMANDLOG, false);
             break;
         case IMPORTER:
+        case IMPORT:
             stats = collectStats(StatsSelector.IMPORTER, interval);
             break;
         case DRROLE:
