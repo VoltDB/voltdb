@@ -817,8 +817,8 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    public void applyExportControl(String exportSource, List<String> exportTargets, String opMode, VoltTable results) {
-        exportLog.info("Export " + opMode + " source:" + exportSource + " targets:" + exportTargets);
+    public void applyExportControl(String exportSource, List<String> exportTargets, String command, VoltTable results) {
+        exportLog.info("Export " + command + " source:" + exportSource + " targets:" + exportTargets);
         synchronized (m_dataSourcesByPartition) {
             RealVoltDB volt = (RealVoltDB) VoltDB.instance();
             for (Iterator<Integer> pIt = m_dataSourcesByPartition.keySet().iterator(); pIt.hasNext();) {
@@ -832,11 +832,11 @@ public class ExportGeneration implements Generation {
                             exportTargets.contains(eds.getTarget()) || exportTargets.isEmpty())) {
                         if (eds.isBlocked() && eds.isMastershipAccepted()) {
                             if (isLeader) {
-                                eds.applyExportControl(opMode);
-                                results.addRow(partition, eds.getTableName(), eds.getTarget(), VoltSystemProcedure.STATUS_OK, "");
+                                eds.applyExportControl(command);
+                                results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
                             } else {
-                                results.addRow(partition, eds.getTableName(), eds.getTarget(), VoltSystemProcedure.STATUS_FAILURE,
-                                        "Stream is blocked on partition replica. Waiting for export mastership transfer.");
+                                results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_FAILURE,
+                                        "Couldn't release on partition replica. Waiting for export mastership transfer to partition master.");
                             }
                         }
                     }

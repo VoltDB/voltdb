@@ -77,18 +77,13 @@ public class ExportControl extends VoltSystemProcedure {
             List<String> exportTargets = Arrays.asList(targets);
             LOG.info("Export " + operationMode + " source:" + exportSource + " targets:" + exportTargets);
             VoltTable results = new VoltTable(
-                    new ColumnInfo("PARTITIONID", VoltType.BIGINT),
                     new ColumnInfo("SOURCE", VoltType.STRING),
                     new ColumnInfo("TARGET", VoltType.STRING),
+                    new ColumnInfo("PARTITIONID", VoltType.BIGINT),
                     new ColumnInfo("STATUS", VoltType.BIGINT),
                     new ColumnInfo("MESSAGE", VoltType.STRING));
             if (context.isLowestSiteId()) {
                 ExportManager.instance().applyExportControl(exportSource, exportTargets, operationMode, results);
-                if (results.getRowCount() == 0) {
-                    RealVoltDB volt = (RealVoltDB)VoltDB.instance();
-                    results.addRow(-1, "", "", VoltSystemProcedure.STATUS_OK,
-                            "No control is applied on host " + volt.getHostMessenger().getHostname());
-                }
             }
 
             return new DependencyPair.TableDependencyPair(DEP_exportalControl, results);
@@ -109,9 +104,9 @@ public class ExportControl extends VoltSystemProcedure {
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String json) throws Exception {
         VoltTable results = new VoltTable(
-                new ColumnInfo("PARTITIONID", VoltType.BIGINT),
                 new ColumnInfo("SOURCE", VoltType.STRING),
                 new ColumnInfo("TARGET", VoltType.STRING),
+                new ColumnInfo("PARTITIONID", VoltType.BIGINT),
                 new ColumnInfo("STATUS", VoltType.BIGINT),
                 new ColumnInfo("MESSAGE", VoltType.STRING));
         String operationMode = null;
@@ -134,20 +129,16 @@ public class ExportControl extends VoltSystemProcedure {
             }
             exportSource = exportSource == null ? "" : exportSource;
         } catch (IllegalArgumentException | JSONException e){
-            results.addRow(-1, "", "", VoltSystemProcedure.STATUS_FAILURE, e.getMessage());
+            results.addRow("", "", -1, VoltSystemProcedure.STATUS_FAILURE, e.getMessage());
             return new VoltTable[] {results};
         }
 
         if (!"".equals(exportSource)) {
             RealVoltDB volt = (RealVoltDB)VoltDB.instance();
             Set<String> exportStreams = CatalogUtil.getExportTableNames( volt.getCatalogContext().database);
-            if (exportStreams.isEmpty()) {
-                results.addRow(-1, "", "", VoltSystemProcedure.STATUS_FAILURE, "No export streams defined.");
-                return new VoltTable[] {results};
-            }
             boolean isThere = exportStreams.stream().anyMatch(exportSource::equalsIgnoreCase);
             if (!isThere) {
-                results.addRow(-1, exportSource, "", VoltSystemProcedure.STATUS_FAILURE, "Export stream " + exportSource + " does not exist.");
+                results.addRow(exportSource, "", -1,VoltSystemProcedure.STATUS_FAILURE, "Export stream " + exportSource + " does not exist.");
                 return new VoltTable[] {results};
             }
         }

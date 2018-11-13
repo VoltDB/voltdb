@@ -713,9 +713,9 @@ public class ExportManager
         return m_exportStats;
     }
 
-    public void applyExportControl(String exportStream, List<String> exportTargets, String opMode, VoltTable results) {
+    public void applyExportControl(String exportStream, List<String> exportTargets, String command, VoltTable results) {
         if (m_generation.get() != null) {
-           m_generation.get().applyExportControl(exportStream, exportTargets, opMode, results);
+           m_generation.get().applyExportControl(exportStream, exportTargets, command, results);
         }
     }
 }
