@@ -406,6 +406,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         m_lastReleasedSeqNo = releaseSeqNo;
+        if (m_status == StreamStatus.BLOCKED &&
+                m_gapTracker.getFirstGap() != null &&
+                releaseSeqNo > m_gapTracker.getFirstGap().getSecond()) {
+            setStatus(StreamStatus.ACTIVE);
+        }
         // If persistent log contains gap, mostly due to node failures and rejoins, acks from leader might
         // fill the gap gradually.
         m_gapTracker.truncate(releaseSeqNo);
@@ -834,6 +839,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // Add following check to eliminate this window.
                     if (!m_mastershipAccepted.get()) {
                         fut.set(null);
+                        m_pollFuture = null;
                         return;
                     }
 
@@ -843,7 +849,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             fut.set(m_pendingContainer.getAndSet(null));
                             if (m_pollFuture != null) {
                                 if (exportLog.isDebugEnabled()) {
-                                    exportLog.debug("picked up work from pending container, set poll future to null");
+                                    exportLog.debug("Pick up work from pending container, set poll future to null");
                                 }
                                 m_pollFuture = null;
                             }
@@ -928,18 +934,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         // the last pushed buffer at the checkpoint time is acked, it won't leave gap
                         // behind before migrates to another node.
                         Pair<Long, Long> gap = m_gapTracker.getFirstGap();
+                        // Hit a gap! Prepare to relinquish master role and broadcast queries for
+                        // capable candidate.
                         if (gap != null && firstUnpolledSeq >= gap.getFirst() && firstUnpolledSeq <= gap.getSecond()) {
-                            // Hit a gap! Prepare to relinquish master role and broadcast queries for
-                            // capable candidate.
-                            exportLog.info(toString() + " hit a gap [" +
-                                    gap.getFirst() + ", " + gap.getSecond() +
-                                    "], start looking for other nodes that has the data.");
                             // If another mastership migration in progress and is before the gap,
-                            // don't bother to start another
-                            if (firstUnpolledSeq -1 <= m_seqNoToDrain ) {
+                            // don't bother to start new one.
+                            if (m_seqNoToDrain > firstUnpolledSeq - 1) {
+                                exportLog.info(toString() + " hit a gap [" +
+                                        gap.getFirst() + ", " + gap.getSecond() +
+                                        "], start looking for other nodes that has the data.");
                                 m_seqNoToDrain = firstUnpolledSeq - 1;
                                 mastershipCheckpoint(firstUnpolledSeq - 1);
                             }
+                            m_pollFuture = null;
+                            return;
                         }
                     }
                 }
@@ -1175,8 +1183,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             @Override
             public void run() {
                 // memorize end sequence number of the most recently pushed buffer from EE
-                // but if we already wait to switch mastership, don't update the sequence to drain to
-                // a greater number
+                // but if we already wait to switch mastership, don't update the drain-to
+                // sequence number to a greater number
                 m_seqNoToDrain = Math.min(m_seqNoToDrain, m_lastPushedSeqNo);
                 m_newLeaderHostId = newLeaderHostId;
                 // if no new buffer to be drained, send the migrate event right away
