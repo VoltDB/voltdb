@@ -101,12 +101,14 @@ public enum CipherExecutor {
     }
 
     public void startup() {
+        /*
         if (m_active.compareAndSet(false, true)) synchronized(this) {
             ThreadFactory thrdfct = CoreUtils.getThreadFactory(
                     name () + " SSL cipher service", CoreUtils.MEDIUM_STACK_SIZE);
             m_es = MoreExecutors.listeningDecorator(
                     Executors.newFixedThreadPool(m_threadCount, thrdfct));
         }
+        */
     }
 
     public void shutdown() {
