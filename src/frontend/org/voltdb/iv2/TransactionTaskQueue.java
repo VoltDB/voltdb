@@ -308,7 +308,7 @@ public class TransactionTaskQueue
                         if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
                             break;
                         }
-                        missingTxn |= sb.isTransactionMissing(taskTxnId);
+                        missingTxn |= sb.peekFirst().getSecond();
                         // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                         // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                         // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.

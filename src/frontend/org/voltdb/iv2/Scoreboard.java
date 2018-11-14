@@ -68,20 +68,28 @@ public class Scoreboard {
         m_fragTask = task;
     }
 
+    /**
+     * Remove the CompleteTransactionTask from the head and count the next CompleteTransactionTask
+     * @param nextTaskCounter CompletionCounter
+     * @return the removed CompleteTransactionTask
+     */
     public Pair<CompleteTransactionTask, Boolean> pollFirstCompletionTask(CompletionCounter nextTaskCounter) {
-        Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.pollFirstEntry().getValue();
 
-        // check next inline for completion
+        // remove from the head
+        Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.pollFirstEntry().getValue();
+        if (m_compTasks.isEmpty()) {
+            return pair;
+        }
+        // check next task for completion to ensure that the heads on all the site
+        // have the same transaction and timestamp
         Pair<CompleteTransactionTask, Boolean> next = peekFirst();
-        if (next != null) {
-            if (nextTaskCounter.txnId == 0L) {
-                nextTaskCounter.txnId = next.getFirst().getMsgTxnId();
-                nextTaskCounter.completionCount++;
-                nextTaskCounter.timestamp = next.getFirst().getTimestamp();
-            } else if (nextTaskCounter.txnId == next.getFirst().getMsgTxnId() &&
-                    nextTaskCounter.timestamp == next.getFirst().getTimestamp()) {
-                nextTaskCounter.completionCount++;
-            }
+        if (nextTaskCounter.txnId == 0L) {
+            nextTaskCounter.txnId = next.getFirst().getMsgTxnId();
+            nextTaskCounter.completionCount++;
+            nextTaskCounter.timestamp = next.getFirst().getTimestamp();
+        } else if (nextTaskCounter.txnId == next.getFirst().getMsgTxnId() &&
+                nextTaskCounter.timestamp == next.getFirst().getTimestamp()) {
+            nextTaskCounter.completionCount++;
         }
         return pair;
     }
@@ -120,11 +128,12 @@ public class Scoreboard {
     }
 
     private boolean hasRestartCompletion(CompleteTransactionTask task) {
-        Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.get(task.getMsgTxnId());
+        Pair<CompleteTransactionTask, Boolean> pair = peekFirst();
         if (pair != null) {
             return (MpRestartSequenceGenerator.isForRestart(pair.getFirst().getTimestamp()) &&
-                task.getMsgTxnId() < pair.getFirst().getMsgTxnId());
+                    task.getMsgTxnId() < pair.getFirst().getMsgTxnId());
         }
+
         return false;
     }
 
@@ -142,11 +151,6 @@ public class Scoreboard {
             }
         }
         return false;
-    }
-
-    public boolean isTransactionMissing(long txnId) {
-        Pair<CompleteTransactionTask, Boolean> pair = m_compTasks.get(txnId);
-        return (pair != null && pair.getSecond());
     }
 
     public String toString() {
