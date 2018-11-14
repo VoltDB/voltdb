@@ -940,7 +940,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             // If another mastership migration in progress and is before the gap,
                             // don't bother to start new one.
                             if (m_seqNoToDrain > firstUnpolledSeq - 1) {
-                                exportLog.info(toString() + " hit a gap [" +
+                                exportLog.info("Hitting a stream gap [" +
                                         gap.getFirst() + ", " + gap.getSecond() +
                                         "], start looking for other nodes that has the data.");
                                 m_seqNoToDrain = firstUnpolledSeq - 1;
@@ -1386,14 +1386,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Send GAP_QUERY message(" + m_currentRequestId + "," + (m_gapTracker.getSafePoint() + 1) +
-                            ") for partition " + m_partitionId + "source signature " + m_tableName +
-                            " from " + CoreUtils.hsIdToString(mbx.getHSId()) +
+                            ") from " + CoreUtils.hsIdToString(mbx.getHSId()) +
                             " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
                 }
             } else {
                 setStatus(StreamStatus.BLOCKED);
                 Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                exportLog.warn(toString() + " is blocked because of data from sequence number " + gap.getFirst() +
+                exportLog.warn("Stream is blocked because of data from sequence number " + gap.getFirst() +
                         " to " + gap.getSecond() + " is missing.");
             }
         }
@@ -1554,7 +1553,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     @Override
     public String toString() {
-        return "ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId();
+        return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId();
     }
 
     private void mastershipCheckpoint(long seq) {
