@@ -33,6 +33,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.Assert;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
@@ -48,6 +49,8 @@ import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.PlannerType;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
+
+import static org.junit.Assert.fail;
 
 /**
  * Some utility functions to compile SQL statements for plan generation tests.
@@ -156,13 +159,23 @@ public class PlannerTestAideDeCamp {
                 partitioning, hsql, estimates, false,
                 costModel, null, joinOrder, detMode, false)) {
 
-            if (PlannerType.VOLTDB == plannerType) {
-                planner.parse();
-                plan = planner.plan();
-            } else if (PlannerType.CALCITE == plannerType) {
-                // TODO: plan using the calcite planner
+            switch (plannerType) {
+                case VOLTDB: {
+                    planner.parse();
+                    plan = planner.plan();
+                    break;
+                }
+                case CALCITE:
+                default: {
+                    // TODO: plan using the calcite planner
+                    fail("Temporarily a dead branch.");
+                    break;
+                }
+
+
             }
-            assert(plan != null);
+
+            Assert.assertNotNull(plan);
         }
 
         // Partitioning optionally inferred from the planning process.
