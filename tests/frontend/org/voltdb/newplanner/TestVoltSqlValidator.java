@@ -102,5 +102,4 @@ public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
         assertExceptionIsThrown("select ^True or i^ from R2",
                 "Cannot apply 'OR' to arguments of type '<BOOLEAN> OR <INTEGER>'.*");
     }
-
 }
