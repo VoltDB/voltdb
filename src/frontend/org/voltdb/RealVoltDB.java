@@ -3563,11 +3563,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_adminListener.stop();
                 }
 
-                // shut down the client interface
-                if (m_clientInterface != null) {
-                    m_clientInterface.shutdown();
-                    m_clientInterface = null;
-                }
                 // send hostDown trap as client interface is
                 // no longer available
                 m_snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down");
@@ -3606,6 +3601,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 shutdownReplicationConsumerRole();
+
+                // shut down the client interface
+                if (m_clientInterface != null) {
+                    m_clientInterface.shutdown();
+                    m_clientInterface = null;
+                }
 
                 if (m_snapshotIOAgent != null) {
                     m_snapshotIOAgent.shutdown();
