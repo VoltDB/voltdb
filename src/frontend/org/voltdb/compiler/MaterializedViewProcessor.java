@@ -272,6 +272,9 @@ public class MaterializedViewProcessor {
                 // Materialized view on single table
                 // create the materializedviewinfo catalog node for the source table
                 Table srcTable = stmt.m_tableList.get(0);
+                if (srcTable.getViews().get(viewName) != null) {
+                    return;
+                }
                 MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
                 matviewinfo.setDest(destTable);
 
