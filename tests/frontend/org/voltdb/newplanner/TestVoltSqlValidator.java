@@ -31,7 +31,7 @@ public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestVoltSqlValidator.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
-        setupValidator(CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
+        init(CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
     }
 
     @Override
