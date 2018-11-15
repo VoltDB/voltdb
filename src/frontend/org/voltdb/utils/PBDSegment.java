@@ -17,13 +17,14 @@
 
 package org.voltdb.utils;
 
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DeferredSerialization;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.export.ExportSequenceNumberTracker;
 
 public abstract class PBDSegment {
 
@@ -97,6 +98,7 @@ public abstract class PBDSegment {
     }
 
     private static final String TRUNCATOR_CURSOR = "__truncator__";
+    private static final String SCANNER_CURSOR = "__scanner__";
     static final int NO_FLAGS = 0;
     static final int FLAG_COMPRESSED = 1;
 
@@ -243,5 +245,40 @@ public abstract class PBDSegment {
         close();
 
         return entriesTruncated;
+    }
+
+    /**
+     * Parse the segment and truncate the file if necessary.
+     * @param truncator    A caller-supplied truncator that decides where in the segment to truncate
+     * @return The number of objects that was truncated. This number will be subtracted from the total number
+     * of available objects in the PBD. -1 means that this whole segment should be removed.
+     * @throws IOException
+     */
+    ExportSequenceNumberTracker scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
+        if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
+
+        openForWrite(false);
+        PBDSegmentReader reader = openForRead(SCANNER_CURSOR);
+        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
+
+        DBBPool.BBContainer cont;
+        while (true) {
+            cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            if (cont == null) {
+                break;
+            }
+            try {
+                //Handoff the object to the truncator and await a decision
+                ExportSequenceNumberTracker retval = scanner.scan(cont);
+                tracker.mergeTracker(retval);
+
+            } finally {
+                cont.discard();
+            }
+        }
+
+        close();
+
+        return tracker;
     }
 }

@@ -1616,7 +1616,7 @@ void VoltDBIPC::pushExportBuffer(
     ::memcpy( &m_reusedResultBuffer[index], signature.c_str(), signature.size());
     index += static_cast<int32_t>(signature.size());
     if (block != NULL) {
-        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->uso());
+        *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->startExportSequenceNumber());
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index+8]) = htonll(block->getRowCountforExport());
     } else {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = 0;

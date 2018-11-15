@@ -52,7 +52,7 @@ public:
     void pushStreamBuffer(StreamBlock *block, bool sync);
 
     /** truncate stream back to mark */
-    virtual void rollbackTo(size_t mark, size_t drRowCost);
+    virtual void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo);
 
     virtual void periodicFlush(int64_t timeInMillis,
                        int64_t lastComittedSpHandle);

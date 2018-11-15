@@ -95,7 +95,7 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
 
             //enable export
             Properties props = new Properties();
-            props.put("replicated", "true");
+            //props.put("replicated", "true");
             props.put("skipinternals", "true");
             builder.addExport(true, "custom", props);
 
@@ -138,11 +138,12 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
                 client.callProcedure("@AdHoc", "insert into t values(" + i + ", 1)");
             }
 
-            cluster.rejoinOne(1);
+            // Don't clear voltdbroot before rejoin
+            cluster.rejoinOne(1, false);
             long tss = System.currentTimeMillis();
             while (true) {
                 Thread.sleep(100);
-                assertTrue("Rejoin time has reached 20s limit, test failed", System.currentTimeMillis() - tss < 20000);
+                assertTrue("Rejoin time has reached 20s limit, test failed", System.currentTimeMillis() - tss < 20_000);
                 // rejoin has finished and partition leader balanced after migration
                 vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
                 if (!vt.fetchRow(0).getString(2).split(":")[0].equals(vt.fetchRow(1).getString(2).split(":")[0])) {
@@ -164,8 +165,8 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             client.callProcedure("@Quiesce");
             while (true) {
                 Thread.sleep(100);
-                assertTrue("Insertion time has reached 10s limit, test failed", System.currentTimeMillis() - tss < 10000);
-                // making sure all export message
+                assertTrue("Insertion time has reached 10s limit, test failed", System.currentTimeMillis() - tss < 10_000);
+                // make sure see all export message
                 if (exportMessageSet.size() == 10) {
                     break;
                 }
