@@ -110,7 +110,7 @@ public enum PlannerPhase {
         ruleList.add(ProjectMergeRule.INSTANCE);
         ruleList.add(FilterProjectTransposeRule.INSTANCE);
 
-        return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
+        return RuleSets.ofList(ruleList);
     }
 
     /**
