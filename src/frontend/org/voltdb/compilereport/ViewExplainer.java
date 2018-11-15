@@ -70,6 +70,7 @@ public class ViewExplainer {
                 throw new Exception("Table " + viewName + " is not a view.");
             }
             mvInfo = viewTable.getMaterializer().getViews().get(viewName);
+            assert mvInfo != null : "Tables " + viewName + "'s materializer's view " + viewName + " is null!";
             fallBackQueryStmts = mvInfo.getFallbackquerystmts();
         }
         else {

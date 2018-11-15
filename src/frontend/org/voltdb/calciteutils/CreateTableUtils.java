@@ -62,7 +62,6 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -349,16 +348,10 @@ public class CreateTableUtils {
                 case ASSUME_UNIQUE:
                     final List<SqlNode> nodes = ((SqlKeyConstraint) col).getOperandList();
                     assert(nodes.size() == 2);      // for un-named constraint, the 1st elm is null; else 1st is SqlIdentifier storing constraint name.
-                    final List<SqlNode> sqls = ((SqlNodeList) nodes.get(1)).getList(),
-                            exprs = sqls.stream().filter(n -> n instanceof SqlBasicCall).collect(Collectors.toList()),
-                            cols = sqls.stream().filter(n -> ! (n instanceof SqlBasicCall) && ! (n instanceof SqlLiteral))   // ignore constant
-                                    .collect(Collectors.toList());
-                    final List<AbstractExpression> voltExprs = exprs.stream()
-                            .map(call -> ExpressionTranslator.translate((SqlBasicCall) call, t))
-                            .collect(Collectors.toList());
-                    final List<Column> columns = cols.stream()
-                            .map(c -> t.getColumns().get(c.toString()))
-                            .collect(Collectors.toList());
+                    Pair<List<Column>, List<AbstractExpression>> columsAndExpressions =
+                            CreateIndexUtils.splitSqlNodes((SqlNodeList) nodes.get(1), t);
+                    final List<AbstractExpression> voltExprs = columsAndExpressions.getSecond();
+                    final List<Column> columns = columsAndExpressions.getFirst();
                     final Pair<String, String> indexAndConstraintNames = CreateIndexUtils.genIndexAndConstraintName(
                             nodes.get(0) == null ? null : nodes.get(0).toString(),
                             col.getKind(), tableName, columns, ! voltExprs.isEmpty());
