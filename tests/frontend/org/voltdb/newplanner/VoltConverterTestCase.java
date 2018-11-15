@@ -49,10 +49,10 @@ public class VoltConverterTestCase extends VoltSqlValidatorTestCase {
     }
 
     protected RelRoot parseValidateAndConvert(String sql) {
-        Objects.requireNonNull(m_validator, "m_validator");
+        Objects.requireNonNull(getValidator(), "m_validator");
         Objects.requireNonNull(m_schemaPlus, "m_schemaPlus");
         SqlNode node = parseAndValidate(sql);
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(m_validator, m_schemaPlus);
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(getValidator(), m_schemaPlus);
         RelRoot root = converter.convertQuery(node, false, true);
         root = root.withRel(converter.decorrelate(node, root.rel));
         return root;
