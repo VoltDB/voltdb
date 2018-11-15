@@ -111,8 +111,9 @@ public class Inits {
                 catch (InterruptedException e) {
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
-                if (iw instanceof COMPLETION_WORK)
+                if (iw instanceof COMPLETION_WORK) {
                     return;
+                }
                 //hostLog.info("Running InitWorker: " + iw.getClass().getName());
                 iw.run();
                 completeInitWork(iw);
@@ -135,8 +136,12 @@ public class Inits {
         Class<?>[] declaredClasses = Inits.class.getDeclaredClasses();
         for (Class<?> cls : declaredClasses) {
             // skip base classes and fake classes
-            if (cls == InitWork.class) continue;
-            if (cls == COMPLETION_WORK.class) continue;
+            if (cls == InitWork.class) {
+                continue;
+            }
+            if (cls == COMPLETION_WORK.class) {
+                continue;
+            }
 
             if (InitWork.class.isAssignableFrom(cls)) {
                 InitWork instance = null;
@@ -395,8 +400,9 @@ public class Inits {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
 
-            if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
+            if ((serializedCatalog == null) || (serializedCatalog.length() == 0)) {
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
+            }
 
             /* N.B. node recovery requires discovering the current catalog version. */
             Catalog catalog = new Catalog();
@@ -600,8 +606,9 @@ public class Inits {
             int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
 
             // allow command line override
-            if (m_config.m_adminPort > 0)
+            if (m_config.m_adminPort > 0) {
                 adminPort = m_config.m_adminPort;
+            }
             // other places might use config to figure out the port
             m_config.m_adminPort = adminPort;
             //Allow cli to set admin mode otherwise use whats in deployment for backward compatibility
@@ -777,7 +784,7 @@ public class Inits {
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
                 if (catalog != null) {
-                    m_statusTracker.setNodeState(NodeState.RECOVERING);
+                    m_statusTracker.set(NodeState.RECOVERING);
                 }
                 // if the restore agent found a catalog, set the following info
                 // so the right node can send it out to the others.

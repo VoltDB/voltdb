@@ -163,7 +163,7 @@ public:
     void pushExportBuffer(StreamBlock *block, bool sync) {}
     void pushEndOfStream() {}
 
-    void rollbackTo(size_t mark, size_t drRowCost) {}
+    void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo) {}
 
     size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,

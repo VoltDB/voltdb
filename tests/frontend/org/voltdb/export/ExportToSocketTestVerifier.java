@@ -42,7 +42,7 @@ import com.google_voltpatches.common.base.Preconditions;
 
 public class ExportToSocketTestVerifier {
     private final ArrayDeque<String[]> m_data = new ArrayDeque<String[]>();
-    private int m_sequenceNumber = 0;
+    private int m_sequenceNumber = 1;
     protected final ThreadLocal<SimpleDateFormat> m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
         @Override
         protected SimpleDateFormat initialValue() {

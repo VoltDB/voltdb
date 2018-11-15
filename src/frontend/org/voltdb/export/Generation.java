@@ -17,7 +17,6 @@
 package org.voltdb.export;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,10 +35,11 @@ public interface Generation {
     public List<ExportStatsRow> getStats(boolean interval);
     public void onSourceDone(int partitionId, String signature);
 
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, long tupleCount);
+    public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
+                                 ByteBuffer buffer, boolean sync);
     public void pushEndOfStream(int partitionId, String signature);
-    public void updateInitialExportStateToTxnId(int partitionId, String signature,
-            boolean isRecover, Long truncationPoint, long sequenceNumber);
+    public void updateInitialExportStateToSeqNo(int partitionId, String signature,
+                                                boolean isRecover, long sequenceNumber);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
 }
