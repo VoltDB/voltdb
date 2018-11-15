@@ -59,6 +59,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -837,28 +838,37 @@ public class ExportGeneration implements Generation {
         return m_dataSourcesByPartition;
     }
 
-    public void applyExportControl(String exportSource, List<String> exportTargets, String command, VoltTable results) {
-        exportLog.info("Export " + command + " source:" + exportSource + " targets:" + exportTargets);
+    public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode operation, VoltTable results) {
+        exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
         synchronized (m_dataSourcesByPartition) {
             RealVoltDB volt = (RealVoltDB) VoltDB.instance();
-            for (Iterator<Integer> pIt = m_dataSourcesByPartition.keySet().iterator(); pIt.hasNext();) {
+            for (Iterator<Integer> partitionIt = m_dataSourcesByPartition.keySet().iterator(); partitionIt.hasNext();) {
                 // apply to partition leaders only
-                Integer partition = pIt.next();
+                Integer partition = partitionIt.next();
                 boolean isLeader = ((SpInitiator)volt.getInitiator(partition)).isLeader();
                 Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partition);
                 for (Iterator<ExportDataSource> it = sources.values().iterator(); it.hasNext();) {
                     ExportDataSource eds = it.next();
-                    if (("".equals(exportSource) || eds.getTableName().equalsIgnoreCase(exportSource)) && (
-                            exportTargets.contains(eds.getTarget()) || exportTargets.isEmpty())) {
-                        if (eds.isBlocked() && eds.isMastershipAccepted()) {
-                            if (isLeader) {
-                                eds.applyExportControl(command);
-                                results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
-                            } else {
-                                results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_FAILURE,
-                                        "Couldn't release on partition replica. Waiting for export mastership transfer to partition master.");
-                            }
-                        }
+                    if (!eds.isBlocked() || !eds.isMastershipAccepted()) {
+                        continue;
+                    }
+
+                    // no export source match
+                    if (!"".equals(exportSource) || !eds.getTableName().equalsIgnoreCase(exportSource)) {
+                        continue;
+                    }
+
+                    // no target match
+                    if ( !exportTargets.contains(eds.getTarget()) || !exportTargets.isEmpty()) {
+                        continue;
+                    }
+
+                    if (isLeader) {
+                        eds.processStreamControl(operation);
+                        results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
+                    } else {
+                        results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_FAILURE,
+                                "Couldn't release on partition replica. Waiting for export mastership transfer to partition master.");
                     }
                 }
             }

@@ -49,6 +49,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
+import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
@@ -739,9 +740,9 @@ public class ExportManager
         return m_exportStats;
     }
 
-    public void applyExportControl(String exportStream, List<String> exportTargets, String command, VoltTable results) {
+    public void processStreamControl(String exportStream, List<String> exportTargets, OperationMode operation, VoltTable results) {
         if (m_generation.get() != null) {
-           m_generation.get().applyExportControl(exportStream, exportTargets, command, results);
+           m_generation.get().processStreamControl(exportStream, exportTargets, operation, results);
         }
     }
 }

@@ -17,15 +17,11 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -68,22 +64,23 @@ public class ExportControl extends VoltSystemProcedure {
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context) {
         if (fragmentId == SysProcFragmentId.PF_exportControl) {
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[1] != null);
-            assert(params.toArray()[2] != null);
-            final String exportSource = (String) params.toArray()[0];
-            final String[] targets = (String[]) params.toArray()[1];
-            final String operationMode = (String) params.toArray()[2];
-            List<String> exportTargets = Arrays.asList(targets);
-            LOG.info("Export " + operationMode + " source:" + exportSource + " targets:" + exportTargets);
             VoltTable results = new VoltTable(
                     new ColumnInfo("SOURCE", VoltType.STRING),
                     new ColumnInfo("TARGET", VoltType.STRING),
                     new ColumnInfo("PARTITIONID", VoltType.BIGINT),
                     new ColumnInfo("STATUS", VoltType.BIGINT),
                     new ColumnInfo("MESSAGE", VoltType.STRING));
+
             if (context.isLowestSiteId()) {
-                ExportManager.instance().applyExportControl(exportSource, exportTargets, operationMode, results);
+                assert(params.toArray()[0] != null);
+                assert(params.toArray()[1] != null);
+                assert(params.toArray()[2] != null);
+                final String exportSource = (String) params.toArray()[0];
+                final String[] targets = (String[]) params.toArray()[1];
+                final String operationMode = (String) params.toArray()[2];
+                List<String> exportTargets = Arrays.asList(targets);
+                ExportManager.instance().processStreamControl(exportSource, exportTargets,
+                        OperationMode.valueOf(operationMode.toUpperCase()), results);
             }
 
             return new DependencyPair.TableDependencyPair(DEP_exportalControl, results);
@@ -94,46 +91,23 @@ public class ExportControl extends VoltSystemProcedure {
         return null;
     }
 
-    /**
-     *
-     * @param ctx
-     * @param json  The json string which contains export source, targets and action command
-     *              example: "{source:\"source\",targets:['target1','target2','targets3'],command:\"release\"}"
-     * @return
-     * @throws Exception
-     */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, String json) throws Exception {
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String exportSource, String[] targets, String operationMode) throws Exception {
         VoltTable results = new VoltTable(
                 new ColumnInfo("SOURCE", VoltType.STRING),
                 new ColumnInfo("TARGET", VoltType.STRING),
                 new ColumnInfo("PARTITIONID", VoltType.BIGINT),
                 new ColumnInfo("STATUS", VoltType.BIGINT),
                 new ColumnInfo("MESSAGE", VoltType.STRING));
-        String operationMode = null;
-        String exportSource = null;
-        List<String> exportTargets = new ArrayList<>();
         try {
-            JSONObject jsObj = new JSONObject(json);
-            operationMode = jsObj.getString("command");
             OperationMode.valueOf(operationMode.toUpperCase());
-
-            exportSource = jsObj.getString("source");
-            JSONArray jsonArray = jsObj.optJSONArray("targets");
-            if (jsonArray != null) {
-                for(int i=0; i < jsonArray.length(); i++) {
-                    String s = jsonArray.getString(i).trim();
-                    if(s.length() > 0) {
-                        exportTargets.add(s.toString());
-                    }
-                }
-            }
-            exportSource = exportSource == null ? "" : exportSource;
-        } catch (IllegalArgumentException | JSONException e){
+        } catch (IllegalArgumentException e){
             results.addRow("", "", -1, VoltSystemProcedure.STATUS_FAILURE, e.getMessage());
             return new VoltTable[] {results};
         }
 
+        exportSource = exportSource == null ? "" : exportSource;
         if (!"".equals(exportSource)) {
+            LOG.info("Export " + operationMode + " source:" + exportSource + " targets:" + Arrays.toString(targets));
             RealVoltDB volt = (RealVoltDB)VoltDB.instance();
             Set<String> exportStreams = CatalogUtil.getExportTableNames( volt.getCatalogContext().database);
             boolean isThere = exportStreams.stream().anyMatch(exportSource::equalsIgnoreCase);
@@ -142,7 +116,7 @@ public class ExportControl extends VoltSystemProcedure {
                 return new VoltTable[] {results};
             }
         }
-        return performExportControl(exportSource, exportTargets.toArray(new String[exportTargets.size()]), operationMode);
+        return performExportControl(exportSource, targets, operationMode);
     }
 
     private final VoltTable[] performExportControl(String exportSource,

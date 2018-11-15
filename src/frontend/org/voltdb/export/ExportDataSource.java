@@ -1599,18 +1599,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_exportTargetName;
     }
 
-    public void applyExportControl(String opMode) {
-        OperationMode operation = OperationMode.valueOf(opMode.toUpperCase());
+    public synchronized void processStreamControl(OperationMode operation) {
         switch (operation) {
         case RELEASE:
-            if (m_status == StreamStatus.BLOCKED) {
+            if (isBlocked() && isMastershipAccepted() && m_gapTracker.getFirstGap() != null) {
+                m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
                 setStatus(StreamStatus.ACTIVE);
-                //TO DO: find the new m_firstUnpolledUso from gap tracker.
-                //m_firstUnpolledUso
+                poll();
             }
             break;
         default:
-            throw new IllegalArgumentException("The export target is in " + m_status+ " state. The operation " + operation + " is not valid.");
+            throw new IllegalArgumentException("The export target is in " + m_status+ " state. " + operation + " is not a valid operation.");
         }
     }
 }

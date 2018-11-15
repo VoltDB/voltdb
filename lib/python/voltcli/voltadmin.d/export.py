@@ -17,8 +17,9 @@ import sys
 import time
 
 def release(runner):
-    json_opts = ['{source:"%s",targets:%s,command:"release"}' % (runner.opts.source, runner.opts.targets)]
-    response = runner.call_proc('@ExportControl', [VOLT.FastSerializer.VOLTTYPE_STRING], json_opts)
+    columns = [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING]
+    params = [runner.opts.source, runner.opts.targets.split(","), "release"]
+    response = runner.call_proc('@ExportControl', columns, params)
     print response.table(0).format_table(caption = 'Export Release Results')
 
 @VOLT.Multi_Command(
@@ -26,7 +27,7 @@ def release(runner):
     description = 'Export control command.',
     options = (
             VOLT.StringOption('-s', '--source', 'source', 'The stream source', default = ''),
-            VOLT.StringListOption('-t', '--target', 'targets', 'The export target on the stream', default = '')
+            VOLT.StringOption('-t', '--target', 'targets', 'The export target on the stream', default = '')
     ),
     modifiers = (
             VOLT.Modifier('release', release, 'move past gaps in the export stream.')
