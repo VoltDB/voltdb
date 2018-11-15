@@ -99,7 +99,6 @@
                   org/json_voltpatches/**/*.java
                   jsr166y/**/*.java
                   io/netty_voltpatches/NinjaKeySet.java
-                  io/netty_voltpatches/**/*.java
                   org/jctools_voltpatches/**/*.java
                   "
 />
