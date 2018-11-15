@@ -36,23 +36,12 @@ import java.util.Objects;
  * @since 8.4
  */
 public class VoltConverterTestCase extends VoltSqlValidatorTestCase {
-    private SchemaPlus m_schemaPlus;
-
-    /**
-     * Set up m_validator and m_schemaPlus from SchemaPlus.
-     *
-     * @param schemaPlus
-     */
-    protected void init(SchemaPlus schemaPlus) {
-        m_schemaPlus = schemaPlus;
-        setupValidator(schemaPlus);
-    }
 
     protected RelRoot parseValidateAndConvert(String sql) {
         Objects.requireNonNull(getValidator(), "m_validator");
-        Objects.requireNonNull(m_schemaPlus, "m_schemaPlus");
+        Objects.requireNonNull(getSchemaPlus(), "m_schemaPlus");
         SqlNode node = parseAndValidate(sql);
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(getValidator(), m_schemaPlus);
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(getValidator(), getSchemaPlus());
         RelRoot root = converter.convertQuery(node, false, true);
         root = root.withRel(converter.decorrelate(node, root.rel));
         return root;
