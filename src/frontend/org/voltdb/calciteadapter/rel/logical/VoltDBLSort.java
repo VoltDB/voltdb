@@ -38,7 +38,7 @@ public class VoltDBLSort extends Sort implements VoltDBLRel {
             RelNode input,
             RelCollation collation) {
             super(cluster, traitSet, input, collation, null, null);
-            assert VoltDBLRel.VOLTDB_LOGICAL.equals(getConvention());
+            assert traitSet.contains(VoltDBLRel.VOLTDB_LOGICAL);
         }
 
         @Override

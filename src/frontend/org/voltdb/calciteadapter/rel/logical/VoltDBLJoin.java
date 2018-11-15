@@ -54,6 +54,7 @@ public class VoltDBLJoin extends Join implements VoltDBLRel {
             boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
+        assert traitSet.contains(VoltDBLRel.VOLTDB_LOGICAL);
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
     }

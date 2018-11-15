@@ -46,6 +46,7 @@ public class VoltDBLAggregate extends Aggregate implements VoltDBLRel {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
+        assert traitSet.contains(VoltDBLRel.VOLTDB_LOGICAL);
     }
 
     @Override

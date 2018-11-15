@@ -44,7 +44,7 @@ public class VoltDBLLimit extends SingleRel implements VoltDBLRel {
             RexNode offset,
             RexNode limit) {
             super(cluster, traitSet, input);
-            assert VoltDBLRel.VOLTDB_LOGICAL.equals(getConvention());
+            assert traitSet.contains(VoltDBLRel.VOLTDB_LOGICAL);
             m_offset = offset;
             m_limit = limit;
         }
@@ -70,14 +70,9 @@ public class VoltDBLLimit extends SingleRel implements VoltDBLRel {
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
-        super.explainTerms(pw);
-        if (m_limit != null) {
-            pw.item("limit", m_limit);
-        }
-        if (m_offset != null) {
-            pw.item("offset", m_offset);
-        }
-        return pw;
+        return super.explainTerms(pw)
+                .itemIf("limit", m_limit, m_limit != null)
+                .itemIf("offset", m_offset, m_offset != null);
     }
 
 }

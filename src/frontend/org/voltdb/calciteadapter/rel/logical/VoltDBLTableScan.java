@@ -36,6 +36,7 @@ public class VoltDBLTableScan extends AbstractVoltDBTableScan implements VoltDBL
                   traitSet,
                   table,
                   voltDBTable);
+          assert traitSet.contains(VoltDBLRel.VOLTDB_LOGICAL);
     }
 
     @Override
