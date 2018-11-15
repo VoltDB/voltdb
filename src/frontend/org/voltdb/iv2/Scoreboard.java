@@ -156,12 +156,13 @@ public class Scoreboard {
     public String toString() {
         StringBuilder builder = new StringBuilder();
         if (!m_compTasks.isEmpty()){
-            for (Pair<CompleteTransactionTask, Boolean> pair : m_compTasks.values())
-            builder.append("CompleteTransactionTasks: " + pair);
-            builder.append("\n");
+            builder.append("CompleteTransactionTasks: ");
+            for (Pair<CompleteTransactionTask, Boolean> pair : m_compTasks.values()) {
+                builder.append("\n" + pair);
+            }
         }
         if (m_fragTask != null) {
-            builder.append("FragmentTask: " + m_fragTask);
+            builder.append("\nFragmentTask: " + m_fragTask);
         }
         return builder.toString();
     }

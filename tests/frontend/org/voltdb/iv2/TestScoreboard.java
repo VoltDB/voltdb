@@ -185,4 +185,23 @@ public class TestScoreboard {
         assertEquals(1000L, scoreboard.peekFirst().getFirst().getMsgTxnId());
         assertEquals(expectedTimestamp, scoreboard.peekFirst().getFirst().getTimestamp());
     }
+
+    @Test
+    public void testTwoRepairsFollowedByRestart() {
+        Scoreboard scoreboard = new Scoreboard();
+        MpRestartSequenceGenerator repairGen = new MpRestartSequenceGenerator(1, false);
+        MpRestartSequenceGenerator restartGen = new MpRestartSequenceGenerator(1, true);
+
+        long expectedTimestamp = repairGen.getNextSeqNum();
+        scoreboard.addCompletedTransactionTask(createComp(1000L, expectedTimestamp), false);
+        scoreboard.addCompletedTransactionTask(createComp(1100L, repairGen.getNextSeqNum()), false);
+
+        long restartTimestamp = restartGen.getNextSeqNum();
+        scoreboard.addCompletedTransactionTask(createComp(2000L, restartTimestamp), false);
+
+        assertEquals(1000L, scoreboard.peekFirst().getFirst().getMsgTxnId());
+        assertEquals(expectedTimestamp, scoreboard.peekFirst().getFirst().getTimestamp());
+        assertEquals(2000L, scoreboard.peekLast().getFirst().getMsgTxnId());
+        assertEquals(restartTimestamp, scoreboard.peekLast().getFirst().getTimestamp());
+    }
 }
