@@ -742,7 +742,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             exportLog.debug("Truncating export pdb files to sequence number " + sequenceNumber);
                         }
                     }
-                    m_gapTracker.truncate(sequenceNumber);
+                    m_gapTracker.truncateAfter(sequenceNumber);
                     resetStateInRejoinOrRecover();
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Truncate tracker via snapshot truncation to " + sequenceNumber + " now is " + m_gapTracker.toString());

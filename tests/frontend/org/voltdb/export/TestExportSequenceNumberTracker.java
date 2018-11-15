@@ -96,31 +96,31 @@ public class TestExportSequenceNumberTracker {
 
         assertEquals(4, tracker.size());
 
+        tracker.truncate(7L);
+        assertEquals(7L, tracker.getFirstSeqNo());
+        assertEquals(40L, tracker.getLastSeqNo());
+        assertEquals(9L, tracker.getSafePoint());
+        assertEquals(10L, tracker.getFirstGap().getFirst().longValue());
+        assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
+        assertEquals(4, tracker.size());
+
+        tracker.truncateAfter(22L);
+        assertEquals(7L, tracker.getFirstSeqNo());
+        assertEquals(22L, tracker.getLastSeqNo());
+        assertEquals(9L, tracker.getSafePoint());
+        assertEquals(10L, tracker.getFirstGap().getFirst().longValue());
+        assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
+        assertEquals(3, tracker.size());
+
         // Truncate inside a gap
         tracker.truncate(11L);
         assertEquals(11L, tracker.getFirstSeqNo());
-        assertEquals(40L, tracker.getLastSeqNo());
+        assertEquals(22L, tracker.getLastSeqNo());
         assertEquals(11L, tracker.getSafePoint());
         assertEquals(12L, tracker.getFirstGap().getFirst().longValue());
         assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
-        assertEquals(4, tracker.size());
-
-        // Truncate before the first sequence number of tracker is no-op
-        tracker.truncate(7L);
-        assertEquals(11L, tracker.getFirstSeqNo());
-        assertEquals(40L, tracker.getLastSeqNo());
-        assertEquals(11L, tracker.getSafePoint());
-        assertEquals(12L, tracker.getFirstGap().getFirst().longValue());
-        assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
-        assertEquals(4, tracker.size());
-
-        tracker.truncate(20L);
-        assertEquals(20L, tracker.getFirstSeqNo());
-        assertEquals(40L, tracker.getLastSeqNo());
-        assertEquals(20L, tracker.getSafePoint());
-        assertEquals(21L, tracker.getFirstGap().getFirst().longValue());
-        assertEquals(24L, tracker.getFirstGap().getSecond().longValue());
         assertEquals(3, tracker.size());
+
 
     }
 }

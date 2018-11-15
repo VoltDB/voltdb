@@ -134,6 +134,35 @@ public class ExportSequenceNumberTracker {
     }
 
     /**
+     * Truncate the tracker to the given truncation point. After truncation,
+     * any ranges after the new truncation point will be removed.
+     * If the new safe point is after the last sequence number of the tracker,
+     * it's a no-op. If the map is empty, truncation point will be the new safe point of tracker.
+     * @param newTruncationPoint    New safe point
+     */
+    public void truncateAfter(long newTruncationPoint) {
+        if (size() == 0) {
+            m_map.add(range(newTruncationPoint, newTruncationPoint));
+            return;
+        }
+        if (newTruncationPoint > getLastSeqNo()) return;
+        final Iterator<Range<Long>> iter = m_map.asDescendingSetOfRanges().iterator();
+        while (iter.hasNext()) {
+            final Range<Long> next = iter.next();
+            if (start(next) > newTruncationPoint) {
+                iter.remove();
+            } else if (next.contains(newTruncationPoint)) {
+                iter.remove();
+                m_map.add(range(start(next), newTruncationPoint));
+                return;
+            } else {
+                break;
+            }
+        }
+        m_map.add(range(newTruncationPoint, newTruncationPoint));
+    }
+
+    /**
      * Merge the given tracker with the current tracker. Ranges can
      * overlap. After the merge, the current tracker will be truncated to the
      * larger safe point.
