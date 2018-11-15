@@ -58,13 +58,8 @@ public abstract class CalcitePlannerTestCase extends PlannerTestCase {
                                                    boolean inferPartitioning,
                                                    boolean forcedSP,
                                                    DeterminismMode detMode) {
-        CompiledPlan cp = null;
-        try {
-            cp = m_aide.compileAdHocPlan(PlannerType.CALCITE, sql, inferPartitioning, forcedSP, detMode);
-            assertNotNull(cp);
-        } catch (Exception ex) {
-            fail(ex.getMessage());
-        }
+        CompiledPlan cp = m_aide.compileAdHocPlan(PlannerType.CALCITE, sql, inferPartitioning, forcedSP, detMode);
+        assertNotNull(cp);
         return cp;
     }
 
