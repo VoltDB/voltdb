@@ -20,7 +20,9 @@ package org.voltdb.calciteutils;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.ddl.SqlCreateIndex;
 import org.json_voltpatches.JSONException;
 import org.voltcore.utils.Pair;
@@ -40,11 +42,11 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 /**
@@ -61,9 +63,10 @@ final public class CreateIndexUtils {
      * Eventually we will get rid of that check from DDLCompiler.
      */
     private static final class ValidateAndExtractFromCreateIndexNode {
-        private Table table;
-        private List<Column> columns;
-        private AbstractExpression filter;
+        private final Table table;
+        private final List<Column> columns;
+        private final List<AbstractExpression> expressions;
+        private final AbstractExpression filter;
 
         /**
          * Constructor from database to refer to, and Calcite CreateIndex node.
@@ -74,53 +77,41 @@ final public class CreateIndexUtils {
             final String tableName = node.getTable().toString();
             table = db.getTables().get(tableName);
             CalciteUtils.exceptWhen(table == null, String.format("Table %s not found", tableName));
-            final CatalogMap<Column> columnsInTable = table.getColumns();
-            columns = node.getColumnList().getList().stream()
-                    .map(SqlNode::toString).map(columnsInTable::get)
-                    .collect(Collectors.toList());
-            if (columns.size() < node.getColumnList().size()) {
-                CalciteUtils.except(String.format("Columns %s not found from table %s",
-                        node.getColumnList().getList().stream().map(SqlNode::toString)
-                                .filter(name -> columnsInTable.get(name) == null)
-                                .collect(Collectors.joining(", ")),
-                        tableName));
-                filter = null;
-            } else if (node.getFilter() == null) {
-                filter = null;
-            } else {
-                filter = ExpressionTranslator.translate((SqlBasicCall) node.getFilter(), table);
-            }
+            final Pair<List<Column>, List<AbstractExpression>> columnsAndExpressions =
+                    splitSqlNodes(node.getColumnList(), table);
+            columns = columnsAndExpressions.getFirst();
+            expressions = columnsAndExpressions.getSecond();
+            filter = node.getFilter() == null ? null :
+                    ExpressionTranslator.translate((SqlBasicCall) node.getFilter(), table);
         }
 
-        /**
-         * Refresh to point to a new table from a different database.
-         * @param table new table from a different database
-         * @return refreshed current instance
-         */
-        ValidateAndExtractFromCreateIndexNode refreshUsing(Table table) {
-            CalciteUtils.exceptWhen(! this.table.getTypeName().equals(table.getTypeName()),
-                    "Cannot refresh to a different table version: table names are different. " +
-                            "Source table name %s, dest table name %s",
-                    table.getTypeName(), this.table.getTypeName());
-            this.table = table;
-            for(int index = 0; index < columns.size(); ++index) {
-                final String columnName = columns.get(index).getTypeName();
-                final Column dstColumn = table.getColumns().get(columnName);
-                CalciteUtils.exceptWhen(dstColumn == null,
-                        "Internal error: table does not have column %s", columnName);
-                columns.set(index, dstColumn);
-            }
-            return this;
-        }
         Table getTable()  {
             return table;
         }
         List<Column> getColumns() {
             return columns;
         }
+        List<AbstractExpression> getExpressions() {
+            return expressions;
+        }
         AbstractExpression getFilter() {
             return filter;
         }
+    }
+
+    /**
+     * Given a SqlNodeList containing columns and expresssions, split them apart and map into VoltDB catalog-aware lists.
+     * @param nodes SqlNodeList to split
+     * @param base base table to reference for column and expressions (TVE).
+     * @return Split pair of columns and expressions.
+     */
+    static Pair<List<Column>, List<AbstractExpression>> splitSqlNodes(SqlNodeList nodes, Table base) {
+        final CatalogMap<Column> columnsInTable = base.getColumns();
+        final Stream<SqlNode> exprs = nodes.getList().stream().filter(n -> n instanceof SqlBasicCall),
+                cols = nodes.getList().stream().filter(n -> ! (n instanceof SqlBasicCall) && ! (n instanceof SqlLiteral));
+        return Pair.of(cols.map(SqlNode::toString).map(columnsInTable::get).collect(Collectors.toList()),
+                exprs.map(call -> ExpressionTranslator.translate((SqlBasicCall) call, base))
+                        .collect(Collectors.toList()));
     }
 
     /**
@@ -355,6 +346,17 @@ final public class CreateIndexUtils {
         return type == SqlCreateIndex.IndexType.UNIQUE ? SqlKind.UNIQUE : SqlKind.ASSUME_UNIQUE;
     }
 
+    /**
+     * Check if the target table exists in current database. If it does, then we are in DDL batch mode,
+     * bring in relevent info needed;
+     * otherwise, we are in DDL ad-hoc mode. Deep-copy all existing tables known in previous database to current one.
+     *
+     * This is where it gets mythical and evil.
+     * @param prevDb previous database
+     * @param currentDb current database
+     * @param node Calcite CREATE INDEX ddl node
+     * @return relevent info needed for building DDL of CREATE INDEX stmt.
+     */
     private static ValidateAndExtractFromCreateIndexNode getOrCreateTable(
             Database prevDb, Database currentDb, SqlCreateIndex node) {
         try {
@@ -362,10 +364,9 @@ final public class CreateIndexUtils {
         } catch (PlanningErrorException ex) {
             if (prevDb == null) {
                 throw ex;
-            } else {
-                final ValidateAndExtractFromCreateIndexNode info =
-                        new ValidateAndExtractFromCreateIndexNode(prevDb, node);
-                return info.refreshUsing(CalciteUtils.addTableToDatabase(currentDb, info.getTable()));
+            } else {    // Need to migrate all tables up to the current DDL to current database.
+                CalciteUtils.migrateAllTables(prevDb, currentDb);
+                return new ValidateAndExtractFromCreateIndexNode(currentDb, node);
             }
         }
     }
@@ -390,24 +391,28 @@ final public class CreateIndexUtils {
             final CatalogMap<Index> indicesOnTable = table.getIndexes();
             final String tableName = table.getTypeName();
             final List<Column> columns = info.getColumns();
+            final List<AbstractExpression> expressions = info.getExpressions();
             final AbstractExpression filter = info.getFilter();
             final String constraintName = indexNode.getName().toString();
 
             CalciteUtils.exceptWhen(indicesOnTable.get(constraintName) != null,
                     String.format("A constraint named %s already exists on table %s", constraintName, tableName));
             final Pair<String, String> indexAndConstraintNames = genIndexAndConstraintName(
-                    constraintName, SqlKind.UNIQUE, tableName, columns, filter != null);
+                    constraintName, SqlKind.UNIQUE, tableName, columns,
+                    filter != null || ! expressions.isEmpty());
             final String indexName = indexAndConstraintNames.getFirst();
             columns.forEach(column -> validatePKeyColumnType(indexName, column));
             validateGeogInColumns(indexName, columns);
+            expressions.forEach(e -> CreateIndexUtils.validateIndexColumnType(indexName, e));
             final StringBuffer msg = new StringBuffer("Partial index \"" + indexName + "\" ");
             if (filter != null && ! filter.isValidExprForIndexesAndMVs(msg, false)) {
                 CalciteUtils.except(msg.toString());
             }
             final boolean hasGeogType =
-                    columns.stream().anyMatch(column -> column.getType() == VoltType.GEOGRAPHY.getValue());
+                    columns.stream().anyMatch(column -> column.getType() == VoltType.GEOGRAPHY.getValue()) ||
+                            expressions.stream().anyMatch(expr -> expr.getValueType() == VoltType.GEOGRAPHY);
             final Index indexConstraint = genIndex(toSqlKind(indexNode.getType()), table, indexName, constraintName,
-                    hasGeogType, columns, Collections.emptyList(), filter);
+                    hasGeogType, columns, expressions, filter);
             CalciteUtils.exceptWhen(
                     StreamSupport.stream(((Iterable<Index>) indicesOnTable::iterator).spliterator(), false)
                             .anyMatch(index -> equals(index, indexConstraint)),
