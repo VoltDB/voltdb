@@ -1017,8 +1017,7 @@ public class CatalogDiffEngine {
         if (suspect instanceof Constraint && field.equals("index"))
             return null;
         if (suspect instanceof Table) {
-            if (field.equals("signature") ||
-                field.equals("tuplelimit"))
+            if (field.equals("signature") || field.equals("tuplelimit") || field.equals("materializer"))
                 return null;
 
             // Always allow disabling DR on table
@@ -1060,6 +1059,10 @@ public class CatalogDiffEngine {
                 assert(nullable != null);
                 if (nullable) return null;
                 restrictionQualifier = " from nullable to non-nullable";
+            }
+            // ENG-14840 - CREATE INDEX copies a table to new database, which involves updating matview and partition columns
+            else if (field.equals("aggregatetype") || field.equals("matviewsource")) {
+                return null;
             }
             else if (field.equals("type") || field.equals("size") || field.equals("inbytes")) {
                 int oldTypeInt = (Integer) prevType.getField("type");

@@ -92,26 +92,6 @@ final public class CreateIndexUtils {
             }
         }
 
-        /**
-         * Refresh to point to a new table from a different database.
-         * @param table new table from a different database
-         * @return refreshed current instance
-         */
-        ValidateAndExtractFromCreateIndexNode refreshUsing(Table table) {
-            CalciteUtils.exceptWhen(! this.table.getTypeName().equals(table.getTypeName()),
-                    "Cannot refresh to a different table version: table names are different. " +
-                            "Source table name %s, dest table name %s",
-                    table.getTypeName(), this.table.getTypeName());
-            this.table = table;
-            for(int index = 0; index < columns.size(); ++index) {
-                final String columnName = columns.get(index).getTypeName();
-                final Column dstColumn = table.getColumns().get(columnName);
-                CalciteUtils.exceptWhen(dstColumn == null,
-                        "Internal error: table does not have column %s", columnName);
-                columns.set(index, dstColumn);
-            }
-            return this;
-        }
         Table getTable()  {
             return table;
         }
@@ -355,6 +335,17 @@ final public class CreateIndexUtils {
         return type == SqlCreateIndex.IndexType.UNIQUE ? SqlKind.UNIQUE : SqlKind.ASSUME_UNIQUE;
     }
 
+    /**
+     * Check if the target table exists in current database. If it does, then we are in DDL batch mode,
+     * bring in relevent info needed;
+     * otherwise, we are in DDL ad-hoc mode. Deep-copy all existing tables known in previous database to current one.
+     *
+     * This is where it gets mythical and evil.
+     * @param prevDb previous database
+     * @param currentDb current database
+     * @param node Calcite CREATE INDEX ddl node
+     * @return relevent info needed for building DDL of CREATE INDEX stmt.
+     */
     private static ValidateAndExtractFromCreateIndexNode getOrCreateTable(
             Database prevDb, Database currentDb, SqlCreateIndex node) {
         try {
@@ -362,10 +353,9 @@ final public class CreateIndexUtils {
         } catch (PlanningErrorException ex) {
             if (prevDb == null) {
                 throw ex;
-            } else {
-                final ValidateAndExtractFromCreateIndexNode info =
-                        new ValidateAndExtractFromCreateIndexNode(prevDb, node);
-                return info.refreshUsing(CalciteUtils.addTableToDatabase(currentDb, info.getTable()));
+            } else {    // Need to migrate all tables up to the current DDL to current database.
+                CalciteUtils.migrateAllTables(prevDb, currentDb);
+                return new ValidateAndExtractFromCreateIndexNode(currentDb, node);
             }
         }
     }
