@@ -88,7 +88,7 @@ public:
     virtual std::string tableType() const { return "StreamedTable"; }
 
     // undo interface particular to streamed table.
-    void undo(size_t mark);
+    void undo(size_t mark, int64_t seqNo);
 
     //Override and say how many bytes are in Java and C++
     int64_t allocatedTupleMemory() const;

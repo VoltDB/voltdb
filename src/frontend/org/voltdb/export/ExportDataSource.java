@@ -156,6 +156,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public final ArrayList<Integer> m_columnLengths = new ArrayList<>();
     private String m_partitionColumnName = "";
 
+    private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
+
     static enum StreamStatus {
         ACTIVE,
         DROPPED,
@@ -1464,12 +1466,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         if (bestCandidate == null) {
                             setStatus(StreamStatus.BLOCKED);
-                            // Show warning only in full cluster.
                             RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
                             if (voltdb.isClusterComplete()) {
-                                Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                                exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
-                                        gap.getFirst() + " to " + gap.getSecond());
+                                if (DISABLE_AUTO_GAP_RELEASE) {
+                                    // Show warning only in full cluster.
+                                    Pair<Long, Long> gap = m_gapTracker.getFirstGap();
+                                    exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
+                                            gap.getFirst() + " to " + gap.getSecond());
+                                } else {
+                                    // TODO: discard warn message once the auto gap release is implemented
+                                    Pair<Long, Long> gap = m_gapTracker.getFirstGap();
+                                    exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
+                                            gap.getFirst() + " to " + gap.getSecond());
+                                }
                             }
                         } else {
                             // time to give up master and give it to the best candidate

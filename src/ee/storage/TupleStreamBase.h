@@ -55,7 +55,7 @@ public:
     virtual void setSecondaryCapacity(size_t capacity) {}
 
     /** truncate stream back to mark */
-    virtual void rollbackTo(size_t mark, size_t drRowCost);
+    virtual void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo);
 
     /** age out committed data */
     virtual void periodicFlush(int64_t timeInMillis,

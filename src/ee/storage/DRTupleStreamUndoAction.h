@@ -31,7 +31,7 @@ DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
 
     void undo() {
         if (m_stream) {
-            m_stream->rollbackTo(m_mark, m_cost);
+            m_stream->rollbackTo(m_mark, m_cost, SIZE_MAX);
         }
     }
 

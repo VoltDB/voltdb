@@ -210,7 +210,7 @@ void TupleStreamBase::pushPendingBlocks()
 /*
  * Discard all data with a uso gte mark
  */
-void TupleStreamBase::rollbackTo(size_t mark, size_t)
+void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
 {
     if (mark > m_uso) {
         throwFatalException("Truncating the future: mark %jd, current USO %jd.",
@@ -222,7 +222,9 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t)
 
     // back up the universal stream counter
     m_uso = mark;
-    m_uncommittedTupleCount = 0;
+    // make the stream of tuples contiguous outside of actual system failures
+    m_uncommittedTupleCount -= m_exportSequenceNumber - exportSeqNo;
+    m_exportSequenceNumber = exportSeqNo;
 
     // working from newest to oldest block, throw
     // away blocks that are fully after mark; truncate

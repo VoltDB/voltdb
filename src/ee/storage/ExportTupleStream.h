@@ -52,6 +52,10 @@ public:
         return m_uso;
     }
 
+    int64_t getSequenceNumber() {
+        return m_exportSequenceNumber;
+    }
+
     /** Set the total number of bytes used and starting sequence number for new buffer (for rejoin/recover) */
     void setBytesUsed(int64_t seqNo, size_t count) {
         assert(m_uso == 0);
