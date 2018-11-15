@@ -22,6 +22,9 @@ import org.apache.calcite.rel.metadata.ChainedRelMetadataProvider;
 import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataProvider;
 
+/**
+ * Volt's provider for providing metadata about relational expressions.
+ */
 public class VoltDBDefaultRelMetadataProvider {
 
     private VoltDBDefaultRelMetadataProvider() {

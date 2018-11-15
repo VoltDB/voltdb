@@ -94,10 +94,15 @@ import org.voltdb.types.CalcitePlannerType;
  * convert() is called for matched rules
  *
  * {@link org.apache.calcite.rel.convert.Converter}
- * can convert from one convention to another
- * via convert()
+ * By declaring itself to be a converter, a relational expression is telling the planner about this equivalence,
+ * and the planner groups expressions which are logically equivalent but have different physical traits
+ * into groups called RelSets.
  *
- * Q: when ConverterRule and when Converter?
+ * Q: why we need to put logically equivalent RelNode to a RelSet?
+ * A: RelSet provides a level of indirection that allows Calcite to optimize queries.
+ * If the input to a relational operator is an equivalence class, not a particular relational expression,
+ * then Calcite has the freedom to choose the member of the equivalence class that has the cheapest cost.
+ *
  *
  * ## Transformer
  * onMatch() is called for matched rules
@@ -162,11 +167,13 @@ public class CalcitePlanner {
                 output = planner.findBestExp();
                 break;
             }
-            case VOLCANO:
-            default: {
+            case VOLCANO: {
                 // TODO: VOLCANO planner
                 output = null;
                 break;
+            }
+            default: {
+                throw new RuntimeException("Dead branch.");
             }
         }
 

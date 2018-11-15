@@ -217,7 +217,7 @@ public class PlannerTool {
         VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, m_schemaPlus);
         RelRoot root = converter.convertQuery(validatedNode, false, true);
         root = root.withRel(converter.decorrelate(validatedNode, root.rel));
-        // apply calcite logical rules
+        // apply calcite logical rules using a HEP planner
         RelNode nodeAfterCalciteLogical = CalcitePlanner.transform(CalcitePlannerType.HEP, PlannerPhase.CALCITE_LOGICAL,
                 root.rel);
 

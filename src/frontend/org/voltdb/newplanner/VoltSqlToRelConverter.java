@@ -76,6 +76,8 @@ public class VoltSqlToRelConverter extends SqlToRelConverter {
      */
     public static VoltSqlToRelConverter create(SqlValidator validator, SchemaPlus schemaPlus) {
         final VolcanoPlanner planner = new VolcanoPlanner();
+        // We add ConventionTraitDef.INSTANCE and RelCollationTraitDef.INSTANCE.
+        // RelDistributionTraitDef will be added in the later stage.
         planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
         planner.addRelTraitDef(RelCollationTraitDef.INSTANCE);
 
