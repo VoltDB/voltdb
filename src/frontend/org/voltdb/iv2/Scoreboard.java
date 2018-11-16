@@ -58,7 +58,6 @@ public class Scoreboard {
             m_compTasks.put(task.getMsgTxnId(), Pair.of(task, missingTxn));
         } else {
             if ( task.getTimestamp() > pair.getFirst().getTimestamp() && isComparable(pair.getFirst(), task)) {
-                m_compTasks.remove(task.getMsgTxnId());
                 m_compTasks.put(task.getMsgTxnId(), Pair.of(task, missingTxn));
             }
         }
