@@ -1563,7 +1563,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     @Override
     public String toString() {
-        return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId();
+        return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId()
+           + "status " + m_status + " master " + m_mastershipAccepted.get();
     }
 
     private void mastershipCheckpoint(long seq) {
@@ -1603,13 +1604,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         switch (operation) {
         case RELEASE:
             if (isBlocked() && isMastershipAccepted() && m_gapTracker.getFirstGap() != null) {
-                m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                long firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Unblock " + this + " move firstUnpolledSeqNo from " +
+                            m_firstUnpolledSeqNo + " to " + firstUnpolledSeqNo);
+                }
+
+                m_firstUnpolledSeqNo = firstUnpolledSeqNo;
                 setStatus(StreamStatus.ACTIVE);
-                poll();
             }
             break;
         default:
-            throw new IllegalArgumentException("The export target is in " + m_status+ " state. " + operation + " is not a valid operation.");
+            throw new IllegalArgumentException(operation + " is not a valid export control operation.");
         }
     }
 }

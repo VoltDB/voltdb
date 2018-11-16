@@ -849,26 +849,27 @@ public class ExportGeneration implements Generation {
                 Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partition);
                 for (Iterator<ExportDataSource> it = sources.values().iterator(); it.hasNext();) {
                     ExportDataSource eds = it.next();
-                    if (!eds.isBlocked() || !eds.isMastershipAccepted()) {
-                        continue;
-                    }
-
                     // no export source match
-                    if (!"".equals(exportSource) || !eds.getTableName().equalsIgnoreCase(exportSource)) {
+                    if (!"".equals(exportSource) && !eds.getTableName().equalsIgnoreCase(exportSource)) {
                         continue;
                     }
 
                     // no target match
-                    if ( !exportTargets.contains(eds.getTarget()) || !exportTargets.isEmpty()) {
+                    if (!exportTargets.isEmpty() && !exportTargets.contains(eds.getTarget())) {
                         continue;
                     }
 
-                    if (isLeader) {
-                        eds.processStreamControl(operation);
-                        results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
-                    } else {
-                        results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_FAILURE,
-                                "Couldn't release on partition replica. Waiting for export mastership transfer to partition master.");
+                    if (eds.isBlocked() && eds.isMastershipAccepted()) {
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Unblocking " + eds);
+                        }
+                        if (isLeader) {
+                            eds.processStreamControl(operation);
+                            results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
+                        } else {
+                            results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_FAILURE,
+                                    "Couldn't release on partition replica. Waiting for export mastership transfer to partition master.");
+                        }
                     }
                 }
             }
