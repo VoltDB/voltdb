@@ -123,6 +123,8 @@ public class MockVoltDB implements VoltDBInterface
             obj.put("httpPort", httpPort);
             obj.put("drPort", drPort);
             obj.put("drInterface", "127.0.0.1");
+            obj.put(VoltZK.drPublicHostProp, "");
+            obj.put(VoltZK.drPublicPortProp, Integer.toString(VoltDB.DISABLED_PORT));
 
             m_localMetadata = obj.toString(4);
 
