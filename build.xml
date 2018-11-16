@@ -2151,6 +2151,9 @@ TEST CASES
     <condition property="config_config" value="-c ${sql_coverage_config}" else="">
         <isset property="sql_coverage_config"/>
     </condition>
+    <condition property="config_hsql" value="-H" else="">
+        <isset property="hsql"/>
+    </condition>
     <condition property="config_postgresql" value="-P" else="">
         <isset property="postgresql"/>
     </condition>
@@ -2223,6 +2226,7 @@ TEST CASES
         <arg line='sql_coverage_test.py' />
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
+        <arg line="${config_hsql}" />
         <arg line="${config_postgresql}" />
         <arg line="${config_postgis}" />
         <arg line="${config_ascii_only}" />
