@@ -436,7 +436,10 @@ public class GuestProcessor implements ExportDataProcessor {
                         }
                     }
                 } catch (Exception e) {
-                    m_logger.error("Error processing export block", e);
+                    if (!e.getMessage().startsWith(
+                            "java.lang.RuntimeException: Should not poll more than once")) {
+                        m_logger.error("Error processing export block", e);
+                    }
                 }
                 if (!m_shutdown) {
                     addBlockListener(source, source.poll(), edb);
