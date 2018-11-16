@@ -30,8 +30,8 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.export.ExportManager;
-import org.voltdb.export.ExportManager.ExportStats;
+import org.voltdb.export.ExportManagerInterface;
+import org.voltdb.export.ExportStats;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
@@ -831,7 +831,7 @@ public class StatsAgent extends OpsAgent
         }
         if (selector == StatsSelector.TABLE) {
             // Append all the stream table stats to Table stats (this should be deprecated at some point)
-            ExportStats statsRows = ExportManager.instance().getExportStats();
+            ExportStats statsRows = ExportManagerInterface.instance().getExportStats();
             Iterator<Object> iter = statsRows.getStatsRowKeyIterator(interval);
             while (iter.hasNext()) {
                 ExportStatsRow stat = statsRows.getStatsRow(iter.next());

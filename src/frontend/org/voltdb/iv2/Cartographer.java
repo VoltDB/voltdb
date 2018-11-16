@@ -58,7 +58,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -174,17 +174,17 @@ public class Cartographer extends StatsSource
                     // This could happen for a previous sp leader Migration  on a fresh rejoined node.
                     // Since this node would not be export master nor should be promoted from previous migration event,
                     // we can ignore this sp leader change for export.
-                    if (newMasterInfo.m_isMigratePartitionLeaderRequested && ExportManager.instance() != null) {
+                    if (newMasterInfo.m_isMigratePartitionLeaderRequested && ExportManagerInterface.instance() != null) {
                         if (isHostIdLocal(hostId)) {
                             // this is a host contain newly promoted partition
                             // inform the export manager to prepare mastership promotion
                             // Cartographer is initialized before ExportManager, ignore callbacks
                             // before export is initialized
-                            ExportManager.instance().prepareAcceptMastership(partitionId);
+                            ExportManagerInterface.instance().prepareAcceptMastership(partitionId);
                         } else {
                             // this host *could* contain old master
                             // inform the export manager to prepare mastership migration (drain existing PBD and notify new leader)
-                            ExportManager.instance().prepareTransferMastership(partitionId, hostId);
+                            ExportManagerInterface.instance().prepareTransferMastership(partitionId, hostId);
                         }
                     }
                 }

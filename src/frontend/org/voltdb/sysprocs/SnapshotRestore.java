@@ -93,7 +93,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.UndoAction;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -1592,7 +1592,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     myPartitionId,
                     signature);
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
-            ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, signature,
+            ExportManagerInterface.instance().updateInitialExportStateToSeqNo(myPartitionId, signature,
                     isRecover, sequenceNumber);
         }
     }

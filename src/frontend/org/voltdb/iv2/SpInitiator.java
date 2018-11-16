@@ -41,7 +41,7 @@ import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -275,7 +275,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     exportLog.debug("Export Manager has been notified that local partition " +
                             m_partitionId + " to accept export stream mastership.");
                 }
-                ExportManager.instance().takeMastership(m_partitionId);
+                ExportManagerInterface.instance().takeMastership(m_partitionId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
