@@ -219,13 +219,13 @@ def check_export_stats(runner, export_tables_with_data, last_collection_time):
             collection_time = firsttuple.column(0)
 
     for r in tablestats.tuples():
-        # TUPLE_ALLOCATED_MEMORY
-        pendingData = r[8]
-        # table name
-        tablename = str(r[4])
-        # partition id...
-        pid = r[3]
-        # host name
+        # TUPLE_PENDING
+        pendingData = r[9]
+        # STREAM_NAME
+        tablename = str(r[5])
+        # PARTITION_ID
+        pid = r[4]
+        # HOSTNAME
         hostname = str(r[2])
         if pendingData > 0:
             if not tablename in export_tables_with_data:
