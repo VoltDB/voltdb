@@ -233,18 +233,9 @@ def get_max_mismatches(comparison_database, suite_name):
     # Kludge to not fail for known issues, when running against PostgreSQL
     # (or the PostGIS extension of PostgreSQL)
     if comparison_database.startswith('Post'):
-        # Known failures in the basic-joins test suite, and in the basic-index-joins,
-        # and basic-compoundex-joins "extended" test suites (see ENG-10775)
-        if (config_name == 'basic-joins' or config_name == 'basic-index-joins' or
-              config_name == 'basic-compoundex-joins'):
-            max_mismatches = 5280
-        # Known failures, related to the ones above, in the basic-int-joins test
-        # suite (see ENG-10775, ENG-11401)
-        elif config_name == 'basic-int-joins':
-            max_mismatches = 600
         # Known failures in the joined-matview-* test suites ...
         # Failures in joined-matview-default-full due to ENG-11086
-        elif config_name == 'joined-matview-default-full':
+        if config_name == 'joined-matview-default-full':
             max_mismatches = 3390
         # Failures in joined-matview-int due to ENG-11086
         elif config_name == 'joined-matview-int':
