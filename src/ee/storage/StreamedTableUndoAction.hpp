@@ -26,18 +26,19 @@ class StreamedTableUndoAction : public UndoOnlyAction {
 
   public:
 
-    StreamedTableUndoAction(StreamedTable *table, size_t mark)
-        : m_table(table), m_mark(mark)
+    StreamedTableUndoAction(StreamedTable *table, size_t mark, int64_t seqNo)
+        : m_table(table), m_mark(mark), m_seqNo(seqNo)
     {
     }
 
     void undo() {
-        m_table->undo(m_mark);
+        m_table->undo(m_mark, m_seqNo);
     }
 
   private:
     StreamedTable *m_table;
     size_t m_mark;
+    int64_t m_seqNo;
 
 };
 

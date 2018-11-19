@@ -385,8 +385,9 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // the whole first buffer.  Roll back the new tuple and make sure
     // we have a good buffer
     size_t mark = m_wrapper->bytesUsed();
+    int64_t seqNo = m_wrapper->getSequenceNumber();
     appendTuple(1, 2);
-    m_wrapper->rollbackTo(mark, 0);
+    m_wrapper->rollbackTo(mark, 0, seqNo);
 
     // so flush and make sure we got something sane
     m_wrapper->periodicFlush(-1, 1);
@@ -421,7 +422,7 @@ TEST_F(ExportTupleStreamTest, RollbackFirstTuple) {
 
     appendTuple(1, 2);
     // rollback the first tuple
-    m_wrapper->rollbackTo(0, 0);
+    m_wrapper->rollbackTo(0, 0, 1);
 
     // write a new tuple and then flush the buffer
     appendTuple(1, 2);
@@ -450,8 +451,9 @@ TEST_F(ExportTupleStreamTest, RollbackMiddleTuple) {
 
     // add another and roll it back and flush
     size_t mark = m_wrapper->bytesUsed();
+    int64_t seqNo = m_wrapper->getSequenceNumber();
     appendTuple(m_tuplesToFill - 1, m_tuplesToFill);
-    m_wrapper->rollbackTo(mark, 0);
+    m_wrapper->rollbackTo(mark, 0, seqNo);
     m_wrapper->periodicFlush(-1, m_tuplesToFill - 1);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -474,11 +476,12 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBuffer)
 
     // now, fill a couple of buffers with tuples from a single transaction
     size_t mark = m_wrapper->bytesUsed();
+    int64_t seqNo = m_wrapper->getSequenceNumber();
     for (int i = 0; i < (m_tuplesToFill + 10) * 2; i++)
     {
         appendTuple(10, 11);
     }
-    m_wrapper->rollbackTo(mark, 0);
+    m_wrapper->rollbackTo(mark, 0, seqNo);
     m_wrapper->periodicFlush(-1, 3);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);

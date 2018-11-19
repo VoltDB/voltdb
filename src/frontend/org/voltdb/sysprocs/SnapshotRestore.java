@@ -1550,15 +1550,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         Database db = context.getDatabase();
         Integer myPartitionId = context.getPartitionId();
-        Long myPartitionTxnId = null;
-        if (isRecover) {
-            for (long txnId : perPartitionTxnIds) {
-                if (TxnEgo.getPartitionId(txnId) == myPartitionId) {
-                    myPartitionTxnId = txnId;
-                    break;
-                }
-            }
-        }
 
         //Iterate the export tables
         for (Table t : db.getTables()) {
@@ -1601,8 +1592,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     myPartitionId,
                     signature);
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
-            ExportManager.instance().updateInitialExportStateToTxnId(myPartitionId, signature,
-                    isRecover, myPartitionTxnId, sequenceNumber);
+            ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, signature,
+                    isRecover, sequenceNumber);
         }
     }
 

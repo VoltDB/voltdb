@@ -282,7 +282,7 @@ public class AsyncExportClient
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
-                .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "true")
+                .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "false")
                 .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .setArguments(args)
@@ -350,7 +350,7 @@ public class AsyncExportClient
                                                   0);
                 }
                 catch (Exception e) {
-                    System.err.println("Exception: " + e);
+                    System.err.println("FATAL Exception: " + e);
                     e.printStackTrace();
                     System.exit(-1);
                 }
@@ -422,8 +422,13 @@ public class AsyncExportClient
         }
         catch(Exception x)
         {
-            System.err.println("Exception: " + x);
+            System.err.println("FATAL Exception: " + x);
             x.printStackTrace();
+        }
+        // if we didn't get any successes we need to fail
+        if ( TrackingResults.get(0) == 0 ) {
+            System.err.println("ERROR No successful transactions");
+            System.exit(-1);
         }
     }
 
@@ -490,6 +495,7 @@ public class AsyncExportClient
         else {
             clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
         }
+        clientConfig.setTopologyChangeAware(true);
         Client client = ClientFactory.createClient(clientConfig);
         clientRef.set(client);
 

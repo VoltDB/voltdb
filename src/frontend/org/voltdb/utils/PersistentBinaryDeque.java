@@ -34,6 +34,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.EELibraryLoader;
+import org.voltdb.export.ExportSequenceNumberTracker;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.PBDSegment.PBDSegmentReader;
 
@@ -913,5 +914,34 @@ public class PersistentBinaryDeque implements BinaryDeque {
     public synchronized void setAwaitingTruncation(boolean m_awaitingTruncation)
     {
         this.m_awaitingTruncation = m_awaitingTruncation;
+    }
+
+    public ExportSequenceNumberTracker scanForGap(BinaryDequeScanner scaner) throws IOException
+    {
+        if (m_closed) {
+            throw new IOException("Cannot parseAndTruncate(): PBD has been closed");
+        }
+
+        assertions();
+        if (m_segments.isEmpty()) {
+            m_usageSpecificLog.debug("PBD " + m_nonce + " has no finished segments");
+            return new ExportSequenceNumberTracker();
+        }
+
+        // Close the last write segment for now, will reopen after scan
+        peekLastSegment().close();
+
+        ExportSequenceNumberTracker gapTracker = new ExportSequenceNumberTracker();
+
+        /*
+         * Iterator all the objects in all the segments and pass them to the scanner
+         */
+        for (PBDSegment segment : m_segments.values()) {
+            ExportSequenceNumberTracker tracker = segment.scan(scaner);
+            gapTracker.mergeTracker(tracker);
+        }
+        // Reopen the last segment for write
+        peekLastSegment().openForWrite(true);
+        return gapTracker;
     }
 }

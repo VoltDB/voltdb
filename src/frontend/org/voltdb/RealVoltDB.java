@@ -1090,7 +1090,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_joining = m_config.m_startAction == StartAction.JOIN;
 
             if (m_rejoining || m_joining) {
-                m_statusTracker.setNodeState(NodeState.REJOINING);
+                m_statusTracker.set(NodeState.REJOINING);
             }
             //Register dummy agents immediately
             m_opsRegistrar.registerMailboxes(m_messenger);
@@ -1712,7 +1712,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 handleHostsFailedForMigratePartitionLeader(failedHosts);
-                acceptExportStreamMastership(failedHosts);
+                checkExportStreamMastership();
 
                 // Send KSafety trap - BTW the side effect of
                 // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
@@ -1819,16 +1819,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    private void acceptExportStreamMastership(Set<Integer> failedHosts) {
+    // Check to see if stream master is colocated with partition leader, if not ask stream master to
+    // move back to partition leader's node.
+    private void checkExportStreamMastership() {
         for (Initiator initiator : m_iv2Initiators.values()) {
             if (initiator.getPartitionId() != MpInitiator.MP_INIT_PID) {
                 SpInitiator spInitiator = (SpInitiator)initiator;
                 if (spInitiator.isLeader()) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Export Manager has been notified that local partition " +
-                                  spInitiator.getPartitionId() + " to reevaluate export stream master.");
-                    }
-                    ExportManager.instance().acceptMastership(spInitiator.getPartitionId());
+                    ExportManager.instance().takeMastership(spInitiator.getPartitionId());
                 }
             }
         }
@@ -2240,6 +2238,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
         }, 0, 6, TimeUnit.MINUTES));
+
+        // export stream master check
+        m_periodicWorks.add(scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                checkExportStreamMastership();
+            }
+        }, 0, 1, TimeUnit.MINUTES));
 
         // other enterprise setup
         EnterpriseMaintenance em = EnterpriseMaintenance.get();
@@ -2891,6 +2897,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             stringer.keySymbolValuePair("zkInterface", zkInterface[0]);
             stringer.keySymbolValuePair("drPort", VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()));
             stringer.keySymbolValuePair("drInterface", VoltDB.getDefaultReplicationInterface());
+            stringer.keySymbolValuePair(VoltZK.drPublicHostProp, VoltDB.getPublicReplicationInterface());
+            stringer.keySymbolValuePair(VoltZK.drPublicPortProp, VoltDB.getPublicReplicationPort());
             stringer.keySymbolValuePair("publicInterface", m_config.m_publicInterface);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
@@ -3048,7 +3056,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .hostCountSupplier(hostCountSupplier)
                 .kfactor(clusterType.getKfactor())
                 .paused(m_config.m_isPaused)
-                .nodeStateSupplier(m_statusTracker.getNodeStateSupplier())
+                .nodeStateSupplier(m_statusTracker.getSupplier())
                 .addAllowed(m_config.m_enableAdd)
                 .safeMode(m_config.m_safeMode)
                 .terminusNonce(getTerminusNonce())
@@ -3370,7 +3378,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // Start the rejoin coordinator
         if (m_joinCoordinator != null) {
             try {
-                m_statusTracker.setNodeState(NodeState.REJOINING);
+                m_statusTracker.set(NodeState.REJOINING);
                 if (!m_joinCoordinator.startJoin(m_catalogContext.database)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
@@ -3689,7 +3697,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             synchronized(m_catalogUpdateLock) {
                 final ReplicationRole oldRole = getReplicationRole();
 
-                m_statusTracker.setNodeState(NodeState.UPDATING);
+                m_statusTracker.set(NodeState.UPDATING);
                 if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
                     if (m_catalogContext.catalogVersion < expectedCatalogVersion) {
                         throw new RuntimeException("Trying to update main catalog context with diff " +
@@ -3861,7 +3869,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         } finally {
             //Set state back to UP
-            m_statusTracker.setNodeState(NodeState.UP);
+            m_statusTracker.set(NodeState.UP);
         }
     }
 
@@ -4169,7 +4177,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
         hostLog.info("Logging host rejoin completion to ZK");
-        m_statusTracker.setNodeState(NodeState.UP);
+        m_statusTracker.set(NodeState.UP);
         Object args[] = { (VoltDB.instance().getMode() == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
@@ -4194,13 +4202,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (mode == OperationMode.PAUSED)
             {
                 m_config.m_isPaused = true;
-                m_statusTracker.setNodeState(NodeState.PAUSED);
+                m_statusTracker.set(NodeState.PAUSED);
                 hostLog.info("Server is entering admin mode and pausing.");
             }
             else if (m_mode == OperationMode.PAUSED)
             {
                 m_config.m_isPaused = false;
-                m_statusTracker.setNodeState(NodeState.UP);
+                m_statusTracker.set(NodeState.UP);
                 hostLog.info("Server is exiting admin mode and resuming operation.");
             }
         }
@@ -4371,7 +4379,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             Object args[] = { (m_mode == OperationMode.PAUSED) ? "PAUSED" : "NORMAL"};
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
-            m_statusTracker.setNodeState(NodeState.UP);
+            m_statusTracker.set(NodeState.UP);
         } else {
             // Set m_mode to RUNNING
             databaseIsRunning();
@@ -4524,7 +4532,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         final String drRole = m_catalogContext.getCluster().getDrrole();
         if (DrRoleType.REPLICA.value().equals(drRole) || DrRoleType.XDCR.value().equals(drRole)) {
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
-            final Pair<String, Integer> drIfAndPort = VoltZK.getDRInterfaceAndPortFromMetadata(m_localMetadata);
+            final Pair<String, Integer> drIfAndPort = VoltZK.getDRPublicInterfaceAndPortFromMetadata(m_localMetadata);
             try {
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                 Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(

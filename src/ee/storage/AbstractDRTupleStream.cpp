@@ -60,7 +60,7 @@ void AbstractDRTupleStream::pushStreamBuffer(StreamBlock *block, bool sync)
 
 // Set m_opened = false first otherwise checkOpenTransaction() may
 // consider the transaction being rolled back as open.
-void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost)
+void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost, int64_t)
 {
     if (mark == INVALID_DR_MARK) {
         m_openSpHandle = m_committedSpHandle;
@@ -81,7 +81,7 @@ void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost)
         m_openSequenceNumber = m_committedSequenceNumber;
         m_opened = false;
     }
-    TupleStreamBase::rollbackTo(mark, drRowCost);
+    TupleStreamBase::rollbackTo(mark, drRowCost, SIZE_MAX);
 }
 
 void AbstractDRTupleStream::periodicFlush(int64_t timeInMillis,

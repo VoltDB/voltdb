@@ -51,7 +51,6 @@ import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.MockVoltDB;
@@ -59,6 +58,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.AckingContainer;
+import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -114,7 +114,8 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, long tupleCount) {
+        public void pushExportBuffer(int partitionId, String signature, long seqNo,
+                int tupleCount, ByteBuffer buffer, boolean sync) {
         }
 
         @Override
@@ -122,8 +123,8 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void updateInitialExportStateToTxnId(int partitionId, String signature,
-                boolean isRecover, Long truncationPoint, long sequenceNumber) {
+        public void updateInitialExportStateToSeqNo(int partitionId, String signature,
+                                                    boolean isRecover, long sequenceNumber) {
         }
 
         @Override
@@ -213,23 +214,23 @@ public class TestExportDataSource extends TestCase {
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
             ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(23, foo, false, 1);
+            s.pushExportBuffer(1, 1, foo, false);
             assertEquals(s.sizeInBytes(), 20 );
 
             //Push it twice more to check stats calc
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(43, foo, false, 1);
+            s.pushExportBuffer(2, 1, foo, false);
             assertEquals(s.sizeInBytes(), 40);
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(63, foo, false, 1);
+            s.pushExportBuffer(3, 1, foo, false);
 
             assertEquals(s.sizeInBytes(), 60);
 
             //Sync which flattens them all, but then pulls the first two back in memory
             //resulting in no change
-            s.pushExportBuffer(63, null, true, 1);
+            s.pushExportBuffer(3, 1, null, true);
 
             assertEquals( 60, s.sizeInBytes());
 
@@ -238,7 +239,7 @@ public class TestExportDataSource extends TestCase {
             //No change in size because the buffers are flattened to disk, until the whole
             //file is polled/acked it won't shrink
             assertEquals( 60, s.sizeInBytes());
-            assertEquals( 42, cont.m_uso);
+            assertEquals( 1, cont.m_seqNo);
 
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
@@ -256,7 +257,7 @@ public class TestExportDataSource extends TestCase {
             //Should lose 20 bytes for the stuff in memory
             assertEquals( 40, s.sizeInBytes());
 
-            assertEquals( 62, cont.m_uso);
+            assertEquals( 2, cont.m_seqNo);
             assertTrue( foo.equals(cont.b()));
 
             cont.discard();
@@ -267,7 +268,7 @@ public class TestExportDataSource extends TestCase {
 
             //No more buffers on disk, so the + 8 is gone, just the last one pulled in memory
             assertEquals( 20, s.sizeInBytes());
-            assertEquals( 82, cont.m_uso);
+            assertEquals( 3, cont.m_seqNo);
             assertEquals( foo, cont.b());
 
             cont.discard();
@@ -279,8 +280,84 @@ public class TestExportDataSource extends TestCase {
                 fail("did not get expected timeout");
             }
             catch( TimeoutException ignoreIt) {}
-//            s.pushExportBuffer(83, null, true);
-//            assertNull(fut.get());
+        } finally {
+            s.close();
+        }
+    }
+
+    public void testDoublePoll() throws Exception{
+        System.out.println("Running testDoublePoll");
+        VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
+        Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
+        ExportDataSource s = new ExportDataSource(null, "database",
+                table.getTypeName(),
+                m_part,
+                CoreUtils.getSiteIdFromHSId(m_site),
+                table.getSignature(),
+                table.getColumns(),
+                table.getPartitioncolumn(),
+                TEST_DIR.getAbsolutePath());
+        try {
+            final CountDownLatch cdl = new CountDownLatch(1);
+            Runnable cdlWaiter = new Runnable() {
+
+                @Override
+                public void run() {
+                    cdl.countDown();
+                }
+            };
+            s.setOnMastership(cdlWaiter, false);
+            s.acceptMastership();
+            // Set ready for polling to enable satisfying fut on push
+            s.setReadyForPolling(true);
+            cdl.await();
+
+            int buffSize = 20 + StreamBlock.HEADER_SIZE;
+
+            // Push a first buffer - and read it back
+            ByteBuffer foo0 = ByteBuffer.allocateDirect(buffSize);
+            foo0.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(1, 1, foo0, false);
+
+            AckingContainer cont0 = s.poll().get();
+            cont0.updateStartTime(System.currentTimeMillis());
+
+            cont0.discard();
+            cont0 = null;
+            System.gc(); System.runFinalization(); Thread.sleep(200);
+
+            // Poll once with no data left - EDS sould set m_pollFuture
+            ListenableFuture<AckingContainer> fut1 = s.poll();
+            assertFalse(fut1.isDone());
+
+            // Do a reentrant poll - the returned fut should have the expected exception
+            ListenableFuture<AckingContainer> fut2 = s.poll();
+            try {
+                AckingContainer c = fut2.get();
+                fail("Did not get expected exception");
+            }
+            catch (Exception e) {
+                if (e.getCause() instanceof ReentrantPollException) {
+                    System.out.println("Got expected exception: " + e);
+
+                } else {
+                    fail("Got unexpected exception: " + e);
+                }
+            }
+
+            // Push a buffer - should satisfy fut1
+            ByteBuffer foo1 = ByteBuffer.allocateDirect(buffSize);
+            foo1.duplicate().put(new byte[buffSize]);
+            s.pushExportBuffer(2, 1, foo1, false);
+
+            // Verify the pushed buffer can be got
+            AckingContainer cont1 = fut1.get();
+            cont1.updateStartTime(System.currentTimeMillis());
+
+            cont1.discard();
+            cont1 = null;
+            System.gc(); System.runFinalization(); Thread.sleep(200);
+
         } finally {
             s.close();
         }
@@ -326,32 +403,32 @@ public class TestExportDataSource extends TestCase {
         foo.duplicate().put(new byte[20]);
         // we are not purposely starting at 0, because on rejoin
         // we may start at non zero offsets
-        s.pushExportBuffer(23, foo, false, 1);
+        s.pushExportBuffer(1, 1, foo, false);
         assertEquals(s.sizeInBytes(), 20 );
 
         //Push it twice more to check stats calc
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(43, foo, false, 1);
+        s.pushExportBuffer(2, 1, foo, false);
         assertEquals(s.sizeInBytes(), 40 );
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
-        s.pushExportBuffer(63, foo, false, 1);
+        s.pushExportBuffer(3, 1, foo, false);
 
         assertEquals(s.sizeInBytes(), 60);
 
         //Sync which flattens them all
-        s.pushExportBuffer(63, null, true, 1);
+        s.pushExportBuffer(3, 1, null, true);
 
         //flattened size
         assertEquals( 60, s.sizeInBytes());
 
-        AckingContainer cont = (AckingContainer)s.poll().get();
+        AckingContainer cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
         assertEquals( 60, s.sizeInBytes());
-        assertEquals( 42, cont.m_uso);
+        assertEquals( 1, cont.m_seqNo);
 
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
@@ -366,10 +443,10 @@ public class TestExportDataSource extends TestCase {
 
         verify(mockedMbox, times(1)).send(
                 eq(42L),
-                argThat(ackPayloadIs(m_part, table.getSignature(), 42))
+                argThat(ackPayloadIs(m_part, table.getSignature(), 1))
                 );
 
-        // Poll and discard buffer 63, too
+        // Poll and discard buffer 2, too
         cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         cont.discard();
@@ -381,10 +458,10 @@ public class TestExportDataSource extends TestCase {
         // 20, no overhead because it was pulled back in
         assertEquals( 20, s.sizeInBytes());
 
-        cont = (AckingContainer)s.poll().get();
+        cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         assertEquals(s.sizeInBytes(), 20);
-        assertEquals(82, cont.m_uso);
+        assertEquals(3, cont.m_seqNo);
         cont.discard();
 
         } finally {
@@ -413,32 +490,32 @@ public class TestExportDataSource extends TestCase {
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[200]);
-            s.pushExportBuffer(203, foo, true, 1);
+            s.pushExportBuffer(101, 1, foo, true);
             long sz = s.sizeInBytes();
-            assertEquals(sz, 200);
+            assertEquals(200, sz);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
             //Ack after push beyond size...last segment kept.
-            s.ack(1000, 0);
+            s.ack(110, 0);
             sz = s.sizeInBytes();
-            assertEquals(sz, 0);
+            assertEquals(0, sz);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
             //Push again and sync to test files.
             ByteBuffer foo2 = ByteBuffer.allocateDirect(900 + StreamBlock.HEADER_SIZE);
             foo2.duplicate().put(new byte[900]);
-            s.pushExportBuffer(903, foo2, true, 1);
+            s.pushExportBuffer(111, 1, foo2, true);
             sz = s.sizeInBytes();
-            assertEquals(sz, 802);
+            assertEquals(900, sz);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
             //Low ack should have no effect.
             s.ack(100, 0);
             sz = s.sizeInBytes();
-            assertEquals(sz, 802);
+            assertEquals(900, sz);
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
 
@@ -454,7 +531,7 @@ public class TestExportDataSource extends TestCase {
             cdl.await();
 
             //Poll and check before and after discard segment files.
-            AckingContainer cont = (AckingContainer) s.poll().get();
+            AckingContainer cont = s.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
             listing = getSortedDirectoryListingSegments();
             assertEquals(listing.size(), 1);
