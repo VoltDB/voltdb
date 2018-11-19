@@ -42,7 +42,7 @@ import org.voltdb.utils.VoltFile;
  *
  * Export PBD buffer layout:
  *    --- Buffer Header   ---
- *    seqNo(8) + tupleCount(4) + exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length)
+ *    seqNo(8) + tupleCount(4) + uniqueId(8) + exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length)
  *    {
  *          ---Inside schema---
  *          tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
@@ -122,11 +122,13 @@ public class StreamBlockQueue {
             final BBContainer fcont = cont;
             long seqNo = cont.b().getLong(0);
             int tupleCount = cont.b().getInt(8);
+            long uniqueId = cont.b().getLong(12);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
             StreamBlock block = new StreamBlock( fcont,
                 seqNo,
                 tupleCount,
+                uniqueId,
                 true);
 
             //Optionally store a reference to the block in the in memory deque
@@ -294,6 +296,7 @@ public class StreamBlockQueue {
                 if (lastSequenceNumber < truncationSeqNo) {
                     return null;
                 }
+                b.getLong(); // uniqueId
                 byte version = b.get(); // export version
                 assert(version == EXPORT_BUFFER_VERSION);
                 b.getLong(); // generation id

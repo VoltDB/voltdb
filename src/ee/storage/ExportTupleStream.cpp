@@ -39,7 +39,7 @@ const size_t ExportTupleStream::s_mdSchemaSize = (19 + 21 + 27 + 17 + 12 + 21 //
                                                                 + ExportTupleStream::METADATA_COL_CNT // Volt Type byte
                                                                 + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t)) // Int for column names string size
                                                                 + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t))); // column length colInfo->length
-const size_t EXPORT_BUFFER_HEADER_SIZE = 4; // Number of rows in the buffer
+const size_t EXPORT_BUFFER_HEADER_SIZE = 12; // row count(4) + uniqueId(8)
 const size_t ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE = 13; // Size of header before schema: Version(1) + GenerationId(8) + SchemaLen(4)
 const uint8_t ExportTupleStream::s_EXPORT_BUFFER_VERSION = 1;
 
@@ -172,6 +172,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     const size_t startingUso = m_uso;
     m_uso += (streamHeaderSz + io.position());
     m_exportSequenceNumber++;
+    // TODO: better to only add this before commit
+    m_currBlock->recordCompletedSpTxn(uniqueId);
 //    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
 //            << " sequence number " << seqNo
 //            << " offset " << m_currBlock->offset() << std::endl;
