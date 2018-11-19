@@ -49,7 +49,9 @@ public class SSLBufferDecrypter {
         if (rc < 0) {
             throw new IOException("channel closed while reading tls frame header");
         }
-        if (rc == 0) return false;
+        if (rc == 0) {
+            return false;
+        }
 
         int framesz = header.getShort(3);
         if (framesz+header.capacity() > buf.writableBytes()) {

@@ -1026,7 +1026,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             hostObj.put(SocketJoiner.PORT, m_config.internalPort);
             jsArray.put(hostObj);
             for (Entry<Integer, Collection<ForeignHost>> entry : m_foreignHosts.asMap().entrySet()) {
-                if (entry.getValue().isEmpty()) continue;
+                if (entry.getValue().isEmpty()) {
+                    continue;
+                }
                 int hsId = entry.getKey();
                 Iterator<ForeignHost> it = entry.getValue().iterator();
                 // all fhs to same host have the same address and port
@@ -1547,7 +1549,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         synchronized (m_mapLock) {
             ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
             for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
-                if (e.getKey().equals(hsId)) continue;
+                if (e.getKey().equals(hsId)) {
+                    continue;
+                }
                 b.put(e.getKey(), e.getValue());
             }
             m_siteMailboxes = b.build();
@@ -1561,7 +1565,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         synchronized (m_mapLock) {
             ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
             for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
-                if (e.getValue() == mbox) continue;
+                if (e.getValue() == mbox) {
+                    continue;
+                }
                 b.put(e.getKey(), e.getValue());
             }
             m_siteMailboxes = b.build();
@@ -1586,7 +1592,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             new HashMap<ForeignHost, ArrayList<Long>>(32);
         for (long hsId : destinationHSIds) {
             ForeignHost host = presend(hsId, message);
-            if (host == null) continue;
+            if (host == null) {
+                continue;
+            }
             ArrayList<Long> bundle = foreignHosts.get(host);
             if (bundle == null) {
                 bundle = new ArrayList<Long>();
@@ -1595,7 +1603,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             bundle.add(hsId);
         }
 
-        if (foreignHosts.size() == 0) return;
+        if (foreignHosts.size() == 0) {
+            return;
+        }
 
         for (Entry<ForeignHost, ArrayList<Long>> e : foreignHosts.entrySet()) {
             e.getKey().send(Longs.toArray(e.getValue()), message);
@@ -1690,9 +1700,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public int countForeignHosts() {
         int retval = 0;
-        for (ForeignHost host : m_foreignHosts.values())
-            if ((host != null) && (host.isUp()))
+        for (ForeignHost host : m_foreignHosts.values()) {
+            if ((host != null) && (host.isUp())) {
                 retval++;
+            }
+        }
         return retval;
     }
 
@@ -1766,7 +1778,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         // Then contact other peers
         List<FutureTask<Void>> tasks = new ArrayList<FutureTask<Void>>();
         for (int hostId : m_foreignHosts.keySet()) {
-            if (hostId == m_localHostId) continue; /* skip target host */
+            if (hostId == m_localHostId) {
+                continue; /* skip target host */
+            }
             Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
             if (it.hasNext()) {
                 ForeignHost fh = it.next();
@@ -1903,7 +1917,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         // it is possible if some nodes are inactive
-        if (hostsToConnect.isEmpty()) return;
+        if (hostsToConnect.isEmpty()) {
+            return;
+        }
 
         for (int hostId : hostsToConnect) {
             Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();

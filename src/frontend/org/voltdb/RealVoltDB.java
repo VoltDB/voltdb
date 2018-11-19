@@ -42,6 +42,11 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URL;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,7 +55,6 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +74,10 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.TrustManagerFactory;
 
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
@@ -588,12 +596,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
         VoltFile managedPath;
-        if (new File(path).isAbsolute())
+        if (new File(path).isAbsolute()) {
             managedPath = new VoltFile(path);
-        else
+        } else {
             managedPath = new VoltFile(voltDbRoot, path);
-        if (managedPath.exists() && managedPath.canRead() && managedPath.list().length > 0)
+        }
+        if (managedPath.exists() && managedPath.canRead() && managedPath.list().length > 0) {
             return managedPath.getAbsolutePath();
+        }
         return null;
     }
 
@@ -625,16 +635,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (!config.m_isEnterprise) {
             return nonEmptyPaths.build();
         }
-        if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getExportOverflowPath(paths.getExportoverflow()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getExportOverflowPath(paths.getExportoverflow()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getDROverflowPath(paths.getDroverflow()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getDROverflowPath(paths.getDroverflow()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogPath(paths.getCommandlog()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogPath(paths.getCommandlog()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null) {
             nonEmptyPaths.add(path);
+        }
         return nonEmptyPaths.build();
     }
 
@@ -643,12 +658,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         PathsType paths = deployment.getPaths();
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
-        if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogPath(paths.getCommandlog()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogPath(paths.getCommandlog()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null) {
             nonEmptyPaths.add(path);
+        }
         return nonEmptyPaths.build();
     }
 
@@ -829,11 +847,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 if (config.m_isEnterprise) {
-                    if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
-                    if (m_licenseApi.isPro()) edition = "Pro Edition";
-                    if (m_licenseApi.isEnterpriseTrial()) edition = "Enterprise Edition";
-                    if (m_licenseApi.isProTrial()) edition = "Pro Edition";
-                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Edition";
+                    if (m_licenseApi.isEnterprise()) {
+                        edition = "Enterprise Edition";
+                    }
+                    if (m_licenseApi.isPro()) {
+                        edition = "Pro Edition";
+                    }
+                    if (m_licenseApi.isEnterpriseTrial()) {
+                        edition = "Enterprise Edition";
+                    }
+                    if (m_licenseApi.isProTrial()) {
+                        edition = "Pro Edition";
+                    }
+                    if (m_licenseApi.isAWSMarketplace()) {
+                        edition = "AWS Marketplace Edition";
+                    }
                 }
 
                 // this also prints out the license type on the console
@@ -855,10 +883,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
             sb.delete(0, sb.length()).append("Command line JVM arguments:");
-            for (String iarg : iargs)
+            for (String iarg : iargs) {
                 sb.append(" ").append(iarg);
-            if (iargs.size() > 0) hostLog.info(sb.toString());
-            else hostLog.info("No JVM command line args known.");
+            }
+            if (iargs.size() > 0) {
+                hostLog.info(sb.toString());
+            } else {
+                hostLog.info("No JVM command line args known.");
+            }
 
             sb.delete(0, sb.length()).append("Command line JVM classpath: ");
             sb.append(System.getProperty("java.class.path", "[not available]"));
@@ -1882,7 +1914,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     class StartActionWatcher implements Watcher {
         @Override
         public void process(WatchedEvent event) {
-            if (m_mode == OperationMode.SHUTTINGDOWN) return;
+            if (m_mode == OperationMode.SHUTTINGDOWN) {
+                return;
+            }
             m_es.submit(new Runnable() {
                 @Override
                 public void run() {
@@ -2248,8 +2282,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         msg.setStartTask();
         final int minimalNumberOfLeaders = (m_cartographer.getPartitionCount() / m_config.m_hostCount);
         Set<Integer> hosts = m_messenger.getLiveHostIds();
-        for (Iterator<Integer> it = hosts.iterator(); it.hasNext();) {
-            int hostId = it.next();
+        for (int hostId : hosts) {
             final int currentMasters = m_cartographer.getMasterCount(hostId);
             if (currentMasters > minimalNumberOfLeaders) {
                 if (hostLog.isDebugEnabled()) {
@@ -3303,8 +3336,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
         String buildString = m_buildString;
-        if (m_buildString.contains("_"))
+        if (m_buildString.contains("_")) {
             buildString = m_buildString.split("_", 2)[1];
+        }
         consoleLog.info(String.format("Build: %s %s %s", m_versionString, buildString, editionTag));
     }
 
@@ -3423,8 +3457,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 // shutdown the web monitoring / json
-                if (m_adminListener != null)
+                if (m_adminListener != null) {
                     m_adminListener.stop();
+                }
 
                 // shut down the client interface
                 if (m_clientInterface != null) {
@@ -3644,8 +3679,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void cleanUpTempCatalogJar() {
         File configInfoDir = getConfigDirectory();
-        if (!configInfoDir.exists())
+        if (!configInfoDir.exists()) {
             return;
+        }
 
         File tempJar = new VoltFile(configInfoDir.getPath(),
                                     InMemoryJarfile.TMP_CATALOG_JAR_FILENAME);
@@ -3740,7 +3776,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 ExportManager.instance().updateCatalog(m_catalogContext, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration, partitions);
 
                 // 1.1 Update the elastic join throughput settings
-                if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
+                if (m_elasticJoinService != null) {
+                    m_elasticJoinService.updateConfig(m_catalogContext);
+                }
 
                 // 1.5 update the dead host timeout
                 if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {
