@@ -24,6 +24,7 @@ import org.apache.calcite.rel.metadata.RelMdParallelism;
 import org.apache.calcite.rel.metadata.RelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.util.BuiltInMethod;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 
 /**
  * VoltDB implementations of the
@@ -49,7 +50,10 @@ public class VoltDBRelMdParallelism extends RelMdParallelism {
      */
     @Override
     public Integer splitCount(RelNode rel, RelMetadataQuery mq) {
-        // TODO: in physical planning phase, introduce the real SplitCount
-        return 1;
+        if (rel instanceof VoltDBPRel) {
+            return ((VoltDBPRel) rel).getSplitCount();
+        } else {
+            return 1;
+        }
     }
 }

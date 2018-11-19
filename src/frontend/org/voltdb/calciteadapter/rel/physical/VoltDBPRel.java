@@ -83,5 +83,4 @@ public interface VoltDBPRel extends RelNode {
         assert(inputNode != null);
         return inputNode.toPlanNode();
     }
-
 }
