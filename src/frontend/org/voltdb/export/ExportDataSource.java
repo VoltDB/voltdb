@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -175,6 +176,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return lastSeq != Long.MIN_VALUE;
         }
 
+    }
+
+    public static class ReentrantPollException extends ExecutionException {
+        private static final long serialVersionUID = 1L;
+        ReentrantPollException() { super(); }
+        ReentrantPollException(String s) { super(s); }
     }
 
     /**
@@ -859,15 +866,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             return;
                         }
                         /*
-                         * The poll is blocking through the future, shouldn't
+                         * The poll is blocking through the cached future, shouldn't
                          * call poll a second time until a response has been given
-                         * which nulls out the field
+                         * which satisfies the cached future.
                          */
                         if (m_pollFuture != null) {
-                            fut.setException(new RuntimeException("Should not poll more than once: InCat = " + m_isInCatalog +
-                                    " ExportDataSource for Table " + getTableName() + " at Partition " + getPartitionId()));
-                            // Since it's not fatal exception, gives it second chance to poll again.
-                            m_pollFuture = null;
+                            fut.setException(new ReentrantPollException("Reentrant poll detected: InCat = " + m_isInCatalog +
+                                    " In ExportDataSource for Table " + getTableName() + ", Partition " + getPartitionId()));
                             return;
                         }
                         if (!m_es.isShutdown()) {
@@ -1403,6 +1408,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public void queryForBestCandidate() {
         m_es.execute(new Runnable() {
+            @Override
             public void run() {
                 sendGapQuery();
             }

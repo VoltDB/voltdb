@@ -39,6 +39,7 @@ import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportDataSource.AckingContainer;
+import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.StreamBlockQueue;
 import org.voltdb.exportclient.ExportClientBase;
@@ -437,7 +438,13 @@ public class GuestProcessor implements ExportDataProcessor {
                         }
                     }
                 } catch (Exception e) {
-                    m_logger.error("Error processing export block", e);
+                    if (e.getCause() instanceof ReentrantPollException) {
+                        m_logger.info("Stopping processing export blocks: " + e.getMessage());
+                        return;
+
+                    } else {
+                        m_logger.error("Error processing export block, continuing processing: ", e);
+                    }
                 }
                 if (!m_shutdown) {
                     addBlockListener(source, source.poll(), edb);
