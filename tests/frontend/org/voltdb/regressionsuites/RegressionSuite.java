@@ -1252,7 +1252,9 @@ public class RegressionSuite extends TestCase {
 
             VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
             for (VoltTable t: results) { System.out.println(t.toString()); }
-            if (results[0].getRowCount() == 0) continue;
+            if (results[0].getRowCount() == 0) {
+                continue;
+            }
 
             boolean foundTargetTuple = false;
             boolean limitExpected = false;
@@ -1271,11 +1273,15 @@ public class RegressionSuite extends TestCase {
                             percentageExpected = true;
                         }
 
-                        if (limitExpected && percentageExpected) return;
+                        if (limitExpected && percentageExpected) {
+                            return;
+                        }
                         break;
                     }
                 }
-                if (foundTargetTuple) break;
+                if (foundTargetTuple) {
+                    break;
+                }
             }
         }
     }

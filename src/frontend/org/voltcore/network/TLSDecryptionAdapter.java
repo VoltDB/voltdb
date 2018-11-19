@@ -123,7 +123,9 @@ public class TLSDecryptionAdapter {
                     while (readStream.dataAvailable() >= TLS_HEADER_SIZE) {
                         readStream.peekBytes(frameHeader.array());
                         m_needed = frameHeader.getShort(3) + TLS_HEADER_SIZE;
-                        if (readStream.dataAvailable() < m_needed) break;
+                        if (readStream.dataAvailable() < m_needed) {
+                            break;
+                        }
                         m_dcryptgw.offer(readStream.getSlice(m_needed));
                         m_needed = NOT_AVAILABLE;
                     }
@@ -209,7 +211,9 @@ public class TLSDecryptionAdapter {
         }
         @Override
         public void run() {
-            if (isDead()) return;
+            if (isDead()) {
+                return;
+            }
             try {
                 m_fut.get();
             } catch (InterruptedException notPossible) {
@@ -267,24 +271,30 @@ public class TLSDecryptionAdapter {
         }
 
         void releaseDecryptedBuffer() {
-            if (m_msgbb.refCnt() > 0) try {
-                m_msgbb.release();
-            } catch (IllegalReferenceCountException ignoreIt) {
+            if (m_msgbb.refCnt() > 0) {
+                try {
+                    m_msgbb.release();
+                } catch (IllegalReferenceCountException ignoreIt) {
+                }
             }
         }
 
         @Override
         public void run() {
             final NIOReadStream.Slice slice = m_q.peek();
-            if (slice == null) return;
+            if (slice == null) {
+                return;
+            }
 
             ByteBuf src = slice.bb;
 
-            if (isDead()) synchronized(this) {
-                slice.markConsumed().discard();
-                m_q.poll();
-                releaseDecryptedBuffer();
-                return;
+            if (isDead()) {
+                synchronized(this) {
+                    slice.markConsumed().discard();
+                    m_q.poll();
+                    releaseDecryptedBuffer();
+                    return;
+                }
             }
 
             ByteBuffer [] slicebbarr = slice.bb.nioBuffers();
@@ -331,7 +341,9 @@ public class TLSDecryptionAdapter {
                     try {
                         bb = m_inputHandler.retrieveNextMessage(m_msgbb);
                         // All of the message bytes are not available yet
-                        if (bb==null) continue;
+                        if (bb==null) {
+                            continue;
+                        }
                     } catch(IOException e) {
                         m_inFlight.release(); m_msgbb.release();
                         m_exceptions.offer(new ExecutionException("failed message length check", e));
