@@ -49,7 +49,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
@@ -78,6 +77,8 @@ import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.ssl.SslContext;
 import jsr166y.ThreadLocalRandom;
 
 /**
@@ -107,7 +108,7 @@ class Distributer {
     //Selector and connection handling, does all work in blocking selection thread
     private final VoltNetworkPool m_network;
 
-    private final SSLContext m_sslContext;
+    private final SslContext m_sslContext;
 
     // Temporary until a distribution/affinity algorithm is written
     private int m_nextConnection = 0;
@@ -944,7 +945,7 @@ class Distributer {
             boolean useClientAffinity,
             boolean sendReadsToReplicasBytDefault,
             Subject subject,
-            SSLContext sslContext) {
+            SslContext sslContext) {
         m_useMultipleThreads = useMultipleThreads;
         m_sslContext = sslContext;
         if (m_sslContext != null) {
@@ -980,7 +981,7 @@ class Distributer {
         SSLEngine sslEngine = null;
 
         if (m_sslContext != null) {
-            sslEngine = m_sslContext.createSSLEngine("client", port);
+            sslEngine = m_sslContext.newEngine(ByteBufAllocator.DEFAULT, host, port);
             sslEngine.setUseClientMode(true);
 
             Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
