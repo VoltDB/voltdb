@@ -81,6 +81,18 @@ public class TestIndexesSuite extends RegressionSuite {
         checkQueryPlan(client, sql, explainPlanStr);
     }
 
+    public void testCreateIndexDESC()
+            throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        try {
+            client.callProcedure("@AdHoc", "CREATE INDEX negIndex ON P1(ID DESC)");
+            fail("DESC should not be allowed in CREATE INDEX.");
+        } catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("unexpected token: DESC"));
+        }
+    }
+
     // Index stuff to test:
     // scans against tree
     // - < <= = > >=, range with > and <
@@ -1298,6 +1310,7 @@ public class TestIndexesSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("indexes-ddl.sql"));
         project.addMultiPartitionProcedures(MP_PROCEDURES);
+        project.setUseDDLSchema(true);
         project.addStmtProcedure("Eng397LimitIndexR1", "select * from R1 where R1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
