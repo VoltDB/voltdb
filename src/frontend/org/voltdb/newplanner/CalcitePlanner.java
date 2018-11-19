@@ -159,7 +159,7 @@ public class CalcitePlanner {
                 RelMetadataQuery.THREAD_PROVIDERS.set(relMetadataProvider);
 
                 // Modify RelMetaProvider for every RelNode in the SQL operator Rel tree.
-                input.accept(new MetaDataProviderModifier(relMetadataProvider));
+                input = input.accept(new MetaDataProviderModifier(relMetadataProvider));
                 planner.setRoot(input);
                 if (!input.getTraitSet().equals(targetTraits)) {
                     planner.changeTraits(input, toTraits);
@@ -219,7 +219,7 @@ public class CalcitePlanner {
 
         @Override
         protected RelNode visitChild(RelNode parent, int i, RelNode child) {
-            child.accept(this);
+            parent = super.visitChild(parent, i, child);
             parent.getCluster().setMetadataProvider(metadataProvider);
             return parent;
         }
