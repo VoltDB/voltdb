@@ -29,6 +29,7 @@ import javax.net.ssl.SSLException;
 import org.voltcore.network.TLSException;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 
 public class SSLBufferDecrypter {
     public final static int TLS_HEADER_SIZE = 5;
@@ -97,6 +98,67 @@ public class SSLBufferDecrypter {
                     throw new TLSException("SSL engine unexpectedly underflowed when decrypting");
                 case CLOSED:
                     throw new TLSException("SSL engine is closed on ssl unwrap of buffer.");
+            }
+        }
+    }
+
+    /**
+     * @see #tlsunwrap(ByteBuffer, ByteBuf, PooledByteBufAllocator)
+     */
+    public ByteBuf tlsunwrap(ByteBuffer srcBuffer, PooledByteBufAllocator allocator) {
+        int size = m_sslEngine.getSession().getApplicationBufferSize();
+        return tlsunwrap(srcBuffer, allocator.buffer(size), allocator);
+    }
+
+    /**
+     * Encrypt data in {@code srcBuffer} into {@code dstBuf} if it is large enough. If an error occurs {@code dstBuf}
+     * will be released. If {@code dstBuf} is not large enough a new buffer will be allocated from {@code allocator} and
+     * {@code dstBuf} will be released.
+     *
+     * @param srcBuffer holding encrypted data
+     * @param dstBuf    to attempt to write plain text data into
+     * @param allocator to be used to allocate new buffers if {@code dstBuf} is too small
+     * @return {@link ByteBuf} containing plain text data
+     */
+    public ByteBuf tlsunwrap(ByteBuffer srcBuffer, ByteBuf dstBuf, PooledByteBufAllocator allocator) {
+        int writerIndex = dstBuf.writerIndex();
+        ByteBuffer byteBuffer = dstBuf.nioBuffer(writerIndex, dstBuf.writableBytes());
+
+        while (true) {
+            SSLEngineResult result;
+            try {
+                result = m_sslEngine.unwrap(srcBuffer, byteBuffer);
+            } catch (SSLException | ReadOnlyBufferException | IllegalArgumentException | IllegalStateException e) {
+                dstBuf.release();
+                throw new TLSException("ssl engine unwrap fault", e);
+            } catch (Throwable t) {
+                dstBuf.release();
+                throw t;
+            }
+
+            switch (result.getStatus()) {
+            case OK:
+                if (result.bytesProduced() <= 0 || srcBuffer.hasRemaining()) {
+                    continue;
+                }
+                dstBuf.writerIndex(writerIndex + result.bytesProduced());
+                return dstBuf;
+            case BUFFER_OVERFLOW:
+                dstBuf.release();
+                if (m_sslEngine.getSession().getApplicationBufferSize() > dstBuf.writableBytes()) {
+                    int size = m_sslEngine.getSession().getApplicationBufferSize();
+                    dstBuf = allocator.buffer(size);
+                    writerIndex = dstBuf.writerIndex();
+                    byteBuffer = dstBuf.nioBuffer(writerIndex, dstBuf.writableBytes());
+                    continue;
+                }
+                throw new TLSException("SSL engine unexpectedly overflowed when decrypting");
+            case BUFFER_UNDERFLOW:
+                dstBuf.release();
+                throw new TLSException("SSL engine unexpectedly underflowed when decrypting");
+            case CLOSED:
+                dstBuf.release();
+                throw new TLSException("SSL engine is closed on ssl unwrap of buffer.");
             }
         }
     }

@@ -42,7 +42,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 import org.json_voltpatches.JSONArray;
@@ -61,6 +60,9 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
+
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.ssl.SslContext;
 
 /**
  * SocketJoiner runs all the time listening for new nodes in the cluster. Since it is a dedicated thread
@@ -348,7 +350,8 @@ public class SocketJoiner {
     private final boolean success = false;
     private final AtomicBoolean m_paused;
     private final JoinAcceptor m_acceptor;
-    private final SSLContext m_sslContext;
+    private final SslContext m_sslServerContext;
+    private final SslContext m_sslClientContext;
     public boolean getSuccess() {
         return success;
     }
@@ -359,7 +362,7 @@ public class SocketJoiner {
             AtomicBoolean isPaused,
             JoinAcceptor acceptor,
             JoinHandler jh,
-            SSLContext sslContext) {
+            SslContext sslServerContext, SslContext sslClientContext) {
         if (internalInterface == null || jh == null || acceptor == null) {
             throw new IllegalArgumentException();
         }
@@ -368,7 +371,8 @@ public class SocketJoiner {
         m_internalPort = internalPort;
         m_paused = isPaused;
         m_acceptor = acceptor;
-        m_sslContext = sslContext;
+        m_sslServerContext = sslServerContext;
+        m_sslClientContext = sslClientContext;
     }
 
     /*
@@ -427,21 +431,43 @@ public class SocketJoiner {
         return jsObj;
     }
 
-    private static class SSLSetup {
-        SSLEngine m_sslEngine;
-        ByteBuffer m_remnant;
-
-        public SSLSetup(SSLEngine sslEngine, ByteBuffer remnant) {
-            m_sslEngine = sslEngine;
-            m_remnant = remnant;
+    /**
+     * Initialize a new {@link SocketChannel} either as a client or server
+     *
+     * @return {@link SSLEngine} instance if the socket is to be encrypted otherwise {@code null} is returned
+     */
+    private SSLEngine initializeSocket(SocketChannel sc, boolean clientMode, List<Long> clockSkews)
+            throws IOException {
+        ByteBuffer timeBuffer = ByteBuffer.allocate(Long.BYTES);
+        if (clientMode) {
+            synchronized (sc.blockingLock()) {
+                boolean isBlocking = sc.isBlocking();
+                // Just being lazy and using blocking mode here to get the server's current timestamp
+                sc.configureBlocking(true);
+                do {
+                    sc.read(timeBuffer);
+                } while (timeBuffer.hasRemaining());
+                sc.configureBlocking(isBlocking);
+            }
+            if (clockSkews != null) {
+                clockSkews.add(System.currentTimeMillis() - ((ByteBuffer) timeBuffer.flip()).getLong());
+            }
+        } else {
+            timeBuffer.putLong(System.currentTimeMillis());
+            timeBuffer.flip();
+            do {
+                sc.write(timeBuffer);
+            } while (timeBuffer.hasRemaining());
         }
+        return setupSSLIfNeeded(sc, clientMode);
     }
-    private SSLSetup setupSSLIfNeeded(SocketChannel sc, boolean clientMode) throws IOException {
-        if (m_sslContext == null) {
+
+    private SSLEngine setupSSLIfNeeded(SocketChannel sc, boolean clientMode) throws IOException {
+        SslContext sslContext = clientMode ? m_sslClientContext : m_sslServerContext;
+        if (sslContext == null) {
             return null;
         }
-        ByteBuffer remnant;
-        SSLEngine sslEngine = m_sslContext.createSSLEngine();
+        SSLEngine sslEngine = sslContext.newEngine(ByteBufAllocator.DEFAULT);
         sslEngine.setUseClientMode(clientMode);
         sslEngine.setNeedClientAuth(false);
 
@@ -457,23 +483,13 @@ public class SocketJoiner {
         sc.socket().setTcpNoDelay(true);
         TLSHandshaker handshaker = new TLSHandshaker(sc, sslEngine);
         handshakeStatus = handshaker.handshake();
-        /*
-         * The JDK caches SSL sessions when the participants are the same (i.e.
-         * multiple connection requests from the same peer). Once a session is cached
-         * the client side ends its handshake session quickly, and is able to send
-         * the login Volt message before the server finishes its handshake. This message
-         * is caught in the servers last handshake network read.
-         */
-        //The remnant is always currentTime from the other side,
-        // which we send in clear so that it doesn't take too long between sending and receiving the time.
-        remnant = handshaker.getRemnantUnencrypted();
 
         if (!handshakeStatus) {
             throw new IOException("Rejected accepting new internal connection, SSL handshake failed.");
         }
         LOG.info("SSL enabled on internal connection " + sc.socket().getRemoteSocketAddress() +
                 " with protocol " + sslEngine.getSession().getProtocol() + " and with cipher " + sslEngine.getSession().getCipherSuite());
-        return new SSLSetup(sslEngine, remnant);
+        return sslEngine;
     }
 
     /*
@@ -486,21 +502,10 @@ public class SocketJoiner {
             try {
                 sc.socket().setTcpNoDelay(true);
                 sc.socket().setPerformancePreferences(0, 2, 1);
-                SSLSetup sslSetup = setupSSLIfNeeded(sc, false);
-                SSLEngine sslEngine = sslSetup == null ? null : sslSetup.m_sslEngine;
+                SSLEngine sslEngine = initializeSocket(sc, false, null);
                 final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
 
                 MessagingChannel messagingChannel = MessagingChannel.get(sc, sslEngine);
-
-                /*
-                 * Send the current time over the new connection for a clock skew check
-                 */
-                ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
-                currentTimeBuf.putLong(System.currentTimeMillis());
-                currentTimeBuf.flip();
-                while (currentTimeBuf.hasRemaining()) {
-                    sc.write(currentTimeBuf);
-                }
 
                 /*
                  * Read a length prefixed JSON message
@@ -597,7 +602,9 @@ public class SocketJoiner {
             while (true) {
                 try {
                     final int selectedKeyCount = m_selector.select();
-                    if (selectedKeyCount == 0) continue;
+                    if (selectedKeyCount == 0) {
+                        continue;
+                    }
                     Set<SelectionKey> selectedKeys = m_selector.selectedKeys();
                     try {
                         for (SelectionKey key : selectedKeys) {
@@ -742,26 +749,8 @@ public class SocketJoiner {
      */
     private RequestHostIdResponse requestHostId (
             MessagingChannel messagingChannel,
-            ByteBuffer remnantBytes,
-            List<Long> skews,
             Set<String> activeVersions) throws Exception
     {
-        // Read the timestamp off the wire and calculate skew for this connection
-        long remoteCurrentTime = 0;
-        if (remnantBytes != null && remnantBytes.hasRemaining()) {
-            assert(remnantBytes.remaining() == 8);
-            remoteCurrentTime = remnantBytes.getLong();
-        } else {
-            ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
-            while (currentTimeBuf.hasRemaining()) {
-                messagingChannel.getSocketChannel().read(currentTimeBuf);
-            }
-            currentTimeBuf.flip();
-            remoteCurrentTime = currentTimeBuf.getLong();
-        }
-        long skew = System.currentTimeMillis() - remoteCurrentTime;
-        skews.add(skew);
-
         VersionChecker versionChecker = m_acceptor.getVersionChecker();
         activeVersions.add(versionChecker.getVersionString());
 
@@ -808,28 +797,8 @@ public class SocketJoiner {
     private JSONObject publishHostId(
             InetSocketAddress hostAddr,
             MessagingChannel messagingChannel,
-            ByteBuffer remnantBytes,
-            List<Long> skews,
             Set<String> activeVersions) throws Exception
     {
-        /*
-         * Get the clock skew value
-         */
-        long remoteCurrentTime = 0;
-        if (remnantBytes != null && remnantBytes.hasRemaining()) {
-            assert(remnantBytes.remaining() == 8);
-            remoteCurrentTime = remnantBytes.getLong();
-        } else {
-            ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
-            while (currentTimeBuf.hasRemaining()) {
-                messagingChannel.getSocketChannel().read(currentTimeBuf);
-            }
-            currentTimeBuf.flip();
-            remoteCurrentTime = currentTimeBuf.getLong();
-            assert(currentTimeBuf.remaining() == 0);
-        }
-        long skew = System.currentTimeMillis() - remoteCurrentTime;
-        skews.add(skew);
         JSONObject jsObj = new JSONObject();
         jsObj.put(TYPE, ConnectionType.PUBLISH_HOSTID.name());
         jsObj.put(HOST_ID, m_localHostId);
@@ -863,28 +832,17 @@ public class SocketJoiner {
     public SocketInfo requestForConnection(InetSocketAddress hostAddr, int hostId) throws IOException, JSONException
     {
         SocketChannel socket = connectToHost(hostAddr);
-        SSLSetup sslSetup = null;
+        SSLEngine sslEngine;
         try {
-            sslSetup = setupSSLIfNeeded(socket, true);
+            sslEngine = initializeSocket(socket, true, null);
         } catch(IOException e) {
             try {
                 socket.close();
             } catch(IOException t) { }
             throw new IOException("SSL setup to " + socket.getRemoteAddress() + " failed", e);
         }
-        SSLEngine sslEngine = sslSetup == null ? null : sslSetup.m_sslEngine;
         MessagingChannel messagingChannel = MessagingChannel.get(socket, sslEngine);
-        /*
-         * Get the clock skew value
-         */
-        if (sslSetup != null && sslSetup.m_remnant.hasRemaining()) {
-            assert(sslSetup.m_remnant.remaining() == 8);
-        } else {
-            ByteBuffer currentTimeBuf = ByteBuffer.allocate(8);
-            while (currentTimeBuf.hasRemaining()) {
-                socket.read(currentTimeBuf);
-            }
-        }
+
         JSONObject jsObj = new JSONObject();
         jsObj.put(TYPE, ConnectionType.REQUEST_CONNECTION.name());
         jsObj.put(VERSION_STRING, m_acceptor.getVersionChecker().getVersionString());
@@ -918,27 +876,29 @@ public class SocketJoiner {
         try {
             LOG.debug("Non-Primary Starting & Connecting to Primary: " + coordIp + " in mode: " + mode);
             SocketChannel socket = createLeaderSocket(coordIp, mode);
-            if (socket == null) return; // in probe mode
+            if (socket == null)
+             {
+                return; // in probe mode
+            }
             socket.socket().setTcpNoDelay(true);
             socket.socket().setPerformancePreferences(0, 2, 1);
-            SSLSetup leaderSSLSetup = null;
+            SSLEngine leaderSSLEngine;
             try {
-                leaderSSLSetup = setupSSLIfNeeded(socket, true);
+                leaderSSLEngine = initializeSocket(socket, true, skews);
             } catch(IOException e) {
+                SocketAddress socketAddress = socket.getRemoteAddress();
                 try {
                     socket.close();
                 } catch(IOException t) { }
-                throw new IOException("SSL setup to " + socket.getRemoteAddress() + " failed", e);
+                throw new IOException("SSL setup to " + socketAddress + " failed", e);
             }
-            SSLEngine leaderSSLEngine = leaderSSLSetup == null ? null : leaderSSLSetup.m_sslEngine;
             MessagingChannel leaderChannel = MessagingChannel.get(socket, leaderSSLEngine);
             if (!coordIp.equals(m_coordIp)) {
                 m_coordIp = coordIp;
             }
+
             // blocking call, send a request to the leader node and get a host id assigned by the leader
-            RequestHostIdResponse response = requestHostId(leaderChannel,
-                    leaderSSLSetup == null ? null : leaderSSLSetup.m_remnant,
-                    skews, activeVersions);
+            RequestHostIdResponse response = requestHostId(leaderChannel, activeVersions);
             // check if the membership request is accepted
             JSONObject responseBody = response.getResponseBody();
             if (!responseBody.optBoolean(ACCEPTED, true)) {
@@ -990,11 +950,9 @@ public class SocketJoiner {
                 }
                 // connect to all the peer hosts (except leader) and advertise our existence
                 SocketChannel hostSocket = connectToHost(hostAddr);
-                SSLSetup sslSetup = setupSSLIfNeeded(hostSocket, true);
-                SSLEngine sslEngine = sslSetup == null ? null : sslSetup.m_sslEngine;
+                SSLEngine sslEngine = initializeSocket(hostSocket, true, skews);
                 MessagingChannel messagingChannel = MessagingChannel.get(hostSocket, sslEngine);
-                JSONObject hostInfo = publishHostId(hostAddr, messagingChannel,
-                        sslSetup == null ? null : sslSetup.m_remnant, skews, activeVersions);
+                JSONObject hostInfo = publishHostId(hostAddr, messagingChannel, activeVersions);
 
                 hostIds[ii] = hostId;
                 hostSockets[ii] = hostSocket;
