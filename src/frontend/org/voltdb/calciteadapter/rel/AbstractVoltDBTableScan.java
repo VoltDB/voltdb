@@ -18,13 +18,9 @@
 package org.voltdb.calciteadapter.rel;
 
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.calcite.rel.metadata.RelMetadataQuery;
-import org.apache.calcite.rel.type.RelDataType;
 
 /**
  * This is from Mike A. as an adaptor <code>org.apache.calcite.rel.core.TableScan</code> that
@@ -32,7 +28,7 @@ import org.apache.calcite.rel.type.RelDataType;
  */
 public abstract class AbstractVoltDBTableScan extends TableScan {
 
-    protected final VoltTable m_voltDBTable;
+    protected final VoltTable m_voltTable;
 
     protected AbstractVoltDBTableScan(RelOptCluster cluster,
                                       RelTraitSet traitSet,
@@ -40,7 +36,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan {
                                       VoltTable voltDBTable) {
         super(cluster, traitSet, table);
         assert(voltDBTable != null) : "VoltDB Table is null";
-        this.m_voltDBTable = voltDBTable;
+        this.m_voltTable = voltDBTable;
     }
 
     /**
@@ -53,10 +49,10 @@ public abstract class AbstractVoltDBTableScan extends TableScan {
         // specially when we merge scans with other redundant nodes like sort for example.
         // Are there better ways of doing this?
         String dg = super.computeDigest();
-        return dg + "_" + m_voltDBTable.getCatTable().getTypeName();
+        return dg + "_" + m_voltTable.getCatTable().getTypeName();
     }
 
-    public VoltTable getVoltDBTable() {
-        return m_voltDBTable;
+    public VoltTable getVoltTable() {
+        return m_voltTable;
     }
 }

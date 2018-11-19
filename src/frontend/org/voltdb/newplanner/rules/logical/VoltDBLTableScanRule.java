@@ -42,6 +42,6 @@ public class VoltDBLTableScanRule extends RelOptRule {
                 tableScan.getCluster(),
                 convertedTraits,
                 tableScan.getTable(),
-                tableScan.getVoltDBTable()));
+                tableScan.getVoltTable()));
     }
   }

@@ -63,6 +63,12 @@ public enum PlannerPhase {
             return mergedRuleSets(getCalciteLogicalRules(),
                     getVoltLogicalRules());
         }
+    },
+
+    PHYSICAL_CONVERSION("VoltDBPhysical Conversion Rules") {
+        public RuleSet getRules() {
+            return getVoltPhysicalConversionRules();
+        }
     };
 
     public final String description;
@@ -136,6 +142,12 @@ public enum PlannerPhase {
         ruleList.add(VoltDBLAggregateRule.INSTANCE);
         ruleList.add(VoltDBLJoinRule.INSTANCE);
 
-        return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
+        return RuleSets.ofList(ruleList);
+    }
+
+    static RuleSet getVoltPhysicalConversionRules() {
+        final List<RelOptRule> ruleList = new ArrayList<>();
+
+        return RuleSets.ofList(ruleList);
     }
 }
