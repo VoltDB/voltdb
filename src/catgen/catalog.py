@@ -73,7 +73,6 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     shutil.copy(prepath + "/CatalogChangeGroup.java", postpath)
     shutil.copy(prepath + "/CatalogDiffEngine.java", postpath)
     shutil.copy(prepath + "/CatalogOperator.java", postpath)
-    shutil.copy(prepath + "/CatalogCommand.java", postpath)
     shutil.copy(prepath + "/CatalogVisitor.java", postpath)
     shutil.copy(prepath + "/CatalogSerializer.java", postpath)
     shutil.copy(prepath + "/FilteredCatalogDiffEngine.java", postpath)
