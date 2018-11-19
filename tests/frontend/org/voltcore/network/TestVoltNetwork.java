@@ -35,7 +35,7 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.HashSet;
 import java.util.Set;
 
-import io.netty_voltpatches.buffer.CompositeByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import jsr166y.ThreadLocalRandom;
 import junit.framework.TestCase;
 

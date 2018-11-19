@@ -28,7 +28,7 @@ import javax.net.ssl.SSLException;
 
 import org.voltcore.network.TLSException;
 
-import io.netty_voltpatches.buffer.ByteBuf;
+import io.netty.buffer.ByteBuf;
 
 public class SSLBufferDecrypter {
     public final static int TLS_HEADER_SIZE = 5;

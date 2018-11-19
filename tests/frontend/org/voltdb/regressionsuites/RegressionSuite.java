@@ -42,7 +42,6 @@ import java.util.regex.Pattern;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
-import io.netty_voltpatches.util.internal.StringUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.CatalogContext;

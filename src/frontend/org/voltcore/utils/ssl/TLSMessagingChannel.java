@@ -26,9 +26,9 @@ import javax.net.ssl.SSLEngine;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.TLSException;
 
-import io.netty_voltpatches.buffer.ByteBuf;
-import io.netty_voltpatches.buffer.CompositeByteBuf;
-import io.netty_voltpatches.buffer.Unpooled;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 
 public class TLSMessagingChannel extends MessagingChannel {
     private final SSLEngine m_engine;
