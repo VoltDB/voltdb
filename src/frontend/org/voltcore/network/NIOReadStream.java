@@ -285,12 +285,12 @@ public class NIOReadStream {
      * A means to defer {@link BBContainer#discard()}. When
      * the data is read from {@link NIOReadStream#m_readBBContainers} it may
      * span one or more {@link BBContainer}. This class collects them, and
-     * uses a {@link io.netty_voltpatches.buffer.CompositeByteBuf} to map
+     * uses a {@link io.netty.buffer.CompositeByteBuf} to map
      * them for easy read access
      */
     public static final class Slice {
         private final List<ContainerSlice> m_slices;
-        public final io.netty_voltpatches.buffer.ByteBuf bb;
+        public final io.netty.buffer.ByteBuf bb;
         private final BitSet m_discarded;
 
         private Slice(List<ContainerSlice> slices) {
@@ -299,7 +299,7 @@ public class NIOReadStream {
             for (int i = 0; i < slices.size(); ++i) {
                 bbs[i] = slices.get(i).bb;
             }
-            bb = io.netty_voltpatches.buffer.Unpooled.wrappedBuffer(bbs);
+            bb = io.netty.buffer.Unpooled.wrappedBuffer(bbs);
             m_slices = slices;
         }
 
