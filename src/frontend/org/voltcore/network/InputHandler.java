@@ -20,7 +20,7 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import io.netty_voltpatches.buffer.CompositeByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 
 public interface InputHandler
 {

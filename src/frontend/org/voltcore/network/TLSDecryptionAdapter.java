@@ -20,7 +20,6 @@ package org.voltcore.network;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
@@ -36,10 +35,10 @@ import org.voltcore.utils.ssl.SSLBufferDecrypter;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
-import io.netty_voltpatches.buffer.ByteBuf;
-import io.netty_voltpatches.buffer.CompositeByteBuf;
-import io.netty_voltpatches.buffer.Unpooled;
-import io.netty_voltpatches.util.IllegalReferenceCountException;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.util.IllegalReferenceCountException;
 
 public class TLSDecryptionAdapter {
     public final static int TLS_HEADER_SIZE = 5;
