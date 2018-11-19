@@ -39,7 +39,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
@@ -71,6 +70,8 @@ import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.ssl.SslContext;
 import junit.framework.TestCase;
 
 /**
@@ -448,16 +449,15 @@ public class RegressionSuite extends TestCase {
 
         SSLEngine sslEngine = null;
         boolean sslEnabled = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
-         if (sslEnabled) {
-             SSLContext sslContext = SSLConfiguration.createSslContext(new SSLConfiguration.SslConfig());
-             sslEngine = sslContext.createSSLEngine("client", port);
-             sslEngine.setUseClientMode(true);
-         }
+        if (sslEnabled) {
+            SslContext sslContext = SSLConfiguration.createClientSslContext(new SSLConfiguration.SslConfig());
+            sslEngine = sslContext.newEngine(ByteBufAllocator.DEFAULT, hNp.getHost(), port);
+            sslEngine.setUseClientMode(true);
+        }
 
         final SocketChannel channel = (SocketChannel)
-            ConnectionUtil.getAuthenticatedConnection(
-                    hNp.getHostText(), m_username, hashedPassword, port, null,
-                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine, 0)[0];
+        ConnectionUtil.getAuthenticatedConnection(hNp.getHost(), m_username, hashedPassword, port, null,
+                ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine, 0)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {

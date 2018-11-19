@@ -41,8 +41,6 @@ import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import javax.net.ssl.SSLContext;
-
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
@@ -70,6 +68,8 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
+
+import io.netty.handler.ssl.SslContext;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -164,7 +164,8 @@ public class VoltDB {
         public SslContextFactory m_sslContextFactory = null;
 
         /** ssl context for client and admin ports */
-        public SSLContext m_sslContext = null;
+        public SslContext m_sslServerContext = null;
+        public SslContext m_sslClientContext = null;
 
         /** enable ssl */
         public boolean m_sslEnable = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));

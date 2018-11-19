@@ -48,7 +48,6 @@ public class TLSDecryptionAdapter {
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
-    private final SSLEngine m_sslEngine;
     private final SSLBufferDecrypter m_decrypter;
 
     private final ConcurrentLinkedDeque<ExecutionException> m_exceptions = new ConcurrentLinkedDeque<>();
@@ -67,16 +66,8 @@ public class TLSDecryptionAdapter {
         m_connection = connection;
         m_inputHandler = handler;
         m_ce = cipherExecutor;
-        m_sslEngine = sslEngine;
         m_decrypter = new SSLBufferDecrypter(sslEngine);
         m_dcryptgw = new DecryptionGateway();
-    }
-
-    /**
-     * this values may change if a TLS session renegotiates its cipher suite
-     */
-    private int applicationBufferSize() {
-        return m_sslEngine.getSession().getApplicationBufferSize();
     }
 
     void die() {
@@ -305,15 +296,12 @@ public class TLSDecryptionAdapter {
                 slicebbarr[0] = src.nioBuffer();
             }
 
-            final int appBuffSz = applicationBufferSize();
-            ByteBuf dest = m_ce.allocator().buffer(appBuffSz).writerIndex(appBuffSz);
-            ByteBuffer destjbb = dest.nioBuffer();
-            int decryptedBytes = 0;
+            ByteBuf dest ;
             int srcBBLength = slicebbarr[0].remaining();
             try {
-                decryptedBytes = m_decrypter.tlsunwrap(slicebbarr[0], destjbb);
+                dest = m_decrypter.tlsunwrap(slicebbarr[0], m_ce.allocator());
             } catch (TLSException e) {
-                m_inFlight.release(); dest.release();
+                m_inFlight.release();
                 m_exceptions.offer(new ExecutionException("fragment decrypt task failed", e));
                 networkLog.error("fragment decrypt task failed", e);
                 networkLog.error("isDead()=" + isDead() + ", Src buffer original length: " + srcBBLength +
@@ -325,8 +313,7 @@ public class TLSDecryptionAdapter {
 
             // src buffer is wholly consumed
             if (!isDead()) {
-                if (decryptedBytes > 0) {
-                    dest.writerIndex(destjbb.limit());
+                if (dest.isReadable()) {
                     m_msgbb.addComponent(true, dest);
                 } else {
                     // the TLS frame was consumed by the call to engines unwrap but it

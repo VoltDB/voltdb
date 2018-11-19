@@ -28,6 +28,7 @@ import org.voltcore.network.TLSException;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 
 public class TLSMessagingChannel extends MessagingChannel {
@@ -80,34 +81,17 @@ public class TLSMessagingChannel extends MessagingChannel {
         CompositeByteBuf msgbb = Unpooled.compositeBuffer();
 
         try {
-            ByteBuf clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
-            ByteBuffer src, dst;
-            do {
-                readbuf.clear();
-                if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
-                    return null;
-                }
-                src = readbuf.nioBuffer();
-                dst = clear.nioBuffer();
-            } while (m_decrypter.tlsunwrap(src, dst) == 0);
+            ByteBuf clear = doUnwrap(readbuf, appsz);
 
-            msgbb.addComponent(true, clear.writerIndex(dst.limit()));
+            msgbb.addComponent(true, clear);
             int needed = numBytes;
             if (numBytes == NOT_AVAILABLE) {
                 needed = msgbb.readableBytes() >= 4 ? validateLength(msgbb.readInt()) : NOT_AVAILABLE;
             }
             while (msgbb.readableBytes() < (needed == NOT_AVAILABLE ? 4 : needed)) {
-                clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
-                do {
-                    readbuf.clear();
-                    if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
-                        return null;
-                    }
-                    src = readbuf.nioBuffer();
-                    dst = clear.nioBuffer();
-                } while (m_decrypter.tlsunwrap(src, dst) == 0);
+                clear = doUnwrap(readbuf, appsz);
 
-                msgbb.addComponent(true, clear.writerIndex(dst.limit()));
+                msgbb.addComponent(true, clear);
 
                 if (needed == NOT_AVAILABLE && msgbb.readableBytes() >= 4) {
                     needed = validateLength(msgbb.readInt());
@@ -125,6 +109,20 @@ public class TLSMessagingChannel extends MessagingChannel {
             readbuf.release();
             msgbb.release();
         }
+    }
+
+    private ByteBuf doUnwrap(ByteBuf readbuf, int appsz) throws IOException {
+        PooledByteBufAllocator allocator = m_ce.allocator();
+        ByteBuf clear = allocator.buffer(appsz);
+        ByteBuffer src;
+        do {
+            readbuf.clear();
+            if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
+                return null;
+            }
+            src = readbuf.nioBuffer();
+        } while (!(clear = m_decrypter.tlsunwrap(src, clear, allocator)).isReadable());
+        return clear;
     }
 
     @Override
