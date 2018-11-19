@@ -204,6 +204,7 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.hash.Hashing;
@@ -211,6 +212,9 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+
+import io.netty.handler.ssl.CipherSuiteFilter;
+import io.netty.handler.ssl.SslContextBuilder;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -1419,7 +1423,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         config.m_port,
                         adminIntf,
                         config.m_adminPort,
-                        m_config.m_sslExternal ? m_config.m_sslContext : null);
+                        m_config.m_sslExternal ? m_config.m_sslServerContext : null);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -2953,15 +2957,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
         if (m_config.m_sslEnable) {
             try {
-                m_config.m_sslContextFactory = getSSLContextFactory(sslType);
-                m_config.m_sslContextFactory.start();
                 hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
                 m_config.m_sslExternal = m_config.m_sslExternal || (sslType != null && sslType.isExternal());
                 m_config.m_sslDR = m_config.m_sslDR || (sslType != null && sslType.isDr());
                 m_config.m_sslInternal = m_config.m_sslInternal || (sslType != null && sslType.isInternal());
-                if (m_config.m_sslExternal || m_config.m_sslDR || m_config.m_sslInternal) {
-                    m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
-                }
+                boolean setSslBuilder = m_config.m_sslExternal || m_config.m_sslDR || m_config.m_sslInternal;
+                setupSslContextCreators(sslType, setSslBuilder);
                 if (m_config.m_sslExternal) {
                     hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
                 }
@@ -2983,7 +2984,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return res == null ? resource : res.getPath();
     }
 
-    private SslContextFactory getSSLContextFactory(SslType sslType) {
+    private void setupSslContextCreators(SslType sslType, boolean setSslBuilder) {
         SslContextFactory sslContextFactory = new SslContextFactory();
         String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
         keyStorePath = null == keyStorePath  ? getResourcePath(Constants.DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
@@ -3023,15 +3024,63 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         sslContextFactory.setTrustStorePassword(trustStorePassword);
 
-        // exclude weak ciphers
-        sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
+        String[] excludeCiphers = new String[] {"SSL_RSA_WITH_DES_CBC_SHA",
                 "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
                 "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
                 "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
                 "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
+                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA"};
+
+        // exclude weak ciphers
+        sslContextFactory.setExcludeCipherSuites(excludeCiphers);
         sslContextFactory.setKeyManagerPassword(keyStorePassword);
-        return sslContextFactory;
+
+        m_config.m_sslContextFactory = sslContextFactory;
+
+        if (setSslBuilder) {
+            KeyManagerFactory keyManagerFactory;
+            try (FileInputStream fis = new FileInputStream(keyStorePath)) {
+                keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                keyStore.load(fis, keyStorePassword.toCharArray());
+                keyManagerFactory.init(keyStore, keyStorePassword.toCharArray());
+            } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | IOException
+                    | CertificateException e) {
+                throw new IllegalArgumentException("Could not initialize KeyManagerFactory", e);
+            }
+
+            TrustManagerFactory trustManagerFactory;
+            try (FileInputStream fis = new FileInputStream(trustStorePath)) {
+                trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                keyStore.load(fis, trustStorePassword.toCharArray());
+                trustManagerFactory.init(keyStore);
+            } catch (NoSuchAlgorithmException | IOException | KeyStoreException | CertificateException e) {
+                throw new IllegalArgumentException("Could not initialize TrustManagerFactory", e);
+            }
+
+            ImmutableSet<String> excludeCipherSet = ImmutableSet.copyOf(excludeCiphers);
+
+            CipherSuiteFilter filter = (ciphers, defaultCiphiers, supportedCiphers) -> {
+                List<String> filteredCiphers = new ArrayList<>(supportedCiphers.size());
+                for (String cipher : ciphers == null ? defaultCiphiers : ciphers) {
+                    if (supportedCiphers.contains(cipher) && !excludeCipherSet.contains(cipher)) {
+                        filteredCiphers.add(cipher);
+                    }
+                }
+
+                return filteredCiphers.toArray(new String[filteredCiphers.size()]);
+            };
+
+            try {
+                m_config.m_sslServerContext = SslContextBuilder.forServer(keyManagerFactory)
+                        .trustManager(trustManagerFactory).ciphers(null, filter).build();
+                m_config.m_sslClientContext = SslContextBuilder.forClient().trustManager(trustManagerFactory)
+                        .ciphers(null, filter).build();
+            } catch (SSLException e) {
+                throw new IllegalArgumentException("Could not create SslContexts", e);
+            }
+        }
     }
 
     private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
@@ -3113,7 +3162,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         //if SSL needs to be enabled for internal communication, SSL context has to be setup before starting HostMessenger
         setupSSL(readDepl);
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, m_config.m_sslInternal ? m_config.m_sslContext : null);
+        if (m_config.m_sslInternal) {
+            m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, m_config.m_sslServerContext,
+                    m_config.m_sslClientContext);
+        } else {
+            m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this                );
+        }
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 

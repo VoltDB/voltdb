@@ -161,7 +161,8 @@ public enum CipherExecutor {
                         PooledByteBufAllocator.defaultMaxOrder(),
                         PooledByteBufAllocator.defaultTinyCacheSize(),
                         PooledByteBufAllocator.defaultSmallCacheSize(),
-                        PooledByteBufAllocator.defaultNormalCacheSize());
+                        PooledByteBufAllocator.defaultNormalCacheSize(),
+                        PooledByteBufAllocator.defaultUseCacheForAllThreads());
     }
 
     // Initialization on demand holder (JSR-133)
@@ -175,7 +176,8 @@ public enum CipherExecutor {
                         PooledByteBufAllocator.defaultMaxOrder(),
                         PooledByteBufAllocator.defaultTinyCacheSize(),
                         PooledByteBufAllocator.defaultSmallCacheSize(),
-                        512);
+                        512,
+                        PooledByteBufAllocator.defaultUseCacheForAllThreads());
     }
 
     public static CipherExecutor valueOf(SSLEngine engn) {

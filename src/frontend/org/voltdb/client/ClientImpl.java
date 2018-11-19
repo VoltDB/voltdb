@@ -37,8 +37,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-import javax.net.ssl.SSLContext;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
@@ -51,6 +49,8 @@ import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
+
+import io.netty.handler.ssl.SslContext;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -89,7 +89,7 @@ public final class ClientImpl implements Client {
     private final String m_username;
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
-    private final SSLContext m_sslContext;
+    private final SslContext m_sslContext;
 
 
     /**
@@ -125,7 +125,7 @@ public final class ClientImpl implements Client {
         }
 
         if (config.m_enableSSL) {
-            m_sslContext = SSLConfiguration.createSslContext(config.m_sslConfig);
+            m_sslContext = SSLConfiguration.createClientSslContext(config.m_sslConfig);
         } else {
             m_sslContext = null;
         }
@@ -194,13 +194,18 @@ public final class ClientImpl implements Client {
                 return true;
             }
             else {
-                if (!m_createConnectionUsername.equals(username)) return false;
-                if (hashedPassword == null)
+                if (!m_createConnectionUsername.equals(username)) {
+                    return false;
+                }
+                if (hashedPassword == null) {
                     return m_hashedPassword == null;
-                else
-                    for (int i = 0; i < hashedPassword.length; i++)
-                        if (hashedPassword[i] != m_hashedPassword[i])
+                } else {
+                    for (int i = 0; i < hashedPassword.length; i++) {
+                        if (hashedPassword[i] != m_hashedPassword[i]) {
                             return false;
+                        }
+                    }
+                }
                 return true;
             }
         } finally {
@@ -216,7 +221,7 @@ public final class ClientImpl implements Client {
         return m_passwordHashCode;
     }
 
-    public SSLContext getSSLContext() {
+    public SslContext getSSLContext() {
         return m_sslContext;
     }
 
@@ -674,7 +679,9 @@ public final class ClientImpl implements Client {
                             m_backpressureLock.wait(timeoutNanos / TimeUnit.MILLISECONDS.toNanos(1), (int)(timeoutNanos % TimeUnit.MILLISECONDS.toNanos(1)));
 
                             //Condition is true, break and return false
-                            if (!m_backpressure) break;
+                            if (!m_backpressure) {
+                                break;
+                            }
 
                             //Calculate whether the timeout should be triggered
                             final long nowNanos = System.nanoTime();

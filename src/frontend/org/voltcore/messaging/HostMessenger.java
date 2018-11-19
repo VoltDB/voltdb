@@ -49,7 +49,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
@@ -92,6 +91,8 @@ import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.primitives.Longs;
+
+import io.netty.handler.ssl.SslContext;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -371,7 +372,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * used when coordinating joining hosts
      */
     private final JoinAcceptor m_acceptor;
-    private final SSLContext m_sslContext;
 
     private static final String SECONDARY_PICONETWORK_THREADS = "secondaryPicoNetworkThreads";
 
@@ -379,10 +379,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_siteMailboxes.get(hsId);
     }
 
-    public HostMessenger(Config config, HostWatcher hostWatcher, SSLContext sslContext) {
+    public HostMessenger(Config config, HostWatcher hostWatcher) {
+        this(config, hostWatcher, null, null);
+    }
+
+    public HostMessenger(Config config, HostWatcher hostWatcher, SslContext sslServerContext,
+            SslContext sslClientContext) {
         m_config = config;
         m_hostWatcher = hostWatcher;
-        m_sslContext = sslContext;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_acceptor = config.acceptor;
         //This ref is updated after the mesh decision is made.
@@ -393,7 +397,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 m_paused,
                 m_acceptor,
                 this,
-                m_sslContext);
+                sslServerContext,
+                sslClientContext);
 
         // Register a clean shutdown hook for the network threads.  This gets cranky
         // when crashLocalVoltDB() is called because System.exit() can get called from
