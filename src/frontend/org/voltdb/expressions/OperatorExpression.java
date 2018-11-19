@@ -192,6 +192,9 @@ public class OperatorExpression extends AbstractExpression {
                     m_right.m_left.explain(impliedTableName) + " ELSE " +
                     m_right.m_right.explain(impliedTableName) + " END)";
         }
+        if (type == ExpressionType.OPERATOR_UNARY_MINUS) {
+            return "(-" +  m_left.explain(impliedTableName) + ")";
+        }
         return "(" + m_left.explain(impliedTableName) +
             " " + type.symbol() + " " +
             m_right.explain(impliedTableName) + ")";
