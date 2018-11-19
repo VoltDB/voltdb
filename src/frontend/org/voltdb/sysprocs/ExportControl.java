@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
@@ -78,7 +79,8 @@ public class ExportControl extends VoltSystemProcedure {
                 final String exportSource = (String) params.toArray()[0];
                 final String[] targets = (String[]) params.toArray()[1];
                 final String operationMode = (String) params.toArray()[2];
-                List<String> exportTargets = Arrays.asList(targets);
+                List<String> exportTargets = Arrays.asList(targets).stream().
+                        filter(t -> (t != null && !"".equals(t))).collect(Collectors.toList());
                 ExportManager.instance().processStreamControl(exportSource, exportTargets,
                         OperationMode.valueOf(operationMode.toUpperCase()), results);
             }

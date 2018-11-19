@@ -846,12 +846,17 @@ public class ExportGeneration implements Generation {
                 // apply to partition leaders only
                 Integer partition = partitionIt.next();
                 boolean isLeader = ((SpInitiator)volt.getInitiator(partition)).isLeader();
+                if (!isLeader) {
+                    continue;
+                }
                 Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partition);
                 for (Iterator<ExportDataSource> it = sources.values().iterator(); it.hasNext();) {
                     ExportDataSource eds = it.next();
-                    // no export source match
-                    if (!"".equals(exportSource) && !eds.getTableName().equalsIgnoreCase(exportSource)) {
+                    // only blocked with export mastership
+                    if (!eds.isBlocked() || !eds.isMastershipAccepted()) {
                         continue;
+                    }
+                    if (!"".equals(exportSource) && !eds.getTableName().equalsIgnoreCase(exportSource)) {
                     }
 
                     // no target match
@@ -859,18 +864,12 @@ public class ExportGeneration implements Generation {
                         continue;
                     }
 
-                    if (eds.isBlocked() && eds.isMastershipAccepted()) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Unblocking " + eds);
-                        }
-                        if (isLeader) {
-                            eds.processStreamControl(operation);
-                            results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
-                        } else {
-                            results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_FAILURE,
-                                    "Couldn't release on partition replica. Waiting for export mastership transfer to partition master.");
-                        }
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Unblocking " + eds);
                     }
+
+                    eds.processStreamControl(operation);
+                    results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
                 }
             }
         }
