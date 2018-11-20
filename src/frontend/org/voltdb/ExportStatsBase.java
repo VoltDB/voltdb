@@ -93,8 +93,8 @@ public class ExportStatsBase extends StatsSource {
         columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID));
         columns.add(new ColumnInfo(Columns.PARTITION_ID, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.SOURCE_NAME, VoltType.STRING));
-        columns.add(new ColumnInfo(Columns.ACTIVE, VoltType.STRING));
         columns.add(new ColumnInfo(Columns.EXPORT_TARGET, VoltType.STRING));
+        columns.add(new ColumnInfo(Columns.ACTIVE, VoltType.STRING));
         columns.add(new ColumnInfo(Columns.TUPLE_COUNT, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.TUPLE_PENDING, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.LAST_QUEUED_TIMESTAMP, VoltType.TIMESTAMP));
