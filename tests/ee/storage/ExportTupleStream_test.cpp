@@ -53,9 +53,9 @@ static const int METADATA_DATA_SIZE = 41;
 //Data size without schema information. = 75
 static const int MAGIC_TUPLE_SIZE = TUPLE_HEADER_SZ + METADATA_DATA_SIZE + TUPLE_SIZE;
 //Buffer row count size
-static const int BUFFER_HEADER_ROW_COUNT_SIZE = 4;
-// Size of Buffer header including schema and uso(ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + BUFFER_HEADER_ROW_COUNT_SIZE)
-static const int BUFFER_HEADER_SIZE = ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + SCHEMA_SIZE + BUFFER_HEADER_ROW_COUNT_SIZE;
+// Size of Buffer header including schema and uso(ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE + MAGIC_HEADER_SPACE_FOR_JAVA + EXPORT_BUFFER_HEADER_SIZE)
+static const int BUFFER_HEADER_SIZE = ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE +
+        MAGIC_HEADER_SPACE_FOR_JAVA + SCHEMA_SIZE + ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE;
 
 // 1k buffer
 static const int BUFFER_SIZE = 1024;

@@ -39,20 +39,20 @@ const size_t ExportTupleStream::s_mdSchemaSize = (19 + 21 + 27 + 17 + 12 + 21 //
                                                                 + ExportTupleStream::METADATA_COL_CNT // Volt Type byte
                                                                 + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t)) // Int for column names string size
                                                                 + (ExportTupleStream::METADATA_COL_CNT * sizeof(int32_t))); // column length colInfo->length
-const size_t EXPORT_BUFFER_HEADER_SIZE = 12; // row count(4) + uniqueId(8)
+const size_t ExportTupleStream::s_EXPORT_BUFFER_HEADER_SIZE = 12; // row count(4) + uniqueId(8)
 const size_t ExportTupleStream::s_FIXED_BUFFER_HEADER_SIZE = 13; // Size of header before schema: Version(1) + GenerationId(8) + SchemaLen(4)
 const uint8_t ExportTupleStream::s_EXPORT_BUFFER_VERSION = 1;
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
                                      const std::string &tableName, const std::vector<std::string> &columnNames)
-    : TupleStreamBase(EL_BUFFER_SIZE, computeSchemaSize(tableName, columnNames) + s_FIXED_BUFFER_HEADER_SIZE + EXPORT_BUFFER_HEADER_SIZE),
+    : TupleStreamBase(EL_BUFFER_SIZE, computeSchemaSize(tableName, columnNames) + s_FIXED_BUFFER_HEADER_SIZE + s_EXPORT_BUFFER_HEADER_SIZE),
       m_partitionId(partitionId),
       m_siteId(siteId),
       m_signature(signature),
       m_generation(generation),
       m_tableName(tableName),
       m_columnNames(columnNames),
-      m_ddlSchemaSize(m_headerSpace - MAGIC_HEADER_SPACE_FOR_JAVA - s_FIXED_BUFFER_HEADER_SIZE - EXPORT_BUFFER_HEADER_SIZE)
+      m_ddlSchemaSize(m_headerSpace - MAGIC_HEADER_SPACE_FOR_JAVA - s_FIXED_BUFFER_HEADER_SIZE - s_EXPORT_BUFFER_HEADER_SIZE)
 {
     m_new = true;
 }
@@ -115,8 +115,8 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     }
     bool includeSchema = m_currBlock->needsSchema();
     if (includeSchema) {
-        ExportSerializeOutput blkhdr(m_currBlock->headerDataPtr()+EXPORT_BUFFER_HEADER_SIZE,
-                          m_currBlock->headerSize() - (MAGIC_HEADER_SPACE_FOR_JAVA+EXPORT_BUFFER_HEADER_SIZE));
+        ExportSerializeOutput blkhdr(m_currBlock->headerDataPtr()+s_EXPORT_BUFFER_HEADER_SIZE,
+                          m_currBlock->headerSize() - (MAGIC_HEADER_SPACE_FOR_JAVA+s_EXPORT_BUFFER_HEADER_SIZE));
         // FIXED_BUFFER_HEADER
         // version and generation Id for the buffer
         blkhdr.writeByte(s_EXPORT_BUFFER_VERSION);
