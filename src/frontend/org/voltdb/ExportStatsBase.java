@@ -25,34 +25,36 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class ExportStatsBase extends StatsSource {
 
-    public static enum ExportRole {
-        MASTER,
-        REPLICA,
-    }
-
     public static class ExportStatsRow {
         public final int m_partitionId;
         public final int m_siteId;
-        public final String m_streamName;
-        public final String m_role;
+        public final String m_sourceName;
         public final String m_exportTarget;
+        public final String m_isExporting;
         public final long m_tupleCount;
         public final long m_tuplesPending;
+        public final long m_lastQueuedTimestamp;
+        public final long m_lastAckedTimestamp;
         public final long m_averageLatency;
         public final long m_maxLatency;
+        public final long m_queueGap;
         public final String m_status;
 
-        public ExportStatsRow(int partitionId, int siteId, String streamName, String role, String exportTarget,
-                long tupleCount, long tuplesPending, long averageLatency, long maxLatency, String status) {
+        public ExportStatsRow(int partitionId, int siteId, String sourceName, String exportTarget, boolean isExporting,
+                long tupleCount, long tuplesPending, long lastQueuedTimestamp, long lastAckedTimestamp,
+                long averageLatency, long maxLatency, long queueGap, String status) {
             m_partitionId = partitionId;
             m_siteId = siteId;
-            m_streamName = streamName;
-            m_role = role;
+            m_sourceName = sourceName;
             m_exportTarget = exportTarget;
+            m_isExporting = isExporting ? "TRUE" : "FALSE";
             m_tupleCount = tupleCount;
             m_tuplesPending = tuplesPending > 0 ? tuplesPending : 0;
+            m_lastQueuedTimestamp = lastQueuedTimestamp;
+            m_lastAckedTimestamp = lastAckedTimestamp;
             m_averageLatency = averageLatency;
             m_maxLatency = maxLatency;
+            m_queueGap = queueGap;
             m_status = status;
         }
     }
@@ -66,13 +68,16 @@ public class ExportStatsBase extends StatsSource {
         // column for both tables
         public static final String SITE_ID = "SITE_ID";
         public static final String PARTITION_ID = "PARTITION_ID";
-        public static final String STREAM_NAME = "STREAM_NAME";
-        public static final String ROLE = "ROLE";
-        public static final String EXPORT_TARGET = "EXPORT_TARGET";
+        public static final String SOURCE_NAME = "SOURCE";
+        public static final String EXPORT_TARGET = "TARGET";
+        public static final String ACTIVE = "ACTIVE";
         public static final String TUPLE_COUNT = "TUPLE_COUNT";
         public static final String TUPLE_PENDING = "TUPLE_PENDING";
+        public static final String LAST_QUEUED_TIMESTAMP = "LAST_QUEUED_TIMESTAMP";
+        public static final String LAST_ACKED_TIMESTAMP = "LAST_ACKED_TIMESTAMP";
         public static final String AVERAGE_LATENCY = "AVERAGE_LATENCY";
         public static final String MAX_LATENCY = "MAX_LATENCY";
+        public static final String QUEUE_GAP = "QUEUE_GAP";
         public static final String STATUS = "STATUS";
     }
 
@@ -81,18 +86,22 @@ public class ExportStatsBase extends StatsSource {
         super(false);
     }
 
+    // Check cluster.py and checkstats.py if order of the columns is changed,
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
         columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID));
         columns.add(new ColumnInfo(Columns.PARTITION_ID, VoltType.BIGINT));
-        columns.add(new ColumnInfo(Columns.STREAM_NAME, VoltType.STRING));
-        columns.add(new ColumnInfo(Columns.ROLE, VoltType.STRING));
+        columns.add(new ColumnInfo(Columns.SOURCE_NAME, VoltType.STRING));
         columns.add(new ColumnInfo(Columns.EXPORT_TARGET, VoltType.STRING));
+        columns.add(new ColumnInfo(Columns.ACTIVE, VoltType.STRING));
         columns.add(new ColumnInfo(Columns.TUPLE_COUNT, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.TUPLE_PENDING, VoltType.BIGINT));
+        columns.add(new ColumnInfo(Columns.LAST_QUEUED_TIMESTAMP, VoltType.TIMESTAMP));
+        columns.add(new ColumnInfo(Columns.LAST_ACKED_TIMESTAMP, VoltType.TIMESTAMP));
         columns.add(new ColumnInfo(Columns.AVERAGE_LATENCY, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.MAX_LATENCY, VoltType.BIGINT));
+        columns.add(new ColumnInfo(Columns.QUEUE_GAP, VoltType.BIGINT));
         columns.add(new ColumnInfo(Columns.STATUS, VoltType.STRING));
     }
 

@@ -212,13 +212,16 @@ public class ExportManager
             ExportStatsRow stat = m_stats.get(rowIndex);
             rowValues[columnNameToIndex.get(Columns.SITE_ID)] = stat.m_siteId;
             rowValues[columnNameToIndex.get(Columns.PARTITION_ID)] = stat.m_partitionId;
-            rowValues[columnNameToIndex.get(Columns.STREAM_NAME)] = stat.m_streamName;
-            rowValues[columnNameToIndex.get(Columns.ROLE)] = stat.m_role;
+            rowValues[columnNameToIndex.get(Columns.SOURCE_NAME)] = stat.m_sourceName;
             rowValues[columnNameToIndex.get(Columns.EXPORT_TARGET)] = stat.m_exportTarget;
+            rowValues[columnNameToIndex.get(Columns.ACTIVE)] = stat.m_isExporting;
             rowValues[columnNameToIndex.get(Columns.TUPLE_COUNT)] = stat.m_tupleCount;
             rowValues[columnNameToIndex.get(Columns.TUPLE_PENDING)] = stat.m_tuplesPending;
+            rowValues[columnNameToIndex.get(Columns.LAST_QUEUED_TIMESTAMP)] = stat.m_lastQueuedTimestamp;
+            rowValues[columnNameToIndex.get(Columns.LAST_ACKED_TIMESTAMP)] = stat.m_lastAckedTimestamp;
             rowValues[columnNameToIndex.get(Columns.AVERAGE_LATENCY)] = stat.m_averageLatency;
             rowValues[columnNameToIndex.get(Columns.MAX_LATENCY)] = stat.m_maxLatency;
+            rowValues[columnNameToIndex.get(Columns.QUEUE_GAP)] = stat.m_queueGap;
             rowValues[columnNameToIndex.get(Columns.STATUS)] = stat.m_status;
         }
 
@@ -691,6 +694,7 @@ public class ExportManager
             String signature,
             long startSequenceNumber,
             long tupleCount,
+            long uniqueId,
             long bufferPtr,
             ByteBuffer buffer,
             boolean sync) {
@@ -706,7 +710,7 @@ public class ExportManager
                 return;
             }
             generation.pushExportBuffer(partitionId, signature, startSequenceNumber,
-                    (int)tupleCount, buffer, sync);
+                    (int)tupleCount, uniqueId, buffer, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);

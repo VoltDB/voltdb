@@ -108,7 +108,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
             }
             while (stats.advanceRow()) {
                 String memoryColumnName = isPersistent ? "TUPLE_ALLOCATED_MEMORY" : "TUPLE_PENDING";
-                String tableColumnName = isPersistent ? "TABLE_NAME": "STREAM_NAME";
+                String tableColumnName = isPersistent ? "TABLE_NAME": "SOURCE";
                 if (stats.getString(tableColumnName).equalsIgnoreCase(tableName)) {
                     if (stats.getLong("PARTITION_ID") == 0 && !zpassed) {
                         if (tuple1 == stats.getLong("TUPLE_COUNT")

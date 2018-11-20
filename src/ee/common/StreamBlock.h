@@ -172,7 +172,7 @@ namespace voltdb
             m_lastDRSequenceNumber = lastDRSequenceNumber;
         }
 
-        void recordCompletedSpTxnForDR(int64_t lastSpUniqueId) {
+        void recordCompletedSpTxn(int64_t lastSpUniqueId) {
             m_lastSpUniqueId = lastSpUniqueId;
         }
 

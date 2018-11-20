@@ -201,6 +201,7 @@ public class TestExportGeneration {
                     m_tableSignature,
                     seqNo,
                     1,
+                    0L,
                     foo.duplicate(),
                     false
                     );
@@ -230,6 +231,7 @@ public class TestExportGeneration {
                 m_tableSignature,
                 /*seqNo*/1L,
                 1,
+                0L,
                 foo.duplicate(),
                 false
                 );
