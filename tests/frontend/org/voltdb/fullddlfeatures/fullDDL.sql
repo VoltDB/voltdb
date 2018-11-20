@@ -15,8 +15,6 @@ T1
     width * length
 );
 
-CREATE INDEX minus ON T1(-width);
-
 CREATE TABLE T2
 (
     width INTEGER
@@ -52,7 +50,7 @@ CREATE UNIQUE INDEX abs_Hash_idx
 ON
 T3
 (
-    ABS(val) ASC
+    ABS(val)
 );
 
 CREATE UNIQUE INDEX nomeaninghashweirdidx
