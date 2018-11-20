@@ -33,6 +33,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -103,7 +104,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         quiesceAndVerifyTarget(client, m_verifier);
     }
 
-    public void testExportControl() throws Exception {
+    public void testExportControlParams() throws Exception {
         System.out.println("testFlowControl");
         final Client client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
@@ -111,11 +112,10 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             System.out.println("Waiting for hashinator to be initialized...");
         }
 
-        String s = "{source:\"ALLOW_NULLS\",targets:['custom'],command:\"release\"}";
-        VoltTable[] tables = client.callProcedure("@ExportControl", s).getResults();
-        for (VoltTable t : tables) {
-            System.out.println(t.toFormattedString());
-        }
+        String[] targets = {"custom"};
+        ClientResponse r = client.callProcedure("@ExportControl", "ALLOW_NULLS", targets, "release");
+        assert(r.getStatus() == ClientResponse.SUCCESS);
+        assert(r.getResults()[0].getRowCount() == 0);
     }
 
     public TestExportV2Suite(final String name) {
