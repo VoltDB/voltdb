@@ -33,11 +33,11 @@ import org.voltdb.VoltDB;
 /**
  * @author rdykiel
  *
- * Generic Export Manager Interface, alse exposes singleton ExportManager instance.
+ * Generic Export Manager Interface, also exposes singleton ExportManager instance.
  */
 public interface ExportManagerInterface {
 
-    static AtomicReference<ExportManagerInterface> m_self = new AtomicReference<>();;
+    static AtomicReference<ExportManagerInterface> m_self = new AtomicReference<>();
 
     public static ExportManagerInterface instance() {
         return m_self.get();
