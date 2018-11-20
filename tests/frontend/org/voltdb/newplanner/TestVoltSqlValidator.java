@@ -31,7 +31,7 @@ public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestVoltSqlValidator.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
-        setupValidator(CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
+        init(CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
     }
 
     @Override
@@ -102,5 +102,4 @@ public class TestVoltSqlValidator extends VoltSqlValidatorTestCase {
         assertExceptionIsThrown("select ^True or i^ from R2",
                 "Cannot apply 'OR' to arguments of type '<BOOLEAN> OR <INTEGER>'.*");
     }
-
 }

@@ -41,18 +41,24 @@ import java.util.Objects;
  */
 public class VoltSqlValidatorTestCase extends PlannerTestCase {
     private VoltSqlValidator m_validator;
+    private SchemaPlus m_schemaPlus;
 
     /**
-     * Set up m_validator from SchemaPlus.
+     * Set up m_validator and m_schemaPlus from SchemaPlus.
      *
      * @param schemaPlus
      */
-    protected void setupValidator(SchemaPlus schemaPlus) {
-        m_validator = new VoltSqlValidator(schemaPlus);
+    protected void init(SchemaPlus schemaPlus) {
+        m_schemaPlus = schemaPlus;
+        m_validator = new VoltSqlValidator(m_schemaPlus);
     }
 
     protected VoltSqlValidator getValidator() {
         return m_validator;
+    }
+
+    protected SchemaPlus getSchemaPlus() {
+        return m_schemaPlus;
     }
 
     protected SqlNode parseAndValidate(String sql) {
