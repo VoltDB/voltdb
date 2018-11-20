@@ -221,7 +221,7 @@ def check_export_stats(runner, export_tables_with_data, last_collection_time):
     for r in tablestats.tuples():
         # TUPLE_PENDING
         pendingData = r[9]
-        # STREAM_NAME
+        # SOURCE
         tablename = str(r[5])
         # PARTITION_ID
         pid = r[4]
