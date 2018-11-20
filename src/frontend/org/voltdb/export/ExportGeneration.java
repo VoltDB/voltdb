@@ -853,10 +853,6 @@ public class ExportGeneration implements Generation {
                 Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partition);
                 for (Iterator<ExportDataSource> it = sources.values().iterator(); it.hasNext();) {
                     ExportDataSource eds = it.next();
-                    // only blocked with export mastership
-                    if (!eds.isBlocked() || !eds.isMastershipAccepted()) {
-                        continue;
-                    }
                     if (!StringUtil.isEmpty(exportSource) && !eds.getTableName().equalsIgnoreCase(exportSource)) {
                         continue;
                     }

@@ -110,7 +110,7 @@ public class ExportControl extends VoltSystemProcedure {
 
         exportSource = exportSource == null ? "" : exportSource;
         LOG.info("Export " + operationMode + " source:" + exportSource + " targets:" + Arrays.toString(targets));
-        if (!"".equals(exportSource)) {
+        if (!StringUtil.isEmpty(exportSource)) {
             RealVoltDB volt = (RealVoltDB)VoltDB.instance();
             Set<String> exportStreams = CatalogUtil.getExportTableNames( volt.getCatalogContext().database);
             boolean isThere = exportStreams.stream().anyMatch(exportSource::equalsIgnoreCase);

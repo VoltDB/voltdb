@@ -1604,14 +1604,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
     }
 
-    public boolean isBlocked() {
-        return m_status == StreamStatus.BLOCKED;
-    }
-
-    public boolean isMastershipAccepted() {
-        return m_mastershipAccepted.get();
-    }
-
     public String getTarget() {
         return m_exportTargetName;
     }
@@ -1619,10 +1611,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public synchronized void processStreamControl(OperationMode operation) {
         switch (operation) {
         case RELEASE:
-            if (isBlocked() && isMastershipAccepted() && m_gapTracker.getFirstGap() != null) {
+            if (m_status == StreamStatus.BLOCKED && m_mastershipAccepted.get() && m_gapTracker.getFirstGap() != null) {
                 long firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Unblock " + this + " move firstUnpolledSeqNo from " +
+                    exportLog.debug("Release " + this + " move firstUnpolledSeqNo from " +
                             m_firstUnpolledSeqNo + " to " + firstUnpolledSeqNo);
                 }
 
@@ -1631,7 +1623,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
             break;
         default:
-            throw new IllegalArgumentException(operation + " is not a valid export control operation.");
+            // should not happen since the operation is verified prior to this call
         }
     }
 }
