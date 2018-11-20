@@ -554,7 +554,7 @@ public class ExportManager implements ExportManagerInterface
             String signature) {
         ExportManagerInterface instance = ExportManagerInterface.instance();
         try {
-            ExportGeneration generation = instance.getGeneration();
+            Generation generation = instance.getGeneration();
             if (generation != null) {
                 generation.pushEndOfStream(partitionId, signature);
             }
@@ -583,7 +583,7 @@ public class ExportManager implements ExportManagerInterface
         if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
         ExportManagerInterface instance = ExportManagerInterface.instance();
         try {
-            ExportGeneration generation = instance.getGeneration();
+            Generation generation = instance.getGeneration();
             if (generation == null) {
                 if (buffer != null) {
                     DBBPool.wrapBB(buffer).discard();
@@ -614,7 +614,7 @@ public class ExportManager implements ExportManagerInterface
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Syncing export data");
         }
-        ExportGeneration generation = ExportManagerInterface.instance().getGeneration();
+        Generation generation = ExportManagerInterface.instance().getGeneration();
         if (generation != null) {
             generation.sync(nofsync);
         }
@@ -626,7 +626,7 @@ public class ExportManager implements ExportManagerInterface
     }
 
     @Override
-    public ExportGeneration getGeneration() {
+    public Generation getGeneration() {
         return m_generation.get();
     }
 }

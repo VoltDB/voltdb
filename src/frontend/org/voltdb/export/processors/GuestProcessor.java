@@ -41,6 +41,7 @@ import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportGeneration;
+import org.voltdb.export.Generation;
 import org.voltdb.export.StreamBlockQueue;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -170,9 +171,10 @@ public class GuestProcessor implements ExportDataProcessor {
     }
 
     @Override
-    public void setExportGeneration(ExportGeneration generation) {
+    public void setExportGeneration(Generation generation) {
         assert generation != null;
-        m_generation = generation;
+        assert generation instanceof ExportGeneration;
+        m_generation = (ExportGeneration) generation;
     }
 
     private class ExportRunner implements Runnable {

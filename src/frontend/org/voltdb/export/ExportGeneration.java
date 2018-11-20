@@ -724,6 +724,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
     public void sync(final boolean nofsync) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
@@ -828,7 +829,6 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    @Override
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
         return m_dataSourcesByPartition;
     }
