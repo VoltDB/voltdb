@@ -606,12 +606,10 @@ public class SocketJoiner {
                     } finally {
                         selectedKeys.clear();
                     }
-                } catch (ClosedByInterruptException e) {
-                    throw new InterruptedException();
-                } catch (ClosedSelectorException e) {
+                } catch (ClosedByInterruptException | ClosedSelectorException e) {
                     throw new InterruptedException();
                 } catch (Exception e) {
-                    LOG.error("fault occurrent in the connection accept loop", e);
+                    LOG.error("Exception occurred in the connection accept loop", e);
                 }
             }
         }
