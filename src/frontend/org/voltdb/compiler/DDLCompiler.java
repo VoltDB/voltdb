@@ -1270,7 +1270,6 @@ public class DDLCompiler {
         if (hasCreated.get()) {
             return;
         }       // Code below this point is not executed any more.
-        System.err.println("Building table " + name /*+ " with " + node.toString()*/);
         // create a table node in the catalog
         final Table table = db.getTables().add(name);
         // set max value before return for view table

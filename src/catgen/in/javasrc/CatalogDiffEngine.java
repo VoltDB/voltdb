@@ -930,8 +930,8 @@ public class CatalogDiffEngine {
             suspect instanceof ColumnRef ||
             suspect instanceof Statement ||
             suspect instanceof PlanFragment ||
-            suspect instanceof TimeToLive ||
-            suspect instanceof Index) {
+            suspect instanceof TimeToLive /*||
+            suspect instanceof Index*/) {       // I need to white-list Index type; but this breaks TestAdhocAlterTable.
             return null;
         }
 
