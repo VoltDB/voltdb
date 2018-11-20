@@ -35,6 +35,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -856,16 +857,13 @@ public class ExportGeneration implements Generation {
                     if (!eds.isBlocked() || !eds.isMastershipAccepted()) {
                         continue;
                     }
-                    if (!"".equals(exportSource) && !eds.getTableName().equalsIgnoreCase(exportSource)) {
+                    if (!StringUtil.isEmpty(exportSource) && !eds.getTableName().equalsIgnoreCase(exportSource)) {
+                        continue;
                     }
 
                     // no target match
                     if (!exportTargets.isEmpty() && !exportTargets.contains(eds.getTarget())) {
                         continue;
-                    }
-
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Unblocking " + eds);
                     }
 
                     eds.processStreamControl(operation);

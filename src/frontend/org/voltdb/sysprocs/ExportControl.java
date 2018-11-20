@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -80,7 +81,7 @@ public class ExportControl extends VoltSystemProcedure {
                 final String[] targets = (String[]) params.toArray()[1];
                 final String operationMode = (String) params.toArray()[2];
                 List<String> exportTargets = Arrays.asList(targets).stream().
-                        filter(t -> (t != null && !"".equals(t))).collect(Collectors.toList());
+                        filter(s -> (!StringUtil.isEmpty(s))).collect(Collectors.toList());
                 ExportManager.instance().processStreamControl(exportSource, exportTargets,
                         OperationMode.valueOf(operationMode.toUpperCase()), results);
             }
