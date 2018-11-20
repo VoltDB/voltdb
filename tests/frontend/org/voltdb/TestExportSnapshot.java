@@ -31,7 +31,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
-import org.voltdb.export.ExportManager;
+import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExportTestExpectedData;
 import org.voltdb.export.TestExportBaseSocketExport;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -90,7 +90,7 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
 
         m_config.shutDown();
-        ExportManager.setInstanceForTest(null);
+        ExportManagerInterface.setInstanceForTest(null);
 
         m_config.startUp(false);
 
