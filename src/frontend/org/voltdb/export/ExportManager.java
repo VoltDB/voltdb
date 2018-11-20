@@ -221,7 +221,7 @@ public class ExportManager
             rowValues[columnNameToIndex.get(Columns.LAST_ACKED_TIMESTAMP)] = stat.m_lastAckedTimestamp;
             rowValues[columnNameToIndex.get(Columns.AVERAGE_LATENCY)] = stat.m_averageLatency;
             rowValues[columnNameToIndex.get(Columns.MAX_LATENCY)] = stat.m_maxLatency;
-            rowValues[columnNameToIndex.get(Columns.QUEUE_GAP)] = stat.m_missingTuple;
+            rowValues[columnNameToIndex.get(Columns.QUEUE_GAP)] = stat.m_queueGap;
             rowValues[columnNameToIndex.get(Columns.STATUS)] = stat.m_status;
         }
 

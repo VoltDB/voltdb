@@ -214,7 +214,7 @@ public class TestExportDataSource extends TestCase {
             int buffSize = 20 + StreamBlock.HEADER_SIZE;
             ByteBuffer foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
-            s.pushExportBuffer(1, 1, 0, foo, false);
+            s.pushExportBuffer(1, 1, 0L, foo, false);
             assertEquals(s.sizeInBytes(), 20 );
 
             //Push it twice more to check stats calc
@@ -403,7 +403,7 @@ public class TestExportDataSource extends TestCase {
         foo.duplicate().put(new byte[20]);
         // we are not purposely starting at 0, because on rejoin
         // we may start at non zero offsets
-        s.pushExportBuffer(1, 1, 0, foo, false);
+        s.pushExportBuffer(1, 1, 0L, foo, false);
         assertEquals(s.sizeInBytes(), 20 );
 
         //Push it twice more to check stats calc
@@ -490,7 +490,7 @@ public class TestExportDataSource extends TestCase {
             //Push and sync
             ByteBuffer foo = ByteBuffer.allocateDirect(200 + StreamBlock.HEADER_SIZE);
             foo.duplicate().put(new byte[200]);
-            s.pushExportBuffer(101, 1, 0, foo, true);
+            s.pushExportBuffer(101, 1, 0L, foo, true);
             long sz = s.sizeInBytes();
             assertEquals(200, sz);
             listing = getSortedDirectoryListingSegments();

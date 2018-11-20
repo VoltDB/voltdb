@@ -105,7 +105,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private long m_overallBlocksSent = 0;
     private long m_overallLatencyInMS = 0;
     private long m_overallMaxLatency = 0;
-    private long m_missingTuple = 0;
+    private long m_queueGap = 0;
     private StreamStatus m_status = StreamStatus.ACTIVE;
 
     private final ExportFormat m_format;
@@ -423,7 +423,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo > m_gapTracker.getFirstGap().getSecond()) {
             setStatus(StreamStatus.ACTIVE);
-            m_missingTuple = 0;
+            m_queueGap = 0;
         }
         // If persistent log contains gap, mostly due to node failures and rejoins, acks from leader might
         // fill the gap gradually.
@@ -594,7 +594,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
                         m_mastershipAccepted.get(), m_tupleCount, m_tuplesPending.get(),
                         m_lastQueuedTimestamp, m_lastAckedTimestamp,
-                        avgLatency, maxLatency, m_missingTuple, m_status.toString());
+                        avgLatency, maxLatency, m_queueGap, m_status.toString());
             }
         });
     }
@@ -987,7 +987,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
                     setStatus(StreamStatus.ACTIVE);
-                    m_missingTuple = 0;
+                    m_queueGap = 0;
                 }
                 final AckingContainer ackingContainer =
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
@@ -1408,7 +1408,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } else {
                 setStatus(StreamStatus.BLOCKED);
                 Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                m_missingTuple = gap.getSecond() - gap.getFirst() + 1;
+                m_queueGap = gap.getSecond() - gap.getFirst() + 1;
                 exportLog.warn("Stream is blocked because of data from sequence number " + gap.getFirst() +
                         " to " + gap.getSecond() + " is missing.");
             }
@@ -1484,7 +1484,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             setStatus(StreamStatus.BLOCKED);
                             Pair<Long, Long> gap = m_gapTracker.getFirstGap();
                             assert (gap != null);
-                            m_missingTuple = gap.getSecond() - gap.getFirst() + 1;
+                            m_queueGap = gap.getSecond() - gap.getFirst() + 1;
                             RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
                             if (voltdb.isClusterComplete()) {
                                 if (DISABLE_AUTO_GAP_RELEASE) {

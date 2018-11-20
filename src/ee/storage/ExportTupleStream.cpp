@@ -172,7 +172,6 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     const size_t startingUso = m_uso;
     m_uso += (streamHeaderSz + io.position());
     m_exportSequenceNumber++;
-    // TODO: better to only add this before commit
     m_currBlock->recordCompletedSpTxn(uniqueId);
 //    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
 //            << " sequence number " << seqNo

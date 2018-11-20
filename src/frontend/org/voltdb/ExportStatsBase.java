@@ -37,12 +37,12 @@ public class ExportStatsBase extends StatsSource {
         public final long m_lastAckedTimestamp;
         public final long m_averageLatency;
         public final long m_maxLatency;
-        public final long m_missingTuple;
+        public final long m_queueGap;
         public final String m_status;
 
         public ExportStatsRow(int partitionId, int siteId, String sourceName, String exportTarget, boolean isExporting,
                 long tupleCount, long tuplesPending, long lastQueuedTimestamp, long lastAckedTimestamp,
-                long averageLatency, long maxLatency, long missingTuple, String status) {
+                long averageLatency, long maxLatency, long queueGap, String status) {
             m_partitionId = partitionId;
             m_siteId = siteId;
             m_sourceName = sourceName;
@@ -54,7 +54,7 @@ public class ExportStatsBase extends StatsSource {
             m_lastAckedTimestamp = lastAckedTimestamp;
             m_averageLatency = averageLatency;
             m_maxLatency = maxLatency;
-            m_missingTuple = missingTuple;
+            m_queueGap = queueGap;
             m_status = status;
         }
     }
