@@ -105,6 +105,8 @@ public:
     static const size_t s_mdSchemaSize;
     // Size of Fixed header (not including schema)
     static const size_t s_FIXED_BUFFER_HEADER_SIZE;
+    // Size of Fixed buffer header (rowCount + uniqueId)
+    static const size_t s_EXPORT_BUFFER_HEADER_SIZE;
 
 private:
     // cached catalog values

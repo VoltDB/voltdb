@@ -69,6 +69,18 @@ public class TestIndexesSuite extends RegressionSuite {
         subTestOrderedMultiMultiIntGTEFailure();
     }
 
+    public void testUnaryMinusIndex()
+            throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        String sql, explainPlanStr;
+
+        explainPlanStr = "INDEX SCAN of \"P1\" using \"P1_IDX_UNARY_MINUS\" (for sort order only)";
+        // exactly match
+        sql = "select * from P1 order by -NUM, NUM2;";
+        checkQueryPlan(client, sql, explainPlanStr);
+    }
+
     // Index stuff to test:
     // scans against tree
     // - < <= = > >=, range with > and <

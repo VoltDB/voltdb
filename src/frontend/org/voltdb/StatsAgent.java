@@ -836,7 +836,7 @@ public class StatsAgent extends OpsAgent
             while (iter.hasNext()) {
                 ExportStatsRow stat = statsRows.getStatsRow(iter.next());
                 resultTable.addRow(now, statsRows.getHostId(), statsRows.getHostname(),
-                        stat.m_siteId, stat.m_partitionId, stat.m_streamName, "StreamedTable",
+                        stat.m_siteId, stat.m_partitionId, stat.m_sourceName, "StreamedTable",
                         stat.m_tupleCount, 0L, 0L, 0L, null, 0);
             }
         }

@@ -54,7 +54,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.ExportStatsBase.ExportRole;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
@@ -97,6 +96,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private String m_exportTargetName = "";
     private long m_tupleCount = 0;
     private AtomicInteger m_tuplesPending = new AtomicInteger(0);
+    private long m_lastQueuedTimestamp = 0;
+    private long m_lastAckedTimestamp = 0;
     private long m_averageLatency = 0; // for current counting-session
     private long m_maxLatency = 0; // for current counting-session
     private long m_blocksSentSinceClear = 0;
@@ -104,6 +105,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private long m_overallBlocksSent = 0;
     private long m_overallLatencyInMS = 0;
     private long m_overallMaxLatency = 0;
+    private long m_queueGap = 0;
+    private StreamStatus m_status = StreamStatus.ACTIVE;
 
     private final ExportFormat m_format;
 
@@ -164,7 +167,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         DROPPED,
         BLOCKED
     }
-    private StreamStatus m_status = StreamStatus.ACTIVE;
 
     static class QueryResponse {
         long lastSeq;
@@ -405,12 +407,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_committedBuffers.pop();
                 try {
                     lastSeqNo = sb.lastSequenceNumber();
+                    m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 } finally {
                     sb.discard();
                 }
             } else if (releaseSeqNo >= sb.startSequenceNumber()) {
                 sb.releaseTo(releaseSeqNo);
                 lastSeqNo = releaseSeqNo;
+                m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 break;
             }
         }
@@ -419,6 +423,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo > m_gapTracker.getFirstGap().getSecond()) {
             setStatus(StreamStatus.ACTIVE);
+            m_queueGap = 0;
         }
         // If persistent log contains gap, mostly due to node failures and rejoins, acks from leader might
         // fill the gap gradually.
@@ -586,10 +591,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     maxLatency = m_overallMaxLatency;
                 }
-                ExportRole role = m_mastershipAccepted.get() ? ExportRole.MASTER : ExportRole.REPLICA;
-
-                return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, role.toString(), m_exportTargetName,
-                        m_tupleCount, m_tuplesPending.get(), avgLatency, maxLatency, m_status.toString());
+                return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
+                        m_mastershipAccepted.get(), m_tupleCount, m_tuplesPending.get(),
+                        m_lastQueuedTimestamp, m_lastAckedTimestamp,
+                        avgLatency, maxLatency, m_queueGap, m_status.toString());
             }
         });
     }
@@ -605,6 +610,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private void pushExportBufferImpl(
             long startSequenceNumber,
             int tupleCount,
+            long uniqueId,
             ByteBuffer buffer,
             boolean sync,
             boolean poll) throws Exception {
@@ -645,7 +651,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 cont.discard();
                                 deleted.set(true);
                             }
-                        }, startSequenceNumber, tupleCount, false);
+                        }, startSequenceNumber, tupleCount, uniqueId, false);
 
                 // Mark release sequence number to partially acked buffer.
                 if (isAcked(sb.startSequenceNumber())) {
@@ -657,6 +663,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     sb.releaseTo(m_lastReleasedSeqNo);
                 }
 
+                m_lastQueuedTimestamp = sb.getTimestamp();
                 m_lastPushedSeqNo = lastSequenceNumber;
                 m_tupleCount += tupleCount;
                 m_tuplesPending.addAndGet(tupleCount);
@@ -693,6 +700,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void pushExportBuffer(
             final long startSequenceNumber,
             final int tupleCount,
+            final long uniqueId,
             final ByteBuffer buffer,
             final boolean sync) {
         try {
@@ -704,7 +712,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_es.isShutdown()) {
             //If we are shutting down push it to PBD
             try {
-                pushExportBufferImpl(startSequenceNumber, tupleCount, buffer, sync, false);
+                pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, sync, false);
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
             } finally {
@@ -718,7 +726,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 public void run() {
                     try {
                         if (!m_es.isShutdown()) {
-                            pushExportBufferImpl(startSequenceNumber, tupleCount, buffer, sync, m_readyForPolling);
+                            pushExportBufferImpl(startSequenceNumber, tupleCount, uniqueId, buffer, sync, m_readyForPolling);
                         }
                     } catch (Throwable t) {
                         VoltDB.crashLocalVoltDB("Error pushing export  buffer", true, t);
@@ -979,6 +987,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
                     setStatus(StreamStatus.ACTIVE);
+                    m_queueGap = 0;
                 }
                 final AckingContainer ackingContainer =
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
@@ -1399,6 +1408,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             } else {
                 setStatus(StreamStatus.BLOCKED);
                 Pair<Long, Long> gap = m_gapTracker.getFirstGap();
+                m_queueGap = gap.getSecond() - gap.getFirst() + 1;
                 exportLog.warn("Stream is blocked because of data from sequence number " + gap.getFirst() +
                         " to " + gap.getSecond() + " is missing.");
             }
@@ -1472,16 +1482,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         if (bestCandidate == null) {
                             setStatus(StreamStatus.BLOCKED);
+                            Pair<Long, Long> gap = m_gapTracker.getFirstGap();
+                            assert (gap != null);
+                            m_queueGap = gap.getSecond() - gap.getFirst() + 1;
                             RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
                             if (voltdb.isClusterComplete()) {
                                 if (DISABLE_AUTO_GAP_RELEASE) {
                                     // Show warning only in full cluster.
-                                    Pair<Long, Long> gap = m_gapTracker.getFirstGap();
                                     exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
                                             gap.getFirst() + " to " + gap.getSecond());
                                 } else {
                                     // TODO: discard warn message once the auto gap release is implemented
-                                    Pair<Long, Long> gap = m_gapTracker.getFirstGap();
                                     exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
                                             gap.getFirst() + " to " + gap.getSecond());
                                 }

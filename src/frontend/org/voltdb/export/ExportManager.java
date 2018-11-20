@@ -575,6 +575,7 @@ public class ExportManager implements ExportManagerInterface
             String signature,
             long startSequenceNumber,
             long tupleCount,
+            long uniqueId,
             long bufferPtr,
             ByteBuffer buffer,
             boolean sync) {
@@ -590,7 +591,7 @@ public class ExportManager implements ExportManagerInterface
                 return;
             }
             generation.pushExportBuffer(partitionId, signature, startSequenceNumber,
-                    (int)tupleCount, buffer, sync);
+                    (int)tupleCount, uniqueId, buffer, sync);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
             exportLog.error("Error pushing export buffer", e);
