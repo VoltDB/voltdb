@@ -961,8 +961,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 m_seqNoToDrain = firstUnpolledSeq - 1;
                                 mastershipCheckpoint(firstUnpolledSeq - 1);
                             }
-                            m_pollFuture = null;
-                            return;
+                            break;
                         }
                     }
                 }
