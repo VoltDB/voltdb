@@ -921,6 +921,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_generation.onSourceDone(m_partitionId, m_signature);
                 return;
             }
+            releaseBlock();
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
@@ -1002,6 +1003,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         } catch (Throwable t) {
             fut.setException(t);
+        }
+    }
+
+    private void releaseBlock() {
+        if (m_status == StreamStatus.BLOCKED && !DISABLE_AUTO_GAP_RELEASE) {
+            RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
+            if (voltdb.isClusterComplete()) {
+                processStreamControl(OperationMode.RELEASE);
+            }
         }
     }
 
@@ -1489,10 +1499,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             if (voltdb.isClusterComplete()) {
                                 if (DISABLE_AUTO_GAP_RELEASE) {
                                     // Show warning only in full cluster.
-                                    exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
-                                            gap.getFirst() + " to " + gap.getSecond());
-                                } else {
-                                    // TODO: discard warn message once the auto gap release is implemented
                                     exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
                                             gap.getFirst() + " to " + gap.getSecond());
                                 }
