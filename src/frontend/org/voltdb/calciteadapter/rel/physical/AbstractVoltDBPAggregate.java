@@ -68,9 +68,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
         super.explainTerms(pw);
         pw.item("split", m_splitCount);
         pw.item("coorinator", m_isCoordinatorAggr);
-        if (m_postPredicate != null) {
-            pw.item("having", m_postPredicate);
-        }
+        pw.itemIf("having", m_postPredicate, m_postPredicate != null);
         return pw;
     }
 

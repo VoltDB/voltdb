@@ -42,7 +42,7 @@ public class VoltDBPSeqScanRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLTableScan tableScan = (VoltDBLTableScan) call.rel(0);
+        VoltDBLTableScan tableScan = call.rel(0);
         RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
 
         // Table distribution
@@ -56,7 +56,7 @@ public class VoltDBPSeqScanRule extends RelOptRule {
                 tableScan.getVoltTable(),
                 scanSplitCount);
 
-        AbstractVoltDBPExchange exchangeRel = null;
+        AbstractVoltDBPExchange exchangeRel;
         if (Type.SINGLETON == tableDist.getType()) {
             exchangeRel = new VoltDBPSingletonExchange(
                     tableScan.getCluster(),

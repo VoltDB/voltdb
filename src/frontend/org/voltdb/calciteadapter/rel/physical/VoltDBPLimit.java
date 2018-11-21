@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -29,13 +30,13 @@ import org.apache.calcite.rel.SingleRel;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.voltdb.plannodes.LimitPlanNode;
+import org.apache.calcite.sql.SqlKind;
 
 import java.util.List;
 
 public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
 
-    // @TODO limit / offset as expressions or parameters
+    // TODO: limit / offset as expressions or parameters
     private RexNode m_offset;
     private RexNode m_limit;
 
@@ -49,7 +50,7 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
             RexNode limit,
             int splitCount) {
         super(cluster, traitSet, input);
-        assert traitSet.contains(VoltDBPRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltDBPRel.VOLTDB_PHYSICAL);
         m_offset = offset;
         m_limit = limit;
         m_splitCount = splitCount;
@@ -103,10 +104,11 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
         double limit = 0f;
-        if (m_limit != null) {
+        // limit and offset can be question marks
+        if (m_limit != null && m_limit.getKind() != SqlKind.DYNAMIC_PARAM) {
             limit = RexLiteral.intValue(m_limit);
         }
-        if (m_offset != null) {
+        if (m_offset != null && m_offset.getKind() != SqlKind.DYNAMIC_PARAM) {
             limit += RexLiteral.intValue(m_offset);
         }
         double defaultLimit = super.estimateRowCount(mq);
@@ -124,7 +126,8 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
         // distribution trait. This would make a "correct"
         // VoltDBPLimit (Single) / DistributedExchange / VoltDBPLimit (Hash) plan
         // less expensive than an "incorrect" VoltDBPLimit (Any) / DistributedExchange one.
-        if (RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
+        if (getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) != null &&
+                RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
             rowCount *= 10000;
         }
 
@@ -135,17 +138,5 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
     @Override
     public int getSplitCount() {
         return m_splitCount;
-    }
-
-    public static LimitPlanNode toPlanNode(RexNode limit, RexNode offset) {
-        LimitPlanNode lpn = new LimitPlanNode();
-        lpn = new LimitPlanNode();
-        if (limit != null) {
-            lpn.setLimit(RexLiteral.intValue(limit));
-        }
-        if (offset != null) {
-            lpn.setOffset(RexLiteral.intValue(offset));
-        }
-        return lpn;
     }
 }

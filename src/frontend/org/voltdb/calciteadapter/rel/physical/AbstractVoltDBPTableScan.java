@@ -44,11 +44,11 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
     protected final int m_splitCount;
 
     // Inline Rels
-    protected RexNode m_offset = null;
-    protected RexNode m_limit = null;
-    protected RelNode m_aggregate = null;
-    protected RelDataType m_preAggregateRowType = null;
-    protected RexProgram m_preAggregateProgram = null;
+    protected RexNode m_offset;
+    protected RexNode m_limit;
+    protected RelNode m_aggregate;
+    protected RelDataType m_preAggregateRowType;
+    protected RexProgram m_preAggregateProgram;
 
     protected AbstractVoltDBPTableScan(RelOptCluster cluster,
                                        RelTraitSet traitSet,
@@ -135,19 +135,15 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
         pw.item("split", m_splitCount);
-
         if (m_program != null) {
             m_program.explainCalc(pw);
         }
-        if (m_limit != null) {
-            pw.item("limit", m_limit);
-        }
-        if (m_offset != null) {
-            pw.item("offset", m_offset);
-        }
+        pw.itemIf("limit", m_limit, m_limit != null);
+        pw.itemIf("offset", m_offset, m_offset != null);
         if (m_aggregate != null) {
             pw.item("aggregate", m_aggregate.getDigest());
         }
+
         return pw;
     }
 
@@ -192,20 +188,6 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
     public abstract RelNode copyWithProgram(RelTraitSet traitSet, RexProgram program, RexBuilder rexBuilder);
 
     public abstract RelNode copyWithAggregate(RelTraitSet traitSet, RelNode aggregate);
-
-    /**
-     * Convert Scan's LIMIT / OFFSET to an inline LimitPlanNode
-     *
-     * @param node
-     * @return
-     */
-    protected AbstractPlanNode addLimitOffset(AbstractPlanNode node) {
-        if (hasLimitOffset()) {
-            LimitPlanNode limitPlanNode = VoltDBPLimit.toPlanNode(m_limit, m_offset);
-            node.addInlinePlanNode(limitPlanNode);
-        }
-        return node;
-    }
 
     protected double estimateRowCountWithLimit(double rowCount) {
         if (m_limit != null) {

@@ -27,12 +27,12 @@ public interface VoltDBPRel extends RelNode {
     final static Convention VOLTDB_PHYSICAL = new Convention.Impl("VOLTDB_PHYSICAL", VoltDBPRel.class) {
         public boolean canConvertConvention(Convention toConvention) {
             return true;
-          }
+        }
 
-          public boolean useAbstractConvertersForConversion(RelTraitSet fromTraits,
-                                                            RelTraitSet toTraits) {
+        public boolean useAbstractConvertersForConversion(RelTraitSet fromTraits,
+                                                          RelTraitSet toTraits) {
             return true;
-          }
+        }
 
     };
 
@@ -44,19 +44,21 @@ public interface VoltDBPRel extends RelNode {
     default AbstractPlanNode toPlanNode() {
         // TODO: implement the method in future
         return null;
-    };
+    }
 
     /**
      * Return number of concurrent processes that this VoltDBPRel will be executed in.
      * If this rel/plan node belongs to a coordinator then its split count is 1
      * For a fragment rel/node the split count = a number of hosts * number of sites per host
+     *
      * @return Split count
      */
     int getSplitCount();
 
     /**
      * Return a child VoltDBRel node in a specified position
-     * @param node Parent Node
+     *
+     * @param node         Parent Node
      * @param childOrdinal Child position
      * @return VoltDBRel
      */
@@ -67,20 +69,21 @@ public interface VoltDBPRel extends RelNode {
                 inputNode = ((RelSubset) inputNode).getBest();
                 assert (inputNode != null);
             }
-            assert(inputNode instanceof VoltDBPRel);
+            assert (inputNode instanceof VoltDBPRel);
         }
         return (VoltDBPRel) inputNode;
     }
 
     /**
      * Convert a child VoltDBRel node in a specified position to an AbstractPlanNode
+     *
      * @param node
      * @param childOrdinal
      * @return AbstractPlanNode
      */
     default AbstractPlanNode inputRelNodeToPlanNode(RelNode node, int childOrdinal) {
         VoltDBPRel inputNode = getInputNode(node, childOrdinal);
-        assert(inputNode != null);
+        assert (inputNode != null);
         return inputNode.toPlanNode();
     }
 }

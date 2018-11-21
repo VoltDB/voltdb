@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -52,7 +53,7 @@ public class VoltDBPSort extends Sort implements VoltDBPRel {
             RexNode limit,
             int splitCount) {
         super(cluster, traitSet, input, collation, offset, limit);
-        assert traitSet.contains(VoltDBPRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltDBPRel.VOLTDB_PHYSICAL);
         m_splitCount = splitCount;
     }
 
@@ -112,7 +113,8 @@ public class VoltDBPSort extends Sort implements VoltDBPRel {
         double rowCount = estimateRowCount(mq);
         // Hack. Discourage Calcite from picking a plan with a Sort that have a RelDistributions.ANY
         // distribution trait.
-        if (RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
+        if (getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) != null &&
+                RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
             rowCount *= 10000;
         }
         RelOptCost defaultCost = super.computeSelfCost(planner, mq);

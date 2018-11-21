@@ -65,13 +65,11 @@ public class VoltDBPSortConvertRule extends ConverterRule {
         int splitCount = (childDistribution.getType().equals(RelDistributions.ANY.getType())) ?
                 1 : AbstractVoltDBPExchange.DISTRIBUTED_SPLIT_COUNT;
 
-        RelNode newRel = new VoltDBPSort(
+        return new VoltDBPSort(
                 sort.getCluster(),
                 traits.plus(sort.getCollation()),
                 convert(sort.getInput(), traits.simplify()),
                 sort.getCollation(),
                 splitCount);
-
-        return newRel;
     }
 }

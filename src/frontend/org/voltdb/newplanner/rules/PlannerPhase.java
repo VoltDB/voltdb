@@ -37,6 +37,7 @@ import org.voltdb.newplanner.rules.logical.VoltDBLSortRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLTableScanRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPAggregateRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPCalcRule;
+import org.voltdb.newplanner.rules.physical.VoltDBPJoinRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPLimitRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPSeqScanRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPSortConvertRule;
@@ -161,6 +162,7 @@ public enum PlannerPhase {
         ruleList.add(VoltDBPSortConvertRule.INSTANCE_VOLTDB);
         ruleList.add(VoltDBPLimitRule.INSTANCE);
         ruleList.add(VoltDBPAggregateRule.INSTANCE);
+        ruleList.add(VoltDBPJoinRule.INSTANCE);
 
         return RuleSets.ofList(ruleList);
     }

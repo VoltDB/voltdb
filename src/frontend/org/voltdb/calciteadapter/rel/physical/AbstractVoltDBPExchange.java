@@ -27,6 +27,7 @@ import org.apache.calcite.rel.core.Exchange;
 
 public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDBPRel {
 
+    // TODO: why 30?
     public static final int DISTRIBUTED_SPLIT_COUNT = 30;
 
     // Exchange's split count equals the count of physical nodes its input runs on
@@ -50,8 +51,7 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
 
     @Override
     protected String computeDigest() {
-        String digest = super.computeDigest();
-        return digest;
+        return super.computeDigest();
     }
 
     @Override

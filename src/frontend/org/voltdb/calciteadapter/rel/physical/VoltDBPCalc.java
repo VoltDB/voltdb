@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -41,7 +42,7 @@ public class VoltDBPCalc extends Calc implements VoltDBPRel {
             RexProgram program,
             int splitCount) {
         super(cluster, traitSet, input, program);
-        assert VoltDBPRel.VOLTDB_PHYSICAL.equals(getConvention());
+        Preconditions.checkArgument(getConvention() == VoltDBPRel.VOLTDB_PHYSICAL);
         m_splitCount = splitCount;
     }
 
@@ -89,10 +90,10 @@ public class VoltDBPCalc extends Calc implements VoltDBPRel {
         double rowCount = estimateRowCount(mq);
         // Hack. Discourage Calcite from picking a plan with a Calc that have a RelDistributions.ANY
         // distribution trait.
-        if (getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) != null &&
-                RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
-            rowCount *= 10000;
-        }
+//        if (getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) != null &&
+//                RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
+//            rowCount *= 10000;
+//        }
         RelOptCost defaultCost = super.computeSelfCost(planner, mq);
         return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
 

@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -38,25 +39,25 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
      * @param cluster
      * @param traitSet
      * @param table
-     * @param voltDBTable
+     * @param voltTable
      */
     public VoltDBPTableSeqScan(RelOptCluster cluster,
                                RelTraitSet traitSet,
                                RelOptTable table,
-                               VoltTable voltDBTable,
+                               VoltTable voltTable,
                                int splitCount) {
           this(cluster,
                   traitSet,
                   table,
-                  voltDBTable,
-                  RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory())),
+                  voltTable,
+                  RexProgram.createIdentity(voltTable.getRowType(cluster.getTypeFactory())),
                   null,
                   null,
                   null,
                   null,
                   null,
                   splitCount);
-          assert traitSet.contains(VoltDBPRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltDBPRel.VOLTDB_PHYSICAL);
     }
 
     /**
@@ -109,7 +110,6 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
         double rowCount = AbstractVoltDBPTableScan.MAX_TABLE_ROW_COUNT;
         rowCount = estimateRowCountWithPredicate(rowCount);
         // SeqScanPlanNode does not pay attention to limit
-//        rowCount = estimateRowCountWithLimit(rowCount);
 
         // If table is distributed divide the row count by the split count.
         // The exchange node would combine individual fragments counts into a total.
