@@ -611,7 +611,8 @@ public class PlanAssembler {
             if (scan instanceof StmtCommonTableScan) {
                 StmtCommonTableScan ctScan = (StmtCommonTableScan)scan;
                 if ( ! ctScan.getIsReplicated()) {
-                    throw new PlanningErrorException("The query defining a common table in a multi-partitioned query can only use replicated tables.");
+                    throw new PlanningErrorException(
+                            "The query defining a common table in a multi-partitioned query can only use replicated tables.");
                 }
             }
         }
