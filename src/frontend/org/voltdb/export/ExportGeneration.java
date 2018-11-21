@@ -51,12 +51,9 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.utils.CatalogUtil;
-
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -208,8 +205,10 @@ public class ExportGeneration implements Generation {
                 Map<String, ExportDataSource> sources = it.next();
                 for (String signature : sources.keySet()) {
                     ExportDataSource src = sources.get(signature);
-                    if (!exportSignatures.contains(src)) {
+                    if (!exportSignatures.contains(signature)) {
                         src.setStatus(ExportDataSource.StreamStatus.DROPPED);
+                    } else if (src.getStatus() == ExportDataSource.StreamStatus.DROPPED) {
+                        src.setStatus(ExportDataSource.StreamStatus.ACTIVE);
                     }
                 }
             }

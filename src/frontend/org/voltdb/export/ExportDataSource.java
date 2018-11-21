@@ -1576,6 +1576,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         this.m_status = status;
     }
 
+    public StreamStatus getStatus() {
+        return m_status;
+    }
+
     @Override
     public String toString() {
         return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId();
