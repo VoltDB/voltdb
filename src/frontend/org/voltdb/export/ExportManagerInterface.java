@@ -29,6 +29,8 @@ import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.sysprocs.ExportControl.OperationMode;
 
 /**
  * @author rdykiel
@@ -123,4 +125,7 @@ public interface ExportManagerInterface {
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
             boolean isRecover, long sequenceNumber);
+
+    public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode valueOf,
+            VoltTable results);
 }

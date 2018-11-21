@@ -632,6 +632,7 @@ public class ExportManager implements ExportManagerInterface
         return m_generation.get();
     }
 
+    @Override
     public void processStreamControl(String exportStream, List<String> exportTargets, OperationMode operation, VoltTable results) {
         if (m_generation.get() != null) {
            m_generation.get().processStreamControl(exportStream, exportTargets, operation, results);
