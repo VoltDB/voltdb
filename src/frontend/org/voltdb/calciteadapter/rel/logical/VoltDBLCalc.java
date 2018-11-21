@@ -17,42 +17,36 @@
 
 package org.voltdb.calciteadapter.rel.logical;
 
-import java.util.List;
-
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.calciteadapter.rel.VoltTable;
-import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
+import org.apache.calcite.rel.core.Calc;
+import org.apache.calcite.rex.RexProgram;
 
-public class VoltDBLTableScan extends AbstractVoltDBTableScan implements VoltDBLRel {
+/**
+ * Logical Calc with <code>VOLTDB_LOGICAL</code> convention trait.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
+public class VoltDBLCalc extends Calc implements VoltDBLRel{
 
-    public VoltDBLTableScan(RelOptCluster cluster,
+    public VoltDBLCalc(
+            RelOptCluster cluster,
             RelTraitSet traitSet,
-            RelOptTable table,
-            VoltTable voltDBTable) {
+            RelNode input,
+            RexProgram program) {
           super(cluster,
                   traitSet,
-                  table,
-                  voltDBTable);
+                  input,
+                  program);
           assert traitSet.contains(VoltDBLRel.VOLTDB_LOGICAL);
-    }
+        }
 
-    @Override
-    public RelNode copy(RelTraitSet traits, List<RelNode> inputs) {
-        return new VoltDBLTableScan(
-                getCluster(),
-                traits,
-                getTable(),
-                getVoltDBTable());
-    }
+        @Override
+        public Calc copy(RelTraitSet traitSet, RelNode child,
+                         RexProgram program) {
+            return new VoltDBLCalc(this.getCluster(), traitSet, child, program);
+        }
 
-    public VoltDBLTableScan copy() {
-        return new VoltDBLTableScan(
-                getCluster(),
-                getTraitSet(),
-                getTable(),
-                getVoltDBTable());
-    }
 }

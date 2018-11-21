@@ -17,9 +17,13 @@
 
 package org.voltdb.newplanner;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
+import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.TableFunctionScan;
@@ -28,6 +32,8 @@ import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.tools.Program;
+import org.apache.calcite.tools.Programs;
 import org.voltdb.newplanner.metadata.VoltDBDefaultRelMetadataProvider;
 import org.voltdb.newplanner.rules.PlannerPhase;
 import org.voltdb.types.CalcitePlannerType;
@@ -168,8 +174,14 @@ public class CalcitePlanner {
                 break;
             }
             case VOLCANO: {
-                // TODO: VOLCANO planner
-                output = null;
+                // the cluster's only planner is the volcano planner.
+                final RelOptPlanner planner = input.getCluster().getPlanner();
+                final Program program = Programs.of(phase.getRules());
+                Preconditions.checkArgument(planner instanceof VolcanoPlanner,
+                        "Cluster is expected to be constructed using VolcanoPlanner. Was actually of type %s.", planner.getClass()
+                                .getName());
+                output = program.run(planner, input, toTraits,
+                        ImmutableList.of(), ImmutableList.of());
                 break;
             }
             default: {

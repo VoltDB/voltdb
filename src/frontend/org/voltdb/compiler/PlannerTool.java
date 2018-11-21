@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
@@ -33,6 +34,7 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.newplanner.CalcitePlanner;
@@ -217,9 +219,10 @@ public class PlannerTool {
         VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, m_schemaPlus);
         RelRoot root = converter.convertQuery(validatedNode, false, true);
         root = root.withRel(converter.decorrelate(validatedNode, root.rel));
-        // apply calcite logical rules using a HEP planner
-        RelNode nodeAfterCalciteLogical = CalcitePlanner.transform(CalcitePlannerType.HEP, PlannerPhase.CALCITE_LOGICAL,
-                root.rel);
+        // apply calcite and Volt logical rules
+        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
+        RelNode nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
+                root.rel, logicalTraits);
 
         return null;
     }

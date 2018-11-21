@@ -17,7 +17,7 @@
 
 package org.voltdb.newplanner.rules;
 
-
+import com.google_voltpatches.common.collect.ImmutableCollection;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.CalcMergeRule;
@@ -29,6 +29,11 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
+import org.voltdb.newplanner.rules.logical.VoltDBLAggregateRule;
+import org.voltdb.newplanner.rules.logical.VoltDBLCalcRule;
+import org.voltdb.newplanner.rules.logical.VoltDBLJoinRule;
+import org.voltdb.newplanner.rules.logical.VoltDBLSortRule;
+import org.voltdb.newplanner.rules.logical.VoltDBLTableScanRule;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +49,19 @@ public enum PlannerPhase {
         public RuleSet getRules() {
             return getCalciteLogicalRules();
         }
+    },
+
+    VOLT_LOGICAL("VoltDB logical rules") {
+        public RuleSet getRules() {
+            return getVoltLogicalRules();
+        }
+    },
+
+    LOGICAL("Calcite and VoltDB logical rules") {
+        public RuleSet getRules() {
+            return mergedRuleSets(getCalciteLogicalRules(),
+                    getVoltLogicalRules());
+        }
     };
 
     public final String description;
@@ -54,6 +72,17 @@ public enum PlannerPhase {
 
     public abstract RuleSet getRules();
 
+    static RuleSet mergedRuleSets(RuleSet... ruleSets) {
+        final ImmutableCollection.Builder<RelOptRule> relOptRuleSetBuilder = ImmutableSet.builder();
+        for (final RuleSet ruleSet : ruleSets) {
+            for (final RelOptRule relOptRule : ruleSet) {
+                relOptRuleSetBuilder.add(relOptRule);
+            }
+        }
+        return RuleSets.ofList(relOptRuleSetBuilder.build());
+    }
+
+    // Calcite's Logical Rules
     static RuleSet getCalciteLogicalRules() {
         /*
         LogicalCalc
@@ -81,5 +110,31 @@ public enum PlannerPhase {
         ruleList.add(FilterProjectTransposeRule.INSTANCE);
 
         return RuleSets.ofList(ruleList);
+    }
+
+    /**
+     * VoltDBLogical Conversion Rules.
+     * <p>
+     * Use to convert the convention from {@link org.apache.calcite.plan.Convention#NONE} to
+     * {@link org.voltdb.calciteadapter.rel.logical.VoltDBLRel#VOLTDB_LOGICAL}.
+     * <p>
+     * <b>Why?</b>
+     * <p>
+     * {@link org.apache.calcite.plan.Convention#NONE} is not implementable, and has to be transformed to
+     * something else in order to be implemented. Otherwise, the Volcano Planner will throw a
+     * CannotPlanException.
+     *
+     * @return
+     */
+    static RuleSet getVoltLogicalRules() {
+        final List<RelOptRule> ruleList = new ArrayList<>();
+
+        ruleList.add(VoltDBLSortRule.INSTANCE);
+        ruleList.add(VoltDBLTableScanRule.INSTANCE);
+        ruleList.add(VoltDBLCalcRule.INSTANCE);
+        ruleList.add(VoltDBLAggregateRule.INSTANCE);
+        ruleList.add(VoltDBLJoinRule.INSTANCE);
+
+        return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
     }
 }
