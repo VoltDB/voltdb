@@ -69,6 +69,7 @@ class Opt:
 admin = Opt('admin', 'adminport', str, 1)
 client = Opt('client', 'port', str, 1)
 externalinterface = Opt('externalinterface', 'externalinterface', str, 1)
+drpublic = Opt('drpublic', 'drpublic', str, 1)
 http = Opt('http', 'httpport', str, 1)
 internal = Opt('internal', 'internalport', str, 1)
 internalinterface = Opt('internalinterface', 'internalinterface', str, 1)
@@ -106,6 +107,7 @@ unknown = Opt('unknown', None, None, 0)
 
 volt_opts = {'create': [admin,
                         client,
+                        drpublic,
                         externalinterface,
                         http,
                         internal,
@@ -123,6 +125,7 @@ volt_opts = {'create': [admin,
 
              'recover': [admin,
                          client,
+			 drpublic,
                          externalinterface,
                          http,
                          internal,
@@ -139,6 +142,7 @@ volt_opts = {'create': [admin,
 
              'rejoin': [admin,
                         client,
+			drpublic,
                         externalinterface,
                         http,
                         internal,
@@ -152,6 +156,7 @@ volt_opts = {'create': [admin,
 
              'add': [admin,
                      client,
+		     drpublic,
                      externalinterface,
                      http,
                      internal,
@@ -171,6 +176,7 @@ volt_opts = {'create': [admin,
 
              'start': [admin,
                        client,
+		       drpublic,
                        externalinterface,
                        http,
                        internal,
