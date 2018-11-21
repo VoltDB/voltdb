@@ -135,15 +135,9 @@ public class PlannerTestCase extends TestCase {
                                             boolean inferPartitioning,
                                             boolean forcedSP,
                                             DeterminismMode detMode) {
-        CompiledPlan cp = null;
-        try {
-            cp = m_aide.compileAdHocPlan(m_plannerType, sql, inferPartitioning, forcedSP, detMode);
-            assertTrue(cp != null);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
+        CompiledPlan cp =
+                m_aide.compileAdHocPlan(m_plannerType, sql, inferPartitioning, forcedSP, detMode);
+        assertNotNull("CompiledPlan is NULL", cp);
         return cp;
     }
 
@@ -162,9 +156,8 @@ public class PlannerTestCase extends TestCase {
                                                     boolean inferPartitioning,
                                                     boolean forcedSP,
                                                     DeterminismMode detMode) {
-        CompiledPlan cp = null;
-        cp = compileAdHocPlan(sql, inferPartitioning, forcedSP, detMode);
-        assertTrue(cp != null);
+        CompiledPlan cp = compileAdHocPlan(sql, inferPartitioning, forcedSP, detMode);
+        assertNotNull("CompiledPlan is NULL", cp);
         return cp;
     }
 

@@ -28,7 +28,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
-import org.voltdb.catalog.org.voltdb.calciteadaptor.CatalogAdapter;
+import org.voltdb.calciteadapter.CatalogAdapter;
 import org.voltdb.newplanner.rules.PlannerPhase;
 import org.voltdb.types.CalcitePlannerType;
 
