@@ -95,7 +95,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         assertTrue(checked);
     }
 
-    private void checkPlannerCache(Client client, int... cacheTypes) throws NoConnectionsException, IOException, ProcCallException {
+    private void checkPlannerCache(Client client, int... cacheTypes) throws IOException, ProcCallException {
         for (int cacheType : cacheTypes) {
             if (cacheType == CACHE_MISS1) {
                 ++m_cache1_level;

@@ -44,6 +44,7 @@ import org.voltdb.compiler.PlannerTool;
 import org.voltdb.newplanner.NonDdlBatch;
 import org.voltdb.newplanner.NonDdlBatchCompiler;
 import org.voltdb.newplanner.SqlBatch;
+import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
@@ -260,18 +261,19 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * @since 8.4
      * @author Yiqun Zhang
      */
-    protected CompletableFuture<ClientResponse> runNonDDLBatchThroughCalcite(SqlBatch batchIn) {
+    protected CompletableFuture<ClientResponse> runNonDDLBatchThroughCalcite(SqlBatch batchIn)
+            throws PlannerFallbackException {
         // TRAIL [Calcite:1] runNonDDLAdHocThroughCalcite
-        NonDdlBatch batch = new NonDdlBatch(batchIn);
-        NonDdlBatchCompiler compiler = new NonDdlBatchCompiler(batch);
-        AdHocPlannedStmtBatch plannedStmtBatch;
+        final NonDdlBatch batch = new NonDdlBatch(batchIn);
+        final AdHocPlannedStmtBatch plannedStmtBatch;
         try {
-            plannedStmtBatch = compiler.compile();
+            plannedStmtBatch = new NonDdlBatchCompiler(batch).compile();
         } catch (AdHocPlanningException ex) {
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getLocalizedMessage());
         }
-
-        if (adhocLog.isDebugEnabled()) {
+        if (plannedStmtBatch == null) {     // The compile() will return null until Calcite is capable of planning DQL.
+            throw new PlannerFallbackException();   // In that case, signals its caller to user fall back behavior.
+        } else if (adhocLog.isDebugEnabled()) {
             logBatch(batch.m_catalogContext, plannedStmtBatch, batch.getUserParameters());
         }
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);

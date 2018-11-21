@@ -38,6 +38,16 @@ public abstract class AbstractSqlTaskDecorator implements SqlTask {
     }
 
     @Override
+    public boolean isDML() {
+        return m_taskToDecorate.isDML();
+    }
+
+    @Override
+    public boolean isDQL() {
+        return m_taskToDecorate.isDQL();
+    }
+
+    @Override
     public String getSQL() {
         return m_taskToDecorate.getSQL();
     }

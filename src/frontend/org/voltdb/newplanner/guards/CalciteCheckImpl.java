@@ -18,6 +18,7 @@
 package org.voltdb.newplanner.guards;
 
 import org.apache.calcite.sql.parser.SqlParseException;
+import org.voltdb.newplanner.SqlTask;
 import org.voltdb.newplanner.SqlTaskImpl;
 import org.voltdb.planner.PlanningErrorException;
 
@@ -26,7 +27,7 @@ import org.voltdb.planner.PlanningErrorException;
  * @author Yiqun Zhang
  * @since 8.4
  */
-public class RealCalciteCheck extends CalciteCheck {
+public class CalciteCheckImpl extends CalciteCheck {
 
     private static String truncate(String src, int max) {
         if (src.length() <= max) {
@@ -39,7 +40,8 @@ public class RealCalciteCheck extends CalciteCheck {
     @Override
     protected boolean doCheck(String sql) {
         try {
-            return new SqlTaskImpl(sql).isDDL();
+            final SqlTask task = new SqlTaskImpl(sql);
+            return task.isDDL() || task.isDQL();
         } catch (SqlParseException e) {
             if (e.getCause() instanceof StackOverflowError) {
                 throw new PlanningErrorException("Encountered stack overflow error. " +

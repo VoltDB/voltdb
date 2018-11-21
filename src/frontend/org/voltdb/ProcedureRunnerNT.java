@@ -511,7 +511,6 @@ public class ProcedureRunnerNT {
                                                     null,
                                                     ex);
         }
-
         return responseFromTableArray(results);
     }
 

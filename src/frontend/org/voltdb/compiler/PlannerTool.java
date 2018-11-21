@@ -208,7 +208,8 @@ public class PlannerTool {
      * Plan a query with the Calcite planner.
      * @param task the query to plan.
      * @param batch the query batch which this query belongs to.
-     * @return a planned statement.
+     * @return a planned statement. Untill DQL is fully supported, it returns null, and the caller
+     * will use fall-back behavior.
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
         // create VoltSqlValidator from SchemaPlus.
@@ -224,6 +225,7 @@ public class PlannerTool {
         RelNode nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 
+        // TODO: finish Calcite planning and convert into AdHocPlannedStatement.
         return null;
     }
 
