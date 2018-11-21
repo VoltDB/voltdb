@@ -38,12 +38,14 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
+import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
@@ -628,5 +630,11 @@ public class ExportManager implements ExportManagerInterface
     @Override
     public Generation getGeneration() {
         return m_generation.get();
+    }
+
+    public void processStreamControl(String exportStream, List<String> exportTargets, OperationMode operation, VoltTable results) {
+        if (m_generation.get() != null) {
+           m_generation.get().processStreamControl(exportStream, exportTargets, operation, results);
+        }
     }
 }
