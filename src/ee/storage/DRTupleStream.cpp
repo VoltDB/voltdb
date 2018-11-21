@@ -534,7 +534,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     }
     else {
         m_lastCommittedSpUniqueId = uniqueId;
-        m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+        m_currBlock->recordCompletedSpTxn(uniqueId);
         // for sp, update the last Committed SpHandle
         m_currBlock->recordLastCommittedSpHandle(m_openSpHandle);
     }
@@ -638,7 +638,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
             m_currBlock->recordCompletedMpTxnForDR(uniqueId);
         } else {
             m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+            m_currBlock->recordCompletedSpTxn(uniqueId);
         }
 
         m_committedUso = m_uso;
@@ -668,7 +668,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
             m_currBlock->recordCompletedMpTxnForDR(uniqueId);
         } else {
             m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+            m_currBlock->recordCompletedSpTxn(uniqueId);
         }
 
         m_committedUso = m_uso;

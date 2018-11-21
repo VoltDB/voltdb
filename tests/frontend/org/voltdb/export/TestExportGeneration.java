@@ -192,28 +192,29 @@ public class TestExportGeneration {
         promoted.await(5, TimeUnit.SECONDS);
 
         int retries = 4000;
-        long uso = 0L;
+        long seqNo = 1L;
         boolean active = false;
 
         while( --retries >= 0 && ! active) {
             m_exportGeneration.pushExportBuffer(
                     m_part,
                     m_tableSignature,
-                    uso,
+                    seqNo,
+                    1,
+                    0L,
                     foo.duplicate(),
-                    false,
-                    1
+                    false
                     );
             AckingContainer cont = (AckingContainer)m_expDs.poll().get();
             cont.updateStartTime(System.currentTimeMillis());
 
-            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_tableSignature, uso + foo.capacity() - StreamBlock.HEADER_SIZE - 1));
+            m_ackMatcherRef.set(ackMbxMessageIs(m_part, m_tableSignature, seqNo));
             m_mbxNotifyCdlRef.set( new CountDownLatch(1));
 
             cont.discard();
 
             active = m_mbxNotifyCdlRef.get().await(2, TimeUnit.MILLISECONDS);
-            uso += foo.capacity() - StreamBlock.HEADER_SIZE;
+            seqNo++;
         }
         assertTrue( "timeout on ack message receipt", retries >= 0);
     }
@@ -228,10 +229,11 @@ public class TestExportGeneration {
         m_exportGeneration.pushExportBuffer(
                 m_part,
                 m_tableSignature,
-                /*uso*/0,
+                /*seqNo*/1L,
+                1,
+                0L,
                 foo.duplicate(),
-                false,
-                1
+                false
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {
@@ -252,7 +254,7 @@ public class TestExportGeneration {
 
         m_mbox.send(
                 hsid,
-                new AckPayloadMessage(m_part, m_tableSignature, foo.capacity(), 1).asVoltMessage()
+                new AckPayloadMessage(m_part, m_tableSignature, 1L, 1).asVoltMessage()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {

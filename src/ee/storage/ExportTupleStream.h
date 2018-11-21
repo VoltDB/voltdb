@@ -52,16 +52,18 @@ public:
         return m_uso;
     }
 
-    /** Set the total number of bytes used (for rejoin/recover) */
-    void setBytesUsed(size_t count) {
+    int64_t getSequenceNumber() {
+        return m_exportSequenceNumber;
+    }
+
+    /** Set the total number of bytes used and starting sequence number for new buffer (for rejoin/recover) */
+    void setBytesUsed(int64_t seqNo, size_t count) {
         assert(m_uso == 0);
-        StreamBlock *sb = new StreamBlock(new char[1], 0, 0, count);
-        ExecutorContext::getPhysicalTopend()->pushExportBuffer(
-                                m_partitionId, m_signature, sb, false);
-        delete sb;
         m_uso = count;
+        // this is for start sequence number of stream block
+        m_exportSequenceNumber = seqNo + 1;
         //Extend the buffer chain to replace any existing stream blocks with a new one
-        //with the correct USO
+        //with the correct sequence number
         extendBufferChain(0);
     }
 
@@ -103,6 +105,8 @@ public:
     static const size_t s_mdSchemaSize;
     // Size of Fixed header (not including schema)
     static const size_t s_FIXED_BUFFER_HEADER_SIZE;
+    // Size of Fixed buffer header (rowCount + uniqueId)
+    static const size_t s_EXPORT_BUFFER_HEADER_SIZE;
 
 private:
     // cached catalog values

@@ -161,10 +161,14 @@ public class JDBCVoltVerifier {
 
         rvr = new ReadVoltRows(client);
         if ( ! processRows(rvr, client, jdbcConnection) ) {
-            System.err.println("Check Table failed, see log for errors");
+            System.err.println("ERROR Check Table failed, see log for errors");
             System.exit(1);
         }
         System.out.println("Total rows checked in VoltDB and JDBC Table: " + rowCheckTotal);
+        if ( rowCheckTotal == 0 ) {
+            System.err.println("ERROR No rows were found, is export_mirror_partitioned_table empty?");
+            System.exit(1);
+        }
         System.exit(0);
     }
 }

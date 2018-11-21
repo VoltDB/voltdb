@@ -5443,6 +5443,9 @@ public class ParserDDL extends ParserRoutine {
             Expression expression = XreadValueExpression();
             indexExprs.add(expression);
 
+            if (token.tokenType == Tokens.DESC) {
+                throw unexpectedToken();
+            }
             // A VoltDB extension to the "readColumnList(table, true)" support for descending-value indexes,
             // that similarly parses the asc/desc indicators but COLLECTS them so they can be ignored later,
             // rather than ignoring them on the spot.

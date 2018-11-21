@@ -202,8 +202,16 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
         return new NibbleStatus(rowsLeft, rowsJustDeleted, "");
     }
 
-    public VoltTable run(String tableName, String columnName, String valueStr, String comparisonOp, long chunksize, long timeoutms, long maxFrequency, long interval) {
-
+    public VoltTable run(
+            String tableName,
+            String columnName,
+            String valueStr,
+            String comparisonOp,
+            long chunksize,
+            long timeoutms,
+            long maxFrequency,
+            long interval)
+    {
         VoltTable returnTable = new VoltTable(new ColumnInfo("ROWS_DELETED", VoltType.BIGINT),
                                 new ColumnInfo("ROWS_LEFT", VoltType.BIGINT),
                                 new ColumnInfo("DELETED_LAST_ROUND", VoltType.BIGINT),
