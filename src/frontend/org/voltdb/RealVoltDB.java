@@ -93,6 +93,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.eclipse.jetty.util.security.Password;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -3021,6 +3022,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             try (FileInputStream fis = new FileInputStream(keyStorePath)) {
                 keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
                 KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                keyStorePassword = deobfuscateIfNeeded(keyStorePassword);
                 keyStore.load(fis, keyStorePassword.toCharArray());
                 keyManagerFactory.init(keyStore, keyStorePassword.toCharArray());
             } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | IOException
@@ -3032,6 +3034,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             try (FileInputStream fis = new FileInputStream(trustStorePath)) {
                 trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
                 KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                trustStorePassword = deobfuscateIfNeeded(trustStorePassword);
                 keyStore.load(fis, trustStorePassword.toCharArray());
                 trustManagerFactory.init(keyStore);
             } catch (NoSuchAlgorithmException | IOException | KeyStoreException | CertificateException e) {
@@ -3060,6 +3063,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 throw new IllegalArgumentException("Could not create SslContexts", e);
             }
         }
+    }
+
+    private String deobfuscateIfNeeded(String password) {
+        if (password.startsWith(Password.__OBFUSCATE)) {
+            return Password.deobfuscate(password);
+        }
+        return password;
     }
 
     private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
