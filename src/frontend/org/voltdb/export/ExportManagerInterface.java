@@ -97,7 +97,7 @@ public interface ExportManagerInterface {
 
     public int getConnCount();
 
-    public ExportGeneration getGeneration();
+    public Generation getGeneration();
 
     public ExportStats getExportStats();
 

@@ -44,7 +44,7 @@ public interface ExportDataProcessor  {
      */
     void addLogger(VoltLogger logger);
 
-    void setExportGeneration(ExportGeneration generation);
+    void setExportGeneration(Generation generation);
 
     /**
      * Inform the processor that initialization is complete; commence work.

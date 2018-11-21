@@ -18,7 +18,6 @@ package org.voltdb.export;
 
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
@@ -41,5 +40,5 @@ public interface Generation {
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 boolean isRecover, long sequenceNumber);
 
-    public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
+    public void sync(boolean nofsync);
 }

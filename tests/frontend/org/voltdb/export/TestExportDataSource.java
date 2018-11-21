@@ -37,7 +37,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -128,7 +127,7 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
+        public void sync(boolean nofsync) {
             throw new UnsupportedOperationException("Not supported yet.");
         }
     }
