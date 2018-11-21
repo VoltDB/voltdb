@@ -905,7 +905,7 @@ public class VoltDB {
             }
 
             if (!inzFH.exists() || !inzFH.isFile() || !inzFH.canRead()) {
-                hostLog.fatal("Specified directory is not a VoltDB initialized root");
+                hostLog.fatal("Specified directory " + inzFH.toString() + " is not a VoltDB initialized root");
                 referToDocAndExit();
             }
 
@@ -918,7 +918,9 @@ public class VoltDB {
             }
 
             if (m_clusterName != null && !m_clusterName.equals(stagedName)) {
-                hostLog.fatal("The database root directory has changed. Either initialization did not complete properly or the directory has been corrupted. You must reinitialize the database directory before using it.");
+                hostLog.fatal("The database root directory has changed. Either initialization did not complete properly, "
+                        + "or the directory has been corrupted. You must reinitialize the database directory before using it: "
+                 + m_clusterName);
                 referToDocAndExit();
             } else {
                 m_clusterName = stagedName;

@@ -107,7 +107,7 @@ public class SqlBatchImpl implements SqlBatch {
             m_tasks.add(sqlTask);
         }
         m_isDDLBatch = isDDLBatch;
-        m_userParams = userParams;
+        m_userParams = userParams == null ? new Object[0] : userParams;
     }
 
     @Override
