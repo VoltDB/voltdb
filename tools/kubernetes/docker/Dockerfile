@@ -47,38 +47,13 @@ ENV TZ=America/New_York
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Create necessary directories, voltdb-kit, voltdb_pristine
+
+# For voltdb bundles and extensions, copy your assets to the corresponding directories in the kit
+# prior to building the image.
+
 WORKDIR /opt
 
 RUN mkdir -p $VOLTDB_DIST
 COPY ./ $VOLTDB_DIST/
 RUN rm -rf $VOLTDB_DIST/doc $VOLTDB_DIST/examples
 COPY tools/kubernetes/bin/ $VOLTDB_DIST/bin
-
-# Setup pristine voltdbroot - it will be copied to persistent storage on first run of the node (k8s)
-ENV VOLTDBPRISTINE=/opt/voltdb_pristine
-ENV ASSETS=$VOLTDBPRISTINE/.assets
-RUN mkdir -p $ASSETS
-COPY ${IP_DIR}/                 $ASSETS/
-# nb. lib-extension is empty in the kit
-COPY ${IP_DIR}/.extension/      $VOLTDB_DIST/lib/extension/
-
-# Copy bundles files from the distribution, then overlay user's bundles files, if any
-COPY ./bundles/                 $VOLTDB_DIST/bundles/
-COPY ${IP_DIR}/.bundles/        $VOLTDB_DIST/bundles/
-
-# !!!
-WORKDIR $VOLTDBPRISTINE
-# TODO !!! don't change the working directory beyond this point, it will break things
-
-# Emit a reinit command sequence
-RUN echo "voltdb init --config $ASSETS/.deployment --schema=$ASSETS/.schema --classes=$ASSETS/.classes" > reinit.sh
-
-# Initialize the database with provided configuration and assets
-RUN voltdb init --config $ASSETS/.deployment --schema=$ASSETS/.schema --classes=$ASSETS/.classes
-COPY ${IP_DIR}/.license         $VOLTDBPRISTINE/license.xml
-#COPY ${IP_DIR}/.log4j           $VOLTDBPRISTINE/log4j.properties
-
-# Setup the container run-time environment
-ENV NODECOUNT=$NODECOUNT
-ENV LEADER=localhost
-ENTRYPOINT voltdbk8s.py voltdb start -H $LEADER -c $NODECOUNT $VOLTDB_START_ARGS
