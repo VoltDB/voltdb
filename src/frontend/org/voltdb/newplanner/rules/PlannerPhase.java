@@ -17,7 +17,6 @@
 
 package org.voltdb.newplanner.rules;
 
-
 import com.google_voltpatches.common.collect.ImmutableCollection;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.calcite.plan.RelOptRule;
