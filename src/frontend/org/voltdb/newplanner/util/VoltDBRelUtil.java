@@ -17,7 +17,6 @@
 
 package org.voltdb.newplanner.util;
 
-import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -48,15 +47,15 @@ public class VoltDBRelUtil {
      */
     public static RelNode addTraitRecurcively(RelNode rel, RelTrait newTrait) {
         assert (rel != null);
-        RelTraitSuttle traitShuttle = new RelTraitSuttle(rel.getCluster().getPlanner(), newTrait);
+        RelTraitShuttle traitShuttle = new RelTraitShuttle(newTrait);
         return rel.accept(traitShuttle);
     }
 
-    private static class RelTraitSuttle extends RelShuttleImpl {
+    private static class RelTraitShuttle extends RelShuttleImpl {
 
         private final RelTrait m_newTrait;
 
-        public RelTraitSuttle(RelOptPlanner planner, RelTrait newTrait) {
+        public RelTraitShuttle(RelTrait newTrait) {
             m_newTrait = newTrait;
         }
 
