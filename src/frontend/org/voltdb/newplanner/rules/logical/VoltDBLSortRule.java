@@ -58,7 +58,16 @@ public class VoltDBLSortRule extends RelOptRule {
                     convertedInput,
                     sort.getCollation());
         }
-        // why split it to two phases? why instead of single VoltDBLSort we need VoltDBLSort and VoltDBLLimit
+        // Q: why split it to two phases? why instead of single VoltDBLSort we need VoltDBLSort and VoltDBLLimit
+        // Mike:
+        // We split it into two res mainly for a couple of reasons:
+        // 1.During physical phase the VoltDBLSort is transformed into a collation trait that Volcano Planner would propagate
+        // as appropriate -see the VoltDBPSortRule implementation. It won't be possible if the sort would have limit / offset
+        // as well
+        // 2.The rules for pushing down Limit and Sort RelNodes differ. For example, Limit / Exchange is transformed
+        // into Coordinator Limit / Exchange / Fragment Limit while Sort / Exchange potentially can be transformed to
+        // Coordinator Sort / MergeExchange / fragment Sort.
+        // 3.The Limit node can be inlined with Scan or Serial Aggregate nodes
         if (sort.offset != null || sort.fetch != null) {
             RelNode limitInput = (logicalRel != null) ? logicalRel : convertedInput;
             logicalRel = new VoltDBLLimit(
