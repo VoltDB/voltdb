@@ -63,6 +63,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -920,6 +921,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_generation.onSourceDone(m_partitionId, m_signature);
                 return;
             }
+            releaseBlock();
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
@@ -1001,6 +1003,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         } catch (Throwable t) {
             fut.setException(t);
+        }
+    }
+
+    private void releaseBlock() {
+        if (m_status == StreamStatus.BLOCKED && !DISABLE_AUTO_GAP_RELEASE) {
+            RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
+            if (voltdb.isClusterComplete()) {
+                processStreamControl(OperationMode.RELEASE);
+            }
         }
     }
 
@@ -1490,10 +1501,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     // Show warning only in full cluster.
                                     exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
                                             gap.getFirst() + " to " + gap.getSecond());
-                                } else {
-                                    // TODO: discard warn message once the auto gap release is implemented
-                                    exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
-                                            gap.getFirst() + " to " + gap.getSecond());
                                 }
                             }
                         } else {
@@ -1576,9 +1583,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         this.m_status = status;
     }
 
+    public StreamStatus getStatus() {
+        return m_status;
+    }
+
     @Override
     public String toString() {
-        return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId();
+        return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId()
+           + "status " + m_status + " master " + m_mastershipAccepted.get();
     }
 
     private void mastershipCheckpoint(long seq) {
@@ -1600,5 +1612,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private void resetStateInRejoinOrRecover() {
         m_lastReleasedSeqNo = m_gapTracker.isEmpty() ? 0L : m_gapTracker.getFirstSeqNo();
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
+    }
+
+    public String getTarget() {
+        return m_exportTargetName;
+    }
+
+    public synchronized void processStreamControl(OperationMode operation) {
+        switch (operation) {
+        case RELEASE:
+            if (m_status == StreamStatus.BLOCKED && m_mastershipAccepted.get() && m_gapTracker.getFirstGap() != null) {
+                long firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Release " + this + " move firstUnpolledSeqNo from " +
+                            m_firstUnpolledSeqNo + " to " + firstUnpolledSeqNo);
+                }
+
+                m_firstUnpolledSeqNo = firstUnpolledSeqNo;
+                setStatus(StreamStatus.ACTIVE);
+            }
+            break;
+        default:
+            // should not happen since the operation is verified prior to this call
+        }
     }
 }

@@ -35,6 +35,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -47,16 +48,18 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
+import org.voltdb.RealVoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.utils.CatalogUtil;
-
+import org.voltdb.sysprocs.ExportControl.OperationMode;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -179,18 +182,20 @@ public class ExportGeneration implements Generation {
             List<Pair<Integer, Integer>> localPartitionsToSites)
     {
         // Now create datasources based on the catalog
-        updateDataSources(catalogContext.database);
         boolean createdSources = false;
+        List<String> exportSignatures = new ArrayList<>();
         for (Connector conn : connectors) {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
                     addDataSources(table, hostId, localPartitionsToSites);
+                    exportSignatures.add(table.getSignature());
                     createdSources = true;
                 }
             }
         }
 
+        updateDataSources(exportSignatures);
         //Only populate partitions in use if export is actually happening
         List<Integer> partitionsInUse = createdSources ?
                 localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toList()) :
@@ -199,24 +204,18 @@ public class ExportGeneration implements Generation {
         createAckMailboxesIfNeeded(messenger, partitionsInUse);
     }
 
-    // mark a DataSource as dropped if its stream is dropped upon uac
-    private void updateDataSources(Database database) {
-        if (m_dataSourcesByPartition.isEmpty()) {
-            return;
-        }
-
-        // current streams in catalog
-        List<String>  exportSignatures = CatalogUtil.getExportTables(database).stream().
-                map(Table::getSignature).collect(Collectors.toList());
-
-        for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
-            Map<String, ExportDataSource> sources = it.next();
-            for (String signature : sources.keySet()) {
-                ExportDataSource src = sources.get(signature);
-                if (exportSignatures.contains(src)) {
-                    src.setStatus(ExportDataSource.StreamStatus.ACTIVE);
-                } else {
-                    src.setStatus(ExportDataSource.StreamStatus.DROPPED);
+    // mark a DataSource as dropped if its connector is dropped.
+    private void updateDataSources( List<String> exportSignatures) {
+        synchronized(m_dataSourcesByPartition) {
+            for (Iterator<Map<String, ExportDataSource>> it = m_dataSourcesByPartition.values().iterator(); it.hasNext();) {
+                Map<String, ExportDataSource> sources = it.next();
+                for (String signature : sources.keySet()) {
+                    ExportDataSource src = sources.get(signature);
+                    if (!exportSignatures.contains(signature)) {
+                        src.setStatus(ExportDataSource.StreamStatus.DROPPED);
+                    } else if (src.getStatus() == ExportDataSource.StreamStatus.DROPPED) {
+                        src.setStatus(ExportDataSource.StreamStatus.ACTIVE);
+                    }
                 }
             }
         }
@@ -831,6 +830,36 @@ public class ExportGeneration implements Generation {
     @Override
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
         return m_dataSourcesByPartition;
+    }
+
+    public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode operation, VoltTable results) {
+        exportLog.info("Export " + operation + " source:" + exportSource + " targets:" + exportTargets);
+        synchronized (m_dataSourcesByPartition) {
+            RealVoltDB volt = (RealVoltDB) VoltDB.instance();
+            for (Iterator<Integer> partitionIt = m_dataSourcesByPartition.keySet().iterator(); partitionIt.hasNext();) {
+                // apply to partition leaders only
+                Integer partition = partitionIt.next();
+                boolean isLeader = ((SpInitiator)volt.getInitiator(partition)).isLeader();
+                if (!isLeader) {
+                    continue;
+                }
+                Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partition);
+                for (Iterator<ExportDataSource> it = sources.values().iterator(); it.hasNext();) {
+                    ExportDataSource eds = it.next();
+                    if (!StringUtil.isEmpty(exportSource) && !eds.getTableName().equalsIgnoreCase(exportSource)) {
+                        continue;
+                    }
+
+                    // no target match
+                    if (!exportTargets.isEmpty() && !exportTargets.contains(eds.getTarget())) {
+                        continue;
+                    }
+
+                    eds.processStreamControl(operation);
+                    results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
+                }
+            }
+        }
     }
 
     @Override
