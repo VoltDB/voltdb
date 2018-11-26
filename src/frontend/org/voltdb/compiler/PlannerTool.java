@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
@@ -35,6 +36,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.newplanner.CalcitePlanner;
@@ -43,6 +45,7 @@ import org.voltdb.newplanner.SqlTask;
 import org.voltdb.newplanner.VoltSqlToRelConverter;
 import org.voltdb.newplanner.VoltSqlValidator;
 import org.voltdb.newplanner.rules.PlannerPhase;
+import org.voltdb.newplanner.util.VoltDBRelUtil;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
@@ -223,6 +226,19 @@ public class PlannerTool {
         RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
         RelNode nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
+
+        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
+        nodeAfterLogical.getCluster().getPlanner().addRelTraitDef(RelDistributions.SINGLETON.getTraitDef());
+
+        // Add RelDistributions.ANY trait to the rel tree.
+        nodeAfterLogical = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogical, RelDistributions.ANY);
+
+        // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
+        RelTraitSet physicalTraits = nodeAfterLogical.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+
+        // apply physical conversion rules.
+        RelNode nodeAfterPhysicalConversion = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
+                PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogical, physicalTraits);
 
         return null;
     }

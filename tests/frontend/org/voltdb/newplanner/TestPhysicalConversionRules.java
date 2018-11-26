@@ -53,18 +53,21 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
     void assertPlanMatch(String sql, String expectedPlan) {
         RelRoot root = parseValidateAndConvert(sql);
 
+        // apply logical rules
         RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
         RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 
-        Preconditions.checkArgument(nodeAfterLogicalRules.getTraitSet().contains(VoltDBLRel.VOLTDB_LOGICAL));
-
+        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
         nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributions.SINGLETON.getTraitDef());
 
+        // Add RelDistributions.ANY trait to the rel tree.
         nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.ANY);
 
+        // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         RelTraitSet physicalTraits = nodeAfterLogicalRules.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
 
+        // apply physical conversion rules.
         RelNode nodeAfterPhysicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
                 PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogicalRules, physicalTraits);
 
