@@ -2182,15 +2182,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * and find the host which hosts the partition replica and the least number of partition leaders.
      * send MigratePartitionLeaderMessage to the host with older partition leader to initiate @MigratePartitionLeader
      * Repeatedly call this task until no qualified partition is available.
+     * @param prepareStopNode if true, only move partition leaders on this host to other hosts-used via @PrepareStopNode
+     * Otherwise, balance the partition leaders among all nodes.
      */
-    void startMigratePartitionLeader(boolean onlyMoveLeadersOnThisHost) {
+    void startMigratePartitionLeader(boolean prepareStopNode) {
         RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
         final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
         Pair<Integer, Integer> target = null;
-        if (onlyMoveLeadersOnThisHost) {
-            target = m_cartographer.getCandidateForMigratePartitionLeader(hostId);
+        if (prepareStopNode) {
+            target = m_cartographer.getPartitionLeaderMigrationTargetForStopNode(hostId);
         } else {
-            target = m_cartographer.getPartitionForMigratePartitionLeader(voltDB.getHostCount(), hostId);
+            target = m_cartographer.getPartitionLeaderMigrationTarget(voltDB.getHostCount(), hostId);
         }
 
         //The host does not have any thing to do this time. It does not mean that the host does not

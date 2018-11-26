@@ -778,7 +778,7 @@ public final class InvocationDispatcher {
             return gracefulFailureResponse("@PrepairStopNode: " + ihid + " is not valid.", task.clientHandle);
         }
 
-       String reason = m_cartographer.canMovePartitonLeaderForStopNode(ihid);
+       String reason = m_cartographer.verifyPartitonLeaderMigrationForStopNode(ihid);
        if (reason != null) {
            return gracefulFailureResponse(
                    "@PrepairStopNode: can not move partition leaders on" + ihid

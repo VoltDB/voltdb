@@ -73,7 +73,7 @@ def stop(runner):
         stateMessage = 'The node shutdown process has stopped.'
         actionMessage = 'You may shutdown the node with the "voltadmin stop --force" command.'
         try:
-            runner.info('Preparing for shutdown...')
+            runner.info('Preparing for shutdown, moving partition leaders to other nodes.')
             response = runner.call_proc('@PrepairStopNode',
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER],
                                     [thost.id],
