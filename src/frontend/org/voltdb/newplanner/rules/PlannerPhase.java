@@ -41,7 +41,6 @@ import org.voltdb.newplanner.rules.physical.VoltDBPJoinRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPLimitRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPSeqScanRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPSortConvertRule;
-import org.voltdb.newplanner.rules.physical.VoltDBPSortRule;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -157,8 +156,6 @@ public enum PlannerPhase {
 
         ruleList.add(VoltDBPCalcRule.INSTANCE);
         ruleList.add(VoltDBPSeqScanRule.INSTANCE);
-        ruleList.add(VoltDBPSortRule.INSTANCE);
-        ruleList.add(VoltDBPSortConvertRule.INSTANCE_NONE);
         ruleList.add(VoltDBPSortConvertRule.INSTANCE_VOLTDB);
         ruleList.add(VoltDBPLimitRule.INSTANCE);
         ruleList.add(VoltDBPAggregateRule.INSTANCE);

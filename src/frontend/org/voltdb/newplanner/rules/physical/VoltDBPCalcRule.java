@@ -26,6 +26,12 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 
+/**
+ * VoltDB physical rule that transform {@link VoltDBLCalc} to {@link VoltDBPCalc}.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBPCalcRule extends RelOptRule {
 
     public static final VoltDBPCalcRule INSTANCE = new VoltDBPCalcRule();

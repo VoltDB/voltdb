@@ -24,15 +24,22 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLJoin;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPJoin;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 
+/**
+ * VoltDB physical rule that transform {@link VoltDBLJoin} to {@link VoltDBPJoin}.
+ *
+ * @author Chao Zhou
+ * @since 8.4
+ */
 public class VoltDBPJoinRule extends RelOptRule {
 
     public static final VoltDBPJoinRule INSTANCE = new VoltDBPJoinRule();
 
     VoltDBPJoinRule() {
-        super(operand(VoltDBLJoin.class, VoltDBPRel.VOLTDB_PHYSICAL, any()));
+        super(operand(VoltDBLJoin.class, VoltDBLRel.VOLTDB_LOGICAL, any()));
     }
 
     @Override

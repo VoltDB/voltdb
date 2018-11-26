@@ -31,7 +31,13 @@ import org.voltdb.calciteadapter.rel.physical.VoltDBPSingletonExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPTableSeqScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPUnionExchange;
 
-
+/**
+ * VoltDB physical rule that transform {@link VoltDBLTableScan} to {@link VoltDBPTableSeqScan}.
+ * And add {@link AbstractVoltDBPExchange} on top of it.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBPSeqScanRule extends RelOptRule {
 
     public static final VoltDBPSeqScanRule INSTANCE = new VoltDBPSeqScanRule();

@@ -26,6 +26,12 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPLimit;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 
+/**
+ * VoltDB physical rule that transform {@link VoltDBLLimit} to {@link VoltDBPLimit}.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBPLimitRule extends RelOptRule {
 
     public static final VoltDBPLimitRule INSTANCE = new VoltDBPLimitRule();

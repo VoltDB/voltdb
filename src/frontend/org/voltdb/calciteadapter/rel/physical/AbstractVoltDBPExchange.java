@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
@@ -44,7 +45,7 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
                                       int splitCount,
                                       boolean topExchange) {
         super(cluster, traitSet, input, traitSet.getTrait(RelDistributionTraitDef.INSTANCE));
-        assert (!RelDistributions.ANY.getType().equals(traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType()));
+        Preconditions.checkArgument(!RelDistributions.ANY.getType().equals(traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType()));
         m_splitCount = splitCount;
         m_topExchange = topExchange;
     }

@@ -129,6 +129,7 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
     }
 
     // For partitioned table, create additional VoltDBPUnionExchange with HASH_DISTRIBUTED on the partition key
+    // VoltDBPUnionExchange is for the fragment and the VoltDBPSingletonExchange is for the Coordinator.
     public void testSeqScanPartitioned() {
         assertPlanMatch("select * from P1",
                 "VoltDBPCalc(expr#0..5=[{inputs}], proj#0..5=[{exprs}], split=[1])\n" +
@@ -424,47 +425,58 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
     public void testJoin() {
         assertPlanMatch("select R1.i, R2.v from R1, R2 " +
                         "where R2.si = R1.i and R2.v = 'foo'",
-                "VoltDBLCalc(expr#0..11=[{inputs}], expr#12=[CAST($t7):INTEGER], expr#13=[=($t12, $t0)], expr#14=['foo'], expr#15=[=($t11, $t14)], expr#16=[AND($t13, $t15)], I=[$t0], V=[$t11], $condition=[$t16])\n" +
-                        "  VoltDBLJoin(condition=[true], joinType=[inner])\n" +
-                        "    VoltDBLTableScan(table=[[catalog, R1]])\n" +
-                        "    VoltDBLTableScan(table=[[catalog, R2]])\n");
+                "VoltDBPCalc(expr#0..11=[{inputs}], expr#12=[CAST($t7):INTEGER], expr#13=[=($t12, $t0)], expr#14=['foo'], expr#15=[=($t11, $t14)], expr#16=[AND($t13, $t15)], I=[$t0], V=[$t11], $condition=[$t16], split=[1])\n" +
+                        "  VoltDBPJoin(condition=[true], joinType=[inner], split=[1])\n" +
+                        "    VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "      VoltDBPTableSeqScan(table=[[catalog, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "    VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "      VoltDBPTableSeqScan(table=[[catalog, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
 
         assertPlanMatch("select R1.i, R2.v from R1 inner join R2 " +
                         "on R2.si = R1.i where R2.v = 'foo'",
-                "VoltDBLCalc(expr#0..12=[{inputs}], expr#13=['foo'], expr#14=[=($t11, $t13)], I=[$t0], V=[$t11], $condition=[$t14])\n" +
-                        "  VoltDBLJoin(condition=[=($12, $0)], joinType=[inner])\n" +
-                        "    VoltDBLTableScan(table=[[catalog, R1]])\n" +
-                        "    VoltDBLCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}])\n" +
-                        "      VoltDBLTableScan(table=[[catalog, R2]])\n");
+                "VoltDBPCalc(expr#0..12=[{inputs}], expr#13=['foo'], expr#14=[=($t11, $t13)], I=[$t0], V=[$t11], $condition=[$t14], split=[1])\n" +
+                        "  VoltDBPJoin(condition=[=($12, $0)], joinType=[inner], split=[1])\n" +
+                        "    VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "      VoltDBPTableSeqScan(table=[[catalog, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "    VoltDBPCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}], split=[1])\n" +
+                        "      VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "        VoltDBPTableSeqScan(table=[[catalog, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
 
         assertPlanMatch("select R2.si, R1.i from R1 inner join " +
                         "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i",
-                "VoltDBLCalc(expr#0..12=[{inputs}], expr#13=['foo'], expr#14=[=($t12, $t13)], expr#15=[4], expr#16=[>($t1, $t15)], expr#17=[>($t2, $t7)], expr#18=[AND($t14, $t16, $t17)], SI=[$t8], I=[$t0], $condition=[$t18])\n" +
-                        "  VoltDBLJoin(condition=[=($7, $6)], joinType=[inner])\n" +
-                        "    VoltDBLCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}])\n" +
-                        "      VoltDBLTableScan(table=[[catalog, R1]])\n" +
-                        "    VoltDBLTableScan(table=[[catalog, R2]])\n");
+                "VoltDBPCalc(expr#0..12=[{inputs}], expr#13=['foo'], expr#14=[=($t12, $t13)], expr#15=[4], expr#16=[>($t1, $t15)], expr#17=[>($t2, $t7)], expr#18=[AND($t14, $t16, $t17)], SI=[$t8], I=[$t0], $condition=[$t18], split=[1])\n" +
+                        "  VoltDBPJoin(condition=[=($7, $6)], joinType=[inner], split=[1])\n" +
+                        "    VoltDBPCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}], split=[1])\n" +
+                        "      VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "        VoltDBPTableSeqScan(table=[[catalog, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "    VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "      VoltDBPTableSeqScan(table=[[catalog, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
 
         assertPlanMatch("select R1.i from R1 inner join " +
                         "R2  on R1.si = R2.si where R1.I + R2.ti = 5",
-                "VoltDBLCalc(expr#0..11=[{inputs}], expr#12=[+($t0, $t8)], expr#13=[5], expr#14=[=($t12, $t13)], I=[$t0], $condition=[$t14])\n" +
-                        "  VoltDBLJoin(condition=[=($1, $7)], joinType=[inner])\n" +
-                        "    VoltDBLTableScan(table=[[catalog, R1]])\n" +
-                        "    VoltDBLTableScan(table=[[catalog, R2]])\n");
+                "VoltDBPCalc(expr#0..11=[{inputs}], expr#12=[+($t0, $t8)], expr#13=[5], expr#14=[=($t12, $t13)], I=[$t0], $condition=[$t14], split=[1])\n" +
+                        "  VoltDBPJoin(condition=[=($1, $7)], joinType=[inner], split=[1])\n" +
+                        "    VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "      VoltDBPTableSeqScan(table=[[catalog, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "    VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "      VoltDBPTableSeqScan(table=[[catalog, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
     }
 
     public void testThreeWayJoin() {
         assertPlanMatch("select R1.i from R1 inner join " +
                         "R2  on R1.si = R2.i inner join " +
                         "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'",
-                "VoltDBLCalc(expr#0..15=[{inputs}], expr#16=[4], expr#17=[>($t1, $t16)], expr#18=['foo'], expr#19=[<>($t14, $t18)], expr#20=[AND($t17, $t19)], I=[$t0], $condition=[$t20])\n" +
-                        "  VoltDBLJoin(condition=[=($12, $14)], joinType=[inner])\n" +
-                        "    VoltDBLCalc(expr#0..12=[{inputs}], expr#13=[CAST($t12):VARCHAR(256) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], proj#0..5=[{exprs}], I0=[$t7], SI1=[$t8], TI0=[$t9], BI0=[$t10], F0=[$t11], V0=[$t12], V00=[$t13])\n" +
-                        "      VoltDBLJoin(condition=[=($6, $7)], joinType=[inner])\n" +
-                        "        VoltDBLCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}])\n" +
-                        "          VoltDBLTableScan(table=[[catalog, R1]])\n" +
-                        "        VoltDBLTableScan(table=[[catalog, R2]])\n" +
-                        "    VoltDBLTableScan(table=[[catalog, R3]])\n");
+                "VoltDBPCalc(expr#0..15=[{inputs}], expr#16=[4], expr#17=[>($t1, $t16)], expr#18=['foo'], expr#19=[<>($t14, $t18)], expr#20=[AND($t17, $t19)], I=[$t0], $condition=[$t20], split=[1])\n" +
+                        "  VoltDBPJoin(condition=[=($12, $14)], joinType=[inner], split=[1])\n" +
+                        "    VoltDBPCalc(expr#0..12=[{inputs}], expr#13=[CAST($t12):VARCHAR(256) CHARACTER SET \"ISO-8859-1\" COLLATE \"ISO-8859-1$en_US$primary\"], proj#0..5=[{exprs}], I0=[$t7], SI1=[$t8], TI0=[$t9], BI0=[$t10], F0=[$t11], V0=[$t12], V00=[$t13], split=[1])\n" +
+                        "      VoltDBPJoin(condition=[=($6, $7)], joinType=[inner], split=[1])\n" +
+                        "        VoltDBPCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], proj#0..6=[{exprs}], split=[1])\n" +
+                        "          VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "            VoltDBPTableSeqScan(table=[[catalog, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "        VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "          VoltDBPTableSeqScan(table=[[catalog, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "    VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "      VoltDBPTableSeqScan(table=[[catalog, R3]], split=[1], expr#0..2=[{inputs}], proj#0..2=[{exprs}])\n");
     }
 
     public void testSubqueriesJoin() {
@@ -475,11 +487,13 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
                         + "  (select * from R2 where f = 30.3) as t2 "
                         + "on t1.i = t2.i "
                         + "where t1.i = 3",
-                "VoltDBLCalc(expr#0..11=[{inputs}], expr#12=[3], expr#13=[=($t0, $t12)], V=[$t5], V0=[$t11], $condition=[$t13])\n" +
-                        "  VoltDBLJoin(condition=[=($0, $6)], joinType=[inner])\n" +
-                        "    VoltDBLCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], proj#0..5=[{exprs}], $condition=[$t7])\n" +
-                        "      VoltDBLTableScan(table=[[catalog, R1]])\n" +
-                        "    VoltDBLCalc(expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], expr#8=[=($t6, $t7)], proj#0..5=[{exprs}], $condition=[$t8])\n" +
-                        "      VoltDBLTableScan(table=[[catalog, R2]])\n");
+                "VoltDBPCalc(expr#0..11=[{inputs}], expr#12=[3], expr#13=[=($t0, $t12)], V=[$t5], V0=[$t11], $condition=[$t13], split=[1])\n" +
+                        "  VoltDBPJoin(condition=[=($0, $6)], joinType=[inner], split=[1])\n" +
+                        "    VoltDBPCalc(expr#0..5=[{inputs}], expr#6=['foo'], expr#7=[=($t5, $t6)], proj#0..5=[{exprs}], $condition=[$t7], split=[1])\n" +
+                        "      VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "        VoltDBPTableSeqScan(table=[[catalog, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
+                        "    VoltDBPCalc(expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], expr#8=[=($t6, $t7)], proj#0..5=[{exprs}], $condition=[$t8], split=[1])\n" +
+                        "      VoltDBPSingletonExchange(distribution=[single])\n" +
+                        "        VoltDBPTableSeqScan(table=[[catalog, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
     }
 }

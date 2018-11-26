@@ -31,8 +31,15 @@ import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPSort;
 
+/**
+ * VoltDB physical rule that transform {@link Sort} to {@link VoltDBPSort}.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBPSortConvertRule extends ConverterRule {
 
+    // TODO: when this rule will be applied?
     public static final VoltDBPSortConvertRule INSTANCE_NONE =
             new VoltDBPSortConvertRule(Convention.NONE);
     public static final VoltDBPSortConvertRule INSTANCE_VOLTDB =
@@ -68,7 +75,7 @@ public class VoltDBPSortConvertRule extends ConverterRule {
         return new VoltDBPSort(
                 sort.getCluster(),
                 traits.plus(sort.getCollation()),
-                convert(sort.getInput(), traits.simplify()),
+                convertedInput,
                 sort.getCollation(),
                 splitCount);
     }

@@ -90,10 +90,10 @@ public class VoltDBPCalc extends Calc implements VoltDBPRel {
         double rowCount = estimateRowCount(mq);
         // Hack. Discourage Calcite from picking a plan with a Calc that have a RelDistributions.ANY
         // distribution trait.
-//        if (getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) != null &&
-//                RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
-//            rowCount *= 10000;
-//        }
+        if (getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) != null &&
+                RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
+            rowCount *= 10000;
+        }
         RelOptCost defaultCost = super.computeSelfCost(planner, mq);
         return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
 

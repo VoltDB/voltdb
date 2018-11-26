@@ -40,6 +40,13 @@ import java.util.List;
 import java.util.Map;
 
 
+/**
+ * VoltDB physical rule that transform {@link VoltDBLAggregate} to {@link VoltDBPHashAggregate}
+ * or {@link VoltDBPSerialAggregate}.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBPAggregateRule extends RelOptRule {
 
     public static final VoltDBPAggregateRule INSTANCE = new VoltDBPAggregateRule();
@@ -70,6 +77,8 @@ public class VoltDBPAggregateRule extends RelOptRule {
                     null,
                     false);
             call.transformTo(hashAggr);
+            // TODO: It seems we can make an early return here cause the planner will always choose the
+            // HashAggregate rather than SerialAggregate. I will go back to checker this in future stage.
         }
 
         // Transform to a physical Serial Aggregate. To enforce a required ordering add a collation
