@@ -178,7 +178,7 @@ public class VoltZK {
     // banElasticJoin blocks elastic join (currently created by DRProducer if the agreed protocol version
     //                                     for the mesh does not support elastic join during DR (i.e. version <= 7).
     //                                     It is now only released after a DR global reset.)
-    // elasticJoinMigration only blockers SPI Migration
+    // elasticJoinMigration only blocks SPI Migration
     public static final String leafNodeElasticJoinInProgress = "join_blocker";
     public static final String elasticJoinInProgress = actionBlockers + "/" + leafNodeElasticJoinInProgress;
     public static final String leafNodeBanElasticJoin = "no_join_blocker";
