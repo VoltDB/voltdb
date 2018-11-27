@@ -921,7 +921,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_generation.onSourceDone(m_partitionId, m_signature);
                 return;
             }
-            releaseBlock();
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
@@ -1006,7 +1005,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void releaseBlock() {
-        if (m_status == StreamStatus.BLOCKED && !DISABLE_AUTO_GAP_RELEASE) {
+        if (m_status == StreamStatus.BLOCKED) {
             RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
             if (voltdb.isClusterComplete()) {
                 processStreamControl(OperationMode.RELEASE);
@@ -1501,6 +1500,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
                                             ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
                                             "use 'voltadmin release' command to skip the missing data.");
+                                } else {
+                                    releaseBlock();
                                 }
                             }
                         } else {
@@ -1590,7 +1591,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     @Override
     public String toString() {
         return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId()
-           + "status " + m_status + " master " + m_mastershipAccepted.get();
+           + " (" + m_status + ", " + m_mastershipAccepted.get() + ")";
     }
 
     private void mastershipCheckpoint(long seq) {
