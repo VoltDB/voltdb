@@ -92,7 +92,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(findTableInSystemCatalogResults("T1"));
         assertTrue(findIndexInSystemCatalogResults("area"));
         assertTrue(verifyIndexUniqueness("area", true));
-        assertEquals(indexedColumnCount("T1"), 2);
+        assertEquals(indexedColumnCount("T1"), 3);
     }
 
     @Test
