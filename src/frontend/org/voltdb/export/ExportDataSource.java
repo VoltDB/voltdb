@@ -957,9 +957,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             // If another mastership migration in progress and is before the gap,
                             // don't bother to start new one.
                             if (m_seqNoToDrain > firstUnpolledSeq - 1) {
-                                exportLog.info("Hitting a stream gap [" +
-                                        gap.getFirst() + ", " + gap.getSecond() +
-                                        "], start looking for other nodes that has the data.");
+                                exportLog.info("Export data missing from current queue [" + gap.getFirst() + ", " + gap.getSecond() +
+                                        "] from " + this.toString() + ". Searching other sites for missing data.");
                                 m_seqNoToDrain = firstUnpolledSeq - 1;
                                 mastershipCheckpoint(firstUnpolledSeq - 1);
                             }
@@ -1419,8 +1418,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 setStatus(StreamStatus.BLOCKED);
                 Pair<Long, Long> gap = m_gapTracker.getFirstGap();
                 m_queueGap = gap.getSecond() - gap.getFirst() + 1;
-                exportLog.warn("Stream is blocked because of data from sequence number " + gap.getFirst() +
-                        " to " + gap.getSecond() + " is missing.");
+                exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                        this.toString() + ". Please rejoin a node with the missing export queue data. ");
             }
         }
     }
@@ -1499,14 +1498,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             if (voltdb.isClusterComplete()) {
                                 if (DISABLE_AUTO_GAP_RELEASE) {
                                     // Show warning only in full cluster.
-                                    exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
-                                            gap.getFirst() + " to " + gap.getSecond());
+                                    exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                                            ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
+                                            "use 'voltadmin release' command to skip the missing data.");
                                 }
                             }
                         } else {
                             // time to give up master and give it to the best candidate
                             m_newLeaderHostId = CoreUtils.getHostIdFromHSId(bestCandidate.getKey());
-                            exportLog.info("Stream master is going to switch to host " + m_newLeaderHostId + " to jump the gap.");
+                            exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString() + " on host " + m_newLeaderHostId);
                             // drainedTo sequence number should haven't been changed.
                             mastershipCheckpoint(m_lastReleasedSeqNo);
                         }
@@ -1623,11 +1623,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         case RELEASE:
             if (m_status == StreamStatus.BLOCKED && m_mastershipAccepted.get() && m_gapTracker.getFirstGap() != null) {
                 long firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Release " + this + " move firstUnpolledSeqNo from " +
-                            m_firstUnpolledSeqNo + " to " + firstUnpolledSeqNo);
-                }
-
+                exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
+                        "] and cluster is complete. Skipping to next available transaction for " + this.toString());
                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;
                 setStatus(StreamStatus.ACTIVE);
             }
