@@ -31,17 +31,14 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.newplanner.SqlBatchImpl;
-import org.voltdb.newplanner.guards.PlannerFallbackException;
+import org.voltdb.parser.SqlParserFactory;
 import org.voltdb.utils.Encoder;
 
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
 /**
@@ -59,8 +56,8 @@ public class DropTableUtils {
      */
     private static SqlNode toSqlNode(String sql) {
         try {
-            return new SqlBatchImpl(sql).iterator().next().getParsedQuery();
-        } catch (SqlParseException | PlannerFallbackException e) {
+            return SqlParserFactory.parse(sql);
+        } catch (SqlParseException e) {
             return null;    // TODO: when Calcite eventually support all Volt syntax, we need to rethrow in here.
         }
     }
@@ -182,19 +179,15 @@ public class DropTableUtils {
                     String.format("Dependent object exists: PUBLIC.%s in statement [%s]", viewNames, sql));
             materializedViews.add(tableName);
             final VoltXMLElement.VoltXMLDiff od = new VoltXMLElement.VoltXMLDiff("databaseschemadatabaseschema");
-            IntStream.range(0, schema.children.size())
-                    .filter(index -> {
-                        final VoltXMLElement elm = schema.children.get(index);
-                        final String dirtyTable = elm.attributes.get("name");
-                        if (elm.name.equals("table") && materializedViews.contains(dirtyTable)) {
-                            compiler.markTableAsDirty(dirtyTable);
-                            od.getRemovedNodes().add(elm);
-                            return true;
-                        } else {
-                            return false;
-                        }
-                    }).boxed().sorted(Comparator.reverseOrder())
-                    .forEach(schema.children::remove);
+            for (int index = schema.children.size() - 1; index >= 0; --index) {
+                final VoltXMLElement elm = schema.children.get(index);
+                final String dirtyTable = elm.attributes.get("name");
+                if (elm.name.equals("table") && materializedViews.contains(dirtyTable)) {
+                    compiler.markTableAsDirty(dirtyTable);
+                    od.getRemovedNodes().add(elm);
+                    schema.children.remove(index);
+                }
+            }
             schema.applyDiff(od);
             return Encoder.hexEncode(sql) + "\n";
         } else {        // Exec "DROP TABLE t IF EXISTS;" and t does not exist
