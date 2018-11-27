@@ -1023,6 +1023,7 @@ public class Cartographer extends StatsSource
         for (Host host : hostList) {
             if (host.m_hostId == localHostId && !host.m_masterPartitionIDs.isEmpty()) {
                 srcHost = host;
+                break;
             }
         }
 

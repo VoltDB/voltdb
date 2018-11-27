@@ -2207,7 +2207,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         int partitionKey = -1;
 
         //MigratePartitionLeader is completed or there are hosts down. Stop MigratePartitionLeader service on this host
-        if (targetHostId == -1 || !voltDB.isClusterComplete()) {
+        if (targetHostId == -1 || (!prepareStopNode && !voltDB.isClusterComplete())) {
             voltDB.scheduleWork(
                     () -> {m_mailbox.deliver(new MigratePartitionLeaderMessage());},
                     0, 0, TimeUnit.SECONDS);
