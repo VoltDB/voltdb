@@ -466,13 +466,13 @@ def check_export_mastership_on_host(runner, hostid):
         if len(resp.table(0).tuples()) == 0:
             return
         # EXPORT stats
-        # column 0: site id
-        # column 3: role
+        # column 1: host id
+        # column 7: active
         mastershipCount = 0;
         for r in resp.table(0).tuples():
-            host = int(r[0].split(":")[0])
-            role = r[3]
-            if host == hostid and role == 'MASTER':
+            host = int(r[1])
+            active = r[7]
+            if host == hostid and active == 'TRUE':
                 mastershipCount +=1
 
         # all partition leaders have been moved

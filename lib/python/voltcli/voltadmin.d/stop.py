@@ -79,9 +79,11 @@ def stop(runner):
                                     [thost.id],
                                     check_status=False)
             # monitor partition leader migration
+            runner.info('Checking partition leader migration')
             checkstats.check_partition_leaders_on_host(runner,thost.id)
 
             # monitor export mastership transfer
+            runner.info('Checking export mastership transfer')
             checkstats.check_export_mastership_on_host(runner,thost.id)
         except StatisticsProcedureException as proex:
              runner.info(stateMessage)
