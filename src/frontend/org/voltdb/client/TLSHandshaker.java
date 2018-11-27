@@ -196,6 +196,10 @@ public class TLSHandshaker {
                 }
             }
         }
+
+        // Flip the buffer so it is setup in case there is a remnant
+        m_rxNetData.flip();
+
         return true;
     }
 
@@ -211,15 +215,14 @@ public class TLSHandshaker {
      * @throws IOException if the decryption operation fails
      */
     public ByteBuffer getRemnant() throws IOException {
-        ByteBuffer bb = ((ByteBuffer)m_rxNetData.duplicate().flip()).slice();
-        if (!bb.hasRemaining()) {
-            return bb;
+        if (!m_rxNetData.hasRemaining()) {
+            return m_rxNetData.slice();
         }
         ByteBuffer remnant = ByteBuffer.allocate(m_eng.getSession().getApplicationBufferSize());
-        SSLEngineResult result = m_eng.unwrap(bb, remnant);
+        SSLEngineResult result = m_eng.unwrap(m_rxNetData, remnant);
         switch (result.getStatus()) {
         case OK:
-            assert !bb.hasRemaining() : "there are unexpected additional remnants";
+            assert !m_rxNetData.hasRemaining() : "there are unexpected additional remnants";
             return ((ByteBuffer)remnant.flip()).slice().asReadOnlyBuffer();
         case BUFFER_OVERFLOW:
             throw new IOException("buffer underflow while decrypting handshake remnant");
@@ -229,6 +232,14 @@ public class TLSHandshaker {
             throw new IOException("ssl engine closed while decrypting handshake remnant");
         }
         return null; // unreachable
+    }
+
+    public boolean hasRemnant() {
+        return m_rxNetData.hasRemaining();
+    }
+
+    public SSLEngine getSslEngine() {
+        return m_eng;
     }
 
     private static ByteBuffer expand(ByteBuffer bb, boolean copy) {
