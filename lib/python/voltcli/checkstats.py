@@ -423,7 +423,6 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
     return lastUpdatedTime
 
 def check_partition_leaders_on_host(runner, hostid):
-    runner.info('Monitoring partition leader migration...')
     lastUpdatedTime = time.time()
     notifyInterval = 10
     lastValidationParamms = [sys.maxint]
@@ -457,7 +456,6 @@ def check_partition_leaders_on_host(runner, hostid):
         time.sleep(1)
 
 def check_export_mastership_on_host(runner, hostid):
-    runner.info('Monitoring export mastership transfer...')
     lastUpdatedTime = time.time()
     notifyInterval = 10
     lastValidationParamms = [sys.maxint]
