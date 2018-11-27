@@ -434,9 +434,9 @@ public class SocketJoiner {
     /**
      * Initialize a new {@link SocketChannel} either as a client or server
      *
-     * @return {@link SSLEngine} instance if the socket is to be encrypted otherwise {@code null} is returned
+     * @return {@link SslHandshakeResult} instance. Never {@code null}
      */
-    private SSLEngine initializeSocket(SocketChannel sc, boolean clientMode, List<Long> clockSkews)
+    private SslHandshakeResult initializeSocket(SocketChannel sc, boolean clientMode, List<Long> clockSkews)
             throws IOException {
         ByteBuffer timeBuffer = ByteBuffer.allocate(Long.BYTES);
         if (clientMode) {
@@ -462,10 +462,10 @@ public class SocketJoiner {
         return setupSSLIfNeeded(sc, clientMode);
     }
 
-    private SSLEngine setupSSLIfNeeded(SocketChannel sc, boolean clientMode) throws IOException {
+    private SslHandshakeResult setupSSLIfNeeded(SocketChannel sc, boolean clientMode) throws IOException {
         SslContext sslContext = clientMode ? m_sslClientContext : m_sslServerContext;
         if (sslContext == null) {
-            return null;
+            return SslHandshakeResult.NO_SSL;
         }
         SSLEngine sslEngine = sslContext.newEngine(ByteBufAllocator.DEFAULT);
         sslEngine.setUseClientMode(clientMode);
@@ -477,7 +477,7 @@ public class SocketJoiner {
             hostLog.warn("Preferred cipher suites are not available");
             intersection = enabled;
         }
-        sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
+        sslEngine.setEnabledCipherSuites(intersection.toArray(new String[intersection.size()]));
         boolean handshakeStatus;
 
         sc.socket().setTcpNoDelay(true);
@@ -489,7 +489,7 @@ public class SocketJoiner {
         }
         LOG.info("SSL enabled on internal connection " + sc.socket().getRemoteSocketAddress() +
                 " with protocol " + sslEngine.getSession().getProtocol() + " and with cipher " + sslEngine.getSession().getCipherSuite());
-        return sslEngine;
+        return new SslHandshakeResult(handshaker);
     }
 
     /*
@@ -502,7 +502,8 @@ public class SocketJoiner {
             try {
                 sc.socket().setTcpNoDelay(true);
                 sc.socket().setPerformancePreferences(0, 2, 1);
-                SSLEngine sslEngine = initializeSocket(sc, false, null);
+                SslHandshakeResult result = initializeSocket(sc, false, null);
+                SSLEngine sslEngine = result.m_sslEngine;
                 final String remoteAddress = sc.socket().getRemoteSocketAddress().toString();
 
                 MessagingChannel messagingChannel = MessagingChannel.get(sc, sslEngine);
@@ -510,7 +511,19 @@ public class SocketJoiner {
                 /*
                  * Read a length prefixed JSON message
                  */
-                JSONObject jsObj = readJSONObjFromWire(messagingChannel);
+                JSONObject jsObj;
+                if (result.m_remnant != null) {
+                    assert result.m_remnant.getInt() == result.m_remnant.remaining()
+                            && result.m_remnant.hasArray() : "Remnant not array or not a single full message. remnant: "
+                                    + result.m_remnant + ", expected length: "
+                                    + result.m_remnant.getInt(result.m_remnant.position() - Integer.BYTES);
+
+                    jsObj = new JSONObject(new String(result.m_remnant.array(),
+                            result.m_remnant.arrayOffset() + result.m_remnant.position(), result.m_remnant.remaining(),
+                            StandardCharsets.UTF_8));
+                } else {
+                    jsObj = readJSONObjFromWire(messagingChannel);
+                }
 
                 LOG.info(jsObj.toString(2));
 
@@ -834,7 +847,7 @@ public class SocketJoiner {
         SocketChannel socket = connectToHost(hostAddr);
         SSLEngine sslEngine;
         try {
-            sslEngine = initializeSocket(socket, true, null);
+            sslEngine = initializeSocket(socket, true, null).m_sslEngine;
         } catch(IOException e) {
             try {
                 socket.close();
@@ -884,7 +897,7 @@ public class SocketJoiner {
             socket.socket().setPerformancePreferences(0, 2, 1);
             SSLEngine leaderSSLEngine;
             try {
-                leaderSSLEngine = initializeSocket(socket, true, skews);
+                leaderSSLEngine = initializeSocket(socket, true, skews).m_sslEngine;
             } catch(IOException e) {
                 SocketAddress socketAddress = socket.getRemoteAddress();
                 try {
@@ -950,7 +963,7 @@ public class SocketJoiner {
                 }
                 // connect to all the peer hosts (except leader) and advertise our existence
                 SocketChannel hostSocket = connectToHost(hostAddr);
-                SSLEngine sslEngine = initializeSocket(hostSocket, true, skews);
+                SSLEngine sslEngine = initializeSocket(hostSocket, true, skews).m_sslEngine;
                 MessagingChannel messagingChannel = MessagingChannel.get(hostSocket, sslEngine);
                 JSONObject hostInfo = publishHostId(hostAddr, messagingChannel, activeVersions);
 
@@ -1063,4 +1076,25 @@ public class SocketJoiner {
         return m_localHostId;
     }
 
+    /**
+     * Simple class to hold the result of an ssl handshake
+     */
+    private static final class SslHandshakeResult {
+        static final SslHandshakeResult NO_SSL = new SslHandshakeResult(null, null);
+
+        /** {@link SSLEngine} used for the handshake or {@code null} if no handshake was performed */
+        final SSLEngine m_sslEngine;
+        /** Extra data read and decrypted during the handshake or {@code null} if no extra data was read */
+        final ByteBuffer m_remnant;
+
+        private SslHandshakeResult(SSLEngine sslEngine, ByteBuffer remnant) {
+            m_sslEngine = sslEngine;
+            m_remnant = remnant;
+        }
+
+        public SslHandshakeResult(TLSHandshaker handshaker) throws IOException {
+            m_sslEngine = handshaker.getSslEngine();
+            m_remnant = handshaker.hasRemnant() ? handshaker.getRemnant() : null;
+        }
+    }
 }
