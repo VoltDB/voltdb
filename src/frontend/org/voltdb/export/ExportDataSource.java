@@ -1282,7 +1282,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private void sendQueryResponse(long senderHSId, long requestId, long lastSeq) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
-        if (mbx != null && p.getSecond().size() > 0 && p.getSecond().contains(senderHSId)) {
+        if (mbx != null) {
             // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
             // requestId(8) + lastSeq(8)
             int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 8;
@@ -1591,7 +1591,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     @Override
     public String toString() {
         return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId()
-           + " (" + m_status + ", " + m_mastershipAccepted.get() + ")";
+           + " (" + m_status + ", " + (m_mastershipAccepted.get() ? "Master":"Replica") + ")";
     }
 
     private void mastershipCheckpoint(long seq) {
