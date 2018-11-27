@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel.logical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -46,7 +47,7 @@ public class VoltDBLAggregate extends Aggregate implements VoltDBLRel {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
-        assert traitSet.contains(VoltDBLRel.VOLTDB_LOGICAL);
+        Preconditions.checkArgument(getConvention() == VoltDBLRel.VOLTDB_LOGICAL);
     }
 
     @Override

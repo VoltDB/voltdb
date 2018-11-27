@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel.logical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -40,7 +41,7 @@ public class VoltDBLCalc extends Calc implements VoltDBLRel{
                   traitSet,
                   input,
                   program);
-          assert traitSet.contains(VoltDBLRel.VOLTDB_LOGICAL);
+          Preconditions.checkArgument(getConvention() == VoltDBLRel.VOLTDB_LOGICAL);
         }
 
         @Override
