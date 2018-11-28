@@ -38,6 +38,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -162,6 +163,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private String m_partitionColumnName = "";
 
     private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
+    static public AtomicLong rowCount = new AtomicLong(0);
+    private volatile long m_prevSeqNo = 0L;
+    private volatile int m_prevTuplesCount = 0;
 
     static enum StreamStatus {
         ACTIVE,
@@ -993,9 +997,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
                                 first_unpolled_block.rowCount());
                 try {
+                    // ENG-15004: Check continuity of buffers we're giving out
+                    if (m_prevSeqNo != 0L
+                            && ackingContainer.m_seqNo != m_prevSeqNo + m_prevTuplesCount) {
+                        exportLog.warn("YYY BUFFER DISCONTINUITY, prev.seqNo: " + m_prevSeqNo
+                                + ", prev.tuplesCount: " + m_prevTuplesCount
+                                + ", cur.seqNo: " + ackingContainer.m_seqNo
+                                + ", cur.tuplesCount: " + ackingContainer.m_tuplesCount);
+                    }
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source dont discard next processor will pick it up.
+                    exportLog.warn("YYY Unexpected: " + reex);
                 }
                 m_pollFuture = null;
             }
@@ -1005,8 +1018,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public class AckingContainer extends BBContainer {
-        final long m_seqNo;
-        final int m_tuplesCount;
+        public final long m_seqNo;
+        public final int m_tuplesCount;
         final BBContainer m_backingCont;
         long m_startTime = 0;
 
@@ -1039,6 +1052,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (m_averageLatency > m_maxLatency) {
                             m_maxLatency = m_averageLatency;
                         }
+                        // ENG-15004: Track total exported rows
+                        rowCount.addAndGet(m_tuplesCount);
+                        exportLog.warn("YYY AckingContainer.discarded total tuples count: " + rowCount.get());
 
                         try {
                              m_backingCont.discard();

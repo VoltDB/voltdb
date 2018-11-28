@@ -333,6 +333,7 @@ public class MatchChecks {
     */
     protected static long getExportBacklog(Client client) {
         long backlog = 0;
+        long tcount = 0;
         try {
             VoltTable tableStats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
             while (tableStats.advanceRow()) {
@@ -340,11 +341,18 @@ public class MatchChecks {
                 if ( allocatedMemory > 0 ) {
                         backlog = backlog + allocatedMemory;
                 }
+                Long tuple_count = tableStats.getLong("TUPLE_COUNT");
+                if ( tuple_count > 0 ) {
+                        tcount += tuple_count;
+                }
             }
         } catch (Exception e) {
             log.error("Table Stats query failed: " + e.getMessage());
         }
 
+        if ( backlog == 0 ) {
+            log.info("No exports pending, total rows exported: " + tcount);
+        }
         return backlog;
 
     }
@@ -404,4 +412,3 @@ public class MatchChecks {
         return false;
     }
 }
-

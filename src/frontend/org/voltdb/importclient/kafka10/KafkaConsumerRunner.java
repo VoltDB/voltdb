@@ -48,8 +48,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.kafka.util.DurableTracker;
-import org.voltdb.importclient.kafka.util.KafkaConstants;
 import org.voltdb.importclient.kafka.util.KafkaCommitPolicy;
+import org.voltdb.importclient.kafka.util.KafkaConstants;
 import org.voltdb.importclient.kafka.util.KafkaUtils;
 import org.voltdb.importclient.kafka.util.PendingWorkTracker;
 import org.voltdb.importclient.kafka.util.ProcedureInvocationCallback;
@@ -459,13 +459,12 @@ public abstract class KafkaConsumerRunner implements Runnable {
             return;
         }
 
-        if (LOGGER.isDebugEnabled()) {
-            StringBuilder builder = new StringBuilder("Consumer group " + m_config.getGroupId() + " committs offsets:");
+            StringBuilder builder = new StringBuilder("ZZZ Consumer group " + m_config.getGroupId() + " committs offsets: ");
             for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : partitionToMetadataMap.entrySet()) {
                 builder.append(entry.getKey() + ":" + entry.getValue().offset());
+                builder.append(", ");
             }
-            LOGGER.debug(builder.toString());
-        }
+            LOGGER.warn(builder.toString());
 
         try {
             m_consumer.commitSync(partitionToMetadataMap);
@@ -476,10 +475,10 @@ public abstract class KafkaConsumerRunner implements Runnable {
                 m_consumer.commitSync(partitionToMetadataMap);
                 m_lastCommitTime = EstTime.currentTimeMillis();
             } catch(KafkaException ke) {
-                LOGGER.warn("Consumer group " + m_config.getGroupId() + " commit offsets:" + ke.getMessage());
+                LOGGER.warn("Consumer group " + m_config.getGroupId() + " commit offsets: " + ke.getMessage());
             }
         } catch (CommitFailedException ce) {
-            LOGGER.warn("Consumer group " + m_config.getGroupId() + " commit offsets:" + ce.getMessage());
+            LOGGER.warn("Consumer group " + m_config.getGroupId() + " commit offsets: " + ce.getMessage());
         }
     }
 

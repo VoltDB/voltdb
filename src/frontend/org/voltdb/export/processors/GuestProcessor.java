@@ -404,6 +404,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                                 break;
                             } catch (RestartBlockException e) {
+                                m_logger.warn("YYY restart exception, seq: " + cont.m_seqNo + ", cnt: " + cont.m_tuplesCount);
                                 if (m_shutdown) {
                                     if (m_logger.isDebugEnabled()) {
                                         // log message for debugging.

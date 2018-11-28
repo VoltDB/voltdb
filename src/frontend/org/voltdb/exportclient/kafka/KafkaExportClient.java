@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -84,6 +85,8 @@ public class KafkaExportClient extends ExportClientBase {
     Map<String, String> m_tablePartitionColumns;
     boolean m_pollFutures = false;
     int m_acksTimeout = 5_000;
+
+    static public AtomicLong rowCount = new AtomicLong(0);
 
     @Override
     public void configure(Properties config) throws Exception {
@@ -353,6 +356,7 @@ public class KafkaExportClient extends ExportClientBase {
             } finally {
                 m_futures.clear();
                 m_failure.set(false);
+                LOG.warn("XXX Rows processed: " + rowCount.get());
             }
         }
 
@@ -379,6 +383,9 @@ public class KafkaExportClient extends ExportClientBase {
                             LOG.warn("Failed to send data. Verify if the kafka server matches bootstrap.servers %s", e,
                                     m_producerConfig.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
                             m_failure.compareAndSet(false, true);
+                        }
+                        else {
+                            rowCount.incrementAndGet();
                         }
                     }
                 }));
