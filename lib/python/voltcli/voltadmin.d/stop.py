@@ -74,10 +74,12 @@ def stop(runner):
         actionMessage = 'You may shutdown the node with the "voltadmin stop --force" command.'
         try:
             runner.info('Preparing for the node shutdown, moving partition leaders and export masters to other nodes.')
-            response = runner.call_proc('@PrepairStopNode',
+            resp = runner.call_proc('@PrepairStopNode',
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER],
                                     [thost.id],
                                     check_status=False)
+            if resp.status() != 1:
+                runner.abort('The preparation for node shutdown failed with status: %s' % resp.response.statusString)
             # monitor partition leader migration
             runner.info('Checking partition leader migration progress on host %d: %s' % (thost.id, thost.hostname))
             checkstats.check_partition_leaders_on_host(runner,thost.id)

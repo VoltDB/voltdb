@@ -935,7 +935,7 @@ public class Cartographer extends StatsSource
         // @MigratePartitionLeader is initiated on the host with the old leader to facilitate DR integration
         // If current host does not have the most partition leaders, give it up.
         // Let the host with the most partition leaders to migrate
-        if (srcHost.m_hostId != localHostId && localHostId == Integer.MIN_VALUE) {
+        if (srcHost.m_hostId != localHostId && localHostId != Integer.MIN_VALUE) {
             return null;
         }
 
