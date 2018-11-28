@@ -1004,15 +1004,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void releaseBlock() {
-        if (m_status == StreamStatus.BLOCKED) {
-            RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
-            if (voltdb.isClusterComplete()) {
-                processStreamControl(OperationMode.RELEASE);
-            }
-        }
-    }
-
     public class AckingContainer extends BBContainer {
         final long m_seqNo;
         final int m_tuplesCount;
@@ -1501,7 +1492,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                             ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
                                             "use 'voltadmin release' command to skip the missing data.");
                                 } else {
-                                    releaseBlock();
+                                    processStreamControl(OperationMode.RELEASE);
                                 }
                             }
                         } else {
