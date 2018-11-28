@@ -163,7 +163,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private String m_partitionColumnName = "";
 
     private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
+
+    // ENG-15004: checking variables
     static public AtomicLong rowCount = new AtomicLong(0);
+    static public AtomicLong missCount = new AtomicLong(0);
+    static public AtomicLong overCount = new AtomicLong(0);
     private volatile long m_prevSeqNo = 0L;
     private volatile int m_prevTuplesCount = 0;
 
@@ -998,13 +1002,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 first_unpolled_block.rowCount());
                 try {
                     // ENG-15004: Check continuity of buffers we're giving out
-                    if (m_prevSeqNo != 0L
-                            && ackingContainer.m_seqNo != m_prevSeqNo + m_prevTuplesCount) {
-                        exportLog.warn("YYY BUFFER DISCONTINUITY, prev.seqNo: " + m_prevSeqNo
-                                + ", prev.tuplesCount: " + m_prevTuplesCount
-                                + ", cur.seqNo: " + ackingContainer.m_seqNo
-                                + ", cur.tuplesCount: " + ackingContainer.m_tuplesCount);
-                    }
+                    checkContinuity(ackingContainer);
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source dont discard next processor will pick it up.
@@ -1015,6 +1013,35 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (Throwable t) {
             fut.setException(t);
         }
+    }
+
+    // make this synchronized to avoid questions
+    private synchronized void checkContinuity(AckingContainer cont) {
+        if (m_prevSeqNo != 0L) {
+            long nextSeqNo = m_prevSeqNo + m_prevTuplesCount;
+            if (cont.m_seqNo < nextSeqNo) {
+                // Some rows sent multiple times?
+                long over = nextSeqNo - cont.m_seqNo;
+                overCount.addAndGet(over);
+                exportLog.warn("YYY BUFFER DISCONTINUITY (OVER), prev.seqNo: " + m_prevSeqNo
+                        + ", prev.tuplesCount: " + m_prevTuplesCount
+                        + ", cur.seqNo: " + cont.m_seqNo
+                        + ", cur.tuplesCount: " + cont.m_tuplesCount
+                        + ", over by: " + over);
+            }
+            else if (cont.m_seqNo > nextSeqNo) {
+                // Some rows missing?
+                long miss = cont.m_seqNo - nextSeqNo;
+                missCount.addAndGet(miss);
+                exportLog.warn("YYY BUFFER DISCONTINUITY (MISS), prev.seqNo: " + m_prevSeqNo
+                        + ", prev.tuplesCount: " + m_prevTuplesCount
+                        + ", cur.seqNo: " + cont.m_seqNo
+                        + ", cur.tuplesCount: " + cont.m_tuplesCount
+                        + ", missing by: " + miss);
+            }
+        }
+        m_prevSeqNo = cont.m_seqNo;
+        m_prevTuplesCount = cont.m_tuplesCount;
     }
 
     public class AckingContainer extends BBContainer {
@@ -1054,7 +1081,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                         // ENG-15004: Track total exported rows
                         rowCount.addAndGet(m_tuplesCount);
-                        exportLog.warn("YYY AckingContainer.discarded total tuples count: " + rowCount.get());
+                        exportLog.warn("YYY AckingContainer.discarded total tuples: " + rowCount.get()
+                                + ", miss: " + missCount.get() + ", over: " + overCount.get());
 
                         try {
                              m_backingCont.discard();
