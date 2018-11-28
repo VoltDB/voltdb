@@ -388,11 +388,6 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
-        //one more check to make sure all the hosts are up before any changes are made
-        if (!db.isClusterComplete()) {
-            return;
-        }
-
         SpScheduler scheduler = (SpScheduler)m_scheduler;
         scheduler.checkPointMigratePartitionLeader();
         scheduler.m_isLeader = false;

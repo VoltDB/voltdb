@@ -2321,7 +2321,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
 
                 //some hosts may be down.
-                if (!voltDB.isClusterComplete()) {
+                if (!voltDB.isClusterComplete() && !prepareStopNode) {
                     anyFailedHosts = true;
                     // If the target host is still alive, migration is still going on.
                     if (!voltDB.getHostMessenger().getLiveHostIds().contains(targetHostId)) break;
