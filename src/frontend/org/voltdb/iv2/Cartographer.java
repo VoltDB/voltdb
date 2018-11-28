@@ -871,7 +871,11 @@ public class Cartographer extends StatsSource
 
         @Override
         public int compareTo(Host other){
-            return (other.m_masterPartitionIDs.size() - m_masterPartitionIDs.size());
+            int diff = (other.m_masterPartitionIDs.size() - m_masterPartitionIDs.size());
+            if (diff != 0) {
+                return diff;
+            }
+            return (m_hostId - other.m_hostId);
         }
 
         @Override
