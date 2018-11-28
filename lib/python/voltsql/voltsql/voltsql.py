@@ -212,6 +212,9 @@ class VoltCli(object):
                 if sql_cmd.strip().lower() in ("help", "help;"):
                     print(README)
                     continue
+                if not sql_cmd.strip():
+                    # do nothing when empty line
+                    continue
                 call(
                     "echo \"{sql_cmd}\" | sqlcmd {options}".format(
                         sql_cmd=sql_cmd, options=option_str),
