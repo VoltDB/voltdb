@@ -79,13 +79,13 @@ def stop(runner):
                                     [thost.id],
                                     check_status=False)
             # monitor partition leader migration
-            runner.info('Checking partition leader migration progress.')
-            checkstats.check_partition_leaders_on_host(runner,thost.id, thost.hostname)
-            runner.info('All partition leaders on %s have been moved.' % (thost.hostname))
+            runner.info('Checking partition leader migration progress on host %d: %s' % (thost.id, thost.hostname))
+            checkstats.check_partition_leaders_on_host(runner,thost.id)
+            runner.info('All partition leaders have been moved.')
             # monitor export master transfer
-            runner.info('Checking export master transfer progress')
-            checkstats.check_export_mastership_on_host(runner,thost.id, thost.hostname)
-            runner.info('All export masters on %s have been transferred' % (thost.hostname))
+            runner.info('Checking export master transfer progress on host %d: %s' % (thost.id, thost.hostname))
+            checkstats.check_export_mastership_on_host(runner,thost.id)
+            runner.info('All export masters have been transferred')
         except StatisticsProcedureException as proex:
              runner.info(stateMessage)
              runner.error(proex.message)

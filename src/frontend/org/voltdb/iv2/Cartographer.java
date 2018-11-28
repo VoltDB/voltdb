@@ -726,31 +726,39 @@ public class Cartographer extends StatsSource
             return "Stopping individual nodes is only allowed on a K-safe cluster";
         }
         try {
-            // Check rejoining status
-            if (m_zk.exists(CoreZK.rejoin_node_blocker, false) != null) {
-                return "All rejoin nodes must be completed";
-            }
-            // Check replicas
-            Set<Integer> otherStoppedHids = new HashSet<Integer>();
-            List<String> children = m_zk.getChildren(VoltZK.host_ids_be_stopped, false);
-            for (String child : children) {
-                int hostId = Integer.parseInt(child);
-                otherStoppedHids.add(hostId);
-            }
-            otherStoppedHids.remove(ihid);
-            String message = doPartitionsHaveReplicas(ihid, otherStoppedHids);
-            if (message != null) {
-                return message;
-            }
-            // Partition leader distribution mast be balanced, otherwise, the migrated partition leader will
-            // be moved back.
-            if (!isPartitionLeadersBalanced()) {
-                return "Cann't move partition leaders since leader migration is in progress";
-            }
-        } catch (KeeperException | InterruptedException e) {
-            return "Error: " + e.getMessage();
+            return m_es.submit(new Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    // Check rejoining status
+                    try {
+                        if (m_zk.exists(CoreZK.rejoin_node_blocker, false) != null) {
+                            return "All rejoin nodes must be completed";
+                        }
+                    } catch (KeeperException.NoNodeException ignore) {}
+                    // Check replicas
+                    Set<Integer> otherStoppedHids = new HashSet<Integer>();
+                    try {
+                        List<String> children = m_zk.getChildren(VoltZK.host_ids_be_stopped, false);
+                        for (String child : children) {
+                            int hostId = Integer.parseInt(child);
+                            otherStoppedHids.add(hostId);
+                        }
+                    } catch (KeeperException.NoNodeException ignore) {}
+                    otherStoppedHids.remove(ihid);
+                    String message = doPartitionsHaveReplicas(ihid, otherStoppedHids);
+                    if (message != null) {
+                        return message;
+                    }
+                    // Partition leader distribution mast be balanced, otherwise, the migrated partition leader will
+                    // be moved back.
+                    if (!isPartitionLeadersBalanced()) {
+                        return "Cann't move partition leaders since leader migration is in progress";
+                    }
+                    return null;
+                }}).get();
+        } catch (InterruptedException | ExecutionException t) {
+            return "Internal error: " + t.getMessage();
         }
-        return null;
     }
 
     private boolean isPartitionLeadersBalanced() {
@@ -1023,7 +1031,6 @@ public class Cartographer extends StatsSource
         for (Host host : hostList) {
             if (host.m_hostId == localHostId && !host.m_masterPartitionIDs.isEmpty()) {
                 srcHost = host;
-                break;
             }
         }
 

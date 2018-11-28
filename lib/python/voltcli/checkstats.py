@@ -422,7 +422,7 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
     # not timeout yet
     return lastUpdatedTime
 
-def check_partition_leaders_on_host(runner, hostid, hostname):
+def check_partition_leaders_on_host(runner, hostid):
     lastUpdatedTime = time.time()
     notifyInterval = 10
     lastValidationParamms = [sys.maxint]
@@ -448,14 +448,14 @@ def check_partition_leaders_on_host(runner, hostid, hostname):
         notifyInterval -= 1
         if notifyInterval == 0:
             notifyInterval = 10
-            runner.info('\tPartition leaders on %s: %d' % (hostname, leaders))
+            runner.info('\tThe number of partition leaders on the host: %d' % (leaders))
 
         lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, [leaders], lastUpdatedTime, runner, str(hostid),
                                                     msg="The cluster has not moved any partition leaders away from host %s in %d seconds.")
         lastValidationParamms = [leaders]
         time.sleep(1)
 
-def check_export_mastership_on_host(runner, hostid, hostname):
+def check_export_mastership_on_host(runner, hostid):
     lastUpdatedTime = time.time()
     notifyInterval = 10
     lastValidationParamms = [sys.maxint]
@@ -480,7 +480,7 @@ def check_export_mastership_on_host(runner, hostid, hostname):
         notifyInterval -= 1
         if notifyInterval == 0:
             notifyInterval = 10
-            runner.info('\tExport masters on %s: %d' % (hostname, mastershipCount))
+            runner.info('\tThe number of export masters on the host: %d' % (mastershipCount))
 
         lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, [mastershipCount], lastUpdatedTime, runner, str(hostid),
                                                     msg="The cluster has not moved any export masters away from host %s in %d seconds.")
