@@ -168,8 +168,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     static public AtomicLong rowCount = new AtomicLong(0);
     static public AtomicLong missCount = new AtomicLong(0);
     static public AtomicLong overCount = new AtomicLong(0);
-    private volatile long m_prevSeqNo = 0L;
-    private volatile int m_prevTuplesCount = 0;
+    private AtomicLong m_prevSeqNo = new AtomicLong(0);
+    private AtomicLong m_prevTuplesCount = new AtomicLong(0);
 
     static enum StreamStatus {
         ACTIVE,
@@ -1017,8 +1017,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     // make this synchronized to avoid questions
     private synchronized void checkContinuity(AckingContainer cont) {
-        if (m_prevSeqNo != 0L) {
-            long nextSeqNo = m_prevSeqNo + m_prevTuplesCount;
+        if (m_prevSeqNo.get() != 0L) {
+            long nextSeqNo = m_prevSeqNo.get() + m_prevTuplesCount.get();
             if (cont.m_seqNo < nextSeqNo) {
                 // Some rows sent multiple times?
                 long over = nextSeqNo - cont.m_seqNo;
@@ -1038,10 +1038,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         + ", cur.seqNo: " + cont.m_seqNo
                         + ", cur.tuplesCount: " + cont.m_tuplesCount
                         + ", missing by: " + miss);
+                exportLog.warn("YYY Gaps: " + m_gapTracker);
             }
         }
-        m_prevSeqNo = cont.m_seqNo;
-        m_prevTuplesCount = cont.m_tuplesCount;
+        m_prevSeqNo.set(cont.m_seqNo);
+        m_prevTuplesCount.set(cont.m_tuplesCount);
     }
 
     public class AckingContainer extends BBContainer {
@@ -1068,9 +1069,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_es.execute(new Runnable() {
                     @Override
                     public void run() {
-                        if (exportLog.isTraceEnabled()) {
-                            exportLog.trace("AckingContainer.discard with sequence number: " + m_seqNo + " tuples count: " + m_tuplesCount);
-                        }
+                        exportLog.warn("YYY AckingContainer.discard with sequence number: " + m_seqNo + " tuples count: " + m_tuplesCount);
                         assert(m_tuplesCount == 0 || m_startTime != 0);
                         long elapsedMS = System.currentTimeMillis() - m_startTime;
                         m_blocksSentSinceClear += 1;
