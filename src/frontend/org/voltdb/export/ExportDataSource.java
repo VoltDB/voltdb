@@ -1630,6 +1630,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;
                 setStatus(StreamStatus.ACTIVE);
+                m_queueGap = 0;
             }
             break;
         default:
