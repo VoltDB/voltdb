@@ -215,6 +215,7 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 import io.netty.handler.ssl.CipherSuiteFilter;
+import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContextBuilder;
 
 /**
@@ -1570,7 +1571,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clientInterface.schedulePeriodicWorks();
 
             // print out a bunch of useful system info
-            logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+            logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
 
 
             // warn the user on the console if k=0 or if no command logging
@@ -1876,7 +1877,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
             hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
             hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
-            logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+            logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
             // log system setting information
             logSystemSettingFromCatalogContext();
 
@@ -2958,7 +2959,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
         if (m_config.m_sslEnable) {
             try {
-                hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
+                hostLog.info("SSL enabled for HTTP. Please point browser to HTTPS URL.");
                 m_config.m_sslExternal = m_config.m_sslExternal || (sslType != null && sslType.isExternal());
                 m_config.m_sslDR = m_config.m_sslDR || (sslType != null && sslType.isDr());
                 m_config.m_sslInternal = m_config.m_sslInternal || (sslType != null && sslType.isInternal());
@@ -3234,7 +3235,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return determination;
     }
 
-    void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
+    void logDebuggingInfo(VoltDB.Configuration config, String httpPortExtraLogMessage, boolean jsonEnabled) {
         String startAction = m_config.m_startAction.toString();
         String startActionLog = "Database start action is " + (startAction.substring(0, 1).toUpperCase() +
                 startAction.substring(1).toLowerCase()) + ".";
@@ -3244,7 +3245,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // print out awesome network stuff
         hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
-        hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", adminPort));
+        hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", config.m_adminPort));
 
         if (m_startMode == OperationMode.PAUSED) {
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
@@ -3257,17 +3258,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (httpPortExtraLogMessage != null) {
             hostLog.info(httpPortExtraLogMessage);
         }
-        if (httpPort != -1) {
-            hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", httpPort));
+        if (config.m_httpPort != -1) {
+            hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", config.m_httpPort));
         }
         else {
             hostLog.info(String.format("Local machine HTTP monitoring is disabled."));
         }
         if (jsonEnabled) {
-            hostLog.info(String.format("Json API over HTTP enabled at path /api/1.0/, listening on port %d.", httpPort));
+            hostLog.info(String.format("Json API over HTTP enabled at path /api/1.0/, listening on port %d.",
+                    config.m_httpPort));
         }
         else {
             hostLog.info("Json API disabled.");
+        }
+        if (config.m_sslEnable) {
+            hostLog.info("OpenSsl is " + (OpenSsl.isAvailable() ? "enabled" : "disabled"));
         }
 
         // java heap size
