@@ -786,7 +786,7 @@ public final class InvocationDispatcher {
 
        // The host has partition masters, go ahead to move them
        if (m_cartographer.getMasterCount(ihid) > 0) {
-           MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(ihid, -1);
+           MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
            message.setStartTask();
            m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(ihid, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
        }

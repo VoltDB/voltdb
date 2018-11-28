@@ -73,7 +73,7 @@ def stop(runner):
         stateMessage = 'The node shutdown process has stopped.'
         actionMessage = 'You may shutdown the node with the "voltadmin stop --force" command.'
         try:
-            runner.info('Preparing for the node shutdown, moving partition leaders and export masters to other nodes.')
+            runner.info('Preparing for stopping node.')
             resp = runner.call_proc('@PrepairStopNode',
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER],
                                     [thost.id],
@@ -81,11 +81,11 @@ def stop(runner):
             if resp.status() != 1:
                 runner.abort('The preparation for node shutdown failed with status: %s' % resp.response.statusString)
             # monitor partition leader migration
-            runner.info('Checking partition leader migration progress on host %d: %s' % (thost.id, thost.hostname))
+            runner.info('Completing partition leader migration on host %d: %s' % (thost.id, thost.hostname))
             checkstats.check_partition_leaders_on_host(runner,thost.id)
-            runner.info('All partition leaders have been moved.')
+            runner.info('All partition leaders have been migrated.')
             # monitor export master transfer
-            runner.info('Checking export master transfer progress on host %d: %s' % (thost.id, thost.hostname))
+            runner.info('Completing export master transfer on host %d: %s' % (thost.id, thost.hostname))
             checkstats.check_export_mastership_on_host(runner,thost.id)
             runner.info('All export masters have been transferred')
         except StatisticsProcedureException as proex:
