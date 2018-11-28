@@ -781,8 +781,7 @@ public final class InvocationDispatcher {
        String reason = m_cartographer.verifyPartitonLeaderMigrationForStopNode(ihid);
        if (reason != null) {
            return gracefulFailureResponse(
-                   "@PrepairStopNode: can not move partition leaders on" + ihid
-                 + ". " + reason, task.clientHandle);
+                   "@PrepairStopNode:" + reason, task.clientHandle);
        }
 
        // The host has partition masters, go ahead to move them
