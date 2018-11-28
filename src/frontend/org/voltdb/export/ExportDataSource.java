@@ -1436,7 +1436,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     return;
                 }
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug(ExportDataSource.this.toString() + " decides to claw mastership back from other node.");
+                    exportLog.debug(ExportDataSource.this.toString() + " is going to export data because partition leader is on current node.");
                 }
                 // Query export membership if current stream is not the master
                 sendTakeMastershipMessage();
