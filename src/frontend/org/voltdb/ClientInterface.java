@@ -2192,7 +2192,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (prepareStopNode) {
             target = m_cartographer.getPartitionLeaderMigrationTargetForStopNode(hostId);
         } else {
-            target = m_cartographer.getPartitionLeaderMigrationTarget(voltDB.getHostCount(), hostId, prepareStopNode);
+            if (voltDB.isClusterComplete()) {
+                target = m_cartographer.getPartitionLeaderMigrationTarget(voltDB.getHostCount(), hostId, prepareStopNode);
+            } else {
+                // Out of the scheduled task
+                target = new Pair<Integer, Integer> (-1, -1);
+            }
         }
 
         //The host does not have any thing to do this time. It does not mean that the host does not
