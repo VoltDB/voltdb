@@ -17,11 +17,9 @@
 
 package org.voltdb.expressions;
 
-import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Represents a vector of expression trees.

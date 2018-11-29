@@ -119,7 +119,7 @@ final public class CreateIndexUtils {
      * @param pkeyName name of the primary key
      * @param col column declared to be primary key
      */
-    static void validatePKeyColumnType(String pkeyName, Column col) {
+    static void validateIndexColumnType(String pkeyName, Column col) {
         final VoltType vt = VoltType.get((byte) col.getType());
         CalciteUtils.exceptWhen(! vt.isIndexable(),
                 String.format("Cannot create index \"%s\" because %s values " +
@@ -384,9 +384,9 @@ final public class CreateIndexUtils {
     public static SchemaPlus run(SqlNode node, Database prevDb, Database currentDb) {
         if (node.getKind() == SqlKind.CREATE_INDEX) {
             final SqlCreateIndex indexNode = (SqlCreateIndex) node;
-            final ValidateAndExtractFromCreateIndexNode info = getOrCreateTable(prevDb, currentDb, indexNode);
             // Now that we know that prevDb has the table referred to, make sure that current version of currentDb should also
             // have it. Clone if it doesn't
+            final ValidateAndExtractFromCreateIndexNode info = getOrCreateTable(prevDb, currentDb, indexNode);
             final Table table = info.getTable();
             final CatalogMap<Index> indicesOnTable = table.getIndexes();
             final String tableName = table.getTypeName();
@@ -401,7 +401,7 @@ final public class CreateIndexUtils {
                     constraintName, SqlKind.UNIQUE, tableName, columns,
                     filter != null || ! expressions.isEmpty());
             final String indexName = indexAndConstraintNames.getFirst();
-            columns.forEach(column -> validatePKeyColumnType(indexName, column));
+            columns.forEach(column -> validateIndexColumnType(indexName, column));
             validateGeogInColumns(indexName, columns);
             expressions.forEach(e -> CreateIndexUtils.validateIndexColumnType(indexName, e));
             final StringBuffer msg = new StringBuffer("Partial index \"" + indexName + "\" ");

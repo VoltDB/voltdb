@@ -59,14 +59,15 @@ class CalciteUtils {
             return null;
         } else {
             final String tableName = table.getTypeName();
-            if (currentDb.getTables().get(tableName) == null) {
+            Table targetTable = currentDb.getTables().get(tableName);
+            if (targetTable == null) {
                 final Table copy = currentDb.getTables().add(tableName);
                 table.copyFields(copy);
                 // When table is a mat view, also clone materializer.
                 final Table materializer = table.getMaterializer();
                 copy.setMaterializer(addTableToDatabase(prevDb, currentDb, materializer));
                 if (materializer != null) {
-                    // Pull in all views' (children) whose materializer is the current one.
+                    // Pull in all views' (children) whose materializer is the target table into current database.
                     StreamSupport.stream(((Iterable<MaterializedViewInfo>)
                             materializer.getViews()::iterator).spliterator(), false)
                             .map(MaterializedViewInfo::getTypeName)
@@ -82,7 +83,6 @@ class CalciteUtils {
                 }
                 assert table.getMaterializer() == null ||
                         table.getMaterializer().getViews().size() == copy.getMaterializer().getViews().size();
-                // table.getViews()
                 StreamSupport.stream(((Iterable<Column>)table.getColumns()::iterator).spliterator(), false)
                         .forEach(col -> {
                             final Column copyColumn = copy.getColumns().get(col.getTypeName());
@@ -97,10 +97,9 @@ class CalciteUtils {
                                 info.copyFields(copyColumn.getMatview());
                             }
                         });
-                return copy;
-            } else {    // the named table already exists in target database.
-                return table;
-            }
+                targetTable = copy;
+            } // otherwise, the named table already exists in target database.
+            return targetTable;
         }
     }
 
