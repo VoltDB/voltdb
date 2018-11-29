@@ -855,8 +855,9 @@ public class ExportGeneration implements Generation {
                         continue;
                     }
 
-                    eds.processStreamControl(operation);
-                    results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
+                    if (eds.processStreamControl(operation)) {
+                        results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
+                    }
                 }
             }
         }
