@@ -74,7 +74,7 @@ def stop(runner):
         actionMessage = 'You may shutdown the node with the "voltadmin stop --force" command.'
         try:
             runner.info('Preparing for stopping node.')
-            resp = runner.call_proc('@PrepairStopNode',
+            resp = runner.call_proc('@PrepareStopNode',
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER],
                                     [thost.id],
                                     check_status=False)

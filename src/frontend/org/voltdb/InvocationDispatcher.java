@@ -424,7 +424,7 @@ public final class InvocationDispatcher {
             }
             else if ("@PrepairStopNode".equals(procName)) {
                 CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
-                return dispatchPrepairStopNode(task);
+                return dispatchPrepareStopNode(task);
             }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
@@ -760,29 +760,29 @@ public final class InvocationDispatcher {
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
-    private ClientResponseImpl dispatchPrepairStopNode(StoredProcedureInvocation task) {
+    private ClientResponseImpl dispatchPrepareStopNode(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
             return gracefulFailureResponse(
-                    "@PrepairStopNode must provide hostId",
+                    "@PrepareStopNode must provide hostId",
                     task.clientHandle);
         }
         if (!(params[0] instanceof Integer)) {
             return gracefulFailureResponse(
-                    "@PrepairStopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
+                    "@PrepareStopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
                     task.clientHandle);
         }
         int ihid = (Integer) params[0];
         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
         Set<Integer> liveHids = hostMessenger.getLiveHostIds();
         if (!liveHids.contains(ihid)) {
-            return gracefulFailureResponse("@PrepairStopNode: " + ihid + " is not valid.", task.clientHandle);
+            return gracefulFailureResponse("@PrepareStopNode: " + ihid + " is not valid.", task.clientHandle);
         }
 
        String reason = m_cartographer.verifyPartitonLeaderMigrationForStopNode(ihid);
        if (reason != null) {
            return gracefulFailureResponse(
-                   "@PrepairStopNode:" + reason, task.clientHandle);
+                   "@PrepareStopNode:" + reason, task.clientHandle);
        }
 
        // The host has partition masters, go ahead to move them

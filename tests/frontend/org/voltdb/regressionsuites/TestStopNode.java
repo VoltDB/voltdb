@@ -359,12 +359,12 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
-    public void testPrepairStopNode() throws Exception {
+    public void testPrepareStopNode() throws Exception {
         Client client = ClientFactory.createClient();
         client.createConnection("localhost", m_config.port(0));
 
         try {
-            client.callProcedure("@PrepairStopNode", 1);
+            client.callProcedure("@PreparwStopNode", 1);
             final long maxSleep = TimeUnit.MINUTES.toMillis(5);
             int leaderCount = Integer.MAX_VALUE;
             long start = System.currentTimeMillis();
