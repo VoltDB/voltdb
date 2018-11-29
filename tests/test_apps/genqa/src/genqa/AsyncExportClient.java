@@ -545,20 +545,24 @@ public class AsyncExportClient
     public static void waitForStreamedAllocatedMemoryZero(Client client,Integer timeout) throws Exception {
         boolean passed = false;
         Instant maxTime = Instant.now().plusSeconds(timeout);
-
+        Instant maxStatsTime = Instant.now().plusSeconds(60);
         VoltTable stats = null;
         try {
             System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
         } catch (Exception ex) {
         }
         while (true) {
-            if ( Instant.now().isAfter(maxTime) ) {
-                throw new Exception("Test Timeout waiting for non-null @Statistics call, "
-                + "increase --timeout arg for slower tests" );
+
+            if ( Instant.now().isAfter(maxStatsTime) ) {
+                throw new Exception("Test Timeout waiting for non-null @Statistics call");
             }
             try {
                 stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+                maxStatsTime = Instant.now().plusSeconds(60);
             } catch (Exception ex) {
+                // Export Statistics are updated asynchronously and may not be upto date immediately on all hosts
+                //retry a few times if we don't get an answer
+                System.err.println("Problem getting @Statistics export: "+ex.getMessage());
             }
             if (stats == null) {
                 Thread.sleep(5000);
@@ -567,12 +571,15 @@ public class AsyncExportClient
             boolean passedThisTime = true;
             while (stats.advanceRow()) {
                 if ( Instant.now().isAfter(maxTime) ) {
-                    throw new Exception("Test Timeout expecting non-zero TUPLE_PENDING Statistic, "
+                    throw new Exception("Test Timeout waiting for export to drain, expecting non-zero TUPLE_PENDING Statistic, "
                     + "increase --timeout arg for slower clients" );
                 }
-                if (0 != stats.getLong("TUPLE_PENDING")) {
+                Long pending = stats.getLong("TUPLE_PENDING");
+                if (0 != pending ) {
+                    String stream = stats.getString("SOURCE");
+                    Long partition = stats.getLong("PARTITION_ID");
                     passedThisTime = false;
-                    System.out.println("Partition Not Zero.");
+                    System.out.println("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is  not zero, got "+pending);
                     break;
                 }
             }

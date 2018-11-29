@@ -482,6 +482,7 @@ public class SocketJoiner {
     private void processSSC(ServerSocketChannel ssc) throws Exception {
         SocketChannel sc = null;
         while ((sc = ssc.accept()) != null) {
+            boolean success = false;
             try {
                 sc.socket().setTcpNoDelay(true);
                 sc.socket().setPerformancePreferences(0, 2, 1);
@@ -562,16 +563,22 @@ public class SocketJoiner {
                 } else {
                     throw new RuntimeException("Unexpected message type " + type + " from " + remoteAddress);
                 }
-            } catch (Exception ex) {
-                // do not leak sockets when exception happens
-                try {
-                    sc.close();
-                } catch (IOException ioex) {
-                    // ignore the close exception on purpose
+                success = true;
+            } catch (IOException e) {
+                LOG.info("IOException occurred while handling new client connection " + sc
+                        + ". Client will most likely retry: " + e);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("", e);
                 }
-
-                // re-throw the exception, it will be handled by the caller
-                throw ex;
+            } finally {
+                // do not leak sockets when exception happens
+                if (!success) {
+                    try {
+                        sc.close();
+                    } catch (IOException ioex) {
+                        // ignore the close exception on purpose
+                    }
+                }
             }
 
         }
@@ -599,12 +606,10 @@ public class SocketJoiner {
                     } finally {
                         selectedKeys.clear();
                     }
-                } catch (ClosedByInterruptException e) {
-                    throw new InterruptedException();
-                } catch (ClosedSelectorException e) {
+                } catch (ClosedByInterruptException | ClosedSelectorException e) {
                     throw new InterruptedException();
                 } catch (Exception e) {
-                    LOG.error("fault occurrent in the connection accept loop", e);
+                    LOG.error("Exception occurred in the connection accept loop", e);
                 }
             }
         }

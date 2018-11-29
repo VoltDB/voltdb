@@ -423,6 +423,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_status == StreamStatus.BLOCKED &&
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo > m_gapTracker.getFirstGap().getSecond()) {
+            exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
             setStatus(StreamStatus.ACTIVE);
             m_queueGap = 0;
         }
@@ -921,7 +922,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_generation.onSourceDone(m_partitionId, m_signature);
                 return;
             }
-            releaseBlock();
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
             ArrayList<StreamBlock> blocksToDelete = new ArrayList<>();
@@ -957,9 +957,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             // If another mastership migration in progress and is before the gap,
                             // don't bother to start new one.
                             if (m_seqNoToDrain > firstUnpolledSeq - 1) {
-                                exportLog.info("Hitting a stream gap [" +
-                                        gap.getFirst() + ", " + gap.getSecond() +
-                                        "], start looking for other nodes that has the data.");
+                                exportLog.info("Export data missing from current queue [" + gap.getFirst() + ", " + gap.getSecond() +
+                                        "] from " + this.toString() + ". Searching other sites for missing data.");
                                 m_seqNoToDrain = firstUnpolledSeq - 1;
                                 mastershipCheckpoint(firstUnpolledSeq - 1);
                             }
@@ -987,6 +986,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // If stream was previously blocked by a gap, now it skips/fulfills the gap
                 // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
+                    exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
                     setStatus(StreamStatus.ACTIVE);
                     m_queueGap = 0;
                 }
@@ -1003,15 +1003,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         } catch (Throwable t) {
             fut.setException(t);
-        }
-    }
-
-    private void releaseBlock() {
-        if (m_status == StreamStatus.BLOCKED && !DISABLE_AUTO_GAP_RELEASE) {
-            RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
-            if (voltdb.isClusterComplete()) {
-                processStreamControl(OperationMode.RELEASE);
-            }
         }
     }
 
@@ -1284,7 +1275,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private void sendQueryResponse(long senderHSId, long requestId, long lastSeq) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
-        if (mbx != null && p.getSecond().size() > 0 && p.getSecond().contains(senderHSId)) {
+        if (mbx != null) {
             // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
             // requestId(8) + lastSeq(8)
             int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 8;
@@ -1419,8 +1410,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 setStatus(StreamStatus.BLOCKED);
                 Pair<Long, Long> gap = m_gapTracker.getFirstGap();
                 m_queueGap = gap.getSecond() - gap.getFirst() + 1;
-                exportLog.warn("Stream is blocked because of data from sequence number " + gap.getFirst() +
-                        " to " + gap.getSecond() + " is missing.");
+                exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                        this.toString() + ". Please rejoin a node with the missing export queue data. ");
             }
         }
     }
@@ -1447,7 +1438,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     return;
                 }
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug(ExportDataSource.this.toString() + " decides to claw mastership back from other node.");
+                    exportLog.debug(ExportDataSource.this.toString() + " is going to export data because partition leader is on current node.");
                 }
                 // Query export membership if current stream is not the master
                 sendTakeMastershipMessage();
@@ -1499,14 +1490,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             if (voltdb.isClusterComplete()) {
                                 if (DISABLE_AUTO_GAP_RELEASE) {
                                     // Show warning only in full cluster.
-                                    exportLog.warn(ExportDataSource.this.toString() + " is blocked because stream hits a gap from sequence number " +
-                                            gap.getFirst() + " to " + gap.getSecond());
+                                    exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                                            ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
+                                            "use 'voltadmin export release' command to skip the missing data.");
+                                } else {
+                                    processStreamControl(OperationMode.RELEASE);
                                 }
                             }
                         } else {
                             // time to give up master and give it to the best candidate
                             m_newLeaderHostId = CoreUtils.getHostIdFromHSId(bestCandidate.getKey());
-                            exportLog.info("Stream master is going to switch to host " + m_newLeaderHostId + " to jump the gap.");
+                            exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString() + " on host " + m_newLeaderHostId);
                             // drainedTo sequence number should haven't been changed.
                             mastershipCheckpoint(m_lastReleasedSeqNo);
                         }
@@ -1583,10 +1577,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         this.m_status = status;
     }
 
+    public StreamStatus getStatus() {
+        return m_status;
+    }
+
     @Override
     public String toString() {
         return "ExportDataSource for table " + getTableName() + " partition " + getPartitionId()
-           + "status " + m_status + " master " + m_mastershipAccepted.get();
+           + " (" + m_status + ", " + (m_mastershipAccepted.get() ? "Master":"Replica") + ")";
     }
 
     private void mastershipCheckpoint(long seq) {
@@ -1619,13 +1617,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         case RELEASE:
             if (m_status == StreamStatus.BLOCKED && m_mastershipAccepted.get() && m_gapTracker.getFirstGap() != null) {
                 long firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Release " + this + " move firstUnpolledSeqNo from " +
-                            m_firstUnpolledSeqNo + " to " + firstUnpolledSeqNo);
-                }
-
+                exportLog.warn("Export data is missing [" + m_gapTracker.getFirstGap().getFirst() + ", " + m_gapTracker.getFirstGap().getSecond() +
+                        "] and cluster is complete. Skipping to next available transaction for " + this.toString());
                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;
                 setStatus(StreamStatus.ACTIVE);
+                m_queueGap = 0;
             }
             break;
         default:
