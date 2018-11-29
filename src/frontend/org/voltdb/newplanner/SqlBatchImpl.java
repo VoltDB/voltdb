@@ -28,6 +28,7 @@ import org.voltdb.newplanner.guards.CalciteCheck;
 import org.voltdb.newplanner.guards.NoLargeQuery;
 import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.sysprocs.AdHocNTBase;
 
 /**
  * A basic SQL query batch containing one or more {@link SqlTask}s.
@@ -41,10 +42,7 @@ public class SqlBatchImpl implements SqlBatch {
     private final Boolean m_isDDLBatch;
     private final Object[] m_userParams;
 
-    static final String s_adHocErrorResponseMessage =
-            "The @AdHoc stored procedure when called with more than one parameter "
-                    + "must be passed a single parameterized SQL statement as its first parameter. "
-                    + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
+    private static final String s_adHocErrorResponseMessage = AdHocNTBase.AdHocErrorResponseMessage;
 
     /**
      * A chain of checks to determine whether a SQL statement should be routed to Calcite.
