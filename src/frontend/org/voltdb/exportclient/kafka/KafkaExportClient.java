@@ -42,6 +42,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportDataSource;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientLogger;
 import org.voltdb.exportclient.ExportDecoderBase;
@@ -376,9 +377,13 @@ public class KafkaExportClient extends ExportClientBase {
             String pval = (rd.partitionValue == null) ? String.valueOf(rd.partitionId) : rd.partitionValue.toString();
             ProducerRecord<String, String> krec = new ProducerRecord<String, String>(m_topic, pval, decoded);
             try {
+                // /ENG-15004, track rows sent to Kafka Client
+                ExportDataSource.putExportKey(rd);
                 m_futures.add(m_producer.send(krec, new Callback() {
                     @Override
                     public void onCompletion(RecordMetadata metadata, Exception e) {
+                      // /ENG-15004, track rows acked by Kafka Client (regardless of exception)
+                      ExportDataSource.putAckedExportKey(rd);
                         if (e != null){
                             LOG.warn("Failed to send data. Verify if the kafka server matches bootstrap.servers %s", e,
                                     m_producerConfig.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));

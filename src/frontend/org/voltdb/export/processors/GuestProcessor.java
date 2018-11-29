@@ -375,7 +375,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                             row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
                                             edb.setPreviousRow(row);
                                         } catch (IOException ioe) {
-                                            m_logger.warn("Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
+                                            m_logger.warn("YYY Failed decoding row for partition" + source.getPartitionId() + ". " + ioe.getMessage());
                                             cont.discard();
                                             cont = null;
                                             break;
@@ -404,7 +404,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                                 break;
                             } catch (RestartBlockException e) {
-                                m_logger.warn("YYY restart exception, seq: " + cont.m_seqNo + ", cnt: " + cont.m_tuplesCount);
+                                m_logger.warn("YYY restart exception, seq: " + cont.m_seqNo + ", cnt: " + cont.m_tuplesCount + ", e: " + e.getMessage());
                                 if (m_shutdown) {
                                     if (m_logger.isDebugEnabled()) {
                                         // log message for debugging.

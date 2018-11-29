@@ -18,6 +18,7 @@
 package org.voltdb.export;
 
 
+import java.lang.Long;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
@@ -63,6 +65,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.exportclient.ExportRow;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
 import org.voltdb.utils.CatalogUtil;
@@ -166,10 +169,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     // ENG-15004: checking variables
     static public AtomicLong rowCount = new AtomicLong(0);
-    static public AtomicLong missCount = new AtomicLong(0);
-    static public AtomicLong overCount = new AtomicLong(0);
-    private AtomicLong m_prevSeqNo = new AtomicLong(0);
-    private AtomicLong m_prevTuplesCount = new AtomicLong(0);
+    static public ConcurrentHashMap<Long, Long> keyMap = new ConcurrentHashMap<>();
+    static public ConcurrentHashMap<Long, Long> ackMap = new ConcurrentHashMap<>();
+
+    public static void putExportKey(ExportRow row) {
+        try {
+          Long key = Long.parseLong(row.values[6].toString());
+          keyMap.putIfAbsent(key, key);
+        }
+        catch (Exception ex) {
+          exportLog.warn("YYY Failed to parse " + row.values[6] + ", as Long:" + ex);
+        }
+    }
+
+    public static void putAckedExportKey(ExportRow row) {
+        try {
+          Long key = Long.parseLong(row.values[6].toString());
+          ackMap.putIfAbsent(key, key);
+        }
+        catch (Exception ex) {
+          exportLog.warn("YYY Failed to parse " + row.values[6] + ", as Long:" + ex);
+        }
+    }
 
     static enum StreamStatus {
         ACTIVE,
@@ -1001,8 +1022,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                 first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
                                 first_unpolled_block.rowCount());
                 try {
-                    // ENG-15004: Check continuity of buffers we're giving out
-                    checkContinuity(ackingContainer);
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source dont discard next processor will pick it up.
@@ -1013,36 +1032,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (Throwable t) {
             fut.setException(t);
         }
-    }
-
-    // make this synchronized to avoid questions
-    private synchronized void checkContinuity(AckingContainer cont) {
-        if (m_prevSeqNo.get() != 0L) {
-            long nextSeqNo = m_prevSeqNo.get() + m_prevTuplesCount.get();
-            if (cont.m_seqNo < nextSeqNo) {
-                // Some rows sent multiple times?
-                long over = nextSeqNo - cont.m_seqNo;
-                overCount.addAndGet(over);
-                exportLog.warn("YYY BUFFER DISCONTINUITY (OVER), prev.seqNo: " + m_prevSeqNo
-                        + ", prev.tuplesCount: " + m_prevTuplesCount
-                        + ", cur.seqNo: " + cont.m_seqNo
-                        + ", cur.tuplesCount: " + cont.m_tuplesCount
-                        + ", over by: " + over);
-            }
-            else if (cont.m_seqNo > nextSeqNo) {
-                // Some rows missing?
-                long miss = cont.m_seqNo - nextSeqNo;
-                missCount.addAndGet(miss);
-                exportLog.warn("YYY BUFFER DISCONTINUITY (MISS), prev.seqNo: " + m_prevSeqNo
-                        + ", prev.tuplesCount: " + m_prevTuplesCount
-                        + ", cur.seqNo: " + cont.m_seqNo
-                        + ", cur.tuplesCount: " + cont.m_tuplesCount
-                        + ", missing by: " + miss);
-                exportLog.warn("YYY Gaps: " + m_gapTracker);
-            }
-        }
-        m_prevSeqNo.set(cont.m_seqNo);
-        m_prevTuplesCount.set(cont.m_tuplesCount);
     }
 
     public class AckingContainer extends BBContainer {
@@ -1081,7 +1070,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         // ENG-15004: Track total exported rows
                         rowCount.addAndGet(m_tuplesCount);
                         exportLog.warn("YYY AckingContainer.discarded total tuples: " + rowCount.get()
-                                + ", miss: " + missCount.get() + ", over: " + overCount.get());
+                          + ", keys: " + keyMap.size() + ", acked: " + ackMap.size());
 
                         try {
                              m_backingCont.discard();
