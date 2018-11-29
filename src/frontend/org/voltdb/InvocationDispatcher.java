@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -786,7 +787,16 @@ public final class InvocationDispatcher {
 
        // The host has partition masters, go ahead to move them
        if (m_cartographer.getMasterCount(ihid) > 0) {
+
+           // shutdown partition leader migration
            MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
+           for (Iterator<Integer> it = liveHids.iterator(); it.hasNext();) {
+               m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(it.next(),
+                           HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
+           }
+
+           // start leader migration on this node
+           message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
            message.setStartTask();
            message.setStopNodeService();
            m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(ihid, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);

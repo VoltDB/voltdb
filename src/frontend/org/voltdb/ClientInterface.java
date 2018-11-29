@@ -221,7 +221,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final InvocationDispatcher m_dispatcher;
 
     private ScheduledExecutorService m_migratePartitionLeaderExecutor;
-
+    private Object m_lock = new Object();
     /*
      * This list of ACGs is iterated to retrieve initiator statistics in IV2.
      * They are thread local, and the ACG happens to be thread local, and if you squint
@@ -2153,27 +2153,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     //start or stop MigratePartitionLeader task
     void processMigratePartitionLeaderTask(MigratePartitionLeaderMessage message) {
-        //start MigratePartitionLeader service
-        if (message.startMigratingPartitionLeaders()) {
-            if (m_migratePartitionLeaderExecutor == null) {
-                m_migratePartitionLeaderExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("MigratePartitionLeader"));
-                final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
-                final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
-                m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
-                        () -> {startMigratePartitionLeader(message.isForStopNode());},
-                        delay, interval, TimeUnit.SECONDS);
+        synchronized(m_lock) {
+            //start MigratePartitionLeader service
+            if (message.startMigratingPartitionLeaders()) {
+                if (m_migratePartitionLeaderExecutor == null) {
+                    m_migratePartitionLeaderExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("MigratePartitionLeader"));
+                    final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
+                    final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
+                    m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
+                            () -> {startMigratePartitionLeader(message.isForStopNode());},
+                            delay, interval, TimeUnit.SECONDS);
+                }
+                hostLog.info("MigratePartitionLeader task is started.");
+                return;
             }
-            hostLog.info("MigratePartitionLeader task is started.");
-            return;
-        }
 
-        if (m_migratePartitionLeaderExecutor == null) {
-            return;
+            //stop MigratePartitionLeader service
+            if (m_migratePartitionLeaderExecutor != null ) {
+                m_migratePartitionLeaderExecutor.shutdown();
+                m_migratePartitionLeaderExecutor = null;
+            }
         }
-
-        //stop MigratePartitionLeader service
-        m_migratePartitionLeaderExecutor.shutdown();
-        m_migratePartitionLeaderExecutor = null;
         hostLog.info("MigratePartitionLeader task is stopped.");
     }
 

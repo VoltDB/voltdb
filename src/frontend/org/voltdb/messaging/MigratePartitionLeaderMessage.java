@@ -108,6 +108,6 @@ public class MigratePartitionLeaderMessage extends VoltMessage {
     }
 
     public boolean isForStopNode() {
-        return (m_startingService && m_stopNodeService);
+        return m_stopNodeService;
     }
 }
