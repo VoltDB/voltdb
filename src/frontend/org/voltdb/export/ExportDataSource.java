@@ -423,6 +423,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_status == StreamStatus.BLOCKED &&
                 m_gapTracker.getFirstGap() != null &&
                 releaseSeqNo > m_gapTracker.getFirstGap().getSecond()) {
+            exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
             setStatus(StreamStatus.ACTIVE);
             m_queueGap = 0;
         }
@@ -985,6 +986,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 // If stream was previously blocked by a gap, now it skips/fulfills the gap
                 // change the status back to normal.
                 if (m_status == StreamStatus.BLOCKED) {
+                    exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
                     setStatus(StreamStatus.ACTIVE);
                     m_queueGap = 0;
                 }
@@ -1490,7 +1492,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     // Show warning only in full cluster.
                                     exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
                                             ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
-                                            "use 'voltadmin release' command to skip the missing data.");
+                                            "use 'voltadmin export release' command to skip the missing data.");
                                 } else {
                                     processStreamControl(OperationMode.RELEASE);
                                 }
