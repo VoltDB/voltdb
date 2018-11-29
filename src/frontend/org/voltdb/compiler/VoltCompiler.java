@@ -68,7 +68,6 @@ import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.calciteutils.CreateTableUtils;
-import org.voltdb.calciteutils.CreateIndexUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;

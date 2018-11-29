@@ -59,14 +59,15 @@ class CalciteUtils {
             return null;
         } else {
             final String tableName = table.getTypeName();
-            if (currentDb.getTables().get(tableName) == null) {
+            Table targetTable = currentDb.getTables().get(tableName);
+            if (targetTable == null) {
                 final Table copy = currentDb.getTables().add(tableName);
                 table.copyFields(copy);
                 // When table is a mat view, also clone materializer.
                 final Table materializer = table.getMaterializer();
                 copy.setMaterializer(addTableToDatabase(prevDb, currentDb, materializer));
                 if (materializer != null) {
-                    // Pull in all views' (children) whose materializer is the current one.
+                    // Pull in all views' (children) whose materializer is the target table into current database.
                     StreamSupport.stream(((Iterable<MaterializedViewInfo>)
                             materializer.getViews()::iterator).spliterator(), false)
                             .map(MaterializedViewInfo::getTypeName)
@@ -82,7 +83,6 @@ class CalciteUtils {
                 }
                 assert table.getMaterializer() == null ||
                         table.getMaterializer().getViews().size() == copy.getMaterializer().getViews().size();
-                // table.getViews()
                 StreamSupport.stream(((Iterable<Column>)table.getColumns()::iterator).spliterator(), false)
                         .forEach(col -> {
                             final Column copyColumn = copy.getColumns().get(col.getTypeName());
@@ -97,39 +97,14 @@ class CalciteUtils {
                                 info.copyFields(copyColumn.getMatview());
                             }
                         });
-                return copy;
-            } else {    // the named table already exists in target database.
-                return table;
-            }
+                targetTable = copy;
+            } // otherwise, the named table already exists in target database.
+            return targetTable;
         }
     }
 
     static void migrateAllTables(Database prevDb, Database currentDb) {
         StreamSupport.stream(((Iterable<Table>) prevDb.getTables()::iterator).spliterator(), false)
                 .forEach(tbl -> addTableToDatabase(prevDb, currentDb, tbl));
-    }
-
-    /**
-     * Collect all terminal expression types from an expression aggregate.
-     * @param src src expression to collect from
-     * @param pred whether current expression need to be collected.
-     * @param collections collected expressions
-     */
-    static void collectSubExpressions(
-            AbstractExpression src, Predicate<AbstractExpression> pred, Set<AbstractExpression> collections) {
-        if (src != null) {
-            if (pred.test(src)) {
-                collections.add(src);
-            }
-            if (src.getLeft() != null) {
-                collectSubExpressions(src.getLeft(), pred, collections);
-            }
-            if (src.getRight() != null) {
-                collectSubExpressions(src.getRight(), pred, collections);
-            }
-            if (src.getArgs() != null) {
-                src.getArgs().forEach(arg -> collectSubExpressions(arg, pred, collections));
-            }
-        }
     }
 }

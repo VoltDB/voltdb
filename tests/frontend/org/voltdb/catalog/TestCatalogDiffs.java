@@ -555,7 +555,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "convertmatview3.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "convertmatview3.jar");
 
-        //verifyDiffRejected(catOriginalSingle, catUpdated); // Removed check since CREATE INDEX calcite support change
+        verifyDiffRejected(catOriginalSingle, catUpdated);
         verifyDiffRejected(catOriginalJoin, catUpdated);
     }
 
@@ -1039,7 +1039,7 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "modmatview2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "modmatview2.jar");
 
-        // verifyDiffRejected(catOriginal, catUpdated); // Removed check since CREATE INDEX calcite support change
+        verifyDiffRejected(catOriginal, catUpdated);
     }
 
     public void testModifyMaterializedViewStructureRejectedIfEmpty() throws IOException {

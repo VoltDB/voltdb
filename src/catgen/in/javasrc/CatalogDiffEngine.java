@@ -1061,9 +1061,10 @@ public class CatalogDiffEngine {
                 restrictionQualifier = " from nullable to non-nullable";
             }
             // ENG-14840 - CREATE INDEX copies a table to new database, which involves updating matview and partition columns
+            /** Disabled before we could get it right.
             else if (field.equals("aggregatetype") || field.equals("matviewsource")) {
                 return null;
-            }
+            }*/
             else if (field.equals("type") || field.equals("size") || field.equals("inbytes")) {
                 int oldTypeInt = (Integer) prevType.getField("type");
                 int newTypeInt = (Integer) suspect.getField("type");

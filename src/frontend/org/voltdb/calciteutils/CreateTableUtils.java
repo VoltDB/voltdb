@@ -358,7 +358,7 @@ public class CreateTableUtils {
                     final String indexName = indexAndConstraintNames.getFirst(), constraintName = indexAndConstraintNames.getSecond();
                     CalciteUtils.exceptWhen(nodes.get(1) != null && indexMap.containsKey(indexName),  // detection of duplicated constraint names
                             "A constraint named %s already exists on table %s.", indexName, tableName);
-                    columns.forEach(column -> CreateIndexUtils.validatePKeyColumnType(indexName, column));
+                    columns.forEach(column -> CreateIndexUtils.validateIndexColumnType(indexName, column));
                     CreateIndexUtils.validateGeogInColumns(indexName, columns);
                     voltExprs.forEach(e -> CreateIndexUtils.validateIndexColumnType(indexName, e));
                     final StringBuffer sb = new StringBuffer(String.format("index %s", indexName));

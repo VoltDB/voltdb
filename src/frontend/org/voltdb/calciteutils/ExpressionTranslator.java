@@ -150,6 +150,8 @@ public class ExpressionTranslator {
         } else if (operator instanceof SqlInOperator) {
             final String colName = call.operand(0).toString();
             final Column col = t.getColumns().get(colName);
+            CalciteUtils.exceptWhen(col == null,
+                    "Column %s does not exist in table %s.", colName, t.getTypeName());
             final VoltType type = VoltType.get((byte) col.getType());
             final VectorValueExpression right = new VectorValueExpression(
                     ((SqlNodeList) call.operand(1)).getList().stream()
