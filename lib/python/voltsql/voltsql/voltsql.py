@@ -202,17 +202,18 @@ class VoltCli(object):
             except EOFError:
                 break
             else:
-                if sql_cmd.lower() == "refresh":
+                stripped_cmd = sql_cmd.strip().lower().rstrip(';')
+                if stripped_cmd == "refresh":
                     # use "refresh" command to force a fresh
                     self.refresher.refresh(self.executor, self.completer, [])
                     continue
-                if sql_cmd.strip().lower() in ("quit", "quit;", "exit", "exit;"):
+                if stripped_cmd in ("quit", "exit"):
                     # exit
                     break
-                if sql_cmd.strip().lower() in ("help", "help;"):
+                if stripped_cmd == "help":
                     print(README)
                     continue
-                if not sql_cmd.strip():
+                if not stripped_cmd:
                     # do nothing when empty line
                     continue
                 call(
