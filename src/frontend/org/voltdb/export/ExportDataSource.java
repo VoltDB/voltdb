@@ -1619,6 +1619,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         "] and cluster is complete. Skipping to next available transaction for " + this.toString());
                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;
                 setStatus(StreamStatus.ACTIVE);
+                m_queueGap = 0;
             }
             break;
         default:
