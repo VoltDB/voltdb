@@ -407,7 +407,7 @@ public class TestStopNode extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         //Lets tolerate 3 node failures.
-        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
+        m_config = new LocalCluster("teststopnode.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(false);
         m_config.setDelayBetweenNodeStartup(1000);
         project.setPartitionDetectionEnabled(true);

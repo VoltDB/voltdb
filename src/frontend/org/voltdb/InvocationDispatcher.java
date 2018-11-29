@@ -422,7 +422,7 @@ public final class InvocationDispatcher {
                 CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                 return dispatchStopNode(task);
             }
-            else if ("@PrepairStopNode".equals(procName)) {
+            else if ("@PrepareStopNode".equals(procName)) {
                 CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                 return dispatchPrepareStopNode(task);
             }
