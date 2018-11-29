@@ -745,6 +745,9 @@ public class Cartographer extends StatsSource
                         }
                     } catch (KeeperException.NoNodeException ignore) {}
                     otherStoppedHids.remove(ihid);
+                    if (!otherStoppedHids.isEmpty()) {
+                        return "Cann't move partition leaders while other nodes are being shutdown.";
+                    }
                     String message = doPartitionsHaveReplicas(ihid, otherStoppedHids);
                     if (message != null) {
                         return message;
