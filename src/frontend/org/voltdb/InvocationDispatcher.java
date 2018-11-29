@@ -788,6 +788,7 @@ public final class InvocationDispatcher {
        if (m_cartographer.getMasterCount(ihid) > 0) {
            MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
            message.setStartTask();
+           message.setStopNodeService();
            m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(ihid, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
        }
 

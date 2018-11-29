@@ -769,7 +769,7 @@ public class Cartographer extends StatsSource
         }
         RealVoltDB db = (RealVoltDB) VoltDB.instance();
         if(db.isClusterComplete()) {
-            Pair<Integer, Integer> pair = getPartitionLeaderMigrationTarget(db.getHostCount(),Integer.MIN_VALUE);
+            Pair<Integer, Integer> pair = getPartitionLeaderMigrationTarget(db.getHostCount(),Integer.MIN_VALUE, true);
             // Partition leader migration may be in progress. don't mess up
             return (pair == null || pair.getFirst() == -1 ) ;
         }
@@ -923,7 +923,7 @@ public class Cartographer extends StatsSource
      * @param localHostId the host id
      * @return  a pair of partition id and destination host id
      */
-    public Pair<Integer, Integer> getPartitionLeaderMigrationTarget(int hostCount, int localHostId) {
+    public Pair<Integer, Integer> getPartitionLeaderMigrationTarget(int hostCount, int localHostId, boolean prepareStopNode) {
 
         final int maxMastersPerHost = (int)Math.ceil(((double)getPartitionCount()) / hostCount);
         final int minMastersPerHost = (getPartitionCount() / hostCount);
@@ -939,7 +939,7 @@ public class Cartographer extends StatsSource
         // @MigratePartitionLeader is initiated on the host with the old leader to facilitate DR integration
         // If current host does not have the most partition leaders, give it up.
         // Let the host with the most partition leaders to migrate
-        if (srcHost.m_hostId != localHostId && localHostId != Integer.MIN_VALUE) {
+        if (srcHost.m_hostId != localHostId && !prepareStopNode) {
             return null;
         }
 

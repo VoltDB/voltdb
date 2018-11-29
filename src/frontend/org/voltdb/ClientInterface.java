@@ -2160,7 +2160,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
                 final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
                 m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
-                        () -> {startMigratePartitionLeader(message.isLeaderMigrationForStopNode());},
+                        () -> {startMigratePartitionLeader(message.isForStopNode());},
                         delay, interval, TimeUnit.SECONDS);
             }
             hostLog.info("MigratePartitionLeader task is started.");
@@ -2192,7 +2192,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (prepareStopNode) {
             target = m_cartographer.getPartitionLeaderMigrationTargetForStopNode(hostId);
         } else {
-            target = m_cartographer.getPartitionLeaderMigrationTarget(voltDB.getHostCount(), hostId);
+            target = m_cartographer.getPartitionLeaderMigrationTarget(voltDB.getHostCount(), hostId, prepareStopNode);
         }
 
         //The host does not have any thing to do this time. It does not mean that the host does not
