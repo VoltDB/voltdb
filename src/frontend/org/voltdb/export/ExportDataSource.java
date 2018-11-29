@@ -1612,7 +1612,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_exportTargetName;
     }
 
-    public synchronized void processStreamControl(OperationMode operation) {
+    public synchronized boolean processStreamControl(OperationMode operation) {
         switch (operation) {
         case RELEASE:
             if (m_status == StreamStatus.BLOCKED && m_mastershipAccepted.get() && m_gapTracker.getFirstGap() != null) {
@@ -1622,10 +1622,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_firstUnpolledSeqNo = firstUnpolledSeqNo;
                 setStatus(StreamStatus.ACTIVE);
                 m_queueGap = 0;
+                return true;
             }
             break;
         default:
             // should not happen since the operation is verified prior to this call
         }
+        return false;
     }
 }
