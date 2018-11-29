@@ -595,8 +595,11 @@ public class StatsAgent extends OpsAgent
     {
         VoltTable[] stats = null;
 
-        VoltTable[] partitionStats = collectStats(StatsSelector.DRPRODUCERPARTITION, false);
+        // TODO: getStatsRowKeyIterator method in NodeStatsSource and PartitionStatsSource has an implicit assumption
+        // that they are going to be called togeher and in the order of NodeStatsSource followed by PartitionStatsSource
+        // call individual stats or out of order could result stale DRPRODUCERPARTITION stats
         VoltTable[] nodeStats = collectStats(StatsSelector.DRPRODUCERNODE, false);
+        VoltTable[] partitionStats = collectStats(StatsSelector.DRPRODUCERPARTITION, false);
         if (partitionStats != null && nodeStats != null) {
             stats = new VoltTable[2];
             stats[0] = partitionStats[0];
