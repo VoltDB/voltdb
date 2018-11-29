@@ -29,8 +29,15 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexProgram;
+import org.voltdb.calciteadapter.rel.util.PlanCostUtil;
 
-
+/**
+ * Sub-class of {@link Calc}
+ * target at {@link #VOLTDB_PHYSICAL} convention
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBPCalc extends Calc implements VoltDBPRel {
 
     private final int m_splitCount;
@@ -88,12 +95,8 @@ public class VoltDBPCalc extends Calc implements VoltDBPRel {
     public RelOptCost computeSelfCost(RelOptPlanner planner,
                                       RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-        // Hack. Discourage Calcite from picking a plan with a Calc that have a RelDistributions.ANY
-        // distribution trait.
-        if (getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) != null &&
-                RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
-            rowCount *= 10000;
-        }
+        rowCount = PlanCostUtil.adjustRowCountOnRelDistribution(rowCount, getTraitSet());
+
         RelOptCost defaultCost = super.computeSelfCost(planner, mq);
         return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
 

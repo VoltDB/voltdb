@@ -96,9 +96,9 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                m_postPredicate,
-                m_splitCount,
-                m_isCoordinatorAggr);
+                getPostPredicate(),
+                getSplitCount(),
+                getIsCoordinatorAggr());
     }
 
     public VoltDBPHashAggregate copy(RelTraitSet traitSet,
@@ -118,7 +118,7 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                m_postPredicate,
+                getPostPredicate(),
                 splitCount,
                 isCoordinatorAggr);
     }

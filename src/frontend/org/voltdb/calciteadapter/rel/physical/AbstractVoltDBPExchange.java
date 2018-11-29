@@ -26,12 +26,19 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
 
+/**
+ * Abstract sub-class of {@link Exchange}
+ * with VoltDB specific attributes about distribution.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDBPRel {
 
     // TODO: why 30?
     public static final int DISTRIBUTED_SPLIT_COUNT = 30;
 
-    // Exchange's split count equals the count of physical nodes its input runs on
+    // Exchange's split count equals the count of (host number * site number per host)  its input runs on
     protected final int m_splitCount;
 
     // An indicator to be set to TRUE only for a top(coordinator) exchange for a multi-partitioned queries

@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -33,12 +34,23 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 import org.voltdb.calciteadapter.rel.VoltTable;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
 
+/**
+ * Abstract sub-class of {@link AbstractVoltDBTableScan}
+ * target at {@link #VOLTDB_PHYSICAL} convention
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan implements VoltDBPRel {
 
+    // TODO: verify this
     public static final int MAX_TABLE_ROW_COUNT = 1000000;
+
+    // If Limit ?, it's likely to be a small number. So pick up 50 here.
+    private static final int DEFAULT_LIMIT_VALUE_PARAMETERIZED = 50;
+
+    private static final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
 
     protected final RexProgram m_program;
     protected final int m_splitCount;
@@ -62,8 +74,9 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
                                        RexProgram preAggregateProgram,
                                        int splitCount) {
         super(cluster, traitSet.plus(VoltDBPRel.VOLTDB_PHYSICAL), table, voltDBTable);
-        assert (program != null);
-        assert (aggregate == null || aggregate instanceof AbstractVoltDBPAggregate);
+        Preconditions.checkNotNull(program);
+        Preconditions.checkArgument(aggregate == null || aggregate instanceof AbstractVoltDBPAggregate);
+        Preconditions.checkArgument(program.getOutputRowType().getFieldCount() > 0);
         m_program = program;
         m_offset = offset;
         m_limit = limit;
@@ -121,14 +134,24 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
         }
     }
 
+    /**
+     * Returns the cost of this plan (not including children).
+     * We will consider the row count as estimateRowCount,
+     * and the CPU cost as estimateRowCount+1.
+     * The IO cost is always 0 cause we are in-memory.
+     * The actual plan cost is depend on the planner implementation.
+     *
+     * @param planner Planner for cost calculation
+     * @param mq Metadata query
+     * @return Cost of this plan (not including children)
+     */
     @Override
     public RelOptCost computeSelfCost(RelOptPlanner planner,
                                       RelMetadataQuery mq) {
         double dRows = estimateRowCount(mq);
         double dCpu = dRows + 1; // ensure non-zero cost
         double dIo = 0;
-        RelOptCost cost = planner.getCostFactory().makeCost(dRows, dCpu, dIo);
-        return cost;
+        return planner.getCostFactory().makeCost(dRows, dCpu, dIo);
     }
 
     @Override
@@ -193,36 +216,13 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
         if (m_limit != null) {
             int limitInt = getLimit();
             if (limitInt == -1) {
-                // If Limit ?, it's likely to be a small number. So pick up 50 here.
-                limitInt = 50;
+                limitInt = DEFAULT_LIMIT_VALUE_PARAMETERIZED;
             }
 
             rowCount = Math.min(rowCount, limitInt);
 
             if ((m_program == null || m_program.getCondition() == null) && m_offset == null) {
                 rowCount = limitInt;
-            }
-        }
-        return rowCount;
-    }
-
-    protected double estimateRowCountWithPredicate(double rowCount) {
-        if (m_program != null && m_program.getCondition() != null) {
-            double discountFactor = 1.0;
-            // Eliminated filters discount the cost of processing tuples with a rapidly
-            // diminishing effect that ranges from a discount of 0.9 for one skipped filter
-            // to a discount approaching 0.888... (=8/9) for many skipped filters.
-            final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
-            // Avoid applying the discount to an initial tie-breaker value of 2 or 3
-            int condSize = RelOptUtil.conjunctions(m_program.getCondition()).size();
-            for (int i = 0; i < condSize; ++i) {
-                discountFactor -= Math.pow(MAX_PER_POST_FILTER_DISCOUNT, i + 1);
-            }
-            if (discountFactor < 1.0) {
-                rowCount *= discountFactor;
-                if (rowCount < 4) {
-                    rowCount = 4;
-                }
             }
         }
         return rowCount;

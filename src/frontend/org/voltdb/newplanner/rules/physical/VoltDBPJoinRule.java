@@ -56,6 +56,6 @@ public class VoltDBPJoinRule extends RelOptRule {
         // I use 1 for now.
         call.transformTo(new VoltDBPJoin(join.getCluster(), convertedTraits, convertedLeft, convertedRight,
                 join.getCondition(), join.getVariablesSet(), join.getJoinType(),
-                join.isSemiJoinDone(), systemFieldList, 1));
+                join.isSemiJoinDone(), systemFieldList, Constants.JOIN_SPLIT_COUNT));
     }
 }

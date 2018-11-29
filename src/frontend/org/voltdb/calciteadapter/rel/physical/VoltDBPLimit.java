@@ -31,6 +31,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
+import org.voltdb.calciteadapter.rel.util.PlanCostUtil;
 
 import java.util.List;
 
@@ -85,12 +86,8 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
     public RelWriter explainTerms(RelWriter pw) {
         super.explainTerms(pw);
         pw.item("split", m_splitCount);
-        if (m_limit != null) {
-            pw.item("limit", m_limit);
-        }
-        if (m_offset != null) {
-            pw.item("offset", m_offset);
-        }
+        pw.itemIf("limit", m_limit, m_limit != null);
+        pw.itemIf("offset", m_offset, m_offset != null);
         return pw;
     }
 
@@ -126,10 +123,7 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
         // distribution trait. This would make a "correct"
         // VoltDBPLimit (Single) / DistributedExchange / VoltDBPLimit (Hash) plan
         // less expensive than an "incorrect" VoltDBPLimit (Any) / DistributedExchange one.
-        if (getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) != null &&
-                RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
-            rowCount *= 10000;
-        }
+        rowCount = PlanCostUtil.adjustRowCountOnRelDistribution(rowCount, getTraitSet());
 
         RelOptCost defaultCost = super.computeSelfCost(planner, mq);
         return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());

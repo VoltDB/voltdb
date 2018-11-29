@@ -23,7 +23,6 @@
 
 package org.voltdb.newplanner;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistributions;

@@ -17,11 +17,14 @@
 
 package org.voltdb.calciteadapter.rel.physical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannodes.AbstractPlanNode;
+
+import java.util.Objects;
 
 public interface VoltDBPRel extends RelNode {
     final static Convention VOLTDB_PHYSICAL = new Convention.Impl("VOLTDB_PHYSICAL", VoltDBPRel.class) {
@@ -38,11 +41,11 @@ public interface VoltDBPRel extends RelNode {
 
     /**
      * Convert VoltDBPRel and its descendant(s) to a AbstractPlanNode tree
-     *
+     * This is the key piece that bridges between Calcite planner and VoltDB planner.
+     * TODO: implement the method in future
      * @return AbstractPlanNode
      */
     default AbstractPlanNode toPlanNode() {
-        // TODO: implement the method in future
         return null;
     }
 
@@ -67,9 +70,10 @@ public interface VoltDBPRel extends RelNode {
         if (inputNode != null) {
             if (inputNode instanceof RelSubset) {
                 inputNode = ((RelSubset) inputNode).getBest();
-                assert (inputNode != null);
+                Objects.requireNonNull(inputNode);
+
             }
-            assert (inputNode instanceof VoltDBPRel);
+            Preconditions.checkArgument(inputNode instanceof VoltDBPRel);
         }
         return (VoltDBPRel) inputNode;
     }
@@ -83,7 +87,7 @@ public interface VoltDBPRel extends RelNode {
      */
     default AbstractPlanNode inputRelNodeToPlanNode(RelNode node, int childOrdinal) {
         VoltDBPRel inputNode = getInputNode(node, childOrdinal);
-        assert (inputNode != null);
+        Objects.requireNonNull(inputNode);
         return inputNode.toPlanNode();
     }
 }

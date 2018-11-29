@@ -30,6 +30,7 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
+import org.voltdb.calciteadapter.rel.util.PlanCostUtil;
 
 public class VoltDBPSort extends Sort implements VoltDBPRel {
 
@@ -111,12 +112,8 @@ public class VoltDBPSort extends Sort implements VoltDBPRel {
     public RelOptCost computeSelfCost(RelOptPlanner planner,
                                       RelMetadataQuery mq) {
         double rowCount = estimateRowCount(mq);
-        // Hack. Discourage Calcite from picking a plan with a Sort that have a RelDistributions.ANY
-        // distribution trait.
-        if (getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE) != null &&
-                RelDistributions.ANY.getType().equals(getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE).getType())) {
-            rowCount *= 10000;
-        }
+        rowCount = PlanCostUtil.adjustRowCountOnRelDistribution(rowCount, getTraitSet());
+
         RelOptCost defaultCost = super.computeSelfCost(planner, mq);
         return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
     }

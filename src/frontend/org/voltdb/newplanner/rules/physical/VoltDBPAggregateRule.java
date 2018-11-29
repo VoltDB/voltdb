@@ -105,7 +105,7 @@ public class VoltDBPAggregateRule extends RelOptRule {
         // The fact that the convertedAggrTraits does have non-empty collation would force Calcite to create
         // a Sort relation on top of the aggregate. We can add the sort ourselves and also declare
         // that both (a new sort and the serial aggregate) relations are equivalent to the original
-        // logical aggregate. This way Caclite will later eliminate the added sort because if would have
+        // logical aggregate. This way Calcite will later eliminate the added sort because it would have
         // higher processing cost
         if (hasGroupBy(aggregate)) {
             VoltDBPSort sort = new VoltDBPSort(

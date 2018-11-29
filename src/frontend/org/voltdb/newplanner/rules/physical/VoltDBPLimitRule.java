@@ -25,6 +25,7 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLLimit;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPLimit;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
+import org.voltdb.newplanner.util.VoltDBRelUtil;
 
 /**
  * VoltDB physical rule that transform {@link VoltDBLLimit} to {@link VoltDBPLimit}.
@@ -49,8 +50,7 @@ public class VoltDBPLimitRule extends RelOptRule {
                 .replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
         RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
-        int splitCount = (convertedInput instanceof VoltDBPRel) ?
-                ((VoltDBPRel) convertedInput).getSplitCount() : 1;
+        int splitCount = VoltDBRelUtil.decideSplitCount(convertedInput);
 
         call.transformTo(new VoltDBPLimit(
                 limitOffset.getCluster(),

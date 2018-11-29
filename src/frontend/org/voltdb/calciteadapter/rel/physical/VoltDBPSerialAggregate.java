@@ -27,6 +27,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.voltdb.calciteadapter.rel.util.PlanCostUtil;
 
 import java.util.List;
 
@@ -118,20 +119,8 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
     public RelOptCost computeSelfCost(RelOptPlanner planner,
                                       RelMetadataQuery mq) {
         double rowCount = getInput().estimateRowCount(mq);
-        // Give a discount to the Aggregate based on the number of the collation fields.
-        //  - Serial Aggregate - the collation size is equal to the number of the GROUP BY columns
-        //          and max discount 1 - 0.1 -  0.01 - 0.001 - ...
-        //  - Partial Aggregate - anything in between
-        // The required order will be enforced by some index which collation would match / satisfy
-        // the aggregate's collation. If a table has more than one index multiple Aggregate / IndexScan
-        // combinations are possible and we want to pick the one that has the maximum GROUP BY columns
-        // covered resulting in a more efficient aggregation (less hashing)
-        double discountFactor = 1.0;
-        final double MAX_PER_COLLATION_DISCOUNT = 0.1;
-        for (int i = 0; i < getGroupCount(); ++i) {
-            discountFactor -= Math.pow(MAX_PER_COLLATION_DISCOUNT, i + 1);
-        }
-        rowCount *= discountFactor;
+
+        rowCount = PlanCostUtil.discountRowCountSerialAggregate(rowCount, getGroupCount());
         return planner.getCostFactory().makeCost(rowCount, 0, 0);
     }
 
@@ -150,9 +139,9 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                m_postPredicate,
-                m_splitCount,
-                m_isCoordinatorAggr,
+                getPostPredicate(),
+                getSplitCount(),
+                getIsCoordinatorAggr(),
                 m_offset,
                 m_limit);
     }

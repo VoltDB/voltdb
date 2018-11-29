@@ -34,17 +34,29 @@ import java.util.List;
 public abstract class AbstractVoltDBPAggregate extends Aggregate implements VoltDBPRel {
 
     // HAVING expression
-    final protected RexNode m_postPredicate;
+    final private RexNode m_postPredicate;
 
-    final protected int m_splitCount;
+    final private int m_splitCount;
 
     // TRUE if this aggregate relation is part of a coordinator tree.
     // The indicator may be useful during the Exchange Transform rule when a coordinator aggregate
     // differs from a fragment one
-    final protected boolean m_isCoordinatorAggr;
+    final private boolean m_isCoordinatorAggr;
 
     /**
-     * Constructor
+     * Constructor.
+     *
+     * @param cluster Cluster
+     * @param traitSet Traits
+     * @param child Child
+     * @param indicator Whether row type should include indicator fields to
+     *                  indicate which grouping set is active; true is deprecated
+     * @param groupSet Bit set of grouping fields
+     * @param groupSets List of all grouping sets; null for just {@code groupSet}
+     * @param aggCalls Collection of calls to aggregate functions
+     * @param postPredicate HAVING expression
+     * @param splitCount Number of concurrent processes that this VoltDBPRel will be executed in
+     * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
      */
     protected AbstractVoltDBPAggregate(
             RelOptCluster cluster,
@@ -93,16 +105,18 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
     /**
      * Copy self
      *
-     * @param cluster
-     * @param traitSet
-     * @param input
-     * @param indicator
-     * @param groupSet
-     * @param groupSets
-     * @param aggCalls
-     * @param postPredicate
-     * @param splitCount
-     * @return
+     * @param cluster Cluster
+     * @param traitSet Traits
+     * @param input Input
+     * @param indicator Whether row type should include indicator fields to
+     *                  indicate which grouping set is active; true is deprecated
+     * @param groupSet Bit set of grouping fields
+     * @param groupSets List of all grouping sets; null for just {@code groupSet}
+     * @param aggCalls Collection of calls to aggregate functions
+     * @param postPredicate HAVING expression
+     * @param splitCount Number of concurrent processes that this VoltDBPRel will be executed in
+     * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
+     * @return A cloned {@link AbstractVoltDBPAggregate}.
      */
     public abstract AbstractVoltDBPAggregate copy(
             RelOptCluster cluster,
@@ -123,6 +137,10 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
     @Override
     public int getSplitCount() {
         return m_splitCount;
+    }
+
+    public boolean getIsCoordinatorAggr() {
+        return m_isCoordinatorAggr;
     }
 
 }

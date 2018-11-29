@@ -25,6 +25,7 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLCalc;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPCalc;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
+import org.voltdb.newplanner.util.VoltDBRelUtil;
 
 /**
  * VoltDB physical rule that transform {@link VoltDBLCalc} to {@link VoltDBPCalc}.
@@ -47,8 +48,7 @@ public class VoltDBPCalcRule extends RelOptRule {
         RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
         RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
-        int splitCount = (convertedInput instanceof VoltDBPRel) ?
-                ((VoltDBPRel) convertedInput).getSplitCount() : 1;
+        int splitCount = VoltDBRelUtil.decideSplitCount(convertedInput);
         call.transformTo(new VoltDBPCalc(
                 calc.getCluster(),
                 convertedTraits,

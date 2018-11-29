@@ -17,10 +17,12 @@
 
 package org.voltdb.newplanner.util;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
+import org.apache.calcite.rel.SingleRel;
 import org.apache.calcite.rel.core.TableFunctionScan;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalAggregate;
@@ -35,6 +37,7 @@ import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 
 public class VoltDBRelUtil {
 
@@ -46,9 +49,14 @@ public class VoltDBRelUtil {
      * @return
      */
     public static RelNode addTraitRecurcively(RelNode rel, RelTrait newTrait) {
-        assert (rel != null);
+        Preconditions.checkNotNull(rel);
         RelTraitShuttle traitShuttle = new RelTraitShuttle(newTrait);
         return rel.accept(traitShuttle);
+    }
+
+    public static int decideSplitCount(RelNode rel) {
+        return (rel instanceof VoltDBPRel) ?
+                ((VoltDBPRel) rel).getSplitCount() : 1;
     }
 
     private static class RelTraitShuttle extends RelShuttleImpl {
@@ -57,6 +65,11 @@ public class VoltDBRelUtil {
 
         public RelTraitShuttle(RelTrait newTrait) {
             m_newTrait = newTrait;
+        }
+
+        private <T extends RelNode> RelNode internal_visit(T visitor) {
+            RelNode newRel = visitor.copy(visitor.getTraitSet().plus(m_newTrait), visitor.getInputs());
+            return visitChildren(newRel);
         }
 
         @Override
@@ -68,14 +81,12 @@ public class VoltDBRelUtil {
 
         @Override
         public RelNode visit(LogicalAggregate aggregate) {
-            RelNode newAggregate = aggregate.copy(aggregate.getTraitSet().plus(m_newTrait), aggregate.getInputs());
-            return visitChild(newAggregate, 0, aggregate.getInput());
+            return internal_visit(aggregate);
         }
 
         @Override
         public RelNode visit(LogicalMatch match) {
-            RelNode newMatch = match.copy(match.getTraitSet().plus(m_newTrait), match.getInputs());
-            return visitChild(newMatch, 0, match.getInput());
+            return internal_visit(match);
         }
 
         @Override
@@ -86,8 +97,7 @@ public class VoltDBRelUtil {
 
         @Override
         public RelNode visit(TableFunctionScan scan) {
-            RelNode newScan = scan.copy(scan.getTraitSet().plus(m_newTrait), scan.getInputs());
-            return visitChildren(newScan);
+            return internal_visit(scan);
         }
 
         @Override
@@ -98,55 +108,46 @@ public class VoltDBRelUtil {
 
         @Override
         public RelNode visit(LogicalFilter filter) {
-            RelNode newFilter = filter.copy(filter.getTraitSet().plus(m_newTrait), filter.getInputs());
-            return visitChild(newFilter, 0, filter.getInput());
+            return internal_visit(filter);
         }
 
         @Override
         public RelNode visit(LogicalProject project) {
-            RelNode newProject = project.copy(project.getTraitSet().plus(m_newTrait), project.getInputs());
-            return visitChild(newProject, 0, project.getInput());
+            return internal_visit(project);
         }
 
         @Override
         public RelNode visit(LogicalJoin join) {
-            RelNode newJoin = join.copy(join.getTraitSet().plus(m_newTrait), join.getInputs());
-            return visitChildren(newJoin);
+            return internal_visit(join);
         }
 
         @Override
         public RelNode visit(LogicalCorrelate correlate) {
-            RelNode newCorrelate = correlate.copy(correlate.getTraitSet().plus(m_newTrait), correlate.getInputs());
-            return visitChildren(newCorrelate);
+            return internal_visit(correlate);
         }
 
         @Override
         public RelNode visit(LogicalUnion union) {
-            RelNode newUnion = union.copy(union.getTraitSet().plus(m_newTrait), union.getInputs());
-            return visitChildren(newUnion);
+            return internal_visit(union);
         }
 
         public RelNode visit(LogicalIntersect intersect) {
-            RelNode newIntersect = intersect.copy(intersect.getTraitSet().plus(m_newTrait), intersect.getInputs());
-            return visitChildren(newIntersect);
+            return internal_visit(intersect);
         }
 
         @Override
         public RelNode visit(LogicalMinus minus) {
-            RelNode newMinus = minus.copy(minus.getTraitSet().plus(m_newTrait), minus.getInputs());
-            return visitChildren(newMinus);
+            return internal_visit(minus);
         }
 
         @Override
         public RelNode visit(LogicalSort sort) {
-            RelNode newSort = sort.copy(sort.getTraitSet().plus(m_newTrait), sort.getInputs());
-            return visitChildren(newSort);
+            return internal_visit(sort);
         }
 
         @Override
         public RelNode visit(LogicalExchange exchange) {
-            RelNode newExchange = exchange.copy(exchange.getTraitSet().plus(m_newTrait), exchange.getInputs());
-            return visitChildren(newExchange);
+            return internal_visit(exchange);
         }
     }
 }

@@ -19,8 +19,6 @@ package org.voltdb.calciteadapter.rel.physical;
 
 import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -31,6 +29,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.calciteadapter.rel.VoltTable;
+import org.voltdb.calciteadapter.rel.util.PlanCostUtil;
 
 public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
 
@@ -51,11 +50,11 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                   table,
                   voltTable,
                   RexProgram.createIdentity(voltTable.getRowType(cluster.getTypeFactory())),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
+                  null, // offset
+                  null, // limit
+                  null, // aggregate
+                  null, // preAggregateRowType
+                  null, // preAggregateProgram
                   splitCount);
         Preconditions.checkArgument(getConvention() == VoltDBPRel.VOLTDB_PHYSICAL);
     }
@@ -97,18 +96,10 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                 splitCount);
     }
 
-    @Override public RelOptCost computeSelfCost(RelOptPlanner planner,
-                                                RelMetadataQuery mq) {
-        double dRows = estimateRowCount(mq);
-        double dCpu = dRows + 1; // ensure non-zero cost
-        double dIo = 0;
-        return planner.getCostFactory().makeCost(dRows, dCpu, dIo);
-    }
-
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
         double rowCount = AbstractVoltDBPTableScan.MAX_TABLE_ROW_COUNT;
-        rowCount = estimateRowCountWithPredicate(rowCount);
+        rowCount = PlanCostUtil.discountRowCountTableScan(rowCount, m_program);
         // SeqScanPlanNode does not pay attention to limit
 
         // If table is distributed divide the row count by the split count.
