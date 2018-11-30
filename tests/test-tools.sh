@@ -553,7 +553,7 @@ function tt-help() {
     echo -e "    tt-echo-build-args) may have '-if-needed' appended, e.g.,"
     echo -e "    'test-tools-server-if-needed' will start a VoltDB server only if"
     echo -e "    one is not already running."
-    echo -e "Some options (tt-set-build-args, tt-set-build-args) may be passed argument(s)"
+    echo -e "Some options (tt-set-build-args, tt-set-setseed) may be passed argument(s)"
     echo -e "    that determine what the relevant environment variable will be set to."
     echo -e "Multiple options may be specified; but options usually call other options that are prerequisites.\n"
     PRINT_ERROR_CODE=0
