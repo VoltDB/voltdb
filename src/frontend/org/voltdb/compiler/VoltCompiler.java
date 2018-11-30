@@ -67,7 +67,7 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.ParameterizationInfo;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
-import org.voltdb.sysprocs.org.voltdb.calciteutils.CreateTableUtils;
+import org.voltdb.calciteutils.CreateTableUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -1139,6 +1139,9 @@ public class VoltCompiler {
                     final Statement stmt = r.getSecond().getFirst();
                     final VoltXMLElement elm = r.getSecond().getSecond();
                     ddlcompiler.getLimitDeleteStmtToXmlEntries().put(stmt, elm);
+//                } else {      // TODO: explicitly left CREATE INDEX switch off till we resolve all CatalogDiff errors
+//                  // First, need to make tests/testprocs/org/voltdb_testprocs/regressionsuites/matviewprocs/matviewsuite-ddl.sql work.
+//                    final SchemaPlus sc = CreateIndexUtils.run(node, previousDBIfAny, db);
                 }
             });
             ddlcompiler.compileToCatalog(db, m_isXDCR); // NOTE: this is the place catalog gets added for create table.

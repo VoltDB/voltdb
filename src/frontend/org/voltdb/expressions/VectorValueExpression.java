@@ -19,6 +19,8 @@ package org.voltdb.expressions;
 
 import org.voltdb.types.ExpressionType;
 
+import java.util.List;
+
 /**
  * Represents a vector of expression trees.
  * Currently used for SQL IN lists (of values), and (column list) IN (SELECT ...)
@@ -27,6 +29,12 @@ public class VectorValueExpression extends AbstractExpression {
 
     public VectorValueExpression() {
         super(ExpressionType.VALUE_VECTOR);
+    }
+
+    public VectorValueExpression(List<AbstractExpression> args) {
+        this();
+        assert args != null : "Args for VectorValueExpression cannot be null";
+        setArgs(args);
     }
 
     @Override

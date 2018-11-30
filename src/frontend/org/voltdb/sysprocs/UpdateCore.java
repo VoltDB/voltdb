@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -42,6 +44,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
@@ -80,6 +83,11 @@ public class UpdateCore extends VoltSystemProcedure {
             SysProcFragmentId.PF_updateCatalogAggregate};
     }
 
+    private static Table getMaterializer(Cluster cluster, String tableName) {
+        return cluster.getDatabases().iterator().next()
+                .getTables().get(tableName).getMaterializer();
+    }
+
     /**
      * Use EE stats to get the row counts for all tables in this partition.
      * Check the provided list of tables that need to be empty against actual
@@ -115,6 +123,20 @@ public class UpdateCore extends VoltSystemProcedure {
         CatalogMap<Table> tables = context.getDatabase().getTables();
         List<List<String>> allTableSets = decodeTables(tablesThatMustBeEmpty);
         Map<String, Boolean> allTables = collapseSets(allTableSets);
+        // Pull in matview dependencies
+        allTables.keySet().stream().flatMap(tableName -> {
+            final Table materialize = getMaterializer(m_cluster, tableName);
+            if (materialize != null) {
+                return Stream.of(materialize.getTypeName());
+            } else {
+                return Stream.empty();
+            }
+        }).collect(Collectors.toSet()).forEach(dep -> {
+            if (! allTables.containsKey(dep)) {
+                allTables.put(dep, false);
+            }
+        });
+
         int[] tableIds = new int[allTables.size()];
         int i = 0;
         for (String tableName : allTables.keySet()) {
@@ -142,7 +164,7 @@ public class UpdateCore extends VoltSystemProcedure {
             throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
         }
         VoltTable stats = s1[0];
-
+        final Map<String, String> matViews = new HashMap<>();
         // find all empty tables and mark that they are empty.
         while (stats.advanceRow()) {
             long tupleCount = stats.getLong("TUPLE_COUNT");
@@ -150,9 +172,19 @@ public class UpdateCore extends VoltSystemProcedure {
             boolean isEmpty = true;
             if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
                 isEmpty = false;
+                // Hang on, don't say so fast that it is non-empty. Check materializer for views.
+                final Table materializer = getMaterializer(m_cluster, tableName);
+                if (materializer != null) {  // whether a view is empty or not depends on all its materializers' emptiness
+                    matViews.put(tableName, materializer.getTypeName());
+                }
             }
             allTables.put(tableName.toUpperCase(), isEmpty);
         }
+        // Resolve emptiness of views by checking its materializer, since the materializer cannot be a view
+        matViews.forEach((view, materializer) -> {
+            assert allTables.containsKey(materializer.toUpperCase());
+            allTables.put(view.toUpperCase(), allTables.get(materializer.toUpperCase()));
+        });
 
         // Reexamine the sets of sets and see if any of them has
         // one empty element.  If not, then add the respective
