@@ -239,7 +239,7 @@ public class TestExportDataSource extends TestCase {
             //No change in size because the buffers are flattened to disk, until the whole
             //file is polled/acked it won't shrink
             assertEquals( 60, s.sizeInBytes());
-            assertEquals( 1, cont.m_seqNo);
+            assertEquals( 1, cont.m_lastSeqNo);
 
             foo = ByteBuffer.allocateDirect(buffSize);
             foo.duplicate().put(new byte[buffSize]);
@@ -257,7 +257,7 @@ public class TestExportDataSource extends TestCase {
             //Should lose 20 bytes for the stuff in memory
             assertEquals( 40, s.sizeInBytes());
 
-            assertEquals( 2, cont.m_seqNo);
+            assertEquals( 2, cont.m_lastSeqNo);
             assertTrue( foo.equals(cont.b()));
 
             cont.discard();
@@ -268,7 +268,7 @@ public class TestExportDataSource extends TestCase {
 
             //No more buffers on disk, so the + 8 is gone, just the last one pulled in memory
             assertEquals( 20, s.sizeInBytes());
-            assertEquals( 3, cont.m_seqNo);
+            assertEquals( 3, cont.m_lastSeqNo);
             assertEquals( foo, cont.b());
 
             cont.discard();
@@ -428,7 +428,7 @@ public class TestExportDataSource extends TestCase {
         //No change in size because the buffers are flattened to disk, until the whole
         //file is polled/acked it won't shrink
         assertEquals( 60, s.sizeInBytes());
-        assertEquals( 1, cont.m_seqNo);
+        assertEquals( 1, cont.m_lastSeqNo);
 
         foo = ByteBuffer.allocateDirect(20 + StreamBlock.HEADER_SIZE);
         foo.duplicate().put(new byte[20]);
@@ -461,7 +461,7 @@ public class TestExportDataSource extends TestCase {
         cont = s.poll().get();
         cont.updateStartTime(System.currentTimeMillis());
         assertEquals(s.sizeInBytes(), 20);
-        assertEquals(3, cont.m_seqNo);
+        assertEquals(3, cont.m_lastSeqNo);
         cont.discard();
 
         } finally {

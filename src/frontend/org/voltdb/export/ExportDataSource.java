@@ -438,8 +438,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             lastSeqNo = releaseSeqNo;
         }
         m_firstUnpolledSeqNo = Math.max(m_firstUnpolledSeqNo, lastSeqNo + 1);
-        int pendingCount = m_tuplesPending.get();
-        m_tuplesPending.set(pendingCount - tuplesSent);
+        m_tuplesPending.addAndGet(-tuplesSent);
 
         return;
     }
@@ -1007,14 +1006,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public class AckingContainer extends BBContainer {
-        final long m_seqNo;
+        final long m_lastSeqNo;
         final int m_tuplesCount;
         final BBContainer m_backingCont;
         long m_startTime = 0;
 
         public AckingContainer(BBContainer cont, long seq, int tuplesSent) {
             super(cont.b());
-            m_seqNo = seq;
+            m_lastSeqNo = seq;
             m_tuplesCount = tuplesSent;
             m_backingCont = cont;
         }
@@ -1031,7 +1030,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     @Override
                     public void run() {
                         if (exportLog.isTraceEnabled()) {
-                            exportLog.trace("AckingContainer.discard with sequence number: " + m_seqNo + " tuples count: " + m_tuplesCount);
+                            exportLog.trace("AckingContainer.discard with sequence number: " + m_lastSeqNo + " tuples count: " + m_tuplesCount);
                         }
                         assert(m_tuplesCount == 0 || m_startTime != 0);
                         long elapsedMS = System.currentTimeMillis() - m_startTime;
@@ -1046,10 +1045,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                              m_backingCont.discard();
                             try {
                                 if (!m_es.isShutdown()) {
-                                    ackImpl(m_seqNo, m_tuplesCount);
+                                    ackImpl(m_lastSeqNo, m_tuplesCount);
                                 }
                             } finally {
-                                forwardAckToOtherReplicas(m_seqNo, m_tuplesCount);
+                                forwardAckToOtherReplicas(m_lastSeqNo, m_tuplesCount);
                             }
                         } catch (Exception e) {
                             exportLog.error("Error acking export buffer", e);
