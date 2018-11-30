@@ -70,7 +70,7 @@ public class ExportControl extends VoltSystemProcedure {
                     new ColumnInfo("SOURCE", VoltType.STRING),
                     new ColumnInfo("TARGET", VoltType.STRING),
                     new ColumnInfo("PARTITIONID", VoltType.BIGINT),
-                    new ColumnInfo("STATUS", VoltType.BIGINT),
+                    new ColumnInfo("STATUS", VoltType.STRING),
                     new ColumnInfo("MESSAGE", VoltType.STRING));
 
             if (context.isLowestSiteId()) {
@@ -99,12 +99,12 @@ public class ExportControl extends VoltSystemProcedure {
                 new ColumnInfo("SOURCE", VoltType.STRING),
                 new ColumnInfo("TARGET", VoltType.STRING),
                 new ColumnInfo("PARTITIONID", VoltType.BIGINT),
-                new ColumnInfo("STATUS", VoltType.BIGINT),
+                new ColumnInfo("STATUS", VoltType.STRING),
                 new ColumnInfo("MESSAGE", VoltType.STRING));
         try {
             OperationMode.valueOf(operationMode.toUpperCase());
         } catch (IllegalArgumentException e){
-            results.addRow("", "", -1, VoltSystemProcedure.STATUS_FAILURE, e.getMessage());
+            results.addRow("", "", -1, "FAILURE", e.getMessage());
             return new VoltTable[] {results};
         }
 
@@ -115,7 +115,7 @@ public class ExportControl extends VoltSystemProcedure {
             Set<String> exportStreams = CatalogUtil.getExportTableNames( volt.getCatalogContext().database);
             boolean isThere = exportStreams.stream().anyMatch(exportSource::equalsIgnoreCase);
             if (!isThere) {
-                results.addRow(exportSource, "", -1,VoltSystemProcedure.STATUS_FAILURE, "Export stream " + exportSource + " does not exist.");
+                results.addRow(exportSource, "", -1,"FAILURE", "Export stream " + exportSource + " does not exist.");
                 return new VoltTable[] {results};
             }
         }
