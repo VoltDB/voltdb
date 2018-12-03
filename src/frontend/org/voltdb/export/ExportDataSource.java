@@ -401,13 +401,23 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             tuplesSent = 0;
         }
 
-        long lastSeqNo = 0;
+        long lastSeqNo = releaseSeqNo;
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("releaseSeqNo " + releaseSeqNo +
+                    " m_committedBuffers.peek().startSequenceNumber() " +
+                    (m_committedBuffers.isEmpty() ? "Empty" : m_committedBuffers.peek().startSequenceNumber()));
+            Iterator<StreamBlock> iter = m_committedBuffers.iterator();
+            while (iter.hasNext()) {
+                StreamBlock sb = iter.next();
+                exportLog.debug("[" + sb.startSequenceNumber() + ", " + sb.lastSequenceNumber() + "]");
+            }
+        }
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
                 m_committedBuffers.pop();
                 try {
-                    lastSeqNo = sb.lastSequenceNumber();
+                    lastSeqNo = Math.max(lastSeqNo, sb.lastSequenceNumber());
                     m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 } finally {
                     sb.discard();
@@ -419,25 +429,22 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 break;
             }
         }
-        m_lastReleasedSeqNo = releaseSeqNo;
         if (m_status == StreamStatus.BLOCKED &&
                 m_gapTracker.getFirstGap() != null &&
-                releaseSeqNo > m_gapTracker.getFirstGap().getSecond()) {
+                releaseSeqNo >= m_gapTracker.getFirstGap().getSecond()) {
             exportLog.info("Export queue gap resolved. Resuming export for " + ExportDataSource.this.toString());
             setStatus(StreamStatus.ACTIVE);
             m_queueGap = 0;
         }
+        m_lastReleasedSeqNo = releaseSeqNo;
         // If persistent log contains gap, mostly due to node failures and rejoins, acks from leader might
         // fill the gap gradually.
         m_gapTracker.truncate(releaseSeqNo);
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Truncate tracker via ack to:" + releaseSeqNo + " now is " + m_gapTracker.toString());
-        }
-        // If releaseSeqNo falls in between stream buffers,
-        if (m_committedBuffers.isEmpty()) {
-            lastSeqNo = releaseSeqNo;
-        }
         m_firstUnpolledSeqNo = Math.max(m_firstUnpolledSeqNo, lastSeqNo + 1);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("Truncate tracker via ack to " + releaseSeqNo + ", next seqNo to poll is " +
+                    m_firstUnpolledSeqNo + ", tracker map is " + m_gapTracker.toString());
+        }
         m_tuplesPending.addAndGet(-tuplesSent);
 
         return;
@@ -1140,7 +1147,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    public void ack(final long seq, int tuplesSent) {
+    public void ack(final long seq, final int tuplesSent) {
 
         //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
@@ -1379,8 +1386,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void sendGapQuery() {
-        // Should be the master and the master was stuck on a gap
-        if (m_mastershipAccepted.get() && m_gapTracker.getFirstGap() != null) {
+        if (m_mastershipAccepted.get() &&  /* active stream */
+                !m_gapTracker.isEmpty() &&  /* finish initialization */
+                m_firstUnpolledSeqNo > m_gapTracker.getSafePoint()) { /* may hit a gap */
             m_queryResponses.clear();
             Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
             Mailbox mbx = p.getFirst();
@@ -1481,9 +1489,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             }
                         }
                         if (bestCandidate == null) {
-                            setStatus(StreamStatus.BLOCKED);
+                            // if current stream doesn't hit gap, just leave it as is.
                             Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                            assert (gap != null);
+                            if (gap == null || m_firstUnpolledSeqNo < gap.getFirst()) {
+                                return;
+                            }
+                            setStatus(StreamStatus.BLOCKED);
                             m_queueGap = gap.getSecond() - gap.getFirst() + 1;
                             RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
                             if (voltdb.isClusterComplete()) {
