@@ -33,8 +33,8 @@ import javax.security.auth.login.LoginException;
 
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltcore.utils.ssl.SSLConfiguration.SslConfig;
-import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.common.Constants;
+import org.voltdb.types.VoltDecimalHelper;
 
 /**
  * Container for configuration settings for a Client

@@ -334,18 +334,19 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
         // allocation for any object of this size, so either the caller
         // passed a bogus data pointer that was never allocated here OR
         // the data pointer's size header has been corrupted.
-#ifdef VOLT_POOL_CHECKING
+
         // We will catch this when we see what compacting pool data is left
-        VOLT_ERROR("Deallocated relocatable pointer %p in wrong context thread (partition %d)",
-                sized, getEnginePartitionId());
+        VOLT_ERROR("Deallocated relocatable pointer %p in wrong context thread (partition %d). Requested size was %d",
+                sized, getEnginePartitionId(), alloc_size);
         VOLT_ERROR_STACK();
-#else
-        throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d",
-                            alloc_size);
-#endif
+        // TODO: ENG-14906: improve thread local pool
+        // implementation and tracking mechanism
+        // throwFatalException("Attempted to free an object of an unrecognized size. Requested size was %d", alloc_size);
+        assert(false);
+    } else {
+       // Free the raw allocation from the found pool.
+       iter->second->free(sized);
     }
-    // Free the raw allocation from the found pool.
-    iter->second->free(sized);
 }
 
 #endif

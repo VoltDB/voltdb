@@ -726,7 +726,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
     assert(UniqueId::isMpUniqueId(localUniqueId));
 
     VOLT_DEBUG("Applying MP binary log: log count: %d, unique ID: %jd, sequence number: %jd", logCount,
-            logs[0]->m_uniqueId, logs[0]->m_sequenceNumber);
+            (intmax_t) logs[0]->m_uniqueId, (intmax_t) logs[0]->m_sequenceNumber);
 
     /*
      * Iterate over all of the logs until they are depleted. If a TRUNCATE_TABLE is encountered stop processing

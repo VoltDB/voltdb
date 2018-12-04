@@ -282,7 +282,7 @@ public class AsyncExportClient
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
-                .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "true")
+                .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "false")
                 .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .setArguments(args)
@@ -350,7 +350,7 @@ public class AsyncExportClient
                                                   0);
                 }
                 catch (Exception e) {
-                    System.err.println("Exception: " + e);
+                    System.err.println("FATAL Exception: " + e);
                     e.printStackTrace();
                     System.exit(-1);
                 }
@@ -422,8 +422,13 @@ public class AsyncExportClient
         }
         catch(Exception x)
         {
-            System.err.println("Exception: " + x);
+            System.err.println("FATAL Exception: " + x);
             x.printStackTrace();
+        }
+        // if we didn't get any successes we need to fail
+        if ( TrackingResults.get(0) == 0 ) {
+            System.err.println("ERROR No successful transactions");
+            System.exit(-1);
         }
     }
 
@@ -490,6 +495,7 @@ public class AsyncExportClient
         else {
             clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
         }
+        clientConfig.setTopologyChangeAware(true);
         Client client = ClientFactory.createClient(clientConfig);
         clientRef.set(client);
 
@@ -539,20 +545,24 @@ public class AsyncExportClient
     public static void waitForStreamedAllocatedMemoryZero(Client client,Integer timeout) throws Exception {
         boolean passed = false;
         Instant maxTime = Instant.now().plusSeconds(timeout);
-
+        Instant maxStatsTime = Instant.now().plusSeconds(60);
         VoltTable stats = null;
         try {
             System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
         } catch (Exception ex) {
         }
         while (true) {
-            if ( Instant.now().isAfter(maxTime) ) {
-                throw new Exception("Test Timeout waiting for non-null @Statistics call, "
-                + "increase --timeout arg for slower tests" );
+
+            if ( Instant.now().isAfter(maxStatsTime) ) {
+                throw new Exception("Test Timeout waiting for non-null @Statistics call");
             }
             try {
                 stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+                maxStatsTime = Instant.now().plusSeconds(60);
             } catch (Exception ex) {
+                // Export Statistics are updated asynchronously and may not be upto date immediately on all hosts
+                //retry a few times if we don't get an answer
+                System.err.println("Problem getting @Statistics export: "+ex.getMessage());
             }
             if (stats == null) {
                 Thread.sleep(5000);
@@ -561,12 +571,15 @@ public class AsyncExportClient
             boolean passedThisTime = true;
             while (stats.advanceRow()) {
                 if ( Instant.now().isAfter(maxTime) ) {
-                    throw new Exception("Test Timeout expecting non-zero TUPLE_PENDING Statistic, "
+                    throw new Exception("Test Timeout waiting for export to drain, expecting non-zero TUPLE_PENDING Statistic, "
                     + "increase --timeout arg for slower clients" );
                 }
-                if (0 != stats.getLong("TUPLE_PENDING")) {
+                Long pending = stats.getLong("TUPLE_PENDING");
+                if (0 != pending ) {
+                    String stream = stats.getString("SOURCE");
+                    Long partition = stats.getLong("PARTITION_ID");
                     passedThisTime = false;
-                    System.out.println("Partition Not Zero.");
+                    System.out.println("Partition "+partition+" for stream "+stream+" TUPLE_PENDING is  not zero, got "+pending);
                     break;
                 }
             }

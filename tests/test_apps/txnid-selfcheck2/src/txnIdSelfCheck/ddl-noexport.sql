@@ -63,7 +63,7 @@ CREATE TABLE adhocr
 , jmp        bigint             NOT NULL
 , CONSTRAINT PK_id_ar PRIMARY KEY (id)
 );
-CREATE INDEX R_TSINDEX ON adhocr (ts DESC);
+CREATE INDEX R_TSINDEX ON adhocr (ts);
 
 -- partitioned table
 CREATE TABLE adhocp
@@ -75,7 +75,7 @@ CREATE TABLE adhocp
 , CONSTRAINT PK_id_ap PRIMARY KEY (id)
 );
 PARTITION TABLE adhocp ON COLUMN id;
-CREATE INDEX P_TSINDEX ON adhocp (ts DESC);
+CREATE INDEX P_TSINDEX ON adhocp (ts);
 
 -- replicated table
 CREATE TABLE bigr
