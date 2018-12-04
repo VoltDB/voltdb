@@ -401,30 +401,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             tuplesSent = 0;
         }
 
-        long lastSeqNo = releaseSeqNo;
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("releaseSeqNo " + releaseSeqNo +
-                    " m_committedBuffers.peek().startSequenceNumber() " +
-                    (m_committedBuffers.isEmpty() ? "Empty" : m_committedBuffers.peek().startSequenceNumber()));
-            Iterator<StreamBlock> iter = m_committedBuffers.iterator();
-            while (iter.hasNext()) {
-                StreamBlock sb = iter.next();
-                exportLog.debug("[" + sb.startSequenceNumber() + ", " + sb.lastSequenceNumber() + "]");
-            }
-        }
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
                 m_committedBuffers.pop();
                 try {
-                    lastSeqNo = Math.max(lastSeqNo, sb.lastSequenceNumber());
                     m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 } finally {
                     sb.discard();
                 }
             } else if (releaseSeqNo >= sb.startSequenceNumber()) {
                 sb.releaseTo(releaseSeqNo);
-                lastSeqNo = releaseSeqNo;
                 m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 break;
             }
@@ -437,10 +424,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_queueGap = 0;
         }
         m_lastReleasedSeqNo = releaseSeqNo;
-        // If persistent log contains gap, mostly due to node failures and rejoins, acks from leader might
-        // fill the gap gradually.
+        // If persistent log contains gap, mostly due to node failures and rejoins, ACK from leader might
+        // cover the gap gradually.
         m_gapTracker.truncate(releaseSeqNo);
-        m_firstUnpolledSeqNo = Math.max(m_firstUnpolledSeqNo, lastSeqNo + 1);
+        // Next poll starts from this number, if it sit in between buffers and stream is active, next poll will
+        // kick off gap detection/resolution.
+        m_firstUnpolledSeqNo = Math.max(m_firstUnpolledSeqNo, releaseSeqNo + 1);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Truncate tracker via ack to " + releaseSeqNo + ", next seqNo to poll is " +
                     m_firstUnpolledSeqNo + ", tracker map is " + m_gapTracker.toString());
