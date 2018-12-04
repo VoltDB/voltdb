@@ -172,6 +172,7 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // note that any allocated memory in m_data is left alone
     // as is m_allocatedTuples
     m_data.clear();
+    VOLT_LOG("XXX", "initialized PersistentTable %s", m_name.c_str());
 }
 
 PersistentTable::~PersistentTable() {
@@ -800,7 +801,20 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
 
     try {
         insertTupleCommon(source, target, fallible);
+<<<<<<< HEAD
     } catch (ConstraintFailureException& e) {
+=======
+        if (m_st != nullptr) {
+            if (m_st->insertTuple(source)) {
+                VOLT_LOG("XXX", "Inserted into companion stream of %s", m_name.c_str());
+            }
+            else {
+                VOLT_LOG("XXX", "Failed to insert into companion stream of %s", m_name.c_str());
+            }
+        }
+    }
+    catch (ConstraintFailureException& e) {
+>>>>>>> c19ee15e5f... First hack at exporting from tables, exports to first configured target
         deleteTupleStorage(target); // also frees object columns
         throw;
     } catch (TupleStreamException& e) {
@@ -883,9 +897,9 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
            char* tupleData = partialCopyToPool(uq->getPool(), target.address(), target.tupleLength());
-            //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
-            //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-            //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+            std::cout << "DEBUG: inserting " << (void*)target.address()
+                       << " { " << target.debugNoHeader() << " } "
+                       << " copied to " << (void*)tupleData << std::endl;
             UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(*uq->getPool(), tupleData, &m_surgeon);
             SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
         }
@@ -1133,6 +1147,12 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     // handle any materialized views
     BOOST_FOREACH (auto view, m_views) {
         view->processTupleInsert(targetTupleToUpdate, fallible);
+    }
+    if (m_st->insertTuple(targetTupleToUpdate)) {
+        VOLT_LOG("XXX", "Inserted UPDATE into companion stream of %s", m_name.c_str());
+    }
+    else {
+        VOLT_LOG("XXX", "Failed to insert UPDATE into companion stream of %s", m_name.c_str());
     }
 }
 

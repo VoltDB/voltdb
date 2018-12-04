@@ -109,6 +109,20 @@ Table* TableFactory::getPersistentTable(
     // initialize stats for the table
     configureStats(name, stats);
 
+    // Create a companion streamed table
+    if (!exportOnly) {
+        streamedTable = new StreamedTable(partitionColumn);
+        initCommon(databaseId,
+                   streamedTable,
+                   name,
+                   schema,
+                   columnNames,
+                   false,  // companion streamed table will NOT take ownership of TupleSchema object
+                   compactionThreshold);
+        persistentTable->setStreamedTable(streamedTable);
+        VOLT_LOG("XXX", "Created companion streamed table for %s", persistentTable->name().c_str());
+    }
+
     return table;
 }
 

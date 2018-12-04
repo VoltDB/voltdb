@@ -690,12 +690,10 @@ public class ExportGeneration implements Generation {
 
         ExportDataSource source = sources.get(signature);
         if (source == null) {
-            exportLog.error("PUSH Could not find export data source for partition " + partitionId +
-                    " Signature " + signature + ". The export data is being discarded.");
-            if (buffer != null) {
-                DBBPool.wrapBB(buffer).discard();
-            }
-            return;
+            String defaultSig = sources.keySet().iterator().next();
+            source = sources.get(defaultSig);
+            exportLog.warn("PUSH Could not find export data source for partition " + partitionId +
+                    " Signature " + signature + ". Using export data source Signature:" + defaultSig);
         }
 
         source.pushExportBuffer(startSequenceNumber, tupleCount, uniqueId, buffer, sync);

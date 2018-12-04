@@ -67,6 +67,7 @@
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
 #include "storage/DRTupleStream.h"
+#include "storage/streamedtable.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 #include "common/SynchronizedThreadLock.h"
@@ -573,7 +574,17 @@ public:
                                 bool shouldDRStreamRows = false,
                                 bool ignoreTupleLimit = true);
 
+    StreamedTable* getStreamedTable() {
+        return m_st;
+    }
+
+    void setStreamedTable(StreamedTable* st) {
+        m_st = st;
+    }
+
 private:
+    StreamedTable* m_st;
+
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false, bool isReplicated = false);
 
