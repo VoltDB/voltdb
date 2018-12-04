@@ -434,8 +434,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug("Truncate tracker via ack to " + releaseSeqNo + ", next seqNo to poll is " +
                     m_firstUnpolledSeqNo + ", tracker map is " + m_gapTracker.toString());
         }
+        int original = m_tuplesPending.get();
         m_tuplesPending.addAndGet(-tuplesSent);
-
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("tuplesPending " + original + " minus " + (-tuplesSent) + ": " + m_tuplesPending.get());
+        }
         return;
     }
 
@@ -669,7 +672,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_lastQueuedTimestamp = sb.getTimestamp();
                 m_lastPushedSeqNo = lastSequenceNumber;
                 m_tupleCount += tupleCount;
+                int original = m_tuplesPending.get();
                 m_tuplesPending.addAndGet(tupleCount);
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("tuplesPending " + original + " add " + tupleCount + ": " + m_tuplesPending.get());
+                }
                 m_committedBuffers.offer(sb);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
@@ -946,6 +953,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     } else if (firstUnpolledSeq > block.lastSequenceNumber()) {
                         blocksToDelete.add(block);
                         iter.remove();
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("pollImpl delete polled buffer [" + block.startSequenceNumber() + "," +
+                                    block.lastSequenceNumber() + "]");
+                        }
                     } else {
                         // Gap only exists in the middle of buffers, why is it never be in the head of
                         // queue? Because only master checks the gap, mastership migration waits until
