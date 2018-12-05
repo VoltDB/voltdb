@@ -426,7 +426,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             setStatus(StreamStatus.ACTIVE);
             m_queueGap = 0;
         }
-        m_lastReleasedSeqNo = releaseSeqNo;
         // If persistent log contains gap, mostly due to node failures and rejoins, ACK from leader might
         // cover the gap gradually.
         m_gapTracker.truncate(releaseSeqNo);
@@ -442,6 +441,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("tuplesPending " + original + " minus " + (m_lastReleasedSeqNo - releaseSeqNo) + ": " + m_tuplesPending.get());
         }
+        m_lastReleasedSeqNo = releaseSeqNo;
         return;
     }
 
