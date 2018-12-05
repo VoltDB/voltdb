@@ -426,6 +426,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             setStatus(StreamStatus.ACTIVE);
             m_queueGap = 0;
         }
+        int original = m_tuplesPending.get();
+        int delta = (int)(releaseSeqNo - m_lastReleasedSeqNo);
+        // It happens when newly rejoined node running on different machine hence has no persistent export data.
+        if (m_gapTracker.isEmpty()) {
+            delta = 0;
+        }
+        m_tuplesPending.addAndGet(-delta);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("tuplesPending " + original + " minus " + (-delta) + ": " + m_tuplesPending.get());
+        }
+        m_lastReleasedSeqNo = releaseSeqNo;
         // If persistent log contains gap, mostly due to node failures and rejoins, ACK from leader might
         // cover the gap gradually.
         m_gapTracker.truncate(releaseSeqNo);
@@ -436,12 +447,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug("Truncate tracker via ack to " + releaseSeqNo + ", next seqNo to poll is " +
                     m_firstUnpolledSeqNo + ", tracker map is " + m_gapTracker.toString());
         }
-        int original = m_tuplesPending.get();
-        m_tuplesPending.addAndGet((int)(m_lastReleasedSeqNo - releaseSeqNo));
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("tuplesPending " + original + " minus " + (m_lastReleasedSeqNo - releaseSeqNo) + ": " + m_tuplesPending.get());
-        }
-        m_lastReleasedSeqNo = releaseSeqNo;
         return;
     }
 
