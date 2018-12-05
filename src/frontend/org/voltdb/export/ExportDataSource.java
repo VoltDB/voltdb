@@ -217,7 +217,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover();
+        resetStateInRejoinOrRecover(false);
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates
@@ -354,7 +354,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover();
+        resetStateInRejoinOrRecover(false);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
         }
@@ -431,24 +431,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_queueGap = 0;
         }
         int original = m_tuplesPending.get();
-        int delta = (int)(releaseSeqNo - m_lastReleasedSeqNo);
-        // It happens when newly rejoined node running on different machine hence has no persistent export data.
-        if (m_gapTracker.isEmpty()) {
-            delta = 0;
-        }
-        m_tuplesPending.addAndGet(-delta);
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("tuplesPending " + original + " minus " + (-delta) + ": " + m_tuplesPending.get());
-        }
         m_lastReleasedSeqNo = releaseSeqNo;
+        int tuplesDeleted = m_gapTracker.truncate(releaseSeqNo);
+        m_tuplesPending.addAndGet(-tuplesDeleted);
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("tuplesPending " + original + " minus " + tuplesDeleted + ": " + m_tuplesPending.get());
+        }
         // If persistent log contains gap, mostly due to node failures and rejoins, ACK from leader might
         // cover the gap gradually.
-        m_gapTracker.truncate(releaseSeqNo);
         // Next poll starts from this number, if it sit in between buffers and stream is active, next poll will
         // kick off gap detection/resolution.
         m_firstUnpolledSeqNo = Math.max(m_firstUnpolledSeqNo, releaseSeqNo + 1);
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Truncate tracker via ack to " + releaseSeqNo + ", next seqNo to poll is " +
+            exportLog.debug("Truncating tracker via ack to " + releaseSeqNo + ", next seqNo to poll is " +
                     m_firstUnpolledSeqNo + ", tracker map is " + m_gapTracker.toString());
         }
         return;
@@ -655,11 +650,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 return;
             }
 
-            m_gapTracker.addRange(startSequenceNumber, lastSequenceNumber);
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Append [" + startSequenceNumber + "," + lastSequenceNumber +"] to gap tracker.");
-            }
-
             try {
                 StreamBlock sb = new StreamBlock(
                         new BBContainer(buffer) {
@@ -681,13 +671,18 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     sb.releaseTo(m_lastReleasedSeqNo);
                 }
 
+                m_gapTracker.addRange(sb.unreleasedSequenceNumber(), lastSequenceNumber);
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Append [" + sb.unreleasedSequenceNumber() + "," + lastSequenceNumber +"] to gap tracker.");
+                }
+
                 m_lastQueuedTimestamp = sb.getTimestamp();
                 m_lastPushedSeqNo = lastSequenceNumber;
                 m_tupleCount += tupleCount;
                 int original = m_tuplesPending.get();
-                m_tuplesPending.addAndGet(tupleCount);
+                m_tuplesPending.addAndGet((int)sb.unreleasedRowCount());
                 if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("tuplesPending " + original + " add " + tupleCount + ": " + m_tuplesPending.get());
+                    exportLog.debug("tuplesPending " + original + " add " + sb.unreleasedRowCount() + ": " + m_tuplesPending.get());
                 }
                 m_committedBuffers.offer(sb);
             } catch (IOException e) {
@@ -777,15 +772,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             return;
                         }
                         m_committedBuffers.truncateToSequenceNumber(sequenceNumber);
+                        m_gapTracker.truncateAfter(sequenceNumber);
                         if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Truncating export pdb files to sequence number " + sequenceNumber);
+                            exportLog.debug("Truncating tracker via snapshot truncation to " + sequenceNumber +
+                                    ", tracker map is " + m_gapTracker.toString());
                         }
                     }
-                    m_gapTracker.truncateAfter(sequenceNumber);
-                    resetStateInRejoinOrRecover();
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Truncate tracker via snapshot truncation to " + sequenceNumber + " now is " + m_gapTracker.toString());
-                    }
+                    // Need to update pending tuples in rejoin
+                    resetStateInRejoinOrRecover(!isRecover);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -1631,9 +1625,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void resetStateInRejoinOrRecover() {
-        m_lastReleasedSeqNo = m_gapTracker.isEmpty() ? 0L : m_gapTracker.getFirstSeqNo();
+    private void resetStateInRejoinOrRecover(boolean updatePendingTuples) {
+        m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo,
+                m_gapTracker.isEmpty() ? 0L : m_gapTracker.getFirstSeqNo());
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
+        if (updatePendingTuples) {
+            m_tuplesPending.set(m_gapTracker.sizeInSequence());
+        }
     }
 
     public String getTarget() {

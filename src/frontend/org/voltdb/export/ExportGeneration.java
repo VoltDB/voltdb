@@ -621,7 +621,6 @@ public class ExportGeneration implements Generation {
                                 " signature " + key + " partition " + partition + " site " + siteId);
                     }
 
-
                     dataSourcesForPartition.put(key, exportDataSource);
                 } else {
                     //Since we are loading from catalog any found EDS mark it to be in catalog.
