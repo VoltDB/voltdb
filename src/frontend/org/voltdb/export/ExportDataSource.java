@@ -376,8 +376,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Mailbox " + CoreUtils.hsIdToString(ackMailboxes.getFirst().getHSId()) + " is registered for " + this.toString() +
-                    " : replicas " + CoreUtils.hsIdCollectionToString(ackMailboxes.getSecond()) );
+            if (ackMailboxes.getSecond() != null) {
+                exportLog.debug("Mailbox " + CoreUtils.hsIdToString(ackMailboxes.getFirst().getHSId()) + " is registered for " + this.toString() +
+                        " : replicas " + CoreUtils.hsIdCollectionToString(ackMailboxes.getSecond()) );
+            } else {
+                exportLog.debug("Mailbox " + CoreUtils.hsIdToString(ackMailboxes.getFirst().getHSId()) + " is registered for " + this.toString());
+            }
         }
         m_ackMailboxRefs.set( ackMailboxes);
     }

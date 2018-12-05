@@ -47,10 +47,10 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
-import org.voltdb.RealVoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
@@ -59,6 +59,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
+
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -341,6 +342,11 @@ public class ExportGeneration implements Generation {
             }
         };
         messenger.createMailbox(null, m_mbox);
+        // Rejoining node may receives gap query message before childUpdating thread gets back result,
+        // in case it couldn't find local mailbox to send back response, update the local mailbox here.
+        for (Integer partition : localPartitions) {
+            updateAckMailboxes(partition, null);
+        }
         // Update latest replica list to each data source.
         updateReplicaList(messenger, localPartitions);
     }
@@ -350,9 +356,7 @@ public class ExportGeneration implements Generation {
         synchronized (m_dataSourcesByPartition) {
             ImmutableList<Long> replicaHSIds = m_replicasHSIds.get(partition);
             for( ExportDataSource eds: m_dataSourcesByPartition.get(partition).values()) {
-                if (replicaHSIds != null) {
-                    eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
-                }
+                eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
                 if (newHSIds != null && !newHSIds.isEmpty()) {
                     // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
                     // master stream resends the event when the export mailbox is aware of new streams.
