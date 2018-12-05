@@ -17,15 +17,15 @@ public class ExportStatement extends StatementProcessor {
         super(ddlCompiler);
     }
 
-    private static boolean isRegularTable(VoltXMLElement m_schema, String name) {
+    private static VoltXMLElement findRegularTable(VoltXMLElement m_schema, String name) {
         for (VoltXMLElement element : m_schema.children) {
             if (element.name.equals("table")
                     && (!element.attributes.containsKey("export"))
                     && element.attributes.get("name").equalsIgnoreCase(name)) {
-                return true;
+                return element;
             }
         }
-        return false;
+        return null;
     }
 
     @Override
@@ -38,13 +38,14 @@ public class ExportStatement extends StatementProcessor {
         String tableName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement);
         String targetName = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
 
-        if (!isRegularTable(m_schema, tableName)) {
+        VoltXMLElement tableXML = findRegularTable(m_schema, tableName.toUpperCase());
+        if (tableXML != null) {
+            tableXML.attributes.put("export", targetName);
+        } else {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Invalid EXPORT TABLE statement: %s is not a table.",
-                    tableName));
+                    "Invalid EXPORT TABLE statement: could not find a table named %s", tableName));
         }
         //System.out.println("XXX Exporting table " + tableName + ", to target " + targetName);
-        //m_returnAfterThis = true;
         return true;
     }
 

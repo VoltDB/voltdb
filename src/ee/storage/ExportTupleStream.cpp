@@ -173,9 +173,9 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     m_uso += (streamHeaderSz + io.position());
     m_exportSequenceNumber++;
     m_currBlock->recordCompletedSpTxn(uniqueId);
-    cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
-            << " sequence number " << seqNo
-            << " offset " << m_currBlock->offset() << std::endl;
+    //cout << "Appending row " << streamHeaderSz + io.position() << " to uso " << m_currBlock->uso()
+    //        << " sequence number " << seqNo
+    //        << " offset " << m_currBlock->offset() << std::endl;
     //Not new anymore as we have new transaction after UAC
     m_new = false;
     return startingUso;

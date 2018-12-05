@@ -196,8 +196,8 @@ void TupleStreamBase::pushPendingBlocks()
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data. The metadata is deleted here.
-            std::cout << "m_committedUso(" << m_committedUso << "), XXX PUSH block->uso() + block->offset() == "
-            << (block->uso() + block->offset()) << std::endl;
+            //std::cout << "m_committedUso(" << m_committedUso << "), XXX PUSH block->uso() + block->offset() == "
+            //<< (block->uso() + block->offset()) << std::endl;
             pushStreamBuffer(block, false);
             delete block;
             m_pendingBlocks.pop_front();
@@ -333,7 +333,6 @@ void
 TupleStreamBase::periodicFlush(int64_t timeInMillis,
                                int64_t lastCommittedSpHandle)
 {
-    //VOLT_LOG("XXX", "flush old tuples for XXX");
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (s_exportFlushTimeout > 0 && timeInMillis - m_lastFlush > s_exportFlushTimeout)) {
         int64_t maxSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);

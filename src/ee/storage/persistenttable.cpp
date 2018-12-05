@@ -133,6 +133,7 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_deltaTable(NULL)
     , m_deltaTableActive(false)
     , m_releaseReplicated(this)
+    , m_st(nullptr)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -172,7 +173,6 @@ void PersistentTable::initializeWithColumns(TupleSchema* schema,
     // note that any allocated memory in m_data is left alone
     // as is m_allocatedTuples
     m_data.clear();
-    VOLT_LOG("XXX", "initialized PersistentTable %s", m_name.c_str());
 }
 
 PersistentTable::~PersistentTable() {
@@ -805,11 +805,8 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
     } catch (ConstraintFailureException& e) {
 =======
         if (m_st != nullptr) {
-            if (m_st->insertTuple(source)) {
-                VOLT_LOG("XXX", "Inserted into companion stream of %s", m_name.c_str());
-            }
-            else {
-                VOLT_LOG("XXX", "Failed to insert into companion stream of %s", m_name.c_str());
+            if (!m_st->insertTuple(source)) {
+                VOLT_ERROR("Failed to insert tuple into companion stream of %s", m_name.c_str());
             }
         }
     }
@@ -897,9 +894,9 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
            char* tupleData = partialCopyToPool(uq->getPool(), target.address(), target.tupleLength());
-            std::cout << "DEBUG: inserting " << (void*)target.address()
-                       << " { " << target.debugNoHeader() << " } "
-                       << " copied to " << (void*)tupleData << std::endl;
+           //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
+           //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+           //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
             UndoReleaseAction* undoAction = createInstanceFromPool<PersistentTableUndoInsertAction>(*uq->getPool(), tupleData, &m_surgeon);
             SynchronizedThreadLock::addUndoAction(isCatalogTableReplicated(), uq, undoAction);
         }

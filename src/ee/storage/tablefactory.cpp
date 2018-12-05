@@ -120,7 +120,7 @@ Table* TableFactory::getPersistentTable(
                    false,  // companion streamed table will NOT take ownership of TupleSchema object
                    compactionThreshold);
         persistentTable->setStreamedTable(streamedTable);
-        VOLT_LOG("XXX", "Created companion streamed table for %s", persistentTable->name().c_str());
+        VOLT_TRACE("Created companion streamed table for %s", persistentTable->name().c_str());
     }
 
     return table;

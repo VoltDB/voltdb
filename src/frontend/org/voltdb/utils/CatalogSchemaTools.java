@@ -343,6 +343,11 @@ public abstract class CatalogSchemaTools {
             sb.append("PARTITION TABLE ").append(catalog_tbl.getTypeName()).append(" ON COLUMN ").append(catalog_tbl.getPartitioncolumn().getTypeName()).append(";\n");
         }
 
+        // IW-ENG14804, add Export directive for regular (non stream) tables
+        if (!isExportOnly && !tableIsView && streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
+            sb.append("EXPORT TABLE ").append(catalog_tbl.getTypeName()).append(" TO TARGET ").append(streamTarget).append(";\n");
+        }
+
         // All other Indexes
         for (Index catalog_idx : catalog_tbl.getIndexes()) {
             if (skip_indexes.contains(catalog_idx)) continue;
@@ -588,7 +593,7 @@ public abstract class CatalogSchemaTools {
                             viewList.add(table);
                             continue;
                         }
-                        toSchema(sb, table, null, CatalogUtil.isTableExportOnly(db, table),
+                        toSchema(sb, table, null, table.getStream(),
                                 (table.getPartitioncolumn() != null ? table.getPartitioncolumn().getName() : null), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                     // A View cannot precede a table that it depends on in the DDL

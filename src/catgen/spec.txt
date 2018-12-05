@@ -166,6 +166,7 @@ begin Table                                  "A table (relation) in the database
   bool isDRed                                "Is this table DRed?"
   Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
   TimeToLive* timeToLive                     "Time to live"
+  bool stream                                "Is this table a stream?"
 end
 
 begin TimeToLive javaonly             "Time to Live (TTL), limits the life span of data"

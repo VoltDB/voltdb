@@ -641,6 +641,7 @@ public abstract class CatalogUtil {
     public static boolean isTableExportOnly(org.voltdb.catalog.Database database,
                                             org.voltdb.catalog.Table table)
     {
+        /* IW-ENG14804
         for (Connector connector : database.getConnectors()) {
             // iterate the connector tableinfo list looking for tableIndex
             // tableInfo has a reference to a table - can compare the reference
@@ -651,7 +652,10 @@ public abstract class CatalogUtil {
                 }
             }
         }
+
         return false;
+        */
+        return table.getStream();
     }
 
     public static boolean isExportEnabled() {

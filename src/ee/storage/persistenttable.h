@@ -574,17 +574,23 @@ public:
                                 bool shouldDRStreamRows = false,
                                 bool ignoreTupleLimit = true);
 
-    StreamedTable* getStreamedTable() {
-        return m_st;
-    }
-
+    /**
+     * IW-ENG14804
+     * Set a companion streamed table to export tuples
+     */
     void setStreamedTable(StreamedTable* st) {
         m_st = st;
     }
 
-private:
-    StreamedTable* m_st;
+    /**
+     * IW-ENG14804
+     * Get the companion streamed table or nullptr
+     */
+    StreamedTable* getStreamedTable() {
+        return m_st;
+    }
 
+private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false, bool isReplicated = false);
 
@@ -858,6 +864,9 @@ private:
     // Objects used to coordinate compaction of Replicated tables
     SynchronizedUndoQuantumReleaseInterest m_releaseReplicated;
     SynchronizedDummyUndoQuantumReleaseInterest m_releaseDummyReplicated;
+
+    // IW-ENG14804 - pointer to companion streamed table or nullptr
+    StreamedTable* m_st;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable& table) :
