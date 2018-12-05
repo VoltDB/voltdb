@@ -394,12 +394,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private synchronized void releaseExportBytes(long releaseSeqNo, int tuplesSent) throws IOException {
         // Released offset is in an already-released past
-        if (!m_committedBuffers.isEmpty() && releaseSeqNo < m_committedBuffers.peek().startSequenceNumber()) {
-            tuplesSent = 0;
+        if (releaseSeqNo < m_lastReleasedSeqNo) {
+            return;
         }
-        if (m_lastReleasedSeqNo == releaseSeqNo) {
-            tuplesSent = 0;
-        }
+//        if (!m_committedBuffers.isEmpty() && releaseSeqNo < m_committedBuffers.peek().startSequenceNumber()) {
+//            tuplesSent = 0;
+//        }
+//        if (m_lastReleasedSeqNo == releaseSeqNo) {
+//            tuplesSent = 0;
+//        }
 
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
@@ -435,9 +438,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_firstUnpolledSeqNo + ", tracker map is " + m_gapTracker.toString());
         }
         int original = m_tuplesPending.get();
-        m_tuplesPending.addAndGet(-tuplesSent);
+        m_tuplesPending.addAndGet((int)(m_lastReleasedSeqNo - releaseSeqNo));
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("tuplesPending " + original + " minus " + (-tuplesSent) + ": " + m_tuplesPending.get());
+            exportLog.debug("tuplesPending " + original + " minus " + (m_lastReleasedSeqNo - releaseSeqNo) + ": " + m_tuplesPending.get());
         }
         return;
     }
