@@ -30,42 +30,16 @@
 
 
 /**
- * A table is export only if any connector's table list marks it as
- * such. Search through the connector's table lists accordingly.
+ * IW-ENG14804
+ * A table is export only its catalog says so.
  */
-bool isTableExportOnly(catalog::Database const & database, int32_t tableIndex) {
-
-    // no export, no export only tables
-    if (database.connectors().size() == 0) {
-        return false;
-    }
-
-    // iterate through all connectors
-    std::map<std::string, catalog::Connector*>::const_iterator connIter;
-    for (connIter = database.connectors().begin();
-         connIter != database.connectors().end();
-         connIter++)
-    {
-        catalog::Connector *connector = connIter->second;
-
-        // iterate the connector tableinfo list looking for tableIndex matches
-        std::map<std::string, catalog::ConnectorTableInfo*>::const_iterator it;
-        for (it = connector->tableInfo().begin();
-             it != connector->tableInfo().end();
-             it++)
-        {
-            if (it->second->table()->relativeIndex() == tableIndex) {
-                return true;
-            }
-        }
-    }
-
-    return false;
+bool isTableExportOnly(catalog::Database const & database, catalog::Table const& catalogTable) {
+    return catalogTable.stream();
 }
 
 
 /**
- * a table is only enable for export if explicitly listed in
+ * a table is only enabled for export if explicitly listed in
  * a connector's table list and if export is enabled for the
  * database as a whole
  */

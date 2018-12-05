@@ -1274,6 +1274,12 @@ public class DDLCompiler {
                 && node.attributes.get("stream").equalsIgnoreCase("true");
         final String streamTarget = node.attributes.get("export");
         final String streamPartitionColumn = node.attributes.get("partitioncolumn");
+
+        // IW-EMG14804, set the stream boolean value
+        if (isStream) {
+            table.setStream(true);
+        }
+
         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed;

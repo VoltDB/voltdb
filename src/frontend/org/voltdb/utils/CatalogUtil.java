@@ -632,7 +632,7 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Return true if a table is a streamed / export table
+     * Return true if a table is a stream
      * This function is duplicated in CatalogUtil.h
      * @param database
      * @param table

@@ -20,9 +20,12 @@ public class ExportStatement extends StatementProcessor {
     private static VoltXMLElement findRegularTable(VoltXMLElement m_schema, String name) {
         for (VoltXMLElement element : m_schema.children) {
             if (element.name.equals("table")
-                    && (!element.attributes.containsKey("export"))
                     && element.attributes.get("name").equalsIgnoreCase(name)) {
-                return element;
+
+                if (! (element.attributes.containsKey("stream")
+                        && element.attributes.get("stream").equalsIgnoreCase("true")) ) {
+                    return element;
+                }
             }
         }
         return null;

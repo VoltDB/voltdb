@@ -395,7 +395,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     }
 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, tableId);
-    bool tableIsExportOnly = isTableExportOnly(catalogDatabase, tableId);
+    bool tableIsExportOnly = isTableExportOnly(catalogDatabase, catalogTable);
     bool drEnabled = !forceNoDR && catalogTable.isDRed();
     bool isReplicated = catalogTable.isreplicated();
     m_materialized = isTableMaterialized(catalogTable);
@@ -419,7 +419,8 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     Table* table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, m_signatureHash,
                                                     m_materialized,
-                                                    partitionColumnIndex, exportEnabled,
+                                                    partitionColumnIndex,
+                                                    exportEnabled,
                                                     tableIsExportOnly,
                                                     tableAllocationTargetSize,
                                                     catalogTable.tuplelimit(),

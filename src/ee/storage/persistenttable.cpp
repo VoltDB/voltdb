@@ -1145,11 +1145,8 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     BOOST_FOREACH (auto view, m_views) {
         view->processTupleInsert(targetTupleToUpdate, fallible);
     }
-    if (m_st->insertTuple(targetTupleToUpdate)) {
-        VOLT_LOG("XXX", "Inserted UPDATE into companion stream of %s", m_name.c_str());
-    }
-    else {
-        VOLT_LOG("XXX", "Failed to insert UPDATE into companion stream of %s", m_name.c_str());
+    if (!m_st->insertTuple(targetTupleToUpdate)) {
+        VOLT_ERROR("Failed to insert UPDATE into companion stream of %s", m_name.c_str());
     }
 }
 

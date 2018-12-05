@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NavigableSet;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
@@ -193,9 +192,8 @@ public class PlanAssembler {
      * Return true if tableList includes at least one matview.
      */
     private boolean tableListIncludesReadOnlyView(List<Table> tableList) {
-        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
         for (Table table : tableList) {
-            if (table.getMaterializer() != null && !exportTables.contains(table.getMaterializer().getTypeName())) {
+            if (table.getMaterializer() != null && !table.getMaterializer().getStream()) {
                 return true;
             }
         }
@@ -206,14 +204,12 @@ public class PlanAssembler {
      * Return true if tableList includes at least one export table.
      */
     private boolean tableListIncludesExportOnly(List<Table> tableList) {
-        // list of all export tables (assume uppercase)
-        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
 
         // this loop is O(number-of-joins * number-of-export-tables)
         // which seems acceptable if not great. Probably faster than
         // re-hashing the export only tables for faster lookup.
         for (Table table : tableList) {
-            if (exportTables.contains(table.getTypeName())) {
+            if (table.getStream()) {
                 return true;
             }
         }
