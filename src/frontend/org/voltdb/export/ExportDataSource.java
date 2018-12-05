@@ -396,18 +396,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_client;
     }
 
-    private synchronized void releaseExportBytes(long releaseSeqNo, int tuplesSent) throws IOException {
+    private synchronized void releaseExportBytes(long releaseSeqNo) throws IOException {
         // Released offset is in an already-released past
         if (releaseSeqNo < m_lastReleasedSeqNo) {
             return;
         }
-//        if (!m_committedBuffers.isEmpty() && releaseSeqNo < m_committedBuffers.peek().startSequenceNumber()) {
-//            tuplesSent = 0;
-//        }
-//        if (m_lastReleasedSeqNo == releaseSeqNo) {
-//            tuplesSent = 0;
-//        }
-
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
@@ -932,7 +925,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     //We are closing source.
                 }
                 //Let generation know to cleanup. Processor needs to do its own cleanup.
-                forwardAckToOtherReplicas(Long.MIN_VALUE, 0);
+                forwardAckToOtherReplicas(Long.MIN_VALUE);
                 m_generation.onSourceDone(m_partitionId, m_signature);
                 return;
             }
@@ -1064,10 +1057,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                              m_backingCont.discard();
                             try {
                                 if (!m_es.isShutdown()) {
-                                    ackImpl(m_lastSeqNo, m_tuplesCount);
+                                    ackImpl(m_lastSeqNo);
                                 }
                             } finally {
-                                forwardAckToOtherReplicas(m_lastSeqNo, m_tuplesCount);
+                                forwardAckToOtherReplicas(m_lastSeqNo);
                             }
                         } catch (Exception e) {
                             exportLog.error("Error acking export buffer", e);
@@ -1084,7 +1077,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void forwardAckToOtherReplicas(long seq, int tuplesSent) {
+    private void forwardAckToOtherReplicas(long seq) {
         // In RunEveryWhere mode, every data source is master, no need to send out acks.
         if (m_runEveryWhere) {
             return;
@@ -1093,8 +1086,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
             // msgType:byte(1) + partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8) + tuplesSent:int(4).
-            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 4;
+            // signaturesBytes.length + ackUSO:long(8).
+            final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.put(ExportManager.RELEASE_BUFFER);
@@ -1102,7 +1095,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(seq);
-            buf.putInt(tuplesSent);
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1111,7 +1103,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Send RELEASE_BUFFER to " + toString() + " with sequence number " + seq
-                        + " tuples sent " + tuplesSent
                         + " from " + CoreUtils.hsIdToString(mbx.getHSId())
                         + " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
             }
@@ -1133,8 +1124,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 Mailbox mbx = p.getFirst();
                 if (mbx != null && newReplicas.size() > 0) {
                  // msg type(1) + partition:int(4) + length:int(4) +
-                    // signaturesBytes.length + ackUSO:long(8) + tuplesSent:int(4).
-                    final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 4;
+                    // signaturesBytes.length + ackUSO:long(8).
+                    final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
 
                     ByteBuffer buf = ByteBuffer.allocate(msgLen);
                     buf.put(ExportManager.RELEASE_BUFFER);
@@ -1142,7 +1133,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     buf.putInt(m_signatureBytes.length);
                     buf.put(m_signatureBytes);
                     buf.putLong(m_lastReleasedSeqNo);
-                    buf.putInt(0);
 
                     BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -1159,7 +1149,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    public void ack(final long seq, final int tuplesSent) {
+    public void ack(final long seq) {
 
         //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
@@ -1181,7 +1171,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     // are already promoted to be the master. If so, ignore the
                     // ack.
                     if (!m_es.isShutdown() && !m_mastershipAccepted.get()) {
-                        ackImpl(seq, tuplesSent);
+                        ackImpl(seq);
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
@@ -1192,11 +1182,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-     private void ackImpl(long seq, int tupleCount) {
+     private void ackImpl(long seq) {
         //Process the ack if any and add blocks to the delete list or move the released sequence number
         if (seq > 0) {
             try {
-                releaseExportBytes(seq, tupleCount);
+                releaseExportBytes(seq);
                 mastershipCheckpoint(seq);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);

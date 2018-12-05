@@ -272,17 +272,15 @@ public class ExportGeneration implements Generation {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received RELEASE_BUFFER message for " + eds.toString() +
                                         " with sequence number: " + seqNo +
-                                        " tuples sent " + tuplesSent +
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
-                            eds.ack(seqNo, tuplesSent);
+                            eds.ack(seqNo);
                         } catch (RejectedExecutionException ignoreIt) {
                             // ignore it: as it is already shutdown
                         }
                     } else if (msgType == ExportManager.GIVE_MASTERSHIP) {
                         final long ackSeqNo = buf.getLong();
-                        int tuplesSent = 0;
                         try {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received GIVE_MASTERSHIP message for " + eds.toString() +
@@ -290,7 +288,7 @@ public class ExportGeneration implements Generation {
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
-                            eds.ack(ackSeqNo, tuplesSent);
+                            eds.ack(ackSeqNo);
                         } catch (RejectedExecutionException ignoreIt) {
                             // ignore it: as it is already shutdown
                         }
