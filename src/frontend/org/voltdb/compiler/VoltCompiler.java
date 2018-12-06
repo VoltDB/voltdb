@@ -1391,7 +1391,7 @@ public class VoltCompiler {
                                         "materialized view.  A view cannot be export source.");
             throw new VoltCompilerException("View configured as export source");
         }
-        if (tableref.getIndexes().size() > 0) {
+        if (tableref.getStream() && tableref.getIndexes().size() > 0) {
             compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
                     "Streams can't have indexes (including primary keys).");
             throw new VoltCompilerException("Streams cannot be configured with indexes");
