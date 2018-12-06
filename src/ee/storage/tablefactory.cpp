@@ -109,8 +109,8 @@ Table* TableFactory::getPersistentTable(
     // initialize stats for the table
     configureStats(name, stats);
 
-    // Create a companion streamed table
-    if (!exportOnly) {
+    // If a regular table with export enabled, create a companion streamed table
+    if (exportEnabled && !exportOnly) {
         streamedTable = new StreamedTable(partitionColumn);
         initCommon(databaseId,
                    streamedTable,
