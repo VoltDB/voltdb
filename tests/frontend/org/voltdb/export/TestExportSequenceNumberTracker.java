@@ -105,7 +105,7 @@ public class TestExportSequenceNumberTracker {
         assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
         assertEquals(4, tracker.size());
         assertEquals(6, truncated);
-        assertEquals(21, tracker.sizeInSequence());
+        assertEquals(20, tracker.sizeInSequence());
 
         tracker.truncateAfter(22L);
         assertEquals(7L, tracker.getFirstSeqNo());
@@ -114,7 +114,7 @@ public class TestExportSequenceNumberTracker {
         assertEquals(10L, tracker.getFirstGap().getFirst().longValue());
         assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
         assertEquals(2, tracker.size());
-        assertEquals(9, tracker.sizeInSequence());
+        assertEquals(8, tracker.sizeInSequence());
 
         // Truncate inside a gap
         truncated = tracker.truncate(11L);
@@ -124,7 +124,7 @@ public class TestExportSequenceNumberTracker {
         assertEquals(12L, tracker.getFirstGap().getFirst().longValue());
         assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
         assertEquals(2, tracker.size());
-        assertEquals(3, truncated);
+        assertEquals(2, truncated);
         assertEquals(6, tracker.sizeInSequence());
 
 
