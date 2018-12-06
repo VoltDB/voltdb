@@ -277,6 +277,8 @@ public class StoredProcedureInvocation implements JSONString {
                 return ParameterSet.fromByteBuffer(duplicate);
             }
         });
+        params.run(); // do this because in some cases the buffer may be a pooled buffer,
+                      // which may be returned back to the pool before we deserialize.
     }
 
     @Override
