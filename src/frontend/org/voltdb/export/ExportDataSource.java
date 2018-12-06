@@ -217,7 +217,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(false);
+        resetStateInRejoinOrRecover(0L, false);
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates
@@ -354,7 +354,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(false);
+        resetStateInRejoinOrRecover(0L, false);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
         }
@@ -758,7 +758,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                     }
                     // Need to update pending tuples in rejoin
-                    resetStateInRejoinOrRecover(!isRecover);
+                    resetStateInRejoinOrRecover(sequenceNumber, !isRecover);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -1527,7 +1527,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void sendTakeMastershipResponse(long senderHsId, long requestId) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
-        if (mbx != null && p.getSecond().size() > 0 && p.getSecond().contains(senderHsId)) {
+        if (mbx != null) {
             // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
             // requestId(8)
             int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8;
@@ -1601,9 +1601,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void resetStateInRejoinOrRecover(boolean updatePendingTuples) {
+    private void resetStateInRejoinOrRecover(long initialSequenceNumber, boolean updatePendingTuples) {
         m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo,
-                m_gapTracker.isEmpty() ? 0L : m_gapTracker.getFirstSeqNo());
+                m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo());
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         if (updatePendingTuples) {
             m_tuplesPending.set(m_gapTracker.sizeInSequence());

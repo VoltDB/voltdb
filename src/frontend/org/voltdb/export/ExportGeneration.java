@@ -260,14 +260,6 @@ public class ExportGeneration implements Generation {
 
                     if (msgType == ExportManager.RELEASE_BUFFER) {
                         final long seqNo = buf.getLong();
-                        int tuplesSent = buf.getInt();
-                        if (tuplesSent < 0 ) {
-                            exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
-                            tuplesSent = 0;
-                        }
-                        if (m_mbox.getHSId() == message.m_sourceHSId) {
-                            tuplesSent = 0;
-                        }
                         try {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received RELEASE_BUFFER message for " + eds.toString() +
