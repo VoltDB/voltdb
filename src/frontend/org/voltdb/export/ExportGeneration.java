@@ -47,10 +47,10 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
-import org.voltdb.RealVoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
@@ -59,6 +59,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.ExportControl.OperationMode;
+
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -259,29 +260,19 @@ public class ExportGeneration implements Generation {
 
                     if (msgType == ExportManager.RELEASE_BUFFER) {
                         final long seqNo = buf.getLong();
-                        int tuplesSent = buf.getInt();
-                        if (tuplesSent < 0 ) {
-                            exportLog.warn("Received an export ack for partition "+eds.getTableName()+" Partition:"+eds.getPartitionId());
-                            tuplesSent = 0;
-                        }
-                        if (m_mbox.getHSId() == message.m_sourceHSId) {
-                            tuplesSent = 0;
-                        }
                         try {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received RELEASE_BUFFER message for " + eds.toString() +
                                         " with sequence number: " + seqNo +
-                                        " tuples sent " + tuplesSent +
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
-                            eds.ack(seqNo, tuplesSent);
+                            eds.ack(seqNo);
                         } catch (RejectedExecutionException ignoreIt) {
                             // ignore it: as it is already shutdown
                         }
                     } else if (msgType == ExportManager.GIVE_MASTERSHIP) {
                         final long ackSeqNo = buf.getLong();
-                        int tuplesSent = 0;
                         try {
                             if (exportLog.isDebugEnabled()) {
                                 exportLog.debug("Received GIVE_MASTERSHIP message for " + eds.toString() +
@@ -289,7 +280,7 @@ public class ExportGeneration implements Generation {
                                         " from " + CoreUtils.hsIdToString(message.m_sourceHSId) +
                                         " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                             }
-                            eds.ack(ackSeqNo, tuplesSent);
+                            eds.ack(ackSeqNo);
                         } catch (RejectedExecutionException ignoreIt) {
                             // ignore it: as it is already shutdown
                         }
@@ -341,6 +332,11 @@ public class ExportGeneration implements Generation {
             }
         };
         messenger.createMailbox(null, m_mbox);
+        // Rejoining node may receives gap query message before childUpdating thread gets back result,
+        // in case it couldn't find local mailbox to send back response, update the local mailbox here.
+        for (Integer partition : localPartitions) {
+            updateAckMailboxes(partition, null);
+        }
         // Update latest replica list to each data source.
         updateReplicaList(messenger, localPartitions);
     }
@@ -350,9 +346,7 @@ public class ExportGeneration implements Generation {
         synchronized (m_dataSourcesByPartition) {
             ImmutableList<Long> replicaHSIds = m_replicasHSIds.get(partition);
             for( ExportDataSource eds: m_dataSourcesByPartition.get(partition).values()) {
-                if (replicaHSIds != null) {
-                    eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
-                }
+                eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
                 if (newHSIds != null && !newHSIds.isEmpty()) {
                     // In case of newly joined or rejoined streams miss any RELEASE_BUFFER event,
                     // master stream resends the event when the export mailbox is aware of new streams.
@@ -616,7 +610,6 @@ public class ExportGeneration implements Generation {
                         exportLog.debug("Creating ExportDataSource for table in catalog " + table.getTypeName() +
                                 " signature " + key + " partition " + partition + " site " + siteId);
                     }
-
 
                     dataSourcesForPartition.put(key, exportDataSource);
                 } else {
