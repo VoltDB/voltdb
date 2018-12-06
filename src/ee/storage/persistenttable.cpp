@@ -215,6 +215,9 @@ PersistentTable::~PersistentTable() {
     if (m_deltaTable) {
         m_deltaTable->decrementRefcount();
     }
+    if (m_st != nullptr) {
+        delete m_st;
+    }
 }
 
 // ------------------------------------------------------------------

@@ -954,6 +954,24 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp, bool updateReplicated,
         if (tcd) {
             Table* table = tcd->getTable();
             PersistentTable * persistenttable = dynamic_cast<PersistentTable*>(table);
+            if (persistenttable) {
+                // IW-ENG14804, handle deleting companion stream
+                // FIXME: factorize deletion logic in common method
+                auto streamedtable = persistenttable->getStreamedTable();
+                if (streamedtable) {
+                    VOLT_TRACE("delete a streamed companion wrapper for %s", tcd->getTable()->name().c_str());
+                    const std::string signature = tcd->signature();
+                    streamedtable->setSignatureAndGeneration(signature, timestamp);
+                    //Maintain the streams that will go away for which wrapper needs to be cleaned;
+                    auto wrapper = streamedtable->getWrapper();
+                    if (wrapper) {
+                        purgedStreams[signature] = streamedtable->getWrapper();
+                        //Unset wrapper so it can be deleted after last push.
+                        streamedtable->setWrapper(NULL);
+                    }
+                    m_exportingTables.erase(signature);
+                }
+            }
             if (persistenttable && persistenttable->isCatalogTableReplicated()) {
                 isReplicatedTable = true;
                 ExecuteWithAllSitesMemory execAllSites;
@@ -1113,10 +1131,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
             // set export info on the new table
             auto streamedtable = tcd->getStreamedTable();
             if (!streamedtable) {
+                // IW-ENG14804, check if this table has a companion stream
                 PersistentTable *persistentTable = tcd->getPersistentTable();
                 streamedtable = persistentTable->getStreamedTable();
                 if (streamedtable) {
-                    VOLT_TRACE(" setting up companion stream for %s", persistentTable->name().c_str());
+                    VOLT_TRACE("setting up companion stream for %s", persistentTable->name().c_str());
                 }
             }
             if (streamedtable) {
@@ -1129,14 +1148,14 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                                 m_executorContext->m_siteId, timestamp, catalogTable->signature(),
                                 streamedtable->name(), streamedtable->getColumnNames());
                         m_exportingStreams[catalogTable->signature()] = wrapper;
-                        VOLT_TRACE(" created stream wrapper for companion stream %s", streamedtable->name().c_str());
+                        VOLT_TRACE("created stream wrapper for companion stream %s", streamedtable->name().c_str());
                     } else {
                         // If stream was dropped in UAC and the added back we should not purge the wrapper.
                         // A case when exact same stream is dropped and added.
                         purgedStreams[catalogTable->signature()] = NULL;
                     }
                     streamedtable->setWrapper(wrapper);
-                    VOLT_TRACE(" set stream wrapper for companion stream %s", streamedtable->name().c_str());
+                    VOLT_TRACE("set stream wrapper for companion stream %s", streamedtable->name().c_str());
                 }
 
                 std::vector<catalog::MaterializedViewInfo*> survivingInfos;
@@ -1191,7 +1210,16 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
              * which will cause it to notify the topend export data source
              * that no more data is coming for the previous generation
              */
+            PersistentTable *persistentTable = tcd->getPersistentTable();
+
             auto streamedTable = tcd->getStreamedTable();
+            if (!streamedTable) {
+                // IW-ENG14804, check if this table has a companion stream
+                streamedTable = persistentTable->getStreamedTable();
+                if (streamedTable) {
+                    VOLT_TRACE("UPDATING companion stream for %s", persistentTable->name().c_str());
+                }
+            }
             if (streamedTable) {
                 //Dont update and roll generation if this is just a non stream table update.
                 if (isStreamUpdate) {
@@ -1260,10 +1288,8 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 continue;
             }
 
-            PersistentTable *persistentTable = tcd->getPersistentTable();
-
             //////////////////////////////////////////
-            // if the table schema has changed, build a new
+            // if the persistent table schema has changed, build a new
             // table and migrate tuples over to it, repopulating
             // indexes as we go
             //////////////////////////////////////////
@@ -1272,13 +1298,13 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplicated,
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
                 ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
                          catalogTable->name().c_str());
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
 
                 // don't continue on to modify/add/remove indexes, because the
                 // call above should rebuild them all anyway
