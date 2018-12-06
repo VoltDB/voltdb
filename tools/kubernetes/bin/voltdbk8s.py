@@ -165,6 +165,8 @@ def get_hostname_tuple(fqdn):
 
 if __name__ == "__main__":
 
+    sys.stderr = sys.stdout
+    print("VoltDB K8S CONTROLLER")
     printdbg(sys.argv)
     printdbg(os.environ)
 
@@ -191,13 +193,6 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     pod_ordinal = int(pod_ordinal)
-
-    # For maintenance mode, don't bring up the database just sleep indefinitely
-    # nb. in maintenance mode, liveness checks will timeout if enabled
-    if '--k8s-maintenance' in sys.argv:
-        while True:
-            sleep(10000)
-        #os.execv('tail' '-f', '/dev/null')
 
     # TODO: -D not tested
     din = find_arg_index(sys.argv, '-D,--dir')
@@ -242,10 +237,11 @@ if __name__ == "__main__":
         pv = os.listdir(working_voltdbroot)
     except OSError:
         pv = []
-    printdbg(pv)
+    printdbg("pv: " + str(pv))
 
+    DO_INIT = len(pv) == 0
     # initialize the voltdbroot if necessary
-    if len(pv) == 0:
+    if DO_INIT:
         print("Initializing a new voltdb database at '%s'" % working_voltdbroot)
         try:
             os.mkdir(working_voltdbroot)
@@ -284,9 +280,10 @@ if __name__ == "__main__":
                   working_voltdbroot)
             sys.exit(-1)
         print("Initialize new voltdb succeeded!!!")
-        os.chdir(olddir)
+        os.chdir(PV_VOLTDBROOT)
         os.system("rm -f " + ssname)
         os.system("ln -sf " + voltdbroot + " " + ssname)
+        os.chdir(olddir)
 
     # check that we have the correct/consistent PV for this node
     try:
@@ -294,8 +291,8 @@ if __name__ == "__main__":
     except OSError:
         pv = []
     if voltdbroot not in pv:
-        printerr("WARNING voltdbroot expected: '%s' actual: '%s'" % (voltdbroot, pv))
-        ###sys.exit(1)  # not enforcing this but beware pv's might go to any pod on reuse?
+        printerr("ERROR voltdbroot expected: '%s' actual: '%s'" % (voltdbroot, pv))
+        sys.exit(1)
 
     os.chdir(working_voltdbroot)
     args = sys.argv[:]  # copy
@@ -340,6 +337,18 @@ if __name__ == "__main__":
 
     print("VoltDB cmd is '%s'" % args[1:])
     print("Starting VoltDB...")
+    os.system('date')
+
+    # For maintenance mode, don't bring up the database just sleep indefinitely
+    # nb. in maintenance mode, liveness checks will timeout if enabled
+    printdbg(args)
+    if '--k8s-maintenance' in args:
+        print("going to sleep...")
+        sys.stdout.flush()
+        sys.stderr.flush()
+        while True:
+            sleep(10000)
+        #os.execv('tail' '-f', '/dev/null')
 
     # flush so we see our output in k8s logs
     sys.stdout.flush()
