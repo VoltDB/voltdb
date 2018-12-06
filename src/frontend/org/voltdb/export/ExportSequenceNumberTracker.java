@@ -29,6 +29,8 @@ import com.google_voltpatches.common.collect.TreeRangeSet;
 
 public class ExportSequenceNumberTracker {
     protected RangeSet<Long> m_map;
+    // Is the first sequence a sentinel? Sentinel doesn't count into the total sequence size of tracker.
+    private boolean m_hasSentinel = false;
 
     /**
      * Returns a canonical range that can be added to the internal range
@@ -110,27 +112,43 @@ public class ExportSequenceNumberTracker {
      * is before the first sequence number of the tracker, it's a no-op. If the
      * map is empty, truncation point will be the new safe point of tracker.
      * @param newTruncationPoint    New safe point
+     * @return number of sequence be truncated
      */
-    public void truncate(long newTruncationPoint) {
-        if (size() == 0) {
+    public int truncate(long newTruncationPoint) {
+        int truncated = 0;
+        if (m_map.isEmpty()) {
             m_map.add(range(newTruncationPoint, newTruncationPoint));
-            return;
+            m_hasSentinel = true;
+            return truncated;
         }
-        if (newTruncationPoint < getFirstSeqNo()) return;
+        if (newTruncationPoint < getFirstSeqNo()) {
+            return truncated;
+        }
+        // Sentinel doesn't count as valid sequence
+        if (m_hasSentinel) {
+            truncated -= 1;
+        }
         final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
         while (iter.hasNext()) {
             final Range<Long> next = iter.next();
             if (end(next) < newTruncationPoint) {
+                truncated += end(next) - start(next) + 1;
                 iter.remove();
             } else if (next.contains(newTruncationPoint)) {
+                truncated += newTruncationPoint - start(next) + 1;
                 iter.remove();
                 m_map.add(range(newTruncationPoint, end(next)));
-                return;
+                m_hasSentinel = true;
+                return truncated;
             } else {
                 break;
             }
         }
-        m_map.add(range(newTruncationPoint, newTruncationPoint));
+        if (!m_map.contains(newTruncationPoint)) {
+            m_map.add(range(newTruncationPoint, newTruncationPoint));
+            m_hasSentinel = true;
+        }
+        return truncated;
     }
 
     /**
@@ -143,9 +161,12 @@ public class ExportSequenceNumberTracker {
     public void truncateAfter(long newTruncationPoint) {
         if (size() == 0) {
             m_map.add(range(newTruncationPoint, newTruncationPoint));
+            m_hasSentinel = true;
             return;
         }
-        if (newTruncationPoint > getLastSeqNo()) return;
+        if (newTruncationPoint > getLastSeqNo()) {
+            return;
+        }
         final Iterator<Range<Long>> iter = m_map.asDescendingSetOfRanges().iterator();
         while (iter.hasNext()) {
             final Range<Long> next = iter.next();
@@ -159,7 +180,10 @@ public class ExportSequenceNumberTracker {
                 break;
             }
         }
-        m_map.add(range(newTruncationPoint, newTruncationPoint));
+        if (m_map.isEmpty()) {
+            m_map.add(range(newTruncationPoint, newTruncationPoint));
+            m_hasSentinel = true;
+        }
     }
 
     /**
@@ -241,6 +265,26 @@ public class ExportSequenceNumberTracker {
      */
     public long getLastSeqNo() {
         return end(m_map.span());
+    }
+
+    /**
+     * Get total number of sequence from the tracker.
+     * @return
+     */
+    public int sizeInSequence() {
+        int sequence = 0;
+        if (m_map.isEmpty()) {
+            return sequence;
+        }
+        final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
+        while (iter.hasNext()) {
+            Range<Long> range = iter.next();
+            sequence += end(range) - start(range) + 1;
+        }
+        if (m_hasSentinel) {
+            sequence -= 1;
+        }
+        return sequence;
     }
 
     public String toShortString() {
