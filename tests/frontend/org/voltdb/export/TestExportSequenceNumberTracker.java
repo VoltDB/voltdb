@@ -46,18 +46,19 @@ public class TestExportSequenceNumberTracker {
     }
 
     @Test
-    public void testAppend() throws Exception {
+    public void testBasic() throws Exception {
         // Append single to range
         tracker.append(1L, 1L);
         assertEquals(1L, tracker.getFirstSeqNo());
         assertEquals(1L, tracker.getLastSeqNo());
         assertEquals(1L, tracker.getSafePoint());
 
-        tracker.truncate(1L);
+        int truncated = tracker.truncate(1L);
         assertEquals(1L, tracker.getFirstSeqNo());
         assertEquals(1L, tracker.getLastSeqNo());
         assertEquals(1L, tracker.getSafePoint());
         assertEquals(null, tracker.getFirstGap());
+        assertEquals(1, truncated);
 
         // Append adjacent single to range
         tracker.append(2L, 9L);
@@ -96,30 +97,35 @@ public class TestExportSequenceNumberTracker {
 
         assertEquals(4, tracker.size());
 
-        tracker.truncate(7L);
+        truncated = tracker.truncate(7L);
         assertEquals(7L, tracker.getFirstSeqNo());
         assertEquals(40L, tracker.getLastSeqNo());
         assertEquals(9L, tracker.getSafePoint());
         assertEquals(10L, tracker.getFirstGap().getFirst().longValue());
         assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
         assertEquals(4, tracker.size());
+        assertEquals(6, truncated);
+        assertEquals(20, tracker.sizeInSequence());
 
         tracker.truncateAfter(22L);
         assertEquals(7L, tracker.getFirstSeqNo());
-        assertEquals(22L, tracker.getLastSeqNo());
+        assertEquals(20L, tracker.getLastSeqNo());
         assertEquals(9L, tracker.getSafePoint());
         assertEquals(10L, tracker.getFirstGap().getFirst().longValue());
         assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
-        assertEquals(3, tracker.size());
+        assertEquals(2, tracker.size());
+        assertEquals(8, tracker.sizeInSequence());
 
         // Truncate inside a gap
-        tracker.truncate(11L);
+        truncated = tracker.truncate(11L);
         assertEquals(11L, tracker.getFirstSeqNo());
-        assertEquals(22L, tracker.getLastSeqNo());
+        assertEquals(20L, tracker.getLastSeqNo());
         assertEquals(11L, tracker.getSafePoint());
         assertEquals(12L, tracker.getFirstGap().getFirst().longValue());
         assertEquals(14L, tracker.getFirstGap().getSecond().longValue());
-        assertEquals(3, tracker.size());
+        assertEquals(2, tracker.size());
+        assertEquals(2, truncated);
+        assertEquals(6, tracker.sizeInSequence());
 
 
     }
