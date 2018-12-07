@@ -71,7 +71,7 @@ public class ZKTestBase {
             config.zkInterface = "127.0.0.1:" + externalPort;
             m_siteIdToZKPort.put(ii, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null, null);
+            HostMessenger hm = new HostMessenger(config, null);
             hm.start();
             m_messengers.add(hm);
         }
@@ -96,7 +96,7 @@ public class ZKTestBase {
             config.zkInterface = "127.0.0.1:" + externalPort;
             m_siteIdToZKPort.put(i, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null, null);
+            HostMessenger hm = new HostMessenger(config, null);
             hm.start();
             m_messengers.add(hm);
             ++i;
@@ -110,7 +110,7 @@ public class ZKTestBase {
             config.zkInterface = "127.0.0.1:" + externalPort;
             m_siteIdToZKPort.put(i, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null, null);
+            HostMessenger hm = new HostMessenger(config, null);
             hm.start();
             m_messengers.add(hm);
         }

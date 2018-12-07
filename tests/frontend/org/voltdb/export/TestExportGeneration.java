@@ -201,6 +201,7 @@ public class TestExportGeneration {
                     m_tableSignature,
                     seqNo,
                     1,
+                    0L,
                     foo.duplicate(),
                     false
                     );
@@ -230,6 +231,7 @@ public class TestExportGeneration {
                 m_tableSignature,
                 /*seqNo*/1L,
                 1,
+                0L,
                 foo.duplicate(),
                 false
                 );
@@ -252,7 +254,7 @@ public class TestExportGeneration {
 
         m_mbox.send(
                 hsid,
-                new AckPayloadMessage(m_part, m_tableSignature, 1L, 1).asVoltMessage()
+                new AckPayloadMessage(m_part, m_tableSignature, 1L).asVoltMessage()
                 );
 
         while( --retries >= 0 && size == m_expDs.sizeInBytes()) {

@@ -21,7 +21,7 @@ import java.util.List;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 
-import io.netty_voltpatches.buffer.ByteBuf;
+import io.netty.buffer.ByteBuf;
 
 /**
  * Container and tracking class used during message encryptions

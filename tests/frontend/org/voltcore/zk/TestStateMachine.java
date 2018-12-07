@@ -174,7 +174,7 @@ public class TestStateMachine extends ZKTestBase {
         config.zkInterface = "127.0.0.1:" + clientPort;
         m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
-        HostMessenger hm = new HostMessenger(config, null, null);
+        HostMessenger hm = new HostMessenger(config, null);
         hm.start();
         MeshProber.prober(hm).waitForDetermination();
         m_messengers.set(site, hm);
@@ -735,8 +735,9 @@ public class TestStateMachine extends ZKTestBase {
         Map<String, ByteBuffer> firstCorrelatedResult = null;
         for (BooleanStateMachine sm : machines) {
             if (sm != null) {
-                if (sm.proposalsOrTasksCompleted != expectedCompletions)
+                if (sm.proposalsOrTasksCompleted != expectedCompletions) {
                     return false;
+                }
                 if (firstCorrelatedResult == null) {
                     firstCorrelatedResult = sm.correlatedResults;
                 }
@@ -753,8 +754,9 @@ public class TestStateMachine extends ZKTestBase {
         List<ByteBuffer> firstUncorrelatedResult = null;
         for (BooleanStateMachine sm : machines) {
             if (sm != null) {
-                if (sm.proposalsOrTasksCompleted != expectedCompletions)
+                if (sm.proposalsOrTasksCompleted != expectedCompletions) {
                     return false;
+                }
                 if (firstUncorrelatedResult == null) {
                     firstUncorrelatedResult = sm.uncorrelatedResults;
                 }

@@ -124,7 +124,7 @@ public class SyncBenchmark {
         int threads = 40;
 
         @Option(desc = "SSL Configuration file")
-        String ssl_config = "";
+        String sslfile = "";
 
         @Override
         public void validate() {
@@ -162,8 +162,8 @@ public class SyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-        if (config.ssl_config.trim().length() > 0) {
-            clientConfig.setTrustStoreConfigFromPropertyFile(config.ssl_config);
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
         }
 

@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
+import org.voltdb.iv2.UniqueIdGenerator;
 
 /*
  * The stream block has a default reference count of 1 for being in the queue.
@@ -45,12 +46,13 @@ import org.voltdb.VoltDB;
  */
 public class StreamBlock {
 
-    public static final int HEADER_SIZE = 12; //sequence number + row count
+    public static final int HEADER_SIZE = 20; //sequence number + row count + uniqueId
 
-    StreamBlock(BBContainer cont, long startSequenceNumber, int rowCount, boolean isPersisted) {
+    StreamBlock(BBContainer cont, long startSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
         m_buffer = cont;
         m_startSequenceNumber = startSequenceNumber;
         m_rowCount = rowCount;
+        m_uniqueId = uniqueId;
         // The first 12 bytes are space for us to store the sequence number and row count if we end up persisting
         m_buffer.b().position(HEADER_SIZE);
         m_totalSize = m_buffer.b().remaining();
@@ -93,6 +95,14 @@ public class StreamBlock {
         return m_rowCount;
     }
 
+    long uniqueId() {
+        return m_uniqueId;
+    }
+
+    long getTimestamp() {
+        return UniqueIdGenerator.getTimestampFromUniqueId(m_uniqueId) * 1000;
+    }
+
     /**
      * Returns the total amount of bytes in the stream
      * @return
@@ -124,6 +134,7 @@ public class StreamBlock {
 
     private final long m_startSequenceNumber;
     private final int m_rowCount;
+    private final long m_uniqueId;
     private final long m_totalSize;
     private BBContainer m_buffer;
     // index of the last row that has been released.
@@ -158,6 +169,7 @@ public class StreamBlock {
         m_buffer.b().order(ByteOrder.LITTLE_ENDIAN);
         m_buffer.b().putLong(0, startSequenceNumber());
         m_buffer.b().putInt(8, rowCount());
+        m_buffer.b().putLong(12, uniqueId());
         m_buffer.b().position(0);
         m_buffer.b().order(ByteOrder.BIG_ENDIAN);
         return getRefCountingContainer(m_buffer.b().asReadOnlyBuffer());

@@ -428,6 +428,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     // signature - signature length bytes
                     // start sequence number - 8 bytes
                     // tupleCount - 8 bytes
+                    // uniqueId - 8 bytes
                     // sync - 1 byte
                     // export buffer length - 4 bytes
                     // export buffer - export buffer length bytes
@@ -438,6 +439,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     String signature = new String(signatureBytes, "UTF-8");
                     long startSequenceNumber = getBytes(8).getLong();
                     long tupleCount = getBytes(8).getLong();
+                    long uniqueId = getBytes(8).getLong();
                     boolean sync = getBytes(1).get() == 1 ? true : false;
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
@@ -445,6 +447,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             signature,
                             startSequenceNumber,
                             tupleCount,
+                            uniqueId,
                             0,
                             length == 0 ? null : getBytes(length),
                             sync);

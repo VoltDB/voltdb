@@ -48,7 +48,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
@@ -111,6 +110,9 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.ssl.SslContext;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -265,7 +267,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private Thread m_thread = null;
         private final boolean m_isAdmin;
         private final InetAddress m_interface;
-        private final SSLContext m_sslContext;
+        private final SslContext m_sslContext;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -273,7 +275,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
                         CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
-        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin, SSLContext sslContext)
+        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin, SslContext sslContext)
         {
             m_interface = intf;
             m_network = network;
@@ -351,7 +353,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     if (m_sslContext != null) {
                         try {
-                            sslEngine = m_sslContext.createSSLEngine();
+                            sslEngine = m_sslContext.newEngine(ByteBufAllocator.DEFAULT);
                         } catch (Exception e) {
                             networkLog.warn("Rejected accepting new connection, failed to create SSLEngine; " +
                                     "indicates problem with SSL configuration: " + e.getMessage());
@@ -1140,13 +1142,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             int clientPort,
             InetAddress adminIntf,
             int adminPort,
-            SSLContext sslContext) throws Exception {
+            SslContext SslContext) throws Exception {
 
         /*
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-                clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer, sslContext);
+                clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer,
+                SslContext);
 
         return ci;
     }
@@ -1159,7 +1162,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     ClientInterface(InetAddress clientIntf, int clientPort, InetAddress adminIntf, int adminPort,
             CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
-            Cartographer cartographer, SSLContext sslContext) throws Exception {
+            Cartographer cartographer, SslContext sslContext) throws Exception {
         m_catalogContext.set(context);
         m_snapshotDaemon = new SnapshotDaemon(context);
         m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
@@ -2317,7 +2320,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (!voltDB.isClusterComplete()) {
                     anyFailedHosts = true;
                     // If the target host is still alive, migration is still going on.
-                    if (!voltDB.getHostMessenger().getLiveHostIds().contains(targetHostId)) break;
+                    if (!voltDB.getHostMessenger().getLiveHostIds().contains(targetHostId)) {
+                        break;
+                    }
                 }
             }
 

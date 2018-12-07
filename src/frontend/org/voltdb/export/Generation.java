@@ -36,7 +36,7 @@ public interface Generation {
     public void onSourceDone(int partitionId, String signature);
 
     public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
-                                 ByteBuffer buffer, boolean sync);
+                                 long uniqueId, ByteBuffer buffer, boolean sync);
     public void pushEndOfStream(int partitionId, String signature);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 boolean isRecover, long sequenceNumber);
