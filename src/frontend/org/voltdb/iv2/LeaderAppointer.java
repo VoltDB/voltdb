@@ -421,8 +421,10 @@ public class LeaderAppointer implements Promotable
         m_initialPartitionCount = numberOfPartitions;
         m_callbacks = new HashMap<Integer, PartitionCallback>();
         m_partitionWatchers = new HashMap<Integer, BabySitter>();
-        m_iv2appointees = new LeaderCache(m_zk, VoltZK.iv2appointees);
-        m_iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_masterCallback);
+        m_iv2appointees = new LeaderCache(m_zk, "LeaderAppointer-iv2Appointees-host" + hm.getHostId(),
+                VoltZK.iv2appointees);
+        m_iv2masters = new LeaderCache(m_zk, "LeaderAppointer-iv2Masters-host" + hm.getHostId(),
+                VoltZK.iv2masters, m_masterCallback);
         m_stats = stats;
         m_expectingDrSnapshot = expectingDrSnapshot;
     }

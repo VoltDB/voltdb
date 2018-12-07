@@ -40,8 +40,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
-import org.voltdb.VoltZK;
-import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -52,6 +50,23 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  * children. The children data objects must be JSONObjects.
  */
 public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
+    protected final ZooKeeper m_zk;
+    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
+    protected final Callback m_cb; // the callback when the cache changes
+    private final String m_whoami; // identify the owner of the leader cache
+
+    // the children of this node are observed.
+    protected final String m_rootNode;
+
+    // All watch processing is run serially in this thread.
+    private final ListeningExecutorService m_es;
+
+    // previous children snapshot for internal use.
+    protected Set<String> m_lastChildren = new HashSet<String>();
+
+    // the cache exposed to the public. Start empty. Love it.
+    protected volatile ImmutableMap<Integer, LeaderCallBackInfo> m_publicCache = ImmutableMap.of();
+
 
     private static final String migrate_partition_leader_suffix = "_migrate_partition_leader_request";
 
@@ -125,16 +140,18 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     }
 
     /** Instantiate a LeaderCache of parent rootNode. The rootNode must exist. */
-    public LeaderCache(ZooKeeper zk, String rootNode)
+    public LeaderCache(ZooKeeper zk, String from, String rootNode)
     {
-        this(zk, rootNode, null);
+        this(zk, from, rootNode, null);
     }
 
-    public LeaderCache(ZooKeeper zk, String rootNode, Callback cb)
+    public LeaderCache(ZooKeeper zk, String from, String rootNode, Callback cb)
     {
         m_zk = zk;
+        m_whoami = from;
         m_rootNode = rootNode;
         m_cb = cb;
+        m_es = CoreUtils.getCachedSingleThreadExecutor("LeaderCache-" + m_whoami, 15000);
     }
 
     /** Initialize and start watching the cache. */
@@ -211,22 +228,6 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     public boolean contain(int partitionId) {
         return m_publicCache.containsKey(partitionId);
     }
-
-    protected final ZooKeeper m_zk;
-    private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
-    protected final Callback m_cb; // the callback when the cache changes
-
-    // the children of this node are observed.
-    protected final String m_rootNode;
-
-    // All watch processing is run serially in this thread.
-    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("LeaderCache", 15000);
-
-    // previous children snapshot for internal use.
-    protected Set<String> m_lastChildren = new HashSet<String>();
-
-    // the cache exposed to the public. Start empty. Love it.
-    protected volatile ImmutableMap<Integer, LeaderCallBackInfo> m_publicCache = ImmutableMap.of();
 
     // parent (root node) sees new or deleted child
     private class ParentEvent implements Runnable {

@@ -152,7 +152,7 @@ public class TestCartographer extends ZKTestBase {
     {
         ZooKeeper zk = getClient(0);
         VoltZK.createPersistentZKNodes(zk);
-        LeaderCache spwriter = new LeaderCache(zk, VoltZK.iv2masters);
+        LeaderCache spwriter = new LeaderCache(zk, "", VoltZK.iv2masters);
         HostMessenger hm = mock(HostMessenger.class);
         when(hm.getZK()).thenReturn(m_messengers.get(0).getZK());
         Cartographer dut = new Cartographer(hm, 0, false);
@@ -187,7 +187,7 @@ public class TestCartographer extends ZKTestBase {
     {
         ZooKeeper zk = getClient(0);
         VoltZK.createPersistentZKNodes(zk);
-        LeaderCache mpwriter = new LeaderCache(zk, VoltZK.iv2mpi);
+        LeaderCache mpwriter = new LeaderCache(zk, "", VoltZK.iv2mpi);
         HostMessenger hm = mock(HostMessenger.class);
         when(hm.getZK()).thenReturn(m_messengers.get(0).getZK());
         Cartographer dut = new Cartographer(hm, 0, false);
