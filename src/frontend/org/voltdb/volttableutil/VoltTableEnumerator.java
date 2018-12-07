@@ -24,6 +24,11 @@ import org.voltdb.VoltType;
 
 import java.sql.Timestamp;
 
+/**
+ * Enumerator that reads from a VoltTable object.
+ *
+ * @param <E> Row type
+ */
 public class VoltTableEnumerator<E> implements Enumerator<E> {
     private VoltTable m_table;
     private RowConverter<E> rowConvert;
@@ -34,10 +39,18 @@ public class VoltTableEnumerator<E> implements Enumerator<E> {
         rowConvert = (RowConverter<E>) new VoltTableRowConverter(fields);
     }
 
+    /**
+     * Row converter.
+     *
+     * @param <E> element type
+     */
     abstract static class RowConverter<E> {
         abstract E convertRow(VoltTableRow row);
     }
 
+    /**
+     * Row converter for VoltTable.
+     */
     static class VoltTableRowConverter extends RowConverter<Object[]> {
         private int[] fields;
 

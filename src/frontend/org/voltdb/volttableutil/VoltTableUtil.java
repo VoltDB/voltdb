@@ -33,10 +33,28 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * The utility class that allow user to run SQL query on {@link VoltTable}.
+ */
 public final class VoltTableUtil {
     private VoltTableUtil() {
     }
 
+    /**
+     * Run a SQL query on {@link VoltTable}.
+     * Exp:
+     * <code>VoltTable vt = VoltTableUtil.executeSql(
+     * "select stations.station_id, count(activity.card_id)
+     * from stations, activity where stations.station_id = activity.station_id
+     * group by stations.station_id",
+     * "stations", stations, "activity", activity);</code>
+     *
+     * @param sql  The SQL string.
+     * @param args a list of {@link String} table_name and {@link VoltTable}
+     *             volt_table pairs. The table_name is always followed by
+     *             the volt_table it assigned to.
+     * @return A result set represented in {@link VoltTable}.
+     */
     public static VoltTable executeSql(String sql, Object... args) {
         if (args.length % 2 == 1) {
             throw new IllegalArgumentException("Argument number not correct");

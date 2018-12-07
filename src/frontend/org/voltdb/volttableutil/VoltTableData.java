@@ -25,6 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * The utility class that represent the Schemas and Tables in VoltTable.
+ */
 public final class VoltTableData {
     private VoltTableData() {
     }

@@ -29,6 +29,9 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.voltdb.VoltTable;
 import org.voltdb.calciteadapter.ColumnType;
 
+/**
+ * An adaptor between a {@link VoltTable} and a {@link ScannableTable}.
+ */
 public class VoltTableTable extends AbstractTable implements ScannableTable {
     private VoltTable m_table;
 
@@ -39,7 +42,9 @@ public class VoltTableTable extends AbstractTable implements ScannableTable {
         m_dataType = null;
     }
 
-
+    /**
+     * Returns an array of integers {0, ..., n - 1}.
+     */
     private static int[] identityList(int n) {
         int[] integers = new int[n];
         for (int i = 0; i < n; i++) {

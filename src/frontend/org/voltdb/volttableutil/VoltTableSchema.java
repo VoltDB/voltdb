@@ -23,6 +23,9 @@ import org.apache.calcite.schema.Table;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Schema mapped onto a {@link VoltTableUtil#executeSql(String, Object...)} call.
+ */
 public class VoltTableSchema extends AbstractSchema {
     private String m_databaseId;
 

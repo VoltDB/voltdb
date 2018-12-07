@@ -23,6 +23,9 @@ import org.apache.calcite.schema.SchemaPlus;
 
 import java.util.Map;
 
+/**
+ * Factory that creates a {@link VoltTableSchema}.
+ */
 public class VoltTableSchemaFactory implements SchemaFactory {
 
     public Schema create(SchemaPlus parentSchema, String name,
