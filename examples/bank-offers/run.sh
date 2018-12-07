@@ -62,7 +62,7 @@ function jars-ifneeded() {
 
 # Init to directory voltdbroot
 function voltinit-ifneeded() {
-    voltdb init --force
+    voltdb init --force --config=./deployment.xml
 }
 
 # run the voltdb server locally
