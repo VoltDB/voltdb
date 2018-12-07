@@ -79,7 +79,6 @@ uploadClientArchives {
             snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
               authentication(userName: sonatypeUsername, password: sonatypePassword)
             }
-            // repository(url: "file://localhost/Users/stefano/tmp/m2repo/")
 
             pom.project {
                name 'voltdbclient'
@@ -137,7 +136,6 @@ uploadServerArchives {
             snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
               authentication(userName: sonatypeUsername, password: sonatypePassword)
             }
-            // repository(url: "file://localhost/Users/stefano/tmp/m2repo/")
 
             pom.project {
                name 'voltdb'
