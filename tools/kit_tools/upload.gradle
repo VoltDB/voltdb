@@ -104,7 +104,7 @@ uploadClientArchives {
                developers {
                    developer {
                        id 'rmorgenstein'
-                       name 'Ruth Morgensten'
+                       name 'Ruth Morgenstein'
                        email 'rmorgenstein@voltdb.com'
                        organizationUrl 'http://www.voltdb.com'
                    }
@@ -162,7 +162,7 @@ uploadServerArchives {
                developers {
                    developer {
                        id 'rmorgenstein'
-                       name 'Ruth Morgensten'
+                       name 'Ruth Morgenstein'
                        email 'rmorgenstein@voltdb.com'
                        organizationUrl 'http://www.voltdb.com'
                    }
