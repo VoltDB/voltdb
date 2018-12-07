@@ -80,9 +80,9 @@
         <level value="TRACE"/>
     </logger -->
 
-    <logger name="TM">
-        <level value="DEBUG"/>
-    </logger>
+    <!-- logger name="TM">
+        <level value="INFO"/>
+    </logger -->
 
     <!-- logger name="REJOIN">
         <level value="INFO"/>

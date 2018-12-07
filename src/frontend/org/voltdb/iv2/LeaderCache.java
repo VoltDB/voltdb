@@ -163,6 +163,16 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     }
 
+    /**
+     * Initialized and start watching partition level cache, this function is blocking.
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    public void startPartitionWatch() throws InterruptedException, ExecutionException {
+        Future<?> task = m_es.submit(new PartitionWatchEvent(null));
+        task.get();
+    }
+
     /** Stop caring */
     @Override
     public void shutdown() throws InterruptedException {
@@ -247,26 +257,6 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     }
 
-    // child node sees modification or deletion
-    private class ChildEvent implements Runnable {
-        private final WatchedEvent m_event;
-        public ChildEvent(WatchedEvent event) {
-            m_event = event;
-        }
-
-        @Override
-        public void run() {
-            try {
-                processChildEvent(m_event);
-            } catch (Exception e) {
-                // ignore post-shutdown session termination exceptions.
-                if (!m_shutdown.get()) {
-                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected failure in LeaderCache.", true, e);
-                }
-            }
-        }
-    }
-
     // Boilerplate to forward zookeeper watches to the executor service
     protected final Watcher m_parentWatch = new Watcher() {
         @Override
@@ -284,31 +274,6 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             }
         }
     };
-
-    // Boilerplate to forward zookeeper watches to the executor service
-    protected final Watcher m_childWatch = new Watcher() {
-        @Override
-        public void process(final WatchedEvent event) {
-            try {
-                if (!m_shutdown.get()) {
-                    m_es.submit(new ChildEvent(event));
-                }
-            } catch (RejectedExecutionException e) {
-                if (m_es.isShutdown()) {
-                    return;
-                } else {
-                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
-                }
-            }
-        }
-    };
-
-    // example zkPath string: /db/iv2masters/1
-    protected static int getPartitionIdFromZKPath(String zkPath)
-    {
-        String array[] = zkPath.split("/");
-        return Integer.valueOf(array[array.length - 1]);
-    }
 
     /**
      * Rebuild the point-in-time snapshot of the children objects
@@ -339,6 +304,10 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         for (ByteArrayCallback callback : callbacks) {
             try {
                 byte payload[] = callback.getData();
+                // During initialization children node may contain no data.
+                if (payload == null) {
+                    continue;
+                }
                 String data = new String(payload, "UTF-8");
                 LeaderCallBackInfo info = LeaderCache.buildLeaderCallbackFromString(data);
                 Integer partitionId = getPartitionIdFromZKPath(callback.getPath());
@@ -353,6 +322,44 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             m_cb.run(m_publicCache);
         }
     }
+
+    // child node sees modification or deletion
+    private class ChildEvent implements Runnable {
+        private final WatchedEvent m_event;
+        public ChildEvent(WatchedEvent event) {
+            m_event = event;
+        }
+
+        @Override
+        public void run() {
+            try {
+                processChildEvent(m_event);
+            } catch (Exception e) {
+                // ignore post-shutdown session termination exceptions.
+                if (!m_shutdown.get()) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected failure in LeaderCache.", true, e);
+                }
+            }
+        }
+    }
+
+    // Boilerplate to forward zookeeper watches to the executor service
+    protected final Watcher m_childWatch = new Watcher() {
+        @Override
+        public void process(final WatchedEvent event) {
+            try {
+                if (!m_shutdown.get()) {
+                    m_es.submit(new ChildEvent(event));
+                }
+            } catch (RejectedExecutionException e) {
+                if (m_es.isShutdown()) {
+                    return;
+                } else {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
+                }
+            }
+        }
+    };
 
     /**
      * Update a modified child and republish a new snapshot. This may indicate
@@ -378,6 +385,41 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         if (m_cb != null) {
             m_cb.run(m_publicCache);
         }
+    }
+
+    // parent (root node) sees new or deleted child
+    private class PartitionWatchEvent implements Runnable {
+        public PartitionWatchEvent(WatchedEvent event) {
+        }
+
+        @Override
+        public void run() {
+            try {
+                processPartitionWatchEvent();
+            } catch (Exception e) {
+                // ignore post-shutdown session termination exceptions.
+                if (!m_shutdown.get()) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Unexpected failure in LeaderCache.", true, e);
+                }
+            }
+        }
+    }
+
+    // Put watch on partition-specific zk node
+    private void processPartitionWatchEvent() throws KeeperException, InterruptedException {
+        try {
+            m_zk.getData(m_rootNode, m_childWatch, null);
+        } catch (KeeperException.NoNodeException e) {
+            m_zk.create(m_rootNode, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            m_zk.getData(m_rootNode, m_childWatch, null);
+        }
+    }
+
+    // example zkPath string: /db/iv2masters/1
+    protected static int getPartitionIdFromZKPath(String zkPath)
+    {
+        String array[] = zkPath.split("/");
+        return Integer.valueOf(array[array.length - 1]);
     }
 
     @Override
