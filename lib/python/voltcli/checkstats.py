@@ -422,6 +422,70 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
     # not timeout yet
     return lastUpdatedTime
 
+def check_partition_leaders_on_host(runner, hostid):
+    lastUpdatedTime = time.time()
+    notifyInterval = 10
+    lastValidationParamms = [sys.maxint]
+    while True:
+        resp = get_stats(runner, 'TOPO')
+        if len(resp.table(0).tuples()) == 0:
+            return
+        # TOPO stats
+        # column 0: partition id
+        # column 2: partition leader
+        leaders = 0;
+        for r in resp.table(0).tuples():
+            if r[0] == 16383:
+                continue
+            leader = int(r[2].split(":")[0])
+            if leader == hostid:
+                leaders +=1
+
+        # all partition leaders have been moved
+        if leaders == 0:
+            return
+
+        notifyInterval -= 1
+        if notifyInterval == 0:
+            notifyInterval = 10
+            runner.info('\tThe number of partition leaders on the host: %d' % (leaders))
+
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, [leaders], lastUpdatedTime, runner, str(hostid),
+                                                    msg="The cluster has not moved any partition leaders away from host %s in %d seconds.")
+        lastValidationParamms = [leaders]
+        time.sleep(1)
+
+def check_export_mastership_on_host(runner, hostid):
+    lastUpdatedTime = time.time()
+    notifyInterval = 10
+    lastValidationParamms = [sys.maxint]
+    while True:
+        resp = get_stats(runner, 'EXPORT')
+        if len(resp.table(0).tuples()) == 0:
+            return
+        # EXPORT stats
+        # column 1: host id
+        # column 7: active
+        mastershipCount = 0;
+        for r in resp.table(0).tuples():
+            host = int(r[1])
+            active = r[7]
+            if host == hostid and active == 'TRUE':
+                mastershipCount +=1
+
+        # all partition leaders have been moved
+        if mastershipCount == 0:
+            return
+
+        notifyInterval -= 1
+        if notifyInterval == 0:
+            notifyInterval = 10
+            runner.info('\tThe number of export masters on the host: %d' % (mastershipCount))
+
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, [mastershipCount], lastUpdatedTime, runner, str(hostid),
+                                                    msg="The cluster has not moved any export masters away from host %s in %d seconds.")
+        lastValidationParamms = [mastershipCount]
+        time.sleep(1)
 
 class StatisticsProcedureException(Exception):
 

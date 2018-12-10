@@ -49,7 +49,6 @@ import org.voltdb.CatalogContext;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
@@ -849,7 +848,7 @@ public class ExportGeneration implements Generation {
                     }
 
                     if (eds.processStreamControl(operation)) {
-                        results.addRow(eds.getTableName(), eds.getTarget(), partition, VoltSystemProcedure.STATUS_OK, "");
+                        results.addRow(eds.getTableName(), eds.getTarget(), partition, "SUCCESS", "");
                     }
                 }
             }

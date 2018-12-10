@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -35,6 +36,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.MpInitiator;
 
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.collect.Sets.SetView;
@@ -357,6 +359,41 @@ public class TestStopNode extends RegressionSuite
         assertFalse(lostConnect);
     }
 
+    public void testPrepareStopNode() throws Exception {
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost", m_config.port(0));
+
+        try {
+            client.callProcedure("@PrepareStopNode", 1);
+            final long maxSleep = TimeUnit.MINUTES.toMillis(5);
+            int leaderCount = Integer.MAX_VALUE;
+            long start = System.currentTimeMillis();
+            while (leaderCount > 0) {
+                leaderCount = 0;
+                VoltTable vt = client.callProcedure("@Statistics", "TOPO").getResults()[0];
+                while (vt.advanceRow()) {
+                    long partition = vt.getLong("Partition");
+                    if (MpInitiator.MP_INIT_PID == partition) { continue; }
+                    String leader = vt.getString("Leader").split(":")[0];
+                    if (leader.equals("1")) {
+                        leaderCount++;
+                    }
+                }
+                if (leaderCount > 0) {
+                    if (maxSleep < (System.currentTimeMillis() - start)) {
+                        break;
+                    }
+                    try { Thread.sleep(1000); } catch (Exception ignored) { }
+                }
+            }
+            assert(leaderCount == 0);
+        } catch (Exception ex) {
+            //We should not get here
+            ex.printStackTrace();
+            fail();
+        }
+    }
+
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
@@ -370,8 +407,9 @@ public class TestStopNode extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         //Lets tolerate 3 node failures.
-        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
+        m_config = new LocalCluster("teststopnode.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(false);
+        m_config.setDelayBetweenNodeStartup(1000);
         project.setPartitionDetectionEnabled(true);
         success = m_config.compile(project);
         assertTrue(success);

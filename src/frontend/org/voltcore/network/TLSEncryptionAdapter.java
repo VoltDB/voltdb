@@ -41,9 +41,9 @@ import org.voltcore.utils.ssl.SSLBufferEncrypter;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
-import io.netty_voltpatches.buffer.ByteBuf;
-import io.netty_voltpatches.buffer.CompositeByteBuf;
-import io.netty_voltpatches.buffer.Unpooled;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 
 public class TLSEncryptionAdapter {
     private static final VoltLogger s_networkLog = new VoltLogger("NETWORK");

@@ -51,6 +51,7 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
 import org.voltdb.MailboxNodeContent;
+import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -720,6 +721,64 @@ public class Cartographer extends StatsSource
         }
     }
 
+    public String verifyPartitonLeaderMigrationForStopNode(final int ihid) {
+        if (m_configuredReplicationFactor == 0) {
+            return "Stopping individual nodes is only allowed on a K-safe cluster";
+        }
+        try {
+            return m_es.submit(new Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    // Check rejoining status
+                    try {
+                        if (m_zk.exists(CoreZK.rejoin_node_blocker, false) != null) {
+                            return "All rejoin nodes must be completed";
+                        }
+                    } catch (KeeperException.NoNodeException ignore) {}
+                    // Check replicas
+                    Set<Integer> otherStoppedHids = new HashSet<Integer>();
+                    try {
+                        List<String> children = m_zk.getChildren(VoltZK.host_ids_be_stopped, false);
+                        for (String child : children) {
+                            int hostId = Integer.parseInt(child);
+                            otherStoppedHids.add(hostId);
+                        }
+                    } catch (KeeperException.NoNodeException ignore) {}
+                    otherStoppedHids.remove(ihid);
+                    if (!otherStoppedHids.isEmpty()) {
+                        return "Cann't move partition leaders while other nodes are being shutdown.";
+                    }
+                    String message = doPartitionsHaveReplicas(ihid, otherStoppedHids);
+                    if (message != null) {
+                        return message;
+                    }
+                    // Partition leader distribution mast be balanced, otherwise, the migrated partition leader will
+                    // be moved back.
+                    if (!isPartitionLeadersBalanced()) {
+                        return "Cann't move partition leaders since leader migration is in progress";
+                    }
+                    return null;
+                }}).get();
+        } catch (InterruptedException | ExecutionException t) {
+            return "Internal error: " + t.getMessage();
+        }
+    }
+
+    private boolean isPartitionLeadersBalanced() {
+        // Is partition leader migration on?
+        final boolean disableSpiTask = "true".equals(System.getProperty("DISABLE_MIGRATE_PARTITION_LEADER", "false"));
+        if (disableSpiTask) {
+            return true;
+        }
+        RealVoltDB db = (RealVoltDB) VoltDB.instance();
+        if(db.isClusterComplete()) {
+            Pair<Integer, Integer> pair = getPartitionLeaderMigrationTarget(db.getHostCount(),Integer.MIN_VALUE, true);
+            // Partition leader migration may be in progress. don't mess up
+            return (pair == null || pair.getFirst() == -1 ) ;
+        }
+        return true;
+    }
+
     // Check if partitions on host hid will have enough replicas after losing host hid.
     // If nodesBeingStopped was set, it means there are concurrent @StopNode running,
     // don't count replicas on those to-be-stopped nodes.
@@ -815,7 +874,11 @@ public class Cartographer extends StatsSource
 
         @Override
         public int compareTo(Host other){
-            return (other.m_masterPartitionIDs.size() - m_masterPartitionIDs.size());
+            int diff = (other.m_masterPartitionIDs.size() - m_masterPartitionIDs.size());
+            if (diff != 0) {
+                return diff;
+            }
+            return (m_hostId - other.m_hostId);
         }
 
         @Override
@@ -860,19 +923,47 @@ public class Cartographer extends StatsSource
      * the least number of partition. if the host with @localHostId is not the host which has the most partition
      * leaders, return null. Eventually the host with most partition leaders will initiate MigratePartitionLeader.
      * @param hostCount  The number of hosts in the cluster
-     * @param localHostId  the host id
+     * @param localHostId the host id
      * @return  a pair of partition id and destination host id
      */
-    public Pair<Integer, Integer> getPartitionForMigratePartitionLeader(int hostCount, int localHostId) {
-
-        Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
-        if (liveHosts.size() == 1) {
-            return null;
-        }
+    public Pair<Integer, Integer> getPartitionLeaderMigrationTarget(int hostCount, int localHostId, boolean prepareStopNode) {
 
         final int maxMastersPerHost = (int)Math.ceil(((double)getPartitionCount()) / hostCount);
         final int minMastersPerHost = (getPartitionCount() / hostCount);
 
+        // Sort the hosts by partition leader count, descending
+        LinkedList<Host> hostList = getHostsByPartionMasterCount();
+
+        // only move SPI from the one with most partition leaders
+        // The local ClientInterface will pick it up and start @MigratePartitionLeader
+        Iterator<Host> it = hostList.iterator();
+        Host srcHost = it.next();
+
+        // @MigratePartitionLeader is initiated on the host with the old leader to facilitate DR integration
+        // If current host does not have the most partition leaders, give it up.
+        // Let the host with the most partition leaders to migrate
+        if (srcHost.m_hostId != localHostId && !prepareStopNode) {
+            return null;
+        }
+
+        // The new host is the one with least number of partition leaders and the partition replica
+        for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
+            Host targetHost = reverseIt.next();
+            int partitionCandidate = findNewHostForPartitionLeader(srcHost,targetHost, maxMastersPerHost, minMastersPerHost);
+            if (partitionCandidate > -1){
+                return new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
+            }
+        }
+
+        // indicate that the cluster is balanced.
+        return  new Pair<Integer, Integer> (-1, -1);
+    }
+
+    private LinkedList<Host> getHostsByPartionMasterCount() {
+        Set<Integer> liveHosts = m_hostMessenger.getLiveHostIds();
+        if (liveHosts.size() == 1) {
+            return null;
+        }
         //collect host and partition info
         Map<Integer, Host> hostsMap = Maps.newHashMap();
         Set<Integer> allMasters = new HashSet<Integer>();
@@ -908,35 +999,11 @@ public class Cartographer extends StatsSource
         //Sort the hosts by partition leader count, descending
         LinkedList<Host> hostList = new LinkedList<Host>(hostsMap.values());
         Collections.sort(hostList);
-
-        //only move SPI from the one with most partition leaders
-        //The local ClientInterface will pick it up and start @MigratePartitionLeader
-        Iterator<Host> it = hostList.iterator();
-        Host srcHost = it.next();
-
-        //@MigratePartitionLeader is initiated on the host with the old leader to facilitate DR integration
-        //If current host does not have the most partition leaders, give it up.
-        if (srcHost.m_hostId != localHostId) {
-            return null;
-        }
-
-        //The new host is the one with least number of partition leaders and the partition replica
-        for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
-            Host targetHost = reverseIt.next();
-            int partitionCandidate = findNewLeaderHost(srcHost,targetHost, maxMastersPerHost, minMastersPerHost);
-            if (partitionCandidate > -1){
-                Pair<Integer, Integer> pair = new Pair<Integer, Integer> (partitionCandidate, targetHost.m_hostId);
-                return pair;
-            }
-        }
-
-        //indicate that the cluster is balanced.
-        Pair<Integer, Integer> pair = new Pair<Integer, Integer> (-1, -1);
-        return pair;
+        return hostList;
     }
 
-    private int findNewLeaderHost(Host src, Host target, int maxMastersPerHost, int minMastersPerHost) {
-        //cann't move onto itself
+    private int findNewHostForPartitionLeader(Host src, Host target, int maxMastersPerHost, int minMastersPerHost) {
+        // cann't move onto itself
         if (src.equals(target)) {
             return -1;
         }
@@ -960,6 +1027,39 @@ public class Cartographer extends StatsSource
             }
         }
         return -1;
+    }
+
+    // find a new host for a partition leader on this host
+    public Pair<Integer, Integer> getPartitionLeaderMigrationTargetForStopNode(int localHostId) {
+
+        // Sort the hosts by partition leader count, descending
+        LinkedList<Host> hostList = getHostsByPartionMasterCount();
+        Host srcHost = null;
+        for (Host host : hostList) {
+            if (host.m_hostId == localHostId && !host.m_masterPartitionIDs.isEmpty()) {
+                srcHost = host;
+                break;
+            }
+        }
+
+        if (srcHost == null) {
+            return new Pair<Integer, Integer> (-1, -1);
+        }
+
+        // The new host is the one with least number of partition leaders and the partition replica
+        for (Iterator<Host> reverseIt = hostList.descendingIterator(); reverseIt.hasNext();) {
+            Host targetHost = reverseIt.next();
+            if (!targetHost.equals(srcHost)) {
+                for (Integer partition : srcHost.m_masterPartitionIDs) {
+                    if (targetHost.m_replicaPartitionIDs.contains(partition)) {
+                        return new Pair<Integer, Integer> (partition, targetHost.m_hostId);
+                    }
+                }
+            }
+        }
+
+        // Indicate that all the partition leaders have been relocated.
+        return new Pair<Integer, Integer> (-1, -1);
     }
 
     //return the number of masters on a host

@@ -17,7 +17,12 @@
 
 package org.voltdb;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
@@ -35,8 +40,6 @@ import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-
-import javax.net.ssl.SSLContext;
 
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltcore.logging.VoltLog4jLogger;
@@ -65,6 +68,8 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
+
+import io.netty.handler.ssl.SslContext;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -159,7 +164,8 @@ public class VoltDB {
         public SslContextFactory m_sslContextFactory = null;
 
         /** ssl context for client and admin ports */
-        public SSLContext m_sslContext = null;
+        public SslContext m_sslServerContext = null;
+        public SslContext m_sslClientContext = null;
 
         /** enable ssl */
         public boolean m_sslEnable = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
@@ -619,11 +625,11 @@ public class VoltDB {
                     m_versionStringOverrideForTest = args[++i].trim();
                     m_versionCompatibilityRegexOverrideForTest = args[++i].trim();
                 }
-                else if (arg.equalsIgnoreCase("buildstringoverride"))
+                else if (arg.equalsIgnoreCase("buildstringoverride")) {
                     m_buildStringOverrideForTest = args[++i].trim();
-                else if (arg.equalsIgnoreCase("placementgroup"))
+                } else if (arg.equalsIgnoreCase("placementgroup")) {
                     m_placementGroup = args[++i].trim();
-                else if (arg.equalsIgnoreCase("force")) {
+                } else if (arg.equalsIgnoreCase("force")) {
                     m_forceVoltdbCreate = true;
                 } else if (arg.equalsIgnoreCase("paused")) {
                     //Start paused.
@@ -1051,8 +1057,9 @@ public class VoltDB {
             // try to find an obj directory
             String userdir = System.getProperty("user.dir");
             String buildMode = System.getProperty("build");
-            if (buildMode == null)
+            if (buildMode == null) {
                 buildMode = "release";
+            }
             assert(buildMode.length() > 0);
             if (userdir != null) {
                 File userObjDir = new File(userdir + File.separator + "obj" + File.separator + buildMode);
@@ -1166,8 +1173,9 @@ public class VoltDB {
             writer.println();
             StackTraceElement[] st = traces.get(key);
             writer.println("****** " + key + " ******");
-            for (StackTraceElement ste : st)
+            for (StackTraceElement ste : st) {
                 writer.println(ste);
+            }
         }
     }
 

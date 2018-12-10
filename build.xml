@@ -1080,24 +1080,8 @@ JAR BUILDING
             </section>
         </manifest>
     </jar>
-    <!--jar destfile="voltdb/voltdb-${dist.version}-javadoc.jar">
-        <fileset dir="${doc.dir}/javadoc/procedure-api" defaultexcludes="no" >
-            <include name="**"/>
-        </fileset>
-        <manifest>
-            <section name="Credits">
-                <attribute name="Author" value="VoltDB Inc." />
-            </section>
-            <section name="Shared">
-                <attribute
-                    name="Title"
-                    value="VoltDB Database JavaDoc"
-                />
-                <attribute name="Date" value="${TODAY}" />
-            </section>
-        </manifest>
-    </jar>
-    <jar destfile="voltdb/voltdbclient-${dist.version}-javadoc.jar">
+
+	<!--<jar destfile="voltdb/voltdbclient-${dist.version}-javadoc.jar">
         <fileset dir="${doc.dir}/javadoc/java-client-api" defaultexcludes="no" >
             <include name="**"/>
         </fileset>
@@ -1115,6 +1099,65 @@ JAR BUILDING
         </manifest>
     </jar-->
 
+</target>
+
+<target name="maven-jars"
+		description = "makes extra .jar files that get pushed to maven repo"
+		depends="voltdb.jar">
+    <jar destfile="${build.dir}/voltdb-${dist.version}-javadoc.jar">
+        <fileset dir="${doc.dir}/javadoc/procedure-api" defaultexcludes="no" >
+            <include name="**"/>
+        </fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB Inc." />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB Stored Procedure JavaDoc"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar>
+	<jar destfile="${build.dir}/voltdb-${dist.version}-sources.jar">
+		<fileset dir="${src.gpl.dir}" defaultexcludes="yes">
+		            <include name="org/voltdb/**"/>
+		            <include name="org/voltcore/**"/>
+		            <include name="org/hsqldb_voltpatches/**" />
+		            <include name="org/apache/**" />
+		            <include name="javax/annotation_voltpatches/**" />
+		            <include name="com/google_voltpatches/**" />
+		            <include name="vanilla/**" />
+		            <include name="jsr166y/**"/>
+		            <include name="org/eclipse/jetty_voltpatches/**" />
+		            <include name="javax/servlet_voltpatches/**" />
+		            <include name="au/com/bytecode/opencsv_voltpatches/**" />
+		            <include name="org/cliffc_voltpatches/**" />
+		            <include name="groovy_voltpatches/**"/>
+		            <include name="org/supercsv_voltpatches/tokenizer/*" />
+		            <include name="org/hsqldb_voltpatches/**" />
+		            <include name="org/json_voltpatches/**" />
+		            <include name="org/HdrHistogram_voltpatches/**" />
+		            <include name="org/mindrot/**" />
+		            <include name="org/spearce_voltpatches/**" />
+		            <include name="io/netty_voltpatches/**" />
+		            <include name="org/jctools_voltpatches/**" />
+		        </fileset>
+	        <manifest>
+	            <section name="Credits">
+	                <attribute name="Author" value="VoltDB Inc." />
+	            </section>
+	            <section name="Shared">
+	                <attribute
+	                    name="Title"
+	                    value="VoltDB Database Sources"
+	                />
+	                <attribute name="Date" value="${TODAY}" />
+	            </section>
+	        </manifest>
+	    </jar>
 </target>
 
 <target name="voltdbclient.jar" depends="compile, buildinfo">

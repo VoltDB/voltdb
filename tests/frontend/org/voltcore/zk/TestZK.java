@@ -91,7 +91,7 @@ public class TestZK extends ZKTestBase {
         config.zkInterface = "127.0.0.1:" + clientPort;
         m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
-        HostMessenger hm = new HostMessenger(config, null, null);
+        HostMessenger hm = new HostMessenger(config, null);
         hm.start();
         MeshProber.prober(hm).waitForDetermination();
         m_messengers.set(site, hm);

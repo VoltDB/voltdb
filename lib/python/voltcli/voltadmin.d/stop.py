@@ -19,12 +19,18 @@
 
 from voltcli.hostinfo import Host
 from voltcli.hostinfo import Hosts
+from voltcli import checkstats
+from voltcli.checkstats import StatisticsProcedureException
 from voltcli import utility
 import sys
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
     description = 'Stop one host of a running VoltDB cluster.',
+    options=(
+        VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default=False),
+        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default=120),
+        ),
     arguments = (
         VOLT.StringArgument('target_host', 'the target hostname[:port] or address[:port]. (default port=3021)'),
     ),
@@ -63,6 +69,34 @@ def stop(runner):
                           runner.opts.username, runner.opts.password,
                           runner.opts.ssl_config, runner.opts.kerberos)
 
+    if not runner.opts.forcing:
+        stateMessage = 'The node shutdown process has stopped.'
+        actionMessage = 'You may shutdown the node with the "voltadmin stop --force" command.'
+        try:
+            runner.info('Preparing for stopping node.')
+            resp = runner.call_proc('@PrepareStopNode',
+                                    [VOLT.FastSerializer.VOLTTYPE_INTEGER],
+                                    [thost.id],
+                                    check_status=False)
+            if resp.status() != 1:
+                runner.abort('The preparation for node shutdown failed with status: %s' % resp.response.statusString)
+            # monitor partition leader migration
+            runner.info('Completing partition leader migration away from host %d: %s' % (thost.id, thost.hostname))
+            checkstats.check_partition_leaders_on_host(runner,thost.id)
+            runner.info('All partition leaders have been migrated.')
+            # monitor export master transfer
+            runner.info('Completing export master transfer away from host %d: %s' % (thost.id, thost.hostname))
+            checkstats.check_export_mastership_on_host(runner,thost.id)
+            runner.info('All export masters have been transferred')
+        except StatisticsProcedureException as proex:
+             runner.info(stateMessage)
+             runner.error(proex.message)
+             if proex.isTimeout:
+                 runner.info(actionMessage)
+             sys.exit(proex.exitCode)
+        except (KeyboardInterrupt, SystemExit):
+            runner.info(stateMessage)
+            runner.abort(actionMessage)
     # Stop the requested host using exec @StopNode HOST_ID
     runner.info('Stopping host %d: %s:%s' % (thost.id, thost.hostname, thost.internalport))
     if not runner.opts.dryrun:
