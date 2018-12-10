@@ -223,7 +223,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final InvocationDispatcher m_dispatcher;
 
     private ScheduledExecutorService m_migratePartitionLeaderExecutor;
-
+    private Object m_lock = new Object();
     /*
      * This list of ACGs is iterated to retrieve initiator statistics in IV2.
      * They are thread local, and the ACG happens to be thread local, and if you squint
@@ -2156,27 +2156,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     //start or stop MigratePartitionLeader task
     void processMigratePartitionLeaderTask(MigratePartitionLeaderMessage message) {
-        //start MigratePartitionLeader service
-        if (message.startMigratingPartitionLeaders()) {
-            if (m_migratePartitionLeaderExecutor == null) {
-                m_migratePartitionLeaderExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("MigratePartitionLeader"));
-                final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
-                final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
-                m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
-                        () -> {startMigratePartitionLeader();},
-                        delay, interval, TimeUnit.SECONDS);
+        synchronized(m_lock) {
+            //start MigratePartitionLeader service
+            if (message.startMigratingPartitionLeaders()) {
+                if (m_migratePartitionLeaderExecutor == null) {
+                    m_migratePartitionLeaderExecutor = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("MigratePartitionLeader"));
+                    final int interval = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_INTERVAL", "1"));
+                    final int delay = Integer.parseInt(System.getProperty("MIGRATE_PARTITION_LEADER_DELAY", "1"));
+                    m_migratePartitionLeaderExecutor.scheduleAtFixedRate(
+                            () -> {startMigratePartitionLeader(message.isForStopNode());},
+                            delay, interval, TimeUnit.SECONDS);
+                }
+                hostLog.info("MigratePartitionLeader task is started.");
+                return;
             }
-            hostLog.info("MigratePartitionLeader task is started.");
-            return;
-        }
 
-        if (m_migratePartitionLeaderExecutor == null) {
-            return;
+            //stop MigratePartitionLeader service
+            if (m_migratePartitionLeaderExecutor != null ) {
+                m_migratePartitionLeaderExecutor.shutdown();
+                m_migratePartitionLeaderExecutor = null;
+            }
         }
-
-        //stop MigratePartitionLeader service
-        m_migratePartitionLeaderExecutor.shutdown();
-        m_migratePartitionLeaderExecutor = null;
         hostLog.info("MigratePartitionLeader task is stopped.");
     }
 
@@ -2185,11 +2185,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * and find the host which hosts the partition replica and the least number of partition leaders.
      * send MigratePartitionLeaderMessage to the host with older partition leader to initiate @MigratePartitionLeader
      * Repeatedly call this task until no qualified partition is available.
+     * @param prepareStopNode if true, only move partition leaders on this host to other hosts-used via @PrepareStopNode
+     * Otherwise, balance the partition leaders among all nodes.
      */
-    void startMigratePartitionLeader() {
+    void startMigratePartitionLeader(boolean prepareStopNode) {
         RealVoltDB voltDB = (RealVoltDB)VoltDB.instance();
         final int hostId = CoreUtils.getHostIdFromHSId(m_siteId);
-        Pair<Integer, Integer> target = m_cartographer.getPartitionForMigratePartitionLeader(voltDB.getHostCount(), hostId);
+        Pair<Integer, Integer> target = null;
+        if (prepareStopNode) {
+            target = m_cartographer.getPartitionLeaderMigrationTargetForStopNode(hostId);
+        } else {
+            if (voltDB.isClusterComplete()) {
+                target = m_cartographer.getPartitionLeaderMigrationTarget(voltDB.getHostCount(), hostId, prepareStopNode);
+            } else {
+                // Out of the scheduled task
+                target = new Pair<Integer, Integer> (-1, -1);
+            }
+        }
 
         //The host does not have any thing to do this time. It does not mean that the host does not
         //have more partition leaders than expected. Other hosts may have more partition leaders
@@ -2203,7 +2215,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         int partitionKey = -1;
 
         //MigratePartitionLeader is completed or there are hosts down. Stop MigratePartitionLeader service on this host
-        if (targetHostId == -1 || !voltDB.isClusterComplete()) {
+        if (targetHostId == -1 || (!prepareStopNode && !voltDB.isClusterComplete())) {
             voltDB.scheduleWork(
                     () -> {m_mailbox.deliver(new MigratePartitionLeaderMessage());},
                     0, 0, TimeUnit.SECONDS);
@@ -2317,7 +2329,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
 
                 //some hosts may be down.
-                if (!voltDB.isClusterComplete()) {
+                if (!voltDB.isClusterComplete() && !prepareStopNode) {
                     anyFailedHosts = true;
                     // If the target host is still alive, migration is still going on.
                     if (!voltDB.getHostMessenger().getLiveHostIds().contains(targetHostId)) {
