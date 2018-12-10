@@ -266,9 +266,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
                     m_es.submit(new ParentEvent(event));
                 }
             } catch (RejectedExecutionException e) {
-                if (m_es.isShutdown()) {
-                    return;
-                } else {
+                if (!m_es.isShutdown()) {
                     org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
                 }
             }
@@ -352,9 +350,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
                     m_es.submit(new ChildEvent(event));
                 }
             } catch (RejectedExecutionException e) {
-                if (m_es.isShutdown()) {
-                    return;
-                } else {
+                if (!m_es.isShutdown()) {
                     org.voltdb.VoltDB.crashLocalVoltDB("Unexpected rejected execution exception", false, e);
                 }
             }
