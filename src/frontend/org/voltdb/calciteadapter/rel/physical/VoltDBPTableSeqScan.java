@@ -31,6 +31,7 @@ import org.apache.calcite.rex.RexProgramBuilder;
 import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 import org.voltdb.calciteadapter.rel.VoltTable;
 import org.voltdb.calciteadapter.rel.util.PlanCostUtil;
+import org.voltdb.newplanner.rules.physical.Constants;
 
 /**
  * The relational expression that represent a VoltDB physical table scan.
@@ -86,7 +87,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
     @Override
     public double estimateRowCount(RelMetadataQuery mq) {
         Preconditions.checkNotNull(mq);
-        double rowCount = AbstractVoltDBPTableScan.MAX_TABLE_ROW_COUNT;
+        double rowCount = Constants.MAX_TABLE_ROW_COUNT;
         rowCount = PlanCostUtil.discountRowCountTableScan(rowCount, m_program);
         // SeqScanPlanNode does not pay attention to limit
 

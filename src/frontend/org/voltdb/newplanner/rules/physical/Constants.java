@@ -24,4 +24,7 @@ public final class Constants {
     static final int JOIN_SPLIT_COUNT = 1;
     // TODO: why 30?
     static public final int DISTRIBUTED_SPLIT_COUNT = 30;
+
+    // TODO: verify this
+    static public final int MAX_TABLE_ROW_COUNT = 1000000;
 }

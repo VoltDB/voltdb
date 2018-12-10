@@ -44,9 +44,6 @@ import org.voltdb.calciteadapter.rel.VoltTable;
  */
 public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan implements VoltDBPRel {
 
-    // TODO: verify this
-    public static final int MAX_TABLE_ROW_COUNT = 1000000;
-
     // If Limit ?, it's likely to be a small number. So pick up 50 here.
     private static final int DEFAULT_LIMIT_VALUE_PARAMETERIZED = 50;
 
@@ -144,7 +141,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
             if (rowDataType.getFieldCount() > 0) {
                 return rowDataType;
             } else {
-                throw new IllegalStateException("Row count can not be 0.");
+                throw new IllegalStateException("Column count can not be 0.");
             }
         }
     }
