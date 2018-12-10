@@ -42,6 +42,11 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URL;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,7 +55,6 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +75,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLException;
+import javax.net.ssl.TrustManagerFactory;
+
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.log4j.Appender;
@@ -85,6 +93,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.eclipse.jetty.util.security.Password;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -196,6 +205,7 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.hash.Hashing;
@@ -203,6 +213,10 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+
+import io.netty.handler.ssl.CipherSuiteFilter;
+import io.netty.handler.ssl.OpenSsl;
+import io.netty.handler.ssl.SslContextBuilder;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -588,12 +602,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
         VoltFile managedPath;
-        if (new File(path).isAbsolute())
+        if (new File(path).isAbsolute()) {
             managedPath = new VoltFile(path);
-        else
+        } else {
             managedPath = new VoltFile(voltDbRoot, path);
-        if (managedPath.exists() && managedPath.canRead() && managedPath.list().length > 0)
+        }
+        if (managedPath.exists() && managedPath.canRead() && managedPath.list().length > 0) {
             return managedPath.getAbsolutePath();
+        }
         return null;
     }
 
@@ -625,16 +641,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (!config.m_isEnterprise) {
             return nonEmptyPaths.build();
         }
-        if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getExportOverflowPath(paths.getExportoverflow()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getExportOverflowPath(paths.getExportoverflow()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getDROverflowPath(paths.getDroverflow()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getDROverflowPath(paths.getDroverflow()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogPath(paths.getCommandlog()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogPath(paths.getCommandlog()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null) {
             nonEmptyPaths.add(path);
+        }
         return nonEmptyPaths.build();
     }
 
@@ -643,12 +664,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         PathsType paths = deployment.getPaths();
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
-        if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null)
+        if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogPath(paths.getCommandlog()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogPath(paths.getCommandlog()))) != null) {
             nonEmptyPaths.add(path);
-        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null)
+        }
+        if ((path = managedPathEmptyCheck(voltDbRoot, getCommandLogSnapshotPath(paths.getCommandlogsnapshot()))) != null) {
             nonEmptyPaths.add(path);
+        }
         return nonEmptyPaths.build();
     }
 
@@ -829,11 +853,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 if (config.m_isEnterprise) {
-                    if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
-                    if (m_licenseApi.isPro()) edition = "Pro Edition";
-                    if (m_licenseApi.isEnterpriseTrial()) edition = "Enterprise Edition";
-                    if (m_licenseApi.isProTrial()) edition = "Pro Edition";
-                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Edition";
+                    if (m_licenseApi.isEnterprise()) {
+                        edition = "Enterprise Edition";
+                    }
+                    if (m_licenseApi.isPro()) {
+                        edition = "Pro Edition";
+                    }
+                    if (m_licenseApi.isEnterpriseTrial()) {
+                        edition = "Enterprise Edition";
+                    }
+                    if (m_licenseApi.isProTrial()) {
+                        edition = "Pro Edition";
+                    }
+                    if (m_licenseApi.isAWSMarketplace()) {
+                        edition = "AWS Marketplace Edition";
+                    }
                 }
 
                 // this also prints out the license type on the console
@@ -855,10 +889,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
             sb.delete(0, sb.length()).append("Command line JVM arguments:");
-            for (String iarg : iargs)
+            for (String iarg : iargs) {
                 sb.append(" ").append(iarg);
-            if (iargs.size() > 0) hostLog.info(sb.toString());
-            else hostLog.info("No JVM command line args known.");
+            }
+            if (iargs.size() > 0) {
+                hostLog.info(sb.toString());
+            } else {
+                hostLog.info("No JVM command line args known.");
+            }
 
             sb.delete(0, sb.length()).append("Command line JVM classpath: ");
             sb.append(System.getProperty("java.class.path", "[not available]"));
@@ -1387,7 +1425,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         config.m_port,
                         adminIntf,
                         config.m_adminPort,
-                        m_config.m_sslExternal ? m_config.m_sslContext : null);
+                        m_config.m_sslExternal ? m_config.m_sslServerContext : null);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -1533,7 +1571,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clientInterface.schedulePeriodicWorks();
 
             // print out a bunch of useful system info
-            logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+            logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
 
 
             // warn the user on the console if k=0 or if no command logging
@@ -1839,7 +1877,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
             hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
             hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
-            logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+            logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
             // log system setting information
             logSystemSettingFromCatalogContext();
 
@@ -1894,7 +1932,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     class StartActionWatcher implements Watcher {
         @Override
         public void process(WatchedEvent event) {
-            if (m_mode == OperationMode.SHUTTINGDOWN) return;
+            if (m_mode == OperationMode.SHUTTINGDOWN) {
+                return;
+            }
             m_es.submit(new Runnable() {
                 @Override
                 public void run() {
@@ -2269,8 +2309,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         msg.setStartTask();
         final int minimalNumberOfLeaders = (m_cartographer.getPartitionCount() / m_config.m_hostCount);
         Set<Integer> hosts = m_messenger.getLiveHostIds();
-        for (Iterator<Integer> it = hosts.iterator(); it.hasNext();) {
-            int hostId = it.next();
+        for (int hostId : hosts) {
             final int currentMasters = m_cartographer.getMasterCount(hostId);
             if (currentMasters > minimalNumberOfLeaders) {
                 if (hostLog.isDebugEnabled()) {
@@ -2920,15 +2959,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
         if (m_config.m_sslEnable) {
             try {
-                m_config.m_sslContextFactory = getSSLContextFactory(sslType);
-                m_config.m_sslContextFactory.start();
-                hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
+                hostLog.info("SSL enabled for HTTP. Please point browser to HTTPS URL.");
                 m_config.m_sslExternal = m_config.m_sslExternal || (sslType != null && sslType.isExternal());
                 m_config.m_sslDR = m_config.m_sslDR || (sslType != null && sslType.isDr());
                 m_config.m_sslInternal = m_config.m_sslInternal || (sslType != null && sslType.isInternal());
-                if (m_config.m_sslExternal || m_config.m_sslDR || m_config.m_sslInternal) {
-                    m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
-                }
+                boolean setSslBuilder = m_config.m_sslExternal || m_config.m_sslDR || m_config.m_sslInternal;
+                setupSslContextCreators(sslType, setSslBuilder);
                 if (m_config.m_sslExternal) {
                     hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
                 }
@@ -2950,7 +2986,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return res == null ? resource : res.getPath();
     }
 
-    private SslContextFactory getSSLContextFactory(SslType sslType) {
+    private void setupSslContextCreators(SslType sslType, boolean setSslBuilder) {
         SslContextFactory sslContextFactory = new SslContextFactory();
         String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
         keyStorePath = null == keyStorePath  ? getResourcePath(Constants.DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
@@ -2990,15 +3026,72 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         sslContextFactory.setTrustStorePassword(trustStorePassword);
 
-        // exclude weak ciphers
-        sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
+        String[] excludeCiphers = new String[] {"SSL_RSA_WITH_DES_CBC_SHA",
                 "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
                 "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
                 "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
                 "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
+                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA"};
+
+        // exclude weak ciphers
+        sslContextFactory.setExcludeCipherSuites(excludeCiphers);
         sslContextFactory.setKeyManagerPassword(keyStorePassword);
-        return sslContextFactory;
+
+        m_config.m_sslContextFactory = sslContextFactory;
+
+        if (setSslBuilder) {
+            KeyManagerFactory keyManagerFactory;
+            try (FileInputStream fis = new FileInputStream(keyStorePath)) {
+                keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                keyStorePassword = deobfuscateIfNeeded(keyStorePassword);
+                keyStore.load(fis, keyStorePassword.toCharArray());
+                keyManagerFactory.init(keyStore, keyStorePassword.toCharArray());
+            } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | IOException
+                    | CertificateException e) {
+                throw new IllegalArgumentException("Could not initialize KeyManagerFactory", e);
+            }
+
+            TrustManagerFactory trustManagerFactory;
+            try (FileInputStream fis = new FileInputStream(trustStorePath)) {
+                trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+                trustStorePassword = deobfuscateIfNeeded(trustStorePassword);
+                keyStore.load(fis, trustStorePassword.toCharArray());
+                trustManagerFactory.init(keyStore);
+            } catch (NoSuchAlgorithmException | IOException | KeyStoreException | CertificateException e) {
+                throw new IllegalArgumentException("Could not initialize TrustManagerFactory", e);
+            }
+
+            ImmutableSet<String> excludeCipherSet = ImmutableSet.copyOf(excludeCiphers);
+
+            CipherSuiteFilter filter = (ciphers, defaultCiphiers, supportedCiphers) -> {
+                List<String> filteredCiphers = new ArrayList<>(supportedCiphers.size());
+                for (String cipher : ciphers == null ? defaultCiphiers : ciphers) {
+                    if (supportedCiphers.contains(cipher) && !excludeCipherSet.contains(cipher)) {
+                        filteredCiphers.add(cipher);
+                    }
+                }
+
+                return filteredCiphers.toArray(new String[filteredCiphers.size()]);
+            };
+
+            try {
+                m_config.m_sslServerContext = SslContextBuilder.forServer(keyManagerFactory)
+                        .trustManager(trustManagerFactory).ciphers(null, filter).build();
+                m_config.m_sslClientContext = SslContextBuilder.forClient().trustManager(trustManagerFactory)
+                        .ciphers(null, filter).build();
+            } catch (SSLException e) {
+                throw new IllegalArgumentException("Could not create SslContexts", e);
+            }
+        }
+    }
+
+    private String deobfuscateIfNeeded(String password) {
+        if (password.startsWith(Password.__OBFUSCATE)) {
+            return Password.deobfuscate(password);
+        }
+        return password;
     }
 
     private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
@@ -3080,7 +3173,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         //if SSL needs to be enabled for internal communication, SSL context has to be setup before starting HostMessenger
         setupSSL(readDepl);
-        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, m_config.m_sslInternal ? m_config.m_sslContext : null);
+        if (m_config.m_sslInternal) {
+            m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, m_config.m_sslServerContext,
+                    m_config.m_sslClientContext);
+        } else {
+            m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this                );
+        }
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
@@ -3137,7 +3235,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return determination;
     }
 
-    void logDebuggingInfo(int adminPort, int httpPort, String httpPortExtraLogMessage, boolean jsonEnabled) {
+    void logDebuggingInfo(VoltDB.Configuration config, String httpPortExtraLogMessage, boolean jsonEnabled) {
         String startAction = m_config.m_startAction.toString();
         String startActionLog = "Database start action is " + (startAction.substring(0, 1).toUpperCase() +
                 startAction.substring(1).toLowerCase()) + ".";
@@ -3147,7 +3245,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // print out awesome network stuff
         hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
-        hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", adminPort));
+        hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", config.m_adminPort));
 
         if (m_startMode == OperationMode.PAUSED) {
             hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
@@ -3160,17 +3258,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (httpPortExtraLogMessage != null) {
             hostLog.info(httpPortExtraLogMessage);
         }
-        if (httpPort != -1) {
-            hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", httpPort));
+        if (config.m_httpPort != -1) {
+            hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", config.m_httpPort));
         }
         else {
             hostLog.info(String.format("Local machine HTTP monitoring is disabled."));
         }
         if (jsonEnabled) {
-            hostLog.info(String.format("Json API over HTTP enabled at path /api/1.0/, listening on port %d.", httpPort));
+            hostLog.info(String.format("Json API over HTTP enabled at path /api/1.0/, listening on port %d.",
+                    config.m_httpPort));
         }
         else {
             hostLog.info("Json API disabled.");
+        }
+        if (config.m_sslEnable) {
+            hostLog.info("OpenSsl is " + (OpenSsl.isAvailable() ? "enabled" : "disabled"));
         }
 
         // java heap size
@@ -3324,8 +3426,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
         String buildString = m_buildString;
-        if (m_buildString.contains("_"))
+        if (m_buildString.contains("_")) {
             buildString = m_buildString.split("_", 2)[1];
+        }
         consoleLog.info(String.format("Build: %s %s %s", m_versionString, buildString, editionTag));
     }
 
@@ -3444,8 +3547,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
 
                 // shutdown the web monitoring / json
-                if (m_adminListener != null)
+                if (m_adminListener != null) {
                     m_adminListener.stop();
+                }
 
                 // shut down the client interface
                 if (m_clientInterface != null) {
@@ -3665,8 +3769,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void cleanUpTempCatalogJar() {
         File configInfoDir = getConfigDirectory();
-        if (!configInfoDir.exists())
+        if (!configInfoDir.exists()) {
             return;
+        }
 
         File tempJar = new VoltFile(configInfoDir.getPath(),
                                     InMemoryJarfile.TMP_CATALOG_JAR_FILENAME);
@@ -3762,7 +3867,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         requiresNewExportGeneration, partitions);
 
                 // 1.1 Update the elastic join throughput settings
-                if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
+                if (m_elasticJoinService != null) {
+                    m_elasticJoinService.updateConfig(m_catalogContext);
+                }
 
                 // 1.5 update the dead host timeout
                 if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {

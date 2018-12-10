@@ -532,8 +532,8 @@ public class Inits {
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, m_config.m_sslContextFactory, mustListen
-                            );
+                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort,
+                            m_config.m_sslContextFactory, mustListen);
                     success = true;
                     break;
                 } catch (Exception e1) {

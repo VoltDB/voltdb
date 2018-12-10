@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2018 VoltDB Inc.
@@ -33,7 +33,7 @@ make_configmap() {
     [ ! -z "${CLASSES_JAR}" ] && CONFIG_MAP_ARGS+=" --from-file=classes=${CLASSES_JAR}"
     [ ! -z "${SCHEMA_FILE}" ] && CONFIG_MAP_ARGS+=" --from-file=schema=${SCHEMA_FILE}"
     [ ! -z "${LICENSE_FILE}" ] && CONFIG_MAP_ARGS+=" --from-file=license=${LICENSE_FILE}"
-    [ ! -z "${LOG4J_CUSTOM_FILE}" ] && CONFIG_MAP_ARGS+=" --from-file=log4jcfg=${LOG4J_CUSTOM_FILE}"
+    [ ! -z "${LOG4J_CONFIG_PATH}" ] && CONFIG_MAP_ARGS+=" --from-file=log4jcfg=${LOG4J_CONFIG_PATH}"
 
     kubectl create configmap $MAPNAME $CONFIG_MAP_ARGS
 
@@ -45,7 +45,7 @@ make_configmap() {
     [ ! -z "${VOLTDB_INIT_ARGS}" ] && echo "VOLTDB_INIT_ARGS=${VOLTDB_INIT_ARGS}"     >> ${PROP_FILE}
     grep VOLTDB_START_ARGS      ${CFG_FILE} >> ${PROP_FILE}
     egrep NODECOUNT              ${CFG_FILE} >> ${PROP_FILE}
-    [ ! -z "${LOG4J_CUSTOM_FILE}"  ] && VOLTDB_OPTS="-Dlog4j.configuration=\"/etc/voltdb/log4jcfg\" $VOLTDB_OPTS"
+    [ ! -z "${LOG4J_CONFIG_PATH}"  ] && echo "LOG4J_CONFIG_PATH=\"/etc/voltdb/log4jcfg\"" >> ${PROP_FILE}
     [ ! -z "${VOLTDB_OPTS}" ] && echo "VOLTDB_OPTS=${VOLTDB_OPTS}"                    >> ${PROP_FILE}
     grep VOLTDB_HEAPMAX         ${CFG_FILE} >> ${PROP_FILE}
     cat ${PROP_FILE}

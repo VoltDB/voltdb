@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
-import io.netty_voltpatches.buffer.CompositeByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 
 public abstract class VoltProtocolHandler implements InputHandler {
     /** VoltProtocolPorts each have a unique id */
