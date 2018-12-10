@@ -79,7 +79,7 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             RexNode postPredicate,
             int splitCount,
             boolean isCoordinatorAggr) {
-        this(cluster,
+        super(cluster,
                 traitSet,
                 child,
                 indicator,
@@ -88,31 +88,9 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 aggCalls,
                 postPredicate,
                 splitCount,
-                isCoordinatorAggr,
-                null,
-                null);
-    }
-
-    public VoltDBPSerialAggregate(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls,
-            RexNode postPredicate,
-            boolean isCoordinatorAggr) {
-        this(cluster,
-                traitSet,
-                child,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                postPredicate,
-                1,
                 isCoordinatorAggr);
+        m_offset = null;
+        m_limit = null;
     }
 
     @Override
@@ -155,7 +133,7 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate,
+            RexNode havingExpression,
             int splitCount,
             boolean isCoordinatorAggr) {
         return new VoltDBPSerialAggregate(
@@ -166,7 +144,7 @@ public class VoltDBPSerialAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                postPredicate,
+                havingExpression,
                 splitCount,
                 isCoordinatorAggr,
                 m_offset,

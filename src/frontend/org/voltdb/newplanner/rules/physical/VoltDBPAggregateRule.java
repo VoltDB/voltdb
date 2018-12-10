@@ -77,8 +77,8 @@ public class VoltDBPAggregateRule extends RelOptRule {
                     null,
                     false);
             call.transformTo(hashAggr);
-            // TODO: It seems we can make an early return here cause the planner will always choose the
-            // HashAggregate rather than SerialAggregate. I will go back to checker this in future stage.
+            // We can't early return here, cause
+            // hash aggregation are replaced with serial aggregation in large query
         }
 
         // Transform to a physical Serial Aggregate. To enforce a required ordering add a collation
@@ -101,6 +101,7 @@ public class VoltDBPAggregateRule extends RelOptRule {
                 aggregate.getGroupSets(),
                 aggregate.getAggCallList(),
                 null,
+                1,
                 false);
         // The fact that the convertedAggrTraits does have non-empty collation would force Calcite to create
         // a Sort relation on top of the aggregate. We can add the sort ourselves and also declare
@@ -140,6 +141,9 @@ public class VoltDBPAggregateRule extends RelOptRule {
     private boolean needHashAggregator(VoltDBLAggregate aggr) {
         // A hash is required to build up per-group aggregates in parallel vs.
         // when there is only one aggregation over the entire table
+
+        // TODO: should be `! isLargeQueryMode() && hasGroupBy(aggr);`
+        // update when we have introduce large query mode in calcite.
         return hasGroupBy(aggr);
     }
 

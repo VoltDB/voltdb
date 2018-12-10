@@ -17,6 +17,7 @@
 
 package org.voltdb.newplanner.rules.physical;
 
+import com.sun.tools.internal.jxc.ap.Const;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
@@ -54,7 +55,7 @@ public class VoltDBPSeqScanRule extends RelOptRule {
         // Table distribution
         RelDistribution tableDist = tableScan.getTable().getDistribution();
         int scanSplitCount = (Type.SINGLETON == tableDist.getType()) ?
-                1 : AbstractVoltDBPExchange.DISTRIBUTED_SPLIT_COUNT;
+                1 : Constants.DISTRIBUTED_SPLIT_COUNT;
         VoltDBPTableSeqScan scanRel = new VoltDBPTableSeqScan(
                 tableScan.getCluster(),
                 convertedTraits.plus(tableDist),

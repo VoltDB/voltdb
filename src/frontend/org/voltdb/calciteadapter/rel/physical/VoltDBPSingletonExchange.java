@@ -21,6 +21,13 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 
+/**
+ * Sub-class of {@link AbstractVoltDBPExchange}
+ * targeted at Exchange on a single partition.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
 public class VoltDBPSingletonExchange extends AbstractVoltDBPExchange implements VoltDBPRel {
 
     public VoltDBPSingletonExchange(RelOptCluster cluster,

@@ -54,7 +54,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
      * @param groupSet Bit set of grouping fields
      * @param groupSets List of all grouping sets; null for just {@code groupSet}
      * @param aggCalls Collection of calls to aggregate functions
-     * @param postPredicate HAVING expression
+     * @param havingExpression HAVING expression
      * @param splitCount Number of concurrent processes that this VoltDBPRel will be executed in
      * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
      */
@@ -66,11 +66,11 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate,
+            RexNode havingExpression,
             int splitCount,
             boolean isCoordinatorAggr) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
-        m_postPredicate = postPredicate;
+        m_postPredicate = havingExpression;
         m_splitCount = splitCount;
         m_isCoordinatorAggr = isCoordinatorAggr;
     }
@@ -103,7 +103,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
     }
 
     /**
-     * Copy self
+     * Copy self, refer to the constructor.
      *
      * @param cluster Cluster
      * @param traitSet Traits
@@ -113,7 +113,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
      * @param groupSet Bit set of grouping fields
      * @param groupSets List of all grouping sets; null for just {@code groupSet}
      * @param aggCalls Collection of calls to aggregate functions
-     * @param postPredicate HAVING expression
+     * @param havingExpression HAVING expression
      * @param splitCount Number of concurrent processes that this VoltDBPRel will be executed in
      * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
      * @return A cloned {@link AbstractVoltDBPAggregate}.
@@ -126,7 +126,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate,
+            RexNode havingExpression,
             int splitCount,
             boolean isCoordinatorAggr);
 

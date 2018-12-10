@@ -35,16 +35,13 @@ import org.apache.calcite.rel.core.Exchange;
  */
 public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDBPRel {
 
-    // TODO: why 30?
-    public static final int DISTRIBUTED_SPLIT_COUNT = 30;
-
     // Exchange's split count equals the count of (host number * site number per host)  its input runs on
     protected final int m_splitCount;
 
     // An indicator to be set to TRUE only for a top(coordinator) exchange for a multi-partitioned queries
     // Other relations could take advantage of this flag during Exchange Transpose rules if a relation
     // behavior depends whether it's part of the coordinator or fragment stack
-    protected final boolean m_topExchange;
+    protected final boolean m_isTopExchange;
 
     protected AbstractVoltDBPExchange(RelOptCluster cluster,
                                       RelTraitSet traitSet,
@@ -54,7 +51,7 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
         super(cluster, traitSet, input, traitSet.getTrait(RelDistributionTraitDef.INSTANCE));
         Preconditions.checkArgument(!RelDistributions.ANY.getType().equals(traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType()));
         m_splitCount = splitCount;
-        m_topExchange = topExchange;
+        m_isTopExchange = topExchange;
     }
 
     @Override
@@ -95,6 +92,6 @@ public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDB
             boolean isTopExchang);
 
     public boolean isTopExchange() {
-        return m_topExchange;
+        return m_isTopExchange;
     }
 }

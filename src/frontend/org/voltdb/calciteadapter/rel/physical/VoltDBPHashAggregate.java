@@ -133,7 +133,7 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls,
-            RexNode postPredicate,
+            RexNode havingExpression,
             int splitCount,
             boolean isCoordinatorAggr) {
         return new VoltDBPHashAggregate(
@@ -144,7 +144,7 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 groupSet,
                 groupSets,
                 aggCalls,
-                postPredicate,
+                havingExpression,
                 splitCount,
                 isCoordinatorAggr);
 

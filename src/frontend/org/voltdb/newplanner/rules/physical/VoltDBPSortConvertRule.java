@@ -70,7 +70,7 @@ public class VoltDBPSortConvertRule extends ConverterRule {
         // If a RelDistribution trait is ANY then this Sort relation still sits above an Exchange node
         // and its distribution is unknown yet. Set it simply to 1
         int splitCount = (childDistribution.getType().equals(RelDistributions.ANY.getType())) ?
-                1 : AbstractVoltDBPExchange.DISTRIBUTED_SPLIT_COUNT;
+                1 : Constants.DISTRIBUTED_SPLIT_COUNT;
 
         return new VoltDBPSort(
                 sort.getCluster(),

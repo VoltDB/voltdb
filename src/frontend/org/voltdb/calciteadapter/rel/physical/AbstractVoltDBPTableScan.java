@@ -62,6 +62,21 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
     protected RelDataType m_preAggregateRowType;
     protected RexProgram m_preAggregateProgram;
 
+    /**
+     * Constructor.
+     *
+     * @param cluster Cluster
+     * @param traitSet Traits
+     * @param table The table definition
+     * @param voltDBTable The target {@link VoltTable}
+     * @param program Program
+     * @param offset Offset
+     * @param limit Limmit
+     * @param aggregate Aggregate
+     * @param preAggregateRowType The type of the rows returned by this relational expression before aggregation
+     * @param preAggregateProgram The program before aggregation
+     * @param splitCount Number of concurrent processes that this relational expression will be executed in
+     */
     protected AbstractVoltDBPTableScan(RelOptCluster cluster,
                                        RelTraitSet traitSet,
                                        RelOptTable table,
@@ -129,7 +144,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
             if (rowDataType.getFieldCount() > 0) {
                 return rowDataType;
             } else {
-                return table.getRowType();
+                throw new IllegalStateException("Row count can not be 0.");
             }
         }
     }
@@ -142,7 +157,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
      * The actual plan cost is depend on the planner implementation.
      *
      * @param planner Planner for cost calculation
-     * @param mq Metadata query
+     * @param mq      Metadata query
      * @return Cost of this plan (not including children)
      */
     @Override
@@ -206,15 +221,26 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
         return m_preAggregateProgram;
     }
 
-    public abstract RelNode copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit);
+    /**
+     * Returns a copy of this {@link AbstractVoltDBTableScan} but with a new
+     * traitSet, limit and offset.
+     */
+    public abstract AbstractVoltDBTableScan copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit);
 
-    public abstract RelNode copyWithProgram(RelTraitSet traitSet, RexProgram program, RexBuilder rexBuilder);
+    /**
+     * Returns a copy of this {@link AbstractVoltDBTableScan} but with a new traitSet and program.
+     */
+    public abstract AbstractVoltDBTableScan copyWithProgram(RelTraitSet traitSet, RexProgram program, RexBuilder rexBuilder);
 
-    public abstract RelNode copyWithAggregate(RelTraitSet traitSet, RelNode aggregate);
+    /**
+     * Returns a copy of this {@link AbstractVoltDBTableScan} but with a new traitSet and aggregate.
+     */
+    public abstract AbstractVoltDBTableScan copyWithAggregate(RelTraitSet traitSet, RelNode aggregate);
 
     protected double estimateRowCountWithLimit(double rowCount) {
         if (m_limit != null) {
             int limitInt = getLimit();
+            // TODO: when could it be -1?
             if (limitInt == -1) {
                 limitInt = DEFAULT_LIMIT_VALUE_PARAMETERIZED;
             }
