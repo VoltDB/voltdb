@@ -284,16 +284,15 @@ public class StreamBlockQueue {
                 ByteBuffer b = bbc.b();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
-                // If the truncation point was the first row in the block, the entire block is to be discarded
-                // We know it is the first row if the start sequence number of buffer is the truncation point
-                if (startSequenceNumber >= truncationSeqNo) {
+                // If after the truncation point is the first row in the block, the entire block is to be discarded
+                if (startSequenceNumber > truncationSeqNo) {
                     return PersistentBinaryDeque.fullTruncateResponse();
                 }
                 final int tupleCountPos = b.position();
                 final int tupleCount = b.getInt();
                 // There is nothing to do with this buffer
                 final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
-                if (lastSequenceNumber < truncationSeqNo) {
+                if (lastSequenceNumber <= truncationSeqNo) {
                     return null;
                 }
                 b.getLong(); // uniqueId
@@ -307,7 +306,7 @@ public class StreamBlockQueue {
                 int offset = 0;
                 while (b.hasRemaining()) {
                     if (startSequenceNumber + offset > truncationSeqNo) {
-                        // The sequence number of this row is the greater then the truncation sequence number.
+                        // The sequence number of this row is the greater than the truncation sequence number.
                         // Don't want this row, but want to preserve all rows before it.
                         // Move back before the row length prefix, txnId and header
                         // Return everything in the block before the truncation point.
