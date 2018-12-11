@@ -217,7 +217,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(0L, false);
+        resetStateInRejoinOrRecover(0L);
 
         /*
          * This is not the catalog relativeIndex(). This ID incorporates
@@ -354,7 +354,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         final String nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
         m_gapTracker = m_committedBuffers.scanForGap();
-        resetStateInRejoinOrRecover(0L, false);
+        resetStateInRejoinOrRecover(0L);
         if (exportLog.isDebugEnabled()) {
             exportLog.debug(toString() + " at AD file reads gap tracker from PBD:" + m_gapTracker.toString());
         }
@@ -771,7 +771,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         }
                     }
                     // Need to update pending tuples in rejoin
-                    resetStateInRejoinOrRecover(sequenceNumber, !isRecover);
+                    resetStateInRejoinOrRecover(sequenceNumber);
                 } catch (Throwable t) {
                     VoltDB.crashLocalVoltDB("Error while trying to truncate export to seq " +
                             sequenceNumber, true, t);
@@ -1614,16 +1614,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    private void resetStateInRejoinOrRecover(long initialSequenceNumber, boolean updatePendingTuples) {
+    private void resetStateInRejoinOrRecover(long initialSequenceNumber) {
         m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo,
                 m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo());
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
-        if (updatePendingTuples) {
-            int original = m_tuplesPending.get();
-            m_tuplesPending.set(m_gapTracker.sizeInSequence());
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("m_tuplesPending " + original + " set to " + m_gapTracker.sizeInSequence() + ": " + m_tuplesPending.get());
-            }
+        int original = m_tuplesPending.get();
+        m_tuplesPending.set(m_gapTracker.sizeInSequence());
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug("m_tuplesPending " + original + " set to " + m_gapTracker.sizeInSequence() + ": " + m_tuplesPending.get());
         }
     }
 
