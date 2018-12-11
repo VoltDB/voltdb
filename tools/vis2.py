@@ -26,6 +26,7 @@ import datetime
 
 STATS_SERVER = 'volt2'
 NaN = float("nan")
+MASTER = 'master'
 
 # These are the "Tableau 20" colors as RGB.
 COLORS = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),
@@ -212,11 +213,13 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
     pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate, series)
 
     toc = dict()
-    branches_sort = sorted(plot_data.keys())
 
-    if 'master' in branches_sort:
-        branches_sort.remove('master')
-        branches_master_first = ['master'] + branches_sort
+    # if MASTER != 'master':
+    #     branches_sort.remove('master')
+
+    if MASTER in branches_sort:
+        branches_sort.remove(MASTER)
+        branches_master_first = [MASTER] + branches_sort
     else:
         branches_master_first = branches_sort
         print "WARN: has no master: %s" % title
@@ -265,7 +268,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             if len(ma) > MOVING_AVERAGE_DAYS:
                 pl.plot(bdata.xdata, ma, bdata.seriescolor, None, None, ":")
 
-            if b == 'master':
+            if b == MASTER:
                 # if we have enough data compute moving average and moving std dev
                 # std is std of data correspoinding to each ma window
                 # nb. std is used only in the charts for the 2-sigma line
@@ -282,15 +285,15 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     failed = 0
                     if polarity == 1:
                         # increasing is bad
-                        bestmapoint = np.nanmin(ma)
-                        localminormax = (bdata.xdata[np.nanargmin(ma)], bestmapoint)
-                        if b == 'master' and bdata.ma[last] > bdata.median * 1.05:
+                        bestpoint = np.nanmin(ma)
+                        localminormax = (bdata.xdata[np.nanargmin(ma)], bestpoint)
+                        if b == MASTER and bdata.ma[last] > bdata.median * 1.05:
                             failed = 1
                     else:
                         # decreasing is bad
-                        bestmapoint = np.nanmax(ma)
-                        localminormax = (bdata.xdata[np.nanargmax(ma)], bestmapoint)
-                        if b == 'master' and bdata.ma[last] < bdata.median * 0.95:
+                        bestpoint = np.nanmax(ma)
+                        localminormax = (bdata.xdata[np.nanargmax(ma)], bestpoint)
+                        if b == MASTER and bdata.ma[last] < bdata.median * 0.95:
                             failed = 1
 
                     # plot the 2-sigma line
@@ -625,20 +628,25 @@ def main():
         exit(-1)
 
     if not os.path.exists(sys.argv[1]):
+        print (os.getcwd())
         print sys.argv[1], "does not exist"
-        exit(-1)
+        os.mkdir(sys.argv[1])
+        #exit(-1)
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
     ndays = 2000
     if len(sys.argv) >= 4:
         ndays = int(sys.argv[3])
+    if len(sys.argv) >= 5:
+        global MASTER
+        MASTER = str(sys.argv[4])
     width = WIDTH
     height = HEIGHT
-    if len(sys.argv) >= 5:
-        width = int(sys.argv[4])
     if len(sys.argv) >= 6:
-        height = int(sys.argv[5])
+        width = int(sys.argv[5])
+    if len(sys.argv) >= 7:
+        height = int(sys.argv[6])
 
     # show all the history
     (stats, mindate, maxdate) = get_stats(STATS_SERVER, 21212, ndays)
