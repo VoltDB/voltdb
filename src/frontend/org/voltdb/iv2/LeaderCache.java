@@ -169,7 +169,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      * @throws ExecutionException
      */
     public void startPartitionWatch() throws InterruptedException, ExecutionException {
-        Future<?> task = m_es.submit(new PartitionWatchEvent(null));
+        Future<?> task = m_es.submit(new PartitionWatchEvent());
         task.get();
     }
 
@@ -385,7 +385,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
 
     // parent (root node) sees new or deleted child
     private class PartitionWatchEvent implements Runnable {
-        public PartitionWatchEvent(WatchedEvent event) {
+        public PartitionWatchEvent() {
         }
 
         @Override
@@ -401,12 +401,12 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     }
 
-    // Put watch on partition-specific zk node
+    // Race to create partition-specific zk node and put a watch on it.
     private void processPartitionWatchEvent() throws KeeperException, InterruptedException {
         try {
-            m_zk.getData(m_rootNode, m_childWatch, null);
-        } catch (KeeperException.NoNodeException e) {
             m_zk.create(m_rootNode, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            m_zk.getData(m_rootNode, m_childWatch, null);
+        } catch (KeeperException.NodeExistsException e) {
             m_zk.getData(m_rootNode, m_childWatch, null);
         }
     }
@@ -414,8 +414,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     // example zkPath string: /db/iv2masters/1
     protected static int getPartitionIdFromZKPath(String zkPath)
     {
-        String array[] = zkPath.split("/");
-        return Integer.valueOf(array[array.length - 1]);
+        return Integer.parseInt(zkPath.substring(zkPath.lastIndexOf('/') + 1));
     }
 
     @Override
