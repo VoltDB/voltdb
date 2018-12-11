@@ -375,7 +375,7 @@ public class AsyncExportClient
 
             Thread.sleep(10000);
             waitForStreamedAllocatedMemoryZero(clientRef.get(),config.exportTimeout);
-            System.out.println("Writing export count as: " + TrackingResults.get(0));
+            System.out.println("Writing export count as: " + TrackingResults.get(0) + " final rowid:" + rowId);
             //Write to export table to get count to be expected on other side.
             if (config.exportGroups) {
                 clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
@@ -401,7 +401,9 @@ public class AsyncExportClient
             , TrackingResults.get(0)
             , TrackingResults.get(1)
             );
-
+            if ( TrackingResults.get(0) + TrackingResults.get(1) != rowId.longValue() ) {
+                System.out.println("WARNING Tracking results total doesn't match find rowId sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
+            }
             // 3. Performance statistics (we only care about the procedure that we're benchmarking)
             System.out.println(
               "\n\n-------------------------------------------------------------------------------------\n"
