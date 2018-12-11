@@ -404,8 +404,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         while (!m_committedBuffers.isEmpty() && releaseSeqNo >= m_committedBuffers.peek().startSequenceNumber()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseSeqNo >= sb.lastSequenceNumber()) {
-                m_committedBuffers.pop();
                 try {
+                    m_committedBuffers.pop();
                     m_lastAckedTimestamp = Math.max(m_lastAckedTimestamp, sb.getTimestamp());
                 } finally {
                     sb.discard();

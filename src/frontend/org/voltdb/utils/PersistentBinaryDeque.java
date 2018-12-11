@@ -217,7 +217,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             PBDSegmentReader segmentReader = segment.getReader(m_cursorId);
                             // Don't delete if this is the last segment.
                             // Cannot be deleted if this reader hasn't finished discarding this.
-                            if (segment == peekLastSegment() || !segmentReader.allReadAndDiscarded()) {
+                            if (/*segment == peekLastSegment() || */!segmentReader.allReadAndDiscarded()) {
                                 return;
                             }
                             if (canDeleteSegment(segment)) {
