@@ -337,14 +337,17 @@ public class ExportKafkaOnServerVerifier {
         consumersLatch2.await();
         System.out.println("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows.get());
         if ( consumedRows.get() == 0 ) {
-            System.out.println("ERROR No rows were consumed.");
-        } else if (consumedRows.get() < expectedRows.get() ) {
-            System.out.println("ERROR Consumed row count: '"+ consumedRows.get() + "' is less then expected: '" + expectedRows.get() + "'");
+            System.err.println("ERROR No rows were consumed.");
             testGood.set(false);
+        } else if (consumedRows.get() < expectedRows.get() ) {
+            // we will calculate the details of this below.
+            System.out.println("WARNING Consumed row count: '" + consumedRows.get() + "' is less then the expected number given by the client: '" +
+                expectedRows.get() + "'");
         }
 
         System.out.println("Checking for missing rows");
-
+        // the total number of rows should equal the value in the EXPORT_DONE_TABLE
+        // there may be missing rows because TXN's will fail if their was server shutdown
         List<Long> missingRowIds = new ArrayList<Long>();
         Long[] sortedIds = foundRowIds.toArray(new Long[0]);
         Arrays.sort(sortedIds);
@@ -362,17 +365,29 @@ public class ExportKafkaOnServerVerifier {
                 duplicateCnt++;
                 continue;
             }
-            lastId = id;
-            while ( currVal < id ) {
-                missingCnt++;
-                System.out.print(currVal+",");
-                currVal++;
-            }
-            currVal++;
-        }
 
-        if ( missingCnt > 0 ) {
-            System.err.println("\nERROR There are '" + missingCnt + "' missing rows");
+            // We expect to have missing values in the sequence
+            // beause of failed txn's in the client
+            if ( lastId < id -1 ) {
+                while ( lastId < id ) {
+                    missingCnt++;
+                    System.out.print(lastId+",");
+                    lastId++;
+                }
+            } else {
+                lastId = id;
+            }
+        }
+        // # received - duplicates + missing rows = LastId
+        long realMissing = lastId - (ids.size() - duplicateCnt + missingCnt);
+        System.out.println("");
+        System.out.println("Total messages in Kafka = " + ids.size());
+        System.out.println("Total missing sequence numbers in Kafka = " + missingCnt);
+        System.out.println("Total duplicates discovered in Kafka = " + duplicateCnt);
+        System.out.println("Total attempted txnid from client = "+lastId);
+
+        if ( realMissing > 0 ) {
+            System.err.println("\nERROR There are '" + realMissing + "' missing rows");
             testGood.set(false);
         } else {
             System.out.println("There were no missing rows");
