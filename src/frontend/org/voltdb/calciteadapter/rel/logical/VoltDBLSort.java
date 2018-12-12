@@ -17,6 +17,7 @@
 
 package org.voltdb.calciteadapter.rel.logical;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
@@ -38,7 +39,7 @@ public class VoltDBLSort extends Sort implements VoltDBLRel {
             RelNode input,
             RelCollation collation) {
             super(cluster, traitSet, input, collation, null, null);
-            assert traitSet.contains(VoltDBLRel.VOLTDB_LOGICAL);
+            Preconditions.checkArgument(getConvention() == VoltDBLRel.VOLTDB_LOGICAL);
         }
 
         @Override

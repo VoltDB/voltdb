@@ -25,6 +25,7 @@ package org.voltdb.newplanner;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
@@ -58,10 +59,10 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
                 root.rel, logicalTraits);
 
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
-        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributions.SINGLETON.getTraitDef());
+        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
         // Add RelDistributions.ANY trait to the rel tree.
-        nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.ANY);
+        nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.SINGLETON);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         RelTraitSet physicalTraits = nodeAfterLogicalRules.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
