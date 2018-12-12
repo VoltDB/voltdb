@@ -159,7 +159,7 @@ import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
-import org.voltdb.join.ElasticJoinService;
+import org.voltdb.join.ElasticService;
 import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
@@ -339,7 +339,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Rejoin coordinator
     private JoinCoordinator m_joinCoordinator = null;
-    private ElasticJoinService m_elasticJoinService = null;
+    private ElasticService m_elasticService = null;
 
     // Snapshot IO agent
     private SnapshotIOAgent m_snapshotIOAgent = null;
@@ -1624,8 +1624,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                            String.class,
                                                            int.class,
                                                            Supplier.class);
-                    m_elasticJoinService =
-                        (ElasticJoinService) constructor.newInstance(
+                    m_elasticService =
+                        (ElasticService) constructor.newInstance(
                                 m_messenger,
                                 m_clientInterface,
                                 m_cartographer,
@@ -1633,7 +1633,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 VoltDB.instance().getCommandLogSnapshotPath(),
                                 m_catalogContext.getDeployment().getCluster().getKfactor(),
                                 m_clusterSettings);
-                    m_elasticJoinService.updateConfig(m_catalogContext);
+                    m_elasticService.updateConfig(m_catalogContext);
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to instantiate elastic join service", false, e);
@@ -3512,8 +3512,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_periodicPriorityWorkThread.shutdown();
                 m_periodicPriorityWorkThread.awaitTermination(356, TimeUnit.DAYS);
 
-                if (m_elasticJoinService != null) {
-                    m_elasticJoinService.shutdown();
+                if (m_elasticService != null) {
+                    m_elasticService.shutdown();
                 }
 
                 if (m_leaderAppointer != null) {
@@ -3847,8 +3847,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         requiresNewExportGeneration, partitions);
 
                 // 1.1 Update the elastic join throughput settings
-                if (m_elasticJoinService != null) {
-                    m_elasticJoinService.updateConfig(m_catalogContext);
+                if (m_elasticService != null) {
+                    m_elasticService.updateConfig(m_catalogContext);
                 }
 
                 // 1.5 update the dead host timeout

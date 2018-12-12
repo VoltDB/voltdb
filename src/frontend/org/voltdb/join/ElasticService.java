@@ -19,7 +19,7 @@ package org.voltdb.join;
 
 import org.voltdb.CatalogContext;
 
-public interface ElasticJoinService {
+public interface ElasticService {
     void shutdown();
     void updateConfig(CatalogContext context);
 }
