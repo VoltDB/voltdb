@@ -505,10 +505,10 @@ public class MpScheduler extends Scheduler
                 m_leaderMigrationMap.remove(message.m_sourceHSId);
 
                 // Leader migration has updated the leader, send the request to the new leader
-                m_mailbox.send(newLeader, (Iv2InitiateTaskMessage)counter.getOpenMessage());
+                m_mailbox.send(newLeader, counter.getOpenMessage());
             } else {
                 // Leader migration not done yet.
-                m_mailbox.send(message.m_sourceHSId, (Iv2InitiateTaskMessage)counter.getOpenMessage());
+                m_mailbox.send(message.m_sourceHSId, counter.getOpenMessage());
             }
             return;
         }
