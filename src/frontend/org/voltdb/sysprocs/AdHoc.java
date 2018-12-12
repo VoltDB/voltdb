@@ -151,7 +151,6 @@ public class AdHoc extends AdHocNTBase {
         return runDDLBatch(sqls, nodes);
     }
 
-
     private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes) {
         // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
         SortedSet<String> conflictTables = new TreeSet<>();

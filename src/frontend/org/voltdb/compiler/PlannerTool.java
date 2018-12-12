@@ -216,7 +216,7 @@ public class PlannerTool {
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
         // create VoltSqlValidator from SchemaPlus.
-        VoltSqlValidator validator = new VoltSqlValidator(m_schemaPlus);
+        VoltSqlValidator validator = VoltSqlValidator.createFromSchema(m_schemaPlus);
         // validate the task's SqlNode.
         SqlNode validatedNode = validator.validate(task.getParsedQuery());
         // convert SqlNode to RelNode.

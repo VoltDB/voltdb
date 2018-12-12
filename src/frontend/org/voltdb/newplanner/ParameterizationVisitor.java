@@ -143,6 +143,11 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
         return retval;
     }
 
+    /**
+     * Comparator for Pair<Integer, SqlNode>, based on the SqlNode's parser position.
+     * @author Yiqun Zhang
+     * @since 8.4
+     */
     private static final class PositionBasedIndexedSqlNodePairComparator implements Comparator<Pair<Integer,SqlNode>> {
         final static PositionBasedIndexedSqlNodePairComparator INSTANCE =
                 new PositionBasedIndexedSqlNodePairComparator();

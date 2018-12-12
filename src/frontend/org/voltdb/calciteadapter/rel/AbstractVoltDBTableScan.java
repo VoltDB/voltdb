@@ -23,7 +23,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.TableScan;
 
 /**
- * This is from Mike A. as an adaptor <code>org.apache.calcite.rel.core.TableScan</code> that
+ * This is from Mike A. as an adapter of <code>org.apache.calcite.rel.core.TableScan</code> that
  * views a <code>org.voltdb.calciteadapter.rel.VoltDBTable</code> as a relational expression.
  */
 public abstract class AbstractVoltDBTableScan extends TableScan {
@@ -33,10 +33,10 @@ public abstract class AbstractVoltDBTableScan extends TableScan {
     protected AbstractVoltDBTableScan(RelOptCluster cluster,
                                       RelTraitSet traitSet,
                                       RelOptTable table,
-                                      VoltTable voltDBTable) {
+                                      VoltTable voltTable) {
         super(cluster, traitSet, table);
-        assert(voltDBTable != null) : "VoltDB Table is null";
-        this.m_voltTable = voltDBTable;
+        assert(voltTable != null) : "VoltTable is null";
+        this.m_voltTable = voltTable;
     }
 
     /**

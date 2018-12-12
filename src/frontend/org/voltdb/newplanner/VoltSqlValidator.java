@@ -17,6 +17,8 @@
 
 package org.voltdb.newplanner;
 
+import java.util.ArrayList;
+
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -30,8 +32,6 @@ import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlValidatorCatalogReader;
 import org.apache.calcite.sql.validate.SqlValidatorImpl;
 
-import java.util.ArrayList;
-
 
 /**
  * VoltDB SQL validator.
@@ -42,10 +42,10 @@ public class VoltSqlValidator extends SqlValidatorImpl {
 
     /**
      * Build a VoltDB SQL validator.
-     * @param opTab
-     * @param catalogReader
-     * @param typeFactory
-     * @param conformance
+     * @param opTab SqlOperatorTable
+     * @param catalogReader SqlValidatorCatalogReader
+     * @param typeFactory RelDataTypeFactory
+     * @param conformance SqlConformance
      */
     public VoltSqlValidator(SqlOperatorTable opTab, SqlValidatorCatalogReader catalogReader,
             RelDataTypeFactory typeFactory, SqlConformance conformance) {
@@ -54,21 +54,19 @@ public class VoltSqlValidator extends SqlValidatorImpl {
 
     /**
      * Build a VoltDB SQL validator from {@link SchemaPlus}.
-     *
      * @param schemaPlus
      */
-    public VoltSqlValidator(SchemaPlus schemaPlus) {
+    public static VoltSqlValidator createFromSchema(SchemaPlus schemaPlus) {
         // TODO: currently we are using the default implementation of SqlOperatorTable, RelDataTypeFactory
         // and SqlConformance. May replace them with our own versions in the future.
-        this(
-                SqlStdOperatorTable.instance(),
-                new CalciteCatalogReader(
-                        CalciteSchema.from(schemaPlus),
-                        new ArrayList<>(),
-                        new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT),
-                        null
+        RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+        return new VoltSqlValidator(SqlStdOperatorTable.instance(),
+                new CalciteCatalogReader(CalciteSchema.from(schemaPlus),
+                        new ArrayList<>(), /*default schema*/
+                        typeFactory,
+                        null /*connection config*/
                 ),
-                new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT),
+                typeFactory,
                 SqlConformanceEnum.DEFAULT
         );
     }

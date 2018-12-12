@@ -31,8 +31,6 @@ import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.parser.SqlParserWrapper;
 import org.voltdb.planner.PlannerTestCase;
 
-import java.util.Objects;
-
 /**
  * A base class for implementing tests against {@link VoltSqlValidator}.
  *
@@ -50,7 +48,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
      */
     protected void init(SchemaPlus schemaPlus) {
         m_schemaPlus = schemaPlus;
-        m_validator = new VoltSqlValidator(m_schemaPlus);
+        m_validator = VoltSqlValidator.createFromSchema(m_schemaPlus);
     }
 
     protected VoltSqlValidator getValidator() {

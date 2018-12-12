@@ -17,6 +17,8 @@
 
 package org.voltdb.newplanner;
 
+import java.util.ArrayList;
+
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
@@ -25,7 +27,6 @@ import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.metadata.RelMetadataProvider;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.schema.SchemaPlus;
@@ -35,10 +36,8 @@ import org.apache.calcite.sql2rel.SqlRexConvertletTable;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 
-import java.util.ArrayList;
-
 /**
- * VoltDB SqlToRelConverter which Converts a SQL parse tree (consisting of
+ * VoltDB SqlToRelConverter which converts a SQL parse tree (consisting of
  * {@link org.apache.calcite.sql.SqlNode} objects) into a relational algebra
  * expression (consisting of {@link org.apache.calcite.rel.RelNode} objects).
  *
@@ -83,7 +82,6 @@ public class VoltSqlToRelConverter extends SqlToRelConverter {
 
         final RexBuilder rexBuilder = new RexBuilder(new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT));
         final RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
-        RelMetadataProvider pv = cluster.getMetadataProvider();
         final Prepare.CatalogReader reader = new CalciteCatalogReader(
                 CalciteSchema.from(schemaPlus),
                 new ArrayList<>(),

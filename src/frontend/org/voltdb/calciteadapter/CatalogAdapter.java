@@ -22,29 +22,32 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.voltdb.calciteadapter.rel.VoltTable;
 import org.voltdb.catalog.Database;
 
-
 /**
- * This is the common adaptor that VoltDB should query any catalog object from.
+ * This is the common adapter that VoltDB should query any catalog object from.
  * It is built around the <code>org.voltdb.catalog.Database</code> instance in sync
  * with any DDL operations. Taken/adapted from Mike A.
  *
- * NOTE that VoltDB creates a new Catalog/Database instance on every DDL stmt. (See
+ * NOTE that VoltDB creates a new Catalog/Database instance on every DDL stmt. (See the
  * <code>org.voltdb.compiler.VoltCompiler.loadSchema</code> method. In future, we
- * might save some trouble by avoid creating all catalog objects (tables, views, indexes,
+ * might save some troubles by avoiding creating all catalog objects (tables, views, indexes,
  * etc.) from scratch upon a new DDL batch/stmt.
+ *
+ * @author Lukai Liu
+ * @since 8.4
  */
 public class CatalogAdapter {
+
     /**
      * Creates a brand new SchemaPlus instance upon new VoltDB Database catalog.
-     *
-     * CalciteSchema is capable of caching; but we disable it for now since
-     * <code>org.apache.calcite.schema.SchemaPlus</code> instance is forced
-     * refreshed upon every new DDL batch/stmt.
+     * CalciteSchema is capable of caching (CachingCalciteSchema), but we disabled it for now to
+     * use SimpleCalciteSchema since the {@link org.apache.calcite.schema.SchemaPlus} instance is
+     * forced to be refreshed upon every new DDL batch/stmt.
      */
     public static SchemaPlus schemaPlusFromDatabase(Database db) {
         final SchemaPlus rootSchema =
-                CalciteSchema.createRootSchema(false, false, "catalog").plus();
-        // Get all tables from database
+                CalciteSchema.createRootSchema(false /*no adding the metadata schema*/,
+                                               false /*no caching*/, "catalog").plus();
+        // Get all tables from the database
         db.getTables().forEach(table -> {
             rootSchema.add(table.getTypeName(), new VoltTable(table));
             // TODO: Get all functions, etc. from database

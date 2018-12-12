@@ -91,14 +91,16 @@ public class NonDdlBatchCompiler {
     }
 
     /**
-     * Compile a batch of one or more SQL statements into a set of plans.
-     * Parameters are valid iff there is exactly one DML/DQL statement.
+     * Compile one task from the current batch.
+     * @param task the task to compile.
+     * @return the planned statement.
+     * @throws AdHocPlanningException
      */
     private AdHocPlannedStatement compileTask(SqlTask task) throws AdHocPlanningException {
         // TRAIL [Calcite:3] NonDdlBatchCompiler.compileTask()
-        assert(m_batch.m_catalogContext.m_ptool != null);
         assert(task != null);
         final PlannerTool ptool = m_batch.m_catalogContext.m_ptool;
+        assert(ptool != null);
 
         try {
             return ptool.planSqlCalcite(task, m_batch);

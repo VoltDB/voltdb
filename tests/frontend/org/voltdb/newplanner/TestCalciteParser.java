@@ -25,10 +25,16 @@ package org.voltdb.newplanner;
 
 import static org.junit.Assert.assertEquals;
 
+import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.junit.Test;
+import org.voltdb.calciteadapter.CatalogAdapter;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.parser.SqlParserWrapper;
 
 public class TestCalciteParser {
@@ -41,5 +47,18 @@ public class TestCalciteParser {
     @Test
     public void testSqlNodeKind() throws SqlParseException {
         assertSqlNodeKind("CREATE TABLE T (a INT)", SqlKind.CREATE_TABLE);
+    }
+
+    @Test
+    public void testComputeDigest() throws SqlParseException {
+        Catalog catalog = new Catalog();
+        Cluster cluster = catalog.getClusters().add("cluster");
+        Database database = cluster.getDatabases().add("database");
+        Table table = database.getTables().add("testTable");
+        SchemaPlus plus = CatalogAdapter.schemaPlusFromDatabase(database);
+        SqlNode sqlNode = SqlParserWrapper.parse("SELECT * FROM testTable;");
+
+        VoltSqlValidator validator = VoltSqlValidator.createFromSchema(plus);
+        SqlNode validatedNode = validator.validate(sqlNode);
     }
 }
