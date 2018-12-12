@@ -44,7 +44,7 @@ public class VoltDBLTableScan extends AbstractVoltDBTableScan implements VoltDBL
                 getCluster(),
                 traits,
                 getTable(),
-                getVoltDBTable());
+                getVoltTable());
     }
 
     public VoltDBLTableScan copy() {
@@ -52,6 +52,6 @@ public class VoltDBLTableScan extends AbstractVoltDBTableScan implements VoltDBL
                 getCluster(),
                 getTraitSet(),
                 getTable(),
-                getVoltDBTable());
+                getVoltTable());
     }
 }

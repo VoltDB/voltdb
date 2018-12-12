@@ -34,6 +34,12 @@ import org.voltdb.newplanner.rules.logical.VoltDBLCalcRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLJoinRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLSortRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLTableScanRule;
+import org.voltdb.newplanner.rules.physical.VoltDBPAggregateRule;
+import org.voltdb.newplanner.rules.physical.VoltDBPCalcRule;
+import org.voltdb.newplanner.rules.physical.VoltDBPJoinRule;
+import org.voltdb.newplanner.rules.physical.VoltDBPLimitRule;
+import org.voltdb.newplanner.rules.physical.VoltDBPSeqScanRule;
+import org.voltdb.newplanner.rules.physical.VoltDBPSortConvertRule;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,12 +68,52 @@ public enum PlannerPhase {
             return mergedRuleSets(getCalciteLogicalRules(),
                     getVoltLogicalRules());
         }
+    },
+
+    PHYSICAL_CONVERSION("VoltDBPhysical Conversion Rules") {
+        public RuleSet getRules() {
+            return getVoltPhysicalConversionRules();
+        }
     };
 
     public final String description;
 
     PlannerPhase(String description) {
         this.description = description;
+    }
+
+    private static final RuleSet s_CalciteLogicalRules;
+    private static final RuleSet s_VoltLogicalRules;
+    private static final RuleSet s_VoltPhysicalConversionRules;
+
+    static {
+        s_CalciteLogicalRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
+                .add(
+                        CalcMergeRule.INSTANCE,
+                        FilterCalcMergeRule.INSTANCE,
+                        FilterToCalcRule.INSTANCE,
+                        ProjectCalcMergeRule.INSTANCE,
+                        ProjectToCalcRule.INSTANCE,
+                        ProjectMergeRule.INSTANCE,
+                        FilterProjectTransposeRule.INSTANCE
+                ).build());
+        s_VoltLogicalRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
+                .add(
+                        VoltDBLSortRule.INSTANCE,
+                        VoltDBLTableScanRule.INSTANCE,
+                        VoltDBLCalcRule.INSTANCE,
+                        VoltDBLAggregateRule.INSTANCE,
+                        VoltDBLJoinRule.INSTANCE
+                ).build());
+        s_VoltPhysicalConversionRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
+                .add(
+                        VoltDBPCalcRule.INSTANCE,
+                        VoltDBPSeqScanRule.INSTANCE,
+                        VoltDBPSortConvertRule.INSTANCE_VOLTDB,
+                        VoltDBPLimitRule.INSTANCE,
+                        VoltDBPAggregateRule.INSTANCE,
+                        VoltDBPJoinRule.INSTANCE
+                ).build());
     }
 
     public abstract RuleSet getRules();
@@ -100,16 +146,7 @@ public enum PlannerPhase {
         ProjectCalcMergeRule merges this with a LogicalProject
         CalcMergeRule merges two LogicalCalcs
         */
-        final List<RelOptRule> ruleList = new ArrayList<>();
-        ruleList.add(CalcMergeRule.INSTANCE);
-        ruleList.add(FilterCalcMergeRule.INSTANCE);
-        ruleList.add(FilterToCalcRule.INSTANCE);
-        ruleList.add(ProjectCalcMergeRule.INSTANCE);
-        ruleList.add(ProjectToCalcRule.INSTANCE);
-        ruleList.add(ProjectMergeRule.INSTANCE);
-        ruleList.add(FilterProjectTransposeRule.INSTANCE);
-
-        return RuleSets.ofList(ruleList);
+        return s_CalciteLogicalRules;
     }
 
     /**
@@ -127,14 +164,10 @@ public enum PlannerPhase {
      * @return
      */
     static RuleSet getVoltLogicalRules() {
-        final List<RelOptRule> ruleList = new ArrayList<>();
+        return s_VoltLogicalRules;
+    }
 
-        ruleList.add(VoltDBLSortRule.INSTANCE);
-        ruleList.add(VoltDBLTableScanRule.INSTANCE);
-        ruleList.add(VoltDBLCalcRule.INSTANCE);
-        ruleList.add(VoltDBLAggregateRule.INSTANCE);
-        ruleList.add(VoltDBLJoinRule.INSTANCE);
-
-        return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
+    static RuleSet getVoltPhysicalConversionRules() {
+        return s_VoltPhysicalConversionRules;
     }
 }
