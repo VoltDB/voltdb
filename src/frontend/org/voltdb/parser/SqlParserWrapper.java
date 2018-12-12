@@ -20,23 +20,26 @@ package org.voltdb.parser;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.parser.SqlParser.Config;
 import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
 
 /**
- * This class provides a factory method to create a parser that is used by VoltDB.
+ * This class provides a wrapper function around Calcite SqlParser to parse a query.
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class SqlParserFactory {
+public class SqlParserWrapper {
+
+    private static Config s_parserConfig =
+            SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build();
+
     /**
      * Given a SQL statement (could be either a DDL or DQL/DML),
-     * create a {@link SqlParser} for it.
+     * parse it into a {@link SqlNode}.
      * @param sql the SQL statement to parse.
-     * @return a SQL parser created from the SQL statement.
+     * @return the parsed SqlNode tree for it.
      */
     public static SqlNode parse(String sql) throws SqlParseException {
-        return SqlParser.create(sql,
-                SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build())
-                .parseQuery(sql);
+        return SqlParser.create(sql, s_parserConfig).parseQuery(sql);
     }
 }

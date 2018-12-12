@@ -60,7 +60,7 @@ public class ParameterizedSqlTask extends AbstractSqlTaskDecorator {
         if (doNotParameterize) {
             m_sqlLiteralList = null;
         } else {
-            ParameterizeVisitor visitor = new ParameterizeVisitor();
+            ParameterizationVisitor visitor = new ParameterizationVisitor();
             getParsedQuery().accept(visitor);
             m_sqlLiteralList = visitor.getSqlLiteralList();
         }

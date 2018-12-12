@@ -37,7 +37,6 @@ public interface SqlBatch extends Iterable<SqlTask>  {
      */
     public boolean isDDLBatch();
 
-
     /**
      * Get the user parameters.
      * @return the user parameter array.

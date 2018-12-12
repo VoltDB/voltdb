@@ -38,7 +38,7 @@ import org.voltcore.utils.Pair;
  * @author Chao Zhou
  * @since 8.4
  */
-public class ParameterizeVisitor extends SqlBasicVisitor<SqlNode> {
+public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
 
     private final List<SqlLiteral> m_sqlLiteralList = new ArrayList<>();
     private int m_dynamicParamIndex = 0;

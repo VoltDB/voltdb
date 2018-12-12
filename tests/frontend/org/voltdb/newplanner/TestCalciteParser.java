@@ -29,12 +29,12 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.junit.Test;
-import org.voltdb.parser.SqlParserFactory;
+import org.voltdb.parser.SqlParserWrapper;
 
 public class TestCalciteParser {
 
     private void assertSqlNodeKind(String sql, SqlKind expectedSqlKind) throws SqlParseException {
-        SqlNode sqlNode = SqlParserFactory.parse(sql);
+        SqlNode sqlNode = SqlParserWrapper.parse(sql);
         assertEquals(expectedSqlKind, sqlNode.getKind());
     }
 

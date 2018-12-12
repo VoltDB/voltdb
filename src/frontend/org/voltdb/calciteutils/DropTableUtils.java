@@ -31,7 +31,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.parser.SqlParserFactory;
+import org.voltdb.parser.SqlParserWrapper;
 import org.voltdb.utils.Encoder;
 
 import java.util.Arrays;
@@ -56,7 +56,7 @@ public class DropTableUtils {
      */
     private static SqlNode toSqlNode(String sql) {
         try {
-            return SqlParserFactory.parse(sql);
+            return SqlParserWrapper.parse(sql);
         } catch (SqlParseException e) {
             return null;    // TODO: when Calcite eventually support all Volt syntax, we need to rethrow in here.
         }
