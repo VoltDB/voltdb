@@ -21,6 +21,7 @@ import org.voltdb.VoltDB;
 
 /**
  * Large queries cannot be handled by Calcite now.
+ * Fail the check if any large queries is detected.
  * @author Yiqun Zhang
  * @since 8.4
  */

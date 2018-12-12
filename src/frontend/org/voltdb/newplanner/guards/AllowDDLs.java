@@ -22,11 +22,11 @@ import org.voltdb.newplanner.SqlTaskImpl;
 import org.voltdb.planner.PlanningErrorException;
 
 /**
- * A check that always fail.
+ * Allow all DDLs.
  * @author Yiqun Zhang
  * @since 8.4
  */
-public class RealCalciteCheck extends CalciteCheck {
+public class AllowDDLs extends CalciteCheck {
 
     private static String truncate(String src, int max) {
         if (src.length() <= max) {

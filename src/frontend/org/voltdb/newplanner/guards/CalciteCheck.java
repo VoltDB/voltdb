@@ -71,4 +71,15 @@ public abstract class CalciteCheck {
         m_next = next;
         return m_next;
     }
+
+    /**
+     * The factory method to create a default check chain.
+     * @return The head of the chain.
+     */
+    public static CalciteCheck create() {
+        CalciteCheck checks = new AllowDDLs();
+        // As we add more features to Calcite, this list should be expanded, and eventually removed.
+        checks.addNext(new NoLargeQuery());
+        return checks;
+    }
 }

@@ -17,6 +17,11 @@
 
 package org.voltdb.newplanner.guards;
 
+/**
+ * Accepts all SELECT queries.
+ * @author Yiqun Zhang
+ * @since 8.4
+ */
 public class AcceptAllSelect extends CalciteCheck {
 
     @Override
