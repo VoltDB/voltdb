@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -63,6 +62,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.ProClass;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 
@@ -499,27 +499,11 @@ SnapshotCompletionInterest, Promotable
 
     private void initialize(StartAction startAction) {
         // Load command log reinitiator
-        try {
-            Class<?> replayClass = MiscUtils.loadProClass("org.voltdb.CommandLogReinitiatorImpl",
-                                                          "Command log replay", true);
-            if (replayClass != null) {
-                Constructor<?> constructor =
-                    replayClass.getConstructor(int.class,
-                                               StartAction.class,
-                                               HostMessenger.class,
-                                               String.class,
-                                               Set.class);
-
-                m_replayAgent =
-                    (CommandLogReinitiator) constructor.newInstance(m_hostId,
-                                                                    startAction,
-                                                                    m_hostMessenger,
-                                                                    m_clPath,
-                                                                    m_liveHosts);
-            }
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Unable to instantiate command log reinitiator",
-                                     true, e);
+        CommandLogReinitiator replayAgent = ProClass.newInstanceOf("org.voltdb.CommandLogReinitiatorImpl",
+                "Command log replay", ProClass.HANDLER_IGNORE, m_hostId, startAction, m_hostMessenger, m_clPath,
+                m_liveHosts);
+        if (replayAgent != null) {
+            m_replayAgent = replayAgent;
         }
         m_replayAgent.setCallback(this);
     }

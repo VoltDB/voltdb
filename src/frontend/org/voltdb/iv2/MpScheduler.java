@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,6 +51,7 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.sysprocs.BalancePartitionsRequest;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.ProClass;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.collect.Maps;
@@ -63,7 +63,7 @@ public class MpScheduler extends Scheduler
     static final VoltLogger repairLogger = new VoltLogger("REPAIR");
 
     // null if running community, fallback to MpProcedureTask
-    private static final Constructor<?> NpProcedureTaskConstructor = loadNpProcedureTaskClass();
+    private static final ProClass<MpProcedureTask> NP_PROCEDURE_CLASS = loadNpProcedureTaskClass();
 
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
@@ -352,7 +352,7 @@ public class MpScheduler extends Scheduler
                     message.isForReplay());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
-        if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
+        if (isNpTxn(message) && NP_PROCEDURE_CLASS.hasProClass()) {
             Set<Integer> involvedPartitions = getBalancePartitions(message);
             if (involvedPartitions != null) {
                 HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
@@ -453,7 +453,7 @@ public class MpScheduler extends Scheduler
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
-        if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
+        if (isNpTxn(message) && NP_PROCEDURE_CLASS.hasProClass()) {
             Set<Integer> involvedPartitions = getBalancePartitions(message);
             if (involvedPartitions != null) {
                 HashMap<Integer, Long> involvedPartitionMasters = Maps.newHashMap(m_partitionMasters);
@@ -623,20 +623,14 @@ public class MpScheduler extends Scheduler
      * Load the pro class for n-partition transactions.
      * @return null if running in community or failed to load the class
      */
-    private static Constructor<?> loadNpProcedureTaskClass()
+    private static ProClass<MpProcedureTask> loadNpProcedureTaskClass()
     {
-        Class<?> klass = MiscUtils.loadProClass("org.voltdb.iv2.NpProcedureTask", "N-Partition", !MiscUtils.isPro());
-        if (klass != null) {
-            try {
-                return klass.getConstructor(Mailbox.class, String.class, TransactionTaskQueue.class,
+        return ProClass
+                .<MpProcedureTask>load("org.voltdb.iv2.NpProcedureTask", "N-Partition",
+                        MiscUtils.isPro() ? ProClass.HANDLER_LOG : ProClass.HANDLER_IGNORE)
+                .errorHandler(tmLog::error)
+                .useConstructorFor(Mailbox.class, String.class, TransactionTaskQueue.class,
                         Iv2InitiateTaskMessage.class, Map.class, long.class, boolean.class, int.class);
-            } catch (NoSuchMethodException e) {
-                hostLog.error("Unabled to get the constructor for pro class NpProcedureTask", e);
-                return null;
-            }
-        } else {
-            return null;
-        }
     }
 
     /**
@@ -657,14 +651,7 @@ public class MpScheduler extends Scheduler
 
     private static MpProcedureTask instantiateNpProcedureTask(Object...params)
     {
-        if (NpProcedureTaskConstructor != null) {
-            try {
-                return (MpProcedureTask) NpProcedureTaskConstructor.newInstance(params);
-            } catch (Exception e) {
-                tmLog.error("Unable to instantiate NpProcedureTask", e);
-            }
-        }
-        return null;
+        return NP_PROCEDURE_CLASS.newInstance(params);
     }
 
     public int getLeaderNodeId() {
