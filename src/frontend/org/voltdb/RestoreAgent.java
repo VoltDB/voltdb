@@ -793,7 +793,9 @@ SnapshotCompletionInterest, Promotable
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest, LOG);
-            if (digest_detail == null) throw new IOException();
+            if (digest_detail == null) {
+                throw new IOException();
+            }
             catalog_crc = digest_detail.getLong("catalogCRC");
 
             if (digest_detail.has("partitionTransactionIds")) {
@@ -1191,7 +1193,9 @@ SnapshotCompletionInterest, Promotable
             Long clStartTxnId = null;
             for (String node : children) {
                 //This might be created before we are done fetching the restore info
-                if (node.equals("snapshot_id")) continue;
+                if (node.equals("snapshot_id")) {
+                    continue;
+                }
 
                 byte[] data = null;
                 data = m_zk.getData(VoltZK.restore + "/" + node, false, null);
