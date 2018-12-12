@@ -558,27 +558,35 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 int producerClusterId = entry.getKey();
                 Map<Integer, DRSiteDrIdTracker> clusterSources =
                         m_maxSeenDrLogsBySrcPartition.getOrDefault(producerClusterId, new HashMap<>());
-                if (!clusterSources.containsKey(MpInitiator.MP_INIT_PID)) {
-                    DRSiteDrIdTracker tracker =
-                            DRConsumerDrIdTracker.createSiteTracker(0,
-                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
-                                    Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
-                    clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
-                }
-                int oldProducerPartitionCount = clusterSources.size() - 1;
-                int newProducerPartitionCount = entry.getValue();
-                assert(oldProducerPartitionCount >= 0);
-                assert(newProducerPartitionCount != -1);
-
-                for (int i = oldProducerPartitionCount; i < newProducerPartitionCount; i++) {
-                    DRSiteDrIdTracker tracker =
-                            DRConsumerDrIdTracker.createSiteTracker(0,
-                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
-                                    Long.MIN_VALUE, Long.MIN_VALUE, i);
-                    clusterSources.put(i, tracker);
-                }
+                addRemoveTrackers(producerClusterId, entry.getValue(), clusterSources);
 
                 m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
+            }
+        }
+
+        private void addRemoveTrackers(int clusterId, int newCount, Map<Integer, DRSiteDrIdTracker> currMap) {
+            if (!currMap.containsKey(MpInitiator.MP_INIT_PID)) {
+                DRSiteDrIdTracker tracker = DRConsumerDrIdTracker.createSiteTracker(0,
+                                                DRLogSegmentId.makeEmptyDRId(clusterId),
+                                                Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
+                currMap.put(MpInitiator.MP_INIT_PID, tracker);
+            }
+
+            int oldCount = currMap.size() - 1;
+            assert(oldCount >= 0);
+            assert(newCount > 0);
+
+            if (newCount > oldCount) { // elastic add. Initialize trackers for new partitions
+                for (int i = oldCount; i < newCount; i++) {
+                    DRSiteDrIdTracker tracker = DRConsumerDrIdTracker.createSiteTracker(0,
+                            DRLogSegmentId.makeEmptyDRId(clusterId),
+                            Long.MIN_VALUE, Long.MIN_VALUE, i);
+                    currMap.put(i, tracker);
+                }
+            } else { // elastic remove. Remove trackers for removed partitions
+                for (int i=newCount; i< oldCount; i++) {
+                    currMap.remove(i);
+                }
             }
         }
 
