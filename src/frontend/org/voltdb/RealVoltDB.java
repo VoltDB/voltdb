@@ -194,6 +194,7 @@ import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+import org.voltdb.utils.ProClass;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.TopologyZKUtils;
 import org.voltdb.utils.VoltFile;
@@ -1177,8 +1178,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             if (m_joining) {
-                Class<?> elasticJoinCoordClass =
-                        MiscUtils.loadProClass("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic", false);
                 try {
                     int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
                     if(determination.startAction == StartAction.JOIN && kfactor > 0) {
@@ -1186,8 +1185,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         String waitMessage = "The join process will begin after a total of " + kfactorPlusOne + " nodes are added, waiting...";
                         consoleLog.info(waitMessage);
                     }
-                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class, String.class);
-                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger, VoltDB.instance().getVoltDBRootPath());
+                    m_joinCoordinator = ProClass.newInstanceOf("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic",
+                            ProClass.HANDLER_LOG, m_messenger, VoltDB.instance().getVoltDBRootPath());
                     m_messenger.registerMailbox(m_joinCoordinator);
                     m_joinCoordinator.initialize(kfactor);
                 } catch (Exception e) {
@@ -1495,11 +1494,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
             try {
-                final Class<?> statsManagerClass =
-                        MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
-                if (statsManagerClass != null && !DISABLE_JMX) {
-                    m_statsManager = (StatsManager)statsManagerClass.newInstance();
-                    m_statsManager.initialize();
+                if (!DISABLE_JMX) {
+                    m_statsManager = ProClass.newInstanceOf("org.voltdb.management.JMXStatsManager", "JMX",
+                            ProClass.HANDLER_IGNORE);
+                    if (m_statsManager != null) {
+                        m_statsManager.initialize();
+                    }
                 }
             } catch (Exception e) {
                 //JMXStatsManager will log and we continue.
@@ -1608,31 +1608,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Start elastic join service
             try {
                 if (m_config.m_isEnterprise) {
-                    Class<?> elasticServiceClass = MiscUtils.loadProClass("org.voltdb.join.ElasticCoordinator",
-                                                                          "Elastic join", false);
-
-                    if (elasticServiceClass == null) {
-                        VoltDB.crashLocalVoltDB("Missing the ElasticJoinCoordinator class file in the enterprise " +
-                                                "edition", false, null);
-                    }
-
-                    Constructor<?> constructor =
-                        elasticServiceClass.getConstructor(HostMessenger.class,
-                                                           ClientInterface.class,
-                                                           Cartographer.class,
-                                                           BalancePartitionsStatistics.class,
-                                                           String.class,
-                                                           int.class,
-                                                           Supplier.class);
-                    m_elasticService =
-                        (ElasticService) constructor.newInstance(
-                                m_messenger,
-                                m_clientInterface,
-                                m_cartographer,
-                                rebalanceStats,
-                                VoltDB.instance().getCommandLogSnapshotPath(),
-                                m_catalogContext.getDeployment().getCluster().getKfactor(),
-                                m_clusterSettings);
+                    m_elasticService = ProClass
+                            .newInstanceOf("org.voltdb.join.ElasticCoordinator", "Elastic Operations",
+                                    ProClass.HANDLER_CRASH, m_messenger, m_clientInterface, m_cartographer,
+                                    rebalanceStats, VoltDB.instance().getCommandLogSnapshotPath(),
+                                    m_catalogContext.getDeployment().getCluster().getKfactor(), m_clusterSettings);
                     m_elasticService.updateConfig(m_catalogContext);
                 }
             } catch (Exception e) {
