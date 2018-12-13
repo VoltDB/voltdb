@@ -128,6 +128,11 @@ public class ExportGeneration implements Generation {
         File files[] = exportOverflowDirectory.listFiles();
         List<Integer> onDiskPartitions = new ArrayList<Integer>();
         if (files != null) {
+            if (exportLog.isDebugEnabled()) {
+                for (File f: files) {
+                    exportLog.debug("Found export data:" + f.getName());
+                }
+            }
             onDiskPartitions = initializeGenerationFromDisk(messenger, localPartitionsToSites);
             // Add new unique partitions from on disk list.
             onDiskPartitions.removeAll(allLocalPartitions);
@@ -151,14 +156,16 @@ public class ExportGeneration implements Generation {
         Map<String, File> dataFiles = new HashMap<>();
         File[] files = m_directory.listFiles();
         for (File data: files) {
-            if (!data.getName().endsWith(".ad")) {
-                String nonce = data.getName().substring(0, data.getName().length() - 3);
+            if (data.getName().endsWith(".pbd")) {
+                // Naming convention for pdb file, [table name]_[table crc]_[partition].[index].pdb
+                String nonce = data.getName().substring(0, data.getName().indexOf('.'));
                 dataFiles.put(nonce, data);
             }
         }
         for (File ad: files) {
             if (ad.getName().endsWith(".ad")) {
-                String nonce = ad.getName().substring(0, ad.getName().length() - 3);
+                // Naming convention for ad file, [table name]_[table crc]_[partition].ad
+                String nonce = ad.getName().substring(0, ad.getName().indexOf('.'));
                 File dataFile = dataFiles.get(nonce);
                 if (dataFile != null) {
                     try {
