@@ -287,6 +287,9 @@ public class StreamBlockQueue {
                 // If the truncation point was the first row in the block, the entire block is to be discarded
                 // We know it is the first row if the start sequence number of buffer is the truncation point
                 if (startSequenceNumber >= truncationSeqNo) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Truncating seqNo after " + startSequenceNumber);
+                    }
                     return PersistentBinaryDeque.fullTruncateResponse();
                 }
                 final int tupleCountPos = b.position();
@@ -294,6 +297,9 @@ public class StreamBlockQueue {
                 // There is nothing to do with this buffer
                 final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
                 if (lastSequenceNumber < truncationSeqNo) {
+                    if (exportLog.isDebugEnabled()) {
+                        exportLog.debug("Truncator skip buffer [" + startSequenceNumber + "," + lastSequenceNumber + "]");
+                    }
                     return null;
                 }
                 b.getLong(); // uniqueId
@@ -307,7 +313,7 @@ public class StreamBlockQueue {
                 int offset = 0;
                 while (b.hasRemaining()) {
                     if (startSequenceNumber + offset > truncationSeqNo) {
-                        // The sequence number of this row is the greater then the truncation sequence number.
+                        // The sequence number of this row is the greater than the truncation sequence number.
                         // Don't want this row, but want to preserve all rows before it.
                         // Move back before the row length prefix, txnId and header
                         // Return everything in the block before the truncation point.
@@ -316,6 +322,9 @@ public class StreamBlockQueue {
                         // update tuple count in the header
                         b.putInt(tupleCountPos, offset - 1);
                         b.position(0);
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Truncating buffer [" + (startSequenceNumber + offset) + "," + lastSequenceNumber + "]");
+                        }
                         return new ByteBufferTruncatorResponse(b);
                     }
                     offset++;
@@ -325,6 +334,9 @@ public class StreamBlockQueue {
                         System.out.println(rowLength);
                     }
                     b.position(b.position() + rowLength);
+                }
+                if (exportLog.isDebugEnabled()) {
+                    exportLog.debug("Truncator skip this buffer [" + startSequenceNumber + "," + lastSequenceNumber + "]");
                 }
                 return null;
             }

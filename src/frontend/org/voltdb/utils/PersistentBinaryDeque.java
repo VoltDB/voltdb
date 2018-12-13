@@ -52,6 +52,7 @@ import com.google_voltpatches.common.base.Throwables;
  *
  */
 public class PersistentBinaryDeque implements BinaryDeque {
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     private static final VoltLogger LOG = new VoltLogger("HOST");
 
     public static class UnsafeOutputContainerFactory implements OutputContainerFactory {
@@ -212,12 +213,19 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             return;
                         }
 
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Discarding PDB segment.. ");
+                        }
+
                         //Segment is potentially ready for deletion
                         try {
                             PBDSegmentReader segmentReader = segment.getReader(m_cursorId);
                             // Don't delete if this is the last segment.
                             // Cannot be deleted if this reader hasn't finished discarding this.
-                            if (/*segment == peekLastSegment() || */!segmentReader.allReadAndDiscarded()) {
+                            if (segment == peekLastSegment() || !segmentReader.allReadAndDiscarded()) {
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Can't delete segment, either this is the last segment or reader still open");
+                                }
                                 return;
                             }
                             if (canDeleteSegment(segment)) {
