@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.join;
+package org.voltdb.elastic;
 
 import org.voltdb.CatalogContext;
 
