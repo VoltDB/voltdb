@@ -40,14 +40,14 @@ public class ExportStatsBase extends StatsSource {
         public final long m_queueGap;
         public final String m_status;
 
-        public ExportStatsRow(int partitionId, int siteId, String sourceName, String exportTarget, boolean isExporting,
+        public ExportStatsRow(int partitionId, int siteId, String sourceName, String exportTarget, String isExporting,
                 long tupleCount, long tuplesPending, long lastQueuedTimestamp, long lastAckedTimestamp,
                 long averageLatency, long maxLatency, long queueGap, String status) {
             m_partitionId = partitionId;
             m_siteId = siteId;
             m_sourceName = sourceName;
             m_exportTarget = exportTarget;
-            m_isExporting = isExporting ? "TRUE" : "FALSE";
+            m_isExporting = isExporting;
             m_tupleCount = tupleCount;
             m_tuplesPending = tuplesPending > 0 ? tuplesPending : 0;
             m_lastQueuedTimestamp = lastQueuedTimestamp;

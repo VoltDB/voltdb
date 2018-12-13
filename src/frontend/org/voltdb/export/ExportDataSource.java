@@ -587,8 +587,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     maxLatency = m_overallMaxLatency;
                 }
+                String exportingRole;
+                if (m_runEveryWhere) {
+                    exportingRole = "XDCR";
+                } else {
+                    exportingRole = (m_mastershipAccepted.get() ? "TRUE" : "FALSE");
+                }
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
-                        m_mastershipAccepted.get(), m_tupleCount, m_tuplesPending.get(),
+                        exportingRole, m_tupleCount, m_tuplesPending.get(),
                         m_lastQueuedTimestamp, m_lastAckedTimestamp,
                         avgLatency, maxLatency, m_queueGap, m_status.toString());
             }
