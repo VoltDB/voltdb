@@ -74,9 +74,6 @@ public class StreamBlock {
             m_buffer = null;
             if (exportLog.isDebugEnabled()) {
                 exportLog.debug("Discarding stream block [" + m_startSequenceNumber + "," + lastSequenceNumber() + "]");
-                for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
-                    exportLog.debug(ste);
-                }
             }
         } else if (count < 0) {
             VoltDB.crashLocalVoltDB("Broken refcounting in export", true, null);

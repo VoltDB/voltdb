@@ -124,25 +124,38 @@ public class ExportGeneration implements Generation {
             List<Pair<Integer, Integer>> localPartitionsToSites,
             File exportOverflowDirectory)
     {
-        List<Integer> allLocalPartitions = localPartitionsToSites.stream().map(p -> p.getFirst()).collect(Collectors.toList());
         File files[] = exportOverflowDirectory.listFiles();
-        List<Integer> onDiskPartitions = new ArrayList<Integer>();
         if (files != null) {
             if (exportLog.isDebugEnabled()) {
                 for (File f: files) {
                     exportLog.debug("Found export data:" + f.getName());
                 }
             }
-            onDiskPartitions = initializeGenerationFromDisk(messenger, localPartitionsToSites);
-            // Add new unique partitions from on disk list.
+            List<Integer> onDiskPartitions = initializeGenerationFromDisk(messenger, localPartitionsToSites);
+            // Count unique partitions only
+            List<Integer> allLocalPartitions = localPartitionsToSites.stream()
+                    .map(p -> p.getFirst())
+                    .collect(Collectors.toList());
+            if (exportLog.isDebugEnabled()) {
+                StringBuilder sb = new StringBuilder();
+                for (Integer p : onDiskPartitions) {
+                    sb.append(p).append(", ");
+                }
+                exportLog.debug("Found on disk partitions " + sb.toString());
+                sb = new StringBuilder();
+                for (Integer p : allLocalPartitions) {
+                    sb.append(p).append(", ");
+                }
+                exportLog.debug("Found on local partitions " + sb.toString());
+            }
             onDiskPartitions.removeAll(allLocalPartitions);
+            // One export mailbox per node, since we only keep one generation
+            if (!onDiskPartitions.isEmpty()) {
+                createAckMailboxesIfNeeded(messenger, onDiskPartitions);
+            }
         }
         initializeGenerationFromCatalog(catalogContext, connectors, hostId, messenger, localPartitionsToSites);
 
-        // One export mailbox per node, since we only keep one generation
-        if (!onDiskPartitions.isEmpty()) {
-            createAckMailboxesIfNeeded(messenger, onDiskPartitions);
-        }
     }
 
     private List<Integer> initializeGenerationFromDisk(HostMessenger messenger, List<Pair<Integer, Integer>> localPartitionsToSites) {
@@ -340,7 +353,7 @@ public class ExportGeneration implements Generation {
         };
         messenger.createMailbox(null, m_mbox);
         // Rejoining node may receives gap query message before childUpdating thread gets back result,
-        // in case it couldn't find local mailbox to send back response, update the local mailbox here.
+        // in case it couldn't find local mailbox to send back response, add local mailbox to the list first.
         for (Integer partition : localPartitions) {
             updateAckMailboxes(partition, null);
         }
@@ -568,9 +581,7 @@ public class ExportGeneration implements Generation {
         ExportDataSource source = new ExportDataSource(this, adFile, localPartitionsToSites);
         adFilePartitions.add(source.getPartitionId());
         if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
-                    " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
-                    " bytes " + source.sizeInBytes());
+            exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
         }
         Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(source.getPartitionId());
         if (dataSourcesForPartition == null) {
