@@ -144,6 +144,8 @@ import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.elastic.BalancePartitionsStatistics;
+import org.voltdb.elastic.ElasticService;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
@@ -159,8 +161,6 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.join.BalancePartitionsStatistics;
-import org.voltdb.join.ElasticService;
 import org.voltdb.largequery.LargeBlockManager;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
@@ -1184,7 +1184,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         String waitMessage = "The join process will begin after a total of " + kfactorPlusOne + " nodes are added, waiting...";
                         consoleLog.info(waitMessage);
                     }
-                    m_joinCoordinator = ProClass.newInstanceOf("org.voltdb.join.ElasticJoinNodeCoordinator", "Elastic",
+                    m_joinCoordinator = ProClass.newInstanceOf("org.voltdb.elastic.ElasticJoinNodeCoordinator", "Elastic",
                             ProClass.HANDLER_LOG, m_messenger, VoltDB.instance().getVoltDBRootPath());
                     m_messenger.registerMailbox(m_joinCoordinator);
                     m_joinCoordinator.initialize(kfactor);
@@ -1608,7 +1608,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             try {
                 if (m_config.m_isEnterprise) {
                     m_elasticService = ProClass
-                            .newInstanceOf("org.voltdb.join.ElasticCoordinator", "Elastic Operations",
+                            .newInstanceOf("org.voltdb.elastic.ElasticCoordinator", "Elastic Operations",
                                     ProClass.HANDLER_CRASH, m_messenger, m_clientInterface, m_cartographer,
                                     rebalanceStats, VoltDB.instance().getCommandLogSnapshotPath(),
                                     m_catalogContext.getDeployment().getCluster().getKfactor(), m_clusterSettings);
