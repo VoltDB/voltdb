@@ -35,20 +35,20 @@ public interface SqlBatch extends Iterable<SqlTask>  {
      * Check if the batch is purely comprised of DDL statements.
      * @return true if the batch is comprised of DDL statements only.
      */
-    public boolean isDDLBatch();
+    boolean isDDLBatch();
 
 
     /**
      * Get the user parameters.
      * @return the user parameter array.
      */
-    public Object[] getUserParameters();
+    Object[] getUserParameters();
 
     /**
      * Get the number of tasks in this batch.
      * @return the count of tasks in this batch.
      */
-    public int getTaskCount();
+    int getTaskCount();
 
     /**
      * Build a {@link SqlBatch} from a {@link ParameterSet} passed through the {@code @AdHoc}
@@ -61,12 +61,11 @@ public interface SqlBatch extends Iterable<SqlTask>  {
      * @throws UnsupportedOperationException when the batch is a mixture of
      * DDL and non-DDL statements or has parameters and more than one query at the same time.
      */
-    public static SqlBatch fromParameterSet(ParameterSet params) throws SqlParseException, PlannerFallbackException {
+    static SqlBatch fromParameterSet(ParameterSet params) throws SqlParseException, PlannerFallbackException {
         Object[] paramArray = params.toArray();
         // The first parameter is always the query string.
         String sqlBlock = (String) paramArray[0];
         Object[] userParams = null;
-        // AdHoc query can have parameters, see TestAdHocQueries.testAdHocWithParams.
         if (params.size() > 1) {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
