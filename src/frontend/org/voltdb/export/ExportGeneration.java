@@ -133,12 +133,12 @@ public class ExportGeneration implements Generation {
             }
             List<Integer> onDiskPartitions = initializeGenerationFromDisk(messenger, localPartitionsToSites);
             // Count unique partitions only
-            List<Integer> allLocalPartitions = localPartitionsToSites.stream()
+            Set<Integer> allLocalPartitions = localPartitionsToSites.stream()
                     .map(p -> p.getFirst())
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
+            Set<Integer> setOnDIskPartitions = new HashSet<Integer>(onDiskPartitions);
             if (exportLog.isDebugEnabled()) {
                 StringBuilder sb = new StringBuilder();
-                Set<Integer> setOnDIskPartitions = new HashSet<Integer>(onDiskPartitions);
                 for (Integer p : setOnDIskPartitions) {
                     sb.append(p).append(", ");
                 }
@@ -149,9 +149,9 @@ public class ExportGeneration implements Generation {
                 }
                 exportLog.debug("Found on local partitions " + sb.toString());
             }
-            onDiskPartitions.removeAll(allLocalPartitions);
+            setOnDIskPartitions.removeAll(allLocalPartitions);
             // One export mailbox per node, since we only keep one generation
-            if (!onDiskPartitions.isEmpty()) {
+            if (!setOnDIskPartitions.isEmpty()) {
                 createAckMailboxesIfNeeded(messenger, onDiskPartitions);
             }
         }
