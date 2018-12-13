@@ -1003,8 +1003,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
                 final AckingContainer ackingContainer =
                         new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1,
-                                first_unpolled_block.rowCount());
+                                first_unpolled_block.startSequenceNumber() + first_unpolled_block.rowCount() - 1);
                 try {
                     fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
@@ -1019,14 +1018,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public class AckingContainer extends BBContainer {
         final long m_lastSeqNo;
-        final int m_tuplesCount;
         final BBContainer m_backingCont;
         long m_startTime = 0;
 
-        public AckingContainer(BBContainer cont, long seq, int tuplesSent) {
+        public AckingContainer(BBContainer cont, long seq) {
             super(cont.b());
             m_lastSeqNo = seq;
-            m_tuplesCount = tuplesSent;
             m_backingCont = cont;
         }
 
@@ -1042,9 +1039,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     @Override
                     public void run() {
                         if (exportLog.isTraceEnabled()) {
-                            exportLog.trace("AckingContainer.discard with sequence number: " + m_lastSeqNo + " tuples count: " + m_tuplesCount);
+                            exportLog.trace("AckingContainer.discard with sequence number: " + m_lastSeqNo);
                         }
-                        assert(m_tuplesCount == 0 || m_startTime != 0);
+                        assert(m_startTime != 0);
                         long elapsedMS = System.currentTimeMillis() - m_startTime;
                         m_blocksSentSinceClear += 1;
                         m_totalLatencySinceClearInMS += elapsedMS;
