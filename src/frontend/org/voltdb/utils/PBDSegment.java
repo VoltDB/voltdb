@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.export.ExportSequenceNumberTracker;
@@ -118,8 +117,6 @@ public abstract class PBDSegment {
     //Avoid unecessary sync with this flag
     protected boolean m_syncedSinceLastEdit = true;
 
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-
     public PBDSegment(File file)
     {
         m_file = file;
@@ -189,10 +186,6 @@ public abstract class PBDSegment {
         final int initialEntryCount = getNumEntries();
         int entriesTruncated = 0;
         int sizeInBytes = 0;
-
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("Parsing and truncating " + m_file.getName());
-        }
 
         DBBPool.BBContainer cont;
         while (true) {

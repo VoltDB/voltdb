@@ -286,9 +286,6 @@ public class StreamBlockQueue {
                 final long startSequenceNumber = b.getLong();
                 // If after the truncation point is the first row in the block, the entire block is to be discarded
                 if (startSequenceNumber > truncationSeqNo) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Truncating seqNo after " + startSequenceNumber);
-                    }
                     return PersistentBinaryDeque.fullTruncateResponse();
                 }
                 final int tupleCountPos = b.position();
@@ -296,9 +293,6 @@ public class StreamBlockQueue {
                 // There is nothing to do with this buffer
                 final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
                 if (lastSequenceNumber <= truncationSeqNo) {
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Truncator skip buffer [" + startSequenceNumber + "," + lastSequenceNumber + "]");
-                    }
                     return null;
                 }
                 b.getLong(); // uniqueId
@@ -321,9 +315,6 @@ public class StreamBlockQueue {
                         // update tuple count in the header
                         b.putInt(tupleCountPos, offset - 1);
                         b.position(0);
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug("Truncating buffer [" + (startSequenceNumber + offset) + "," + lastSequenceNumber + "]");
-                        }
                         return new ByteBufferTruncatorResponse(b);
                     }
                     offset++;
@@ -333,9 +324,6 @@ public class StreamBlockQueue {
                         System.out.println(rowLength);
                     }
                     b.position(b.position() + rowLength);
-                }
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Truncator skip this buffer [" + startSequenceNumber + "," + lastSequenceNumber + "]");
                 }
                 return null;
             }

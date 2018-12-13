@@ -425,11 +425,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         m_lastReleasedSeqNo = releaseSeqNo;
         int tuplesDeleted = m_gapTracker.truncate(releaseSeqNo);
-        int original = m_tuplesPending.get();
         m_tuplesPending.addAndGet(-tuplesDeleted);
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("m_tuplesPending " + original + " minus " + tuplesDeleted + ":" + m_tuplesPending.get());
-        }
         // If persistent log contains gap, mostly due to node failures and rejoins, ACK from leader might
         // cover the gap gradually.
         // Next poll starts from this number, if it sit in between buffers and stream is active, next poll will
@@ -591,11 +587,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     maxLatency = m_overallMaxLatency;
                 }
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("Export Stats: " + m_partitionId + " " + m_siteId + " " + m_tableName + " " + m_exportTargetName + " " + m_mastershipAccepted.get() +
-                            " " + m_tupleCount + " " + m_tuplesPending.get() + " " + m_lastQueuedTimestamp + " " + m_lastAckedTimestamp + " " + avgLatency + " " +
-                            maxLatency + " " + m_queueGap + " " + m_status.toString());
-                }
                 return new ExportStatsRow(m_partitionId, m_siteId, m_tableName, m_exportTargetName,
                         m_mastershipAccepted.get(), m_tupleCount, m_tuplesPending.get(),
                         m_lastQueuedTimestamp, m_lastAckedTimestamp,
@@ -671,11 +662,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_lastQueuedTimestamp = sb.getTimestamp();
                 m_lastPushedSeqNo = lastSequenceNumber;
                 m_tupleCount += tupleCount;
-                int original = m_tuplesPending.get();
                 m_tuplesPending.addAndGet((int)sb.unreleasedRowCount());
-                if (exportLog.isDebugEnabled()) {
-                    exportLog.debug("m_tuplesPending " + original + " add " + sb.unreleasedRowCount() + ":" + m_tuplesPending.get());
-                }
                 m_committedBuffers.offer(sb);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
@@ -1616,11 +1603,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo,
                 m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo() - 1);
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
-        int original = m_tuplesPending.get();
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
-        if (exportLog.isDebugEnabled()) {
-            exportLog.debug("m_tuplesPending " + original + " set to " + m_gapTracker.sizeInSequence() + ": " + m_tuplesPending.get());
-        }
     }
 
     public String getTarget() {

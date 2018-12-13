@@ -126,29 +126,12 @@ public class ExportGeneration implements Generation {
     {
         File files[] = exportOverflowDirectory.listFiles();
         if (files != null) {
-            if (exportLog.isDebugEnabled()) {
-                for (File f: files) {
-                    exportLog.debug("Found export data:" + f.getName());
-                }
-            }
             List<Integer> onDiskPartitions = initializeGenerationFromDisk(messenger, localPartitionsToSites);
             // Count unique partitions only
             Set<Integer> allLocalPartitions = localPartitionsToSites.stream()
                     .map(p -> p.getFirst())
                     .collect(Collectors.toSet());
             Set<Integer> setOnDIskPartitions = new HashSet<Integer>(onDiskPartitions);
-            if (exportLog.isDebugEnabled()) {
-                StringBuilder sb = new StringBuilder();
-                for (Integer p : setOnDIskPartitions) {
-                    sb.append(p).append(", ");
-                }
-                exportLog.debug("Found on disk partitions " + sb.toString());
-                sb = new StringBuilder();
-                for (Integer p : allLocalPartitions) {
-                    sb.append(p).append(", ");
-                }
-                exportLog.debug("Found on local partitions " + sb.toString());
-            }
             setOnDIskPartitions.removeAll(allLocalPartitions);
             // One export mailbox per node, since we only keep one generation
             if (!setOnDIskPartitions.isEmpty()) {

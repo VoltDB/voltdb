@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -47,7 +46,6 @@ import org.voltdb.iv2.UniqueIdGenerator;
  */
 public class StreamBlock {
 
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     public static final int HEADER_SIZE = 20; //sequence number + row count + uniqueId
 
     StreamBlock(BBContainer cont, long startSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
@@ -72,9 +70,6 @@ public class StreamBlock {
         if (count == 0) {
             m_buffer.discard();
             m_buffer = null;
-            if (exportLog.isDebugEnabled()) {
-                exportLog.debug("Discarding stream block [" + m_startSequenceNumber + "," + lastSequenceNumber() + "]");
-            }
         } else if (count < 0) {
             VoltDB.crashLocalVoltDB("Broken refcounting in export", true, null);
         }
