@@ -138,7 +138,8 @@ public class ExportGeneration implements Generation {
                     .collect(Collectors.toList());
             if (exportLog.isDebugEnabled()) {
                 StringBuilder sb = new StringBuilder();
-                for (Integer p : onDiskPartitions) {
+                Set<Integer> setOnDIskPartitions = new HashSet<Integer>(onDiskPartitions);
+                for (Integer p : setOnDIskPartitions) {
                     sb.append(p).append(", ");
                 }
                 exportLog.debug("Found on disk partitions " + sb.toString());

@@ -1614,7 +1614,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void resetStateInRejoinOrRecover(long initialSequenceNumber) {
         m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo,
-                m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo());
+                m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo() - 1);
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         int original = m_tuplesPending.get();
         m_tuplesPending.set(m_gapTracker.sizeInSequence());

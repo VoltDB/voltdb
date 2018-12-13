@@ -284,9 +284,8 @@ public class StreamBlockQueue {
                 ByteBuffer b = bbc.b();
                 b.order(ByteOrder.LITTLE_ENDIAN);
                 final long startSequenceNumber = b.getLong();
-                // If the truncation point was the first row in the block, the entire block is to be discarded
-                // We know it is the first row if the start sequence number of buffer is the truncation point
-                if (startSequenceNumber >= truncationSeqNo) {
+                // If after the truncation point is the first row in the block, the entire block is to be discarded
+                if (startSequenceNumber > truncationSeqNo) {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Truncating seqNo after " + startSequenceNumber);
                     }
@@ -296,7 +295,7 @@ public class StreamBlockQueue {
                 final int tupleCount = b.getInt();
                 // There is nothing to do with this buffer
                 final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
-                if (lastSequenceNumber < truncationSeqNo) {
+                if (lastSequenceNumber <= truncationSeqNo) {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Truncator skip buffer [" + startSequenceNumber + "," + lastSequenceNumber + "]");
                     }
