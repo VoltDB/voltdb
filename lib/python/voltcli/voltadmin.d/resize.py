@@ -51,6 +51,17 @@ def status(runner):
         runner.error(message)
         sys.exit(1)
 
+def clearup(runner):
+    result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING],
+                              [3, runner.opts.hostOrPartition]).table(0)
+    status = result.tuple(0).column_integer(0)
+    message = result.tuple(0).column_string(1)
+    if status == 0:
+        runner.info(message)
+    else:
+        runner.error(message)
+        sys.exit(1)
+
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
     description = 'Elastic resizing cluster command.',
@@ -63,6 +74,7 @@ def status(runner):
             VOLT.Modifier('test', test, 'Check the feasibility of current resizing plan.'),
             VOLT.Modifier('start', start, 'Start the elastically resizing.'),
             VOLT.Modifier('status', status, 'Check the resizing progress.'),
+            VOLT.Modifier('clearup', status, 'Reset the status of last finished removal to ready for next removal.'),
     )
 )
 
