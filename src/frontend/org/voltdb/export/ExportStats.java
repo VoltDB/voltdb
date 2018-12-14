@@ -77,7 +77,7 @@ public class ExportStats extends ExportStatsBase {
         rowValues[columnNameToIndex.get(Columns.PARTITION_ID)] = stat.m_partitionId;
         rowValues[columnNameToIndex.get(Columns.SOURCE_NAME)] = stat.m_sourceName;
         rowValues[columnNameToIndex.get(Columns.EXPORT_TARGET)] = stat.m_exportTarget;
-        rowValues[columnNameToIndex.get(Columns.ACTIVE)] = stat.m_isExporting;
+        rowValues[columnNameToIndex.get(Columns.ACTIVE)] = stat.m_exportingRole;
         rowValues[columnNameToIndex.get(Columns.TUPLE_COUNT)] = stat.m_tupleCount;
         rowValues[columnNameToIndex.get(Columns.TUPLE_PENDING)] = stat.m_tuplesPending;
         rowValues[columnNameToIndex.get(Columns.LAST_QUEUED_TIMESTAMP)] = stat.m_lastQueuedTimestamp;

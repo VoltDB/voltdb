@@ -109,11 +109,15 @@ swappable-tables        ::= R11[,] R12 | P11[,] P12 | R21[,] R22 | P21[,] P22 | 
                             'R12'[,] R11 | P12[,] 'P11' | R22[,] 'R21' | 'P22'[,] P21 | \
                             {table-name}[,] {table-name} | '{table-name}'[,] '{table-name}'
 
-legit-table-name        ::= {table-name-w-no-pk} | {table-name-w-pk-int} 4| {table-name-w-pk-str} | \
+# TODO: include {ddl-table-name} (with non-zero weight), once implemented:
+legit-table-name        ::= {ddl-table-name} 0| {table-name-w-no-pk} | \
+                            {table-name-w-pk-int} 4| {table-name-w-pk-str} | \
                             {table-name-w-pk-int-str} | {table-name-w-pk-str-int} | \
                             {table-name-w-pk-varbin}  | {table-name-w-pk-i-s-v}
 
-legit-view-name         ::= VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | \
+# TODO: include {ddl-view-name} (with non-zero weight), once implemented:
+legit-view-name         ::= {ddl-view-name} 0| \
+                            VR1 | VP1 | VR2 | VP2 | VR3 | VP3 | VR4 | VP4 | \
                             VR5 | VP5 | VR6 | VP6 | VR7 | VP7
 
 table-name              ::= {legit-table-name} 199| NONEXISTENT_TABLE
@@ -199,6 +203,7 @@ view-column-name        ::= {table-column-name}
 legit-column-name       ::= {table-column-name} 9| {view-column-name}
 column-name             ::= {legit-column-name} 399| NONEXISTENT_COLUMN
 column-list             ::= {column-name} [, {column-list}]
+column-expression-list  ::= {column-expression} [, {column-expression-list}]
 
 # These versions include the JSON and 'internet' columns (used with the INET... functions),
 # which we don't normally want to set to invalid values (but selecting them is fine)
@@ -214,7 +219,7 @@ any-varbin-column-name  ::= {varbin-ipv-column-name} 2| {varbinary-column-name}
 any-table-column-name   ::= {table-column-name} 15| {varbin-ipv-column-name} 2| {string-ipv-column-name} 2| {json-column-name}
 any-view-column-name    ::= {any-table-column-name}
 any-legit-column-name   ::= {any-table-column-name} 9| {any-view-column-name}
-any-column-name         ::= {any-legit-column-name} 399| NONEXISTENT_COLUMN
+any-column-name         ::= {any-legit-column-name} 999| NONEXISTENT_COLUMN
 
 # Note: if you add a new column to the DDL file, add it here
 # (and in other places with this comment)
@@ -273,6 +278,7 @@ t0                      ::= {t0-set:t5} 6| \
                             {t0-set:t1}
 
 table-name-or-alias-set ::= {table-name-set} 3| {table-alias-set}
+table-or-view-name-set  ::= {table-name-set} 3| {view-name-set}
 view-name-or-alias-set  ::= {view-name-set}  3| {view-alias-set}
 
 table-ref-set           ::= {table-name-or-alias-set} 5| \
@@ -296,15 +302,19 @@ column-alias-set        ::= {column-alias:ca1} 6| \
 column-alias-ref        ::= {column-alias;ca1,ca2,ca3,ca4,ca5,c1,c2,c3,c4}
 
 ################################################################################
-# Any (non-DDL) SQL statement:
+# Any SQL statement (this now includes some DDL statements):
 # The "50" before the first "|" makes the "select-statement" option 50 times as
 # likely as the least likely (last) option; so half of these SQL statements will
-# be SELECT statements; but only 1% will be "delete-statement", since we don't
-# want to delete all the rows in a table too often.
+# be SELECT statements; but only 1% will be "ddl-statement", since we don't want
+# to change the schema too often. Similarly, only 1% will be "delete-statement",
+# since we don't want to delete all the rows in a table too often.
 #
-sql-statement           ::= {select-statement} 50| {cte-statement} 5| \
-                            {insert-statement} 14| {upsert-statement} 13| {update-statement} 12| \
-                            {special-sql-statement} 5| {delete-statement}
+sql-statement           ::= {select-statement} 50| {cte-statement}     5| \
+                            {dml-statement}    40| {sqlcmd-statement}  4| \
+                            {ddl-statement}
+
+dml-statement           ::= {insert-statement} 13| {upsert-statement} 13| \
+                            {update-statement} 13| {delete-statement}
 
 ################################################################################
 # Grammar rules for an INSERT statement:
@@ -1178,17 +1188,16 @@ recursive-clause-point1 ::= add2GeographyPoint({cte-col1:ctec1}, {point-rarely-n
 recursive-clause-poly1  ::= addGeographyPointToGeography({cte-col1:ctec1}, {point-rarely-null-value})
 
 ################################################################################
-# Grammar rules for special non-standard SQL statements that can be used in
-# sqlcmd (and therefore should be tested), even though they are not part of
-# standard SQL. The most important such statements are the ones that 'exec'
-# a (System, Default, or User-defined) Stored Procedure; but you can also
-# CREATE or DROP a Stored Procedure (which are DDL statements); or 'explain'
-# a SQL statement, procedure, or view; or 'show' a list of tables, classes,
+# Grammar rules for special non-standard statements that can be used in sqlcmd
+# (and therefore should be tested), even though they are not part of standard
+# SQL. The most important such statements are the ones that 'exec' a (System,
+# Default, or User-defined) Stored Procedure; but you can also 'explain' a SQL
+# statement, procedure, or view; or 'show' a list of tables, classes,
 # procedures, or functions.
 ################################################################################
 #
-special-sql-statement   ::= {exec-stored-proc} 80| {explain-statement} 10| \
-                            {random-proc-statement} 9| {show-statement}
+sqlcmd-statement        ::= {exec-stored-proc} 89| {explain-statement} 10| \
+                            {show-statement}
 
 # Note: both 'exec' and 'show' have two spaces after them; this is a kludge
 # so that all 'exec' statements, and similarly all 'show' statements, will be
@@ -1207,10 +1216,6 @@ explainproc-statement   ::= explainproc {stored-proc-name}
 explainview-statement   ::= explainview {view-name}
 
 stored-proc-name        ::= {user-proc-name} 5| {default-proc-name} 4| {system-proc-name}
-
-# Note that these are DDL statements
-# TODO: enable {drop-create-proc-stmnt}, once hanging issues resolved
-random-proc-statement   ::= {drop-create-proc-stmnt} 0| {create-proc-as-statement} 2| {drop-proc-statement}
 
 ################################################################################
 # System Stored Procedures
@@ -2213,9 +2218,64 @@ ng-polygon-value           ::= NULL
 
 
 ################################################################################
+################################################################################
+################################################################################
+#
+# DDL statements
+#
 # TODO: we probably should eventually combine the sql-ddl-grammar.txt file with
 # this one (i.e., copy it to here), but what follows are the only sections that
-# we need so far (formerly in that file but moved here).
+# we need so far (formerly in that file but moved here, with modifications).
+
+################################################################################
+# Grammar rules for all DDL statements:
+#
+# TODO: include all DDL statements (with non-zero weights), once implemented,
+# especially CREATE TABLE, CREATE VIEW, ALTER TABLE, and PARTITION statements
+#
+ddl-statement           ::= {create-statement}     | {alter-table-statement} 0| \
+                            {partition-statement} 0| {drop-statement}
+
+create-statement        ::= {create-table-statement} 0| {create-index-statement} | \
+                            {create-view-statement}  0| {create-proc-statement}
+
+################################################################################
+# Names for tables, views, indexes, and stored procedures, to be used in DDL
+# statements: some, listed elsewhere, use a fixed schema; others, listed here,
+# may be changed via DDL:
+#
+ddl-table-name          ::= DT{digit-0-to-5}
+ddl-view-name           ::= DV{digit-0-to-5}
+ddl-index-name          ::= DIDX{digit-0-to-5}
+ddl-proc-name           ::= {random-proc-0params}
+
+################################################################################
+# Grammar rules for a CREATE INDEX statement:
+# indexes may be created on any table or view, not only on the 'ddl-...' ones
+# defined above.
+################################################################################
+#
+create-index-statement  ::= CREATE[ {unique-or-assume-unique}] INDEX {ddl-index-name} \
+                            ON {table-or-view-name-set} ({column-expression-list}) \
+                            [[{where-clause}]]
+
+unique-or-assume-unique ::= UNIQUE | ASSUMEUNIQUE
+
+################################################################################
+# Grammar rules for CREATE / DROP PROCEDURE statements:
+# stored procedures may be created on any table or view, not only on the
+# 'ddl-...' ones defined above.
+################################################################################
+#
+# TODO: enable {drop-create-proc-stmnt} (with non-zero weight), once hanging
+# issues are resolved
+create-proc-statement   ::= {create-proc-as-statement} 2| {drop-create-proc-stmnt} 0|  \
+                            {drop-proc-statement}
+
+# This version drops a procedure first (if it exists), before creating a new
+# one using the same procedure name, so this is more likely to be valid
+drop-create-proc-stmnt  ::= DROP PROCEDURE {ddl-proc-name:p0} IF EXISTS; \
+                            {create-proc-as-statement}
 
 ################################################################################
 # Grammar rules for a CREATE PROCEDURE AS statement:
@@ -2223,24 +2283,21 @@ ng-polygon-value           ::= NULL
 #
 # TODO: eventually uncomment the ALLOW {role-name-list} clause (after defining
 # role-name-list, and dealing with roles generally)
-create-proc-as-statement::= CREATE PROCEDURE {random-proc-0params:p0} \
-                            [PARTITION ON TABLE {table-name} COLUMN {column-name}[ PARAMETER {digit}]] \
+create-proc-as-statement::= CREATE PROCEDURE {ddl-proc-name:p0} \
+                            [PARTITION ON TABLE {table-name-ref} \
+                              COLUMN {column-name}[ PARAMETER {digit}]] \
 #                           [[[ALLOW {role-name-list}]]] \
                             AS {sql-statement}
-
-# This version drops a procedure first (if it exists), before creating a new
-# one using the same procedure name, so this is more likely to be valid
-drop-create-proc-stmnt  ::= DROP PROCEDURE {random-proc-0params:p0} IF EXISTS; \
-                            {create-proc-as-statement}
 
 ################################################################################
 # Grammar rules for all DROP statements, i.e., DROP TABLE, DROP VIEW,
 # DROP INDEX, and DROP PROCEDURE statements:
 ################################################################################
 #
-drop-statement          ::= {drop-table-statement} | {drop-view-statement} | \
-                            {drop-index-statement} | {drop-proc-statement}
-drop-table-statement    ::= DROP TABLE {table-name}[[ IF EXISTS]][[ CASCADE]]
-drop-view-statement     ::= DROP VIEW  {view-name}[   IF EXISTS]
-drop-index-statement    ::= DROP INDEX {index-name}[  IF EXISTS]
-drop-proc-statement     ::= DROP PROCEDURE {random-proc-0params}[ IF EXISTS]
+# TODO: include all DROP statements (with non-zero weights), once implemented:
+drop-statement          ::= {drop-table-statement} 0| {drop-index-statement} | \
+                            {drop-view-statement}  0| {drop-proc-statement}
+drop-table-statement    ::= DROP TABLE     {ddl-table-name}[[ IF EXISTS]][[ CASCADE]]
+drop-view-statement     ::= DROP VIEW      {ddl-view-name}[   IF EXISTS]
+drop-index-statement    ::= DROP INDEX     {ddl-index-name}[  IF EXISTS]
+drop-proc-statement     ::= DROP PROCEDURE {ddl-proc-name}[   IF EXISTS]
