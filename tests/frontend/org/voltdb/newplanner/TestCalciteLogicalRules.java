@@ -100,17 +100,6 @@ public class TestCalciteLogicalRules extends PlanRulesTestCase {
                         "  VoltDBLTableScan(table=[[catalog, R1]])\n");
     }
 
-    // Partition info are introduced in the physical plan phase. In logical plan phase there is no difference.
-    public void testSeqScanPartitioned() {
-        assertPlanMatch("select * from P1",
-                "LogicalCalc(expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n" +
-                        "  VoltDBLTableScan(table=[[catalog, P1]])\n");
-
-        assertPlanMatch("select i from P1",
-                "LogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
-                        "  VoltDBLTableScan(table=[[catalog, P1]])\n");
-    }
-
     // Index info are introduced in the physical plan phase. In logical plan phase there is no difference.
     public void testIndexScan() {
         assertPlanMatch("select bi from RI1 where i > 45 and ti > 3",

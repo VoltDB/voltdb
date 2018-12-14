@@ -131,22 +131,6 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
                         "    VoltDBPTableSeqScan(table=[[catalog, R1]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
     }
 
-    // For partitioned table, create additional VoltDBPUnionExchange with HASH_DISTRIBUTED on the partition key
-    // VoltDBPUnionExchange is for the fragment and the VoltDBPSingletonExchange is for the Coordinator.
-    public void testSeqScanPartitioned() {
-        assertPlanMatch("select * from P1",
-                "VoltDBPCalc(expr#0..5=[{inputs}], proj#0..5=[{exprs}], split=[1])\n" +
-                        "  VoltDBPSingletonExchange(distribution=[single])\n" +
-                        "    VoltDBPUnionExchange(distribution=[hash[0]])\n" +
-                        "      VoltDBPTableSeqScan(table=[[catalog, P1]], split=[30], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
-
-        assertPlanMatch("select i from P1",
-                "VoltDBPCalc(expr#0..5=[{inputs}], I=[$t0], split=[1])\n" +
-                        "  VoltDBPSingletonExchange(distribution=[single])\n" +
-                        "    VoltDBPUnionExchange(distribution=[hash[0]])\n" +
-                        "      VoltDBPTableSeqScan(table=[[catalog, P1]], split=[30], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
-    }
-
     public void testSeqScanWithLimit() {
         assertPlanMatch("select i from R1 limit 5",
                 "VoltDBPLimit(split=[1], limit=[5])\n" +
