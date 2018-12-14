@@ -1193,7 +1193,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * has to drain existing PBD and then notify new leaders (through ack)
      */
     void prepareTransferMastership(int newLeaderHostId) {
-        if (!m_mastershipAccepted.get() || m_runEveryWhere) {
+        if (!m_mastershipAccepted.get()) {
             return;
         }
         m_es.submit(new Runnable() {
@@ -1415,7 +1415,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 for( Long siteId: p.getSecond()) {
                     mbx.send(siteId, bpm);
                 }
-
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Send GAP_QUERY message(" + m_currentRequestId + "," + (m_gapTracker.getSafePoint() + 1) +
                             ") from " + CoreUtils.hsIdToString(mbx.getHSId()) +
