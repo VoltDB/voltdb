@@ -1,0 +1,132 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2018 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package org.voltdb.newplanner;
+
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelRoot;
+import org.voltdb.calciteadapter.CatalogAdapter;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
+import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
+import org.voltdb.newplanner.rules.PlannerPhase;
+import org.voltdb.newplanner.util.VoltDBRelUtil;
+import org.voltdb.types.CalcitePlannerType;
+
+public class TestMPQueryFallbackRules extends VoltConverterTestCase {
+    @Override
+    protected void setUp() throws Exception {
+        setupSchema(TestVoltSqlValidator.class.getResource(
+                "testcalcite-ddl.sql"), "testcalcite", false);
+        init(CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
+    }
+
+    @Override
+    public void tearDown() throws Exception {
+        super.tearDown();
+    }
+
+    private void assertNotFallback(String sql) {
+        RelRoot root = parseValidateAndConvert(sql);
+
+        // apply logical rules
+        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
+        RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
+                root.rel, logicalTraits);
+
+        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
+        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
+
+        // Add RelDistributions.ANY trait to the rel tree.
+        nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.SINGLETON);
+
+        // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
+        RelTraitSet physicalTraits = nodeAfterLogicalRules.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+
+        // apply physical conversion rules.
+        CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
+                PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogicalRules, physicalTraits);
+    }
+
+    private void assertFallback(String sql) {
+        try {
+            assertNotFallback(sql);
+        } catch (RuntimeException e) {
+            // we got the exception, we are good.
+            return;
+        }
+        fail("Expected fallback.");
+    }
+
+    // when we only deal with replicated table, we will always have a SP query.
+    public void testReplicated() {
+        assertNotFallback("select * from R2");
+
+        assertNotFallback("select i, si from R1");
+
+        assertNotFallback("select i, si from R1 where si = 9");
+    }
+
+    // Partitioned with no filter, always a MP query
+    public void testPartitionedNoFilter() {
+        assertFallback("select * from P1");
+
+        assertFallback("select i from P1");
+    }
+
+    public void testPartitionedWithFilter() {
+        // equal condition on partition key
+        assertNotFallback("select * from P1 where i = 1");
+
+        assertNotFallback("select * from P1 where 1 = i");
+
+        // other conditions on partition key
+        assertFallback("select * from P1 where i > 10");
+        assertFallback("select * from P1 where i != 10");
+
+        // equal condition on partition key with ANDs
+        assertNotFallback("select si, v from P1 where 7=si and i=2");
+        assertNotFallback("select si, v from P1 where 7>si and i=2 and ti<3");
+
+        // equal condition on partition key with ORs
+        assertFallback("select si, v from P1 where 7=si or i=2");
+        assertFallback("select si, v from P1 where 7=si or i=2 or ti=3");
+
+        // equal condition on partition key with ORs and ANDs
+        assertFallback("select si, v from P1 where 7>si or (i=2 and ti<3)");
+        assertNotFallback("select si, v from P1 where 7>si and (i=2 and ti<3)");
+        assertNotFallback("select si, v from P1 where (7>si or ti=2) and i=2");
+        assertFallback("select si, v from P1 where (7>si or ti=2) or i=2");
+
+        // equal condition with some expression that always TURE
+        assertNotFallback("select si, v from P1 where (7=si and i=2) and 1=1");
+        assertFallback("select si, v from P1 where (7=si and i=2) or 1=1");
+
+        // equal condition with some expression that always FALSE
+        assertNotFallback("select si, v from P1 where (7=si and i=2) and 1=2");
+        // TODO: we should pass the commented test below if the planner is clever enough
+//        assertNotFallback("select si, v from P1 where (7=si and i=2) or 1=2");
+    }
+}

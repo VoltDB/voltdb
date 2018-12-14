@@ -1,0 +1,97 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2018 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.newplanner.rules.logical;
+
+import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.logical.LogicalCalc;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLocalRef;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexProgram;
+import org.apache.calcite.sql.SqlKind;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
+
+import java.util.List;
+
+/**
+ * Rule that fallback a query if it is multi-partitioned.
+ *
+ * @author Chao Zhou
+ * @since 8.4
+ */
+public class MPQueryFallBackRule extends RelOptRule {
+    public static final MPQueryFallBackRule INSTANCE = new MPQueryFallBackRule();
+
+    private MPQueryFallBackRule() {
+        super(operand(LogicalCalc.class,
+                operand(VoltDBLTableScan.class, any())));
+    }
+
+    /**
+     * Helper function to decide whether the filtered result is located at a single partition.
+     *
+     * @param program       the program of a {@link LogicalCalc}.
+     * @param rexNode       the condition of the program.
+     * @param partitionKeys the list of partition keys for the target table.
+     * @return true if the filtered result is located at a single partition.
+     */
+    private static boolean isSinglePartitioned(RexProgram program, RexNode rexNode, List<Integer> partitionKeys) {
+        if (rexNode instanceof RexCall) {
+            RexCall rexCall = (RexCall) rexNode;
+            SqlKind sqlKind = rexCall.getOperator().getKind();
+            switch (sqlKind) {
+                case EQUALS:
+                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
+                            isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                case AND:
+                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
+                            isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                case OR:
+                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) &&
+                            isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                default:
+                    return false;
+            }
+        }
+        if (rexNode instanceof RexInputRef) {
+            return partitionKeys.contains(((RexInputRef) rexNode).getIndex());
+        }
+        if (rexNode instanceof RexLocalRef) {
+            return isSinglePartitioned(program,
+                    program.getExprList().get(((RexLocalRef) rexNode).getIndex()), partitionKeys);
+        }
+        return false;
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+        LogicalCalc calc = call.rel(0);
+        VoltDBLTableScan tableScan = call.rel(1);
+        RelDistribution tableDist = tableScan.getTable().getDistribution();
+        if (tableDist.getType() != RelDistribution.Type.SINGLETON) {
+            if (calc.getProgram().getCondition() == null ||
+                    !isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys())) {
+                throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
+            }
+        }
+    }
+}
+

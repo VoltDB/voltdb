@@ -29,6 +29,7 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
+import org.voltdb.newplanner.rules.logical.MPQueryFallBackRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLAggregateRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLCalcRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLJoinRule;
@@ -40,9 +41,6 @@ import org.voltdb.newplanner.rules.physical.VoltDBPJoinRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPLimitRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPSeqScanRule;
 import org.voltdb.newplanner.rules.physical.VoltDBPSortConvertRule;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Returns RuleSet for concrete planner phase.
@@ -95,7 +93,9 @@ public enum PlannerPhase {
                         ProjectCalcMergeRule.INSTANCE,
                         ProjectToCalcRule.INSTANCE,
                         ProjectMergeRule.INSTANCE,
-                        FilterProjectTransposeRule.INSTANCE
+                        FilterProjectTransposeRule.INSTANCE,
+                        MPQueryFallBackRule.INSTANCE
+//                        FilterJoinRule.FILTER_ON_JOIN
                 ).build());
         s_VoltLogicalRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(
