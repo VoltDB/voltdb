@@ -30,24 +30,32 @@ import org.apache.calcite.rex.RexProgram;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLCalc extends Calc implements VoltDBLRel{
+public class VoltDBLCalc extends Calc implements VoltDBLRel {
+    private boolean m_isReplicated = true;
 
     public VoltDBLCalc(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
             RexProgram program) {
-          super(cluster,
-                  traitSet,
-                  input,
-                  program);
-          Preconditions.checkArgument(getConvention() == VoltDBLRel.VOLTDB_LOGICAL);
-        }
+        super(cluster,
+                traitSet,
+                input,
+                program);
+        Preconditions.checkArgument(getConvention() == VoltDBLRel.VOLTDB_LOGICAL);
+    }
 
-        @Override
-        public Calc copy(RelTraitSet traitSet, RelNode child,
-                         RexProgram program) {
-            return new VoltDBLCalc(this.getCluster(), traitSet, child, program);
-        }
+    @Override
+    public Calc copy(RelTraitSet traitSet, RelNode child,
+                     RexProgram program) {
+        return new VoltDBLCalc(this.getCluster(), traitSet, child, program);
+    }
 
+    public boolean getIsReplicated() {
+        return m_isReplicated;
+    }
+
+    public void setIsReplicated(boolean isReplicated) {
+        m_isReplicated = isReplicated;
+    }
 }

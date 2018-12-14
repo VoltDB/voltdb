@@ -22,6 +22,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
+import org.apache.calcite.rel.rules.FilterJoinRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
@@ -94,8 +95,8 @@ public enum PlannerPhase {
                         ProjectToCalcRule.INSTANCE,
                         ProjectMergeRule.INSTANCE,
                         FilterProjectTransposeRule.INSTANCE,
-                        MPQueryFallBackRule.INSTANCE
-//                        FilterJoinRule.FILTER_ON_JOIN
+                        MPQueryFallBackRule.INSTANCE,
+                        FilterJoinRule.FILTER_ON_JOIN
                 ).build());
         s_VoltLogicalRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(

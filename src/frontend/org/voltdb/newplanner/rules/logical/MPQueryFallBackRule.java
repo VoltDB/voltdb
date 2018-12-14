@@ -27,6 +27,7 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.sql.SqlKind;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLCalc;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 
 import java.util.List;
@@ -41,7 +42,7 @@ public class MPQueryFallBackRule extends RelOptRule {
     public static final MPQueryFallBackRule INSTANCE = new MPQueryFallBackRule();
 
     private MPQueryFallBackRule() {
-        super(operand(LogicalCalc.class,
+        super(operand(VoltDBLCalc.class,
                 operand(VoltDBLTableScan.class, any())));
     }
 
@@ -83,13 +84,16 @@ public class MPQueryFallBackRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        LogicalCalc calc = call.rel(0);
+        VoltDBLCalc calc = call.rel(0);
         VoltDBLTableScan tableScan = call.rel(1);
         RelDistribution tableDist = tableScan.getTable().getDistribution();
         if (tableDist.getType() != RelDistribution.Type.SINGLETON) {
             if (calc.getProgram().getCondition() == null ||
                     !isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys())) {
                 throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
+            }
+            else {
+                calc.setIsReplicated(false);
             }
         }
     }

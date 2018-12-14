@@ -74,6 +74,7 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         try {
             assertNotFallback(sql);
         } catch (RuntimeException e) {
+            assertTrue(e.getMessage().startsWith("Error while applying rule MPQueryFallBackRule"));
             // we got the exception, we are good.
             return;
         }
@@ -104,7 +105,7 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
 
         // other conditions on partition key
         assertFallback("select * from P1 where i > 10");
-        assertFallback("select * from P1 where i != 10");
+        assertFallback("select * from P1 where i <> 10");
 
         // equal condition on partition key with ANDs
         assertNotFallback("select si, v from P1 where 7=si and i=2");
