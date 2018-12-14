@@ -1408,11 +1408,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
                 }
             } else {
-                setStatus(StreamStatus.BLOCKED);
-                Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                m_queueGap = gap.getSecond() - gap.getFirst() + 1;
-                exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
-                        this.toString() + ". Please rejoin a node with the missing export queue data. ");
+                // jump over the gap
+                if (m_runEveryWhere) {
+                    m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                    m_queueGap = 0;
+                } else {
+                    setStatus(StreamStatus.BLOCKED);
+                    Pair<Long, Long> gap = m_gapTracker.getFirstGap();
+                    m_queueGap = gap.getSecond() - gap.getFirst() + 1;
+                    exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                            this.toString() + ". Please rejoin a node with the missing export queue data. ");
+                }
             }
         }
     }
@@ -1488,17 +1494,23 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             if (gap == null || m_firstUnpolledSeqNo < gap.getFirst()) {
                                 return;
                             }
-                            setStatus(StreamStatus.BLOCKED);
-                            m_queueGap = gap.getSecond() - gap.getFirst() + 1;
-                            RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
-                            if (voltdb.isClusterComplete()) {
-                                if (DISABLE_AUTO_GAP_RELEASE) {
-                                    // Show warning only in full cluster.
-                                    exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
-                                            ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
-                                            "use 'voltadmin export release' command to skip the missing data.");
-                                } else {
-                                    processStreamControl(OperationMode.RELEASE);
+                            // jump over the gap
+                            if (m_runEveryWhere) {
+                                m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                                m_queueGap = 0;
+                            } else {
+                                setStatus(StreamStatus.BLOCKED);
+                                m_queueGap = gap.getSecond() - gap.getFirst() + 1;
+                                RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
+                                if (voltdb.isClusterComplete()) {
+                                    if (DISABLE_AUTO_GAP_RELEASE) {
+                                        // Show warning only in full cluster.
+                                        exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                                                ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
+                                                "use 'voltadmin export release' command to skip the missing data.");
+                                    } else {
+                                        processStreamControl(OperationMode.RELEASE);
+                                    }
                                 }
                             }
                         } else {
