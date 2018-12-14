@@ -1383,6 +1383,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void sendGapQuery() {
+
+        // jump over a gap for run everywhere
+        if (m_runEveryWhere) {
+            if (m_gapTracker.getFirstGap() != null) {
+                m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+            }
+            m_queueGap = 0;
+            return;
+        }
+
         if (m_mastershipAccepted.get() &&  /* active stream */
                 !m_gapTracker.isEmpty() &&  /* finish initialization */
                 m_firstUnpolledSeqNo > m_gapTracker.getSafePoint()) { /* may hit a gap */
@@ -1391,12 +1401,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             Mailbox mbx = p.getFirst();
             m_currentRequestId = System.nanoTime();
             if (mbx != null && p.getSecond().size() > 0) {
-                // jump over the gap
-                if (m_runEveryWhere) {
-                    m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                    m_queueGap = 0;
-                    return;
-                }
                 // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
                 // requestId(8) + gapStart(8)
                 final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 8;
@@ -1418,12 +1422,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             " to " + CoreUtils.hsIdCollectionToString(p.getSecond()));
                 }
             } else {
-                // jump over the gap
-                if (m_runEveryWhere) {
-                    m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                    m_queueGap = 0;
-                    return;
-                }
                 setStatus(StreamStatus.BLOCKED);
                 Pair<Long, Long> gap = m_gapTracker.getFirstGap();
                 m_queueGap = gap.getSecond() - gap.getFirst() + 1;
