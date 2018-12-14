@@ -1211,6 +1211,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void sendGiveMastershipMessage(int newLeaderHostId, long curSeq) {
+        if (m_runEveryWhere) {
+            return;
+        }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0 ) {
@@ -1380,6 +1383,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void sendGapQuery() {
+
+        // jump over a gap for run everywhere
+        if (m_runEveryWhere) {
+            if (m_gapTracker.getFirstGap() != null) {
+                m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+            }
+            m_queueGap = 0;
+            return;
+        }
+
         if (m_mastershipAccepted.get() &&  /* active stream */
                 !m_gapTracker.isEmpty() &&  /* finish initialization */
                 m_firstUnpolledSeqNo > m_gapTracker.getSafePoint()) { /* may hit a gap */
