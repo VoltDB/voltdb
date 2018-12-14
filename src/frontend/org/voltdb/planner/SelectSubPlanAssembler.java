@@ -19,13 +19,7 @@ package org.voltdb.planner;
 
 import java.util.*;
 
-import org.hsqldb_voltpatches.HSQLInterface;
-import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
-import org.voltdb.compiler.DatabaseEstimates;
-import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -63,6 +57,16 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
     private ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<>();
 
+    private static final long S_TOTAL_JVM_BYTES = Runtime.getRuntime().maxMemory();
+    // Approximate size in bytes of each plan: about 50 KB with some experiments.
+    private static final long S_PLAN_SIZE = 50_000;
+    // Number of times generateSubPlanForJoinNode() gets called recursively that we collect an estimate of heap size,
+    // and early exit if too large heap size had been used.
+    private static final int S_PLAN_ESTIMATE_PERIOD = 100;
+    // Stop generating any further possible plans, if we have reached xx% of available JVM heap memory
+    private static final short S_MAX_HEAP_MEMORY_USAGE_PCT = 98;
+    private static final long S_MAX_ALLOWED_PLAN_MEMORY = (long) (S_TOTAL_JVM_BYTES / 100. * S_MAX_HEAP_MEMORY_USAGE_PCT);
+
     /**
      *
      * @param db The catalog's Database object.
@@ -98,7 +102,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ArrayList<List<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
         // Reassemble the all possible combinations of the sub-tree and queue them
         ArrayDeque<JoinNode> joinOrders = new ArrayDeque<>();
-        queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>(), joinOrders, findAll);
+        queueSubJoinOrders(joinOrderList, 0, new ArrayList<>(), joinOrders, findAll);
         return joinOrders;
     }
 
@@ -156,8 +160,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 return generateFullJoinOrdersForTree(subTree);
             } else {
                 // Shouldn't get there
-                assert(false);
-                return null;
+                throw new PlanningErrorException("Internal error: unsupported join type " + joinType.toString());
             }
         } else {
             // Single tables and subqueries
@@ -516,7 +519,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * generate all possible plans for the tree.
+     * generate all possible plans for the tree, or to the extend that further planning would drain JVM heap memory
+     * (at threshold of 98% of JVM memory, with estimated size of each plan of 50 KB).
      *
      * @param rootNode The root node for the whole join tree.
      * @param nodes The node list to iterate over.
@@ -538,9 +542,37 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return;
         }
 
+        if (! m_plans.isEmpty() && m_plans.size() % S_PLAN_ESTIMATE_PERIOD == 0) {
+            final long usedHeapMemory = evaluatePlanSize() * S_PLAN_SIZE;
+            if (usedHeapMemory >= S_MAX_ALLOWED_PLAN_MEMORY) {
+                //System.err.println("Running out of heap memory. Stop further planning. Free memory = " +
+                //        Runtime.getRuntime().freeMemory());
+                return;
+            }
+        }
         for (AccessPath path : joinNode.m_accessPaths) {
             joinNode.m_currentAccessPath = path;
             generateSubPlanForJoinNodeRecursively(rootNode, nextNode+1, nodes);
+        }
+    }
+
+    /**
+     * Evaluate size of currently generated plans.
+     * @return the total number of plan nodes contained in generated plan candidates.
+     */
+    private long evaluatePlanSize() {
+        return m_plans.stream().mapToLong(SelectSubPlanAssembler::evaluetePlanSize).sum();
+    }
+
+    private static long evaluetePlanSize(AbstractPlanNode node) {
+        if (node == null) {
+            return 0;
+        } else {
+            long cost = 1;
+            for (int index = 0; index < node.getChildCount(); ++index) {
+                cost += evaluetePlanSize(node.getChild(index));
+            }
+            return cost;
         }
     }
 
@@ -549,7 +581,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * that gives the right tuples.
      *
      * @param joinNode The join node to build the plan for.
-     * @param isInnerTable True if the join node is the inner node in the join
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */

@@ -1823,6 +1823,55 @@ public class TestJoinsSuite extends RegressionSuite {
         assertContentOfTable(new Object[][] {{null, 2}, {1.0, 1}}, cr.getResults()[0]);
     }
 
+    public void testEng15030() throws IOException, ProcCallException {
+        Client client = getClient();
+        final String bigJoin = "SELECT rowkeys.value as row_key, " +
+                " T1.value as T1_value, " +
+                "T2.value as T2_value, " +
+                "T3.value as T3_value, " +
+                "T4.value as T4_value, " +
+                "T5.value as T5_value, " +
+                "T6.value as T6_value, " +
+                "T7.value as T7_value, " +
+                "T8.value as T8_value, " +
+                "T9.value as T9_value, " +
+                "T10.value as T10_value, " +
+                "T11.value as T11_value, " +
+                "T12.value as T12_value, " +
+                "T13.value as T13_value, " +
+                "T14.value as T14_value, " +
+                "T15.value as T15_value, " +
+                "T16.value as T16_value, " +
+                "T17.value as T17_value, " +
+                "T18.value as T18_value, " +
+                "T19.value as T19_value, " +
+                "T20.value as T20_value " +
+                "FROM rowkeys " +
+                "LEFT JOIN float_cells T1 ON rowkeys.part = T1.part AND rowkeys.value = T1.row_key AND T1.attribute_id = 2889597802680156167 " +
+                "LEFT JOIN float_cells T2 ON rowkeys.part = T2.part AND rowkeys.value = T2.row_key AND T2.attribute_id = 2889597802688544775 " +
+                "LEFT JOIN float_cells T3 ON rowkeys.part = T3.part AND rowkeys.value = T3.row_key AND T3.attribute_id = 2889597802696933383 " +
+                "LEFT JOIN float_cells T4 ON rowkeys.part = T4.part AND rowkeys.value = T4.row_key AND T4.attribute_id = 2889597802696949767 " +
+                "LEFT JOIN float_cells T5 ON rowkeys.part = T5.part AND rowkeys.value = T5.row_key AND T5.attribute_id = 2889597802705321991 " +
+                "LEFT JOIN float_cells T6 ON rowkeys.part = T6.part AND rowkeys.value = T6.row_key AND T6.attribute_id = 2889597802713710599 " +
+                "LEFT JOIN float_cells T7 ON rowkeys.part = T7.part AND rowkeys.value = T7.row_key AND T7.attribute_id = 2889597802713726983 " +
+                "LEFT JOIN float_cells T8 ON rowkeys.part = T8.part AND rowkeys.value = T8.row_key AND T8.attribute_id = 2889597802722099207 " +
+                "LEFT JOIN float_cells T9 ON rowkeys.part = T9.part AND rowkeys.value = T9.row_key AND T9.attribute_id = 2889597802730487815 " +
+                "LEFT JOIN float_cells T10 ON rowkeys.part = T10.part AND rowkeys.value = T10.row_key AND T10.attribute_id = 2889597802755653639 " +
+                "LEFT JOIN float_cells T11 ON rowkeys.part = T11.part AND rowkeys.value = T11.row_key AND T11.attribute_id = 2889597802680156167 " +
+                "LEFT JOIN float_cells T12 ON rowkeys.part = T12.part AND rowkeys.value = T12.row_key AND T12.attribute_id = 2889597802688544785 " +
+                "LEFT JOIN float_cells T13 ON rowkeys.part = T13.part AND rowkeys.value = T13.row_key AND T13.attribute_id = 2889597802696933393 " +
+                "LEFT JOIN float_cells T14 ON rowkeys.part = T14.part AND rowkeys.value = T14.row_key AND T14.attribute_id = 2889597802696949777 " +
+                "LEFT JOIN float_cells T15 ON rowkeys.part = T15.part AND rowkeys.value = T15.row_key AND T15.attribute_id = 2889597802705322001 " +
+                "LEFT JOIN float_cells T16 ON rowkeys.part = T16.part AND rowkeys.value = T16.row_key AND T16.attribute_id = 2889597802713710609 " +
+                "LEFT JOIN float_cells T17 ON rowkeys.part = T17.part AND rowkeys.value = T17.row_key AND T17.attribute_id = 2889597802713726993 " +
+                "LEFT JOIN float_cells T18 ON rowkeys.part = T18.part AND rowkeys.value = T18.row_key AND T18.attribute_id = 2889597802722099217 " +
+                "LEFT JOIN float_cells T19 ON rowkeys.part = T19.part AND rowkeys.value = T19.row_key AND T19.attribute_id = 2889597802730487825 " +
+                "LEFT JOIN float_cells T20 ON rowkeys.part = T20.part AND rowkeys.value = T20.row_key AND T20.attribute_id = 2889597802755653649 " +
+                "WHERE " +
+                "rowkeys.dataset_id = 2889597788000092160 AND rowkeys.part = 3297";
+        assertEquals(ClientResponse.SUCCESS, client.callProcedure("@Explain", bigJoin).getStatus());
+    }
+
     static public junit.framework.Test suite() {
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestJoinsSuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
