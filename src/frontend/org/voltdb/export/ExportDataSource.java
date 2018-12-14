@@ -1193,7 +1193,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * has to drain existing PBD and then notify new leaders (through ack)
      */
     void prepareTransferMastership(int newLeaderHostId) {
-        if (!m_mastershipAccepted.get()) {
+        if (!m_mastershipAccepted.get() || m_runEveryWhere) {
             return;
         }
         m_es.submit(new Runnable() {
@@ -1211,6 +1211,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void sendGiveMastershipMessage(int newLeaderHostId, long curSeq) {
+        if (m_runEveryWhere) {
+            return;
+        }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0 ) {
@@ -1388,6 +1391,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             Mailbox mbx = p.getFirst();
             m_currentRequestId = System.nanoTime();
             if (mbx != null && p.getSecond().size() > 0) {
+                // jump over the gap
+                if (m_runEveryWhere) {
+                    m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
+                    m_queueGap = 0;
+                    return;
+                }
                 // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
                 // requestId(8) + gapStart(8)
                 final int msgLen = 1 + 4 + 4 + m_signatureBytes.length + 8 + 8;
@@ -1402,6 +1411,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 for( Long siteId: p.getSecond()) {
                     mbx.send(siteId, bpm);
                 }
+
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Send GAP_QUERY message(" + m_currentRequestId + "," + (m_gapTracker.getSafePoint() + 1) +
                             ") from " + CoreUtils.hsIdToString(mbx.getHSId()) +
@@ -1412,13 +1422,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_runEveryWhere) {
                     m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
                     m_queueGap = 0;
-                } else {
-                    setStatus(StreamStatus.BLOCKED);
-                    Pair<Long, Long> gap = m_gapTracker.getFirstGap();
-                    m_queueGap = gap.getSecond() - gap.getFirst() + 1;
-                    exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
-                            this.toString() + ". Please rejoin a node with the missing export queue data. ");
+                    return;
                 }
+                setStatus(StreamStatus.BLOCKED);
+                Pair<Long, Long> gap = m_gapTracker.getFirstGap();
+                m_queueGap = gap.getSecond() - gap.getFirst() + 1;
+                exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                        this.toString() + ". Please rejoin a node with the missing export queue data. ");
             }
         }
     }
@@ -1494,23 +1504,17 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             if (gap == null || m_firstUnpolledSeqNo < gap.getFirst()) {
                                 return;
                             }
-                            // jump over the gap
-                            if (m_runEveryWhere) {
-                                m_firstUnpolledSeqNo = m_gapTracker.getFirstGap().getSecond() + 1;
-                                m_queueGap = 0;
-                            } else {
-                                setStatus(StreamStatus.BLOCKED);
-                                m_queueGap = gap.getSecond() - gap.getFirst() + 1;
-                                RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
-                                if (voltdb.isClusterComplete()) {
-                                    if (DISABLE_AUTO_GAP_RELEASE) {
-                                        // Show warning only in full cluster.
-                                        exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
-                                                ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
-                                                "use 'voltadmin export release' command to skip the missing data.");
-                                    } else {
-                                        processStreamControl(OperationMode.RELEASE);
-                                    }
+                            setStatus(StreamStatus.BLOCKED);
+                            m_queueGap = gap.getSecond() - gap.getFirst() + 1;
+                            RealVoltDB voltdb = (RealVoltDB)VoltDB.instance();
+                            if (voltdb.isClusterComplete()) {
+                                if (DISABLE_AUTO_GAP_RELEASE) {
+                                    // Show warning only in full cluster.
+                                    exportLog.warn("Export is blocked, missing [" + gap.getFirst() + ", " + gap.getSecond() + "] from " +
+                                            ExportDataSource.this.toString() + ". Please rejoin a node with the missing export queue data or " +
+                                            "use 'voltadmin export release' command to skip the missing data.");
+                                } else {
+                                    processStreamControl(OperationMode.RELEASE);
                                 }
                             }
                         } else {
