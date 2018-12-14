@@ -150,7 +150,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // connection IDs used by internal adapters
     public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
-    public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
+    public static final long ELASTIC_COORDINATOR_CID    = Long.MIN_VALUE + 3;
     // public static final long UNUSED_CID (was DR)     = Long.MIN_VALUE + 4;
     // public static final long UNUSED_CID              = Long.MIN_VALUE + 5;
     public static final long EXECUTE_TASK_CID           = Long.MIN_VALUE + 6;
