@@ -35,7 +35,7 @@ import org.voltdb.catalog.Database;
  * @author Lukai Liu
  * @since 8.4
  */
-public class CatalogAdapter {
+public class VoltSchemaPlus {
 
     /**
      * Creates a brand new SchemaPlus instance upon new VoltDB Database catalog.
@@ -43,16 +43,14 @@ public class CatalogAdapter {
      * use SimpleCalciteSchema since the {@link org.apache.calcite.schema.SchemaPlus} instance is
      * forced to be refreshed upon every new DDL batch/stmt.
      */
-    public static SchemaPlus schemaPlusFromDatabase(Database db) {
-        final SchemaPlus rootSchema =
-                CalciteSchema.createRootSchema(false /*no adding the metadata schema*/,
-                                               false /*no caching*/, "catalog").plus();
+    public static SchemaPlus from(Database db) {
+        final SchemaPlus schema = CalciteSchema.createRootSchema(false /*no adding the metadata schema*/,
+                                                                 false /*no caching*/, "catalog").plus();
         // Get all tables from the database
         db.getTables().forEach(table -> {
-            rootSchema.add(table.getTypeName(), new VoltTable(table));
+            schema.add(table.getTypeName(), new VoltTable(table));
             // TODO: Get all functions, etc. from database
         });
-        return rootSchema;
+        return schema;
     }
-
 }

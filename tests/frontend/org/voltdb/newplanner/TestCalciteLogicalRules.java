@@ -26,7 +26,7 @@ package org.voltdb.newplanner;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
-import org.voltdb.calciteadapter.CatalogAdapter;
+import org.voltdb.calciteadapter.VoltSchemaPlus;
 import org.voltdb.newplanner.rules.PlannerPhase;
 import org.voltdb.types.CalcitePlannerType;
 
@@ -35,7 +35,7 @@ public class TestCalciteLogicalRules extends PlanRulesTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestVoltSqlValidator.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
-        init(CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
+        init(VoltSchemaPlus.from(getDatabase()));
     }
 
     @Override

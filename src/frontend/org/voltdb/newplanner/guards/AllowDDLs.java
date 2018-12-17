@@ -17,8 +17,9 @@
 
 package org.voltdb.newplanner.guards;
 
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.voltdb.newplanner.SqlTaskImpl;
+import org.voltdb.newplanner.VoltSqlParser;
 import org.voltdb.planner.PlanningErrorException;
 
 /**
@@ -39,7 +40,7 @@ public class AllowDDLs extends CalciteCheck {
     @Override
     protected boolean doCheck(String sql) {
         try {
-            return new SqlTaskImpl(sql).isDDL();
+            return VoltSqlParser.parse(sql).isA(SqlKind.DDL);
         } catch (SqlParseException e) {
             if (e.getCause() instanceof StackOverflowError) {
                 throw new PlanningErrorException("Encountered stack overflow error. " +

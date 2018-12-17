@@ -18,13 +18,17 @@
 package org.voltdb.newplanner;
 
 import java.util.Iterator;
+import java.util.concurrent.CompletableFuture;
+
+import org.voltdb.client.ClientResponse;
+import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 
 /**
  * Extend this class to create a decorator for a {@link SqlBatch}.
  * @since 8.4
  * @author Yiqun Zhang
  */
-public abstract class AbstractSqlBatchDecorator implements SqlBatch {
+public abstract class AbstractSqlBatchDecorator extends SqlBatch {
 
     /**
      * The {@link SqlBatch} to be decorated.
@@ -33,6 +37,11 @@ public abstract class AbstractSqlBatchDecorator implements SqlBatch {
 
     public AbstractSqlBatchDecorator(SqlBatch batchToDecorate) {
         m_batchToDecorate = batchToDecorate;
+    }
+
+    @Override
+    public CompletableFuture<ClientResponse> execute() throws AdHocPlanningException {
+        return m_batchToDecorate.execute();
     }
 
     @Override
@@ -53,5 +62,10 @@ public abstract class AbstractSqlBatchDecorator implements SqlBatch {
     @Override
     public Iterator<SqlTask> iterator() {
         return m_batchToDecorate.iterator();
+    }
+
+    @Override
+    Context getContext() {
+        return m_batchToDecorate.getContext();
     }
 }

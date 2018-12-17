@@ -20,7 +20,6 @@ package org.voltdb.newplanner;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.voltdb.parser.SqlParserWrapper;
 
 /**
  * SqlTask stores a parsed query.
@@ -38,12 +37,12 @@ public class SqlTaskImpl implements SqlTask {
      * @throws SqlParseException when the parsing goes wrong.
      * @throws IllegalArgumentException if the SQL string is null or empty.
      */
-    public SqlTaskImpl(String sql) throws SqlParseException {
+    SqlTaskImpl(String sql) throws SqlParseException {
         if ((sql == null) || (sql = sql.trim()).isEmpty()) { // remove any spaces or newlines
             throw new IllegalArgumentException("Can't plan empty or null SQL.");
         }
         m_sqlString = sql;
-        m_parsedQuery = SqlParserWrapper.parse(sql);
+        m_parsedQuery = VoltSqlParser.parse(sql);
     }
 
     /**

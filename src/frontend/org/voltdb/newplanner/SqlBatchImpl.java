@@ -20,11 +20,17 @@ package org.voltdb.newplanner;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.newplanner.guards.CalciteCheck;
 import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.sysprocs.AdHocNTBase;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * A basic SQL query batch containing one or more {@link SqlTask}s.
@@ -32,13 +38,14 @@ import org.voltdb.parser.SQLLexer;
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class SqlBatchImpl implements SqlBatch {
+public class SqlBatchImpl extends SqlBatch {
 
-    private final List<SqlTask> m_tasks;
+    private final ImmutableList<SqlTask> m_tasks;
+    private final ImmutableList<Object> m_userParams;
     private final Boolean m_isDDLBatch;
-    private final Object[] m_userParams;
+    private final Context m_context;
 
-    static final String s_adHocErrorResponseMessage =
+    static final String ADHOC_ERROR_RESPONSE =
             "The @AdHoc stored procedure when called with more than one parameter "
                     + "must be passed a single parameterized SQL statement as its first parameter. "
                     + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
@@ -46,13 +53,13 @@ public class SqlBatchImpl implements SqlBatch {
     /**
      * A chain of checks to determine whether a SQL statement should be routed to Calcite.
      */
-    static final CalciteCheck s_calciteChecks = CalciteCheck.create();
+    static final CalciteCheck CALCITE_CHECKS = CalciteCheck.create();
 
     /**
      * Build a batch from a string of one or more SQL statements. </br>
      * The SQL statements can have parameter place-holders, but we will throw
      * an error if the batch has more than one query when user parameters are supplied
-     * because we currently do not support this.
+     * because we currently do not support it.
      * @param sqlBlock a string of one or more SQL statements.
      * @param userParams user parameter values for the query.
      * @throws SqlParseException when the query parsing went wrong.
@@ -60,7 +67,7 @@ public class SqlBatchImpl implements SqlBatch {
      * @throws UnsupportedOperationException when the batch is a mixture of
      * DDL and non-DDL statements or has parameters and more than one query at the same time.
      */
-    public SqlBatchImpl(String sqlBlock, Object... userParams)
+    SqlBatchImpl(String sqlBlock, Object[] userParams, Context context)
             throws SqlParseException, PlannerFallbackException {
         // We can process batches of either all DDL or all DML/DQL, no mixed batch can be accepted.
         // Split the SQL statements, and process them one by one.
@@ -74,29 +81,50 @@ public class SqlBatchImpl implements SqlBatch {
             throw new RuntimeException("Failed to plan, no SQL statement provided.");
         }
         if (userParams != null && userParams.length > 0 && sqlList.size() != 1) {
-            throw new UnsupportedOperationException(s_adHocErrorResponseMessage);
+            throw new UnsupportedOperationException(ADHOC_ERROR_RESPONSE);
         }
-        m_tasks = new ArrayList<>(sqlList.size());
+
+        ImmutableList.Builder<SqlTask> taskBuilder = new ImmutableList.Builder<>();
         // Are all the queries in this input batch DDL? (null means not determined yet)
         Boolean isDDLBatch = null;
         // Iterate over the SQL string list and build SqlTasks out of the SQL strings.
         for (final String sql : sqlList) {
-            if (! s_calciteChecks.check(sql)) {
+            if (! CALCITE_CHECKS.check(sql)) {
                 // The query cannot pass the compatibility check, throw a fall-back exception
-                // so that VoltDB will use the old parser and planner.
+                // so that VoltDB will use the legacy parser and planner.
                 throw new PlannerFallbackException();
             }
-            SqlTask sqlTask = SqlTask.create(sql);
+            SqlTask sqlTask = SqlTask.from(sql);
             if (isDDLBatch == null) {
                 isDDLBatch = sqlTask.isDDL();
             } else if (isDDLBatch ^ sqlTask.isDDL()) { // True if isDDLBatch is different from isDDL
                 // No mixing DDL and DML/DQL. Turn this into an error and return it to the client.
                 throw new UnsupportedOperationException("Mixing DDL with DML/DQL queries is unsupported.");
             }
-            m_tasks.add(sqlTask);
+            taskBuilder.add(sqlTask);
         }
+        m_tasks = taskBuilder.build();
+        m_userParams = ImmutableList.copyOf(userParams);
         m_isDDLBatch = isDDLBatch;
-        m_userParams = userParams;
+        m_context = context;
+    }
+
+    @Override
+    public CompletableFuture<ClientResponse> execute() {
+        // This function is called for DDL batches. Non-DDL batches will be handled in NonDDLBatch.execute().
+        final List<String> sqls = new ArrayList<>(getTaskCount()), validated = new ArrayList<>();
+        final List<SqlNode> nodes = new ArrayList<>(getTaskCount());
+        for (SqlTask task : this) {
+            final String sql = task.getSQL();
+            sqls.add(sql);
+            nodes.add(task.getParsedQuery());
+            AdHocNTBase.processAdHocSQLStmtTypes(sql, validated);
+            // NOTE: need to exercise the processAdHocSQLStmtTypes() method, because some tests
+            // (i.e. ENG-7653, TestAdhocCompilerException.java) rely on the code path.
+            // But, we might not need to call it? Certainly it involves some refactory for the check and simulation.
+            validated.clear();
+        }
+        return getContext().runDDLBatch(sqls, nodes);
     }
 
     @Override
@@ -111,11 +139,16 @@ public class SqlBatchImpl implements SqlBatch {
 
     @Override
     public Object[] getUserParameters() {
-        return m_userParams;
+        return m_userParams.toArray();
     }
 
     @Override
     public int getTaskCount() {
         return m_tasks.size();
+    }
+
+    @Override
+    Context getContext() {
+        return m_context;
     }
 }

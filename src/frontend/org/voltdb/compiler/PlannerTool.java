@@ -26,7 +26,10 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql2rel.RelDecorrelator;
+import org.apache.calcite.sql2rel.SqlToRelConverter;
+import org.apache.calcite.tools.RelBuilder;
+import org.apache.calcite.tools.ValidationException;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
@@ -36,13 +39,14 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.calciteadapter.VoltSchemaPlus;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.newplanner.CalcitePlanner;
-import org.voltdb.newplanner.NonDdlBatch;
 import org.voltdb.newplanner.SqlTask;
+import org.voltdb.newplanner.VoltFrameworkConfig;
 import org.voltdb.newplanner.VoltSqlToRelConverter;
 import org.voltdb.newplanner.VoltSqlValidator;
 import org.voltdb.newplanner.rules.PlannerPhase;
@@ -63,7 +67,7 @@ import org.voltdb.utils.Encoder;
  * Planner tool accepts an already compiled VoltDB catalog and then
  * interactively accept SQL and outputs plans on standard out.
  *
- * Used only for ad hoc queries.
+ * Used only for AdHoc queries.
  */
 public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -87,13 +91,13 @@ public class PlannerTool {
     private final double m_largeModeRatio = Double.valueOf((System.getenv("LARGE_MODE_RATIO") == null ||
             System.getenv("LARGE_MODE_RATIO").equals("-1")) ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
 
-    public PlannerTool(final Database database, byte[] catalogHash)
-    {
+    public PlannerTool(final Database database, byte[] catalogHash) {
         assert(database != null);
 
         m_database = database;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+        m_schemaPlus = VoltSchemaPlus.from(m_database);
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
@@ -135,11 +139,11 @@ public class PlannerTool {
         m_schemaPlus = schemaPlus;
     }
 
-    public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash, SchemaPlus schemaPlus) {
+    public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash) {
         m_database = database;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
-        m_schemaPlus = schemaPlus;
+        m_schemaPlus = VoltSchemaPlus.from(m_database);
 
         return this;
     }
@@ -213,16 +217,21 @@ public class PlannerTool {
      * @param task the query to plan.
      * @param batch the query batch which this query belongs to.
      * @return a planned statement.
+     * @throws ValidationException
      */
-    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
-        // create VoltSqlValidator from SchemaPlus.
-        VoltSqlValidator validator = VoltSqlValidator.createFromSchema(m_schemaPlus);
-        // validate the task's SqlNode.
-        SqlNode validatedNode = validator.validate(task.getParsedQuery());
+    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task) throws ValidationException {
+        // TRAIL [Calcite:3] NonDdlBatchCompiler.compileTask()
+        VoltFrameworkConfig plannerConfig = new VoltFrameworkConfig(m_schemaPlus);
+
+        // Create VoltSqlValidator from SchemaPlus.
+        VoltSqlValidator validator = VoltSqlValidator.from(m_schemaPlus);
         // convert SqlNode to RelNode.
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, m_schemaPlus);
-        RelRoot root = converter.convertQuery(validatedNode, false, true);
-        root = root.withRel(converter.decorrelate(validatedNode, root.rel));
+        SqlToRelConverter.Config config = SqlToRelConverter.Config.DEFAULT;
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, m_schemaPlus, config);
+        final RelBuilder relBuilder = config.getRelBuilderFactory().create(converter.getCluster(), null);
+
+        RelRoot root = converter.convertQuery(task.getParsedQuery(), true, true);
+        root = root.withRel(RelDecorrelator.decorrelateQuery(root.rel, relBuilder));
         // apply calcite and Volt logical rules
         RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
         RelNode nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,

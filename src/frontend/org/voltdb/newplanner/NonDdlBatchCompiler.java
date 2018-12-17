@@ -23,12 +23,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
-import org.voltcore.logging.VoltLogger;
+import org.voltdb.CatalogContext;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * A compiler that compiles a non-DDL batch.
@@ -37,11 +39,17 @@ import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
  */
 public class NonDdlBatchCompiler {
 
-    static final VoltLogger s_adHocLog = new VoltLogger("ADHOC");
     private final NonDdlBatch m_batch;
+
+    /**
+     * Record the catalog version that the queries are planned against.
+     * Catch races vs. updateApplicationCatalog.
+     */
+    private final CatalogContext m_catalogContext;
 
     public NonDdlBatchCompiler(NonDdlBatch batch) {
         m_batch = batch;
+        m_catalogContext = VoltDB.instance().getCatalogContext();
     }
 
     /**
@@ -82,12 +90,21 @@ public class NonDdlBatchCompiler {
             throw new AdHocPlanningException(errorSummary);
         }
 
-        return new AdHocPlannedStmtBatch(m_batch.getUserParameters(),
-                                         plannedStmts,
-                                         partitionParamIndex,
-                                         partitionParamType,
-                                         partitionParamValue,
-                                         m_batch.getUserPartitioningKeys());
+        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
+                m_batch.getUserParameters(),
+                plannedStmts,
+                partitionParamIndex,
+                partitionParamType,
+                partitionParamValue,
+                m_batch.getUserPartitioningKeys());
+        if (m_batch.getContext().getLogger().isDebugEnabled()) {
+            m_batch.getContext().logBatch(m_catalogContext, plannedStmtBatch, m_batch.getUserParameters());
+        }
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endAsync("planadhoc", m_batch.getContext().getClientHandle()));
+        }
+        return plannedStmtBatch;
     }
 
     /**
@@ -98,12 +115,11 @@ public class NonDdlBatchCompiler {
      */
     private AdHocPlannedStatement compileTask(SqlTask task) throws AdHocPlanningException {
         // TRAIL [Calcite:3] NonDdlBatchCompiler.compileTask()
-        assert(task != null);
-        final PlannerTool ptool = m_batch.m_catalogContext.m_ptool;
+        final PlannerTool ptool = m_catalogContext.m_ptool;
         assert(ptool != null);
 
         try {
-            return ptool.planSqlCalcite(task, m_batch);
+            return ptool.planSqlCalcite(task);
         } catch (Exception e) {
             throw new AdHocPlanningException(e.getMessage());
         } catch (StackOverflowError error) {
@@ -131,13 +147,13 @@ public class NonDdlBatchCompiler {
             throw new AdHocPlanningException("Encountered stack overflow error. " +
                     "Try reducing the number of predicate expressions in the query.");
         } catch (AssertionError ae) {
-            String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc.  "
+            String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc. "
                     + "Please contact VoltDB at support@voltdb.com with your log files.";
             StringWriter stringWriter = new StringWriter();
             PrintWriter writer = new PrintWriter(stringWriter);
             ae.printStackTrace(writer);
             String stackTrace = stringWriter.toString();
-            s_adHocLog.error(msg + "\n" + stackTrace);
+            m_batch.getContext().getLogger().error(msg + "\n" + stackTrace);
             throw new AdHocPlanningException(msg);
         }
     }

@@ -56,7 +56,7 @@ public class VoltSqlValidator extends SqlValidatorImpl {
      * Build a VoltDB SQL validator from {@link SchemaPlus}.
      * @param schemaPlus
      */
-    public static VoltSqlValidator createFromSchema(SchemaPlus schemaPlus) {
+    public static VoltSqlValidator from(SchemaPlus schemaPlus) {
         // TODO: currently we are using the default implementation of SqlOperatorTable, RelDataTypeFactory
         // and SqlConformance. May replace them with our own versions in the future.
         RelDataTypeFactory typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);

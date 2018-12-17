@@ -25,22 +25,27 @@ package org.voltdb.newplanner;
 
 import static org.junit.Assert.assertEquals;
 
+import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.sql2rel.RelDecorrelator;
+import org.apache.calcite.sql2rel.SqlToRelConverter;
+import org.apache.calcite.tools.Frameworks;
+import org.apache.calcite.tools.Planner;
+import org.apache.calcite.tools.RelBuilder;
 import org.junit.Test;
-import org.voltdb.calciteadapter.CatalogAdapter;
+import org.voltdb.calciteadapter.VoltSchemaPlus;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.parser.SqlParserWrapper;
 
 public class TestCalciteParser {
 
     private void assertSqlNodeKind(String sql, SqlKind expectedSqlKind) throws SqlParseException {
-        SqlNode sqlNode = SqlParserWrapper.parse(sql);
+        SqlNode sqlNode = VoltSqlParser.parse(sql);
         assertEquals(expectedSqlKind, sqlNode.getKind());
     }
 
@@ -55,10 +60,20 @@ public class TestCalciteParser {
         Cluster cluster = catalog.getClusters().add("cluster");
         Database database = cluster.getDatabases().add("database");
         Table table = database.getTables().add("testTable");
-        SchemaPlus plus = CatalogAdapter.schemaPlusFromDatabase(database);
-        SqlNode sqlNode = SqlParserWrapper.parse("SELECT * FROM testTable;");
 
-        VoltSqlValidator validator = VoltSqlValidator.createFromSchema(plus);
-        SqlNode validatedNode = validator.validate(sqlNode);
+        SchemaPlus plus = VoltSchemaPlus.from(database);
+
+        VoltFrameworkConfig plannerConfig = new VoltFrameworkConfig(plus);
+        Planner planner = Frameworks.getPlanner(plannerConfig);
+
+        SqlNode sqlNode = planner.parse("SELECT * FROM testTable;");
+
+        VoltSqlValidator validator = VoltSqlValidator.from(plus);
+        SqlToRelConverter.Config config = SqlToRelConverter.Config.DEFAULT;
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, plus, config);
+        final RelBuilder relBuilder = config.getRelBuilderFactory().create(converter.getCluster(), null);
+
+        RelRoot root = converter.convertQuery(sqlNode, true, true);
+        root = root.withRel(RelDecorrelator.decorrelateQuery(root.rel, relBuilder));
     }
 }

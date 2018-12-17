@@ -79,12 +79,12 @@ public class TestQueryParameterization {
     @Test
     public void testNotParameterizable() throws SqlParseException {
         // Cannot parameterized a query that already got user parameters.
-        ParameterizedSqlTask task = new ParameterizedSqlTask(SqlTask.create(
+        ParameterizedSqlTask task = new ParameterizedSqlTask(SqlTask.from(
                 "select * from T where id = 7 and cnt < ? and name = 'Chao'"));
         assertNull(task.getSqlLiteralList());
 
         // We do not parameterize DDL.
-        task = new ParameterizedSqlTask(SqlTask.create(
+        task = new ParameterizedSqlTask(SqlTask.from(
                 "CREATE TABLE t1 (a INT DEFAULT 1)"));
         assertNull(task.getSqlLiteralList());
     }
@@ -124,8 +124,8 @@ public class TestQueryParameterization {
          */
         public ParameterizationTestCase(String original,
                 String parameterized, SqlLiteral... literals) throws SqlParseException {
-            m_actualTask = new ParameterizedSqlTask(SqlTask.create(original));
-            m_expectedTask = SqlTask.create(parameterized);
+            m_actualTask = new ParameterizedSqlTask(SqlTask.from(original));
+            m_expectedTask = SqlTask.from(parameterized);
             for (SqlLiteral literal : literals) {
                 m_expectedLiterals.add(literal);
             }
@@ -180,7 +180,7 @@ public class TestQueryParameterization {
      * @throws SqlParseException if the query parsing goes wrong.
      */
     private void assertHasLiteralsLeft(String sql, int expectedLiteralsLeft) throws SqlParseException {
-        ParameterizedSqlTask task = new ParameterizedSqlTask(SqlTask.create(sql));
+        ParameterizedSqlTask task = new ParameterizedSqlTask(SqlTask.from(sql));
         SqlLiteralCounter counter = new SqlLiteralCounter();
         task.getParsedQuery().accept(counter);
         assertEquals(expectedLiteralsLeft, counter.getLiteralCount());

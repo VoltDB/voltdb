@@ -27,10 +27,8 @@ import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql2rel.SqlRexConvertletTable;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
@@ -73,22 +71,23 @@ public class VoltSqlToRelConverter extends SqlToRelConverter {
      * @param schemaPlus
      * @return
      */
-    public static VoltSqlToRelConverter create(SqlValidator validator, SchemaPlus schemaPlus) {
+    public static VoltSqlToRelConverter create(SqlValidator validator,
+            SchemaPlus schemaPlus, SqlToRelConverter.Config config) {
         final VolcanoPlanner planner = new VolcanoPlanner();
         // We add ConventionTraitDef.INSTANCE and RelCollationTraitDef.INSTANCE.
         // RelDistributionTraitDef will be added in the later stage.
         planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
         planner.addRelTraitDef(RelCollationTraitDef.INSTANCE);
 
-        final RexBuilder rexBuilder = new RexBuilder(new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT));
+        final RexBuilder rexBuilder = new RexBuilder(validator.getTypeFactory());
         final RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
-        final Prepare.CatalogReader reader = new CalciteCatalogReader(
+        final Prepare.CatalogReader catalogReader = new CalciteCatalogReader(
                 CalciteSchema.from(schemaPlus),
                 new ArrayList<>(),
-                new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT),
+                validator.getTypeFactory(),
                 null
         );
-        return new VoltSqlToRelConverter(null, validator, reader, cluster,
-                StandardConvertletTable.INSTANCE, SqlToRelConverter.Config.DEFAULT);
+        return new VoltSqlToRelConverter(null /*view expander*/, validator, catalogReader, cluster,
+                StandardConvertletTable.INSTANCE, config);
     }
 }

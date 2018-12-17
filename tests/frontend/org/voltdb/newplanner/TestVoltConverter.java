@@ -24,14 +24,14 @@
 package org.voltdb.newplanner;
 
 import org.apache.calcite.rel.RelRoot;
-import org.voltdb.calciteadapter.CatalogAdapter;
+import org.voltdb.calciteadapter.VoltSchemaPlus;
 
 public class TestVoltConverter extends VoltConverterTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestVoltSqlValidator.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
-        init(CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
+        init(VoltSchemaPlus.from(getDatabase()));
     }
 
     @Override

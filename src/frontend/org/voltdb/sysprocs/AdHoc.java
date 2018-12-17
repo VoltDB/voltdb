@@ -28,12 +28,15 @@ import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.calcite.sql.SqlNode;
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.newplanner.SqlBatch;
-import org.voltdb.newplanner.SqlTask;
 import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
 
@@ -43,36 +46,31 @@ public class AdHoc extends AdHocNTBase {
      * Run an AdHoc query batch through the Calcite parser and planner, fall back to the old
      * parser and planner when the batch cannot be handled.
      * @param params the user parameters. The first parameter is always the query text.
-     * The rest parameters are the ones used in the queries. </br>
-     * Some notes:
-     * <ul>
-     *   <li>AdHoc DDLs do not take parameters ("?" will be treated as an unexpected token);</li>
-     *   <li>Currently, a non-DDL batch can take parameters only if the batch has one query.</li>
-     *   <li>We do not handle large query mode now. The special flag for swap tables is also
-     *       eliminated. They both need to be re-designed in the new Calcite framework.</li>
-     * </ul>
+     *               The rest parameters are the ones used in the queries. </br>
      * @return the client response.
      * @since 8.4
      * @author Yiqun Zhang
      */
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
         // TRAIL [Calcite:0] [entry] AdHoc.run()
+        /**
+         * Some notes:
+         * 1. AdHoc DDLs do not take parameters ("?" will be treated as an unexpected token);
+         * 2. Currently, a DML/DQL batch can take parameters only if the batch has one query.
+         * 3. We do not handle large query mode now. The special flag for swap tables is also
+         *    eliminated. They both need to be re-designed in the new Calcite framework.
+         */
         SqlBatch batch;
         try {
             // We do not need to worry about the ParameterSet,
             // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
-            batch = SqlBatch.fromParameterSet(params);
-            if (batch.isDDLBatch()) {
-                return runDDLBatchThroughCalcite(batch);
-            } else {
-                // Large query mode should be set to m_backendTargetType.isLargeTempTableTarget
-                // But for now let's just disable it.
-                return runNonDDLBatchThroughCalcite(batch);
-            }
+            batch = SqlBatch.from(params, m_context);
+            return batch.execute();
         } catch (PlannerFallbackException ex) {
+            // Use the legacy planner to run this.
             return runFallback(params);
         } catch (Exception ex) {
-            // For now, let's just fail the batch if any error happens.
+            // Any other exceptions will result in a failure client response.
             return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE,
                                      ex.getLocalizedMessage());
         }
@@ -125,30 +123,6 @@ public class AdHoc extends AdHocNTBase {
         assert(mix == AdHocSQLMix.ALL_DDL);
         // Since we are not going through Calcite, there is no need to update CalciteSchema.
         return runDDLBatch(sqlStatements, Collections.emptyList());
-    }
-
-    /**
-     * Run a DDL batch through Calcite.
-     * @param batch the batch to run.
-     * @return the client response.
-     * @since 8.4
-     * @author Yiqun Zhang
-     */
-    private CompletableFuture<ClientResponse> runDDLBatchThroughCalcite(SqlBatch batch) {
-        final List<String> sqls = new ArrayList<>(batch.getTaskCount()),
-                validated = new ArrayList<>();
-        final List<SqlNode> nodes = new ArrayList<>(batch.getTaskCount());
-        for (SqlTask task : batch) {
-            final String sql = task.getSQL();
-            sqls.add(sql);
-            nodes.add(task.getParsedQuery());
-            processAdHocSQLStmtTypes(sql, validated);
-            // NOTE: need to exercise the processAdHocSQLStmtTypes() method, because some tests
-            // (i.e. ENG-7653, TestAdhocCompilerException.java) rely on the code path.
-            // But, we might not need to call it? Certainly it involves some refactory for the check and simulation.
-            validated.clear();
-        }
-        return runDDLBatch(sqls, nodes);
     }
 
     private CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes) {
@@ -207,18 +181,54 @@ public class AdHoc extends AdHocNTBase {
             return makeQuickResponse(
                     ClientResponse.GRACEFUL_FAILURE,
                     "Cluster is configured to use @UpdateApplicationCatalog " +
-                            "to change application schema.  AdHoc DDL is forbidden.");
+                    "to change application schema.  AdHoc DDL is forbidden.");
         }
 
         logCatalogUpdateInvocation("@AdHoc");
 
         return updateApplication("@AdHoc",
-                null,
-                null,
-                sqlStatements.toArray(new String[0]),
-                sqlNodes,
-                null,
-                false,
-                true);
+                                null, /*operationBytes*/
+                                null, /*operationString*/
+                                sqlStatements.toArray(new String[0]), /*adhocDDLStmts*/
+                                sqlNodes,
+                                null, /*replayHashOverride*/
+                                false, /*isPromotion*/
+                                true); /*useAdhocDDL*/
     }
+
+    /**
+     * The SqlBatch was designed to be self-contained. However, this is not entirely true due to the way that
+     * the legacy code was organized. Until I have further reshaped the legacy code path, I will leave an
+     * interface to call back into the private methods of {@link org.voltdb.sysprocs.AdHoc}.
+     * @author Yiqun Zhang
+     * @since 8.4
+     */
+    private class AdHocContext implements SqlBatch.Context {
+        @Override
+        public CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes) {
+            return AdHoc.this.runDDLBatch(sqlStatements, sqlNodes);
+        }
+
+        @Override
+        public void logBatch(CatalogContext context, AdHocPlannedStmtBatch batch, Object[] userParams) {
+            AdHoc.this.logBatch(context, batch, userParams);
+        }
+
+        @Override
+        public VoltLogger getLogger() {
+            return adhocLog;
+        }
+
+        @Override
+        public long getClientHandle() {
+            return AdHoc.this.getClientHandle();
+        }
+
+        @Override
+        public CompletableFuture<ClientResponse> createAdHocTransaction(AdHocPlannedStmtBatch plannedStmtBatch)
+                throws VoltTypeException {
+            return AdHoc.this.createAdHocTransaction(plannedStmtBatch, false);
+        }
+    }
+    private AdHocContext m_context = new AdHocContext();
 }

@@ -46,7 +46,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
-import org.voltdb.calciteadapter.CatalogAdapter;
+import org.voltdb.calciteadapter.VoltSchemaPlus;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
@@ -324,7 +324,7 @@ public class CreateTableUtils {
     public static Pair<SchemaPlus, Pair<Statement, VoltXMLElement>> addTable(
             SqlNode node, HSQLInterface hsql, Database db) {
         if (node.getKind() != SqlKind.CREATE_TABLE) {           // for now, only partially support CREATE TABLE stmt
-            return Pair.of(CatalogAdapter.schemaPlusFromDatabase(db), null);
+            return Pair.of(VoltSchemaPlus.from(db), null);
         }
         final List<SqlNode> nameAndColListAndQuery = ((SqlCreateTable) node).getOperandList();
         final String tableName = nameAndColListAndQuery.get(0).toString();
@@ -391,6 +391,6 @@ public class CreateTableUtils {
         t.setSignature(CatalogUtil.getSignatureForTable(tableName, columnTypes));
         procTTLStmt(t, ((SqlCreateTable) node).getTtlConstraint());
         addAnnotation(t);
-        return Pair.of(CatalogAdapter.schemaPlusFromDatabase(db), limitRowCatalogUpdate);
+        return Pair.of(VoltSchemaPlus.from(db), limitRowCatalogUpdate);
     }
 }

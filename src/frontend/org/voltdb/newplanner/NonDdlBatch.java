@@ -19,10 +19,13 @@ package org.voltdb.newplanner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
-import org.voltdb.CatalogContext;
-import org.voltdb.VoltDB;
+import org.voltdb.VoltTypeException;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 
 /**
  * A batch of non-DDL SQL queries.
@@ -32,12 +35,6 @@ import org.voltdb.planner.StatementPartitioning;
  * @author Yiqun Zhang
  */
 public final class NonDdlBatch extends AbstractSqlBatchDecorator {
-
-    /**
-     * Record the catalog version that the queries are planned against.
-     * Catch races vs. updateApplicationCatalog.
-     */
-    public final CatalogContext m_catalogContext;
 
     /**
      * The user partitioning keys and the infer partitioning value affects the final
@@ -62,14 +59,28 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
      * @param batchToDecorate the {@link SqlBatch} that this is built from.
      * @throws IllegalArgumentException if the given batch is not a non-DDL batch.
      */
-    public NonDdlBatch(SqlBatch batchToDecorate) {
+    NonDdlBatch(SqlBatch batchToDecorate) {
         super(batchToDecorate);
         if (batchToDecorate.isDDLBatch()) {
             throw new IllegalArgumentException("Cannot create a non-DDL batch from a batch of DDL statements.");
         }
-        m_catalogContext = VoltDB.instance().getCatalogContext();
         m_userPartitionKeys = null;
         setInferPartitioning(true);
+    }
+
+    @Override
+    public CompletableFuture<ClientResponse> execute() throws AdHocPlanningException {
+        // TRAIL [Calcite:1] NonDdlBatch.execute()
+        NonDdlBatchCompiler compiler = new NonDdlBatchCompiler(this);
+        AdHocPlannedStmtBatch plannedStmtBatch = compiler.compile();
+
+        // No explain mode and swap tables now.
+        try {
+            return getContext().createAdHocTransaction(plannedStmtBatch);
+        } catch (VoltTypeException vte) {
+            String msg = "Unable to execute AdHoc SQL statement(s): " + vte.getMessage();
+            throw new AdHocPlanningException(msg);
+        }
     }
 
     /**

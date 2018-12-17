@@ -28,7 +28,6 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
-import org.voltdb.parser.SqlParserWrapper;
 import org.voltdb.planner.PlannerTestCase;
 
 /**
@@ -48,7 +47,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
      */
     protected void init(SchemaPlus schemaPlus) {
         m_schemaPlus = schemaPlus;
-        m_validator = VoltSqlValidator.createFromSchema(m_schemaPlus);
+        m_validator = VoltSqlValidator.from(m_schemaPlus);
     }
 
     protected VoltSqlValidator getValidator() {
@@ -63,7 +62,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         assertNotNull("m_validator is null", m_validator);
         SqlNode sqlNode;
         try {
-            sqlNode = SqlParserWrapper.parse(sql);
+            sqlNode = VoltSqlParser.parse(sql);
         } catch (Throwable e) {
             throw new RuntimeException("Error while parsing query: " + sql, e);
         }
@@ -95,7 +94,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         final SqlNode sqlNode;
         final SqlParserUtil.StringAndPos sap = SqlParserUtil.findPos(sql);
         try {
-            sqlNode = SqlParserWrapper.parse(sap.sql);
+            sqlNode = VoltSqlParser.parse(sap.sql);
         } catch (Throwable e) {
             throw mapException(e, expectedMsgPattern, sap.sql);
         }

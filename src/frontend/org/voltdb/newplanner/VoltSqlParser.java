@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.parser;
+package org.voltdb.newplanner;
 
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -28,9 +28,9 @@ import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
  * @since 8.4
  * @author Yiqun Zhang
  */
-public class SqlParserWrapper {
+public class VoltSqlParser {
 
-    private static Config s_parserConfig =
+    static final Config PARSER_CONFIG =
             SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build();
 
     /**
@@ -40,6 +40,6 @@ public class SqlParserWrapper {
      * @return the parsed SqlNode tree for it.
      */
     public static SqlNode parse(String sql) throws SqlParseException {
-        return SqlParser.create(sql, s_parserConfig).parseQuery(sql);
+        return SqlParser.create(sql, PARSER_CONFIG).parseQuery(sql);
     }
 }

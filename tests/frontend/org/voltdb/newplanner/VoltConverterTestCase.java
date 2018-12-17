@@ -23,11 +23,11 @@
 
 package org.voltdb.newplanner;
 
-import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.sql.SqlNode;
-
 import java.util.Objects;
+
+import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql2rel.SqlToRelConverter;
 
 /**
  * A base class for implementing tests against {@link VoltSqlToRelConverter}.
@@ -41,7 +41,7 @@ public class VoltConverterTestCase extends VoltSqlValidatorTestCase {
         Objects.requireNonNull(getValidator(), "m_validator");
         Objects.requireNonNull(getSchemaPlus(), "m_schemaPlus");
         SqlNode node = parseAndValidate(sql);
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(getValidator(), getSchemaPlus());
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(getValidator(), getSchemaPlus(), SqlToRelConverter.Config.DEFAULT);
         RelRoot root = converter.convertQuery(node, false, true);
         root = root.withRel(converter.decorrelate(node, root.rel));
         return root;

@@ -34,7 +34,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
-import org.voltdb.calciteadapter.CatalogAdapter;
+import org.voltdb.calciteadapter.VoltSchemaPlus;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -417,7 +417,7 @@ final public class CreateIndexUtils {
                     StreamSupport.stream(((Iterable<Index>) indicesOnTable::iterator).spliterator(), false)
                             .anyMatch(index -> equals(index, indexConstraint)),
                     String.format("A constraint already exists on table %s", tableName));
-            return CatalogAdapter.schemaPlusFromDatabase(currentDb);
+            return VoltSchemaPlus.from(currentDb);
         } else {
             return null;
         }

@@ -28,8 +28,8 @@ import org.apache.calcite.sql.parser.SqlParseException;
 public interface SqlTask {
 
     /**
-     * Tell if this {@link SqlTaskImpl} is a DDL task.
-     * @return true if this {@code SqlTask} is a DDL task.
+     * Tell if this is a DDL task.
+     * @return true if this is a DDL task.
      */
     boolean isDDL();
 
@@ -52,7 +52,7 @@ public interface SqlTask {
      * @throws SqlParseException when the parsing goes wrong.
      * @throws IllegalArgumentException if the SQL string is null or empty.
      */
-    static SqlTask create(String sql) throws SqlParseException {
+    static SqlTask from(String sql) throws SqlParseException {
         return new SqlTaskImpl(sql);
     }
 }
