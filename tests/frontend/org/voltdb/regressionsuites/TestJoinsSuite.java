@@ -24,7 +24,10 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.stream.StreamSupport;
 
+import org.junit.Assert;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -1869,7 +1872,11 @@ public class TestJoinsSuite extends RegressionSuite {
                 "LEFT JOIN float_cells T20 ON rowkeys.part = T20.part AND rowkeys.value = T20.row_key AND T20.attribute_id = 2889597802755653649 " +
                 "WHERE " +
                 "rowkeys.dataset_id = 2889597788000092160 AND rowkeys.part = 3297";
-        assertEquals(ClientResponse.SUCCESS, client.callProcedure("@Explain", bigJoin).getStatus());
+        final ClientResponse cr = client.callProcedure("@Explain", bigJoin);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertTrue("Expect that the plan contains at least 3 index scans, got fewer",
+                Arrays.stream(cr.getResults()[0].toString().split("\n"))
+                        .filter(line -> line.contains("INDEX SCAN of")).count() >= 3);
     }
 
     static public junit.framework.Test suite() {

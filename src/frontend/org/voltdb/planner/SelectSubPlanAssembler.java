@@ -65,7 +65,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     private static final int S_PLAN_ESTIMATE_PERIOD = 100;
     // Stop generating any further possible plans, if we have reached xx% of available JVM heap memory
     private static final short S_MAX_HEAP_MEMORY_USAGE_PCT = 98;
-    private static final long S_MAX_ALLOWED_PLAN_MEMORY = (long) (S_TOTAL_JVM_BYTES / 100. * S_MAX_HEAP_MEMORY_USAGE_PCT);
+    private static final long S_MAX_ALLOWED_PLAN_MEMORY = S_TOTAL_JVM_BYTES * S_MAX_HEAP_MEMORY_USAGE_PCT/ 100;
 
     /**
      *

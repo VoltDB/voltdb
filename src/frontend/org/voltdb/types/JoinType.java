@@ -30,33 +30,16 @@ public enum JoinType {
     LEFT        (2),
     FULL        (3),
     RIGHT       (4);
-    private final int m_val;
 
     JoinType(int val) {
         assert (this.ordinal() == val) :
             "Enum element " + this.name() +
             " in position " + this.ordinal() +
             " instead of position " + val;
-        m_val = val;
     }
 
     public int getValue() {
         return this.ordinal();
-    }
-    public String toString() {
-        switch (m_val) {
-            case 0:
-                return "INVALID";
-            case 1:
-                return "INNER";
-            case 2:
-                return "LEFT";
-            case 3:
-                return "FULL";
-            case 4:
-            default:
-                return "RIGHT";
-        }
     }
 
     protected static final Map<Integer, JoinType> idx_lookup = new HashMap<Integer, JoinType>();
