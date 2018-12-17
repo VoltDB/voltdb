@@ -74,6 +74,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
@@ -81,6 +82,7 @@ import javax.net.ssl.TrustManagerFactory;
 
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.FileAppender;
@@ -243,8 +245,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
@@ -1065,17 +1065,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_config.m_startAction.doesRecover()) {
                 m_config.m_hostCount = fromPropertyFile.hostcount();
             }
+            if (m_config.m_recoverPlacement) {
+                if (!StringUtils.isEmpty(fromPropertyFile.placementgroup())) {
+                    m_config.m_recoveredPlacementGroup = fromPropertyFile.placementgroup();
+                }
+                if (!StringUtils.isEmpty(fromPropertyFile.partitionids())) {
+                    m_config.m_recoveredPartitions = fromPropertyFile.partitionids();
+                }
+            }
+
             Map<String, String> fromCommandLine = m_config.asClusterSettingsMap();
             Map<String, String> fromDeploymentFile = CatalogUtil.
                     asClusterSettingsMap(readDepl.deployment);
 
             ClusterSettings clusterSettings = ClusterSettings.create(
                     fromCommandLine, fromPropertyFile.asMap(), fromDeploymentFile);
-
-            // persist the merged settings
-            clusterSettings.store();
-
-            m_clusterSettings.set(clusterSettings, 1);
 
             MeshProber.Determination determination = buildClusterMesh(readDepl);
             if (m_config.m_startAction == StartAction.PROBE) {
@@ -1217,6 +1221,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
             AbstractTopology topo = getTopology(config.m_startAction, hostGroups, sitesPerHostMap, m_joinCoordinator);
+            topo = recoverTopology(topo, hostInfos, config.m_startAction);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
@@ -1253,6 +1258,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     partitionGroupPeers = topo.getPartitionGroupPeers(m_messenger.getHostId());
                 }
                 m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
+
+                // persist the merged settings
+                m_config.m_recoveredPartitions = partitions.stream().map( n -> n.toString()).collect(Collectors.joining( "," ));
+                clusterSettings = ClusterSettings.create(
+                        m_config.asClusterSettingsMap(), fromPropertyFile.asMap(), fromDeploymentFile);
+                clusterSettings.store();
+                m_clusterSettings.set(clusterSettings, 1);
+
                 for (int ii = 0; ii < partitions.size(); ii++) {
                     Integer partition = partitions.get(ii);
                     m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
@@ -2177,6 +2190,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         return topology;
+    }
+
+    private AbstractTopology recoverTopology(AbstractTopology topo, Map<Integer, HostMessenger.HostInfo> hostMap, StartAction startAction) {
+        if (!m_config.m_recoverPlacement || (!startAction.doesRecover() && !startAction.doesRejoin())) {
+            return topo;
+        }
+
+        return topo;
     }
 
     private TreeMap<Integer, Initiator> createIv2Initiators(Collection<Integer> partitions,
@@ -3170,14 +3191,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hmconfig.coreBindIds = m_config.m_networkCoreBindings;
         hmconfig.acceptor = criteria;
         hmconfig.localSitesCount = m_config.m_sitesperhost;
-
+        if (!StringUtils.isEmpty(m_config.m_recoveredPartitions)) {
+            hmconfig.recoveredPartitions = m_config.m_recoveredPartitions;
+        }
+        if (!StringUtils.isEmpty(m_config.m_recoveredPlacementGroup)) {
+            hmconfig.recoveredGroup = m_config.m_recoveredPlacementGroup;
+        }
         //if SSL needs to be enabled for internal communication, SSL context has to be setup before starting HostMessenger
         setupSSL(readDepl);
         if (m_config.m_sslInternal) {
             m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, m_config.m_sslServerContext,
                     m_config.m_sslClientContext);
         } else {
-            m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this                );
+            m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this);
         }
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
