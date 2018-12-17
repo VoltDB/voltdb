@@ -108,7 +108,7 @@ public abstract class PBDSegment {
     // Has to be able to hold at least one object (compressed or not)
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
     static final int OBJECT_HEADER_BYTES = 8;
-    static final int SEGMENT_HEADER_BYTES = 8;
+    static final int SEGMENT_HEADER_BYTES = 8; // number of entries (4 bytes), total bytes of data (4 bytes)
     protected final File m_file;
 
     protected boolean m_closed = true;
