@@ -36,9 +36,9 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
-import org.voltdb.newplanner.SqlBatch;
-import org.voltdb.newplanner.guards.PlannerFallbackException;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.plannerv2.SqlBatch;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 
 public class AdHoc extends AdHocNTBase {
 

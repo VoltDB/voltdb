@@ -28,6 +28,7 @@ import java.util.Objects;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
+import org.voltdb.plannerv2.VoltSqlToRelConverter;
 
 /**
  * A base class for implementing tests against {@link VoltSqlToRelConverter}.

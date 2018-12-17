@@ -35,6 +35,9 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.util.Litmus;
 import org.junit.Test;
+import org.voltdb.plannerv2.ParameterizationVisitor;
+import org.voltdb.plannerv2.ParameterizedSqlTask;
+import org.voltdb.plannerv2.SqlTask;
 
 public class TestQueryParameterization {
 

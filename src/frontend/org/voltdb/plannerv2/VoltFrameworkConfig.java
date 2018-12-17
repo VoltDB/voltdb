@@ -1,0 +1,118 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2018 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.plannerv2;
+
+import org.apache.calcite.plan.Context;
+import org.apache.calcite.plan.ConventionTraitDef;
+import org.apache.calcite.plan.RelOptCostFactory;
+import org.apache.calcite.plan.RelTraitDef;
+import org.apache.calcite.rel.RelCollationTraitDef;
+import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.rex.RexExecutor;
+import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.sql.SqlOperatorTable;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParser.Config;
+import org.apache.calcite.sql2rel.SqlRexConvertletTable;
+import org.apache.calcite.sql2rel.SqlToRelConverter;
+import org.apache.calcite.sql2rel.StandardConvertletTable;
+import org.apache.calcite.tools.FrameworkConfig;
+import org.apache.calcite.tools.Program;
+import org.voltdb.VoltDB;
+
+import com.google.common.collect.ImmutableList;
+
+public class VoltFrameworkConfig implements FrameworkConfig {
+
+    public static final VoltFrameworkConfig DEFAULT = new VoltFrameworkConfig(null);
+
+    @SuppressWarnings("rawtypes")
+    private static final ImmutableList<RelTraitDef> TRAIT_DEFS =
+            ImmutableList.of(ConventionTraitDef.INSTANCE, RelCollationTraitDef.INSTANCE);
+
+    private final SchemaPlus m_schema;
+
+    public VoltFrameworkConfig(SchemaPlus schema) {
+        m_schema = schema;
+    }
+
+    @Override
+    public Config getParserConfig() {
+        return VoltSqlParser.PARSER_CONFIG;
+    }
+
+    @Override
+    public org.apache.calcite.sql2rel.SqlToRelConverter.Config getSqlToRelConverterConfig() {
+        return SqlToRelConverter.Config.DEFAULT;
+    }
+
+    @Override
+    public SchemaPlus getDefaultSchema() {
+        if (m_schema == null) {
+            return VoltSchemaPlus.from(VoltDB.instance().getCatalogContext().database);
+        }
+        else {
+            return m_schema;
+        }
+    }
+
+    @Override
+    public RexExecutor getExecutor() {
+        // Reduces expressions, and writes their results into {@code reducedValues}.
+        return null;
+    }
+
+    @Override
+    public ImmutableList<Program> getPrograms() {
+        return null;
+    }
+
+    @Override
+    public SqlOperatorTable getOperatorTable() {
+        return SqlStdOperatorTable.instance();
+    }
+
+    @Override
+    public RelOptCostFactory getCostFactory() {
+        // Volcano planner then will enable its own default cost factory (VolcanoCost.FACTORY).
+        return null;
+    }
+
+    @SuppressWarnings("rawtypes")
+    @Override
+    public ImmutableList<RelTraitDef> getTraitDefs() {
+        // This seems to be for the converter rules, double check!
+        return TRAIT_DEFS;
+    }
+
+    @Override
+    public SqlRexConvertletTable getConvertletTable() {
+        return StandardConvertletTable.INSTANCE;
+    }
+
+    @Override
+    public Context getContext() {
+        return null;
+    }
+
+    @Override
+    public RelDataTypeSystem getTypeSystem() {
+        return RelDataTypeSystem.DEFAULT;
+    }
+
+}

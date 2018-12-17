@@ -27,9 +27,10 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
-import org.voltdb.calciteadapter.VoltSchemaPlus;
-import org.voltdb.newplanner.rules.PlannerPhase;
+import org.voltdb.plannerv2.CalcitePlanner;
+import org.voltdb.plannerv2.VoltSchemaPlus;
+import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rules.PlannerPhase;
 import org.voltdb.types.CalcitePlannerType;
 
 public class TestLogicalRules extends PlanRulesTestCase {

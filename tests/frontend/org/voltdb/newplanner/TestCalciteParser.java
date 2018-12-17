@@ -36,11 +36,15 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
 import org.apache.calcite.tools.RelBuilder;
 import org.junit.Test;
-import org.voltdb.calciteadapter.VoltSchemaPlus;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.plannerv2.VoltFrameworkConfig;
+import org.voltdb.plannerv2.VoltSchemaPlus;
+import org.voltdb.plannerv2.VoltSqlParser;
+import org.voltdb.plannerv2.VoltSqlToRelConverter;
+import org.voltdb.plannerv2.VoltSqlValidator;
 
 public class TestCalciteParser {
 

@@ -24,7 +24,7 @@
 package org.voltdb.newplanner;
 
 import org.apache.calcite.rel.RelRoot;
-import org.voltdb.calciteadapter.VoltSchemaPlus;
+import org.voltdb.plannerv2.VoltSchemaPlus;
 
 public class TestVoltConverter extends VoltConverterTestCase {
     @Override

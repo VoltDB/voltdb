@@ -29,11 +29,12 @@ import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
-import org.voltdb.calciteadapter.CatalogAdapter;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
-import org.voltdb.newplanner.rules.PlannerPhase;
-import org.voltdb.newplanner.util.VoltDBRelUtil;
+import org.voltdb.plannerv2.CalcitePlanner;
+import org.voltdb.plannerv2.VoltSchemaPlus;
+import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
+import org.voltdb.plannerv2.rules.PlannerPhase;
+import org.voltdb.plannerv2.utils.VoltDBRelUtil;
 import org.voltdb.types.CalcitePlannerType;
 
 public class TestPhysicalConversionRules extends PlanRulesTestCase {
@@ -41,7 +42,7 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestVoltSqlValidator.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
-        init(CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
+        init(VoltSchemaPlus.from(getDatabase()));
     }
 
     @Override

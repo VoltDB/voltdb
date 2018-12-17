@@ -29,6 +29,8 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.planner.PlannerTestCase;
+import org.voltdb.plannerv2.VoltSqlParser;
+import org.voltdb.plannerv2.VoltSqlValidator;
 
 /**
  * A base class for implementing tests against {@link VoltSqlValidator}.
