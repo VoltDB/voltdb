@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
-
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
@@ -236,7 +235,7 @@ public class SpPromoteAlgo implements RepairAlgo
         }
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             if (repairLogger.isDebugEnabled()) {
-                repairLogger.debug(m_whoami + "RespairResponse:\n" + li);
+                repairLogger.debug(m_whoami + "RepairResponse:\n" + li);
             }
             List<Long> needsRepair = new ArrayList<Long>(5);
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {

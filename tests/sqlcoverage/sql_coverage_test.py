@@ -254,8 +254,7 @@ def ignore_known_mismatches(comparison_database, suite_name, reproducer):
     to avoid producing lots of meaningless reproducer*.html files.
     """
     if (comparison_database.startswith('Post') and reproducer == Reproduce.DML and
-            suite_name in ['basic-joins', 'basic-index-joins', 'basic-compoundex-joins',
-            'basic-int-joins', 'joined-matview-default-full', 'joined-matview-int']):
+            suite_name in ['joined-matview-default-full', 'joined-matview-int']):
         reproducer = Reproduce.NONE
     return reproducer
 
@@ -760,6 +759,9 @@ if __name__ == "__main__":
     parser.add_option("-g", "--generate-only", action="store_true",
                       dest="generate_only", default=False,
                       help="only generate and report SQL statements, do not start any database servers")
+    parser.add_option("-H", "--hsql", action="store_true",
+                      dest="hsql", default=False,
+                      help="compare VoltDB results to HSqlDB, rather than PostgreSQL")
     parser.add_option("-P", "--postgresql", action="store_true",
                       dest="postgresql", default=False,
                       help="compare VoltDB results to PostgreSQL, rather than HSqlDB")
@@ -803,8 +805,11 @@ if __name__ == "__main__":
     else:
         configs_to_run = config_list.get_configs()
 
-    comparison_database = "HSqlDB"  # default value
-    debug_transform_sql = False
+    comparison_database = "PostgreSQL"  # default value (new 11/2018)
+    debug_transform_sql = True
+    if options.hsql:
+        comparison_database = 'HSqlDB'
+        debug_transform_sql = False
     if options.postgresql:
         comparison_database = 'PostgreSQL'
         debug_transform_sql = True
