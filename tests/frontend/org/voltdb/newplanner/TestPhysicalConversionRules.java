@@ -60,7 +60,7 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
 
         System.out.println(RelOptUtil.toString(nodeAfterLogicalRules));
 
-        nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.HEP_ORDERED, PlannerPhase.MP_FALLBACK,
+        nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
                 nodeAfterLogicalRules);
 
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
@@ -499,7 +499,12 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
 //        assertPlanMatch("select P1.i, P2.v from P1, P2 " +
 //                "where P2.si = P1.i and P2.i = 34 and P1.i = 33","");
 
-        assertPlanMatch("select R1.i, P2.v from R1, P2 " +
-                "where P2.si = R1.i and P2.i = 34","");
+//        assertPlanMatch("select R1.i from R1 inner join " +
+//                "R2  on R1.si = R2.si inner join " +
+//                "R3 on R2.i = R3.ii","");
+
+        assertPlanMatch("select R1.i from R1 inner join " +
+                "R2  on R1.si = R2.i inner join " +
+                "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'","");
     }
 }

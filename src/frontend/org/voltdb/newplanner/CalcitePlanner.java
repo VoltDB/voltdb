@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
@@ -150,10 +151,14 @@ public class CalcitePlanner {
         final RelNode output;
         switch (plannerType) {
             case HEP:
-            case HEP_ORDERED: {
+            case HEP_ORDERED:
+            case HEP_BOTTOM_UP: {
                 final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
-                if (plannerType == CalcitePlannerType.HEP) {
+                if (plannerType != CalcitePlannerType.HEP_ORDERED) {
+                    if (plannerType == CalcitePlannerType.HEP_BOTTOM_UP) {
+                        hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
+                    }
                     // add the ruleset to group, otherwise each rules will only apply once in order.
                     hepProgramBuilder.addGroupBegin();
                     phase.getRules().forEach(hepProgramBuilder::addRuleInstance);

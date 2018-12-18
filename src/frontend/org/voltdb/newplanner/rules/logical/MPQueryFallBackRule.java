@@ -42,13 +42,13 @@ import java.util.List;
  */
 public class MPQueryFallBackRule extends RelOptRule {
     public static final MPQueryFallBackRule INSTANCE_0 = new MPQueryFallBackRule(operand(VoltDBLCalc.class,
-            operand(VoltDBLTableScan.class, any())));
+            operand(VoltDBLTableScan.class, any())), "MPQueryFallBackRule0");
 
     public static final MPQueryFallBackRule INSTANCE_1 = new MPQueryFallBackRule(operand(VoltDBLCalc.class,
-            operand(VoltDBLJoin.class, any())));
+            operand(VoltDBLJoin.class, any())), "MPQueryFallBackRule1");
 
-    private MPQueryFallBackRule(RelOptRuleOperand operand) {
-        super(operand);
+    private MPQueryFallBackRule(RelOptRuleOperand operand, String desc) {
+        super(operand, desc);
     }
 
     /**
@@ -89,6 +89,8 @@ public class MPQueryFallBackRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
+        System.out.println("hit!!!!!1: ");
+        System.out.println(call.rel(0).toString());
         VoltDBLCalc calc = call.rel(0);
         if (call.rel(1) instanceof VoltDBLTableScan) {
             VoltDBLTableScan tableScan = call.rel(1);
@@ -98,12 +100,10 @@ public class MPQueryFallBackRule extends RelOptRule {
                         !isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys())) {
                     throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
                 }
-                else {
-                    // use in MPJoinQueryFallBackRule
-                    calc.setIsReplicated(false);
-                }
+                // use in MPJoinQueryFallBackRule
+                calc.setIsReplicated(false);
             }
-        } else if(call.rel(1) instanceof VoltDBLJoin) {
+        } else if (call.rel(1) instanceof VoltDBLJoin) {
             VoltDBLJoin join = call.rel(1);
             calc.setIsReplicated(join.getIsReplicated());
         }

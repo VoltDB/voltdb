@@ -22,9 +22,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rel.logical.LogicalProject;
-import org.apache.calcite.rel.rules.JoinProjectTransposeRule;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLCalc;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLJoin;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
@@ -42,18 +39,29 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
                             operand(VoltDBLTableScan.class, any()),
                             operand(VoltDBLTableScan.class, any())), "MPJoinQueryFallBackRule1");
 
-    // TODO: check unordered()?
     public static final MPJoinQueryFallBackRule INSTANCE_2 =
             new MPJoinQueryFallBackRule(
                     operand(VoltDBLJoin.class,
-                            operand(VoltDBLCalc.class, any()),
-                            operand(VoltDBLTableScan.class, any())), "MPJoinQueryFallBackRule2");
+                            unordered(operand(VoltDBLCalc.class, any()),
+                            operand(VoltDBLTableScan.class, any()))), "MPJoinQueryFallBackRule2");
 
     public static final MPJoinQueryFallBackRule INSTANCE_3 =
             new MPJoinQueryFallBackRule(
                     operand(VoltDBLJoin.class,
-                            operand(VoltDBLTableScan.class, any()),
-                            operand(VoltDBLCalc.class, any())), "MPJoinQueryFallBackRule3");
+                            operand(VoltDBLJoin.class, any()),
+                            operand(VoltDBLJoin.class, any())), "MPJoinQueryFallBackRule3");
+
+    public static final MPJoinQueryFallBackRule INSTANCE_4 =
+            new MPJoinQueryFallBackRule(
+                    operand(VoltDBLJoin.class,
+                            unordered(operand(VoltDBLJoin.class, any()),
+                                    operand(VoltDBLTableScan.class, any()))), "MPJoinQueryFallBackRule4");
+
+//    public static final MPJoinQueryFallBackRule INSTANCE_3 =
+//            new MPJoinQueryFallBackRule(
+//                    operand(VoltDBLJoin.class,
+//                            operand(VoltDBLTableScan.class, any()),
+//                            operand(VoltDBLCalc.class, any())), "MPJoinQueryFallBackRule3");
 
     private MPJoinQueryFallBackRule(RelOptRuleOperand operand, String desc) {
         super(operand, desc);
@@ -65,6 +73,8 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
         } else if (node instanceof VoltDBLTableScan) {
             RelDistribution tableDist = node.getTable().getDistribution();
             return tableDist.getType() == RelDistribution.Type.SINGLETON;
+        } else if (node instanceof VoltDBLJoin) {
+            return ((VoltDBLJoin) node).getIsReplicated();
         }
         return true;
     }
@@ -77,12 +87,17 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
         System.out.println("hit: "+leftIsReplicated+"  "+rightIsReplicated);
         System.out.println(call.rel(1).toString());
         System.out.println(call.rel(2).toString());
+        if(call.rel(1) instanceof VoltDBLTableScan && !leftIsReplicated) {
+            throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
+        }
+        if(call.rel(2) instanceof VoltDBLTableScan && !rightIsReplicated) {
+            throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
+        }
         if(leftIsReplicated && rightIsReplicated){
             join.setIsReplicated(true);
         } else if(leftIsReplicated || rightIsReplicated){
             join.setIsReplicated(false);
         } else {
-            System.out.println("throw");
             throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
         }
     }

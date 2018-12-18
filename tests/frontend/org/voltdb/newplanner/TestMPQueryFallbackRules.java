@@ -59,7 +59,7 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
 
         System.out.println(RelOptUtil.toString(nodeAfterLogicalRules));
 
-        nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.HEP_ORDERED, PlannerPhase.MP_FALLBACK,
+        nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
                 nodeAfterLogicalRules);
 
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
@@ -80,6 +80,7 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         try {
             assertNotFallback(sql);
         } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
             assertTrue(e.getMessage().startsWith("Error while applying rule") ||
                     e.getMessage().equals("MP query not supported in Calcite planner."));
             // we got the exception, we are good.
@@ -98,7 +99,7 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
     }
 
     // Partitioned with no filter, always a MP query
-    public void testPartitionedNoFilter() {
+    public void testPartitionedWithoutFilter() {
         assertFallback("select * from P1");
 
         assertFallback("select i from P1");
@@ -152,7 +153,7 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
                 "R2  on R1.si = R2.si where R1.I + R2.ti = 5");
     }
 
-    public void testJoinPartitionTable() {
+    public void testJoinPartitionedTable() {
         // when join 2 partitioned table, assume it is always MP
         assertFallback("select P1.i, P2.v from P1, P2 " +
                 "where P2.si = P1.i and P2.v = 'foo'");
@@ -192,5 +193,108 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
 
         assertNotFallback("select R1.i, P2.v from R1 inner join P2 " +
                 "on P2.si = R1.i and P2.i =3 where P2.v = 'bar'");
+    }
+
+    public void testThreeWayJoinWithoutFilter() {
+        // three-way join on replicated tables, SP
+        assertNotFallback("select R1.i from R1 inner join " +
+                "R2  on R1.si = R2.si inner join " +
+                "R3 on R2.i = R3.ii");
+
+        // all partitioned, MP
+        assertFallback("select P1.i from P1 inner join " +
+                "P2  on P1.si = P2.si inner join " +
+                "P3 on P2.i = P3.i");
+
+        // one of them partitioned, MP
+        assertFallback("select P1.i from P1 inner join " +
+                "R2  on P1.si = R2.si inner join " +
+                "R3 on R2.i = R3.ii");
+
+        assertFallback("select R1.i from R1 inner join " +
+                "P2  on R1.si = P2.si inner join " +
+                "R3 on P2.i = R3.ii");
+
+        assertFallback("select R1.i from R1 inner join " +
+                "R2  on R1.si = R2.si inner join " +
+                "P3 on R2.i = P3.i");
+
+        // two of them partitioned, MP
+        assertFallback("select R1.i from R1 inner join " +
+                "P2  on R1.si = P2.si inner join " +
+                "P3 on P2.i = P3.i");
+
+        assertFallback("select P1.i from P1 inner join " +
+                "R2  on P1.si = R2.si inner join " +
+                "P3 on R2.i = P3.i");
+
+        assertFallback("select P1.i from P1 inner join " +
+                "P2  on P1.si = P2.si inner join " +
+                "R3 on P2.i = R3.ii");
+
+        // this is tricky. Note `P1.si = R2.i` will produce a Calc with CAST.
+        assertFallback("select P1.i from P1 inner join " +
+                "R2  on P1.si = R2.i inner join " +
+                "R3 on R2.i = R3.ii");
+    }
+
+    public void testThreeWayJoinWithFilter() {
+        assertNotFallback("select R1.i from R1 inner join " +
+                "R2  on R1.si = R2.i inner join " +
+                "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'");
+
+        assertFallback("select P1.i from P1 inner join " +
+                "R2  on P1.si = R2.i inner join " +
+                "R3 on R2.v = R3.vc where P1.si > 4 and R3.vc <> 'foo'");
+
+        assertFallback("select P1.i from P1 inner join " +
+                "P2  on P1.si = P2.i inner join " +
+                "R3 on P2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'");
+
+        assertFallback("select P1.i from P1 inner join " +
+                "P2  on P1.si = P2.i inner join " +
+                "R3 on P2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo' and P2.i = 5");
+
+        assertFallback("select R1.i from R1 inner join " +
+                "R2  on R1.si = R2.i inner join " +
+                "P3 on R2.v = P3.v where R1.si > 4 and P3.si = 6");
+
+        assertNotFallback("select P1.i from P1 inner join " +
+                "R2  on P1.si = R2.i inner join " +
+                "R3 on R2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'");
+
+        assertNotFallback("select R1.i from R1 inner join " +
+                "P2  on R1.si = P2.i inner join " +
+                "R3 on P2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo' and P2.i = 5");
+
+        assertNotFallback("select R1.i from R1 inner join " +
+                "R2  on R1.si = R2.i inner join " +
+                "P3 on R2.v = P3.v where R1.si > 4 and P3.i = 6");
+    }
+
+    public void testSubqueriesJoin() {
+        assertNotFallback("select t1.v, t2.v "
+                + "from "
+                + "  (select * from R1 where v = 'foo') as t1 "
+                + "  inner join "
+                + "  (select * from R2 where f = 30.3) as t2 "
+                + "on t1.i = t2.i "
+                + "where t1.i = 3");
+
+        assertFallback("select t1.v, t2.v "
+                + "from "
+                + "  (select * from R1 where v = 'foo') as t1 "
+                + "  inner join "
+                + "  (select * from P2 where f = 30.3) as t2 "
+                + "on t1.i = t2.i "
+                + "where t1.i = 3");
+
+        assertNotFallback("select t1.v, t2.v "
+                + "from "
+                + "  (select * from R1 where v = 'foo') as t1 "
+                + "  inner join "
+                + "  (select * from P2 where i = 303) as t2 "
+                + "on t1.i = t2.i "
+                + "where t1.i = 3");
     }
 }
