@@ -18,5 +18,7 @@
 package org.voltdb.types;
 
 public enum CalcitePlannerType {
-    HEP, VOLCANO
+    HEP,
+    HEP_ORDERED, // A hep planer that rules are applied in order. (first rule0)
+    VOLCANO
 }

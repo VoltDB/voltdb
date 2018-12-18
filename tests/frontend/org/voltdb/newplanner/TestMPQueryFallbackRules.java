@@ -23,6 +23,7 @@
 
 package org.voltdb.newplanner;
 
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
@@ -56,6 +57,11 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 
+        System.out.println(RelOptUtil.toString(nodeAfterLogicalRules));
+
+        nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.HEP_ORDERED, PlannerPhase.MP_FALLBACK,
+                nodeAfterLogicalRules);
+
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
         nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
@@ -63,10 +69,10 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.SINGLETON);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-        RelTraitSet physicalTraits = nodeAfterLogicalRules.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet physicalTraits = nodeAfterLogicalRules.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).replace(RelDistributions.SINGLETON);
 
         // apply physical conversion rules.
-        CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
+        RelNode nodeAfterPhysicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
                 PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogicalRules, physicalTraits);
     }
 
@@ -74,7 +80,8 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         try {
             assertNotFallback(sql);
         } catch (RuntimeException e) {
-            assertTrue(e.getMessage().startsWith("Error while applying rule"));
+            assertTrue(e.getMessage().startsWith("Error while applying rule") ||
+                    e.getMessage().equals("MP query not supported in Calcite planner."));
             // we got the exception, we are good.
             return;
         }
@@ -146,19 +153,44 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
     }
 
     public void testJoinPartitionTable() {
+        // when join 2 partitioned table, assume it is always MP
         assertFallback("select P1.i, P2.v from P1, P2 " +
                 "where P2.si = P1.i and P2.v = 'foo'");
 
-        assertNotFallback("select P1.i, P2.v from P1, P2 " +
+        assertFallback("select P1.i, P2.v from P1, P2 " +
                 "where P2.si = P1.i and P2.i = 34");
 
-        assertFallback("select R1.i, R2.v from R1 inner join R2 " +
-                "on R2.si = R1.i where R2.v = 'foo'");
-//
-//        assertNotFallback("select R2.si, R1.i from R1 inner join " +
-//                "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i");
-//
-//        assertNotFallback("select R1.i from R1 inner join " +
-//                "R2  on R1.si = R2.si where R1.I + R2.ti = 5");
+        assertFallback("select P1.i, P2.v from P1 inner join P2 " +
+                "on P2.si = P1.i where P2.v = 'foo'");
+
+        // when join a partitioned table with a replicated table,
+        // if the filtered result on the partitioned table is not SP, then the query is MP
+        assertFallback("select R1.i, P2.v from R1, P2 " +
+                "where P2.si = R1.i and P2.v = 'foo'");
+
+        assertFallback("select R1.i, P2.v from R1, P2 " +
+                "where P2.si = R1.i and P2.i > 3");
+
+        assertFallback("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i and (P2.i > 3 or P2.i =1)");
+
+        // when join a partitioned table with a replicated table,
+        // if the filtered result on the partitioned table is SP, then the query is SP
+        assertNotFallback("select R1.i, P2.v from R1, P2 " +
+                "where P2.si = R1.i and P2.i = 3");
+
+        assertNotFallback("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i where P2.i =3");
+
+        assertNotFallback("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i where P2.i =3 and P2.v = 'bar'");
+
+        // when join a partitioned table with a replicated table,
+        // if the join condition can filter the partitioned table in SP, then the query is SP
+        assertNotFallback("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i and P2.i =3");
+
+        assertNotFallback("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i and P2.i =3 where P2.v = 'bar'");
     }
 }

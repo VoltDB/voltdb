@@ -69,6 +69,12 @@ public enum PlannerPhase {
                     getVoltLogicalRules());
         }
     },
+    // always use a HEP_ORDERED planner for MP_FALLBACK, cause the rules need to apply in order.
+    MP_FALLBACK("MP query fallback rules") {
+        public RuleSet getRules() {
+            return getVoltMPFallbackRules();
+        }
+    },
 
     PHYSICAL_CONVERSION("VoltDBPhysical Conversion Rules") {
         public RuleSet getRules() {
@@ -84,6 +90,7 @@ public enum PlannerPhase {
 
     private static final RuleSet s_CalciteLogicalRules;
     private static final RuleSet s_VoltLogicalRules;
+    private static final RuleSet s_VoltMPFallbackRules;
     private static final RuleSet s_VoltPhysicalConversionRules;
 
     static {
@@ -96,8 +103,8 @@ public enum PlannerPhase {
                         ProjectToCalcRule.INSTANCE,
                         ProjectMergeRule.INSTANCE,
                         FilterProjectTransposeRule.INSTANCE,
-                        MPQueryFallBackRule.INSTANCE_0,
-                        FilterJoinRule.FILTER_ON_JOIN
+                        FilterJoinRule.FILTER_ON_JOIN,
+                        FilterJoinRule.JOIN
 //                        MPJoinQueryFallBackRule.INSTANCE_0,
 //                        MPJoinQueryFallBackRule.INSTANCE_1,
 //                        MPJoinQueryFallBackRule.INSTANCE_2,
@@ -116,6 +123,14 @@ public enum PlannerPhase {
 //                        MPJoinQueryFallBackRule.INSTANCE_2,
 //                        MPJoinQueryFallBackRule.INSTANCE_3
                 ).build());
+        s_VoltMPFallbackRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
+                .add(
+                        MPQueryFallBackRule.INSTANCE_0,
+                        MPJoinQueryFallBackRule.INSTANCE_0,
+                        MPJoinQueryFallBackRule.INSTANCE_1,
+                        MPJoinQueryFallBackRule.INSTANCE_2,
+                        MPJoinQueryFallBackRule.INSTANCE_3
+                ).build());
         s_VoltPhysicalConversionRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(
                         VoltDBPCalcRule.INSTANCE,
@@ -123,11 +138,11 @@ public enum PlannerPhase {
                         VoltDBPSortConvertRule.INSTANCE_VOLTDB,
                         VoltDBPLimitRule.INSTANCE,
                         VoltDBPAggregateRule.INSTANCE,
-                        VoltDBPJoinRule.INSTANCE,
-                        MPJoinQueryFallBackRule.INSTANCE_0,
-                        MPJoinQueryFallBackRule.INSTANCE_1,
-                        MPJoinQueryFallBackRule.INSTANCE_2,
-                        MPJoinQueryFallBackRule.INSTANCE_3
+                        VoltDBPJoinRule.INSTANCE
+//                        MPJoinQueryFallBackRule.INSTANCE_0,
+//                        MPJoinQueryFallBackRule.INSTANCE_1,
+//                        MPJoinQueryFallBackRule.INSTANCE_2,
+//                        MPJoinQueryFallBackRule.INSTANCE_3
                 ).build());
     }
 
@@ -184,5 +199,9 @@ public enum PlannerPhase {
 
     static RuleSet getVoltPhysicalConversionRules() {
         return s_VoltPhysicalConversionRules;
+    }
+
+    static RuleSet getVoltMPFallbackRules() {
+        return s_VoltMPFallbackRules;
     }
 }

@@ -58,6 +58,11 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
         RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 
+        System.out.println(RelOptUtil.toString(nodeAfterLogicalRules));
+
+        nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.HEP_ORDERED, PlannerPhase.MP_FALLBACK,
+                nodeAfterLogicalRules);
+
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
         nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
@@ -65,7 +70,7 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
         nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.SINGLETON);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-        RelTraitSet physicalTraits = nodeAfterLogicalRules.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet physicalTraits = nodeAfterLogicalRules.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).replace(RelDistributions.SINGLETON);
 
         // apply physical conversion rules.
         RelNode nodeAfterPhysicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
@@ -485,10 +490,16 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
     }
 
     public void testTemp() {
-        assertPlanMatch("select R1.i, R2.v from R1 inner join R2 " +
-                "on R2.si = R1.i where R2.v = 'foo'","");
+//        assertPlanMatch("select P1.i, P2.v from P1 inner join P2 " +
+//                "on P2.si = P1.i where P2.v = 'foo'","");
 
 //        assertPlanMatch("select P1.i, P2.v from P1, P2 " +
 //                "where P2.si = P1.i and P2.i = 34","");
+
+//        assertPlanMatch("select P1.i, P2.v from P1, P2 " +
+//                "where P2.si = P1.i and P2.i = 34 and P1.i = 33","");
+
+        assertPlanMatch("select R1.i, P2.v from R1, P2 " +
+                "where P2.si = R1.i and P2.i = 34","");
     }
 }

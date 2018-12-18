@@ -27,7 +27,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.Sort;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
-import org.voltdb.calciteadapter.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPSort;
 import org.voltdb.newplanner.util.VoltDBRelUtil;

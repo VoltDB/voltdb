@@ -45,22 +45,22 @@ import org.voltdb.types.CalcitePlannerType;
  * 1. Optimize logical plan (the SQL query can directly translate to a initial logical plan,
  * then we optimize it to a better logical plan)
  * 2. Convert logical plan into a physical plan (represents the physical execution stages)
- *
+ * <p>
  * common optimizations:
  * Prune unused fields, Merge projections, Convert subqueries to joins, Reorder joins,
  * Push down projections, Push down filters
- *
+ * <p>
  * Key Concepts:
- *
+ * <p>
  * # {@link org.apache.calcite.rel.RelNode} represents a relational expression
  * Sort, Join, Project, Filter, Scan...
  * Exp:
  * select col1 as id, col2 as name from foo where col1=21;
- *
+ * <p>
  * Project ( id = [$0], name = [$1] ) <-- expression
  * Filter (condition=[= ($0, 21)])   <-- children/input
  * TableScan (table = [foo])
- *
+ * <p>
  * # {@link org.apache.calcite.rex.RexNode} represents a row-level expression:
  * = scalar expr
  * Projection fields, conditions
@@ -69,62 +69,62 @@ import org.voltdb.types.CalcitePlannerType;
  * Struct field access     -->  RexFieldAccess
  * Function call           -->  RexCall
  * Window expression       -->  RexOver
- *
+ * <p>
  * # traits
  * Defined by the {@link org.apache.calcite.plan.RelTrait} interface
  * Traits are used to validate plan output
  * {@link org.apache.calcite.plan.Convention}
  * {@link org.apache.calcite.rel.RelCollation}
  * {@link org.apache.calcite.rel.RelDistribution}
- *
+ * <p>
  * ## Convention
  * Convention is a type of RelTrait, it is associated with a
  * RelNode interface
- *
+ * <p>
  * Conventions are used to represent a single data source.
- *
+ * <p>
  * describing how the expression passes data to its consuming relational expression
- *
+ * <p>
  * Inputs to a relational expression must be in the same convention.
- *
+ * <p>
  * # Rules
  * Rules are used to modify query plans.
- *
+ * <p>
  * Defined by the {@link org.apache.calcite.plan.RelOptRule} interface
- *
+ * <p>
  * Rules are matched to elements of a query plan using pattern matching
  * {@link org.apache.calcite.plan.RelOptRuleOperand}
- *
+ * <p>
  * ## Converter
  * {@link org.apache.calcite.rel.convert.ConverterRule}
  * convert() is called for matched rules
- *
+ * <p>
  * {@link org.apache.calcite.rel.convert.Converter}
  * By declaring itself to be a converter, a relational expression is telling the planner about this equivalence,
  * and the planner groups expressions which are logically equivalent but have different physical traits
  * into groups called RelSets.
- *
+ * <p>
  * Q: why we need to put logically equivalent RelNode to a RelSet?
  * A: RelSet provides a level of indirection that allows Calcite to optimize queries.
  * If the input to a relational operator is an equivalence class, not a particular relational expression,
  * then Calcite has the freedom to choose the member of the equivalence class that has the cheapest cost.
- *
- *
+ * <p>
+ * <p>
  * ## Transformer
  * onMatch() is called for matched rules
- *
+ * <p>
  * call.transformTo()
- *
+ * <p>
  * # Planners
  * {@link org.apache.calcite.plan.volcano.VolcanoPlanner}
  * {@link org.apache.calcite.plan.hep.HepPlanner}
- *
+ * <p>
  * # Program
  * {@link org.apache.calcite.tools.Program}
- *
+ * <p>
  * Program that transforms a relational expression into another relational expression.
  * A planner is a sequence of programs, each of which is sometimes called a "phase".
- *
+ * <p>
  * The most typical program is an invocation of the volcano planner with a particular RuleSet.
  */
 
@@ -149,13 +149,18 @@ public class CalcitePlanner {
         final RelTraitSet toTraits = targetTraits.simplify();
         final RelNode output;
         switch (plannerType) {
-            case HEP: {
+            case HEP:
+            case HEP_ORDERED: {
                 final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
-                // add the ruleset to group, otherwise each rules will only apply once in order.
-                hepProgramBuilder.addGroupBegin();
-                phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
-                hepProgramBuilder.addGroupEnd();
+                if (plannerType == CalcitePlannerType.HEP) {
+                    // add the ruleset to group, otherwise each rules will only apply once in order.
+                    hepProgramBuilder.addGroupBegin();
+                    phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+                    hepProgramBuilder.addGroupEnd();
+                } else {
+                    phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+                }
 
                 // create the HepPlanner.
                 final HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
