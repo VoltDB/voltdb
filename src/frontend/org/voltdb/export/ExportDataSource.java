@@ -912,6 +912,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         try {
+            cleanupEmptySource();
             StreamBlock first_unpolled_block = null;
             //Assemble a list of blocks to delete so that they can be deleted
             //outside of the m_committedBuffers critical section
@@ -1170,25 +1171,29 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (seq > 0) {
             try {
                 releaseExportBytes(seq);
-                // Discard drained export data source if it's dangling or dropped.
-                if ((!this.m_isInCatalog || m_status == StreamStatus.DROPPED) && m_committedBuffers.isEmpty()) {
-                    //Returning null indicates end of stream
-                    try {
-                        if (m_pollFuture != null) {
-                            m_pollFuture.set(null);
-                        }
-                    } catch (RejectedExecutionException reex) {
-                        //We are closing source.
-                    }
-                    m_pollFuture = null;
-                    m_generation.onSourceDone(m_partitionId, m_signature);
-                    return;
-                }
+                cleanupEmptySource();
                 mastershipCheckpoint(seq);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                 return;
             }
+        }
+    }
+
+    // Discard dangling or dropped export data source when the buffer is empty
+    private void cleanupEmptySource() throws IOException {
+        if ((!this.m_isInCatalog || m_status == StreamStatus.DROPPED) && m_committedBuffers.isEmpty()) {
+            //Returning null indicates end of stream
+            try {
+                if (m_pollFuture != null) {
+                    m_pollFuture.set(null);
+                }
+            } catch (RejectedExecutionException reex) {
+                //We are closing source.
+            }
+            m_pollFuture = null;
+            m_generation.onSourceDone(m_partitionId, m_signature);
+            return;
         }
     }
 
@@ -1378,9 +1383,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public synchronized void runEveryWhere(boolean runEveryWhere) {
         m_runEveryWhere = runEveryWhere;
-        //export stream for run-everywhere clients doesn't need ack mailbox
-        m_ackMailboxRefs.set(null);
         if (runEveryWhere) {
+            //export stream for run-everywhere clients doesn't need ack mailbox
+            m_ackMailboxRefs.set(null);
             acceptMastership();
         }
     }
@@ -1438,6 +1443,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void queryForBestCandidate() {
+        if (m_runEveryWhere) {
+            return;
+        }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
@@ -1447,15 +1455,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     void takeMastership() {
-        // Skip current master
-        if (m_mastershipAccepted.get()) {
+        // Skip current master or in run everywhere mode
+        if (m_mastershipAccepted.get() || m_runEveryWhere) {
             return;
         }
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                // Skip current master
-                if (m_mastershipAccepted.get()) {
+                if (m_mastershipAccepted.get() || m_runEveryWhere) {
                     return;
                 }
                 if (exportLog.isDebugEnabled()) {
@@ -1612,6 +1619,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void mastershipCheckpoint(long seq) {
+        if (m_runEveryWhere) {
+            return;
+        }
         if (exportLog.isTraceEnabled()) {
             exportLog.trace("Export table " + getTableName() + " mastership checkpoint "  +
                     " m_newLeaderHostId " + m_newLeaderHostId + " m_seqNoToDrain " + m_seqNoToDrain +
