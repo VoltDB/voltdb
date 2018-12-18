@@ -483,4 +483,12 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
                         "      VoltDBPSingletonExchange(distribution=[single])\n" +
                         "        VoltDBPTableSeqScan(table=[[catalog, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
     }
+
+    public void testTemp() {
+        assertPlanMatch("select R1.i, R2.v from R1 inner join R2 " +
+                "on R2.si = R1.i where R2.v = 'foo'","");
+
+//        assertPlanMatch("select P1.i, P2.v from P1, P2 " +
+//                "where P2.si = P1.i and P2.i = 34","");
+    }
 }

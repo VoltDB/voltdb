@@ -19,6 +19,7 @@ package org.voltdb.newplanner.rules.logical;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.logical.LogicalCalc;
 import org.apache.calcite.rex.RexCall;
@@ -28,6 +29,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.sql.SqlKind;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLCalc;
+import org.voltdb.calciteadapter.rel.logical.VoltDBLJoin;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 
 import java.util.List;
@@ -39,11 +41,14 @@ import java.util.List;
  * @since 8.4
  */
 public class MPQueryFallBackRule extends RelOptRule {
-    public static final MPQueryFallBackRule INSTANCE = new MPQueryFallBackRule();
+    public static final MPQueryFallBackRule INSTANCE_0 = new MPQueryFallBackRule(operand(VoltDBLCalc.class,
+            operand(VoltDBLTableScan.class, any())));
 
-    private MPQueryFallBackRule() {
-        super(operand(VoltDBLCalc.class,
-                operand(VoltDBLTableScan.class, any())));
+    public static final MPQueryFallBackRule INSTANCE_1 = new MPQueryFallBackRule(operand(VoltDBLCalc.class,
+            operand(VoltDBLJoin.class, any())));
+
+    private MPQueryFallBackRule(RelOptRuleOperand operand) {
+        super(operand);
     }
 
     /**
@@ -85,16 +90,22 @@ public class MPQueryFallBackRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltDBLCalc calc = call.rel(0);
-        VoltDBLTableScan tableScan = call.rel(1);
-        RelDistribution tableDist = tableScan.getTable().getDistribution();
-        if (tableDist.getType() != RelDistribution.Type.SINGLETON) {
-            if (calc.getProgram().getCondition() == null ||
-                    !isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys())) {
-                throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
+        if (call.rel(1) instanceof VoltDBLTableScan) {
+            VoltDBLTableScan tableScan = call.rel(1);
+            RelDistribution tableDist = tableScan.getTable().getDistribution();
+            if (tableDist.getType() != RelDistribution.Type.SINGLETON) {
+                if (calc.getProgram().getCondition() == null ||
+                        !isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys())) {
+                    throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
+                }
+                else {
+                    // use in MPJoinQueryFallBackRule
+                    calc.setIsReplicated(false);
+                }
             }
-            else {
-                calc.setIsReplicated(false);
-            }
+        } else if(call.rel(1) instanceof VoltDBLJoin) {
+            VoltDBLJoin join = call.rel(1);
+            calc.setIsReplicated(join.getIsReplicated());
         }
     }
 }

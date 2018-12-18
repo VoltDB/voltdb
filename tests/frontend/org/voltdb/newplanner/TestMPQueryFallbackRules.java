@@ -74,7 +74,7 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         try {
             assertNotFallback(sql);
         } catch (RuntimeException e) {
-            assertTrue(e.getMessage().startsWith("Error while applying rule MPQueryFallBackRule"));
+            assertTrue(e.getMessage().startsWith("Error while applying rule"));
             // we got the exception, we are good.
             return;
         }
@@ -129,5 +129,36 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         assertNotFallback("select si, v from P1 where (7=si and i=2) and 1=2");
         // TODO: we should pass the commented test below if the planner is clever enough
 //        assertNotFallback("select si, v from P1 where (7=si and i=2) or 1=2");
+    }
+
+    public void testJoin() {
+        assertNotFallback("select R1.i, R2.v from R1, R2 " +
+                "where R2.si = R1.i and R2.v = 'foo'");
+
+        assertNotFallback("select R1.i, R2.v from R1 inner join R2 " +
+                "on R2.si = R1.i where R2.v = 'foo'");
+
+        assertNotFallback("select R2.si, R1.i from R1 inner join " +
+                "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i");
+
+        assertNotFallback("select R1.i from R1 inner join " +
+                "R2  on R1.si = R2.si where R1.I + R2.ti = 5");
+    }
+
+    public void testJoinPartitionTable() {
+        assertFallback("select P1.i, P2.v from P1, P2 " +
+                "where P2.si = P1.i and P2.v = 'foo'");
+
+        assertNotFallback("select P1.i, P2.v from P1, P2 " +
+                "where P2.si = P1.i and P2.i = 34");
+
+        assertFallback("select R1.i, R2.v from R1 inner join R2 " +
+                "on R2.si = R1.i where R2.v = 'foo'");
+//
+//        assertNotFallback("select R2.si, R1.i from R1 inner join " +
+//                "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i");
+//
+//        assertNotFallback("select R1.i from R1 inner join " +
+//                "R2  on R1.si = R2.si where R1.I + R2.ti = 5");
     }
 }

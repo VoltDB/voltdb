@@ -413,4 +413,9 @@ public class TestLogicalRules extends PlanRulesTestCase {
                         "    VoltDBLCalc(expr#0..5=[{inputs}], expr#6=[CAST($t4):DOUBLE NOT NULL], expr#7=[30.3], expr#8=[=($t6, $t7)], proj#0..5=[{exprs}], $condition=[$t8])\n" +
                         "      VoltDBLTableScan(table=[[catalog, R2]])\n");
     }
+
+    public void testTemp() {
+        assertPlanMatch("select P1.i, P2.v from P1, P2 " +
+                "where P2.si = P1.i and P2.i = 34","");
+    }
 }

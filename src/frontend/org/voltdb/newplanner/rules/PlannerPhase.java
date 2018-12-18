@@ -30,6 +30,7 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
+import org.voltdb.newplanner.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.newplanner.rules.logical.MPQueryFallBackRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLAggregateRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLCalcRule;
@@ -95,8 +96,13 @@ public enum PlannerPhase {
                         ProjectToCalcRule.INSTANCE,
                         ProjectMergeRule.INSTANCE,
                         FilterProjectTransposeRule.INSTANCE,
-                        MPQueryFallBackRule.INSTANCE,
+                        MPQueryFallBackRule.INSTANCE_0,
                         FilterJoinRule.FILTER_ON_JOIN
+//                        MPJoinQueryFallBackRule.INSTANCE_0,
+//                        MPJoinQueryFallBackRule.INSTANCE_1,
+//                        MPJoinQueryFallBackRule.INSTANCE_2,
+//                        MPJoinQueryFallBackRule.INSTANCE_3
+
                 ).build());
         s_VoltLogicalRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(
@@ -105,6 +111,10 @@ public enum PlannerPhase {
                         VoltDBLCalcRule.INSTANCE,
                         VoltDBLAggregateRule.INSTANCE,
                         VoltDBLJoinRule.INSTANCE
+//                        MPJoinQueryFallBackRule.INSTANCE_0,
+//                        MPJoinQueryFallBackRule.INSTANCE_1,
+//                        MPJoinQueryFallBackRule.INSTANCE_2,
+//                        MPJoinQueryFallBackRule.INSTANCE_3
                 ).build());
         s_VoltPhysicalConversionRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(
@@ -113,7 +123,11 @@ public enum PlannerPhase {
                         VoltDBPSortConvertRule.INSTANCE_VOLTDB,
                         VoltDBPLimitRule.INSTANCE,
                         VoltDBPAggregateRule.INSTANCE,
-                        VoltDBPJoinRule.INSTANCE
+                        VoltDBPJoinRule.INSTANCE,
+                        MPJoinQueryFallBackRule.INSTANCE_0,
+                        MPJoinQueryFallBackRule.INSTANCE_1,
+                        MPJoinQueryFallBackRule.INSTANCE_2,
+                        MPJoinQueryFallBackRule.INSTANCE_3
                 ).build());
     }
 
