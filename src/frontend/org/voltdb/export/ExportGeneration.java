@@ -252,8 +252,6 @@ public class ExportGeneration implements Generation {
                         }
                         final ExportDataSource eds = partitionSources.get(signature);
                         if (eds == null) {
-                            exportLog.warn("Received an export ack for partition " + partition +
-                                    " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
                             // For dangling buffers
                             if (msgType == ExportManager.TAKE_MASTERSHIP) {
                                 final long requestId = buf.getLong();
@@ -263,7 +261,11 @@ public class ExportGeneration implements Generation {
                                             CoreUtils.hsIdToString(message.m_sourceHSId) +
                                             " to " + CoreUtils.hsIdToString(m_mbox.getHSId()));
                                 }
-                                sendDummyTakeMastershipMessage(message.m_sourceHSId, requestId, partition, stringBytes);
+                                sendDummyTakeMastershipResponse(message.m_sourceHSId, requestId, partition, stringBytes);
+                            } else {
+                                exportLog.warn("Received export message " + msgType + " for partition " +
+                                        partition + " source signature " + signature +
+                                        " which does not exist on this node, sources = " + partitionSources);
                             }
                             return;
                         }
@@ -354,7 +356,7 @@ public class ExportGeneration implements Generation {
     }
 
     // Auto reply a response when the requested stream is no longer exists
-    private void sendDummyTakeMastershipMessage(long sourceHsid, long requestId, int partitionId, byte[] signatureBytes) {
+    private void sendDummyTakeMastershipResponse(long sourceHsid, long requestId, int partitionId, byte[] signatureBytes) {
         // msg type(1) + partition:int(4) + length:int(4) + signaturesBytes.length
         // requestId(8)
         int msgLen = 1 + 4 + 4 + signatureBytes.length + 8;
@@ -369,7 +371,7 @@ public class ExportGeneration implements Generation {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Partition " + partitionId + " mailbox hsid (" +
                     CoreUtils.hsIdToString(m_mbox.getHSId()) +
-                    ") send TAKE_MASTERSHIP_RESPONSE message(" +
+                    ") send dummy TAKE_MASTERSHIP_RESPONSE message(" +
                     requestId + ") to " + CoreUtils.hsIdToString(sourceHsid));
         }
     }
