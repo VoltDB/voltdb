@@ -48,6 +48,9 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import javax.net.ssl.SSLEngine;
 
 import org.apache.commons.lang3.StringUtils;
@@ -79,6 +82,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
 import org.voltdb.probe.MeshProber;
 
+import com.google.common.collect.Lists;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableCollection;
@@ -155,7 +159,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public int localSitesCount;
         public final boolean startPause;
         public String recoveredPartitions;
-        public String recoveredGroup;
         public Config(String coordIp, int coordPort, boolean paused) {
             startPause = paused;
             if (coordIp == null || coordIp.length() == 0) {
@@ -263,18 +266,17 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         private final static String GROUP = "group";
         private final static String LOCAL_SITES_COUNT = "localSitesCount";
         private final static String RECOVERED_PARTITION_IDS = "recoveredPartitions";
-        private final static String RECOVERED_GROUP = "recoveredGroup";
         public final String m_hostIp;
         public final String m_group;
         public final int m_localSitesCount;
+
+        // comma separated partition ids
         public final String m_recoveredPartitions;
-        public final String m_recoveredGroup;
-        public HostInfo(String hostIp, String group, int localSitesCount, String partitionIds, String recoveredGroup) {
+        public HostInfo(String hostIp, String group, int localSitesCount, String partitionIds) {
             m_hostIp = hostIp;
             m_group = group;
             m_localSitesCount = localSitesCount;
             m_recoveredPartitions = partitionIds;
-            m_recoveredGroup = recoveredGroup;
         }
 
         public byte[] toBytes() throws JSONException
@@ -285,7 +287,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             js.keySymbolValuePair(GROUP, m_group);
             js.keySymbolValuePair(LOCAL_SITES_COUNT, m_localSitesCount);
             js.keySymbolValuePair(RECOVERED_PARTITION_IDS, m_recoveredPartitions);
-            js.keySymbolValuePair(RECOVERED_GROUP, m_recoveredGroup);
             js.endObject();
             return js.toString().getBytes(StandardCharsets.UTF_8);
         }
@@ -293,10 +294,19 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public static HostInfo fromBytes(byte[] bytes) throws JSONException
         {
             final JSONObject obj = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
-//            List<Integer> ids = Stream.of(partitionIds.split(","))
-//                        .map(Integer::parseInt).collect(Collectors.toList());
             return new HostInfo(obj.getString(HOST_IP), obj.getString(GROUP), obj.getInt(LOCAL_SITES_COUNT),
-                    obj.getString(RECOVERED_PARTITION_IDS), obj.getString(RECOVERED_GROUP));
+                    obj.getString(RECOVERED_PARTITION_IDS));
+        }
+
+        public List<Integer> getRecoveredPartitions() {
+            List<Integer> partitions;
+            if (StringUtils.isEmpty(m_recoveredPartitions )) {
+                partitions = Lists.newArrayList();
+            } else {
+                partitions = Stream.of(m_recoveredPartitions.split(","))
+                        .map(Integer::parseInt).collect(Collectors.toList());
+            }
+            return partitions;
         }
     }
 
@@ -719,7 +729,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
              * knows the size of the mesh. This part only registers this host
              */
             final HostInfo hostInfo = new HostInfo(m_config.coordinatorIp.toString(), m_config.group, m_config.localSitesCount,
-                    m_config.recoveredPartitions, m_config.recoveredGroup);
+                    m_config.recoveredPartitions);
             m_zk.create(CoreZK.hosts_host + selectedHostId, hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         }
         zkInitBarrier.countDown();
@@ -1149,10 +1159,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         HostInfo hostInfo;
         if (m_config.internalInterface.isEmpty()) {
             hostInfo = new HostInfo(new InetSocketAddress(m_joiner.m_reportedInternalInterface, m_config.internalPort).toString(),
-                                    m_config.group, m_config.localSitesCount, m_config.recoveredPartitions, m_config.recoveredGroup);
+                                    m_config.group, m_config.localSitesCount, m_config.recoveredPartitions);
         } else {
             hostInfo = new HostInfo(new InetSocketAddress(m_config.internalInterface, m_config.internalPort).toString(),
-                                    m_config.group, m_config.localSitesCount, m_config.recoveredPartitions, m_config.recoveredGroup);
+                                    m_config.group, m_config.localSitesCount, m_config.recoveredPartitions);
         }
 
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);

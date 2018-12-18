@@ -332,7 +332,6 @@ public class VoltDB {
         /** Best effort to recover previous partition layout*/
         public boolean m_recoverPlacement = false;
         public String m_recoveredPartitions = "";
-        public String m_recoveredPlacementGroup;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
@@ -846,7 +845,6 @@ public class VoltDB {
             return ImmutableMap.<String, String>builder()
                     .put(ClusterSettings.HOST_COUNT, Integer.toString(m_hostCount))
                     .put(ClusterSettings.PARTIITON_IDS, m_recoveredPartitions)
-                    .put(ClusterSettings.PLACEMENT_GROUP, (m_placementGroup != null) ? m_placementGroup : "NONE")
                     .build();
         }
 

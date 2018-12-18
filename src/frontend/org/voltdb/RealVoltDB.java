@@ -1066,9 +1066,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_config.m_hostCount = fromPropertyFile.hostcount();
             }
             if (m_config.m_recoverPlacement) {
-                if (!StringUtils.isEmpty(fromPropertyFile.placementgroup())) {
-                    m_config.m_recoveredPlacementGroup = fromPropertyFile.placementgroup();
-                }
                 if (!StringUtils.isEmpty(fromPropertyFile.partitionids())) {
                     m_config.m_recoveredPartitions = fromPropertyFile.partitionids();
                 }
@@ -3193,9 +3190,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hmconfig.localSitesCount = m_config.m_sitesperhost;
         if (!StringUtils.isEmpty(m_config.m_recoveredPartitions)) {
             hmconfig.recoveredPartitions = m_config.m_recoveredPartitions;
-        }
-        if (!StringUtils.isEmpty(m_config.m_recoveredPlacementGroup)) {
-            hmconfig.recoveredGroup = m_config.m_recoveredPlacementGroup;
         }
         //if SSL needs to be enabled for internal communication, SSL context has to be setup before starting HostMessenger
         setupSSL(readDepl);
