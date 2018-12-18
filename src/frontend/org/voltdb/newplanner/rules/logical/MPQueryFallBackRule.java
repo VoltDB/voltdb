@@ -35,7 +35,7 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 import java.util.List;
 
 /**
- * Rule that fallback a query if it is multi-partitioned.
+ * Rules that fallback a query if it is multi-partitioned.
  *
  * @author Chao Zhou
  * @since 8.4
@@ -59,7 +59,7 @@ public class MPQueryFallBackRule extends RelOptRule {
      * @param partitionKeys the list of partition keys for the target table.
      * @return true if the filtered result is located at a single partition.
      */
-    private static boolean isSinglePartitioned(RexProgram program, RexNode rexNode, List<Integer> partitionKeys) {
+    private boolean isSinglePartitioned(RexProgram program, RexNode rexNode, List<Integer> partitionKeys) {
         if (rexNode instanceof RexCall) {
             RexCall rexCall = (RexCall) rexNode;
             SqlKind sqlKind = rexCall.getOperator().getKind();
@@ -89,8 +89,6 @@ public class MPQueryFallBackRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        System.out.println("hit!!!!!1: ");
-        System.out.println(call.rel(0).toString());
         VoltDBLCalc calc = call.rel(0);
         if (call.rel(1) instanceof VoltDBLTableScan) {
             VoltDBLTableScan tableScan = call.rel(1);

@@ -23,17 +23,12 @@
 
 package org.voltdb.newplanner;
 
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelDistributionTraitDef;
-import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.voltdb.calciteadapter.CatalogAdapter;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.newplanner.rules.PlannerPhase;
-import org.voltdb.newplanner.util.VoltDBRelUtil;
 import org.voltdb.types.CalcitePlannerType;
 
 public class TestMPQueryFallbackRules extends VoltConverterTestCase {
@@ -57,30 +52,15 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 
-        System.out.println(RelOptUtil.toString(nodeAfterLogicalRules));
-
-        nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
+        // do MP fall back check
+        CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
                 nodeAfterLogicalRules);
-
-        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
-        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
-
-        // Add RelDistributions.ANY trait to the rel tree.
-        nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.SINGLETON);
-
-        // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-        RelTraitSet physicalTraits = nodeAfterLogicalRules.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).replace(RelDistributions.SINGLETON);
-
-        // apply physical conversion rules.
-        RelNode nodeAfterPhysicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
-                PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogicalRules, physicalTraits);
     }
 
     private void assertFallback(String sql) {
         try {
             assertNotFallback(sql);
         } catch (RuntimeException e) {
-            System.out.println(e.getMessage());
             assertTrue(e.getMessage().startsWith("Error while applying rule") ||
                     e.getMessage().equals("MP query not supported in Calcite planner."));
             // we got the exception, we are good.

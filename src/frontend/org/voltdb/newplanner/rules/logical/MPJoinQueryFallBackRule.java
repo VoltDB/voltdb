@@ -26,6 +26,12 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLCalc;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLJoin;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 
+/**
+ * Rules that fallback a query with Join operator if it is multi-partitioned.
+ *
+ * @author Chao Zhou
+ * @since 8.4
+ */
 public class MPJoinQueryFallBackRule extends RelOptRule {
     public static final MPJoinQueryFallBackRule INSTANCE_0 =
             new MPJoinQueryFallBackRule(
@@ -43,7 +49,7 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
             new MPJoinQueryFallBackRule(
                     operand(VoltDBLJoin.class,
                             unordered(operand(VoltDBLCalc.class, any()),
-                            operand(VoltDBLTableScan.class, any()))), "MPJoinQueryFallBackRule2");
+                                    operand(VoltDBLTableScan.class, any()))), "MPJoinQueryFallBackRule2");
 
     public static final MPJoinQueryFallBackRule INSTANCE_3 =
             new MPJoinQueryFallBackRule(
@@ -57,16 +63,16 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
                             unordered(operand(VoltDBLJoin.class, any()),
                                     operand(VoltDBLTableScan.class, any()))), "MPJoinQueryFallBackRule4");
 
-//    public static final MPJoinQueryFallBackRule INSTANCE_3 =
-//            new MPJoinQueryFallBackRule(
-//                    operand(VoltDBLJoin.class,
-//                            operand(VoltDBLTableScan.class, any()),
-//                            operand(VoltDBLCalc.class, any())), "MPJoinQueryFallBackRule3");
-
     private MPJoinQueryFallBackRule(RelOptRuleOperand operand, String desc) {
         super(operand, desc);
     }
 
+    /**
+     * Helper function to tell the child RelNode is replicated or not.
+     *
+     * @param node The child RelNode.
+     * @return True if is replicated.
+     */
     private boolean isReplicated(RelNode node) {
         if (node instanceof VoltDBLCalc) {
             return ((VoltDBLCalc) node).getIsReplicated();
@@ -84,18 +90,13 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
         VoltDBLJoin join = call.rel(0);
         boolean leftIsReplicated = isReplicated(call.rel(1));
         boolean rightIsReplicated = isReplicated(call.rel(2));
-        System.out.println("hit: "+leftIsReplicated+"  "+rightIsReplicated);
-        System.out.println(call.rel(1).toString());
-        System.out.println(call.rel(2).toString());
-        if(call.rel(1) instanceof VoltDBLTableScan && !leftIsReplicated) {
+        if ((call.rel(1) instanceof VoltDBLTableScan && !leftIsReplicated) ||
+                (call.rel(2) instanceof VoltDBLTableScan && !rightIsReplicated)) {
             throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
         }
-        if(call.rel(2) instanceof VoltDBLTableScan && !rightIsReplicated) {
-            throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
-        }
-        if(leftIsReplicated && rightIsReplicated){
+        if (leftIsReplicated && rightIsReplicated) {
             join.setIsReplicated(true);
-        } else if(leftIsReplicated || rightIsReplicated){
+        } else if (leftIsReplicated || rightIsReplicated) {
             join.setIsReplicated(false);
         } else {
             throw new UnsupportedOperationException("MP query not supported in Calcite planner.");

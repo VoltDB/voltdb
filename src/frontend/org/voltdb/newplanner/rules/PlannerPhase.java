@@ -69,7 +69,7 @@ public enum PlannerPhase {
                     getVoltLogicalRules());
         }
     },
-    // always use a HEP_ORDERED planner for MP_FALLBACK, cause the rules need to apply in order.
+    // always use a HEP_BOTTOM_UP planner for MP_FALLBACK, it is match order sensitive.
     MP_FALLBACK("MP query fallback rules") {
         public RuleSet getRules() {
             return getVoltMPFallbackRules();
@@ -105,11 +105,6 @@ public enum PlannerPhase {
                         FilterProjectTransposeRule.INSTANCE,
                         FilterJoinRule.FILTER_ON_JOIN,
                         FilterJoinRule.JOIN
-//                        MPJoinQueryFallBackRule.INSTANCE_0,
-//                        MPJoinQueryFallBackRule.INSTANCE_1,
-//                        MPJoinQueryFallBackRule.INSTANCE_2,
-//                        MPJoinQueryFallBackRule.INSTANCE_3
-
                 ).build());
         s_VoltLogicalRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(
@@ -118,10 +113,6 @@ public enum PlannerPhase {
                         VoltDBLCalcRule.INSTANCE,
                         VoltDBLAggregateRule.INSTANCE,
                         VoltDBLJoinRule.INSTANCE
-//                        MPJoinQueryFallBackRule.INSTANCE_0,
-//                        MPJoinQueryFallBackRule.INSTANCE_1,
-//                        MPJoinQueryFallBackRule.INSTANCE_2,
-//                        MPJoinQueryFallBackRule.INSTANCE_3
                 ).build());
         s_VoltMPFallbackRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(
@@ -141,10 +132,6 @@ public enum PlannerPhase {
                         VoltDBPLimitRule.INSTANCE,
                         VoltDBPAggregateRule.INSTANCE,
                         VoltDBPJoinRule.INSTANCE
-//                        MPJoinQueryFallBackRule.INSTANCE_0,
-//                        MPJoinQueryFallBackRule.INSTANCE_1,
-//                        MPJoinQueryFallBackRule.INSTANCE_2,
-//                        MPJoinQueryFallBackRule.INSTANCE_3
                 ).build());
     }
 

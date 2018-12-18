@@ -156,6 +156,7 @@ public class CalcitePlanner {
                 final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
                 if (plannerType != CalcitePlannerType.HEP_ORDERED) {
+                    // if it is HEP_BOTTOM_UP, add the match order
                     if (plannerType == CalcitePlannerType.HEP_BOTTOM_UP) {
                         hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
                     }
@@ -164,6 +165,7 @@ public class CalcitePlanner {
                     phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
                     hepProgramBuilder.addGroupEnd();
                 } else {
+                    // if it is HEP_ORDERED, rules will only apply once in order
                     phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
                 }
 
