@@ -87,6 +87,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_subject = rhs.m_subject;
         m_spHandle = rhs.m_spHandle;
         m_truncationHandle = rhs.m_truncationHandle;
+        m_isForReplica = rhs.m_isForReplica;
     }
 
     public long getInitiatorHSId() {
