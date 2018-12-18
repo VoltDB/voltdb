@@ -228,6 +228,10 @@ public class PlannerTool {
         RelNode nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 
+        // do the MP fallback check
+        nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
+                nodeAfterLogical);
+
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
         nodeAfterLogical.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
