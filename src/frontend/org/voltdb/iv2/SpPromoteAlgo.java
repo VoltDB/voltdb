@@ -25,8 +25,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
-
-import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
@@ -252,11 +250,6 @@ public class SpPromoteAlgo implements RepairAlgo
                 }
             }
             if (!needsRepair.isEmpty()) {
-                // ENG-14744: ensure replicas receiving those messages won't check for misrouted messages
-                if (li.getPayload() instanceof TransactionInfoBaseMessage) {
-                    TransactionInfoBaseMessage tibm = (TransactionInfoBaseMessage) li.getPayload();
-                    tibm.setForReplica(true);
-                }
                 if (repairLogger.isDebugEnabled()) {
                     repairLogger.debug(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(needsRepair) +
                             " with message: " + li.getPayload());
