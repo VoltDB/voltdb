@@ -17,22 +17,15 @@
 
 package org.voltdb.plannerv2;
 
-import java.util.ArrayList;
-
-import org.apache.calcite.jdbc.CalciteSchema;
-import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
-import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.prepare.Prepare;
-import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql2rel.SqlRexConvertletTable;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
-import org.apache.calcite.sql2rel.StandardConvertletTable;
 
 /**
  * VoltDB SqlToRelConverter which converts a SQL parse tree (consisting of
@@ -54,7 +47,7 @@ public class VoltSqlToRelConverter extends SqlToRelConverter {
      * @param convertletTable
      * @param config
      */
-    public VoltSqlToRelConverter(
+    private VoltSqlToRelConverter(
             RelOptTable.ViewExpander viewExpander,
             SqlValidator validator,
             Prepare.CatalogReader catalogReader,
@@ -66,28 +59,22 @@ public class VoltSqlToRelConverter extends SqlToRelConverter {
 
     /**
      * Creates a VoltDB Converter.
-     *
-     * @param validator
-     * @param schemaPlus
-     * @return
+     * @param config VoltFrameworkConfig
+     * @return VoltSqlToRelConverter
      */
-    public static VoltSqlToRelConverter create(SqlValidator validator,
-            SchemaPlus schemaPlus, SqlToRelConverter.Config config) {
+    public static VoltSqlToRelConverter create(VoltFrameworkConfig config) {
         final VolcanoPlanner planner = new VolcanoPlanner();
-        // We add ConventionTraitDef.INSTANCE and RelCollationTraitDef.INSTANCE.
-        // RelDistributionTraitDef will be added in the later stage.
-        planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
-        planner.addRelTraitDef(RelCollationTraitDef.INSTANCE);
-
-        final RexBuilder rexBuilder = new RexBuilder(validator.getTypeFactory());
-        final RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
-        final Prepare.CatalogReader catalogReader = new CalciteCatalogReader(
-                CalciteSchema.from(schemaPlus),
-                new ArrayList<>(),
-                validator.getTypeFactory(),
-                null
+        for (@SuppressWarnings("rawtypes") RelTraitDef def : config.getTraitDefs()) {
+            planner.addRelTraitDef(def);
+        }
+        final RexBuilder rexBuilder = new RexBuilder(config.getTypeFactory());
+        return new VoltSqlToRelConverter(
+                null /* view expander */,
+                new VoltSqlValidator(config),
+                config.getCatalogReader(),
+                RelOptCluster.create(planner, rexBuilder),
+                config.getConvertletTable(),
+                config.getSqlToRelConverterConfig()
         );
-        return new VoltSqlToRelConverter(null /*view expander*/, validator, catalogReader, cluster,
-                StandardConvertletTable.INSTANCE, config);
     }
 }

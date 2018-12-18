@@ -22,7 +22,7 @@ package org.voltdb.plannerv2.guards;
  * @author Yiqun Zhang
  * @since 8.4
  */
-public class AcceptAllSelect extends CalciteCheck {
+public class AcceptAllSelect extends CalciteCompatibilityCheck {
 
     @Override
     protected final boolean doCheck(String sql) {

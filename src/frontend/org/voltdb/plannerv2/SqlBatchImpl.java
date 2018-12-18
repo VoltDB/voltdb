@@ -26,7 +26,7 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.parser.SQLLexer;
-import org.voltdb.plannerv2.guards.CalciteCheck;
+import org.voltdb.plannerv2.guards.CalciteCompatibilityCheck;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.sysprocs.AdHocNTBase;
 
@@ -53,7 +53,7 @@ public class SqlBatchImpl extends SqlBatch {
     /**
      * A chain of checks to determine whether a SQL statement should be routed to Calcite.
      */
-    static final CalciteCheck CALCITE_CHECKS = CalciteCheck.create();
+    static final CalciteCompatibilityCheck CALCITE_CHECKS = CalciteCompatibilityCheck.create();
 
     /**
      * Build a batch from a string of one or more SQL statements. </br>
@@ -104,7 +104,11 @@ public class SqlBatchImpl extends SqlBatch {
             taskBuilder.add(sqlTask);
         }
         m_tasks = taskBuilder.build();
-        m_userParams = ImmutableList.copyOf(userParams);
+        if (userParams != null) {
+            m_userParams = ImmutableList.copyOf(userParams);
+        } else {
+            m_userParams = null;
+        }
         m_isDDLBatch = isDDLBatch;
         m_context = context;
     }

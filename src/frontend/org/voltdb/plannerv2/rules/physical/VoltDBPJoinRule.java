@@ -24,7 +24,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.voltdb.plannerv2.rel.logical.VoltDBLJoin;
-import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPJoin;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 
@@ -39,7 +39,7 @@ public class VoltDBPJoinRule extends RelOptRule {
     public static final VoltDBPJoinRule INSTANCE = new VoltDBPJoinRule();
 
     VoltDBPJoinRule() {
-        super(operand(VoltDBLJoin.class, VoltDBLRel.VOLTDB_LOGICAL, any()));
+        super(operand(VoltDBLJoin.class, VoltLogicalRel.VOLTDB_LOGICAL, any()));
     }
 
     @Override

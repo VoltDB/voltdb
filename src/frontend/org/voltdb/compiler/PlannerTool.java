@@ -27,7 +27,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql2rel.RelDecorrelator;
-import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.ValidationException;
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -54,8 +53,7 @@ import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.VoltFrameworkConfig;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.plannerv2.VoltSqlToRelConverter;
-import org.voltdb.plannerv2.VoltSqlValidator;
-import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rules.PlannerPhase;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
@@ -220,20 +218,20 @@ public class PlannerTool {
      * @throws ValidationException
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task) throws ValidationException {
-        // TRAIL [Calcite:3] NonDdlBatchCompiler.compileTask()
-        VoltFrameworkConfig plannerConfig = new VoltFrameworkConfig(m_schemaPlus);
+        // TRAIL [Calcite:4] PlannerTool.planSqlCalcite()
 
-        // Create VoltSqlValidator from SchemaPlus.
-        VoltSqlValidator validator = VoltSqlValidator.from(m_schemaPlus);
-        // convert SqlNode to RelNode.
-        SqlToRelConverter.Config config = SqlToRelConverter.Config.DEFAULT;
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, m_schemaPlus, config);
-        final RelBuilder relBuilder = config.getRelBuilderFactory().create(converter.getCluster(), null);
+        VoltFrameworkConfig frameworkConfig = new VoltFrameworkConfig(m_schemaPlus);
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(frameworkConfig);
+        final RelBuilder relBuilder = frameworkConfig.getSqlToRelConverterConfig()
+                .getRelBuilderFactory().create(converter.getCluster(), null /*RelOptSchema*/);
 
-        RelRoot root = converter.convertQuery(task.getParsedQuery(), true, true);
+        // Validate the query and convert SqlNode to RelNode.
+        RelRoot root = converter.convertQuery(task.getParsedQuery(), true /*needs validation*/, true /*top*/);
+        root = root.withRel(converter.flattenTypes(root.rel, true /*restructure*/));
         root = root.withRel(RelDecorrelator.decorrelateQuery(root.rel, relBuilder));
-        // apply calcite and Volt logical rules
-        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
+
+        // Apply Calcite and VoltDB logical rules
+        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
         RelNode nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 

@@ -26,7 +26,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.Sort;
-import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPSort;
@@ -44,7 +44,7 @@ public class VoltDBPSortConvertRule extends ConverterRule {
     public static final VoltDBPSortConvertRule INSTANCE_NONE =
             new VoltDBPSortConvertRule(Convention.NONE);
     public static final VoltDBPSortConvertRule INSTANCE_VOLTDB =
-            new VoltDBPSortConvertRule(VoltDBLRel.VOLTDB_LOGICAL);
+            new VoltDBPSortConvertRule(VoltLogicalRel.VOLTDB_LOGICAL);
 
     VoltDBPSortConvertRule(RelTrait inTrait) {
         super(

@@ -24,7 +24,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltDBLCalc;
-import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 
 public class VoltDBLCalcRule extends RelOptRule {
 
@@ -38,8 +38,8 @@ public class VoltDBLCalcRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         LogicalCalc calc = call.rel(0);
         RelNode input = calc.getInput();
-        RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
-        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL));
+        RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
+        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL));
         call.transformTo(new VoltDBLCalc(
                 calc.getCluster(),
                 convertedTraits,

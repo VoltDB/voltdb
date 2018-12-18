@@ -15,14 +15,24 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.plannerv2.rel.logical;
+package org.voltdb.plannerv2.metadata;
 
-import org.apache.calcite.plan.Convention;
-import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.metadata.ChainedRelMetadataProvider;
+import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
+import org.apache.calcite.rel.metadata.RelMetadataProvider;
+
+import com.google.common.collect.ImmutableList;
 
 /**
- * From Mike A. A RelNode interface added with calling convention trait.
+ * Volt's provider for providing metadata about relational expressions.
  */
-public interface VoltDBLRel extends RelNode  {
-    final static Convention VOLTDB_LOGICAL = new Convention.Impl("VOLTDB_LOGICAL", VoltDBLRel.class);
+public class VoltRelMetadataProvider extends ChainedRelMetadataProvider {
+
+    public static final RelMetadataProvider INSTANCE = new VoltRelMetadataProvider();
+
+    protected VoltRelMetadataProvider() {
+        super(ImmutableList.of(VoltRelMdParallelism.SOURCE,
+                               DefaultRelMetadataProvider.INSTANCE));
+    }
+
 }

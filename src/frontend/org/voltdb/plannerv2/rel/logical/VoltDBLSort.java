@@ -31,7 +31,7 @@ import org.apache.calcite.rex.RexNode;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLSort extends Sort implements VoltDBLRel {
+public class VoltDBLSort extends Sort implements VoltLogicalRel {
 
     public VoltDBLSort(
             RelOptCluster cluster,
@@ -39,7 +39,7 @@ public class VoltDBLSort extends Sort implements VoltDBLRel {
             RelNode input,
             RelCollation collation) {
             super(cluster, traitSet, input, collation, null, null);
-            Preconditions.checkArgument(getConvention() == VoltDBLRel.VOLTDB_LOGICAL);
+            Preconditions.checkArgument(getConvention() == VoltLogicalRel.VOLTDB_LOGICAL);
         }
 
         @Override

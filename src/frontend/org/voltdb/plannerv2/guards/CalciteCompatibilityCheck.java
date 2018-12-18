@@ -23,12 +23,12 @@ package org.voltdb.plannerv2.guards;
  * @author Yiqun Zhang
  * @since 8.4
  */
-public abstract class CalciteCheck {
+public abstract class CalciteCompatibilityCheck {
 
     /**
      * The next check in the chain.
      */
-    CalciteCheck m_next;
+    CalciteCompatibilityCheck m_next;
 
     /**
      * All the {@code CalciteCheck} subclasses should implement this method to do
@@ -62,12 +62,12 @@ public abstract class CalciteCheck {
     }
 
     /**
-     * Add another {@code CalcitePass} instance to the end of the chain and return the
-     * newly appended {@code CalcitePass} instance.
+     * Add another {@code CalciteCompatibilityCheck} instance to the end of the chain
+     * and return the newly appended {@code CalciteCompatibilityCheck} instance.
      * @param next the instance to append.
      * @return the instance appended.
      */
-    public final CalciteCheck addNext(CalciteCheck next) {
+    public final CalciteCompatibilityCheck addNext(CalciteCompatibilityCheck next) {
         m_next = next;
         return m_next;
     }
@@ -76,8 +76,8 @@ public abstract class CalciteCheck {
      * The factory method to create a default check chain.
      * @return The head of the chain.
      */
-    public static CalciteCheck create() {
-        CalciteCheck checks = new AllowDDLs();
+    public static CalciteCompatibilityCheck create() {
+        CalciteCompatibilityCheck checks = new AcceptDDLsAsWeCan();
         // As we add more features to Calcite, this list should be expanded, and eventually removed.
         checks.addNext(new NoLargeQuery());
         return checks;

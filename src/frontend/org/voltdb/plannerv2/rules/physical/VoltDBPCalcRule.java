@@ -22,7 +22,7 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.logical.VoltDBLCalc;
-import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPCalc;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
@@ -38,7 +38,7 @@ public class VoltDBPCalcRule extends RelOptRule {
     public static final VoltDBPCalcRule INSTANCE = new VoltDBPCalcRule();
 
     VoltDBPCalcRule() {
-        super(operand(VoltDBLCalc.class, VoltDBLRel.VOLTDB_LOGICAL, any()));
+        super(operand(VoltDBLCalc.class, VoltLogicalRel.VOLTDB_LOGICAL, any()));
     }
 
     @Override

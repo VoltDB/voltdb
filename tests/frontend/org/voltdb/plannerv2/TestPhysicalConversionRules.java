@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.newplanner;
+package org.voltdb.plannerv2;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
@@ -31,7 +31,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.voltdb.plannerv2.CalcitePlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
-import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rules.PlannerPhase;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
@@ -55,7 +55,7 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
         RelRoot root = parseValidateAndConvert(sql);
 
         // apply logical rules
-        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
+        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
         RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 

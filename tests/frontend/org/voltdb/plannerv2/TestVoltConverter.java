@@ -21,30 +21,29 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.newplanner;
-
-import java.util.Objects;
+package org.voltdb.plannerv2;
 
 import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql2rel.SqlToRelConverter;
-import org.voltdb.plannerv2.VoltSqlToRelConverter;
+import org.voltdb.plannerv2.VoltSchemaPlus;
 
-/**
- * A base class for implementing tests against {@link VoltSqlToRelConverter}.
- *
- * @author Chao Zhou
- * @since 8.4
- */
-public class VoltConverterTestCase extends VoltSqlValidatorTestCase {
-
-    protected RelRoot parseValidateAndConvert(String sql) {
-        Objects.requireNonNull(getValidator(), "m_validator");
-        Objects.requireNonNull(getSchemaPlus(), "m_schemaPlus");
-        SqlNode node = parseAndValidate(sql);
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(getValidator(), getSchemaPlus(), SqlToRelConverter.Config.DEFAULT);
-        RelRoot root = converter.convertQuery(node, false, true);
-        root = root.withRel(converter.decorrelate(node, root.rel));
-        return root;
+public class TestVoltConverter extends VoltConverterTestCase {
+    @Override
+    protected void setUp() throws Exception {
+        setupSchema(TestVoltSqlValidator.class.getResource(
+                "testcalcite-ddl.sql"), "testcalcite", false);
+        init(VoltSchemaPlus.from(getDatabase()));
     }
+
+    @Override
+    public void tearDown() throws Exception {
+        super.tearDown();
+    }
+
+
+    public void testSimple() {
+        RelRoot root = parseValidateAndConvert("select i from R2");
+        assertEquals("Root {kind: SELECT, rel: LogicalProject#1, rowType: RecordType(INTEGER I), fields: [<0, I>], collation: []}",
+                root.toString());
+    }
+
 }

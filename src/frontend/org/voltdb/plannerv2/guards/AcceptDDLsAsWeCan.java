@@ -23,11 +23,11 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.plannerv2.VoltSqlParser;
 
 /**
- * Allow all DDLs.
+ * Allow all DDLs if we support them.
  * @author Yiqun Zhang
  * @since 8.4
  */
-public class AllowDDLs extends CalciteCheck {
+public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
 
     private static String truncate(String src, int max) {
         if (src.length() <= max) {
@@ -43,12 +43,16 @@ public class AllowDDLs extends CalciteCheck {
             return VoltSqlParser.parse(sql).isA(SqlKind.DDL);
         } catch (SqlParseException e) {
             if (e.getCause() instanceof StackOverflowError) {
+                // Ethan: I think this is copied from NonDdlBatchCompiler and AdHocNTBase.compileAdHocSQL
+                // by Lukai. It may be unnecessary.
+                // Throwing an exception that's not a PlannerFallbackException will abort the planning.
                 throw new PlanningErrorException("Encountered stack overflow error. " +
                         "Try reducing the number of predicate expressions in the query.");
-            } else { // For all Calcite unsupported syntax, fall back to VoltDB implementation
+            } else {
+                // For all Calcite unsupported syntax, fall back to VoltDB implementation by returning false.
                 System.err.println(truncate(e.getMessage(), 100));  // print Calcite's parse error
+                return false;
             }
-            return false;
         }
     }
 

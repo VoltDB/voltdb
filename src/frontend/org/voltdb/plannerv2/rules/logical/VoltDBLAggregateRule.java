@@ -24,7 +24,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.voltdb.plannerv2.rel.logical.VoltDBLAggregate;
-import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 
 /**
  * VoltDB logical rule that transform {@link LogicalAggregate} to {@link VoltDBLAggregate}.
@@ -44,8 +44,8 @@ public class VoltDBLAggregateRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         LogicalAggregate aggr = call.rel(0);
         RelNode input = aggr.getInput();
-        RelTraitSet convertedTraits = aggr.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
-        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL));
+        RelTraitSet convertedTraits = aggr.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
+        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL));
         call.transformTo(VoltDBLAggregate.create(
                 aggr.getCluster(),
                 convertedTraits,

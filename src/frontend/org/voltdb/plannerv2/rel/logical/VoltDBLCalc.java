@@ -30,7 +30,7 @@ import org.apache.calcite.rex.RexProgram;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLCalc extends Calc implements VoltDBLRel{
+public class VoltDBLCalc extends Calc implements VoltLogicalRel{
 
     public VoltDBLCalc(
             RelOptCluster cluster,
@@ -41,7 +41,7 @@ public class VoltDBLCalc extends Calc implements VoltDBLRel{
                   traitSet,
                   input,
                   program);
-          Preconditions.checkArgument(getConvention() == VoltDBLRel.VOLTDB_LOGICAL);
+          Preconditions.checkArgument(getConvention() == VoltLogicalRel.VOLTDB_LOGICAL);
         }
 
         @Override

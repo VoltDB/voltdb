@@ -18,7 +18,6 @@
 package org.voltdb.plannerv2.metadata;
 
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.metadata.BuiltInMetadata;
 import org.apache.calcite.rel.metadata.ReflectiveRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMdParallelism;
 import org.apache.calcite.rel.metadata.RelMetadataProvider;
@@ -33,21 +32,13 @@ import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
  *
  * @see org.apache.calcite.rel.metadata.RelMetadataQuery#splitCount
  */
-public class VoltDBRelMdParallelism extends RelMdParallelism {
-
-    private static final VoltDBRelMdParallelism INSTANCE = new VoltDBRelMdParallelism();
+public class VoltRelMdParallelism extends RelMdParallelism {
 
     public static final RelMetadataProvider SOURCE =
-            ReflectiveRelMetadataProvider.reflectiveSource(INSTANCE,
+            ReflectiveRelMetadataProvider.reflectiveSource(
+                    new VoltRelMdParallelism(),
                     BuiltInMethod.SPLIT_COUNT.method);
 
-    /**
-     * Catch-all implementation for
-     * {@link BuiltInMetadata.Parallelism#splitCount()},
-     * invoked using reflection.
-     *
-     * @see org.apache.calcite.rel.metadata.RelMetadataQuery#splitCount
-     */
     @Override
     public Integer splitCount(RelNode rel, RelMetadataQuery mq) {
         if (rel instanceof VoltDBPRel) {

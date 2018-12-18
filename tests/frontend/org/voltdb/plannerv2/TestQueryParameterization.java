@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.newplanner;
+package org.voltdb.plannerv2;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;

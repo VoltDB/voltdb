@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.newplanner;
+package org.voltdb.plannerv2;
 
 import static org.junit.Assert.assertEquals;
 
@@ -31,20 +31,12 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql2rel.RelDecorrelator;
-import org.apache.calcite.sql2rel.SqlToRelConverter;
-import org.apache.calcite.tools.Frameworks;
-import org.apache.calcite.tools.Planner;
 import org.apache.calcite.tools.RelBuilder;
 import org.junit.Test;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.plannerv2.VoltFrameworkConfig;
-import org.voltdb.plannerv2.VoltSchemaPlus;
-import org.voltdb.plannerv2.VoltSqlParser;
-import org.voltdb.plannerv2.VoltSqlToRelConverter;
-import org.voltdb.plannerv2.VoltSqlValidator;
 
 public class TestCalciteParser {
 
@@ -66,18 +58,13 @@ public class TestCalciteParser {
         Table table = database.getTables().add("testTable");
 
         SchemaPlus plus = VoltSchemaPlus.from(database);
-
-        VoltFrameworkConfig plannerConfig = new VoltFrameworkConfig(plus);
-        Planner planner = Frameworks.getPlanner(plannerConfig);
-
-        SqlNode sqlNode = planner.parse("SELECT * FROM testTable;");
-
-        VoltSqlValidator validator = VoltSqlValidator.from(plus);
-        SqlToRelConverter.Config config = SqlToRelConverter.Config.DEFAULT;
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, plus, config);
-        final RelBuilder relBuilder = config.getRelBuilderFactory().create(converter.getCluster(), null);
-
+        VoltFrameworkConfig frameworkConfig = new VoltFrameworkConfig(plus);
+        SqlNode sqlNode = VoltSqlParser.parse("SELECT * FROM testTable");
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(frameworkConfig);
+        final RelBuilder relBuilder = frameworkConfig.getSqlToRelConverterConfig()
+                .getRelBuilderFactory().create(converter.getCluster(), null /*RelOptSchema*/);
         RelRoot root = converter.convertQuery(sqlNode, true, true);
+        root = root.withRel(converter.flattenTypes(root.rel, true /*restructure*/));
         root = root.withRel(RelDecorrelator.decorrelateQuery(root.rel, relBuilder));
     }
 }

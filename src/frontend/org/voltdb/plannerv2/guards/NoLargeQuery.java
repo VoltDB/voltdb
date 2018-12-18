@@ -25,7 +25,7 @@ import org.voltdb.VoltDB;
  * @author Yiqun Zhang
  * @since 8.4
  */
-public class NoLargeQuery extends CalciteCheck {
+public class NoLargeQuery extends CalciteCompatibilityCheck {
 
     private static final boolean s_isLargeTempTableTarget =
             VoltDB.instance().getBackendTargetType().isLargeTempTableTarget;

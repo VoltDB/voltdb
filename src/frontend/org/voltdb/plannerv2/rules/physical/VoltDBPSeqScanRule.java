@@ -23,7 +23,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistribution.Type;
 import org.apache.calcite.rel.RelDistributions;
-import org.voltdb.plannerv2.rel.logical.VoltDBLRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.logical.VoltDBLTableScan;
 import org.voltdb.plannerv2.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
@@ -43,7 +43,7 @@ public class VoltDBPSeqScanRule extends RelOptRule {
     public static final VoltDBPSeqScanRule INSTANCE = new VoltDBPSeqScanRule();
 
     private VoltDBPSeqScanRule() {
-        super(operand(VoltDBLTableScan.class, VoltDBLRel.VOLTDB_LOGICAL, any()));
+        super(operand(VoltDBLTableScan.class, VoltLogicalRel.VOLTDB_LOGICAL, any()));
     }
 
     @Override

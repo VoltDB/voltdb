@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.newplanner;
+package org.voltdb.plannerv2;
 
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
@@ -29,6 +29,7 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.planner.PlannerTestCase;
+import org.voltdb.plannerv2.VoltFrameworkConfig;
 import org.voltdb.plannerv2.VoltSqlParser;
 import org.voltdb.plannerv2.VoltSqlValidator;
 
@@ -40,6 +41,7 @@ import org.voltdb.plannerv2.VoltSqlValidator;
  */
 public class VoltSqlValidatorTestCase extends PlannerTestCase {
     private VoltSqlValidator m_validator;
+    private VoltFrameworkConfig m_config;
     private SchemaPlus m_schemaPlus;
 
     /**
@@ -49,11 +51,16 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
      */
     protected void init(SchemaPlus schemaPlus) {
         m_schemaPlus = schemaPlus;
-        m_validator = VoltSqlValidator.from(m_schemaPlus);
+        m_config = new VoltFrameworkConfig(schemaPlus);
+        m_validator = new VoltSqlValidator(m_config);
     }
 
     protected VoltSqlValidator getValidator() {
         return m_validator;
+    }
+
+    protected VoltFrameworkConfig getConfig() {
+        return m_config;
     }
 
     protected SchemaPlus getSchemaPlus() {

@@ -17,23 +17,32 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
-import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.voltcore.utils.Pair;
 
-import org.voltdb.catalog.*;
+import org.json_voltpatches.JSONException;
+import org.voltcore.utils.Pair;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Table;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.Encoder;
-import org.voltdb.expressions.*;
-import org.json_voltpatches.JSONException;
-import scala.Int;
 
 /**
  * Tries to find a matching materialized view for the given SELECT statement, and rewrite the query.

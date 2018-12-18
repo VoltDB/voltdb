@@ -17,58 +17,77 @@
 
 package org.voltdb.plannerv2;
 
+import java.util.Objects;
+
+import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.Context;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCostFactory;
 import org.apache.calcite.plan.RelTraitDef;
+import org.apache.calcite.prepare.CalciteCatalogReader;
+import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelCollationTraitDef;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexExecutor;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-import org.apache.calcite.sql.parser.SqlParser.Config;
+import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.validate.SqlConformance;
+import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql2rel.SqlRexConvertletTable;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Program;
-import org.voltdb.VoltDB;
 
 import com.google.common.collect.ImmutableList;
 
 public class VoltFrameworkConfig implements FrameworkConfig {
 
-    public static final VoltFrameworkConfig DEFAULT = new VoltFrameworkConfig(null);
+    // TODO: currently we are using the default implementation of SqlOperatorTable, RelDataTypeFactory
+    // and SqlConformance, etc. May replace them with our own versions in the future.
 
     @SuppressWarnings("rawtypes")
     private static final ImmutableList<RelTraitDef> TRAIT_DEFS =
             ImmutableList.of(ConventionTraitDef.INSTANCE, RelCollationTraitDef.INSTANCE);
 
     private final SchemaPlus m_schema;
+    private final RelDataTypeFactory m_typeFactory;
+    private final Prepare.CatalogReader m_catalogReader;
+
+    @Override
+    public RelDataTypeSystem getTypeSystem() {
+        return RelDataTypeSystem.DEFAULT;
+    }
 
     public VoltFrameworkConfig(SchemaPlus schema) {
-        m_schema = schema;
+        m_schema = Objects.requireNonNull(schema);
+        m_typeFactory = new SqlTypeFactoryImpl(getTypeSystem());
+        CalciteSchema calciteSchema = CalciteSchema.from(m_schema);
+        m_catalogReader = new CalciteCatalogReader(
+                calciteSchema,
+                calciteSchema.path(null), /*default schema*/
+                m_typeFactory,
+                null /*connection configuration*/
+        );
     }
 
     @Override
-    public Config getParserConfig() {
+    public SqlParser.Config getParserConfig() {
         return VoltSqlParser.PARSER_CONFIG;
     }
 
     @Override
-    public org.apache.calcite.sql2rel.SqlToRelConverter.Config getSqlToRelConverterConfig() {
+    public SqlToRelConverter.Config getSqlToRelConverterConfig() {
         return SqlToRelConverter.Config.DEFAULT;
     }
 
     @Override
     public SchemaPlus getDefaultSchema() {
-        if (m_schema == null) {
-            return VoltSchemaPlus.from(VoltDB.instance().getCatalogContext().database);
-        }
-        else {
-            return m_schema;
-        }
+        return m_schema;
     }
 
     @Override
@@ -110,9 +129,15 @@ public class VoltFrameworkConfig implements FrameworkConfig {
         return null;
     }
 
-    @Override
-    public RelDataTypeSystem getTypeSystem() {
-        return RelDataTypeSystem.DEFAULT;
+    public RelDataTypeFactory getTypeFactory() {
+        return m_typeFactory;
     }
 
+    public SqlConformance getSqlConformance() {
+        return SqlConformanceEnum.DEFAULT;
+    }
+
+    public Prepare.CatalogReader getCatalogReader() {
+        return m_catalogReader;
+    }
 }
