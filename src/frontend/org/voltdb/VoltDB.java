@@ -330,7 +330,7 @@ public class VoltDB {
         public File m_stagedClassesPath = null;
 
         /** Best effort to recover previous partition layout*/
-        public boolean m_recoverPlacement = false;
+        public boolean m_restorePlacement = false;
         public String m_recoveredPartitions = "";
 
         public int getZKPort() {
@@ -720,8 +720,8 @@ public class VoltDB {
                         System.err.println("FATAL: Supplied classes jar file " + m_stagedClassesPath + " is not an ordinary file.");
                         referToDocAndExit();
                     }
-                } else if (arg.equalsIgnoreCase("recoverplacement")) {
-                    m_recoverPlacement = true;
+                } else if (arg.equalsIgnoreCase("restoreplacement")) {
+                    m_restorePlacement = true;
                 } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();

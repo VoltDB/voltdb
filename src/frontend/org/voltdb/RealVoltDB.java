@@ -1065,10 +1065,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_config.m_startAction.doesRecover()) {
                 m_config.m_hostCount = fromPropertyFile.hostcount();
             }
-            if (m_config.m_recoverPlacement) {
-                if (!StringUtils.isEmpty(fromPropertyFile.partitionids())) {
-                    m_config.m_recoveredPartitions = fromPropertyFile.partitionids();
-                }
+            if (m_config.m_restorePlacement && !StringUtils.isEmpty(fromPropertyFile.partitionids())) {
+                m_config.m_recoveredPartitions = fromPropertyFile.partitionids();
             }
 
             Map<String, String> fromCommandLine = m_config.asClusterSettingsMap();
@@ -1077,6 +1075,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             ClusterSettings clusterSettings = ClusterSettings.create(
                     fromCommandLine, fromPropertyFile.asMap(), fromDeploymentFile);
+
+            clusterSettings.store();
+            m_clusterSettings.set(clusterSettings, 1);
 
             MeshProber.Determination determination = buildClusterMesh(readDepl);
             if (m_config.m_startAction == StartAction.PROBE) {
@@ -1261,7 +1262,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 clusterSettings = ClusterSettings.create(
                         m_config.asClusterSettingsMap(), fromPropertyFile.asMap(), fromDeploymentFile);
                 clusterSettings.store();
-                m_clusterSettings.set(clusterSettings, 1);
+                m_clusterSettings.set(clusterSettings, 2);
 
                 for (int ii = 0; ii < partitions.size(); ii++) {
                     Integer partition = partitions.get(ii);
@@ -2190,9 +2191,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private AbstractTopology recoverTopology(AbstractTopology topo, Map<Integer, HostMessenger.HostInfo> hostMap, StartAction startAction) {
-        if (!m_config.m_recoverPlacement || (!startAction.doesRecover() && !startAction.doesRejoin())) {
+        if (!m_config.m_restorePlacement || (!startAction.doesRecover() && !startAction.doesRejoin())) {
             return topo;
         }
+
 
         return topo;
     }
