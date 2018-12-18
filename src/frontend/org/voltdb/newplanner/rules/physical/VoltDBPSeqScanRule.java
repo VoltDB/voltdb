@@ -22,7 +22,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistribution.Type;
-import org.apache.calcite.rel.RelDistributions;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
@@ -52,7 +51,7 @@ public class VoltDBPSeqScanRule extends RelOptRule {
         RelDistribution tableDist = tableScan.getTable().getDistribution();
         int scanSplitCount = (Type.SINGLETON == tableDist.getType()) ?
                 1 : Constants.DISTRIBUTED_SPLIT_COUNT;
-        // TODO: we make the distribution trait here ALWAYS SINGLE because we only support SP this release.
+        // TODO: we make the distribution trait here ALWAYS SINGLE because we only support SP in our initial release.
         // when come to MP, distribution trait can be HASH and Exchange nodes should be introduced to
         // handle this.
         VoltDBPTableSeqScan scanRel = new VoltDBPTableSeqScan(
@@ -62,28 +61,6 @@ public class VoltDBPSeqScanRule extends RelOptRule {
                 tableScan.getVoltTable(),
                 scanSplitCount);
 
-//        AbstractVoltDBPExchange exchangeRel;
-//        if (Type.SINGLETON == tableDist.getType()) {
-//            exchangeRel = new VoltDBPSingletonExchange(
-//                    tableScan.getCluster(),
-//                    convertedTraits.plus(RelDistributions.SINGLETON),
-//                    scanRel,
-//                    false);
-//        } else {
-//            // Fragment's exchange
-//            exchangeRel = new VoltDBPUnionExchange(
-//                    tableScan.getCluster(),
-//                    convertedTraits.plus(tableDist),
-//                    scanRel,
-//                    scanSplitCount,
-//                    false);
-//            // Coordinator's exchange
-//            exchangeRel = new VoltDBPSingletonExchange(
-//                    tableScan.getCluster(),
-//                    convertedTraits.plus(RelDistributions.SINGLETON),
-//                    exchangeRel,
-//                    true);
-//        }
         call.transformTo(scanRel);
     }
 }

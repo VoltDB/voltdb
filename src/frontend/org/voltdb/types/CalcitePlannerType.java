@@ -20,6 +20,6 @@ package org.voltdb.types;
 public enum CalcitePlannerType {
     HEP,
     HEP_BOTTOM_UP, // Match from leaves up
-    HEP_ORDERED, // A hep planer that rules are applied in order.
+    HEP_ORDERED, // Rules are applied once in order.
     VOLCANO
 }
