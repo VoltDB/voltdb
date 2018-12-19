@@ -255,7 +255,7 @@ public class HSQLInterface {
         VoltXMLDiff diff = VoltXMLElement.computeDiff(tableXMLOld, tableXMLNew);
 
         // now find any views that might be missing and make sure the diff reflects that
-        // they're gone NOTE!!!
+        // they're gone
         if (stmtInfo.cascade) {
             Set<String> finalTableNames = getTableNames();
             for (String tableName : existingTableNames) {
