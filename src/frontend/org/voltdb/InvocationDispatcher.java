@@ -518,12 +518,22 @@ public final class InvocationDispatcher {
             // when VoltDB.crash... is called, we close off the client interface
             // and it might not be possible to create new transactions.
             // Return an error.
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
+            // Another case is when elastic shrink, the target partition may be
+            // removed in between the transaction is created
+            if (m_cihm.get(handler.connectionId()) == null) {
+                return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
                     new VoltTable[0],
                     "VoltDB failed to create the transaction internally.  It is possible this "
                     + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
                     + "it should be safe to resend the work, as the work was never started.",
                     task.clientHandle);
+            } else {
+                return new ClientResponseImpl(ClientResponseImpl.TXN_MISPARTITIONED,
+                    new VoltTable[0],
+                    "VoltDB failed to create the transaction internally.  It is possible this "
+                    + "was caused by elastic shrink event that removed master partition.",
+                    task.clientHandle);
+            }
         }
 
         return null;
@@ -1330,6 +1340,13 @@ public final class InvocationDispatcher {
             if (isReadOnly) {
                 isShortCircuitRead = true;
             }
+        }
+
+        if (initiatorHSId == null) {
+            hostLog.rateLimitedLog(60, Level.WARN, null,
+                    "InvocationDispatcher.createTransaction request rejected. "
+                    + "This is likely due to parition leader being removed during elastic shrink.");
+            return false;
         }
 
         long handle = cihm.getHandle(isSinglePartition, isSinglePartition ? partitions[0] : -1, invocation.getClientHandle(),
