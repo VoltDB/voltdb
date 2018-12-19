@@ -103,6 +103,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.messaging.SiteMailbox;
+import org.voltcore.messaging.SocketJoiner;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
@@ -3184,16 +3185,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         try {
             m_messenger.start();
-        } catch (CoreUtils.RetryException e) {
-
-            // do not log as fatal in this case
-            boolean printStackTrace = true;
-            if (e.getMessage() != null  && e.getMessage().indexOf(MeshProber.MESH_ONE_REJOIN_MSG )> -1) {
-                printStackTrace = false;
+        } catch (Exception e) {
+            boolean printStackTrace =  true;
+            // do not log fatal exception message in these cases
+            if (e.getMessage() != null) {
+                if (e.getMessage().indexOf(SocketJoiner.FAIL_ESTABLISH_MESH_MSG) > -1 ||
+                        e.getMessage().indexOf(MeshProber.MESH_ONE_REJOIN_MSG )> -1) {
+                    printStackTrace = false;
+                }
             }
             VoltDB.crashLocalVoltDB(e.getMessage(), printStackTrace, e);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
         VoltZK.createPersistentZKNodes(m_messenger.getZK());
