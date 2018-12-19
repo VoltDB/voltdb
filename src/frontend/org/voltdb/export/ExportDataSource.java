@@ -164,9 +164,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private static final boolean DISABLE_AUTO_GAP_RELEASE = Boolean.getBoolean("DISABLE_AUTO_GAP_RELEASE");
 
     static enum StreamStatus {
-        ACTIVE,
-        DROPPED,
-        BLOCKED
+        ACTIVE("ACTIVE"),
+        BLOCKED("BLOCKED"),
+        DROPPED_PENDING_EOS("DROPPED"),
+        EOS_PROCESSED("DROPPED"),
+        DROPPED("DROPPED");
+
+        private final String m_displayName;
+        private StreamStatus(String displayName) {
+            m_displayName = displayName;
+        }
+        public String toString() {
+            return m_displayName;
+        }
     }
 
     static class QueryResponse {
@@ -702,6 +712,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         exportLog.info("End of stream for table: " + getTableName() +
                 " partition: " + getPartitionId() + " signature: " + getSignature());
         m_eos = true;
+        if (m_status == StreamStatus.DROPPED_PENDING_EOS) {
+            setStatus(StreamStatus.DROPPED);
+        }
+        else {
+            setStatus(StreamStatus.EOS_PROCESSED);
+        }
     }
 
     public void pushExportBuffer(

@@ -214,8 +214,15 @@ public class ExportGeneration implements Generation {
                 for (String signature : sources.keySet()) {
                     ExportDataSource src = sources.get(signature);
                     if (!exportSignatures.contains(signature)) {
-                        src.setStatus(ExportDataSource.StreamStatus.DROPPED);
-                    } else if (src.getStatus() == ExportDataSource.StreamStatus.DROPPED) {
+                        synchronized (src) {
+                            if (src.getStatus() == ExportDataSource.StreamStatus.EOS_PROCESSED) {
+                                src.setStatus(ExportDataSource.StreamStatus.DROPPED);
+                            }
+                            else {
+                                src.setStatus(ExportDataSource.StreamStatus.DROPPED_PENDING_EOS);
+                            }
+                        }
+                    } else if (src.getStatus().ordinal() >= ExportDataSource.StreamStatus.DROPPED_PENDING_EOS.ordinal()) {
                         src.setStatus(ExportDataSource.StreamStatus.ACTIVE);
                     }
                 }
