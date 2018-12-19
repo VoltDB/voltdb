@@ -208,7 +208,7 @@ public class PlannerTool {
      * Plan a query with the Calcite planner.
      * @param task the query to plan.
      * @param batch the query batch which this query belongs to.
-     * @return a planned statement. Untill DQL is fully supported, it returns null, and the caller
+     * @return a planned statement. Until DQL is fully supported, it returns null, and the caller
      * will use fall-back behavior.
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
