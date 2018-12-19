@@ -1314,8 +1314,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug(toString() + " is no longer the export stream master.");
         }
         m_mastershipAccepted.set(false);
-        m_isInCatalog = false;
-        m_eos = false;
         m_pollFuture = null;
         m_readyForPolling = false;
         m_seqNoToDrain = Long.MAX_VALUE;
