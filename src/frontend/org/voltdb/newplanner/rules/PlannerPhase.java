@@ -116,13 +116,8 @@ public enum PlannerPhase {
                 ).build());
         s_VoltMPFallbackRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(
-                        MPQueryFallBackRule.INSTANCE_0,
-                        MPQueryFallBackRule.INSTANCE_1,
-                        MPJoinQueryFallBackRule.INSTANCE_0,
-                        MPJoinQueryFallBackRule.INSTANCE_1,
-                        MPJoinQueryFallBackRule.INSTANCE_2,
-                        MPJoinQueryFallBackRule.INSTANCE_3,
-                        MPJoinQueryFallBackRule.INSTANCE_4
+                        MPQueryFallBackRule.INSTANCE,
+                        MPJoinQueryFallBackRule.INSTANCE
                 ).build());
         s_VoltPhysicalConversionRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(

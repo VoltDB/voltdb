@@ -31,8 +31,6 @@ import org.apache.calcite.rex.RexProgram;
  * @since 8.4
  */
 public class VoltDBLCalc extends Calc implements VoltDBLRel {
-    private boolean m_isReplicated = true;
-
     public VoltDBLCalc(
             RelOptCluster cluster,
             RelTraitSet traitSet,
@@ -49,13 +47,5 @@ public class VoltDBLCalc extends Calc implements VoltDBLRel {
     public Calc copy(RelTraitSet traitSet, RelNode child,
                      RexProgram program) {
         return new VoltDBLCalc(this.getCluster(), traitSet, child, program);
-    }
-
-    public boolean getIsReplicated() {
-        return m_isReplicated;
-    }
-
-    public void setIsReplicated(boolean isReplicated) {
-        m_isReplicated = isReplicated;
     }
 }

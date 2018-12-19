@@ -21,6 +21,10 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.SingleRel;
 import org.apache.calcite.rel.logical.LogicalCalc;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
@@ -29,7 +33,6 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.sql.SqlKind;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLCalc;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLJoin;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 
 import java.util.List;
@@ -41,11 +44,9 @@ import java.util.List;
  * @since 8.4
  */
 public class MPQueryFallBackRule extends RelOptRule {
-    public static final MPQueryFallBackRule INSTANCE_0 = new MPQueryFallBackRule(operand(VoltDBLCalc.class,
-            operand(VoltDBLTableScan.class, any())), "MPQueryFallBackRule0");
-
-    public static final MPQueryFallBackRule INSTANCE_1 = new MPQueryFallBackRule(operand(VoltDBLCalc.class,
-            operand(VoltDBLJoin.class, any())), "MPQueryFallBackRule1");
+    public static final MPQueryFallBackRule INSTANCE = new MPQueryFallBackRule(
+            operand(SingleRel.class, RelDistributions.ANY,
+                    some(operand(RelNode.class, any()))), "MPQueryFallBackRule");
 
     private MPQueryFallBackRule(RelOptRuleOperand operand, String desc) {
         super(operand, desc);
@@ -89,8 +90,8 @@ public class MPQueryFallBackRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLCalc calc = call.rel(0);
-        if (call.rel(1) instanceof VoltDBLTableScan) {
+        if (call.rel(0) instanceof VoltDBLCalc && call.rel(1) instanceof VoltDBLTableScan) {
+            VoltDBLCalc calc = call.rel(0);
             VoltDBLTableScan tableScan = call.rel(1);
             RelDistribution tableDist = tableScan.getTable().getDistribution();
             if (tableDist.getType() != RelDistribution.Type.SINGLETON) {
@@ -98,12 +99,15 @@ public class MPQueryFallBackRule extends RelOptRule {
                         !isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys())) {
                     throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
                 }
-                // use in MPJoinQueryFallBackRule
-                calc.setIsReplicated(false);
             }
-        } else if (call.rel(1) instanceof VoltDBLJoin) {
-            VoltDBLJoin join = call.rel(1);
-            calc.setIsReplicated(join.getIsReplicated());
+            call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), calc.getInputs()));
+        } else {
+            RelNode child = call.rel(1);
+            RelDistribution childDist = child.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+            if (childDist != RelDistributions.ANY) {
+                SingleRel node = call.rel(0);
+                call.transformTo(node.copy(node.getTraitSet().replace(childDist), node.getInputs()));
+            }
         }
     }
 }

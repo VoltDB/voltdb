@@ -23,12 +23,15 @@
 
 package org.voltdb.newplanner;
 
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.voltdb.calciteadapter.CatalogAdapter;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.newplanner.rules.PlannerPhase;
+import org.voltdb.newplanner.util.VoltDBRelUtil;
 import org.voltdb.types.CalcitePlannerType;
 
 public class TestMPQueryFallbackRules extends VoltConverterTestCase {
@@ -52,7 +55,10 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 
-        // do MP fall back check
+        // Add RelDistributions.ANY trait to the rel tree.
+        nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.ANY);
+
+        // do the MP fallback check
         CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
                 nodeAfterLogicalRules);
     }
@@ -276,5 +282,9 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
                 + "  (select * from P2 where i = 303) as t2 "
                 + "on t1.i = t2.i "
                 + "where t1.i = 3");
+
+        assertFallback("select RI1.bi from RI1, (select I from P2 order by I) P22 where RI1.i = P22.I");
+
+        assertNotFallback("select RI1.bi from RI1, (select I from P2 where I = 5 order by I) P22 where RI1.i = P22.I");
     }
 }

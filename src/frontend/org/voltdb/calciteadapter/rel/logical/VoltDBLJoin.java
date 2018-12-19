@@ -44,8 +44,6 @@ public class VoltDBLJoin extends Join implements VoltDBLRel {
 
     private final ImmutableList<RelDataTypeField> systemFieldList;
 
-    private boolean m_isReplicated = true;
-
     public VoltDBLJoin(
             RelOptCluster cluster,
             RelTraitSet traitSet,
@@ -85,13 +83,5 @@ public class VoltDBLJoin extends Join implements VoltDBLRel {
 
     public List<RelDataTypeField> getSystemFieldList() {
         return systemFieldList;
-    }
-
-    public boolean getIsReplicated() {
-        return m_isReplicated;
-    }
-
-    public void setIsReplicated(boolean isReplicated) {
-        m_isReplicated = isReplicated;
     }
 }

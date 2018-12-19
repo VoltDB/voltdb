@@ -228,6 +228,9 @@ public class PlannerTool {
         RelNode nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 
+        // Add RelDistributions.ANY trait to the rel tree.
+        nodeAfterLogical = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogical, RelDistributions.ANY);
+
         // do the MP fallback check
         nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
                 nodeAfterLogical);
@@ -235,11 +238,9 @@ public class PlannerTool {
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
         nodeAfterLogical.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
-        // Add RelDistributions.SINGLETON trait to the rel tree.
-        nodeAfterLogical = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogical, RelDistributions.SINGLETON);
-
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-        RelTraitSet physicalTraits = nodeAfterLogical.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet physicalTraits = nodeAfterLogical.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL)
+                .replace(RelDistributions.SINGLETON);
 
         // apply physical conversion rules.
         RelNode nodeAfterPhysicalConversion = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
