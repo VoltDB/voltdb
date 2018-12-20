@@ -684,28 +684,6 @@ public class ExportGeneration implements Generation {
         source.pushExportBuffer(startSequenceNumber, tupleCount, uniqueId, buffer, sync);
     }
 
-    @Override
-    public void pushEndOfStream(int partitionId, String signature) {
-        assert(m_dataSourcesByPartition.containsKey(partitionId));
-        assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
-        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
-
-        if (sources == null) {
-            exportLog.error("EOS Could not find export data sources for partition "
-                    + partitionId + ". The export end of stream is being discarded.");
-            return;
-        }
-
-        ExportDataSource source = sources.get(signature);
-        if (source == null) {
-            exportLog.error("EOS Could not find export data source for partition " + partitionId +
-                    " signature " + signature + ". The export end of stream is being discarded.");
-            return;
-        }
-
-        source.pushEndOfStream();
-    }
-
     private void cleanup(final HostMessenger messenger) {
         shutdown = true;
         //We need messenger NULL guard for tests.

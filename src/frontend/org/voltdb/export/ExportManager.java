@@ -673,16 +673,6 @@ public class ExportManager
     public static void pushEndOfStream(
             int partitionId,
             String signature) {
-        ExportManager instance = instance();
-        try {
-            ExportGeneration generation = instance.m_generation.get();
-            if (generation != null) {
-                generation.pushEndOfStream(partitionId, signature);
-            }
-        } catch (Exception e) {
-            //Don't let anything take down the execution site thread
-            exportLog.error("Error pushing export end of stream", e);
-        }
     }
     /*
      * This method pulls double duty as a means of pushing export buffers
