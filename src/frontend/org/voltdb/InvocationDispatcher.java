@@ -1343,7 +1343,7 @@ public final class InvocationDispatcher {
         }
 
         if (initiatorHSId == null) {
-            hostLog.rateLimitedLog(60, Level.WARN, null,
+            hostLog.rateLimitedLog(60, Level.INFO, null,
                     "InvocationDispatcher.createTransaction request rejected. "
                     + "This is likely due to parition leader being removed during elastic shrink.");
             return false;
