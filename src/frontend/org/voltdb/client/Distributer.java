@@ -1454,8 +1454,14 @@ class Distributer {
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
 
+            String leader = vt.getString("Leader");
+            String sites = vt.getString("Sites");
+            if (sites == null || leader == null) {
+                continue;
+            }
+
             ArrayList<NodeConnection> connections = new ArrayList<>();
-            for (String site : vt.getString("Sites").split(",")) {
+            for (String site : sites.split(",")) {
                 site = site.trim();
                 Integer hostId = Integer.valueOf(site.split(":")[0]);
                 if (m_hostIdToConnection.containsKey(hostId)) {
@@ -1466,7 +1472,8 @@ class Distributer {
             }
             m_partitionReplicas.put(partition, connections.toArray(new NodeConnection[0]));
 
-            Integer leaderHostId = Integer.valueOf(vt.getString("Leader").split(":")[0]);
+
+            Integer leaderHostId = Integer.valueOf(leader.split(":")[0]);
             if (m_hostIdToConnection.containsKey(leaderHostId)) {
                 m_partitionMasters.put(partition, m_hostIdToConnection.get(leaderHostId));
             }
