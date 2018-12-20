@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.plannerv2;
+package org.voltdb.plannerv2.deprecated;
 
 @Deprecated
 public enum CalcitePlannerType {
