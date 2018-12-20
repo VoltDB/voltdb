@@ -36,9 +36,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import com.google_voltpatches.common.collect.Range;
-import com.google_voltpatches.common.collect.RangeMap;
-import com.google_voltpatches.common.collect.TreeRangeMap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -56,7 +53,10 @@ import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Iterables;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.MultimapBuilder;
+import com.google_voltpatches.common.collect.Range;
+import com.google_voltpatches.common.collect.RangeMap;
 import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.collect.TreeRangeMap;
 
 public class AbstractTopology {
 
@@ -1246,6 +1246,11 @@ public class AbstractTopology {
     public List<Integer> getPartitionIdList(int hostId) {
         Host h = hostsById.get(hostId);
         return (h != null) ? h.getPartitionIdList() : null;
+    }
+
+    public Collection<Integer> getHostIdList(int partitionId) {
+        Partition p = partitionsById.get(partitionId);
+        return (p != null) ? p.hostIds : null;
     }
 
     public int getSitesPerHost() {
