@@ -35,7 +35,6 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rules.PlannerPhase;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
-import org.voltdb.types.CalcitePlannerType;
 
 public class TestPhysicalConversionRules extends PlanRulesTestCase {
     @Override

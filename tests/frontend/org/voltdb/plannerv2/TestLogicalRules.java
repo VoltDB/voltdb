@@ -31,7 +31,6 @@ import org.voltdb.plannerv2.CalcitePlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rules.PlannerPhase;
-import org.voltdb.types.CalcitePlannerType;
 
 public class TestLogicalRules extends PlanRulesTestCase {
     @Override

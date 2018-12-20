@@ -34,5 +34,4 @@ public class VoltRelMetadataProvider extends ChainedRelMetadataProvider {
         super(ImmutableList.of(VoltRelMdParallelism.SOURCE,
                                DefaultRelMetadataProvider.INSTANCE));
     }
-
 }

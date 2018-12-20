@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.types;
+package org.voltdb.plannerv2;
 
 public enum CalcitePlannerType {
     HEP, VOLCANO

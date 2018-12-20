@@ -21,13 +21,10 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.sql2rel.RelDecorrelator;
-import org.apache.calcite.tools.RelBuilder;
+import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -48,16 +45,13 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.plannerv2.CalcitePlanner;
 import org.voltdb.plannerv2.SqlTask;
-import org.voltdb.plannerv2.VoltFrameworkConfig;
+import org.voltdb.plannerv2.VoltPlanner;
+import org.voltdb.plannerv2.VoltPlannerPrograms;
 import org.voltdb.plannerv2.VoltSchemaPlus;
-import org.voltdb.plannerv2.VoltSqlToRelConverter;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
-import org.voltdb.plannerv2.rules.PlannerPhase;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
-import org.voltdb.types.CalcitePlannerType;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
@@ -216,38 +210,30 @@ public class PlannerTool {
      * @param batch the query batch which this query belongs to.
      * @return a planned statement.
      * @throws ValidationException
+     * @throws RelConversionException
      */
-    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task) throws ValidationException {
+    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task) throws ValidationException, RelConversionException {
         // TRAIL [Calcite:4] PlannerTool.planSqlCalcite()
 
-        VoltFrameworkConfig frameworkConfig = new VoltFrameworkConfig(m_schemaPlus);
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(frameworkConfig);
-        final RelBuilder relBuilder = frameworkConfig.getSqlToRelConverterConfig()
-                .getRelBuilderFactory().create(converter.getCluster(), null /*RelOptSchema*/);
+        VoltPlanner planner = new VoltPlanner(m_schemaPlus);
+        planner.validate(task.getParsedQuery());
+        RelNode rel = planner.convert(task.getParsedQuery());
+        RelTraitSet requiredLogicalOutputTraits = rel.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
+        RelNode transformed = planner.transform(
+                VoltPlannerPrograms.directory.LOGICAL.ordinal(),
+                requiredLogicalOutputTraits, rel);
 
-        // Validate the query and convert SqlNode to RelNode.
-        RelRoot root = converter.convertQuery(task.getParsedQuery(), true /*needs validation*/, true /*top*/);
-        root = root.withRel(converter.flattenTypes(root.rel, true /*restructure*/));
-        root = root.withRel(RelDecorrelator.decorrelateQuery(root.rel, relBuilder));
-
-        // Apply Calcite and VoltDB logical rules
-        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
-        RelNode nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
-                root.rel, logicalTraits);
-
-        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
-        nodeAfterLogical.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
         // Add RelDistributions.SINGLETON trait to the rel tree.
-        nodeAfterLogical = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogical, RelDistributions.SINGLETON);
+        transformed = VoltDBRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-        RelTraitSet physicalTraits = nodeAfterLogical.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet physicalTraits = transformed.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
 
-        // apply physical conversion rules.
-        RelNode nodeAfterPhysicalConversion = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
-                PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogical, physicalTraits);
-
+//        // apply physical conversion rules.
+//        RelNode nodeAfterPhysicalConversion = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
+//                PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogical, physicalTraits);
+        planner.close();
         return null;
     }
 

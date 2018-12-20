@@ -25,9 +25,12 @@ package org.voltdb.plannerv2;
 
 import java.util.Objects;
 
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlNode;
-import org.voltdb.plannerv2.VoltSqlToRelConverter;
+import org.apache.calcite.sql2rel.SqlToRelConverter;
 
 /**
  * A base class for implementing tests against {@link VoltSqlToRelConverter}.
@@ -42,7 +45,17 @@ public class VoltConverterTestCase extends VoltSqlValidatorTestCase {
         Objects.requireNonNull(getSchemaPlus(), "m_schemaPlus is null");
         Objects.requireNonNull(getConfig(), "m_config is null");
         SqlNode node = parseAndValidate(sql);
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(getConfig());
+
+        RexBuilder rexBuilder = new RexBuilder(getConfig().getTypeFactory());
+        VolcanoPlanner planner = new VolcanoPlanner();
+        RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
+        SqlToRelConverter converter =  new SqlToRelConverter(
+                null /* view expander */,
+                getValidator(),
+                getConfig().getCatalogReader(),
+                cluster,
+                getConfig().getConvertletTable(),
+                getConfig().getSqlToRelConverterConfig());
         RelRoot root = converter.convertQuery(node, false, true);
         root = root.withRel(converter.decorrelate(node, root.rel));
         return root;

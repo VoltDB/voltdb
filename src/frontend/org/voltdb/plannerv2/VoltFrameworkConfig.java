@@ -27,6 +27,7 @@ import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelCollationTraitDef;
+import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexExecutor;
@@ -34,6 +35,8 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.parser.SqlParser.Config;
+import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
@@ -47,12 +50,13 @@ import com.google.common.collect.ImmutableList;
 
 public class VoltFrameworkConfig implements FrameworkConfig {
 
-    // TODO: currently we are using the default implementation of SqlOperatorTable, RelDataTypeFactory
-    // and SqlConformance, etc. May replace them with our own versions in the future.
-
     @SuppressWarnings("rawtypes")
     private static final ImmutableList<RelTraitDef> TRAIT_DEFS =
-            ImmutableList.of(ConventionTraitDef.INSTANCE, RelCollationTraitDef.INSTANCE);
+            ImmutableList.of(ConventionTraitDef.INSTANCE,
+                             RelCollationTraitDef.INSTANCE,
+                             RelDistributionTraitDef.INSTANCE);
+    private static final Config PARSER_CONFIG =
+            SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build();
 
     private final SchemaPlus m_schema;
     private final RelDataTypeFactory m_typeFactory;
@@ -77,7 +81,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
 
     @Override
     public SqlParser.Config getParserConfig() {
-        return VoltSqlParser.PARSER_CONFIG;
+        return PARSER_CONFIG;
     }
 
     @Override
@@ -98,7 +102,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
 
     @Override
     public ImmutableList<Program> getPrograms() {
-        return null;
+        return VoltPlannerPrograms.get();
     }
 
     @Override

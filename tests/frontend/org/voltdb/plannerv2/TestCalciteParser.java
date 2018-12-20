@@ -25,13 +25,9 @@ package org.voltdb.plannerv2;
 
 import static org.junit.Assert.assertEquals;
 
-import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
-import org.apache.calcite.sql2rel.RelDecorrelator;
-import org.apache.calcite.tools.RelBuilder;
 import org.junit.Test;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -56,15 +52,5 @@ public class TestCalciteParser {
         Cluster cluster = catalog.getClusters().add("cluster");
         Database database = cluster.getDatabases().add("database");
         Table table = database.getTables().add("testTable");
-
-        SchemaPlus plus = VoltSchemaPlus.from(database);
-        VoltFrameworkConfig frameworkConfig = new VoltFrameworkConfig(plus);
-        SqlNode sqlNode = VoltSqlParser.parse("SELECT * FROM testTable");
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(frameworkConfig);
-        final RelBuilder relBuilder = frameworkConfig.getSqlToRelConverterConfig()
-                .getRelBuilderFactory().create(converter.getCluster(), null /*RelOptSchema*/);
-        RelRoot root = converter.convertQuery(sqlNode, true, true);
-        root = root.withRel(converter.flattenTypes(root.rel, true /*restructure*/));
-        root = root.withRel(RelDecorrelator.decorrelateQuery(root.rel, relBuilder));
     }
 }

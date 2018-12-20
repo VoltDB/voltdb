@@ -34,7 +34,6 @@ import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.voltdb.plannerv2.metadata.VoltRelMetadataProvider;
 import org.voltdb.plannerv2.rules.PlannerPhase;
-import org.voltdb.types.CalcitePlannerType;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -129,6 +128,7 @@ import com.google.common.collect.ImmutableList;
  * @author Chao Zhou
  * @since 8.4
  */
+@Deprecated
 public class CalcitePlanner {
     /**
      * Transform RelNode to a new RelNode, targeting the provided set of traits.
@@ -141,7 +141,7 @@ public class CalcitePlanner {
      */
     static public RelNode transform(CalcitePlannerType plannerType, PlannerPhase phase, RelNode input,
                                     RelTraitSet targetTraits) {
-        final RelTraitSet toTraits = targetTraits.simplify();
+        targetTraits = targetTraits.simplify();
         final RelNode output;
         switch (plannerType) {
             case HEP: {
@@ -163,7 +163,7 @@ public class CalcitePlanner {
                 input = input.accept(new MetaDataProviderModifier(relMetadataProvider));
                 planner.setRoot(input);
                 if (!input.getTraitSet().equals(targetTraits)) {
-                    planner.changeTraits(input, toTraits);
+                    planner.changeTraits(input, targetTraits);
                 }
                 output = planner.findBestExp();
                 break;
@@ -175,7 +175,7 @@ public class CalcitePlanner {
                 Preconditions.checkArgument(planner instanceof VolcanoPlanner,
                         "Cluster is expected to be constructed using VolcanoPlanner. Was actually of type %s.", planner.getClass()
                                 .getName());
-                output = program.run(planner, input, toTraits,
+                output = program.run(planner, input, targetTraits,
                         ImmutableList.of(), ImmutableList.of());
                 break;
             }
