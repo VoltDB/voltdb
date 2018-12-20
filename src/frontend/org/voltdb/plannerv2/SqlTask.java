@@ -28,10 +28,22 @@ import org.apache.calcite.sql.parser.SqlParseException;
 public interface SqlTask {
 
     /**
-     * Tell if this is a DDL task.
-     * @return true if this is a DDL task.
+     * Tell if this {@code SqlTask} is a DDL task.
+     * @return true if this {@code SqlTask} is a DDL task.
      */
     boolean isDDL();
+
+    /**
+     * Tell if this {@code SqlTask} is a DQL task.
+     * @return true if this {@code SqlTask} is a DQL task.
+     */
+    boolean isDQL();
+
+    /**
+     * Tell if this {@code SqlTask} is a DML task.
+     * @return true if this {@code SqlTask} is a DML task.
+     */
+    boolean isDML();
 
     /**
      * Get the original SQL query text.

@@ -87,7 +87,6 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
         // The first parameter is always the query string.
         String sqlBlock = (String) paramArray[0];
         Object[] userParams = null;
-        // AdHoc query can have parameters, see TestAdHocQueries.testAdHocWithParams.
         if (params.size() > 1) {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }

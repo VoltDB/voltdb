@@ -69,17 +69,18 @@ public class NonDdlBatchCompiler {
 
         for (final SqlTask task : m_batch) {
             try {
-                AdHocPlannedStatement result = compileTask(task);
-                // The planning tool may have optimized for the single partition case
-                // and generated a partition parameter.
-                if (m_batch.inferPartitioning()) {
+                final AdHocPlannedStatement result = compileTask(task);
+                if (result == null) {   // if any SQL of the batch is unsupported, signal caller to use fall back behavior.
+                    return null;
+                } else if (m_batch.inferPartitioning()) {
+                    // The planning tool may have optimized for the single partition case
+                    // and generated a partition parameter.
                     partitionParamIndex = result.getPartitioningParameterIndex();
                     partitionParamType = result.getPartitioningParameterType();
                     partitionParamValue = result.getPartitioningParameterValue();
                 }
                 plannedStmts.add(result);
-            }
-            catch (AdHocPlanningException e) {
+            } catch (AdHocPlanningException e) {
                 errorMsgs.add(e.getMessage());
             }
         }
@@ -108,9 +109,10 @@ public class NonDdlBatchCompiler {
     }
 
     /**
-     * Compile one task from the current batch.
-     * @param task the task to compile.
-     * @return the planned statement.
+     * Compile a batch of one or more SQL statements into a set of plans.
+     * Parameters are valid iff there is exactly one DML/DQL statement.
+     * @param task SqlTask for one SQL statement
+     * @return planned statement, or null if the SqlTask is not fully planned/supported.
      * @throws AdHocPlanningException
      */
     private AdHocPlannedStatement compileTask(SqlTask task) throws AdHocPlanningException {

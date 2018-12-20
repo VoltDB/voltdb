@@ -54,6 +54,16 @@ public class SqlTaskImpl implements SqlTask {
         return m_parsedQuery.isA(SqlKind.DDL);
     }
 
+    @Override
+    public boolean isDQL() {
+        return m_parsedQuery.getKind() == SqlKind.SELECT;
+    }
+
+    @Override
+    public boolean isDML() {
+        return m_parsedQuery.isA(SqlKind.DML);
+    }
+
     /**
      * Get the original SQL query text.
      * @return the original SQL query text.

@@ -91,7 +91,6 @@ public class AdHoc extends AdHocNTBase {
 
         List<String> sqlStatements = new ArrayList<>();
         AdHocSQLMix mix = processAdHocSQLStmtTypes(sql, sqlStatements);
-
         if (mix == AdHocSQLMix.EMPTY) {
             // we saw neither DDL or DQL/DML.  Make sure that we get a
             // response back to the client
