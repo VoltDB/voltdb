@@ -21,29 +21,27 @@ import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.logical.LogicalCalc;
-import org.voltdb.plannerv2.rel.logical.VoltDBLCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.logical.VoltDBLTableScan;
 
-public class VoltDBLCalcRule extends RelOptRule {
 
-    public static final VoltDBLCalcRule INSTANCE = new VoltDBLCalcRule();
+public class VoltLTableScanRule extends RelOptRule {
 
-    VoltDBLCalcRule() {
-        super(operand(LogicalCalc.class, Convention.NONE, any()));
+    public static final VoltLTableScanRule INSTANCE = new VoltLTableScanRule();
+
+    private VoltLTableScanRule() {
+        super(operand(VoltDBLTableScan.class, Convention.NONE, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        LogicalCalc calc = call.rel(0);
-        RelNode input = calc.getInput();
-        RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
-        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL));
-        call.transformTo(new VoltDBLCalc(
-                calc.getCluster(),
+        VoltDBLTableScan tableScan = call.rel(0);
+        RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
+        // The only change is replace(VoltDBLRel.VOLTDB_LOGICAL)
+        call.transformTo(new VoltDBLTableScan(
+                tableScan.getCluster(),
                 convertedTraits,
-                convertedInput,
-                calc.getProgram()));
+                tableScan.getTable(),
+                tableScan.getVoltTable()));
     }
-}
+  }

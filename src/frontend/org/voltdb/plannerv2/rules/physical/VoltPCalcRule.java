@@ -33,11 +33,11 @@ import org.voltdb.plannerv2.utils.VoltDBRelUtil;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBPCalcRule extends RelOptRule {
+public class VoltPCalcRule extends RelOptRule {
 
-    public static final VoltDBPCalcRule INSTANCE = new VoltDBPCalcRule();
+    public static final VoltPCalcRule INSTANCE = new VoltPCalcRule();
 
-    VoltDBPCalcRule() {
+    VoltPCalcRule() {
         super(operand(VoltDBLCalc.class, VoltLogicalRel.VOLTDB_LOGICAL, any()));
     }
 

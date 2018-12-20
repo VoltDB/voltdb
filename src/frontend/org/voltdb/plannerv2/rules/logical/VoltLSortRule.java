@@ -24,22 +24,22 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.voltdb.plannerv2.rel.logical.VoltDBLLimit;
+import org.voltdb.plannerv2.rel.logical.VoltLLimit;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.logical.VoltDBLSort;
 
 /**
- * VoltDB logical rule that transform {@link LogicalSort} to {@link VoltDBLSort} or {@link VoltDBLLimit}.
+ * VoltDB logical rule that transform {@link LogicalSort} to {@link VoltDBLSort} or {@link VoltLLimit}.
  *
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLSortRule extends RelOptRule {
+public class VoltLSortRule extends RelOptRule {
 
-    public static final VoltDBLSortRule INSTANCE = new VoltDBLSortRule();
+    public static final VoltLSortRule INSTANCE = new VoltLSortRule();
 
     // declare want kind of operand we should match
-    VoltDBLSortRule() {
+    VoltLSortRule() {
         super(operand(LogicalSort.class, Convention.NONE, any()));
     }
 
@@ -70,7 +70,7 @@ public class VoltDBLSortRule extends RelOptRule {
         // 3.The Limit node can be inlined with Scan or Serial Aggregate nodes
         if (sort.offset != null || sort.fetch != null) {
             RelNode limitInput = (logicalRel != null) ? logicalRel : convertedInput;
-            logicalRel = new VoltDBLLimit(
+            logicalRel = new VoltLLimit(
                     sort.getCluster(),
                     convertedTraits,
                     limitInput,

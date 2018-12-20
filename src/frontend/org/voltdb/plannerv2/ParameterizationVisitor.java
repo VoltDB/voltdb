@@ -32,9 +32,9 @@ import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.voltcore.utils.Pair;
 
 /**
- * The visitor that can replace all the {@link SqlLiteral} in the query to {@link SqlDynamicParam}.
+ * The visitor that can replace all the {@link org.apache.calcite.sql.SqlLiteral}
+ * in the query to {@link org.apache.calcite.sql.SqlDynamicParam}.
  * It is used for parameterizing a query.
- *
  * @author Chao Zhou
  * @since 8.4
  */
@@ -51,8 +51,7 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
         return m_sqlLiteralList;
     }
 
-    @Override
-    public SqlNode visit(SqlLiteral literal) {
+    @Override public SqlNode visit(SqlLiteral literal) {
         /*
          * For SqlLiteral, we replace it with a SqlDynamicParam.
          * There are special cases where some classes have SqlLiteral to
@@ -80,13 +79,11 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
         return new SqlDynamicParam(m_dynamicParamIndex++, literal.getParserPosition());
     }
 
-    @Override
-    public SqlNode visit(SqlDynamicParam param) {
+    @Override public SqlNode visit(SqlDynamicParam param) {
         throw new RuntimeException("Shouldn't be parameterizing a query that already has parameters.");
     }
 
-    @Override
-    public SqlNode visit(SqlCall call) {
+    @Override public SqlNode visit(SqlCall call) {
         // The parameters should be indexed in the order they appeared in the query.
         // So we need to sort the operands by their parser positions here.
         // We pair the operands with their original indexes before sorting, so those
@@ -108,8 +105,7 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
         return null;
     }
 
-    @Override
-    public SqlNode visit(SqlNodeList nodeList) {
+    @Override public SqlNode visit(SqlNodeList nodeList) {
         // This function is very similar to SqlNode visit(SqlCall call), see comments there.
         // An example use case of the SqlNodeList is the IN clause: select * from t where a in (1, ?, 2);
         List<Pair<Integer, SqlNode>> indexedNodes = toIndexedPairList(nodeList.getList());

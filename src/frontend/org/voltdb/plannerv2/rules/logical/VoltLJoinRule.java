@@ -34,10 +34,10 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
  * @author Chao Zhou
  * @since 8.4
  */
-public class VoltDBLJoinRule extends RelOptRule {
-    public static final VoltDBLJoinRule INSTANCE = new VoltDBLJoinRule();
+public class VoltLJoinRule extends RelOptRule {
+    public static final VoltLJoinRule INSTANCE = new VoltLJoinRule();
 
-    VoltDBLJoinRule() {
+    VoltLJoinRule() {
         super(operand(LogicalJoin.class, Convention.NONE, any()));
     }
 

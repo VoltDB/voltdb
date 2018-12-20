@@ -38,15 +38,15 @@ import org.voltdb.plannerv2.utils.VoltDBRelUtil;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBPSortConvertRule extends ConverterRule {
+public class VoltPSortConvertRule extends ConverterRule {
 
     // TODO: when this rule will be applied?
-    public static final VoltDBPSortConvertRule INSTANCE_NONE =
-            new VoltDBPSortConvertRule(Convention.NONE);
-    public static final VoltDBPSortConvertRule INSTANCE_VOLTDB =
-            new VoltDBPSortConvertRule(VoltLogicalRel.VOLTDB_LOGICAL);
+    public static final VoltPSortConvertRule INSTANCE_NONE =
+            new VoltPSortConvertRule(Convention.NONE);
+    public static final VoltPSortConvertRule INSTANCE_VOLTDB =
+            new VoltPSortConvertRule(VoltLogicalRel.VOLTDB_LOGICAL);
 
-    VoltDBPSortConvertRule(RelTrait inTrait) {
+    VoltPSortConvertRule(RelTrait inTrait) {
         super(
                 Sort.class,
                 inTrait,

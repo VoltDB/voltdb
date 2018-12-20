@@ -48,6 +48,12 @@ import org.apache.calcite.tools.Program;
 
 import com.google.common.collect.ImmutableList;
 
+/**
+ * Implementation of {@link org.apache.calcite.tools.FrameworkConfig}
+ * describing how to configure VoltDB planning sessions with Calcite.
+ * @author Yiqun Zhang
+ * @since 8.4
+ */
 public class VoltFrameworkConfig implements FrameworkConfig {
 
     @SuppressWarnings("rawtypes")
@@ -55,92 +61,95 @@ public class VoltFrameworkConfig implements FrameworkConfig {
             ImmutableList.of(ConventionTraitDef.INSTANCE,
                              RelCollationTraitDef.INSTANCE,
                              RelDistributionTraitDef.INSTANCE);
-    private static final Config PARSER_CONFIG =
+
+    static final Config PARSER_CONFIG =
             SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build();
 
     private final SchemaPlus m_schema;
     private final RelDataTypeFactory m_typeFactory;
     private final Prepare.CatalogReader m_catalogReader;
 
-    @Override
-    public RelDataTypeSystem getTypeSystem() {
+    @Override public RelDataTypeSystem getTypeSystem() {
         return RelDataTypeSystem.DEFAULT;
     }
 
+    /**
+     * Build a {@link org.voltdb.plannerv2.VoltFrameworkConfig}
+     * @param schema the converted {@code SchemaPlus} from VoltDB catalog.
+     */
     public VoltFrameworkConfig(SchemaPlus schema) {
         m_schema = Objects.requireNonNull(schema);
         m_typeFactory = new SqlTypeFactoryImpl(getTypeSystem());
         CalciteSchema calciteSchema = CalciteSchema.from(m_schema);
         m_catalogReader = new CalciteCatalogReader(
                 calciteSchema,
-                calciteSchema.path(null), /*default schema*/
+                calciteSchema.path(null) /*default schema*/,
                 m_typeFactory,
                 null /*connection configuration*/
         );
     }
 
-    @Override
-    public SqlParser.Config getParserConfig() {
+    @Override public SqlParser.Config getParserConfig() {
         return PARSER_CONFIG;
     }
 
-    @Override
-    public SqlToRelConverter.Config getSqlToRelConverterConfig() {
+    @Override public SqlToRelConverter.Config getSqlToRelConverterConfig() {
         return SqlToRelConverter.Config.DEFAULT;
     }
 
-    @Override
-    public SchemaPlus getDefaultSchema() {
+    @Override public SchemaPlus getDefaultSchema() {
         return m_schema;
     }
 
-    @Override
-    public RexExecutor getExecutor() {
+    @Override public RexExecutor getExecutor() {
         // Reduces expressions, and writes their results into {@code reducedValues}.
         return null;
     }
 
-    @Override
-    public ImmutableList<Program> getPrograms() {
+    @Override public ImmutableList<Program> getPrograms() {
         return VoltPlannerPrograms.get();
     }
 
-    @Override
-    public SqlOperatorTable getOperatorTable() {
+    @Override public SqlOperatorTable getOperatorTable() {
         return SqlStdOperatorTable.instance();
     }
 
-    @Override
-    public RelOptCostFactory getCostFactory() {
+    @Override public RelOptCostFactory getCostFactory() {
         // Volcano planner then will enable its own default cost factory (VolcanoCost.FACTORY).
         return null;
     }
 
     @SuppressWarnings("rawtypes")
-    @Override
-    public ImmutableList<RelTraitDef> getTraitDefs() {
+    @Override public ImmutableList<RelTraitDef> getTraitDefs() {
         // This seems to be for the converter rules, double check!
         return TRAIT_DEFS;
     }
 
-    @Override
-    public SqlRexConvertletTable getConvertletTable() {
+    @Override public SqlRexConvertletTable getConvertletTable() {
         return StandardConvertletTable.INSTANCE;
     }
 
-    @Override
-    public Context getContext() {
+    @Override public Context getContext() {
         return null;
     }
 
+    /**
+     * @return the {@code RelDataTypeFactory} that is used by VoltlDB planner.
+     */
     public RelDataTypeFactory getTypeFactory() {
         return m_typeFactory;
     }
 
+    /**
+     * @return the {@code SqlConformance} that is used by VoltlDB planner.
+     */
     public SqlConformance getSqlConformance() {
         return SqlConformanceEnum.DEFAULT;
     }
 
+    /**
+     * @return the {@code CatalogReader} that is used by VoltlDB planner.
+     */
     public Prepare.CatalogReader getCatalogReader() {
         return m_catalogReader;
     }

@@ -17,6 +17,7 @@
 
 package org.voltdb.plannerv2;
 
+@Deprecated
 public enum CalcitePlannerType {
     HEP, VOLCANO
 }

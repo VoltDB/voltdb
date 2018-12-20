@@ -25,12 +25,12 @@ import org.voltdb.plannerv2.rel.VoltTable;
 /**
  * This is the common adapter that VoltDB should query any catalog object from.
  * It is built around the <code>org.voltdb.catalog.Database</code> instance in sync
- * with any DDL operations. Taken/adapted from Mike A.
+ * with any DDL operations. Taken/adapted from Mike Alexeev.
  *
- * NOTE that VoltDB creates a new Catalog/Database instance on every DDL stmt. (See the
- * <code>org.voltdb.compiler.VoltCompiler.loadSchema</code> method. In future, we
- * might save some troubles by avoiding creating all catalog objects (tables, views, indexes,
- * etc.) from scratch upon a new DDL batch/stmt.
+ * NOTE that VoltDB creates a new Catalog/Database instance on every DDL statement.
+ * (See <code>org.voltdb.compiler.VoltCompiler.loadSchema()</code>.
+ * In future, we might save some troubles by avoiding creating all catalog objects
+ * (tables, views, indexes, etc.) from scratch upon a new DDL batch/statement.
  *
  * @author Lukai Liu
  * @since 8.4
@@ -39,9 +39,7 @@ public class VoltSchemaPlus {
 
     /**
      * Creates a brand new SchemaPlus instance upon new VoltDB Database catalog.
-     * CalciteSchema is capable of caching (CachingCalciteSchema), but we disabled it for now to
-     * use SimpleCalciteSchema since the {@link org.apache.calcite.schema.SchemaPlus} instance is
-     * forced to be refreshed upon every new DDL batch/stmt.
+     * @param db the VoltDB database catalog object.
      */
     public static SchemaPlus from(Database db) {
         final SchemaPlus schema = CalciteSchema.createRootSchema(false /*no adding the metadata schema*/,

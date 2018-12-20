@@ -21,27 +21,38 @@ import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.voltdb.plannerv2.rel.logical.VoltDBLAggregate;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.logical.VoltDBLTableScan;
 
+/**
+ * VoltDB logical rule that transform {@link LogicalAggregate} to {@link VoltDBLAggregate}.
+ *
+ * @author Michael Alexeev
+ * @since 8.4
+ */
+public class VoltLAggregateRule extends RelOptRule {
 
-public class VoltDBLTableScanRule extends RelOptRule {
+    public static final VoltLAggregateRule INSTANCE = new VoltLAggregateRule();
 
-    public static final VoltDBLTableScanRule INSTANCE = new VoltDBLTableScanRule();
-
-    private VoltDBLTableScanRule() {
-        super(operand(VoltDBLTableScan.class, Convention.NONE, any()));
+    VoltLAggregateRule() {
+        super(operand(LogicalAggregate.class, Convention.NONE, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLTableScan tableScan = call.rel(0);
-        RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
-        // The only change is replace(VoltDBLRel.VOLTDB_LOGICAL)
-        call.transformTo(new VoltDBLTableScan(
-                tableScan.getCluster(),
+        LogicalAggregate aggr = call.rel(0);
+        RelNode input = aggr.getInput();
+        RelTraitSet convertedTraits = aggr.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
+        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL));
+        call.transformTo(VoltDBLAggregate.create(
+                aggr.getCluster(),
                 convertedTraits,
-                tableScan.getTable(),
-                tableScan.getVoltTable()));
+                convertedInput,
+                aggr.indicator,
+                aggr.getGroupSet(),
+                aggr.getGroupSets(),
+                aggr.getAggCallList()));
     }
-  }
+}

@@ -58,7 +58,7 @@ public interface SqlTask {
     SqlNode getParsedQuery();
 
     /**
-     * Create a default {@link SqlTask} from a SQL query.
+     * Create a default {@link org.voltdb.plannerv2.SqlTask} from a SQL query.
      * @param sql the SQL query
      * @return the created SqlTask.
      * @throws SqlParseException when the parsing goes wrong.

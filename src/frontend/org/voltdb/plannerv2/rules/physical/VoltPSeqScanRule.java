@@ -38,11 +38,11 @@ import org.voltdb.plannerv2.rel.physical.VoltDBPUnionExchange;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBPSeqScanRule extends RelOptRule {
+public class VoltPSeqScanRule extends RelOptRule {
 
-    public static final VoltDBPSeqScanRule INSTANCE = new VoltDBPSeqScanRule();
+    public static final VoltPSeqScanRule INSTANCE = new VoltPSeqScanRule();
 
-    private VoltDBPSeqScanRule() {
+    private VoltPSeqScanRule() {
         super(operand(VoltDBLTableScan.class, VoltLogicalRel.VOLTDB_LOGICAL, any()));
     }
 

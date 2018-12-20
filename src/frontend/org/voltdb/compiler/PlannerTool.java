@@ -25,6 +25,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
+import org.apache.calcite.util.Util;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
@@ -45,6 +46,7 @@ import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.VoltPlanner;
 import org.voltdb.plannerv2.VoltPlannerPrograms;
 import org.voltdb.plannerv2.VoltSchemaPlus;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
@@ -203,15 +205,14 @@ public class PlannerTool {
     /**
      * Plan a query with the Calcite planner.
      * @param task the query to plan.
-     * @param batch the query batch which this query belongs to.
-     * @return a planned statement. Until DQL is fully supported, it returns null, and the caller
-     * will use fall-back behavior.
+     * @return a planned statement.
      * @throws ValidationException
      * @throws RelConversionException
+     * @throws PlannerFallbackException
      */
-    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task) throws ValidationException, RelConversionException {
+    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
+            throws ValidationException, RelConversionException, PlannerFallbackException {
         // TRAIL [Calcite:4] PlannerTool.planSqlCalcite()
-
         VoltPlanner planner = new VoltPlanner(m_schemaPlus);
         planner.validate(task.getParsedQuery());
         RelNode rel = planner.convert(task.getParsedQuery());
@@ -225,15 +226,18 @@ public class PlannerTool {
         transformed = VoltDBRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-        RelTraitSet physicalTraits = transformed.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
 
-//        // apply physical conversion rules.
-//        RelNode nodeAfterPhysicalConversion = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
-//                PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogical, physicalTraits);
+        // Apply physical conversion rules.
+        RelNode nodeAfterPhysicalConversion = planner.transform(
+                VoltPlannerPrograms.directory.VOLT_PHYSICAL_CONVERSION.ordinal(),
+                requiredPhysicalOutputTraits, transformed);
+
+        Util.discard(nodeAfterPhysicalConversion);
+
         planner.close();
-
         // TODO: finish Calcite planning and convert into AdHocPlannedStatement.
-        return null;
+        throw new PlannerFallbackException();
     }
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,

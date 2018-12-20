@@ -60,10 +60,15 @@ public class VoltPlanner implements Planner {
     final SqlToRelConverter m_sqlToRelConverter;
     final RelBuilder m_relBuilder;
 
+    // Internal states.
     State m_state;
     SqlNode m_validatedSqlNode;
     RelRoot m_relRoot;
 
+    /**
+     * Build a {@link org.voltdb.plannerv2.VoltPlanner}
+     * @param schema the converted {@code SchemaPlus} from VoltDB catalog.
+     */
     public VoltPlanner(SchemaPlus schema) {
         m_config = new VoltFrameworkConfig(schema);
         m_validator = new VoltSqlValidator(m_config);
@@ -77,7 +82,7 @@ public class VoltPlanner implements Planner {
         cluster.setMetadataProvider(new CachingRelMetadataProvider(
                 VoltRelMetadataProvider.INSTANCE, m_relPlanner));
         m_sqlToRelConverter = new SqlToRelConverter(
-                null /* view expander */,
+                null /*view expander*/,
                 m_validator,
                 m_config.getCatalogReader(),
                 cluster,
@@ -90,20 +95,20 @@ public class VoltPlanner implements Planner {
         reset();
     }
 
-    @Override
-    public void reset() {
+    @Override public void reset() {
         m_validatedSqlNode = null;
         m_relRoot = null;
         m_state = State.STATE_1_READY;
     }
 
-    @Override
-    public SqlNode parse(String sql) throws SqlParseException {
+    @Override public SqlNode parse(String sql) throws SqlParseException {
+        // parse() does not participate the VoltPlanner state machine because in VoltDB
+        // parsing is more isolated from the other steps like validation, conversion, and
+        // transformation etc.
         return SqlParser.create(sql, m_config.getParserConfig()).parseQuery(sql);
     }
 
-    @Override
-    public SqlNode validate(SqlNode sqlNode) throws ValidationException {
+    @Override public SqlNode validate(SqlNode sqlNode) throws ValidationException {
         ensure(State.STATE_1_READY);
         try {
             m_validatedSqlNode = m_validator.validate(sqlNode);
@@ -114,15 +119,14 @@ public class VoltPlanner implements Planner {
         return m_validatedSqlNode;
     }
 
-    @Override
-    public Pair<SqlNode, RelDataType> validateAndGetType(SqlNode sqlNode) throws ValidationException {
+    @Override public Pair<SqlNode, RelDataType> validateAndGetType(SqlNode sqlNode)
+            throws ValidationException {
         final SqlNode validatedNode = this.validate(sqlNode);
         final RelDataType type = m_validator.getValidatedNodeType(validatedNode);
         return Pair.of(validatedNode, type);
     }
 
-    @Override
-    public RelRoot rel(SqlNode sql) throws RelConversionException {
+    @Override public RelRoot rel(SqlNode sql) throws RelConversionException {
         if (m_state == State.STATE_1_READY) {
             try {
                 validate(sql);
@@ -142,18 +146,15 @@ public class VoltPlanner implements Planner {
         return m_relRoot;
     }
 
-    @Override
-    public RelNode convert(SqlNode sql) throws RelConversionException {
+    @Override public RelNode convert(SqlNode sql) throws RelConversionException {
         return rel(sql).rel;
     }
 
-    @Override
-    public RelDataTypeFactory getTypeFactory() {
+    @Override public RelDataTypeFactory getTypeFactory() {
         return m_config.getTypeFactory();
     }
 
-    @Override
-    public RelNode transform(int ruleSetIndex, RelTraitSet requiredOutputTraits, RelNode rel)
+    @Override public RelNode transform(int ruleSetIndex, RelTraitSet requiredOutputTraits, RelNode rel)
             throws RelConversionException {
         ensure(State.STATE_3_CONVERTED);
         Program program = m_config.getPrograms().get(ruleSetIndex);
@@ -163,13 +164,11 @@ public class VoltPlanner implements Planner {
                 ImmutableList.of() /*lattices*/);
     }
 
-    @Override
-    public void close() {
+    @Override public void close() {
         reset();
     }
 
-    @Override
-    public RelTraitSet getEmptyTraitSet() {
+    @Override public RelTraitSet getEmptyTraitSet() {
         return m_relPlanner.emptyTraitSet();
     }
 
@@ -203,6 +202,7 @@ public class VoltPlanner implements Planner {
             throw new IllegalArgumentException("Cannot move from " + planner.m_state + " to " + this);
         }
 
+        /** Whether allow all other states to transit to this state. */
         boolean allowTransitFromAny() {
             return false;
         }

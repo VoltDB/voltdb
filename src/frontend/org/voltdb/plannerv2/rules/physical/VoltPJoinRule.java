@@ -34,11 +34,11 @@ import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
  * @author Chao Zhou
  * @since 8.4
  */
-public class VoltDBPJoinRule extends RelOptRule {
+public class VoltPJoinRule extends RelOptRule {
 
-    public static final VoltDBPJoinRule INSTANCE = new VoltDBPJoinRule();
+    public static final VoltPJoinRule INSTANCE = new VoltPJoinRule();
 
-    VoltDBPJoinRule() {
+    VoltPJoinRule() {
         super(operand(VoltDBLJoin.class, VoltLogicalRel.VOLTDB_LOGICAL, any()));
     }
 

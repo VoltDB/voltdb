@@ -24,7 +24,8 @@ import org.apache.calcite.rel.metadata.RelMetadataProvider;
 import com.google.common.collect.ImmutableList;
 
 /**
- * Volt's provider for providing metadata about relational expressions.
+ * VoltDB's provider for providing metadata about relational expressions.
+ * @since 8.4
  */
 public class VoltRelMetadataProvider extends ChainedRelMetadataProvider {
 

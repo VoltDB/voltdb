@@ -29,17 +29,17 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
-import org.voltdb.plannerv2.rules.logical.VoltDBLAggregateRule;
-import org.voltdb.plannerv2.rules.logical.VoltDBLCalcRule;
-import org.voltdb.plannerv2.rules.logical.VoltDBLJoinRule;
-import org.voltdb.plannerv2.rules.logical.VoltDBLSortRule;
-import org.voltdb.plannerv2.rules.logical.VoltDBLTableScanRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPAggregateRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPCalcRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPLimitRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPSeqScanRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPSortConvertRule;
+import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
+import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
+import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
+import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
+import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
+import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -99,20 +99,20 @@ public enum PlannerPhase {
                 ).build());
         s_VoltLogicalRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(
-                        VoltDBLSortRule.INSTANCE,
-                        VoltDBLTableScanRule.INSTANCE,
-                        VoltDBLCalcRule.INSTANCE,
-                        VoltDBLAggregateRule.INSTANCE,
-                        VoltDBLJoinRule.INSTANCE
+                        VoltLSortRule.INSTANCE,
+                        VoltLTableScanRule.INSTANCE,
+                        VoltLCalcRule.INSTANCE,
+                        VoltLAggregateRule.INSTANCE,
+                        VoltLJoinRule.INSTANCE
                 ).build());
         s_VoltPhysicalConversionRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
                 .add(
-                        VoltDBPCalcRule.INSTANCE,
-                        VoltDBPSeqScanRule.INSTANCE,
-                        VoltDBPSortConvertRule.INSTANCE_VOLTDB,
-                        VoltDBPLimitRule.INSTANCE,
-                        VoltDBPAggregateRule.INSTANCE,
-                        VoltDBPJoinRule.INSTANCE
+                        VoltPCalcRule.INSTANCE,
+                        VoltPSeqScanRule.INSTANCE,
+                        VoltPSortConvertRule.INSTANCE_VOLTDB,
+                        VoltPLimitRule.INSTANCE,
+                        VoltPAggregateRule.INSTANCE,
+                        VoltPJoinRule.INSTANCE
                 ).build());
     }
 

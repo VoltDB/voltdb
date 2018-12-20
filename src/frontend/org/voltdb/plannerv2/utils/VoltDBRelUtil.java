@@ -17,12 +17,10 @@
 
 package org.voltdb.plannerv2.utils;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
-import org.apache.calcite.rel.SingleRel;
 import org.apache.calcite.rel.core.TableFunctionScan;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalAggregate;
@@ -38,6 +36,8 @@ import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
+
+import com.google.common.base.Preconditions;
 
 public class VoltDBRelUtil {
 
@@ -131,6 +131,7 @@ public class VoltDBRelUtil {
             return internal_visit(union);
         }
 
+        @Override
         public RelNode visit(LogicalIntersect intersect) {
             return internal_visit(intersect);
         }

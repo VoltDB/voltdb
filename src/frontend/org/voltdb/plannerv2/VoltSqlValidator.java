@@ -26,7 +26,8 @@ import org.apache.calcite.sql.validate.SqlValidatorImpl;
  */
 public class VoltSqlValidator extends SqlValidatorImpl {
     /**
-     * Build a VoltDB SQL validator from {@link VoltFrameworkConfig}.
+     * Build a VoltDB SQL validator from
+     * {@link org.voltdb.plannerv2.VoltFrameworkConfig}.
      * @param config the bundled framework configuration.
      */
     public VoltSqlValidator(VoltFrameworkConfig config) {

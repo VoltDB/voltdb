@@ -18,7 +18,7 @@
 package org.voltdb.plannerv2.guards;
 
 /**
- * Check if the SQL statement should be passed to Calcite.
+ * Check if a SQL statement should be routed to Calcite planner.
  * This is a temporary check before we can make Calcite support all the VoltDB syntaxes.
  * @author Yiqun Zhang
  * @since 8.4
@@ -31,8 +31,8 @@ public abstract class CalciteCompatibilityCheck {
     CalciteCompatibilityCheck m_next;
 
     /**
-     * All the {@code CalciteCheck} subclasses should implement this method to do
-     * their own checks and return a result.
+     * All the {@code CalciteCompatibilityCheck} subclasses should implement this method
+     * to do their own checks and return a result.
      * @param sql the SQL statement to check.
      * @return the check result.
      */
@@ -47,9 +47,9 @@ public abstract class CalciteCompatibilityCheck {
     protected abstract boolean isNegativeCheck();
 
     /**
-     * Start the chained check to see if the SQL statement should be passed to Calcite.
+     * Start the chained check to see if the SQL statement should be routed to Calcite.
      * @param sql the SQL statement to check.
-     * @return true if this statement should be directed to Calcite.
+     * @return true if this statement should be routed to Calcite.
      */
     public final boolean check(String sql) {
         boolean pass = doCheck(sql);
@@ -77,9 +77,10 @@ public abstract class CalciteCompatibilityCheck {
      * @return The head of the chain.
      */
     public static CalciteCompatibilityCheck create() {
-        CalciteCompatibilityCheck checks = new AcceptDDLsAsWeCan();
         // As we add more features to Calcite, this list should be expanded, and eventually removed.
-        checks.addNext(new NoLargeQuery());
+        CalciteCompatibilityCheck checks = new AcceptDDLsAsWeCan();
+        checks.addNext(new AcceptAllSelect())
+              .addNext(new NoLargeQuery());
         return checks;
     }
 }

@@ -20,8 +20,6 @@ package org.voltdb.plannerv2;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
-import org.apache.calcite.sql.parser.SqlParser.Config;
-import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
 
 /**
  * This class provides a wrapper function around Calcite SqlParser to parse a query.
@@ -30,9 +28,6 @@ import org.apache.calcite.sql.parser.ddl.SqlDdlParserImpl;
  */
 public class VoltSqlParser {
 
-    static final Config PARSER_CONFIG =
-            SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build();
-
     /**
      * Given a SQL statement (could be either a DDL or DQL/DML),
      * parse it into a {@link SqlNode}.
@@ -40,6 +35,6 @@ public class VoltSqlParser {
      * @return the parsed SqlNode tree for it.
      */
     public static SqlNode parse(String sql) throws SqlParseException {
-        return SqlParser.create(sql, PARSER_CONFIG).parseQuery(sql);
+        return SqlParser.create(sql, VoltFrameworkConfig.PARSER_CONFIG).parseQuery(sql);
     }
 }

@@ -33,8 +33,10 @@ import org.voltdb.sysprocs.AdHocNTBase;
 import com.google.common.collect.ImmutableList;
 
 /**
- * A basic SQL query batch containing one or more {@link SqlTask}s.
- * It does not carry information specific to DDL or non-DDL planning.
+ * A basic query batch with one or more {@link org.voltdb.plannerv2.SqlTask}s.
+ * The basic information is sufficient for DDL batches, but planning DQL/DML needs
+ * more add-ons. We will have decorators {@link org.voltdb.plannerv2.NonDdlBatch}
+ * to bulk up the information contained in the batch.
  * @since 8.4
  * @author Yiqun Zhang
  */
@@ -52,6 +54,7 @@ public class SqlBatchImpl extends SqlBatch {
 
     /**
      * A chain of checks to determine whether a SQL statement should be routed to Calcite.
+     * Eventually we will let Calcite support all the VoltDB SQLs and remove this check from the code.
      */
     static final CalciteCompatibilityCheck CALCITE_CHECKS = CalciteCompatibilityCheck.create();
 
@@ -62,20 +65,20 @@ public class SqlBatchImpl extends SqlBatch {
      * because we currently do not support it.
      * @param sqlBlock a string of one or more SQL statements.
      * @param userParams user parameter values for the query.
+     * @param context the AdHoc context. used for calling internal AdHoc APIs before the refactor is done.
      * @throws SqlParseException when the query parsing went wrong.
      * @throws PlannerFallbackException when any of the queries in the batch cannot be handled by Calcite.
-     * @throws UnsupportedOperationException when the batch is a mixture of
-     * DDL and non-DDL statements or has parameters and more than one query at the same time.
+     * @throws UnsupportedOperationException when the batch is a mixture of DDL and non-DDL
+     *         statements or has parameters and more than one query at the same time.
      */
     SqlBatchImpl(String sqlBlock, Object[] userParams, Context context)
             throws SqlParseException, PlannerFallbackException {
-        // We can process batches of either all DDL or all DML/DQL, no mixed batch can be accepted.
+        // TODO: Calcite's error message (in SqlParseException) will contain line and column numbers.
+        // This information is lost during the split. It will be helpful to develop a way to preserve it.
+
         // Split the SQL statements, and process them one by one.
         // Currently (1.17.0), SqlParser only supports parsing single SQL statement.
         // https://issues.apache.org/jira/browse/CALCITE-2310
-
-        // TODO: Calcite's error message (in SqlParseException) will contain line and column numbers.
-        // This information is lost during the split. It will be helpful to develop a way to preserve it.
         List<String> sqlList = SQLLexer.splitStatements(sqlBlock).getCompletelyParsedStmts();
         if (sqlList.size() == 0) {
             throw new RuntimeException("Failed to plan, no SQL statement provided.");
@@ -113,46 +116,51 @@ public class SqlBatchImpl extends SqlBatch {
         m_context = context;
     }
 
-    @Override
-    public CompletableFuture<ClientResponse> execute() {
-        // This function is called for DDL batches. Non-DDL batches will be handled in NonDDLBatch.execute().
+    @Override public CompletableFuture<ClientResponse> execute() {
+        // TRAIL [Calcite-AdHoc-DDL:1] SqlBatchImpl.execute()
+        // DDL batches will be executed here because they don't require additional context information.
+        // DQL/DML batches need to be decorated by NonDDLBatch so they can have enough information for planning.
+        // It is NonDDLBatch.execute() that will get called for those batches.
+
+        // The code here is still not in its final form. It is more like a compromised, temporary solution
+        // and relies heavily on the legacy code path.
         final List<String> sqls = new ArrayList<>(getTaskCount()), validated = new ArrayList<>();
         final List<SqlNode> nodes = new ArrayList<>(getTaskCount());
         for (SqlTask task : this) {
             final String sql = task.getSQL();
             sqls.add(sql);
             nodes.add(task.getParsedQuery());
-            AdHocNTBase.processAdHocSQLStmtTypes(sql, validated);
             // NOTE: need to exercise the processAdHocSQLStmtTypes() method, because some tests
             // (i.e. ENG-7653, TestAdhocCompilerException.java) rely on the code path.
-            // But, we might not need to call it? Certainly it involves some refactory for the check and simulation.
+            // But, we might not need to call it? Certainly it involves some refactory for
+            // the check and simulation.
+            AdHocNTBase.processAdHocSQLStmtTypes(sql, validated);
             validated.clear();
         }
         return getContext().runDDLBatch(sqls, nodes);
     }
 
-    @Override
-    public boolean isDDLBatch() {
+    @Override public boolean isDDLBatch() {
         return m_isDDLBatch;
     }
 
-    @Override
-    public Iterator<SqlTask> iterator() {
+    @Override public Iterator<SqlTask> iterator() {
         return m_tasks.iterator();
     }
 
-    @Override
-    public Object[] getUserParameters() {
-        return m_userParams.toArray();
+    @Override public Object[] getUserParameters() {
+        if (m_userParams == null) {
+            return null;
+        } else {
+            return m_userParams.toArray();
+        }
     }
 
-    @Override
-    public int getTaskCount() {
+    @Override public int getTaskCount() {
         return m_tasks.size();
     }
 
-    @Override
-    Context getContext() {
+    @Override Context getContext() {
         return m_context;
     }
 }

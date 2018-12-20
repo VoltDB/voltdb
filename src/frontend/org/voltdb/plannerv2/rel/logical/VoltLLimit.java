@@ -33,12 +33,12 @@ import java.util.List;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLLimit extends SingleRel implements VoltLogicalRel {
+public class VoltLLimit extends SingleRel implements VoltLogicalRel {
 
     private RexNode m_offset;
     private RexNode m_limit;
 
-    public VoltDBLLimit(
+    public VoltLLimit(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
@@ -50,13 +50,13 @@ public class VoltDBLLimit extends SingleRel implements VoltLogicalRel {
             m_limit = limit;
         }
 
-    public VoltDBLLimit copy(RelTraitSet traitSet, RelNode input,
+    public VoltLLimit copy(RelTraitSet traitSet, RelNode input,
                              RexNode offset, RexNode limit) {
-        return new VoltDBLLimit(getCluster(), traitSet, input, offset, limit);
+        return new VoltLLimit(getCluster(), traitSet, input, offset, limit);
     }
 
     @Override
-    public VoltDBLLimit copy(RelTraitSet traitSet,
+    public VoltLLimit copy(RelTraitSet traitSet,
                              List<RelNode> inputs) {
         return copy(traitSet, sole(inputs), m_offset, m_limit);
     }

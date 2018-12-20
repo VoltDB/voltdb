@@ -21,17 +21,19 @@ import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.client.ClientResponse;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 
 /**
- * Extend this class to create a decorator for a {@link SqlBatch}.
+ * Extend this class to create a decorator for a
+ * {@link org.voltdb.plannerv2.SqlBatch}.
  * @since 8.4
  * @author Yiqun Zhang
  */
 public abstract class AbstractSqlBatchDecorator extends SqlBatch {
 
     /**
-     * The {@link SqlBatch} to be decorated.
+     * The {@link org.voltdb.plannerv2.SqlBatch} to be decorated.
      */
     final SqlBatch m_batchToDecorate;
 
@@ -39,33 +41,28 @@ public abstract class AbstractSqlBatchDecorator extends SqlBatch {
         m_batchToDecorate = batchToDecorate;
     }
 
-    @Override
-    public CompletableFuture<ClientResponse> execute() throws AdHocPlanningException {
+    @Override public CompletableFuture<ClientResponse> execute()
+            throws AdHocPlanningException, PlannerFallbackException {
         return m_batchToDecorate.execute();
     }
 
-    @Override
-    public boolean isDDLBatch() {
+    @Override public boolean isDDLBatch() {
         return m_batchToDecorate.isDDLBatch();
     }
 
-    @Override
-    public Object[] getUserParameters() {
+    @Override public Object[] getUserParameters() {
         return m_batchToDecorate.getUserParameters();
     }
 
-    @Override
-    public int getTaskCount() {
+    @Override public int getTaskCount() {
         return m_batchToDecorate.getTaskCount();
     }
 
-    @Override
-    public Iterator<SqlTask> iterator() {
+    @Override public Iterator<SqlTask> iterator() {
         return m_batchToDecorate.iterator();
     }
 
-    @Override
-    Context getContext() {
+    @Override Context getContext() {
         return m_batchToDecorate.getContext();
     }
 }

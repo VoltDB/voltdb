@@ -25,12 +25,13 @@ import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 
 /**
- * A batch of non-DDL SQL queries.
- * This class is a decorator for a {@link SqlBatch}, adding
- * some contextual information for planning.
+ * A batch of DQL/DML queries.
+ * This class is a decorator for a {@link org.voltdb.plannerv2.SqlBatch},
+ * adding some contextual information for planning.
  * @since 8.4
  * @author Yiqun Zhang
  */
@@ -54,10 +55,10 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
     private StatementPartitioning m_partitioning;
 
     /**
-     * Build a non-DDL SQL batch from a basic SQL batch, adding default
+     * Build a DQL/DML batch from a basic SQL batch, adding default
      * contextual information.
-     * @param batchToDecorate the {@link SqlBatch} that this is built from.
-     * @throws IllegalArgumentException if the given batch is not a non-DDL batch.
+     * @param batchToDecorate the {@link org.voltdb.plannerv2.SqlBatch} that this is built from.
+     * @throws IllegalArgumentException if the given batch is a DDL batch.
      */
     NonDdlBatch(SqlBatch batchToDecorate) {
         super(batchToDecorate);
@@ -68,9 +69,9 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
         setInferPartitioning(true);
     }
 
-    @Override
-    public CompletableFuture<ClientResponse> execute() throws AdHocPlanningException {
-        // TRAIL [Calcite:1] NonDdlBatch.execute()
+    @Override public CompletableFuture<ClientResponse> execute()
+            throws AdHocPlanningException, PlannerFallbackException {
+        // TRAIL [Calcite-AdHoc-DQL/DML:1] NonDDLBatch.execute()
         NonDdlBatchCompiler compiler = new NonDdlBatchCompiler(this);
         AdHocPlannedStmtBatch plannedStmtBatch = compiler.compile();
 
@@ -87,7 +88,7 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
      * Set if the planner should infer the partitioning for this batch. </br>
      * Note: The change takes effect only when the batch has one {@link SqlTask}.
      * @param value the target value.
-     * @return this {@link NonDdlBatch} instance itself.
+     * @return this {@link org.voltdb.plannerv2.NonDdlBatch} instance itself.
      */
     public NonDdlBatch setInferPartitioning(boolean value) {
         m_inferPartitioning = m_batchToDecorate.getTaskCount() == 1 && value;
@@ -108,7 +109,7 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
      * Users can specify as many partitioning keys as they want, but only two
      * partition keys at most are currently supported.
      * @param key a user partitioning key.
-     * @return this {@link NonDdlBatch} instance itself.
+     * @return this {@link org.voltdb.plannerv2.NonDdlBatch} instance itself.
      */
     public NonDdlBatch addUserPartitioningKey(Object key) {
         if (key == null) {

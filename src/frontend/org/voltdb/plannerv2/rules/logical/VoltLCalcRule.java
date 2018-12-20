@@ -22,37 +22,28 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.voltdb.plannerv2.rel.logical.VoltDBLAggregate;
+import org.apache.calcite.rel.logical.LogicalCalc;
+import org.voltdb.plannerv2.rel.logical.VoltDBLCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 
-/**
- * VoltDB logical rule that transform {@link LogicalAggregate} to {@link VoltDBLAggregate}.
- *
- * @author Michael Alexeev
- * @since 8.4
- */
-public class VoltDBLAggregateRule extends RelOptRule {
+public class VoltLCalcRule extends RelOptRule {
 
-    public static final VoltDBLAggregateRule INSTANCE = new VoltDBLAggregateRule();
+    public static final VoltLCalcRule INSTANCE = new VoltLCalcRule();
 
-    VoltDBLAggregateRule() {
-        super(operand(LogicalAggregate.class, Convention.NONE, any()));
+    VoltLCalcRule() {
+        super(operand(LogicalCalc.class, Convention.NONE, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        LogicalAggregate aggr = call.rel(0);
-        RelNode input = aggr.getInput();
-        RelTraitSet convertedTraits = aggr.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
+        LogicalCalc calc = call.rel(0);
+        RelNode input = calc.getInput();
+        RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
         RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL));
-        call.transformTo(VoltDBLAggregate.create(
-                aggr.getCluster(),
+        call.transformTo(new VoltDBLCalc(
+                calc.getCluster(),
                 convertedTraits,
                 convertedInput,
-                aggr.indicator,
-                aggr.getGroupSet(),
-                aggr.getGroupSets(),
-                aggr.getAggCallList()));
+                calc.getProgram()));
     }
 }

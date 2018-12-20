@@ -47,11 +47,11 @@ import java.util.Map;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBPAggregateRule extends RelOptRule {
+public class VoltPAggregateRule extends RelOptRule {
 
-    public static final VoltDBPAggregateRule INSTANCE = new VoltDBPAggregateRule();
+    public static final VoltPAggregateRule INSTANCE = new VoltPAggregateRule();
 
-    private VoltDBPAggregateRule() {
+    private VoltPAggregateRule() {
         super(operand(VoltDBLAggregate.class, VoltLogicalRel.VOLTDB_LOGICAL, any()));
     }
 

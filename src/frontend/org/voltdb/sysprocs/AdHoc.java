@@ -43,8 +43,9 @@ import org.voltdb.plannerv2.guards.PlannerFallbackException;
 public class AdHoc extends AdHocNTBase {
 
     /**
-     * Run an AdHoc query batch through the Calcite parser and planner, fall back to the old
-     * parser and planner when the batch cannot be handled.
+     * Run an AdHoc query batch through Calcite parser and planner.
+     * If there is anything that Calcite cannot handle, we will let it fall back to
+     * the legacy parser and planner.
      * @param params the user parameters. The first parameter is always the query text.
      *               The rest parameters are the ones used in the queries. </br>
      * @return the client response.
@@ -52,10 +53,11 @@ public class AdHoc extends AdHocNTBase {
      * @author Yiqun Zhang
      */
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
-        // TRAIL [Calcite:0] [entry] AdHoc.run()
+        // TRAIL [Calcite-AdHoc-DQL/DML:0] AdHoc.run()
+        // TRAIL [Calcite-AdHoc-DDL:0] AdHoc.run()
         /**
          * Some notes:
-         * 1. AdHoc DDLs do not take parameters ("?" will be treated as an unexpected token);
+         * 1. AdHoc DDLs do not take parameters - "?" will be treated as an unexpected token;
          * 2. Currently, a DML/DQL batch can take parameters only if the batch has one query.
          * 3. We do not handle large query mode now. The special flag for swap tables is also
          *    eliminated. They both need to be re-designed in the new Calcite framework.
@@ -196,13 +198,15 @@ public class AdHoc extends AdHocNTBase {
     }
 
     /**
-     * The SqlBatch was designed to be self-contained. However, this is not entirely true due to the way that
-     * the legacy code was organized. Until I have further reshaped the legacy code path, I will leave an
-     * interface to call back into the private methods of {@link org.voltdb.sysprocs.AdHoc}.
+     * The {@link org.voltdb.plannerv2.SqlBatch} was designed to be self-contained.
+     * However, this is not entirely true due to the way that the legacy code was organized.
+     * Until I have further reshaped the legacy code path, I will leave this interface to call back
+     * into the private methods of {@link org.voltdb.sysprocs.AdHoc}.
      * @author Yiqun Zhang
      * @since 8.4
      */
     private class AdHocContext implements SqlBatch.Context {
+
         @Override
         public CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes) {
             return AdHoc.this.runDDLBatch(sqlStatements, sqlNodes);

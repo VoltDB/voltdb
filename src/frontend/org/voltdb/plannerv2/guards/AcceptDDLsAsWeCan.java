@@ -43,14 +43,14 @@ public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
             return VoltSqlParser.parse(sql).isA(SqlKind.DDL);
         } catch (SqlParseException e) {
             if (e.getCause() instanceof StackOverflowError) {
-                // Ethan: I think this is copied from NonDdlBatchCompiler and AdHocNTBase.compileAdHocSQL
-                // by Lukai. It may be unnecessary.
+                // Ethan: I think this is copied from NonDdlBatchCompiler and
+                // AdHocNTBase.compileAdHocSQL() by Lukai. It may be unnecessary.
                 // Throwing an exception that's not a PlannerFallbackException will abort the planning.
                 throw new PlanningErrorException("Encountered stack overflow error. " +
                         "Try reducing the number of predicate expressions in the query.");
             } else {
                 // For all Calcite unsupported syntax, fall back to VoltDB implementation by returning false.
-                System.err.println(truncate(e.getMessage(), 100));  // print Calcite's parse error
+                System.err.println(truncate(e.getMessage(), 100));  // Print Calcite's parse error
                 return false;
             }
         }

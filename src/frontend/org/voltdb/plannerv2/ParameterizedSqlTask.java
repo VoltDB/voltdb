@@ -25,9 +25,8 @@ import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.util.Util.FoundOne;
 
 /**
- * Parameterize a query stored in a {@link SqlTask} and store its parameter
- * values as a list of {@link SqlLiteral}.
- *
+ * Parameterize a query stored in a {@link org.voltdb.plannerv2.SqlTask}
+ * and store its parameter values as a list of {@link org.apache.calcite.sql.SqlLiteral}.
  * @author Chao Zhou
  * @since 8.4
  */
@@ -81,8 +80,7 @@ public class ParameterizedSqlTask extends AbstractSqlTaskDecorator {
      */
     private static final class DynamicParamFinder extends SqlBasicVisitor<Void> {
         static final DynamicParamFinder INSTANCE = new DynamicParamFinder();
-        @Override
-        public Void visit(SqlDynamicParam param) {
+        @Override public Void visit(SqlDynamicParam param) {
             throw FoundOne.NULL;
         }
     }

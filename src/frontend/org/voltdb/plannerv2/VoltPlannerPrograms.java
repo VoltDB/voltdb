@@ -15,17 +15,17 @@ import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
-import org.voltdb.plannerv2.rules.logical.VoltDBLAggregateRule;
-import org.voltdb.plannerv2.rules.logical.VoltDBLCalcRule;
-import org.voltdb.plannerv2.rules.logical.VoltDBLJoinRule;
-import org.voltdb.plannerv2.rules.logical.VoltDBLSortRule;
-import org.voltdb.plannerv2.rules.logical.VoltDBLTableScanRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPAggregateRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPCalcRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPJoinRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPLimitRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPSeqScanRule;
-import org.voltdb.plannerv2.rules.physical.VoltDBPSortConvertRule;
+import org.voltdb.plannerv2.rules.logical.VoltLAggregateRule;
+import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
+import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
+import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
+import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
+import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
 
 import com.google.common.collect.ImmutableList;
 
@@ -43,6 +43,7 @@ public class VoltPlannerPrograms {
         VOLT_PHYSICAL_CONVERSION
     }
 
+    /** See {@link org.apache.calcite.tools.Programs.CALC_RULES} */
     private static final RuleSet CALC_LOGICAL = RuleSets.ofList(
             CalcMergeRule.INSTANCE,
             FilterCalcMergeRule.INSTANCE,
@@ -53,21 +54,21 @@ public class VoltPlannerPrograms {
             FilterProjectTransposeRule.INSTANCE);
 
     private static final RuleSet VOLT_LOGICAL = RuleSets.ofList(
-            VoltDBLSortRule.INSTANCE,
-            VoltDBLTableScanRule.INSTANCE,
-            VoltDBLCalcRule.INSTANCE,
-            VoltDBLAggregateRule.INSTANCE,
-            VoltDBLJoinRule.INSTANCE);
+            VoltLSortRule.INSTANCE,
+            VoltLTableScanRule.INSTANCE,
+            VoltLCalcRule.INSTANCE,
+            VoltLAggregateRule.INSTANCE,
+            VoltLJoinRule.INSTANCE);
 
     private static final RuleSet LOGICAL = concat(CALC_LOGICAL, VOLT_LOGICAL);
 
     private static final RuleSet VOLT_PHYSICAL_CONVERSION = RuleSets.ofList(
-            VoltDBPCalcRule.INSTANCE,
-            VoltDBPSeqScanRule.INSTANCE,
-            VoltDBPSortConvertRule.INSTANCE_VOLTDB,
-            VoltDBPLimitRule.INSTANCE,
-            VoltDBPAggregateRule.INSTANCE,
-            VoltDBPJoinRule.INSTANCE);
+            VoltPCalcRule.INSTANCE,
+            VoltPSeqScanRule.INSTANCE,
+            VoltPSortConvertRule.INSTANCE_VOLTDB,
+            VoltPLimitRule.INSTANCE,
+            VoltPAggregateRule.INSTANCE,
+            VoltPJoinRule.INSTANCE);
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
             Programs.listOf(

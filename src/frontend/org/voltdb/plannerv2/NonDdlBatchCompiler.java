@@ -29,11 +29,12 @@ import org.voltdb.VoltType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 import org.voltdb.utils.VoltTrace;
 
 /**
- * A compiler that compiles a non-DDL batch.
+ * A compiler that compiles a DQL/DML batch.
  * @since 8.4
  * @author Yiqun Zhang
  */
@@ -43,7 +44,7 @@ public class NonDdlBatchCompiler {
 
     /**
      * Record the catalog version that the queries are planned against.
-     * Catch races vs. updateApplicationCatalog.
+     * Catch races versus UpdateApplicationCatalog.
      */
     private final CatalogContext m_catalogContext;
 
@@ -53,14 +54,15 @@ public class NonDdlBatchCompiler {
     }
 
     /**
-     * Compile this non-DDL batch.
+     * Compile this DQL/DML batch.
      * @return a {@link AdHocPlannedStmtBatch}.
      * @throws AdHocPlanningException if the planning went wrong. </br>
-     * The {@code AdHocPlanningException} will be aggregated with all exceptions
-     * collected from planning the entire batch.
+     *         The {@code AdHocPlanningException} will be aggregated with all exceptions
+     *         collected from planning the entire batch.
+     * @throws PlannerFallbackException if we need to switch to the legacy parser/planner.
      */
-    public AdHocPlannedStmtBatch compile() throws AdHocPlanningException {
-        // TRAIL [Calcite:2] NonDdlBatchCompiler.compile()
+    public AdHocPlannedStmtBatch compile() throws AdHocPlanningException, PlannerFallbackException {
+        // TRAIL [Calcite-AdHoc-DQL/DML:2] NonDDLBatchCompiler.compile()
         List<String> errorMsgs = new ArrayList<>();
         List<AdHocPlannedStatement> plannedStmts = new ArrayList<>();
         int partitionParamIndex = -1;
@@ -70,9 +72,7 @@ public class NonDdlBatchCompiler {
         for (final SqlTask task : m_batch) {
             try {
                 final AdHocPlannedStatement result = compileTask(task);
-                if (result == null) {   // if any SQL of the batch is unsupported, signal caller to use fall back behavior.
-                    return null;
-                } else if (m_batch.inferPartitioning()) {
+                if (m_batch.inferPartitioning()) {
                     // The planning tool may have optimized for the single partition case
                     // and generated a partition parameter.
                     partitionParamIndex = result.getPartitioningParameterIndex();
@@ -114,16 +114,20 @@ public class NonDdlBatchCompiler {
      * @param task SqlTask for one SQL statement
      * @return planned statement, or null if the SqlTask is not fully planned/supported.
      * @throws AdHocPlanningException
+     * @throws PlannerFallbackException if we need to switch to the legacy parser/planner.
      */
-    private AdHocPlannedStatement compileTask(SqlTask task) throws AdHocPlanningException {
-        // TRAIL [Calcite:3] NonDdlBatchCompiler.compileTask()
+    private AdHocPlannedStatement compileTask(SqlTask task)
+            throws AdHocPlanningException, PlannerFallbackException {
+        // TRAIL [Calcite-AdHoc-DQL/DML:3] NonDdlBatchCompiler.compileTask()
         final PlannerTool ptool = m_catalogContext.m_ptool;
         assert(ptool != null);
-
         try {
             return ptool.planSqlCalcite(task);
-        } catch (Exception e) {
-            throw new AdHocPlanningException(e.getMessage());
+        } catch (PlannerFallbackException ex) {
+            // Let go the PlannerFallbackException so we can fall back to the legacy planner.
+            throw ex;
+        } catch (Exception ex) {
+            throw new AdHocPlanningException(ex.getMessage());
         } catch (StackOverflowError error) {
             /*
              * Overly long predicate expressions can cause a StackOverflowError in various
