@@ -22,7 +22,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistribution.Type;
-import org.apache.calcite.rel.RelDistributions;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
 import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;

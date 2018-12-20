@@ -61,12 +61,12 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
         // Add RelDistributions.ANY trait to the rel tree.
         nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.ANY);
 
+        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
+        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
+
         // do the MP fallback check
         nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
                 nodeAfterLogicalRules);
-
-        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
-        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         RelTraitSet physicalTraits = nodeAfterLogicalRules.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).

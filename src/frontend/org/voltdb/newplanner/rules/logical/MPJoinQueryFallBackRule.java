@@ -36,9 +36,9 @@ import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
 public class MPJoinQueryFallBackRule extends RelOptRule {
     public static final MPJoinQueryFallBackRule INSTANCE =
             new MPJoinQueryFallBackRule(
-                    operand(VoltDBLJoin.class,
-                            operand(RelNode.class, any()),
-                            operand(RelNode.class, any())), "MPJoinQueryFallBackRule");
+                    operand(VoltDBLJoin.class, RelDistributions.ANY,
+                            some(operand(RelNode.class, any()),
+                                    operand(RelNode.class, any()))), "MPJoinQueryFallBackRule");
 
     private MPJoinQueryFallBackRule(RelOptRuleOperand operand, String desc) {
         super(operand, desc);

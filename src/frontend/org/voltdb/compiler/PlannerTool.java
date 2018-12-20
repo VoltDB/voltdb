@@ -231,12 +231,12 @@ public class PlannerTool {
         // Add RelDistributions.ANY trait to the rel tree.
         nodeAfterLogical = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogical, RelDistributions.ANY);
 
+        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
+        nodeAfterLogical.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
+
         // do the MP fallback check
         nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
                 nodeAfterLogical);
-
-        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
-        nodeAfterLogical.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         RelTraitSet physicalTraits = nodeAfterLogical.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL)

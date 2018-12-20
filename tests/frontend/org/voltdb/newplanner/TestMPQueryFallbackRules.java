@@ -25,6 +25,7 @@ package org.voltdb.newplanner;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
@@ -57,6 +58,9 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
 
         // Add RelDistributions.ANY trait to the rel tree.
         nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.ANY);
+
+        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
+        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
         // do the MP fallback check
         CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
