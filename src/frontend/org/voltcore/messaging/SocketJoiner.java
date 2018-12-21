@@ -96,6 +96,7 @@ public class SocketJoiner {
     private static final int RETRY_INTERVAL_SALT = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL_SALT", 30);
     private static final int CRITICAL_CLOCKSKEW = 100;
 
+    public static final String FAIL_ESTABLISH_MESH_MSG = "Failed to establish socket mesh.";
     /**
      * Supports quick probes for request host id attempts to seed nodes
      */
@@ -320,7 +321,7 @@ public class SocketJoiner {
             try {
                 connectToPrimary(m_coordIp, ConnectStrategy.CONNECT);
             } catch (Exception e) {
-                hostLog.error("Failed to establish socket mesh.", e);
+                hostLog.error(FAIL_ESTABLISH_MESH_MSG, e);
                 throw new RuntimeException("Failed to establish socket mesh with " + m_coordIp, e);
             }
         }

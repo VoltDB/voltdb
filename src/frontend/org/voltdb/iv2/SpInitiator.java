@@ -221,7 +221,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 if (!migratePartitionLeader && !m_initiatorMailbox.acceptPromotion()) {
                     tmLog.info(m_whoami
                             + "rejoining site can not be promoted to leader. Terminating.");
-                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
+                    // rejoining not completed. The node will be shutdown @RealVoltDB.hostFailed() anyway.
+                    // do not log extra fatal message.
+                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null, false);
                     return;
                 }
 
