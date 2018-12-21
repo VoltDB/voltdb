@@ -143,7 +143,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final AtomicReference<AckingContainer> m_pendingContainer = new AtomicReference<>();
     // Is EDS from catalog or from disk pdb?
     private volatile boolean m_isInCatalog;
-    private volatile boolean m_eos;
     private final Generation m_generation;
     private final File m_adFile;
     private ExportClientBase m_client;
@@ -290,7 +289,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             fos.getFD().sync();
         }
         m_isInCatalog = true;
-        m_eos = false;
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                     m_tableName + " partition " + m_partitionId, 1);
@@ -360,7 +358,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         //EDS created from adfile is always from disk.
         m_isInCatalog = false;
-        m_eos = false;
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                 m_tableName + " partition " + m_partitionId, 1);
@@ -695,13 +692,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //Its ok.
             }
         }
-    }
-
-
-    public void pushEndOfStream() {
-        exportLog.info("End of stream for table: " + getTableName() +
-                " partition: " + getPartitionId() + " signature: " + getSignature());
-        m_eos = true;
     }
 
     public void pushExportBuffer(
