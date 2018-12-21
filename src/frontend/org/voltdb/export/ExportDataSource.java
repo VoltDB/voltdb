@@ -637,7 +637,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_tupleCount += tupleCount;
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Dropping already acked buffer. " +
-                            " Buffer info: " + startSequenceNumber + " Size: " + tupleCount +
+                            " Buffer info: [" + startSequenceNumber + "," + lastSequenceNumber + "] Size: " + tupleCount +
                             " last released seq: " + m_lastReleasedSeqNo);
                 }
                 cont.discard();
@@ -659,8 +659,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (isAcked(sb.startSequenceNumber())) {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Setting releaseSeqNo as " + m_lastReleasedSeqNo +
-                                " for SB with sequence number " + sb.startSequenceNumber() +
-                                " for partition " + m_partitionId);
+                                " for SB [" + sb.startSequenceNumber() + "," + sb.lastSequenceNumber() +
+                                "] for partition " + m_partitionId);
                     }
                     sb.releaseTo(m_lastReleasedSeqNo);
                 }
@@ -1636,8 +1636,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void resetStateInRejoinOrRecover(long initialSequenceNumber) {
-        m_lastReleasedSeqNo = Math.max(initialSequenceNumber,
-                m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo() - 1);
+        m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo,
+                Math.max(initialSequenceNumber,
+                        m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo() - 1));
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
     }
