@@ -49,18 +49,15 @@ public class SqlTaskImpl implements SqlTask {
      * Tell if this {@link SqlTaskImpl} is a DDL task.
      * @return true if this {@code SqlTask} is a DDL task.
      */
-    @Override
-    public boolean isDDL() {
+    @Override public boolean isDDL() {
         return m_parsedQuery.isA(SqlKind.DDL);
     }
 
-    @Override
-    public boolean isDQL() {
+    @Override public boolean isDQL() {
         return m_parsedQuery.getKind() == SqlKind.SELECT;
     }
 
-    @Override
-    public boolean isDML() {
+    @Override public boolean isDML() {
         return m_parsedQuery.isA(SqlKind.DML);
     }
 
@@ -68,8 +65,7 @@ public class SqlTaskImpl implements SqlTask {
      * Get the original SQL query text.
      * @return the original SQL query text.
      */
-    @Override
-    public String getSQL() {
+    @Override public String getSQL() {
         return m_sqlString;
     }
 
@@ -77,8 +73,11 @@ public class SqlTaskImpl implements SqlTask {
      * Get the parsed query node tree.
      * @return the parsed query node tree.
      */
-    @Override
-    public SqlNode getParsedQuery() {
+    @Override public SqlNode getParsedQuery() {
         return m_parsedQuery;
+    }
+
+    @Override public String toString() {
+        return getSQL();
     }
 }

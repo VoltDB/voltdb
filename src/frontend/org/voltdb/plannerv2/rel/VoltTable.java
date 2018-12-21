@@ -42,6 +42,7 @@ import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.plannerv2.rel.logical.VoltDBLTableScan;
+import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
 
 /**
@@ -54,7 +55,7 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class VoltTable implements TranslatableTable {
 
-    final private org.voltdb.catalog.Table m_catTable;
+    private final org.voltdb.catalog.Table m_catTable;
 
     /**
      * Build a {@code VoltTable} from a catalog table.
@@ -66,11 +67,11 @@ public class VoltTable implements TranslatableTable {
     }
 
     /**
-     *
-     * @param typeFactory
-     * @param vt
-     * @param prec
-     * @return
+     * Create a {@link org.apache.calcite.rel.type.RelDataType} from a {@link org.voltdb.VoltType}.
+     * @param typeFactory the RelDataTypeFactory.
+     * @param vt VoltDB type.
+     * @param prec the precision
+     * @return the created {@link org.apache.calcite.rel.type.RelDataType}.
      */
     public static RelDataType toRelDataType(RelDataTypeFactory typeFactory, VoltType vt, int prec) {
         SqlTypeName sqlTypeName = SqlTypeName.get(vt.toSQLString().toUpperCase());
@@ -79,13 +80,13 @@ public class VoltTable implements TranslatableTable {
         // ENG-14727
         switch (vt) {
             case STRING:
-                // This doesn't seem quite right...
-                rdt = typeFactory.createSqlType(sqlTypeName, prec);
-                //rdt = typeFactory.createTypeWithCharsetAndCollation(rdt, Charset.forName("UTF-8"), SqlCollation.IMPLICIT);
-                break;
             case VARBINARY:
                 // The default precision for VARBINARY and VARCHAR (STRING) is not specified.
                 rdt = typeFactory.createSqlType(sqlTypeName, prec);
+                break;
+            case DECIMAL:
+                rdt = typeFactory.createSqlType(sqlTypeName,
+                        VoltDecimalHelper.kDefaultPrecision, VoltDecimalHelper.kDefaultScale);
                 break;
             default:
                 rdt = typeFactory.createSqlType(sqlTypeName);
@@ -93,22 +94,21 @@ public class VoltTable implements TranslatableTable {
         return rdt;
     }
 
-    @Override
-    public TableType getJdbcTableType() {
+    @Override public TableType getJdbcTableType() {
         return TableType.TABLE;
     }
 
     @Override
     public RelDataType getRowType(RelDataTypeFactory typeFactory) {
         return new RelDataTypeFactory.Builder(typeFactory) {{
-            CatalogUtil
-                    .getSortedCatalogItems(getCatTable().getColumns(), "index")
-                    .forEach(catColumn ->
-                            add(catColumn.getName(),
-                                    typeFactory.createTypeWithNullability(toRelDataType(typeFactory,
-                                            VoltType.get((byte)catColumn.getType()),
-                                            catColumn.getSize()),
-                                            catColumn.getNullable())));
+            CatalogUtil.getSortedCatalogItems(getCatTable().getColumns(), "index")
+                .forEach(catColumn ->
+                    add(catColumn.getName(),
+                        typeFactory.createTypeWithNullability(
+                                toRelDataType(typeFactory,
+                                              VoltType.get((byte)catColumn.getType()),
+                                              catColumn.getSize()),
+                                              catColumn.getNullable())));
         }}.build();
     }
 

@@ -44,7 +44,7 @@ import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.plannerv2.ColumnType;
+import org.voltdb.plannerv2.ColumnTypes;
 import org.voltdb.types.ExpressionType;
 
 import java.util.List;
@@ -91,7 +91,7 @@ public class ExpressionTranslator {
 
     private static ConstantValueExpression of(SqlLiteral literal) {
         final ConstantValueExpression ret = new ConstantValueExpression();
-        ret.setValueType(ColumnType.getVoltType(literal.getTypeName()));
+        ret.setValueType(ColumnTypes.getVoltType(literal.getTypeName()));
         ret.setValue(literal.toValue());
         return ret;
     }

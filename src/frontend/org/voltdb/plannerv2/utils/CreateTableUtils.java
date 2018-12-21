@@ -49,7 +49,7 @@ import org.voltdb.catalog.TimeToLive;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.plannerv2.ColumnType;
+import org.voltdb.plannerv2.ColumnTypes;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -145,7 +145,7 @@ public class CreateTableUtils {
 
         final SqlDataTypeSpec type = (SqlDataTypeSpec) nameAndType.get(1);
         int colSize = type.getPrecision();       // -1 when user did not provide.
-        final VoltType vt = ColumnType.getVoltType(type.getTypeName().toString());
+        final VoltType vt = ColumnTypes.getVoltType(type.getTypeName().toString());
         column.setType(vt.getValue());
         column.setNullable(type.getNullable());
         // Validate user-supplied size (SqlDataTypeSpec.precision)

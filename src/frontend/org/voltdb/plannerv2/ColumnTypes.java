@@ -16,25 +16,28 @@
  */
 package org.voltdb.plannerv2;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 
-import com.google.common.collect.ImmutableBiMap;
-
 /**
  * Adaptor between <code>org.voltdb.VoltType</code> and <code>org.apache.calcite.sql.SqlDataTypeSpec</code>.
  * VoltDB needs to understand Calcite data types, because we create catalog from Calcite SqlNode;
  * Calcite needs to understand Volt data types in the planning stage. (right?)
  */
-public class ColumnType {
+public class ColumnTypes {
 
-    private static final ImmutableBiMap<SqlTypeName, VoltType> COLUMN_TYPES;
+    private static final Map<SqlTypeName, VoltType> CALC_TO_VOLT;
+    private static final Map<VoltType, SqlTypeName> VOLT_TO_CALC;
 
     static {
-        ImmutableBiMap.Builder<SqlTypeName, VoltType> builder = new ImmutableBiMap.Builder<>();
+        Map<SqlTypeName, VoltType> calcToVolt = new HashMap<>();
+        Map<VoltType, SqlTypeName> voltToCalc = new HashMap<>();
         Stream.of(
             Pair.of(VoltType.BOOLEAN, SqlTypeName.BOOLEAN),
             Pair.of(VoltType.FLOAT, SqlTypeName.FLOAT),
@@ -56,13 +59,15 @@ public class ColumnType {
         ).forEach(types -> {
             final VoltType vt = types.getFirst();
             final SqlTypeName ct = types.getSecond();
-            builder.put(ct, vt);
+            calcToVolt.put(ct, vt);
+            voltToCalc.put(vt, ct);
         });
-        COLUMN_TYPES = builder.build();
+        CALC_TO_VOLT = Collections.unmodifiableMap(calcToVolt);
+        VOLT_TO_CALC = Collections.unmodifiableMap(voltToCalc);
     }
 
     public static VoltType getVoltType(SqlTypeName calciteType) {
-        return COLUMN_TYPES.get(calciteType);
+        return CALC_TO_VOLT.get(calciteType);
     }
 
     public static VoltType getVoltType(String calciteType) {
@@ -70,6 +75,6 @@ public class ColumnType {
     }
 
     public static SqlTypeName getCalciteType(VoltType voltType) {
-        return COLUMN_TYPES.inverse().get(voltType);
+        return VOLT_TO_CALC.get(voltType);
     }
 }

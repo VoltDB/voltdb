@@ -17,22 +17,18 @@
 
 package org.voltdb.plannerv2.utils;
 
+import java.util.stream.StreamSupport;
+
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.PlanningErrorException;
-
-import java.util.Set;
-import java.util.function.Predicate;
-import java.util.stream.StreamSupport;
 
 /**
  * Utilities that serve the package only.
  */
-class CalciteUtils {
-    private CalciteUtils() {}
+abstract class CalciteUtils {
 
     static void except(String msg) {
         throw new PlanningErrorException(msg, 0);

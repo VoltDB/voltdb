@@ -216,11 +216,10 @@ public class PlannerTool {
         VoltPlanner planner = new VoltPlanner(m_schemaPlus);
         planner.validate(task.getParsedQuery());
         RelNode rel = planner.convert(task.getParsedQuery());
-        RelTraitSet requiredLogicalOutputTraits = rel.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
+        RelTraitSet requiredLogicalOutputTraits = planner.getEmptyTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
         RelNode transformed = planner.transform(
                 VoltPlannerPrograms.directory.LOGICAL.ordinal(),
                 requiredLogicalOutputTraits, rel);
-
 
         // Add RelDistributions.SINGLETON trait to the rel tree.
         transformed = VoltDBRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);

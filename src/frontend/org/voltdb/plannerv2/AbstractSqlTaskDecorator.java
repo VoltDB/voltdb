@@ -51,4 +51,8 @@ public abstract class AbstractSqlTaskDecorator implements SqlTask {
     @Override public SqlNode getParsedQuery() {
         return m_taskToDecorate.getParsedQuery();
     }
+
+    @Override public String toString() {
+        return m_taskToDecorate.toString();
+    }
 }
