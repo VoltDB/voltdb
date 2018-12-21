@@ -1349,6 +1349,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
                             m_queryResponses.clear();
                             m_onMastership.run();
+                            forwardAckToOtherReplicas(m_lastReleasedSeqNo);
                         }
                     }
                 } catch (Exception e) {
