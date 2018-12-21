@@ -27,7 +27,6 @@ import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexExecutor;
@@ -59,8 +58,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
     @SuppressWarnings("rawtypes")
     private static final ImmutableList<RelTraitDef> TRAIT_DEFS =
             ImmutableList.of(ConventionTraitDef.INSTANCE,
-                             RelCollationTraitDef.INSTANCE,
-                             RelDistributionTraitDef.INSTANCE);
+                             RelCollationTraitDef.INSTANCE);
 
     static final Config PARSER_CONFIG =
             SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build();

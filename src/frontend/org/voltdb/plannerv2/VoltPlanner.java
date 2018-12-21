@@ -75,9 +75,6 @@ public class VoltPlanner implements Planner {
         m_validator.setIdentifierExpansion(true);
         m_rexBuilder = new RexBuilder(m_config.getTypeFactory());
         m_relPlanner = new VolcanoPlanner();
-        for (@SuppressWarnings("rawtypes") RelTraitDef def : m_config.getTraitDefs()) {
-            m_relPlanner.addRelTraitDef(def);
-        }
         RelOptCluster cluster = RelOptCluster.create(m_relPlanner, m_rexBuilder);
         cluster.setMetadataProvider(new CachingRelMetadataProvider(
                 VoltRelMetadataProvider.INSTANCE, m_relPlanner));
@@ -98,6 +95,10 @@ public class VoltPlanner implements Planner {
     @Override public void reset() {
         m_validatedSqlNode = null;
         m_relRoot = null;
+        m_relPlanner.clearRelTraitDefs();
+        for (@SuppressWarnings("rawtypes") RelTraitDef def : m_config.getTraitDefs()) {
+            m_relPlanner.addRelTraitDef(def);
+        }
         m_state = State.STATE_1_READY;
     }
 
