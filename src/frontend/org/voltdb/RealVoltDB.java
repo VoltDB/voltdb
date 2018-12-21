@@ -244,8 +244,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
@@ -1720,6 +1718,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             @Override
             public void run()
             {
+                // stop this node if rejoining.
+                if (stopRejoiningHost()) {
+                    return;
+                }
+
                 //create a blocker for repair if this is a MP leader and partition leaders change
                 if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
                     VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
@@ -1776,8 +1779,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_messenger.removeStopNodeNotice(hostId);
                 }
 
-                stopRejoiningHost();
-
                 // let the client interface know host(s) have failed to clean up any outstanding work
                 // especially non-transactional work
                 m_clientInterface.handleFailedHosts(failedHosts);
@@ -1786,7 +1787,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     // If the current node hasn't finished rejoin when another node fails, fail this node to prevent locking up.
-    private void stopRejoiningHost() {
+    private boolean stopRejoiningHost() {
 
         // The host failure notification could come before mesh determination, wait for the determination
         try {
@@ -1797,7 +1798,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (m_rejoining) {
             VoltDB.crashLocalVoltDB("Another node failed before this node could finish rejoining. " +
                     "As a result, the rejoin operation has been canceled. Please try again.");
+            return true;
         }
+        return false;
     }
 
     private void handleHostsFailedForMigratePartitionLeader(Set<Integer> failedHosts) {
