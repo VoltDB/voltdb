@@ -42,7 +42,7 @@ public interface ClusterSettings extends Settings {
     public int cangamanga();
 
     @Key(PARTIITON_IDS)
-    @DefaultValue("-1")
+    @DefaultValue("")
     public String partitionids();
 
     public static ClusterSettings create(Map<?, ?>... imports) {

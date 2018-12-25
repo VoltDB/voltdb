@@ -34,6 +34,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -312,6 +313,22 @@ public class AbstractTopology {
             String[] strIds = missingPartitionIds.stream().map(i -> String.valueOf(i)).toArray(String[]::new);
             return String.format("After Host %d failure, non-viable cluster due to k-safety violation. "
                                + "Missing partitions: %s", failedHostId, String.join(",", strIds));
+        }
+    }
+
+    public static class PartitionRestoreException extends Exception {
+        private static final long serialVersionUID = 1L;
+        public final ImmutableSet<Integer> hostIds;
+        public final String partitionIds;
+        public PartitionRestoreException(String partitionIds, List<Integer> hostIds) {
+            this.hostIds = ImmutableSet.copyOf(hostIds);
+            this.partitionIds = partitionIds;
+        }
+
+        @Override
+        public String getMessage() {
+            String hosts = hostIds.stream().map(n -> n.toString()).collect(Collectors.joining( "," ));
+            return String.format("Partitions %s can not be restored on hosts %s.", partitionIds, hosts);
         }
     }
 
@@ -1598,7 +1615,7 @@ public class AbstractTopology {
      * @return recovered topology if a matching node is found
      */
     public static AbstractTopology mutateRecoverTopology(AbstractTopology topology,
-            Set<Integer> liveHosts, int localHostId, String placementGroup) {
+            Set<Integer> liveHosts, int localHostId, String placementGroup, String recoverPartitions) {
 
         Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
         Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
@@ -1608,11 +1625,20 @@ public class AbstractTopology {
         Map<String, Set<Integer>> haGroupMaps = Maps.newHashMap();
         for (Host host : topology.hostsById.values()) {
             int hostId = host.id;
-            //recover from the 1st none-living node in the same placement group
-            if (host.haGroup.token.equalsIgnoreCase(placementGroup) &&
-                    !liveHosts.contains(hostId) && recoveredHostId < 0) {
-                recoveredHostId = host.id;
-                hostId = localHostId;
+            if (!liveHosts.contains(hostId) && recoveredHostId < 0) {
+                // recover from match partition
+                if (!StringUtils.isEmpty(recoverPartitions)) {
+                    String partitions = host.getSortedPartitionIdList().stream()
+                            .map(n -> n.toString()).collect(Collectors.joining( "," ));
+                    if (partitions.equals(recoverPartitions)) {
+                        recoveredHostId = host.id;
+                        hostId = localHostId;
+                    }
+                } else if (host.haGroup.token.equalsIgnoreCase(placementGroup)) {
+                    // recover from the 1st none-living node in the same placement group
+                    recoveredHostId = host.id;
+                    hostId = localHostId;
+                }
             }
             Set<Integer> groupHostIds = haGroupMaps.get(host.haGroup.token);
             if (groupHostIds == null) {
@@ -1651,6 +1677,64 @@ public class AbstractTopology {
             mp.leader = mutableHostMap.get(leader);
         }
         return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
+    }
+
+    /**
+     * Best effort to find the matching host with partitions on the existing topology
+     * Use the partitions of the recovering host to match a node in the topology
+     * @param topology The topology
+     * @param partitionsByHostsMap The partition id string by hosts
+     * @return recovered topology
+     */
+    public static AbstractTopology recoverTopologyFromPartitions(AbstractTopology topology,
+            Map<String, List<Integer>> partitionsByHostsMap) throws PartitionRestoreException{
+        if (partitionsByHostsMap == null || partitionsByHostsMap.isEmpty()) {
+            return topology;
+        }
+
+        Map<Integer, Host> hostsById = new TreeMap<>(topology.hostsById);
+        for (Map.Entry<String, List<Integer>> entry : partitionsByHostsMap.entrySet()) {
+            List<Integer> restoredHosts = entry.getValue();
+            List<Integer> partitionsByHosts = new ArrayList<>();
+            for (Host host : hostsById.values()) {
+                String partitions = host.getSortedPartitionIdList().stream()
+                        .map(n -> n.toString()).collect(Collectors.joining( "," ));
+                if (partitions.equals(entry.getKey()) && !restoredHosts.remove(new Integer(host.id))) {
+                    partitionsByHosts.add(host.id);
+                }
+            }
+            // Partitions on right hosts, no restoration
+            if (restoredHosts.isEmpty()) {
+                continue;
+            }
+            if (restoredHosts.size() != partitionsByHosts.size()) {
+                throw new PartitionRestoreException(entry.getKey(), entry.getValue());
+            }
+            for(int i = 0; i < partitionsByHosts.size(); i++) {
+                int fromHostId = restoredHosts.get(i);
+                int toHostId = partitionsByHosts.get(i);
+                Host fromHost = hostsById.get(fromHostId);
+                Host toHost = hostsById.get(toHostId);
+                hostsById.put(fromHostId, movePartitions(toHost, fromHostId));
+                hostsById.put(toHostId, movePartitions(fromHost,toHostId));
+            }
+        }
+        return new AbstractTopology(topology.version + 1, hostsById.values());
+    }
+
+    private static Host movePartitions(Host host, int hostId) {
+        List<Partition> partitions = Lists.newArrayList();
+        for (Partition p: host.partitions) {
+            List<Integer> hostIds = new ArrayList<>(p.hostIds);
+            hostIds.remove(host.id);
+            hostIds.add(hostId);
+            int leaderHostId = (p.leaderHostId == host.id) ? hostId : p.leaderHostId;
+            Partition e = new Partition(p.id, p.k, leaderHostId, hostIds);
+            partitions.add(e);
+        }
+        Host h = new Host(hostId, host.targetSiteCount, host.haGroup, partitions);
+        h.isMissing = host.isMissing;
+        return h;
     }
 
     /**

@@ -299,13 +299,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         public List<Integer> getRecoveredPartitions() {
-            List<Integer> partitions;
-            if (StringUtils.isEmpty(m_recoveredPartitions )) {
-                partitions = Lists.newArrayList();
-            } else {
-                partitions = Stream.of(m_recoveredPartitions.split(","))
-                        .map(Integer::parseInt).collect(Collectors.toList());
+            if (StringUtils.isEmpty(m_recoveredPartitions)) {
+                return Lists.newArrayList();
             }
+            List<Integer> partitions = Stream.of(m_recoveredPartitions.split(","))
+                    .map(Integer::parseInt).sorted().collect(Collectors.toList());
             return partitions;
         }
     }
