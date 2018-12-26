@@ -49,9 +49,11 @@ import org.voltdb.AbstractTopology.HostDescription;
 import org.voltdb.AbstractTopology.KSafetyViolationException;
 import org.voltdb.AbstractTopology.Partition;
 import org.voltdb.AbstractTopology.PartitionDescription;
+import org.voltdb.AbstractTopology.PartitionRestoreException;
 
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 import junit.framework.TestCase;
 
@@ -437,6 +439,139 @@ public class TestAbstractTopology extends TestCase {
         }
     }
 
+    public void testPartitionsLayoutStability() throws JSONException {
+
+        // 5 node k1 with partition group
+        String partitionGroup = null;
+        for (int i = 0; i < 10000; i++) {
+            TestDescription td = getBoringDescription(5, 6, 1, 1, 2);
+            AbstractTopology topo = subTestDescription(td, false);
+            String partitionGroupTemp = null;
+            Map<String, List<Integer>> partitionsByHostsMap = Maps.newHashMap();
+            for (Host host : topo.hostsById.values()) {
+                String partitions = host.getSortedPartitionIdList().stream()
+                        .map(n -> n.toString()).collect(Collectors.joining( "," ));
+                List<Integer> hosts = partitionsByHostsMap.get(partitions);
+                if (hosts == null) {
+                    hosts = Lists.newArrayList();
+                    partitionsByHostsMap.put(partitions, hosts);
+                }
+                hosts.add(host.id);
+                if (hosts.size() == 2) {
+                    partitionGroupTemp = partitions;
+                }
+            }
+            if (partitionGroup == null) {
+                partitionGroup = partitionGroupTemp;
+            } else if (!partitionGroup.equals(partitionGroupTemp)) {
+               fail("Generated different partition groups: " + partitionGroup + "/" + partitionGroupTemp);
+            }
+        }
+
+    }
+    public void testPartitionsRecovery() throws JSONException {
+        // 5 node k1
+        TestDescription td = getBoringDescription(5, 6, 1, 1, 2);
+        AbstractTopology topo = subTestDescription(td, false);
+        //partition layout: {6,7,8,9,10,11=[2, 3], 0,1,2,12,13,14=[4], 3,4,5,12,13,14=[0], 0,1,2,3,4,5=[1]}
+        Map<String, List<Integer>> partitionsByHostsMap = Maps.newHashMap();
+        for (Host host : topo.hostsById.values()) {
+            String partitions = host.getSortedPartitionIdList().stream()
+                    .map(n -> n.toString()).collect(Collectors.joining( "," ));
+            List<Integer> hosts = partitionsByHostsMap.get(partitions);
+            if (hosts == null) {
+                hosts = Lists.newArrayList();
+                partitionsByHostsMap.put(partitions, hosts);
+            }
+            hosts.add(host.id);
+        }
+
+        // mix around partition layout
+        Map<String, List<Integer>> incorrectPartitionsByHosts = Maps.newHashMap();
+        List<String> partitionsList = new ArrayList<> (partitionsByHostsMap.keySet());
+        List<List<Integer>> hostList = new ArrayList<> (partitionsByHostsMap.values());
+        int partitionCount = partitionsList.size();
+        for (int i = 0; i < partitionCount; i++) {
+            int shift = i + 1;
+            if (i == (partitionCount -1)){
+                shift = 0;
+            }
+            incorrectPartitionsByHosts.put(partitionsList.get(i), hostList.get(shift));
+        }
+        try {
+            // incorrect partition layout: {6,7,8,9,10,11=[4], 0,1,2,12,13,14=[0], 3,4,5,12,13,14=[1], 0,1,2,3,4,5=[2, 3]}
+            topo = AbstractTopology.recoverTopologyFromPartitions(topo, incorrectPartitionsByHosts);
+            fail();
+        } catch (PartitionRestoreException e) {
+            //expected.
+        }
+
+        Map<String, List<Integer>> correctPartitionsByHosts = Maps.newHashMap();
+        correctPartitionsByHosts.put("6,7,8,9,10,11", new ArrayList<Integer>(Arrays.asList(0,1)));
+        correctPartitionsByHosts.put("0,1,2,12,13,14", new ArrayList<Integer>(Arrays.asList(4)));
+        correctPartitionsByHosts.put("3,4,5,12,13,14", new ArrayList<Integer>(Arrays.asList(3)));
+        correctPartitionsByHosts.put("0,1,2,3,4,5", new ArrayList<Integer>(Arrays.asList(2)));
+
+        try {
+            // correct placement layout: {6,7,8,9,10,11=[0,1], 0,1,2,12,13,14=[4], 3,4,5,12,13,14=[3], 0,1,2,3,4,5=[2]}
+            topo = AbstractTopology.recoverTopologyFromPartitions(topo, correctPartitionsByHosts);
+        } catch (PartitionRestoreException e) {
+            fail(e.getMessage());
+        }
+
+        // verify partitions
+        Map<String, List<Integer>> recoveredPartitionsByHosts = Maps.newHashMap();
+        for (Host host : topo.hostsById.values()) {
+            String partitions = host.getSortedPartitionIdList().stream()
+                    .map(n -> n.toString()).collect(Collectors.joining( "," ));
+            List<Integer> hosts = recoveredPartitionsByHosts.get(partitions);
+            if (hosts == null) {
+                hosts = Lists.newArrayList();
+                recoveredPartitionsByHosts.put(partitions, hosts);
+            }
+            hosts.add(host.id);
+        }
+
+        // verify if the recovered placement layouts are the same as the ones from input.
+        for (Map.Entry<String, List<Integer>> e : correctPartitionsByHosts.entrySet()) {
+            List<Integer> recovered = recoveredPartitionsByHosts.get(e.getKey());
+            recovered.removeAll(e.getValue());
+            assert(recovered.isEmpty());
+        }
+    }
+
+    public void testPartitionsRecoveryForRejoin() throws JSONException {
+        // 5 node k1
+        TestDescription td = getBoringDescription(5, 6, 1, 1, 2);
+        AbstractTopology topo = subTestDescription(td, false);
+        String partitions = null;
+        for (Host host : topo.hostsById.values()) {
+            if (host.id == 0) {
+                partitions = host.getSortedPartitionIdList().stream()
+                        .map(n -> n.toString()).collect(Collectors.joining( "," ));
+            }
+        }
+
+        // fake host 0 and 1 as down
+        Set<Integer> liveHosts = Sets.newHashSet();
+        liveHosts.add(2);
+        liveHosts.add(3);
+        liveHosts.add(4);
+
+        // rejoin and recover partition
+        final int localHostId = 6;
+        topo = AbstractTopology.mutateRecoverTopology(topo, liveHosts, localHostId, "0", partitions);
+        for (Host host : topo.hostsById.values()) {
+            if (host.id != localHostId) {
+                continue;
+            }
+            String recoveredPartitions = host.getSortedPartitionIdList().stream()
+                    .map(n -> n.toString()).collect(Collectors.joining( "," ));
+
+            // verify the rejoined host has the input partition list
+            assert(partitions.equals(recoveredPartitions));
+        }
+    }
     // Generate random but valid configurations feature both partition group
     // and rack-aware group attributes.
     // A valid configuration means:

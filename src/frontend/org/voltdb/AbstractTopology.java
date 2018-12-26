@@ -1617,6 +1617,7 @@ public class AbstractTopology {
     public static AbstractTopology mutateRecoverTopology(AbstractTopology topology,
             Set<Integer> liveHosts, int localHostId, String placementGroup, String recoverPartitions) {
 
+        boolean canRecover = canRecoverPartitionForRejoin(topology, liveHosts, recoverPartitions);
         Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
         Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
 
@@ -1627,7 +1628,7 @@ public class AbstractTopology {
             int hostId = host.id;
             if (!liveHosts.contains(hostId) && recoveredHostId < 0) {
                 // recover from match partition
-                if (!StringUtils.isEmpty(recoverPartitions)) {
+                if (canRecover) {
                     String partitions = host.getSortedPartitionIdList().stream()
                             .map(n -> n.toString()).collect(Collectors.joining( "," ));
                     if (partitions.equals(recoverPartitions)) {
@@ -1679,6 +1680,21 @@ public class AbstractTopology {
         return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
     }
 
+    private static boolean canRecoverPartitionForRejoin(AbstractTopology topology, Set<Integer> liveHosts, String partitionList) {
+        if (partitionList == null) {
+            return false;
+        }
+        for (Host host : topology.hostsById.values()) {
+            if (!liveHosts.contains(host.id)) {
+                String partitions = host.getSortedPartitionIdList().stream()
+                        .map(n -> n.toString()).collect(Collectors.joining( "," ));
+                if (partitions.equals(partitionList)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     /**
      * Best effort to find the matching host with partitions on the existing topology
      * Use the partitions of the recovering host to match a node in the topology
@@ -1726,7 +1742,7 @@ public class AbstractTopology {
         List<Partition> partitions = Lists.newArrayList();
         for (Partition p: host.partitions) {
             List<Integer> hostIds = new ArrayList<>(p.hostIds);
-            hostIds.remove(host.id);
+            hostIds.remove(new Integer(host.id));
             hostIds.add(hostId);
             int leaderHostId = (p.leaderHostId == host.id) ? hostId : p.leaderHostId;
             Partition e = new Partition(p.id, p.k, leaderHostId, hostIds);
