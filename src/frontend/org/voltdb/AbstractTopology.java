@@ -1676,7 +1676,7 @@ public class AbstractTopology {
             int leader = (partition.leaderHostId == recoveredHostId) ? localHostId : partition.leaderHostId;
             mp.leader = mutableHostMap.get(leader);
         }
-        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
+        return convertMutablesToTopology(canRecover ? (topology.version + 1) : topology.version, mutableHostMap, mutablePartitionMap);
     }
 
     private static boolean canRecoverPartitionForRejoin(AbstractTopology topology, Set<Integer> liveHosts, String partitionList) {

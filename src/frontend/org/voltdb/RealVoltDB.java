@@ -1726,6 +1726,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup, String recoverPartitions) {
 
+        long version = topology.version;
         AbstractTopology recoveredTopo = AbstractTopology.mutateRecoverTopology(topology,
                 m_messenger.getLiveHostIds(),
                 m_messenger.getHostId(),
@@ -1733,6 +1734,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 recoverPartitions);
         if (recoveredTopo == null) {
             return null;
+        }
+        if (version < recoveredTopo.version) {
+            hostLog.info("Partition placement layout has been restored for rejoining.");
         }
         List<Integer> partitions = recoveredTopo.getPartitionIdList(m_messenger.getHostId());
         if (partitions != null && partitions.size() == m_catalogContext.getNodeSettings().getLocalSitesCount()) {

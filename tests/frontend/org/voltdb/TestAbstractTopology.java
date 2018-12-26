@@ -1003,7 +1003,7 @@ public class TestAbstractTopology extends TestCase {
         }
     }
 
-    public void testRestorePlacement() throws Exception {
+    public void testRestorePlacementOnRecovery() throws Exception {
         LocalCluster cluster = null;
         try{
             cluster = createLocalCluster("testRestorePlacement.jar", 6, 5, 1);
@@ -1016,6 +1016,29 @@ public class TestAbstractTopology extends TestCase {
             cluster.setLogSearchPatterns(restoredMsg);
             cluster.startUp(false);
             assert(cluster.verifyLogMessages(restoredMsg));
+        } finally {
+            if (cluster != null){
+                cluster.shutDown();
+            }
+        }
+    }
+
+
+    public void testRestorePlacementOnRejoin() throws Exception {
+        LocalCluster cluster = null;
+        try{
+            cluster = createLocalCluster("testRestorePlacement.jar", 6, 5, 2);
+            cluster.startUp();
+
+            cluster.killSingleHost(3);
+            cluster.killSingleHost(4);
+            cluster.setRestorePlacement(true);
+            List<String> restoredMsg = new ArrayList<String> (Arrays.asList("Partition placement layout has been restored for rejoining."));
+            cluster.setLogSearchPatterns(restoredMsg);
+            cluster.recoverOne(3, 1, "", false);
+            // host ids in LocalCluster will be assigned async. So when a local host is recovered, it may be assigned
+            // with different host id.  The property is used for placement restore test.
+            assert(cluster.verifyLogMessages(new ArrayList<Integer> (Arrays.asList(3)), restoredMsg));
         } finally {
             if (cluster != null){
                 cluster.shutDown();

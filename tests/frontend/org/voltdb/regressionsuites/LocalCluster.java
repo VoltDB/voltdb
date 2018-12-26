@@ -1561,6 +1561,7 @@ public class LocalCluster extends VoltServerConfig {
             rejoinCmdLn.m_zkInterface = "127.0.0.1:" + portGenerator.next();
             rejoinCmdLn.m_internalPort = internalPortGenerator.nextInternalPort(hostId);
             rejoinCmdLn.m_coordinators = internalPortGenerator.getCoordinators();
+            rejoinCmdLn.m_restorePlacement = m_restorePlacement;
             setPortsFromConfig(hostId, rejoinCmdLn);
             if (this.m_additionalProcessEnv != null) {
                 for (String name : this.m_additionalProcessEnv.keySet()) {
