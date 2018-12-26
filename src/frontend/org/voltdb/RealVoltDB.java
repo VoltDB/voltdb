@@ -2206,10 +2206,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
             }
             if (m_config.m_restorePlacement && m_config.m_startAction.doesRecover()){
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Recovered partition layout:" + restoredPartitionsByHosts);
+                }
+                long version = topology.version;
                 try {
                     topology = AbstractTopology.recoverTopologyFromPartitions(topology, restoredPartitionsByHosts);
                 } catch (PartitionRestoreException e) {
                     hostLog.warn(e.getMessage());
+                }
+                if (version < topology.version) {
+                    hostLog.info("Partition placement has been restored.");
                 }
             }
             //move partition masters from missing hosts to live hosts

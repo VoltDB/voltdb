@@ -177,6 +177,7 @@ public class LocalCluster extends VoltServerConfig {
     private String[] m_modeOverrides = null;
     private Map<Integer, Integer> m_sitesperhostOverrides = null;
     private String[] m_placementGroups = null;
+    private boolean m_restorePlacement = false;
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
     // with the port numbers and command line parameter value specific to that
@@ -1164,6 +1165,7 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.voltdbRoot(root);
             cmdln.pathToDeployment(null);
             cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
+            cmdln.m_restorePlacement = m_restorePlacement;
         }
 
         if (this.m_additionalProcessEnv != null) {
@@ -2479,5 +2481,9 @@ public class LocalCluster extends VoltServerConfig {
     private void resetLogMessageMatchResults(int hostId) {
         assertTrue(m_logMessageMatchResults.containsKey(hostId));
         m_logMessageMatchResults.get(hostId).clear();
+    }
+
+    public void setRestorePlacement(boolean restorePlacement) {
+        m_restorePlacement = restorePlacement;
     }
 }
