@@ -332,7 +332,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                                     if (m_usageSpecificLog.isDebugEnabled()) {
                                         m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted during init");
                                     }
-                                    qs.closeAndDelete();
+                                    qs.closeAndTruncate();
                                     return false;
                                 }
                             }
@@ -463,7 +463,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             m_numObjects -= segment.getNumEntries();
             iterator.remove();
             m_usageSpecificLog.debug("Segment " + segment.file() + " has been closed and deleted by truncator");
-            segment.closeAndDelete();
+            segment.closeAndTruncate();
         }
 
         /*
