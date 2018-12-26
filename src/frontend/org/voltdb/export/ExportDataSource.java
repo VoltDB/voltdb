@@ -661,16 +661,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                     sb.releaseTo(m_lastReleasedSeqNo);
                 }
-
-                m_gapTracker.addRange(sb.unreleasedSequenceNumber(), lastSequenceNumber);
+                long newTuples = m_gapTracker.addRange(sb.unreleasedSequenceNumber(), lastSequenceNumber);
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Append [" + sb.unreleasedSequenceNumber() + "," + lastSequenceNumber +"] to gap tracker.");
                 }
 
                 m_lastQueuedTimestamp = sb.getTimestamp();
                 m_lastPushedSeqNo = lastSequenceNumber;
-                m_tupleCount += tupleCount;
-                m_tuplesPending.addAndGet((int)sb.unreleasedRowCount());
+                m_tupleCount += newTuples;
+                m_tuplesPending.addAndGet((int)newTuples);
                 m_committedBuffers.offer(sb);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
@@ -1051,6 +1050,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
+    public void forwardAckToOtherReplicas() {
+        forwardAckToOtherReplicas(m_lastReleasedSeqNo);
+    }
+
     private void forwardAckToOtherReplicas(long seq) {
         // In RunEveryWhere mode, every data source is master, no need to send out acks.
         if (m_runEveryWhere) {
@@ -1339,7 +1342,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             // Either get enough responses or have received TRANSFER_MASTER event, clear the response sender HSids.
                             m_queryResponses.clear();
                             m_onMastership.run();
-                            forwardAckToOtherReplicas(m_lastReleasedSeqNo);
                         }
                     }
                 } catch (Exception e) {
