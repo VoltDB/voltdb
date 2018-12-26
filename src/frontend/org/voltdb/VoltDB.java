@@ -1234,6 +1234,12 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        crashLocalVoltDB(errMsg, stackTrace, thrown, true);
+    }
+    /**
+     * Exit the process with an error message, optionally with a stack trace.
+     */
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown, boolean logFatal) {
 
         if (exitAfterMessage) {
             System.err.println(errMsg);
@@ -1330,7 +1336,9 @@ public class VoltDB {
 
                 if (log != null)
                 {
-                    log.fatal(errMsg);
+                    if (logFatal) {
+                        log.fatal(errMsg);
+                    }
                     if (thrown != null) {
                         if (stackTrace) {
                             log.fatal("Fatal exception", thrown);
