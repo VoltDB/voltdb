@@ -14,46 +14,56 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 import sys
+from voltcli.hostinfo import Hosts
 
+# TODO: change to specific version when feature branch merge into master
 RELEASE_MAJOR_VERSION = 8
-RELEASE_MINOR_VERSION = 5
+RELEASE_MINOR_VERSION = 4
+
+# elastic remove procedure call option
+# Need to be update once ElasticRemoveNT.java add/remove/change option coding
+class Option:
+    TEST = 0
+    START = 1
+    STATUS = 2
+    COMPELETE = 3
+
 
 def test(runner):
-    result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING],
-                              [0, runner.opts.hostOrPartition]).table(0)
-    status = result.tuple(0).column_integer(0)
-    message = result.tuple(0).column_string(1)
-    if status == 0:
-        runner.info(message)
-    else:
-        runner.error(message)
-        sys.exit(1)
+    procedureCaller(runner, Option.TEST)
 
 def start(runner):
-    result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING],
-                              [1, runner.opts.hostOrPartition]).table(0)
-    status = result.tuple(0).column_integer(0)
-    message = result.tuple(0).column_string(1)
-    if status == 0:
-        runner.info(message)
-    else:
-        runner.error(message)
-        sys.exit(1)
+    procedureCaller(runner, Option.START)
 
 def status(runner):
-    result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING],
-                              [2, runner.opts.hostOrPartition]).table(0)
-    status = result.tuple(0).column_integer(0)
-    message = result.tuple(0).column_string(1)
-    if status == 0:
-        runner.info(message)
-    else:
-        runner.error(message)
-        sys.exit(1)
+    procedureCaller(runner, Option.STATUS)
 
-def clearup(runner):
+def complete(runner):
+    procedureCaller(runner, Option.COMPELETE)
+
+def procedureCaller(runner, type):
+    response = runner.call_proc('@SystemInformation',
+                                [VOLT.FastSerializer.VOLTTYPE_STRING],
+                                ['OVERVIEW'])
+
+    # Convert @SystemInformation results to objects.
+    hosts = Hosts(runner.abort)
+    for tuple in response.table(0).tuples():
+        hosts.update(tuple[0], tuple[1], tuple[2])
+
+    # get current version and root directory from an arbitrary node
+    host = hosts.hosts_by_id.itervalues().next()
+
+    # @ElasticRemoveNT is added in v8.5?, so must check the version of target cluster to make it work properly.
+    version = host.version
+    versionStr = version.split('.')
+    majorVersion = int(versionStr[0])
+    minorVersion = int(versionStr[1])
+    if majorVersion < RELEASE_MAJOR_VERSION or (majorVersion == RELEASE_MAJOR_VERSION and minorVersion < RELEASE_MINOR_VERSION):
+        runner.abort('The version of targeting cluster is ' + version + ' which is lower than version ' + str(RELEASE_MAJOR_VERSION) + '.' + str(RELEASE_MINOR_VERSION) +' for supporting elastic resize.' )
+
     result = runner.call_proc('@ElasticRemoveNT', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_STRING],
-                              [3, runner.opts.hostOrPartition]).table(0)
+                              [type, runner.opts.hostOrPartition]).table(0)
     status = result.tuple(0).column_integer(0)
     message = result.tuple(0).column_string(1)
     if status == 0:
@@ -74,7 +84,7 @@ def clearup(runner):
             VOLT.Modifier('test', test, 'Check the feasibility of current resizing plan.'),
             VOLT.Modifier('start', start, 'Start the elastically resizing.'),
             VOLT.Modifier('status', status, 'Check the resizing progress.'),
-            VOLT.Modifier('clearup', status, 'Reset the status of last finished removal to ready for next removal.'),
+            VOLT.Modifier('complete', status, 'Complete the previous removal.'),
     )
 )
 
