@@ -88,4 +88,9 @@ public interface ConsumerDRGateway extends Promotable {
     boolean isSafeForDropLocal();
 
     void handleProducerClusterElasticChange(byte producerClusterId, int newProducerPartitionCount);
+
+    /**
+     * Log the current set of clusters that this consumer is receiving data from.
+     */
+    public void logActiveConversations();
 }
