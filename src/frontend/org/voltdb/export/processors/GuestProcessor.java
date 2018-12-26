@@ -225,6 +225,7 @@ public class GuestProcessor implements ExportDataProcessor {
             m_decoders.add(pair);
             final ListenableFuture<AckingContainer> fut = m_source.poll();
             addBlockListener(m_source, fut, edb);
+            m_source.forwardAckToOtherReplicas();
         }
 
         private void runDataSource() {

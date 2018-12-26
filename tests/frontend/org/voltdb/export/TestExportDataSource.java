@@ -118,10 +118,6 @@ public class TestExportDataSource extends TestCase {
         }
 
         @Override
-        public void pushEndOfStream(int partitionId, String signature) {
-        }
-
-        @Override
         public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                     boolean isRecover, long sequenceNumber) {
         }

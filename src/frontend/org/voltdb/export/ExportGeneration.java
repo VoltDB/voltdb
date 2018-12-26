@@ -378,8 +378,8 @@ public class ExportGeneration implements Generation {
 
     // Access by multiple threads
     public void updateAckMailboxes(int partition, Set<Long> newHSIds) {
+        ImmutableList<Long> replicaHSIds = m_replicasHSIds.get(partition);
         synchronized (m_dataSourcesByPartition) {
-            ImmutableList<Long> replicaHSIds = m_replicasHSIds.get(partition);
             for( ExportDataSource eds: m_dataSourcesByPartition.get(partition).values()) {
                 eds.updateAckMailboxes(Pair.of(m_mbox, replicaHSIds));
                 if (newHSIds != null && !newHSIds.isEmpty()) {
@@ -598,17 +598,19 @@ public class ExportGeneration implements Generation {
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating " + source.toString() + " for " + adFile + " bytes " + source.sizeInBytes());
         }
-        Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(source.getPartitionId());
-        if (dataSourcesForPartition == null) {
-            dataSourcesForPartition = new HashMap<String, ExportDataSource>();
-            m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
-        } else {
-            if (dataSourcesForPartition.get(source.getSignature()) != null) {
-                exportLog.warn("On Disk generation with same table, partition already exists using known data source.");
-                return;
+        synchronized(m_dataSourcesByPartition) {
+            Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(source.getPartitionId());
+            if (dataSourcesForPartition == null) {
+                dataSourcesForPartition = new HashMap<String, ExportDataSource>();
+                m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
+            } else {
+                if (dataSourcesForPartition.get(source.getSignature()) != null) {
+                    exportLog.warn("On Disk generation with same table, partition already exists using known data source.");
+                    return;
+                }
             }
+            dataSourcesForPartition.put( source.getSignature(), source);
         }
-        dataSourcesForPartition.put( source.getSignature(), source);
     }
 
     // silly helper to add datasources for a table catalog object
@@ -622,37 +624,39 @@ public class ExportGeneration implements Generation {
              */
             int partition = partitionAndSiteId.getFirst();
             int siteId = partitionAndSiteId.getSecond();
-            try {
-                Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
-                if (dataSourcesForPartition == null) {
-                    dataSourcesForPartition = new HashMap<String, ExportDataSource>();
-                    m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
-                }
-                final String key = table.getSignature();
-                if (!dataSourcesForPartition.containsKey(key)) {
-                    ExportDataSource exportDataSource = new ExportDataSource(this,
-                            "database",
-                            table.getTypeName(),
-                            partition,
-                            siteId,
-                            key,
-                            table.getColumns(),
-                            table.getPartitioncolumn(),
-                            m_directory.getPath());
-                    if (exportLog.isDebugEnabled()) {
-                        exportLog.debug("Creating ExportDataSource for table in catalog " + table.getTypeName() +
-                                " signature " + key + " partition " + partition + " site " + siteId);
+            synchronized(m_dataSourcesByPartition) {
+                try {
+                    Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
+                    if (dataSourcesForPartition == null) {
+                        dataSourcesForPartition = new HashMap<String, ExportDataSource>();
+                        m_dataSourcesByPartition.put(partition, dataSourcesForPartition);
                     }
+                    final String key = table.getSignature();
+                    if (!dataSourcesForPartition.containsKey(key)) {
+                        ExportDataSource exportDataSource = new ExportDataSource(this,
+                                "database",
+                                table.getTypeName(),
+                                partition,
+                                siteId,
+                                key,
+                                table.getColumns(),
+                                table.getPartitioncolumn(),
+                                m_directory.getPath());
+                        if (exportLog.isDebugEnabled()) {
+                            exportLog.debug("Creating ExportDataSource for table in catalog " + table.getTypeName() +
+                                    " signature " + key + " partition " + partition + " site " + siteId);
+                        }
 
-                    dataSourcesForPartition.put(key, exportDataSource);
-                } else {
-                    //Since we are loading from catalog any found EDS mark it to be in catalog.
-                    dataSourcesForPartition.get(key).markInCatalog();
+                        dataSourcesForPartition.put(key, exportDataSource);
+                    } else {
+                        //Since we are loading from catalog any found EDS mark it to be in catalog.
+                        dataSourcesForPartition.get(key).markInCatalog();
+                    }
+                } catch (IOException e) {
+                    VoltDB.crashLocalVoltDB(
+                            "Error creating datasources for table " +
+                            table.getTypeName() + " host id " + hostId, true, e);
                 }
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB(
-                        "Error creating datasources for table " +
-                        table.getTypeName() + " host id " + hostId, true, e);
             }
         }
     }
@@ -684,41 +688,21 @@ public class ExportGeneration implements Generation {
         source.pushExportBuffer(startSequenceNumber, tupleCount, uniqueId, buffer, sync);
     }
 
-    @Override
-    public void pushEndOfStream(int partitionId, String signature) {
-        assert(m_dataSourcesByPartition.containsKey(partitionId));
-        assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
-        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
-
-        if (sources == null) {
-            exportLog.error("EOS Could not find export data sources for partition "
-                    + partitionId + ". The export end of stream is being discarded.");
-            return;
-        }
-
-        ExportDataSource source = sources.get(signature);
-        if (source == null) {
-            exportLog.error("EOS Could not find export data source for partition " + partitionId +
-                    " signature " + signature + ". The export end of stream is being discarded.");
-            return;
-        }
-
-        source.pushEndOfStream();
-    }
-
     private void cleanup(final HostMessenger messenger) {
         shutdown = true;
         //We need messenger NULL guard for tests.
         if (m_mbox != null && messenger != null) {
-            for (Integer partition : m_dataSourcesByPartition.keySet()) {
-                final String partitionDN =  m_mailboxesZKPath + "/" + partition;
-                String path = partitionDN + "/" + m_mbox.getHSId();
-                try {
-                    messenger.getZK().delete(path, 0);
-                } catch (InterruptedException ex) {
-                    ;
-                } catch (KeeperException ex) {
-                    ;
+            synchronized(m_dataSourcesByPartition) {
+                for (Integer partition : m_dataSourcesByPartition.keySet()) {
+                    final String partitionDN =  m_mailboxesZKPath + "/" + partition;
+                    String path = partitionDN + "/" + m_mbox.getHSId();
+                    try {
+                        messenger.getZK().delete(path, 0);
+                    } catch (InterruptedException ex) {
+                        ;
+                    } catch (KeeperException ex) {
+                        ;
+                    }
                 }
             }
             messenger.removeMailbox(m_mbox);
@@ -751,11 +735,13 @@ public class ExportGeneration implements Generation {
     @Override
     public void sync(final boolean nofsync) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-        for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
-            for (ExportDataSource source : dataSources.values()) {
-                ListenableFuture<?> syncFuture = source.sync(nofsync);
-                if (syncFuture != null)
-                    tasks.add(syncFuture);
+        synchronized(m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : dataSources.values()) {
+                    ListenableFuture<?> syncFuture = source.sync(nofsync);
+                    if (syncFuture != null)
+                        tasks.add(syncFuture);
+                }
             }
         }
 
@@ -770,9 +756,11 @@ public class ExportGeneration implements Generation {
     @Override
     public void close(final HostMessenger messenger) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-        for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
-            for (ExportDataSource source : sources.values()) {
-                tasks.add(source.close());
+        synchronized(m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : sources.values()) {
+                    tasks.add(source.close());
+                }
             }
         }
         try {
@@ -788,9 +776,11 @@ public class ExportGeneration implements Generation {
     }
 
     public void unacceptMastership() {
-        for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
-            for (ExportDataSource source : partitionDataSourceMap.values()) {
-                source.unacceptMastership();
+        synchronized(m_dataSourcesByPartition) {
+            for (Map<String, ExportDataSource> partitionDataSourceMap : m_dataSourcesByPartition.values()) {
+                for (ExportDataSource source : partitionDataSourceMap.values()) {
+                    source.unacceptMastership();
+                }
             }
         }
     }
@@ -801,14 +791,16 @@ public class ExportGeneration implements Generation {
      * @param partitionId
      */
     public void prepareTransferMastership(int partitionId, int hostId) {
-        Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
+        synchronized(m_dataSourcesByPartition) {
+            Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
-        // this case happens when there are no export tables
-        if (partitionDataSourceMap == null) {
-            return;
-        }
-        for (ExportDataSource eds : partitionDataSourceMap.values()) {
-            eds.prepareTransferMastership(hostId);
+            // this case happens when there are no export tables
+            if (partitionDataSourceMap == null) {
+                return;
+            }
+            for (ExportDataSource eds : partitionDataSourceMap.values()) {
+                eds.prepareTransferMastership(hostId);
+            }
         }
     }
 
@@ -819,18 +811,20 @@ public class ExportGeneration implements Generation {
      */
     @Override
     public void acceptMastership(int partitionId) {
-        Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
+        synchronized(m_dataSourcesByPartition) {
+            Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
-        // this case happens when there are no export tables
-        if (partitionDataSourceMap == null) {
-            return;
-        }
+            // this case happens when there are no export tables
+            if (partitionDataSourceMap == null) {
+                return;
+            }
 
-        for( ExportDataSource eds: partitionDataSourceMap.values()) {
-            try {
-                eds.acceptMastership();
-            } catch (Exception e) {
-                exportLog.error("Unable to start exporting", e);
+            for( ExportDataSource eds: partitionDataSourceMap.values()) {
+                try {
+                    eds.acceptMastership();
+                } catch (Exception e) {
+                    exportLog.error("Unable to start exporting", e);
+                }
             }
         }
     }
@@ -841,15 +835,17 @@ public class ExportGeneration implements Generation {
      * @param partitionId
      */
     void takeMastership(int partitionId) {
-        Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
+        synchronized(m_dataSourcesByPartition) {
+            Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
-        // this case happens when there are no export tables
-        if (partitionDataSourceMap == null) {
-            return;
-        }
+            // this case happens when there are no export tables
+            if (partitionDataSourceMap == null) {
+                return;
+            }
 
-        for( ExportDataSource eds: partitionDataSourceMap.values()) {
-            eds.takeMastership();
+            for( ExportDataSource eds: partitionDataSourceMap.values()) {
+                eds.takeMastership();
+            }
         }
     }
 

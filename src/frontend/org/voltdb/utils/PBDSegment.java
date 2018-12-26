@@ -177,8 +177,9 @@ public abstract class PBDSegment {
      * @throws IOException
      */
     int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException {
-        if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
-
+        if (!m_closed) {
+            close();
+        }
         openForWrite(false);
         PBDSegmentReader reader = openForRead(TRUNCATOR_CURSOR);
 
