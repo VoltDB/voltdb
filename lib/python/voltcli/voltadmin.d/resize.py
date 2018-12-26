@@ -26,7 +26,7 @@ class Option:
     TEST = 0
     START = 1
     STATUS = 2
-    COMPELETE = 3
+    COMPLETE = 3
 
 
 def test(runner):
@@ -39,7 +39,7 @@ def status(runner):
     procedureCaller(runner, Option.STATUS)
 
 def complete(runner):
-    procedureCaller(runner, Option.COMPELETE)
+    procedureCaller(runner, Option.COMPLETE)
 
 def procedureCaller(runner, type):
     response = runner.call_proc('@SystemInformation',
@@ -84,7 +84,7 @@ def procedureCaller(runner, type):
             VOLT.Modifier('test', test, 'Check the feasibility of current resizing plan.'),
             VOLT.Modifier('start', start, 'Start the elastically resizing.'),
             VOLT.Modifier('status', status, 'Check the resizing progress.'),
-            VOLT.Modifier('complete', status, 'Complete the previous removal.'),
+            VOLT.Modifier('complete', complete, 'Complete the previous removal.'),
     )
 )
 
