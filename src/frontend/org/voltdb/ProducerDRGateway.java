@@ -205,4 +205,9 @@ public interface ProducerDRGateway {
     public void dropLocal();
 
     public void elasticChangeUpdatesPartitionCount(int newPartitionCnt);
+
+    /**
+     * If DR producer is enabled and listening, this will log the current conversations.
+     */
+    public void logActiveConversations();
 }
