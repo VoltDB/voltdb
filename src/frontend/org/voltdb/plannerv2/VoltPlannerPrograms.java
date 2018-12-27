@@ -43,14 +43,23 @@ public class VoltPlannerPrograms {
         VOLT_PHYSICAL_CONVERSION
     }
 
-    /** See {@link org.apache.calcite.tools.Programs.CALC_RULES} */
+    /**
+     * See {@link org.apache.calcite.tools.Programs.CALC_RULES}
+     * Calcite logical rules are for dealing with projection and filters.
+     * The consecutive projections and filters are later merged into a LogicalCalc. */
     private static final RuleSet CALC_LOGICAL = RuleSets.ofList(
+            // Merge two LogicalCalc's.
+            // Who produces LogicalCalc? - See comments in LogicalCalc.java
+            // Is there an example of this merge?
+            // - See comments in RexProgramBuilder.mergePrograms()
             CalcMergeRule.INSTANCE,
             FilterCalcMergeRule.INSTANCE,
             FilterToCalcRule.INSTANCE,
             ProjectCalcMergeRule.INSTANCE,
             ProjectToCalcRule.INSTANCE,
             ProjectMergeRule.INSTANCE,
+            // Filter   ->  Project
+            // Project      Filter
             FilterProjectTransposeRule.INSTANCE);
 
     private static final RuleSet VOLT_LOGICAL = RuleSets.ofList(

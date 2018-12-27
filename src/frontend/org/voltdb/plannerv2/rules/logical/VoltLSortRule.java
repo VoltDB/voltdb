@@ -24,12 +24,13 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalSort;
+import org.voltdb.plannerv2.rel.logical.VoltDBLSort;
 import org.voltdb.plannerv2.rel.logical.VoltLLimit;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.logical.VoltDBLSort;
 
 /**
- * VoltDB logical rule that transform {@link LogicalSort} to {@link VoltDBLSort} or {@link VoltLLimit}.
+ * VoltDB logical rule that transform {@link LogicalSort} to
+ * {@link VoltDBLSort} or {@link VoltLLimit}.
  *
  * @author Michael Alexeev
  * @since 8.4

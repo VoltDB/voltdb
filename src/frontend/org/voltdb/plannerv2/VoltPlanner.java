@@ -53,17 +53,17 @@ import com.google.common.collect.ImmutableList;
  */
 public class VoltPlanner implements Planner {
 
-    final VoltFrameworkConfig m_config;
-    final SqlValidator m_validator;
-    final RexBuilder m_rexBuilder;
-    final RelOptPlanner m_relPlanner;
-    final SqlToRelConverter m_sqlToRelConverter;
-    final RelBuilder m_relBuilder;
+    private final VoltFrameworkConfig m_config;
+    private final SqlValidator m_validator;
+    private final RexBuilder m_rexBuilder;
+    private final RelOptPlanner m_relPlanner;
+    private final SqlToRelConverter m_sqlToRelConverter;
+    private final RelBuilder m_relBuilder;
 
     // Internal states.
-    State m_state;
-    SqlNode m_validatedSqlNode;
-    RelRoot m_relRoot;
+    private State m_state;
+    private SqlNode m_validatedSqlNode;
+    private RelRoot m_relRoot;
 
     /**
      * Build a {@link org.voltdb.plannerv2.VoltPlanner}
@@ -78,6 +78,7 @@ public class VoltPlanner implements Planner {
         for (@SuppressWarnings("rawtypes") RelTraitDef def : m_config.getTraitDefs()) {
             m_relPlanner.addRelTraitDef(def);
         }
+        // The RelTraitDefs need to be added to the planner before building the cluster
         RelOptCluster cluster = RelOptCluster.create(m_relPlanner, m_rexBuilder);
         cluster.setMetadataProvider(new CachingRelMetadataProvider(
                 VoltRelMetadataProvider.INSTANCE, m_relPlanner));
@@ -163,6 +164,7 @@ public class VoltPlanner implements Planner {
     @Override public RelNode transform(int ruleSetIndex, RelTraitSet requiredOutputTraits, RelNode rel)
             throws RelConversionException {
         ensure(State.STATE_3_CONVERTED);
+        requiredOutputTraits = requiredOutputTraits.simplify();
         Program program = m_config.getPrograms().get(ruleSetIndex);
         return program.run(
                 m_relPlanner, rel, requiredOutputTraits,

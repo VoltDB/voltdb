@@ -17,13 +17,14 @@
 
 package org.voltdb.plannerv2.rel.logical;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rex.RexNode;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Logical Sort with <code>VOLTDB_LOGICAL</code> convention trait.
@@ -38,15 +39,15 @@ public class VoltDBLSort extends Sort implements VoltLogicalRel {
             RelTraitSet traitSet,
             RelNode input,
             RelCollation collation) {
-            super(cluster, traitSet, input, collation, null, null);
-            Preconditions.checkArgument(getConvention() == VoltLogicalRel.VOLTDB_LOGICAL);
-        }
+        super(cluster, traitSet, input, collation, null, null);
+        Preconditions.checkArgument(getConvention() == VoltLogicalRel.VOLTDB_LOGICAL);
+    }
 
-        @Override
-        public VoltDBLSort copy(RelTraitSet traitSet, RelNode input,
-                                RelCollation collation,
-                                RexNode offset,
-                                RexNode fetch) {
-          return new VoltDBLSort(getCluster(), traitSet, input, collation);
-        }
+    @Override
+    public VoltDBLSort copy(RelTraitSet traitSet, RelNode input,
+                            RelCollation collation,
+                            RexNode offset,
+                            RexNode fetch) {
+        return new VoltDBLSort(getCluster(), traitSet, input, collation);
+    }
 }

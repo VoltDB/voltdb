@@ -17,8 +17,6 @@
 
 package org.voltdb.plannerv2.rules;
 
-import com.google_voltpatches.common.collect.ImmutableCollection;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
@@ -41,8 +39,8 @@ import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.google_voltpatches.common.collect.ImmutableCollection;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Returns RuleSet for concrete planner phase.
@@ -52,18 +50,21 @@ import java.util.List;
  */
 public enum PlannerPhase {
     CALCITE_LOGICAL("Calcite logical rules") {
+        @Override
         public RuleSet getRules() {
             return getCalciteLogicalRules();
         }
     },
 
     VOLT_LOGICAL("VoltDB logical rules") {
+        @Override
         public RuleSet getRules() {
             return getVoltLogicalRules();
         }
     },
 
     LOGICAL("Calcite and VoltDB logical rules") {
+        @Override
         public RuleSet getRules() {
             return mergedRuleSets(getCalciteLogicalRules(),
                     getVoltLogicalRules());
@@ -71,6 +72,7 @@ public enum PlannerPhase {
     },
 
     PHYSICAL_CONVERSION("VoltDBPhysical Conversion Rules") {
+        @Override
         public RuleSet getRules() {
             return getVoltPhysicalConversionRules();
         }

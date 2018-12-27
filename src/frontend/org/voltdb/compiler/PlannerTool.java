@@ -21,6 +21,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.tools.RelConversionException;
@@ -49,6 +50,7 @@ import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
+import org.voltdb.plannerv2.utils.VoltDBRelUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
@@ -211,7 +213,7 @@ public class PlannerTool {
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
             throws ValidationException, RelConversionException, PlannerFallbackException {
-        // TRAIL [Calcite:4] PlannerTool.planSqlCalcite()
+        // TRAIL [Calcite-AdHoc-DQL/DML:4] PlannerTool.planSqlCalcite()
         VoltPlanner planner = new VoltPlanner(m_schemaPlus);
 
         // Validate the task's SqlNode.
@@ -220,8 +222,11 @@ public class PlannerTool {
         // Convert SqlNode to RelNode.
         RelNode rel = planner.convert(task.getParsedQuery());
 
-        // Apply Calcite and VoltDB logical rules
+        // Set the convention trait from NONE to VOLTDB_LOGICAL.
         RelTraitSet requiredLogicalOutputTraits = planner.getEmptyTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
+        // Apply Calcite and VoltDB logical rules
+        // See comments in VoltPlannerPrograms.directory.LOGICAL to find out
+        // what each rule is used for.
         RelNode transformed = planner.transform(
                 VoltPlannerPrograms.directory.LOGICAL.ordinal(),
                 requiredLogicalOutputTraits, rel);
@@ -232,7 +237,7 @@ public class PlannerTool {
         transformed.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
         // Add RelDistributions.SINGLETON trait to the rel tree.
-//        transformed = VoltDBRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);
+        transformed = VoltDBRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);

@@ -32,7 +32,7 @@ public class VoltRelMetadataProvider extends ChainedRelMetadataProvider {
     public static final RelMetadataProvider INSTANCE = new VoltRelMetadataProvider();
 
     protected VoltRelMetadataProvider() {
-        super(ImmutableList.of(VoltRelMdParallelism.SOURCE,
+        super(ImmutableList.of(//VoltRelMdParallelism.SOURCE,
                                DefaultRelMetadataProvider.INSTANCE));
     }
 }
