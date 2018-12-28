@@ -27,27 +27,36 @@ import org.apache.calcite.rex.RexNode;
 import com.google.common.base.Preconditions;
 
 /**
- * Logical Sort with <code>VOLTDB_LOGICAL</code> convention trait.
+ * Sub-class of {@link org.apache.calcite.rel.core.Sort}
+ * targeted at the VoltDB logical calling convention.
  *
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLSort extends Sort implements VoltRel {
+public class VoltLogicalSort extends Sort implements VoltLogicalRel {
 
-    public VoltDBLSort(
+    /**
+     * Creates a VoltLogicalSort.
+     *
+     * @param cluster   Cluster this relational expression belongs to
+     * @param traitSet  Traits
+     * @param input     Input relational expression
+     * @param collation Array of sort specifications
+     */
+    public VoltLogicalSort(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
             RelCollation collation) {
         super(cluster, traitSet, input, collation, null, null);
-        Preconditions.checkArgument(getConvention() == VoltRel.CONVENTION);
+        Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
     @Override
-    public VoltDBLSort copy(RelTraitSet traitSet, RelNode input,
+    public VoltLogicalSort copy(RelTraitSet traitSet, RelNode input,
                             RelCollation collation,
                             RexNode offset,
                             RexNode fetch) {
-        return new VoltDBLSort(getCluster(), traitSet, input, collation);
+        return new VoltLogicalSort(getCluster(), traitSet, input, collation);
     }
 }

@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableList;
 
 /**
  * VoltDB's provider for providing metadata about relational expressions.
+ *
  * @since 8.4
  */
 public class VoltRelMetadataProvider extends ChainedRelMetadataProvider {
@@ -32,7 +33,7 @@ public class VoltRelMetadataProvider extends ChainedRelMetadataProvider {
     public static final RelMetadataProvider INSTANCE = new VoltRelMetadataProvider();
 
     protected VoltRelMetadataProvider() {
-        super(ImmutableList.of(//VoltRelMdParallelism.SOURCE,
+        super(ImmutableList.of(VoltRelMdParallelism.SOURCE,
                                DefaultRelMetadataProvider.INSTANCE));
     }
 }

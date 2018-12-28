@@ -21,7 +21,8 @@ import org.voltdb.VoltDB;
 
 /**
  * Large queries cannot be handled by Calcite now.
- * Fail the check if any large queries is detected.
+ * Fail the check if the large query mode is enabled.
+ *
  * @author Yiqun Zhang
  * @since 8.4
  */
@@ -30,13 +31,11 @@ public class NoLargeQuery extends CalciteCompatibilityCheck {
     private static final boolean s_isLargeTempTableTarget =
             VoltDB.instance().getBackendTargetType().isLargeTempTableTarget;
 
-    @Override
-    protected final boolean doCheck(String sql) {
+    @Override protected final boolean doCheck(String sql) {
         return ! s_isLargeTempTableTarget;
     }
 
-    @Override
-    protected final boolean isNegativeCheck() {
+    @Override protected final boolean isNegativeCheck() {
         return true;
     }
 }

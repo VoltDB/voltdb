@@ -20,7 +20,7 @@ package org.voltdb.plannerv2.guards;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.planner.PlanningErrorException;
-import org.voltdb.plannerv2.VoltSqlParser;
+import org.voltdb.plannerv2.VoltFastSqlParser;
 
 /**
  * Allow all DDLs if we support them.
@@ -37,13 +37,13 @@ public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
         }
     }
 
-    @Override
-    protected boolean doCheck(String sql) {
+    @Override protected boolean doCheck(String sql) {
         try {
-            return VoltSqlParser.parse(sql).isA(SqlKind.DDL);
+            return VoltFastSqlParser.parse(sql).isA(SqlKind.DDL);
         } catch (SqlParseException e) {
             if (e.getCause() instanceof StackOverflowError) {
-                // Ethan: I think this is copied from NonDdlBatchCompiler and
+                // Note - ethan - 12/28/2008:
+                // I think this is copied from NonDdlBatchCompiler and
                 // AdHocNTBase.compileAdHocSQL() by Lukai. It may be unnecessary.
                 // Throwing an exception that's not a PlannerFallbackException will abort the planning.
                 throw new PlanningErrorException("Encountered stack overflow error. " +
@@ -56,8 +56,7 @@ public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
         }
     }
 
-    @Override
-    protected boolean isNegativeCheck() {
+    @Override protected boolean isNegativeCheck() {
         return false;
     }
 }

@@ -32,9 +32,11 @@ import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.voltcore.utils.Pair;
 
 /**
- * The visitor that can replace all the {@link org.apache.calcite.sql.SqlLiteral}
- * in the query to {@link org.apache.calcite.sql.SqlDynamicParam}.
- * It is used for parameterizing a query.
+ * The visitor that can replace all {@link SqlLiteral} in the query to
+ * {@link SqlDynamicParam}. It is used for parameterizing a query.
+ * After parameterization, the original parameter values are preserved in the
+ * {@link ParameterizedSqlTask}.
+ *
  * @author Chao Zhou
  * @since 8.4
  */
@@ -44,7 +46,6 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
     private int m_dynamicParamIndex = 0;
 
     /**
-     * Get the list of parameter values.
      * @return the list of parameter values.
      */
     public List<SqlLiteral> getSqlLiteralList() {
@@ -73,6 +74,7 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
          */
         if (literal.getTypeName() == SqlTypeName.BOOLEAN
                 || literal.getTypeName() == SqlTypeName.SYMBOL) {
+            // Return null, nothing will change.
             return null;
         }
         m_sqlLiteralList.add(literal);
@@ -124,6 +126,7 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
     /**
      * Pair the list elements with their ordinal indexes, then put the pairs into
      * another list.
+     *
      * @param originalList the list of elements.
      * @return the generated list of pairs.
      */
@@ -141,14 +144,15 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
 
     /**
      * Comparator for Pair<Integer, SqlNode>, based on the SqlNode's parser position.
+     *
      * @author Yiqun Zhang
      * @since 8.4
      */
     private static final class PositionBasedIndexedSqlNodePairComparator implements Comparator<Pair<Integer,SqlNode>> {
         final static PositionBasedIndexedSqlNodePairComparator INSTANCE =
                 new PositionBasedIndexedSqlNodePairComparator();
-        @Override
-        public int compare(Pair<Integer,SqlNode> o1, Pair<Integer,SqlNode> o2) {
+
+        @Override public int compare(Pair<Integer,SqlNode> o1, Pair<Integer,SqlNode> o2) {
             SqlParserPos lPos = o1.getSecond().getParserPosition();
             SqlParserPos rPos = o2.getSecond().getParserPosition();
             return lPos.startsBefore(rPos) ? -1 : 1;

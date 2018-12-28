@@ -25,18 +25,23 @@ import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 
 /**
- * Extend this class to create a decorator for a
- * {@link org.voltdb.plannerv2.SqlBatch}.
- * @since 8.4
+ * Extend this class to create a decorator for a {@link SqlBatch}.
+ *
  * @author Yiqun Zhang
+ * @since 8.4
  */
 public abstract class AbstractSqlBatchDecorator extends SqlBatch {
 
     /**
-     * The {@link org.voltdb.plannerv2.SqlBatch} to be decorated.
+     * The {@link SqlBatch} to be decorated.
      */
     final SqlBatch m_batchToDecorate;
 
+    /**
+     * Initialize an AbstractSqlBatchDecorator.
+     *
+     * @param batchToDecorate the {link SqlBatch} this decorator is decorating.
+     */
     public AbstractSqlBatchDecorator(SqlBatch batchToDecorate) {
         m_batchToDecorate = batchToDecorate;
     }

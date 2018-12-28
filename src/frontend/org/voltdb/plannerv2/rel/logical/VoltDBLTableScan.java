@@ -26,7 +26,7 @@ import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
 import org.voltdb.plannerv2.rel.VoltTable;
 
-public class VoltDBLTableScan extends AbstractVoltTableScan implements VoltRel {
+public class VoltDBLTableScan extends AbstractVoltTableScan implements VoltLogicalRel {
 
     public VoltDBLTableScan(RelOptCluster cluster,
             RelTraitSet traitSet,

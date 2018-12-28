@@ -18,8 +18,9 @@
 package org.voltdb.plannerv2.guards;
 
 /**
- * An exception indicates that we should go back and use the old VoltDB parser
- * and planner.
+ * An exception indicates that we should go back and use the legacy
+ * VoltDB parser and planner.
+ *
  * @author Yiqun Zhang
  * @since 8.4
  */

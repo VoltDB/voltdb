@@ -33,27 +33,25 @@ import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 
 /**
- * The base class for defining a query batch with one or more {@link org.voltdb.plannerv2.SqlTask}s.</br>
+ * The base class for defining a query batch with one or more {@link SqlTask}.</br>
  * It provides the {@code Iterable<SqlTask>} interface to give access to its contained tasks.
- * @since 8.4
+ *
  * @author Yiqun Zhang
+ * @since 8.4
  */
 public abstract class SqlBatch implements Iterable<SqlTask>  {
 
     /**
-     * Check if the batch is purely comprised of DDL statements.
      * @return true if the batch is comprised of DDL statements only.
      */
     public abstract boolean isDDLBatch();
 
     /**
-     * Get the user parameters.
      * @return the user parameter array.
      */
     public abstract Object[] getUserParameters();
 
     /**
-     * Get the number of tasks in this batch.
      * @return the count of tasks in this batch.
      */
     public abstract int getTaskCount();
@@ -62,12 +60,15 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
      * Get the execution context of this batch; </br>
      * This should only be used internally, do not expose it as it calls
      * private APIs in AdHoc.
-     * @return the context.
+     *
+     * @return the context
+     * @see SqlBatch.Context
      */
     abstract Context getContext();
 
     /**
      * Execute the batch.
+     *
      * @return the client response.
      * @throws AdHocPlanningException if the planning went wrong.
      * @throws PlannerFallbackException if we need to switch to the legacy parser/planner.
@@ -76,11 +77,12 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
             throws AdHocPlanningException, PlannerFallbackException;
 
     /**
-     * Build a {@link org.voltdb.plannerv2.SqlBatch} from a {@link org.voltdb.ParameterSet}
+     * Build a {@link SqlBatch} from a {@link org.voltdb.ParameterSet}
      * passed through the {@code @AdHoc} system stored procedure.
+     *
      * @param params the user parameters. The first parameter is always the query text.
-     * The rest parameters are the ones used in the query.
-     * @param context the AdHoc context. used for calling internal AdHoc APIs before the refactor is done.
+     *               The rest parameters are the ones used in the query.
+     * @param context the AdHoc context which is used for calling internal AdHoc APIs before further refactor.
      * @return a {@code SqlBatch} built from the given {@code ParameterSet}.
      * @throws SqlParseException when the query parsing went wrong.
      * @throws PlannerFallbackException when any of the queries in the batch cannot be handled by Calcite.
@@ -98,7 +100,7 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
         SqlBatch batch = new SqlBatchImpl(sqlBlock, userParams, context);
-        if (! batch.isDDLBatch()) {
+        if ( ! batch.isDDLBatch()) {
             // Decorate the batch with the add-ons for non-DDL batches so that it will just do the right thing.
             batch = new NonDdlBatch(batch);
         }
@@ -110,6 +112,7 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
      * due to the way that the legacy code was designed.
      * Before I have further reshaped the legacy code path, I will leave an interface to call back
      * into the private methods of {@link org.voltdb.sysprocs.AdHoc} as a compromise.
+     *
      * @author Yiqun Zhang
      * @since 8.4
      */

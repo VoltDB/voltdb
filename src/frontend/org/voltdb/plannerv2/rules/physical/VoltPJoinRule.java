@@ -23,13 +23,13 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeField;
-import org.voltdb.plannerv2.rel.logical.VoltDBLJoin;
-import org.voltdb.plannerv2.rel.logical.VoltRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPJoin;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 
 /**
- * VoltDB physical rule that transform {@link VoltDBLJoin} to {@link VoltDBPJoin}.
+ * VoltDB physical rule that transform {@link VoltLogicalJoin} to {@link VoltDBPJoin}.
  *
  * @author Chao Zhou
  * @since 8.4
@@ -39,12 +39,12 @@ public class VoltPJoinRule extends RelOptRule {
     public static final VoltPJoinRule INSTANCE = new VoltPJoinRule();
 
     VoltPJoinRule() {
-        super(operand(VoltDBLJoin.class, VoltRel.CONVENTION, any()));
+        super(operand(VoltLogicalJoin.class, VoltLogicalRel.CONVENTION, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLJoin join = call.rel(0);
+        VoltLogicalJoin join = call.rel(0);
         RelNode left = join.getLeft();
         RelNode right = join.getRight();
         RelTraitSet convertedTraits = join.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);

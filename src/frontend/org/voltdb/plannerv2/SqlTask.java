@@ -22,43 +22,30 @@ import org.apache.calcite.sql.parser.SqlParseException;
 
 /**
  * SqlTask stores a parsed query tree.
- * @since 8.4
+ *
  * @author Yiqun Zhang
+ * @since 8.4
  */
 public interface SqlTask {
 
     /**
-     * Tell if this {@code SqlTask} is a DDL task.
-     * @return true if this {@code SqlTask} is a DDL task.
+     * @return true if this {@link SqlTask} is a DDL task.
      */
     boolean isDDL();
 
     /**
-     * Tell if this {@code SqlTask} is a DQL task.
-     * @return true if this {@code SqlTask} is a DQL task.
-     */
-    boolean isDQL();
-
-    /**
-     * Tell if this {@code SqlTask} is a DML task.
-     * @return true if this {@code SqlTask} is a DML task.
-     */
-    boolean isDML();
-
-    /**
-     * Get the original SQL query text.
      * @return the original SQL query text.
      */
     String getSQL();
 
     /**
-     * Get the parsed query node tree.
      * @return the parsed query node tree.
      */
     SqlNode getParsedQuery();
 
     /**
-     * Create a default {@link org.voltdb.plannerv2.SqlTask} from a SQL query.
+     * Create a basic {@link SqlTask} from a SQL query.
+     *
      * @param sql the SQL query
      * @return the created SqlTask.
      * @throws SqlParseException when the parsing goes wrong.

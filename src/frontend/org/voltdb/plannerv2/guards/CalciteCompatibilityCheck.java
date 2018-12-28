@@ -20,6 +20,7 @@ package org.voltdb.plannerv2.guards;
 /**
  * Check if a SQL statement should be routed to Calcite planner.
  * This is a temporary check before we can make Calcite support all the VoltDB syntaxes.
+ *
  * @author Yiqun Zhang
  * @since 8.4
  */
@@ -31,10 +32,11 @@ public abstract class CalciteCompatibilityCheck {
     CalciteCompatibilityCheck m_next;
 
     /**
-     * All the {@code CalciteCompatibilityCheck} subclasses should implement this method
+     * All the {@link CalciteCompatibilityCheck} subclasses should implement this method
      * to do their own checks and return a result.
-     * @param sql the SQL statement to check.
-     * @return the check result.
+     *
+     * @param sql the SQL statement to check
+     * @return the check result
      */
     protected abstract boolean doCheck(String sql);
 
@@ -42,12 +44,14 @@ public abstract class CalciteCompatibilityCheck {
      * Indicates whether this check is a negative check.
      * A positive check should proceed to its next chained check on check failure.
      * A negative check should proceed to its next chained check on check success.
+     *
      * @return true if the check is a negative one.
      */
     protected abstract boolean isNegativeCheck();
 
     /**
      * Start the chained check to see if the SQL statement should be routed to Calcite.
+     *
      * @param sql the SQL statement to check.
      * @return true if this statement should be routed to Calcite.
      */
@@ -62,8 +66,9 @@ public abstract class CalciteCompatibilityCheck {
     }
 
     /**
-     * Add another {@code CalciteCompatibilityCheck} instance to the end of the chain
+     * Add another {@link CalciteCompatibilityCheck} instance to the end of the chain
      * and return the newly appended {@code CalciteCompatibilityCheck} instance.
+     *
      * @param next the instance to append.
      * @return the instance appended.
      */
@@ -74,6 +79,7 @@ public abstract class CalciteCompatibilityCheck {
 
     /**
      * The factory method to create a default check chain.
+     *
      * @return The head of the chain.
      */
     public static CalciteCompatibilityCheck create() {

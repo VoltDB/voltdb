@@ -25,8 +25,9 @@ import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.util.Util.FoundOne;
 
 /**
- * Parameterize a query stored in a {@link org.voltdb.plannerv2.SqlTask}
- * and store its parameter values as a list of {@link org.apache.calcite.sql.SqlLiteral}.
+ * Parameterize a query stored in a {@link SqlTask}
+ * and store its parameter values as a list of {@link SqlLiteral}.
+ *
  * @author Chao Zhou
  * @since 8.4
  */
@@ -35,24 +36,27 @@ public class ParameterizedSqlTask extends AbstractSqlTaskDecorator {
     private final List<SqlLiteral> m_sqlLiteralList;
 
     /**
-     * Build a {@code ParameterizedSqlTask} from a {@code SqlTask}.
-     * @param taskToDecorate the {@code SqlTask} this is built on.
+     * Build a {@code ParameterizedSqlTask} decorating a {@code SqlTask}.
+     *
+     * @param taskToDecorate the {@link SqlTask} this decorator is decorating.
      */
     public ParameterizedSqlTask(SqlTask taskToDecorate) {
         super(taskToDecorate);
-        // Re-decorating another ParameterizedSqlTask is not what we want to see.
-        // But, be robust.
+
+        // If the task to decorate happens to be another {@code ParameterizedSqlTask},
+        // save the effort and just copy over the parameter literal list.
         if (taskToDecorate instanceof ParameterizedSqlTask) {
             m_sqlLiteralList = ((ParameterizedSqlTask) taskToDecorate).m_sqlLiteralList;
             return;
         }
+
         // DDL statements cannot be parameterized.
         boolean doNotParameterize = taskToDecorate.isDDL();
-        if (! doNotParameterize) {
+        if ( ! doNotParameterize) {
             try {
                 getParsedQuery().accept(DynamicParamFinder.INSTANCE);
             } catch (FoundOne found) {
-                // If the SqlTask already has parameters, do not parameterize it.
+                // If the SqlTask already has user-specified parameters, do not parameterize it.
                 doNotParameterize = true;
             }
         }
@@ -66,8 +70,7 @@ public class ParameterizedSqlTask extends AbstractSqlTaskDecorator {
     }
 
     /**
-     * Get the List of parameter values.
-     * @return the List of parameter values.
+     * @return the list of parameter values.
      */
     public List<SqlLiteral> getSqlLiteralList() {
         return m_sqlLiteralList;
@@ -75,6 +78,7 @@ public class ParameterizedSqlTask extends AbstractSqlTaskDecorator {
 
     /**
      * A visitor to find {@link SqlDynamicParam} in a node tree.
+     *
      * @author Yiqun Zhang
      * @since 8.4
      */

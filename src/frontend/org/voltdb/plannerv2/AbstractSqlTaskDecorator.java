@@ -20,28 +20,29 @@ package org.voltdb.plannerv2;
 import org.apache.calcite.sql.SqlNode;
 
 /**
- * Extend this class to create a decorator for a {@link org.voltdb.plannerv2.SqlTask}.
+ * Extend this class to create a decorator for a {@link SqlTask}.
+ *
  * @author Yiqun Zhang
  * @since 8.4
  */
 public abstract class AbstractSqlTaskDecorator implements SqlTask {
 
+    /**
+     * The {@link SqlTask} to be decorated.
+     */
     final SqlTask m_taskToDecorate;
 
+    /**
+     * Initialize an AbstractSqlTaskDecorator.
+     *
+     * @param taskToDecorate the {@link SqlTask} this decorator is decorating.
+     */
     public AbstractSqlTaskDecorator(SqlTask taskToDecorate) {
         m_taskToDecorate = taskToDecorate;
     }
 
     @Override public boolean isDDL() {
         return m_taskToDecorate.isDDL();
-    }
-
-    @Override public boolean isDML() {
-        return m_taskToDecorate.isDML();
-    }
-
-    @Override public boolean isDQL() {
-        return m_taskToDecorate.isDQL();
     }
 
     @Override public String getSQL() {

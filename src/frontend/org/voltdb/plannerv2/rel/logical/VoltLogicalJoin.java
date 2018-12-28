@@ -17,8 +17,10 @@
 
 package org.voltdb.plannerv2.rel.logical;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -29,22 +31,43 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 /**
- * Logical Join with <code>VOLTDB_LOGICAL</code> convention trait.
- *
+ * Sub-class of {@link org.apache.calcite.rel.core.Join}
+ * targeted at the VoltDB logical calling convention.
+ * @see org.apache.calcite.rel.logical.LogicalJoin
  * @author Chao Zhou
  * @since 8.4
  */
-public class VoltDBLJoin extends Join implements VoltRel {
-    private final boolean semiJoinDone;
+public class VoltLogicalJoin extends Join implements VoltLogicalRel {
 
+    private final boolean semiJoinDone;
     private final ImmutableList<RelDataTypeField> systemFieldList;
 
-    public VoltDBLJoin(
+    /**
+     * Creates a VoltLogicalJoin.
+     *
+     * <p>Use {@link #create} unless you know what you're doing.
+     *
+     * @param cluster          Cluster
+     * @param traitSet         Trait set
+     * @param left             Left input
+     * @param right            Right input
+     * @param condition        Join condition
+     * @param joinType         Join type
+     * @param variablesSet     Set of variables that are set by the
+     *                         LHS and used by the RHS and are not available to
+     *                         nodes above this LogicalJoin in the tree
+     * @param semiJoinDone     Whether this join has been translated to a
+     *                         semi-join
+     * @param systemFieldList  List of system fields that will be prefixed to
+     *                         output row type; typically empty but must not be
+     *                         null
+     * @see #isSemiJoinDone()
+     */
+    public VoltLogicalJoin(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode left,
@@ -55,16 +78,15 @@ public class VoltDBLJoin extends Join implements VoltRel {
             boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
-        Preconditions.checkArgument(getConvention() == VoltRel.CONVENTION);
+        Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
     }
 
     @Override
-    public VoltDBLJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
-                                      RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
-        return new VoltDBLJoin(getCluster(),
-                traitSet, left, right, conditionExpr,
+    public VoltLogicalJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
+            RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
+        return new VoltLogicalJoin(getCluster(), traitSet, left, right, conditionExpr,
                 variablesSet, joinType, semiJoinDone, systemFieldList);
     }
 
@@ -81,6 +103,7 @@ public class VoltDBLJoin extends Join implements VoltRel {
         return semiJoinDone;
     }
 
+    @Override
     public List<RelDataTypeField> getSystemFieldList() {
         return systemFieldList;
     }

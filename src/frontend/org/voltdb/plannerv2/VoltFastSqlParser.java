@@ -15,24 +15,28 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.plannerv2.rel.logical;
+package org.voltdb.plannerv2;
 
-import org.apache.calcite.plan.Convention;
-import org.apache.calcite.plan.volcano.VolcanoPlanner;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.sql.parser.SqlParser;
 
 /**
- * Relational expressions that uses the VoltDB calling convention.
+ * Direct API provider for parsing a SQL query.
+ *
+ * @author Yiqun Zhang
+ * @since 8.4
  */
-public interface VoltRel extends RelNode  {
+public class VoltFastSqlParser {
+
     /**
-     * [Ethan] Why is this necessary?
-     * The default convention is Convention.NONE.
-     * In {@link VolcanoPlanner#getCost(RelNode, RelMetadataQuery)},
-     * you can see that if the convention is NONE, the relational node
-     * will be made infinite cost. The planner will fail to come up
-     * with a plan with best cost.
+     * Given a SQL statement (could be either a DDL or DQL/DML),
+     * parse it into a {@link SqlNode}.
+     *
+     * @param sql the SQL statement to parse.
+     * @return the parsed SqlNode tree for it.
      */
-    Convention CONVENTION = new Convention.Impl("VoltDB", VoltRel.class);
+    public static SqlNode parse(String sql) throws SqlParseException {
+        return SqlParser.create(sql, VoltFrameworkConfig.PARSER_CONFIG).parseQuery(sql);
+    }
 }

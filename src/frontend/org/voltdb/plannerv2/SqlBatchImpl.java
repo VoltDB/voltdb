@@ -33,12 +33,13 @@ import org.voltdb.sysprocs.AdHocNTBase;
 import com.google.common.collect.ImmutableList;
 
 /**
- * A basic query batch with one or more {@link org.voltdb.plannerv2.SqlTask}s.
+ * A basic query batch with one or more {@link SqlTask}.
  * The basic information is sufficient for DDL batches, but planning DQL/DML needs
- * more add-ons. We will have decorators {@link org.voltdb.plannerv2.NonDdlBatch}
+ * more add-ons. We will have decorators {@link NonDdlBatch}
  * to bulk up the information contained in the batch.
- * @since 8.4
+ *
  * @author Yiqun Zhang
+ * @since 8.4
  */
 public class SqlBatchImpl extends SqlBatch {
 
@@ -63,9 +64,10 @@ public class SqlBatchImpl extends SqlBatch {
      * The SQL statements can have parameter place-holders, but we will throw
      * an error if the batch has more than one query when user parameters are supplied
      * because we currently do not support it.
-     * @param sqlBlock a string of one or more SQL statements.
-     * @param userParams user parameter values for the query.
-     * @param context the AdHoc context. used for calling internal AdHoc APIs before the refactor is done.
+     *
+     * @param sqlBlock    a string of one or more SQL statements.
+     * @param userParams  user parameter values for the query.
+     * @param context     the AdHoc context. used for calling internal AdHoc APIs before the refactor is done.
      * @throws SqlParseException when the query parsing went wrong.
      * @throws PlannerFallbackException when any of the queries in the batch cannot be handled by Calcite.
      * @throws UnsupportedOperationException when the batch is a mixture of DDL and non-DDL
@@ -118,10 +120,12 @@ public class SqlBatchImpl extends SqlBatch {
 
     @Override public CompletableFuture<ClientResponse> execute() {
         // TRAIL [Calcite-AdHoc-DDL:1] SqlBatchImpl.execute()
+
         // DDL batches will be executed here because they don't require additional context information.
         // DQL/DML batches need to be decorated by NonDDLBatch so they can have enough information for planning.
         // It is NonDDLBatch.execute() that will get called for those batches.
 
+        // Note - ethan - 12/28/2018:
         // The code here is still not in its final form. It is more like a compromised, temporary solution
         // and relies heavily on the legacy code path.
         final List<String> sqls = new ArrayList<>(getTaskCount()), validated = new ArrayList<>();

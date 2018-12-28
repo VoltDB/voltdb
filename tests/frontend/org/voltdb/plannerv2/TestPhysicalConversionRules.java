@@ -31,7 +31,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.voltdb.plannerv2.deprecated.CalcitePlanner;
 import org.voltdb.plannerv2.deprecated.CalcitePlannerType;
-import org.voltdb.plannerv2.rel.logical.VoltRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rules.PlannerPhase;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
@@ -54,7 +54,7 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
         RelRoot root = parseValidateAndConvert(sql);
 
         // apply logical rules
-        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltRel.CONVENTION);
+        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltLogicalRel.CONVENTION);
         RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 

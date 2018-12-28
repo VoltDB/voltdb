@@ -17,37 +17,30 @@
 
 package org.voltdb.plannerv2.rel.logical;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rex.RexProgram;
 
+import com.google.common.base.Preconditions;
+
 /**
- * Logical Calc with <code>VOLTDB_LOGICAL</code> convention trait.
+ * Logical Calc with the <code>VOLTDB_LOGICAL</code> convention trait.
  *
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLCalc extends Calc implements VoltRel{
+public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
 
-    public VoltDBLCalc(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RexProgram program) {
-          super(cluster,
-                  traitSet,
-                  input,
-                  program);
-          Preconditions.checkArgument(getConvention() == VoltRel.CONVENTION);
-        }
+    public VoltLogicalCalc(RelOptCluster cluster, RelTraitSet traitSet,
+            RelNode input, RexProgram program) {
+        super(cluster, traitSet, input, program);
+        Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
+    }
 
-        @Override
-        public Calc copy(RelTraitSet traitSet, RelNode child,
-                         RexProgram program) {
-            return new VoltDBLCalc(this.getCluster(), traitSet, child, program);
-        }
-
+    @Override
+    public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program) {
+        return new VoltLogicalCalc(this.getCluster(), traitSet, child, program);
+    }
 }

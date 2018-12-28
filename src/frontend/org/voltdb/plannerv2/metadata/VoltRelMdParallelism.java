@@ -30,17 +30,15 @@ import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
  * {@link org.apache.calcite.rel.metadata.BuiltInMetadata.Parallelism}
  * metadata provider for the standard logical algebra.
  *
- * @see org.apache.calcite.rel.metadata.RelMetadataQuery#splitCount
+ * @see RelMetadataQuery#splitCount(RelNode)
  */
 public class VoltRelMdParallelism extends RelMdParallelism {
 
     public static final RelMetadataProvider SOURCE =
             ReflectiveRelMetadataProvider.reflectiveSource(
-                    new VoltRelMdParallelism(),
-                    BuiltInMethod.SPLIT_COUNT.method);
+                    new VoltRelMdParallelism(), BuiltInMethod.SPLIT_COUNT.method);
 
-    @Override
-    public Integer splitCount(RelNode rel, RelMetadataQuery mq) {
+    @Override public Integer splitCount(RelNode rel, RelMetadataQuery mq) {
         if (rel instanceof VoltDBPRel) {
             return ((VoltDBPRel) rel).getSplitCount();
         } else {

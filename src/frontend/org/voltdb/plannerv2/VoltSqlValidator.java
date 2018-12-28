@@ -21,14 +21,16 @@ import org.apache.calcite.sql.validate.SqlValidatorImpl;
 
 /**
  * VoltDB SQL validator.
+ *
  * @author Yiqun Zhang
  * @since 8.4
  */
 public class VoltSqlValidator extends SqlValidatorImpl {
+
     /**
-     * Build a VoltDB SQL validator from
-     * {@link org.voltdb.plannerv2.VoltFrameworkConfig}.
-     * @param config the bundled framework configuration.
+     * Build a VoltDB SQL validator from {@link VoltFrameworkConfig}.
+     *
+     * @param config VoltDB planning sessions configuration.
      */
     public VoltSqlValidator(VoltFrameworkConfig config) {
         super(config.getOperatorTable(), config.getCatalogReader(),

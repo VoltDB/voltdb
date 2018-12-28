@@ -30,7 +30,7 @@ import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannerv2.VoltFrameworkConfig;
-import org.voltdb.plannerv2.VoltSqlParser;
+import org.voltdb.plannerv2.VoltFastSqlParser;
 import org.voltdb.plannerv2.VoltSqlValidator;
 
 /**
@@ -71,7 +71,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         assertNotNull("m_validator is null", m_validator);
         SqlNode sqlNode;
         try {
-            sqlNode = VoltSqlParser.parse(sql);
+            sqlNode = VoltFastSqlParser.parse(sql);
         } catch (Throwable e) {
             throw new RuntimeException("Error while parsing query: " + sql, e);
         }
@@ -103,7 +103,7 @@ public class VoltSqlValidatorTestCase extends PlannerTestCase {
         final SqlNode sqlNode;
         final SqlParserUtil.StringAndPos sap = SqlParserUtil.findPos(sql);
         try {
-            sqlNode = VoltSqlParser.parse(sap.sql);
+            sqlNode = VoltFastSqlParser.parse(sap.sql);
         } catch (Throwable e) {
             throw mapException(e, expectedMsgPattern, sap.sql);
         }

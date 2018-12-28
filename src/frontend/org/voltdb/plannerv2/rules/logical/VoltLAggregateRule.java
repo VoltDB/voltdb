@@ -23,11 +23,11 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.voltdb.plannerv2.rel.logical.VoltDBLAggregate;
-import org.voltdb.plannerv2.rel.logical.VoltRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalAggregate;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 
 /**
- * VoltDB logical rule that transform {@link LogicalAggregate} to {@link VoltDBLAggregate}.
+ * VoltDB logical rule that transform {@link LogicalAggregate} to {@link VoltLogicalAggregate}.
  *
  * @author Michael Alexeev
  * @since 8.4
@@ -44,9 +44,9 @@ public class VoltLAggregateRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         LogicalAggregate aggr = call.rel(0);
         RelNode input = aggr.getInput();
-        RelTraitSet convertedTraits = aggr.getTraitSet().replace(VoltRel.CONVENTION);
-        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltRel.CONVENTION));
-        call.transformTo(VoltDBLAggregate.create(
+        RelTraitSet convertedTraits = aggr.getTraitSet().replace(VoltLogicalRel.CONVENTION);
+        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.CONVENTION));
+        call.transformTo(VoltLogicalAggregate.create(
                 aggr.getCluster(),
                 convertedTraits,
                 convertedInput,

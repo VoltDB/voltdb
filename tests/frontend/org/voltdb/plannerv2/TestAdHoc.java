@@ -18,6 +18,7 @@ public class TestAdHoc extends RegressionSuite {
 
     public void testCompileAdHoc() throws IOException, ProcCallException {
         Client client = getClient();
+//        client.callProcedure("@AdHoc", "select a from t1 where a > some (select c from t2 where c = 1)");
 //        client.callProcedure("@AdHoc", "select a from t where a > 0;");
         client.callProcedure("@AdHoc", "select a from t where a > ? limit 2 offset ?;", 100, 2);
     }
@@ -28,7 +29,8 @@ public class TestAdHoc extends RegressionSuite {
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("create table t(a int);");
+        project.addLiteralSchema("create table t1(a int, b varchar);");
+        project.addLiteralSchema("create table t2(c int, d varchar);");
 
         LocalCluster config = new LocalCluster("calcite-adhoc.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));

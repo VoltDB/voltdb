@@ -29,7 +29,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.voltdb.plannerv2.deprecated.CalcitePlanner;
 import org.voltdb.plannerv2.deprecated.CalcitePlannerType;
-import org.voltdb.plannerv2.rel.logical.VoltRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rules.PlannerPhase;
 
 public class TestLogicalRules extends PlanRulesTestCase {
@@ -49,7 +49,7 @@ public class TestLogicalRules extends PlanRulesTestCase {
     void assertPlanMatch(String sql, String expectedPlan) {
         RelRoot root = parseValidateAndConvert(sql);
 
-        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltRel.CONVENTION);
+        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltLogicalRel.CONVENTION);
         RelNode node = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
                 root.rel, logicalTraits);
 

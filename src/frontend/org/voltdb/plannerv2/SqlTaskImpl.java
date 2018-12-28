@@ -22,9 +22,10 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 
 /**
- * SqlTask stores a parsed query.
- * @since 8.4
+ * Basic {@link SqlTask} implementation.
+ *
  * @author Yiqun Zhang
+ * @since 8.4
  */
 public class SqlTaskImpl implements SqlTask {
 
@@ -33,46 +34,27 @@ public class SqlTaskImpl implements SqlTask {
 
     /**
      * Create a {@link SqlTaskImpl} from a SQL query string.
+     *
      * @param sql the query string.
      * @throws SqlParseException when the parsing goes wrong.
      * @throws IllegalArgumentException if the SQL string is null or empty.
      */
     SqlTaskImpl(String sql) throws SqlParseException {
-        if ((sql == null) || (sql = sql.trim()).isEmpty()) { // remove any spaces or newlines
+        if ((sql == null) || (sql = sql.trim()).isEmpty()) { // Remove any spaces or newlines
             throw new IllegalArgumentException("Can't plan empty or null SQL.");
         }
         m_sqlString = sql;
-        m_parsedQuery = VoltSqlParser.parse(sql);
+        m_parsedQuery = VoltFastSqlParser.parse(sql);
     }
 
-    /**
-     * Tell if this {@link SqlTaskImpl} is a DDL task.
-     * @return true if this {@code SqlTask} is a DDL task.
-     */
     @Override public boolean isDDL() {
         return m_parsedQuery.isA(SqlKind.DDL);
     }
 
-    @Override public boolean isDQL() {
-        return m_parsedQuery.getKind() == SqlKind.SELECT;
-    }
-
-    @Override public boolean isDML() {
-        return m_parsedQuery.isA(SqlKind.DML);
-    }
-
-    /**
-     * Get the original SQL query text.
-     * @return the original SQL query text.
-     */
     @Override public String getSQL() {
         return m_sqlString;
     }
 
-    /**
-     * Get the parsed query node tree.
-     * @return the parsed query node tree.
-     */
     @Override public SqlNode getParsedQuery() {
         return m_parsedQuery;
     }

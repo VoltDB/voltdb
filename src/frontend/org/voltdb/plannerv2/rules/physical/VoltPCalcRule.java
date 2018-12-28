@@ -21,14 +21,14 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.plannerv2.rel.logical.VoltDBLCalc;
-import org.voltdb.plannerv2.rel.logical.VoltRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPCalc;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
 
 /**
- * VoltDB physical rule that transform {@link VoltDBLCalc} to {@link VoltDBPCalc}.
+ * VoltDB physical rule that transform {@link VoltLogicalCalc} to {@link VoltDBPCalc}.
  *
  * @author Michael Alexeev
  * @since 8.4
@@ -38,12 +38,12 @@ public class VoltPCalcRule extends RelOptRule {
     public static final VoltPCalcRule INSTANCE = new VoltPCalcRule();
 
     VoltPCalcRule() {
-        super(operand(VoltDBLCalc.class, VoltRel.CONVENTION, any()));
+        super(operand(VoltLogicalCalc.class, VoltLogicalRel.CONVENTION, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLCalc calc = call.rel(0);
+        VoltLogicalCalc calc = call.rel(0);
         RelNode input = calc.getInput();
         RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
         RelNode convertedInput = convert(input,

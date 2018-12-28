@@ -37,7 +37,7 @@ import org.voltdb.catalog.Table;
 public class TestCalciteParser {
 
     private void assertSqlNodeKind(String sql, SqlKind expectedSqlKind) throws SqlParseException {
-        SqlNode sqlNode = VoltSqlParser.parse(sql);
+        SqlNode sqlNode = VoltFastSqlParser.parse(sql);
         assertEquals(expectedSqlKind, sqlNode.getKind());
     }
 

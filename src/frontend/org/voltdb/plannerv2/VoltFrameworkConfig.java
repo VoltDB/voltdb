@@ -48,21 +48,27 @@ import org.apache.calcite.tools.Program;
 import com.google.common.collect.ImmutableList;
 
 /**
- * Implementation of {@link org.apache.calcite.tools.FrameworkConfig}
+ * Implementation of {@link FrameworkConfig}
  * describing how to configure VoltDB planning sessions with Calcite.
+ *
  * @author Yiqun Zhang
  * @since 8.4
  */
 public class VoltFrameworkConfig implements FrameworkConfig {
 
+    /**
+     * The list of trait definitions used by the planner.
+     */
     @SuppressWarnings("rawtypes")
-    private static final ImmutableList<RelTraitDef> TRAIT_DEFS =
-            ImmutableList.of(ConventionTraitDef.INSTANCE,
-                             RelCollationTraitDef.INSTANCE);
+    private static final ImmutableList<RelTraitDef> TRAIT_DEFS = ImmutableList.of(
+            ConventionTraitDef.INSTANCE,
+            RelCollationTraitDef.INSTANCE);
 
     static final Config PARSER_CONFIG =
             SqlParser.configBuilder().setParserFactory(SqlDdlParserImpl.FACTORY).build();
+    static final String DEFAULT_SCHEMA_NAME = "public";
 
+    // -- Additional states that do not belong to the original FrameworkConfig interface.
     private final SchemaPlus m_schema;
     private final RelDataTypeFactory m_typeFactory;
     private final Prepare.CatalogReader m_catalogReader;
@@ -72,7 +78,8 @@ public class VoltFrameworkConfig implements FrameworkConfig {
     }
 
     /**
-     * Build a {@link org.voltdb.plannerv2.VoltFrameworkConfig}
+     * Build a {@link VoltFrameworkConfig}.
+     *
      * @param schema the converted {@code SchemaPlus} from VoltDB catalog.
      */
     public VoltFrameworkConfig(SchemaPlus schema) {
@@ -113,13 +120,13 @@ public class VoltFrameworkConfig implements FrameworkConfig {
     }
 
     @Override public RelOptCostFactory getCostFactory() {
-        // Volcano planner then will enable its own default cost factory (VolcanoCost.FACTORY).
+        // Return null here then the Volcano planner will enable its own
+        // default cost factory (VolcanoCost.FACTORY).
         return null;
     }
 
     @SuppressWarnings("rawtypes")
     @Override public ImmutableList<RelTraitDef> getTraitDefs() {
-        // This seems to be for the converter rules, double check!
         return TRAIT_DEFS;
     }
 
@@ -132,21 +139,21 @@ public class VoltFrameworkConfig implements FrameworkConfig {
     }
 
     /**
-     * @return the {@code RelDataTypeFactory} that is used by VoltlDB planner.
+     * @return the {@link RelDataTypeFactory} that is used by the VoltlDB planner.
      */
     public RelDataTypeFactory getTypeFactory() {
         return m_typeFactory;
     }
 
     /**
-     * @return the {@code SqlConformance} that is used by VoltlDB planner.
+     * @return the {@link SqlConformance} that is used by the VoltlDB planner.
      */
     public SqlConformance getSqlConformance() {
         return SqlConformanceEnum.DEFAULT;
     }
 
     /**
-     * @return the {@code CatalogReader} that is used by VoltlDB planner.
+     * @return the {@link Prepare.CatalogReader} that is used by the VoltlDB planner.
      */
     public Prepare.CatalogReader getCatalogReader() {
         return m_catalogReader;

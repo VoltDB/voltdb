@@ -33,12 +33,12 @@ import java.util.List;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLAggregate extends Aggregate implements VoltRel {
+public class VoltLogicalAggregate extends Aggregate implements VoltLogicalRel {
 
     /**
      * Constructor
      */
-    private VoltDBLAggregate(
+    private VoltLogicalAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -47,14 +47,14 @@ public class VoltDBLAggregate extends Aggregate implements VoltRel {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
-        Preconditions.checkArgument(getConvention() == VoltRel.CONVENTION);
+        Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
     @Override
-    public VoltDBLAggregate copy(RelTraitSet traitSet, RelNode input,
+    public VoltLogicalAggregate copy(RelTraitSet traitSet, RelNode input,
                                  boolean indicator, ImmutableBitSet groupSet,
                                  List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        return VoltDBLAggregate.create(
+        return VoltLogicalAggregate.create(
                 getCluster(),
                 traitSet,
                 input,
@@ -64,7 +64,7 @@ public class VoltDBLAggregate extends Aggregate implements VoltRel {
                 aggCalls);
     }
 
-    public static VoltDBLAggregate create(
+    public static VoltLogicalAggregate create(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -72,7 +72,7 @@ public class VoltDBLAggregate extends Aggregate implements VoltRel {
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls) {
-        return new VoltDBLAggregate(
+        return new VoltLogicalAggregate(
                 cluster,
                 traitSet,
                 child,

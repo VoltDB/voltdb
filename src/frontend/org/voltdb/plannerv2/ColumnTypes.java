@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb.plannerv2;
 
 import java.util.Collections;
@@ -26,9 +27,13 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 
 /**
- * Adaptor between <code>org.voltdb.VoltType</code> and <code>org.apache.calcite.sql.SqlDataTypeSpec</code>.
- * VoltDB needs to understand Calcite data types, because we create catalog from Calcite SqlNode;
- * Calcite needs to understand Volt data types in the planning stage. (right?)
+ * An adapter between {@link VoltType} and {@link SqlTypeName}}.
+ * VoltDB needs to understand Calcite data types, because we populate the catalog
+ * using Calcite {@code SqlNode};
+ * Calcite needs to understand VoltDB data types in the planning stage.
+ *
+ * @author Lukai Liu
+ * @since 8.4
  */
 public class ColumnTypes {
 
@@ -38,23 +43,26 @@ public class ColumnTypes {
     static {
         Map<SqlTypeName, VoltType> calcToVolt = new HashMap<>();
         Map<VoltType, SqlTypeName> voltToCalc = new HashMap<>();
+
         Stream.of(
-            Pair.of(VoltType.BOOLEAN, SqlTypeName.BOOLEAN),
-            Pair.of(VoltType.FLOAT, SqlTypeName.FLOAT),
-            Pair.of(VoltType.VARBINARY, SqlTypeName.VARBINARY),
-            // string types
             Pair.of(VoltType.STRING, SqlTypeName.CHAR),
             Pair.of(VoltType.STRING, SqlTypeName.VARCHAR),
-            Pair.of(VoltType.TIMESTAMP, SqlTypeName.TIMESTAMP),
+            Pair.of(VoltType.VARBINARY, SqlTypeName.VARBINARY),
 
+            Pair.of(VoltType.BOOLEAN, SqlTypeName.BOOLEAN),
+
+            Pair.of(VoltType.TINYINT, SqlTypeName.TINYINT),
+            Pair.of(VoltType.SMALLINT, SqlTypeName.SMALLINT),
             Pair.of(VoltType.INTEGER, SqlTypeName.INTEGER),
             Pair.of(VoltType.BIGINT, SqlTypeName.BIGINT),
-            Pair.of(VoltType.SMALLINT, SqlTypeName.SMALLINT),
-            Pair.of(VoltType.TINYINT, SqlTypeName.TINYINT),
 
+            Pair.of(VoltType.TIMESTAMP, SqlTypeName.TIMESTAMP),
+            Pair.of(VoltType.FLOAT, SqlTypeName.FLOAT),
             Pair.of(VoltType.DECIMAL, SqlTypeName.DECIMAL),
 
-            Pair.of(VoltType.GEOGRAPHY, SqlTypeName.GEOMETRY), // NOTE!
+            // Note - ethan - 12/28/2018:
+            // Not sure this works well. Internally, VoltDB stores GEOGRAPHY as VARBINARY.
+            Pair.of(VoltType.GEOGRAPHY, SqlTypeName.GEOMETRY),
             Pair.of(VoltType.GEOGRAPHY_POINT, SqlTypeName.GEOMETRY)
         ).forEach(types -> {
             final VoltType vt = types.getFirst();
@@ -62,18 +70,37 @@ public class ColumnTypes {
             calcToVolt.put(ct, vt);
             voltToCalc.put(vt, ct);
         });
+
         CALC_TO_VOLT = Collections.unmodifiableMap(calcToVolt);
         VOLT_TO_CALC = Collections.unmodifiableMap(voltToCalc);
     }
 
+    /**
+     * Get the matching {@link VoltType} of the given {@link SqlTypeName}.
+     *
+     * @param calciteType the Calcite {@link SqlTypeName}
+     * @return the matching {@link VoltType}
+     */
     public static VoltType getVoltType(SqlTypeName calciteType) {
         return CALC_TO_VOLT.get(calciteType);
     }
 
+    /**
+     * Get the matching {@link VoltType} of the given SQL type name in string.
+     *
+     * @param calciteType SQL type name string
+     * @return the matching {@link VoltType}
+     */
     public static VoltType getVoltType(String calciteType) {
         return VoltType.typeFromString(calciteType);
     }
 
+    /**
+     * Get the matching Calcite {@link SqlTypeName} of the given {@link VoltType}.
+     *
+     * @param voltType The VoltDB {@link VoltType}
+     * @return the matching Calcite {@link SqlTypeName}
+     */
     public static SqlTypeName getCalciteType(VoltType voltType) {
         return VOLT_TO_CALC.get(voltType);
     }

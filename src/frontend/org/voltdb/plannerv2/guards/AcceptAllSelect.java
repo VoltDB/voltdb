@@ -19,18 +19,17 @@ package org.voltdb.plannerv2.guards;
 
 /**
  * Accepts all SELECT queries.
+ *
  * @author Yiqun Zhang
  * @since 8.4
  */
 public class AcceptAllSelect extends CalciteCompatibilityCheck {
 
-    @Override
-    protected final boolean doCheck(String sql) {
+    @Override protected final boolean doCheck(String sql) {
         return sql.toUpperCase().startsWith("SELECT");
     }
 
-    @Override
-    protected final boolean isNegativeCheck() {
+    @Override protected final boolean isNegativeCheck() {
         return false;
     }
 }

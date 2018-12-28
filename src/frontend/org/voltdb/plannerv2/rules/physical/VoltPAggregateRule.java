@@ -28,8 +28,8 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.util.ImmutableBitSet;
-import org.voltdb.plannerv2.rel.logical.VoltDBLAggregate;
-import org.voltdb.plannerv2.rel.logical.VoltRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalAggregate;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPHashAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPSerialAggregate;
@@ -41,7 +41,7 @@ import java.util.Map;
 
 
 /**
- * VoltDB physical rule that transform {@link VoltDBLAggregate} to {@link VoltDBPHashAggregate}
+ * VoltDB physical rule that transform {@link VoltLogicalAggregate} to {@link VoltDBPHashAggregate}
  * or {@link VoltDBPSerialAggregate}.
  *
  * @author Michael Alexeev
@@ -52,12 +52,12 @@ public class VoltPAggregateRule extends RelOptRule {
     public static final VoltPAggregateRule INSTANCE = new VoltPAggregateRule();
 
     private VoltPAggregateRule() {
-        super(operand(VoltDBLAggregate.class, VoltRel.CONVENTION, any()));
+        super(operand(VoltLogicalAggregate.class, VoltLogicalRel.CONVENTION, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLAggregate aggregate = call.rel(0);
+        VoltLogicalAggregate aggregate = call.rel(0);
         RelTraitSet convertedAggrTraits = aggregate.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
 
         RelNode input = aggregate.getInput();
@@ -123,7 +123,7 @@ public class VoltPAggregateRule extends RelOptRule {
 
     }
 
-    RelCollation buildGroupByCollation(VoltDBLAggregate aggr) {
+    RelCollation buildGroupByCollation(VoltLogicalAggregate aggr) {
         // Build a collation that represents each GROUP BY expression.
         // This collation implies that this serial aggregate requires its input
         // to be sorted in an order that is one of permutations of the fields from this collation
@@ -138,7 +138,7 @@ public class VoltPAggregateRule extends RelOptRule {
         return RelCollations.of(collationFields.toArray(new RelFieldCollation[collationFields.size()]));
     }
 
-    private boolean needHashAggregator(VoltDBLAggregate aggr) {
+    private boolean needHashAggregator(VoltLogicalAggregate aggr) {
         // A hash is required to build up per-group aggregates in parallel vs.
         // when there is only one aggregation over the entire table
 
@@ -147,7 +147,7 @@ public class VoltPAggregateRule extends RelOptRule {
         return hasGroupBy(aggr);
     }
 
-    private boolean hasGroupBy(VoltDBLAggregate aggr) {
+    private boolean hasGroupBy(VoltLogicalAggregate aggr) {
         return !aggr.getGroupSet().isEmpty();
     }
 }

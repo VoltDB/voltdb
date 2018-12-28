@@ -24,27 +24,31 @@ import org.voltdb.plannerv2.rel.VoltTable;
 
 /**
  * This is the common adapter that VoltDB should query any catalog object from.
- * It is built around the <code>org.voltdb.catalog.Database</code> instance in sync
- * with any DDL operations. Taken/adapted from Mike Alexeev.
- *
- * NOTE that VoltDB creates a new Catalog/Database instance on every DDL statement.
- * (See <code>org.voltdb.compiler.VoltCompiler.loadSchema()</code>.
+ * It is built around the {@link Database} instance in sync
+ * with any DDL operations. Taken/adapted from <b>Mike Alexeev</b>.
+ * </br></br>
+ * <b>NOTE</b> VoltDB creates a new Catalog/Database instance on every DDL statement.
  * In future, we might save some troubles by avoiding creating all catalog objects
  * (tables, views, indexes, etc.) from scratch upon a new DDL batch/statement.
  *
+ * @see org.voltdb.compiler.VoltCompiler#loadSchema(org.hsqldb_voltpatches.HSQLInterface,
+ *      org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad, String...)
  * @author Lukai Liu
  * @since 8.4
  */
 public class VoltSchemaPlus {
 
     /**
-     * Creates a brand new SchemaPlus instance upon new VoltDB Database catalog.
+     * Creates a brand new {@link SchemaPlus} instance following a VoltDB Database catalog.
+     *
      * @param db the VoltDB database catalog object.
      */
     public static SchemaPlus from(Database db) {
-        final SchemaPlus schema = CalciteSchema.createRootSchema(false /*no adding the metadata schema*/,
-                                                                 false /*no caching*/, "catalog").plus();
-        // Get all tables from the database
+        final SchemaPlus schema = CalciteSchema.createRootSchema(
+                false /*no adding the metadata schema*/,
+                false /*no caching*/, VoltFrameworkConfig.DEFAULT_SCHEMA_NAME).plus();
+
+        // Get all tables from the database and add them to the SchemaPlus.
         db.getTables().forEach(table -> {
             schema.add(table.getTypeName(), new VoltTable(table));
             // TODO: Get all functions, etc. from database

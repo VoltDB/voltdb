@@ -51,6 +51,7 @@ import com.google.common.collect.ImmutableList;
 /**
  * Implementation of {@link org.apache.calcite.tools.Planner}.
  * You can use this planner for multiple queries unless there is a catalog change.
+ *
  * @author Yiqun Zhang
  * @since 8.4
  */
@@ -69,7 +70,8 @@ public class VoltPlanner implements Planner {
     private RelRoot m_relRoot;
 
     /**
-     * Build a {@link org.voltdb.plannerv2.VoltPlanner}
+     * Build a {@link VoltPlanner}.
+     *
      * @param schema the converted {@code SchemaPlus} from VoltDB catalog.
      */
     public VoltPlanner(SchemaPlus schema) {
@@ -81,7 +83,7 @@ public class VoltPlanner implements Planner {
         for (@SuppressWarnings("rawtypes") RelTraitDef def : m_config.getTraitDefs()) {
             m_relPlanner.addRelTraitDef(def);
         }
-        // The RelTraitDefs need to be added to the planner before building the cluster
+        // The RelTraitDefs need to be added to the planner before building the RelOptCluster.
         RelOptCluster cluster = RelOptCluster.create(m_relPlanner, m_rexBuilder);
         cluster.setMetadataProvider(new CachingRelMetadataProvider(
                 VoltRelMetadataProvider.INSTANCE, m_relPlanner));
@@ -96,6 +98,7 @@ public class VoltPlanner implements Planner {
         m_relBuilder = m_config.getSqlToRelConverterConfig().getRelBuilderFactory().create(
                 m_sqlToRelConverter.getCluster(), null /*RelOptSchema*/);
 
+        // Initialize internal states.
         m_validatedSqlNode = null;
         m_relRoot = null;
         m_state = State.STATE_1_READY;
@@ -178,11 +181,28 @@ public class VoltPlanner implements Planner {
                 ImmutableList.of() /*lattices*/);
     }
 
-    public RelNode transformHep(VoltPlannerRules.Phase phase, RelNode rel) {
+    /**
+     * Use the {@link HepPlanner} to convert one relational expression tree into another relational
+     * expression based on a particular rule set and requires set of traits.
+     *
+     * @param phase  The planner phase
+     * @param rel    The root node
+     * @return the transformed relational expression tree.
+     */
+    public static RelNode transformHep(VoltPlannerRules.Phase phase, RelNode rel) {
         return transformHep(phase, false, rel);
     }
 
-    public RelNode transformHep(VoltPlannerRules.Phase phase, boolean bottomUp, RelNode rel) {
+    /**
+     * Use the {@link HepPlanner} to convert one relational expression tree into another relational
+     * expression based on a particular rule set and requires set of traits.
+     *
+     * @param phase     The planner phase
+     * @param bottomUp  Whether to use the bottom-up match order.
+     * @param rel       The root node
+     * @return the transformed relational expression tree.
+     */
+    public static RelNode transformHep(VoltPlannerRules.Phase phase, boolean bottomUp, RelNode rel) {
         final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
         if (bottomUp) {
             hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
@@ -201,7 +221,11 @@ public class VoltPlanner implements Planner {
         return m_relPlanner.emptyTraitSet();
     }
 
-    // Make sure the planner is at the certain state.
+    /**
+     * Make sure the planner is at a certain state.
+     *
+     * @param state the expected planner state.
+     */
     private void ensure(State state) {
         if (state == m_state) {
             return;

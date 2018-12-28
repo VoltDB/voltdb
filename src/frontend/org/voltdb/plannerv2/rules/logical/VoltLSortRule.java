@@ -24,13 +24,13 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.voltdb.plannerv2.rel.logical.VoltDBLSort;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
 import org.voltdb.plannerv2.rel.logical.VoltLLimit;
-import org.voltdb.plannerv2.rel.logical.VoltRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 
 /**
  * VoltDB logical rule that transform {@link LogicalSort} to
- * {@link VoltDBLSort} or {@link VoltLLimit}.
+ * {@link VoltLogicalSort} or {@link VoltLLimit}.
  *
  * @author Michael Alexeev
  * @since 8.4
@@ -48,12 +48,12 @@ public class VoltLSortRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         LogicalSort sort = call.rel(0);
         RelNode input = sort.getInput();
-        RelTraitSet convertedTraits = sort.getTraitSet().replace(VoltRel.CONVENTION);
-        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltRel.CONVENTION));
+        RelTraitSet convertedTraits = sort.getTraitSet().replace(VoltLogicalRel.CONVENTION);
+        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.CONVENTION));
         RelNode logicalRel = null;
         RelCollation sortCollation = sort.getCollation();
         if (!sortCollation.getFieldCollations().isEmpty()) {
-            logicalRel = new VoltDBLSort(
+            logicalRel = new VoltLogicalSort(
                     sort.getCluster(),
                     convertedTraits,
                     convertedInput,
