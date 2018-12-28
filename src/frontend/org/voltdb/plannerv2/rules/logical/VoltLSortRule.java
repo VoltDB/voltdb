@@ -26,7 +26,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.voltdb.plannerv2.rel.logical.VoltDBLSort;
 import org.voltdb.plannerv2.rel.logical.VoltLLimit;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.logical.VoltRel;
 
 /**
  * VoltDB logical rule that transform {@link LogicalSort} to
@@ -48,8 +48,8 @@ public class VoltLSortRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         LogicalSort sort = call.rel(0);
         RelNode input = sort.getInput();
-        RelTraitSet convertedTraits = sort.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
-        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL));
+        RelTraitSet convertedTraits = sort.getTraitSet().replace(VoltRel.CONVENTION);
+        RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltRel.CONVENTION));
         RelNode logicalRel = null;
         RelCollation sortCollation = sort.getCollation();
         if (!sortCollation.getFieldCollations().isEmpty()) {

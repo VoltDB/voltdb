@@ -33,7 +33,7 @@ import java.util.List;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltLLimit extends SingleRel implements VoltLogicalRel {
+public class VoltLLimit extends SingleRel implements VoltRel {
 
     private RexNode m_offset;
     private RexNode m_limit;
@@ -45,7 +45,7 @@ public class VoltLLimit extends SingleRel implements VoltLogicalRel {
             RexNode offset,
             RexNode limit) {
             super(cluster, traitSet, input);
-            Preconditions.checkArgument(getConvention() == VoltLogicalRel.VOLTDB_LOGICAL);
+            Preconditions.checkArgument(getConvention() == VoltRel.CONVENTION);
             m_offset = offset;
             m_limit = limit;
         }

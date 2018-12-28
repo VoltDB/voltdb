@@ -129,6 +129,8 @@ public class NonDdlBatchCompiler {
         } catch (Exception ex) {
             throw new AdHocPlanningException(ex.getMessage());
         } catch (StackOverflowError error) {
+            // TODO: This is from AdHocNTBase.compileAdHocSQL()
+            // Maybe it is not needed any more in Calcite.
             /*
              * Overly long predicate expressions can cause a StackOverflowError in various
              * code paths that may be covered by different StackOverflowError/Error/Throwable

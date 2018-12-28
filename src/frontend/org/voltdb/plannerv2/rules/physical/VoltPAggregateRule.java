@@ -29,7 +29,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.plannerv2.rel.logical.VoltDBLAggregate;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.logical.VoltRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPHashAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPSerialAggregate;
@@ -52,7 +52,7 @@ public class VoltPAggregateRule extends RelOptRule {
     public static final VoltPAggregateRule INSTANCE = new VoltPAggregateRule();
 
     private VoltPAggregateRule() {
-        super(operand(VoltDBLAggregate.class, VoltLogicalRel.VOLTDB_LOGICAL, any()));
+        super(operand(VoltDBLAggregate.class, VoltRel.CONVENTION, any()));
     }
 
     @Override

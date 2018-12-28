@@ -32,7 +32,7 @@ import com.google.common.base.Preconditions;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLSort extends Sort implements VoltLogicalRel {
+public class VoltDBLSort extends Sort implements VoltRel {
 
     public VoltDBLSort(
             RelOptCluster cluster,
@@ -40,7 +40,7 @@ public class VoltDBLSort extends Sort implements VoltLogicalRel {
             RelNode input,
             RelCollation collation) {
         super(cluster, traitSet, input, collation, null, null);
-        Preconditions.checkArgument(getConvention() == VoltLogicalRel.VOLTDB_LOGICAL);
+        Preconditions.checkArgument(getConvention() == VoltRel.CONVENTION);
     }
 
     @Override

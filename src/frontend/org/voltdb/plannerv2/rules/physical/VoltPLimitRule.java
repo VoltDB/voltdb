@@ -22,7 +22,7 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.logical.VoltLLimit;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.logical.VoltRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPLimit;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
@@ -39,7 +39,7 @@ public class VoltPLimitRule extends RelOptRule {
 
     VoltPLimitRule() {
         super(operand(VoltLLimit.class,
-                VoltLogicalRel.VOLTDB_LOGICAL, any()));
+                VoltRel.CONVENTION, any()));
     }
 
     @Override

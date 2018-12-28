@@ -18,11 +18,21 @@
 package org.voltdb.plannerv2.rel.logical;
 
 import org.apache.calcite.plan.Convention;
+import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 
 /**
- * From Mike A. A RelNode interface added with calling convention trait.
+ * Relational expressions that uses the VoltDB calling convention.
  */
-public interface VoltLogicalRel extends RelNode  {
-    final static Convention VOLTDB_LOGICAL = new Convention.Impl("VOLTDB_LOGICAL", VoltLogicalRel.class);
+public interface VoltRel extends RelNode  {
+    /**
+     * [Ethan] Why is this necessary?
+     * The default convention is Convention.NONE.
+     * In {@link VolcanoPlanner#getCost(RelNode, RelMetadataQuery)},
+     * you can see that if the convention is NONE, the relational node
+     * will be made infinite cost. The planner will fail to come up
+     * with a plan with best cost.
+     */
+    Convention CONVENTION = new Convention.Impl("VoltDB", VoltRel.class);
 }

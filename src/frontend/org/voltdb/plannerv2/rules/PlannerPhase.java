@@ -155,7 +155,7 @@ public enum PlannerPhase {
      * VoltDBLogical Conversion Rules.
      * <p>
      * Use to convert the convention from {@link org.apache.calcite.plan.Convention#NONE} to
-     * {@link org.voltdb.plannerv2.rel.logical.VoltLogicalRel#VOLTDB_LOGICAL}.
+     * {@link org.voltdb.plannerv2.rel.logical.VoltRel#CONVENTION}.
      * <p>
      * <b>Why?</b>
      * <p>

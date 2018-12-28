@@ -26,7 +26,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.voltdb.plannerv2.rel.logical.VoltDBLJoin;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.logical.VoltRel;
 
 /**
  * VoltDB logical rule that transform {@link LogicalJoin} to {@link VoltDBLJoin}.
@@ -46,9 +46,9 @@ public class VoltLJoinRule extends RelOptRule {
         LogicalJoin join = call.rel(0);
         RelNode left = join.getLeft();
         RelNode right = join.getRight();
-        RelTraitSet convertedTraits = join.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL);
-        RelNode convertedLeft = convert(left, left.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL));
-        RelNode convertedRight = convert(right, right.getTraitSet().replace(VoltLogicalRel.VOLTDB_LOGICAL));
+        RelTraitSet convertedTraits = join.getTraitSet().replace(VoltRel.CONVENTION);
+        RelNode convertedLeft = convert(left, left.getTraitSet().replace(VoltRel.CONVENTION));
+        RelNode convertedRight = convert(right, right.getTraitSet().replace(VoltRel.CONVENTION));
         ImmutableList<RelDataTypeField> systemFieldList = ImmutableList.copyOf(join.getSystemFieldList());
 
         call.transformTo(new VoltDBLJoin(join.getCluster(), convertedTraits, convertedLeft, convertedRight,

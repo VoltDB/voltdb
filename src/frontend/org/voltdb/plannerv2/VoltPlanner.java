@@ -118,6 +118,9 @@ public class VoltPlanner implements Planner {
     @Override public SqlNode validate(SqlNode sqlNode) throws ValidationException {
         ensure(State.STATE_1_READY);
         try {
+            // Note: The the data types are validated in this stage.
+            // Meanwhile, any identifiers in the query will be fully-qualified.
+            // For example: select a from T; -> select T.a from catalog.T as T;
             m_validatedSqlNode = m_validator.validate(sqlNode);
         } catch (RuntimeException e) {
             throw new ValidationException(e);

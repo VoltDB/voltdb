@@ -33,7 +33,7 @@ import java.util.List;
  * @author Michael Alexeev
  * @since 8.4
  */
-public class VoltDBLAggregate extends Aggregate implements VoltLogicalRel {
+public class VoltDBLAggregate extends Aggregate implements VoltRel {
 
     /**
      * Constructor
@@ -47,7 +47,7 @@ public class VoltDBLAggregate extends Aggregate implements VoltLogicalRel {
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls) {
         super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
-        Preconditions.checkArgument(getConvention() == VoltLogicalRel.VOLTDB_LOGICAL);
+        Preconditions.checkArgument(getConvention() == VoltRel.CONVENTION);
     }
 
     @Override

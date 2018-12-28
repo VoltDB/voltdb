@@ -39,7 +39,7 @@ import java.util.Set;
  * @author Chao Zhou
  * @since 8.4
  */
-public class VoltDBLJoin extends Join implements VoltLogicalRel {
+public class VoltDBLJoin extends Join implements VoltRel {
     private final boolean semiJoinDone;
 
     private final ImmutableList<RelDataTypeField> systemFieldList;
@@ -55,7 +55,7 @@ public class VoltDBLJoin extends Join implements VoltLogicalRel {
             boolean semiJoinDone,
             ImmutableList<RelDataTypeField> systemFieldList) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
-        Preconditions.checkArgument(getConvention() == VoltLogicalRel.VOLTDB_LOGICAL);
+        Preconditions.checkArgument(getConvention() == VoltRel.CONVENTION);
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
     }

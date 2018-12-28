@@ -21,7 +21,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.logical.VoltRel;
 import org.voltdb.plannerv2.rel.logical.VoltDBLSort;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 
@@ -38,7 +38,7 @@ public class VoltDBPSortRule extends RelOptRule {
     public static final VoltDBPSortRule INSTANCE = new VoltDBPSortRule();
 
     VoltDBPSortRule() {
-        super(operand(VoltDBLSort.class, VoltLogicalRel.VOLTDB_LOGICAL, any()));
+        super(operand(VoltDBLSort.class, VoltRel.CONVENTION, any()));
     }
 
     @Override
