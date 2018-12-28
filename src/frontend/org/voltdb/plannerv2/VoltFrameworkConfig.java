@@ -105,7 +105,7 @@ public class VoltFrameworkConfig implements FrameworkConfig {
     }
 
     @Override public ImmutableList<Program> getPrograms() {
-        return VoltPlannerPrograms.get();
+        return VoltPlannerRules.getPrograms();
     }
 
     @Override public SqlOperatorTable getOperatorTable() {

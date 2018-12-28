@@ -1,9 +1,5 @@
 package org.voltdb.plannerv2;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
@@ -30,24 +26,27 @@ import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
 import com.google.common.collect.ImmutableList;
 
 /**
- * Programs used by VoltDB for various planning stages.
+ * Rules used by VoltDB for various planning stages.
  * @author Yiqun Zhang
  * @since 8.4
  */
-public class VoltPlannerPrograms {
+public class VoltPlannerRules {
 
-    public enum directory {
-        CALC_LOGICAL,
-        VOLT_LOGICAL,
-        LOGICAL,
-        VOLT_PHYSICAL_CONVERSION
+    public enum Phase {
+        LOGICAL {
+            @Override
+            public RuleSet getRules() {
+                return VoltPlannerRules.LOGICAL;
+            }
+        };
+        public abstract RuleSet getRules();
     }
 
     /**
      * See {@link org.apache.calcite.tools.Programs.CALC_RULES}
      * Calcite logical rules are for dealing with projection and filters.
      * The consecutive projections and filters are later merged into a LogicalCalc. */
-    private static final RuleSet CALC_LOGICAL = RuleSets.ofList(
+    private static final RuleSet LOGICAL = RuleSets.ofList(
             // Merge two LogicalCalc's.
             // Who produces LogicalCalc? - See comments in LogicalCalc.java
             // Is there an example of this merge?
@@ -69,8 +68,6 @@ public class VoltPlannerPrograms {
             VoltLAggregateRule.INSTANCE,
             VoltLJoinRule.INSTANCE);
 
-    private static final RuleSet LOGICAL = concat(CALC_LOGICAL, VOLT_LOGICAL);
-
     private static final RuleSet VOLT_PHYSICAL_CONVERSION = RuleSets.ofList(
             VoltPCalcRule.INSTANCE,
             VoltPSeqScanRule.INSTANCE,
@@ -81,23 +78,11 @@ public class VoltPlannerPrograms {
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
             Programs.listOf(
-                    CALC_LOGICAL,
-                    VOLT_LOGICAL,
                     LOGICAL,
                     VOLT_PHYSICAL_CONVERSION)
             );
 
-    static RuleSet concat(RuleSet... ruleSets) {
-        final List<RelOptRule> ruleList = new ArrayList<>();
-        for (final RuleSet ruleSet : ruleSets) {
-            for (final RelOptRule relOptRule : ruleSet) {
-                ruleList.add(relOptRule);
-            }
-        }
-        return RuleSets.ofList(ruleList);
-    }
-
-    public static ImmutableList<Program> get() {
+    public static ImmutableList<Program> getPrograms() {
         return PROGRAMS;
     }
 }

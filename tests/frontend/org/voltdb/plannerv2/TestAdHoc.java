@@ -19,7 +19,7 @@ public class TestAdHoc extends RegressionSuite {
     public void testCompileAdHoc() throws IOException, ProcCallException {
         Client client = getClient();
 //        client.callProcedure("@AdHoc", "select a from t where a > 0;");
-        client.callProcedure("@AdHoc", "select a from t where a > 0 limit 2 offset 1;");
+        client.callProcedure("@AdHoc", "select a from t where a > ? limit 2 offset ?;", 100, 2);
     }
 
     static public junit.framework.Test suite() throws IOException {

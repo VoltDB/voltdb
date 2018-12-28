@@ -21,6 +21,9 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitDef;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepMatchOrder;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
@@ -173,6 +176,21 @@ public class VoltPlanner implements Planner {
                 m_relPlanner, rel, requiredOutputTraits,
                 ImmutableList.of() /*materializations*/,
                 ImmutableList.of() /*lattices*/);
+    }
+
+    public RelNode transformHep(VoltPlannerRules.Phase phase, RelNode rel) {
+        return transformHep(phase, false, rel);
+    }
+
+    public RelNode transformHep(VoltPlannerRules.Phase phase, boolean bottomUp, RelNode rel) {
+        final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+        if (bottomUp) {
+            hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
+        }
+        phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+        HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
+        planner.setRoot(rel);
+        return planner.findBestExp();
     }
 
     @Override public void close() {
