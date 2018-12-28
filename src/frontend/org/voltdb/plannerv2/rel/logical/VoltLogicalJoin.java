@@ -35,8 +35,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 /**
- * Sub-class of {@link org.apache.calcite.rel.core.Join}
- * targeted at the VoltDB logical calling convention.
+ * Sub-class of {@link Join} targeted at the VoltDB logical calling convention.
+ *
  * @see org.apache.calcite.rel.logical.LogicalJoin
  * @author Chao Zhou
  * @since 8.4

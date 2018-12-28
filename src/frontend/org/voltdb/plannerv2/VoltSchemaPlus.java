@@ -25,7 +25,7 @@ import org.voltdb.plannerv2.rel.VoltTable;
 /**
  * This is the common adapter that VoltDB should query any catalog object from.
  * It is built around the {@link Database} instance in sync
- * with any DDL operations. Taken/adapted from <b>Mike Alexeev</b>.
+ * with any DDL operations. Taken/adapted from <b>Michael Alexeev</b>.
  * </br></br>
  * <b>NOTE</b> VoltDB creates a new Catalog/Database instance on every DDL statement.
  * In future, we might save some troubles by avoiding creating all catalog objects

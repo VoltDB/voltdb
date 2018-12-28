@@ -17,7 +17,8 @@
 
 package org.voltdb.plannerv2.rel.logical;
 
-import com.google.common.base.Preconditions;
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -25,10 +26,10 @@ import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.util.ImmutableBitSet;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
 
 /**
- * Logical Aggregate with <code>VOLTDB_LOGICAL</code> convention trait.
+ * Sub-class of {@link Aggregate} targeted at the VoltDB logical calling convention.
  *
  * @author Michael Alexeev
  * @since 8.4
@@ -36,49 +37,30 @@ import java.util.List;
 public class VoltLogicalAggregate extends Aggregate implements VoltLogicalRel {
 
     /**
-     * Constructor
+     * Creates a VoltLogicalAggregate.
+     *
+     * @param cluster   Cluster that this relational expression belongs to
+     * @param traitSet  Trait set
+     * @param child     Input relational expression
+     * @param groupSet  Bit set of grouping fields
+     * @param groupSets Grouping sets, or null to use just {@code groupSet}
+     * @param aggCalls  Array of aggregates to compute, not null
      */
-    private VoltLogicalAggregate(
+    public VoltLogicalAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
-            boolean indicator,
             ImmutableBitSet groupSet,
             List<ImmutableBitSet> groupSets,
             List<AggregateCall> aggCalls) {
-        super(cluster, traitSet, child, indicator, groupSet, groupSets, aggCalls);
+        super(cluster, traitSet, child, false /*indicator*/, groupSet, groupSets, aggCalls);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
-    @Override
-    public VoltLogicalAggregate copy(RelTraitSet traitSet, RelNode input,
+    @Override public VoltLogicalAggregate copy(RelTraitSet traitSet, RelNode input,
                                  boolean indicator, ImmutableBitSet groupSet,
                                  List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        return VoltLogicalAggregate.create(
-                getCluster(),
-                traitSet,
-                input,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls);
-    }
-
-    public static VoltLogicalAggregate create(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls) {
-        return new VoltLogicalAggregate(
-                cluster,
-                traitSet,
-                child,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls);
+        return new VoltLogicalAggregate(getCluster(), traitSet, input,
+                groupSet, groupSets, aggCalls);
     }
 }

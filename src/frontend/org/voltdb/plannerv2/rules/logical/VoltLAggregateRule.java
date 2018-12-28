@@ -46,13 +46,7 @@ public class VoltLAggregateRule extends RelOptRule {
         RelNode input = aggr.getInput();
         RelTraitSet convertedTraits = aggr.getTraitSet().replace(VoltLogicalRel.CONVENTION);
         RelNode convertedInput = convert(input, input.getTraitSet().replace(VoltLogicalRel.CONVENTION));
-        call.transformTo(VoltLogicalAggregate.create(
-                aggr.getCluster(),
-                convertedTraits,
-                convertedInput,
-                aggr.indicator,
-                aggr.getGroupSet(),
-                aggr.getGroupSets(),
-                aggr.getAggCallList()));
+        call.transformTo(new VoltLogicalAggregate(aggr.getCluster(), convertedTraits,
+                convertedInput, aggr.getGroupSet(), aggr.getGroupSets(), aggr.getAggCallList()));
     }
 }

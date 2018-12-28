@@ -25,12 +25,12 @@ import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
-import org.voltdb.plannerv2.rel.logical.VoltLLimit;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 
 /**
  * VoltDB logical rule that transform {@link LogicalSort} to
- * {@link VoltLogicalSort} or {@link VoltLLimit}.
+ * {@link VoltLogicalSort} or {@link VoltLogicalLimit}.
  *
  * @author Michael Alexeev
  * @since 8.4
@@ -71,7 +71,7 @@ public class VoltLSortRule extends RelOptRule {
         // 3.The Limit node can be inlined with Scan or Serial Aggregate nodes
         if (sort.offset != null || sort.fetch != null) {
             RelNode limitInput = (logicalRel != null) ? logicalRel : convertedInput;
-            logicalRel = new VoltLLimit(
+            logicalRel = new VoltLogicalLimit(
                     sort.getCluster(),
                     convertedTraits,
                     limitInput,

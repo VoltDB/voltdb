@@ -21,14 +21,14 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.plannerv2.rel.logical.VoltLLimit;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPLimit;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.utils.VoltDBRelUtil;
 
 /**
- * VoltDB physical rule that transform {@link VoltLLimit} to {@link VoltDBPLimit}.
+ * VoltDB physical rule that transform {@link VoltLogicalLimit} to {@link VoltDBPLimit}.
  *
  * @author Michael Alexeev
  * @since 8.4
@@ -38,13 +38,13 @@ public class VoltPLimitRule extends RelOptRule {
     public static final VoltPLimitRule INSTANCE = new VoltPLimitRule();
 
     VoltPLimitRule() {
-        super(operand(VoltLLimit.class,
+        super(operand(VoltLogicalLimit.class,
                 VoltLogicalRel.CONVENTION, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltLLimit limitOffset = call.rel(0);
+        VoltLogicalLimit limitOffset = call.rel(0);
         RelNode input = limitOffset.getInput();
         RelTraitSet convertedTraits = limitOffset.getTraitSet()
                 .replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
