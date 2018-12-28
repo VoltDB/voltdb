@@ -101,7 +101,7 @@ public class VoltTable implements TranslatableTable {
     @Override
     public RelDataType getRowType(RelDataTypeFactory typeFactory) {
         return new RelDataTypeFactory.Builder(typeFactory) {{
-            CatalogUtil.getSortedCatalogItems(getCatTable().getColumns(), "index")
+            CatalogUtil.getSortedCatalogItems(getCatalogTable().getColumns(), "index")
                 .forEach(catColumn ->
                     add(catColumn.getName(),
                         typeFactory.createTypeWithNullability(
@@ -157,18 +157,23 @@ public class VoltTable implements TranslatableTable {
                 this);
     }
 
-    public org.voltdb.catalog.Table getCatTable() {
+    /**
+     * @return the table information stored in the VoltDB catalog.
+     */
+    public org.voltdb.catalog.Table getCatalogTable() {
         return m_catTable;
     }
 
     @Override
-    public boolean isRolledUp(String column) { // VoltDB does not support RollUp
+    public boolean isRolledUp(String column) {
+        // VoltDB does not support RollUp
         return false;
     }
 
     @Override
     public boolean rolledUpColumnValidInsideAgg(String column, SqlCall call,
-            SqlNode parent, CalciteConnectionConfig config) { // VoltDB does not support RollUp
+            SqlNode parent, CalciteConnectionConfig config) {
+        // VoltDB does not support RollUp
         return false;
     }
 }

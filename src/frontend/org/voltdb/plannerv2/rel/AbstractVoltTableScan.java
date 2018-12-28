@@ -26,11 +26,11 @@ import org.apache.calcite.rel.core.TableScan;
  * This is from Mike A. as an adapter of <code>org.apache.calcite.rel.core.TableScan</code> that
  * views a <code>org.voltdb.calciteadapter.rel.VoltDBTable</code> as a relational expression.
  */
-public abstract class AbstractVoltDBTableScan extends TableScan {
+public abstract class AbstractVoltTableScan extends TableScan {
 
     protected final VoltTable m_voltTable;
 
-    protected AbstractVoltDBTableScan(RelOptCluster cluster,
+    protected AbstractVoltTableScan(RelOptCluster cluster,
                                       RelTraitSet traitSet,
                                       RelOptTable table,
                                       VoltTable voltTable) {
@@ -49,7 +49,7 @@ public abstract class AbstractVoltDBTableScan extends TableScan {
         // specially when we merge scans with other redundant nodes like sort for example.
         // Are there better ways of doing this?
         String dg = super.computeDigest();
-        return dg + "_" + m_voltTable.getCatTable().getTypeName();
+        return dg + "_" + m_voltTable.getCatalogTable().getTypeName();
     }
 
     public VoltTable getVoltTable() {

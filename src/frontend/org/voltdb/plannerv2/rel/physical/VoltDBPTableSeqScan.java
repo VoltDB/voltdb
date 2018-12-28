@@ -28,7 +28,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
-import org.voltdb.plannerv2.rel.AbstractVoltDBTableScan;
+import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
 import org.voltdb.plannerv2.rel.VoltTable;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannerv2.rules.physical.Constants;
@@ -98,7 +98,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
     }
 
     @Override
-    public AbstractVoltDBTableScan copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
+    public AbstractVoltTableScan copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
         VoltDBPTableSeqScan newScan = new VoltDBPTableSeqScan(
                 getCluster(),
                 traitSet,
@@ -115,7 +115,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
     }
 
     @Override
-    public AbstractVoltDBTableScan copyWithProgram(RelTraitSet traitSet, RexProgram newProgram, RexBuilder programRexBuilder) {
+    public AbstractVoltTableScan copyWithProgram(RelTraitSet traitSet, RexProgram newProgram, RexBuilder programRexBuilder) {
         // Merge two programs program / m_program into a new merged program
         RexProgram mergedProgram = RexProgramBuilder.mergePrograms(
                 newProgram,
@@ -138,7 +138,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
     }
 
     @Override
-    public AbstractVoltDBTableScan copyWithAggregate(RelTraitSet traitSet, RelNode aggregate) {
+    public AbstractVoltTableScan copyWithAggregate(RelTraitSet traitSet, RelNode aggregate) {
         // Need to create a Program for the inline aggregate because it will define
         // the output row type for the scan
         // Preserve the original program and row type

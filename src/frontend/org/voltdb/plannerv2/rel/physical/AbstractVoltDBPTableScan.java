@@ -32,17 +32,17 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
-import org.voltdb.plannerv2.rel.AbstractVoltDBTableScan;
+import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
 import org.voltdb.plannerv2.rel.VoltTable;
 
 /**
- * Abstract sub-class of {@link AbstractVoltDBTableScan}
+ * Abstract sub-class of {@link AbstractVoltTableScan}
  * target at {@link #VOLTDB_PHYSICAL} convention
  *
  * @author Michael Alexeev
  * @since 8.4
  */
-public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan implements VoltDBPRel {
+public abstract class AbstractVoltDBPTableScan extends AbstractVoltTableScan implements VoltDBPRel {
 
     // If Limit ?, it's likely to be a small number. So pick up 50 here.
     private static final int DEFAULT_LIMIT_VALUE_PARAMETERIZED = 50;
@@ -219,20 +219,20 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
     }
 
     /**
-     * Returns a copy of this {@link AbstractVoltDBTableScan} but with a new
+     * Returns a copy of this {@link AbstractVoltTableScan} but with a new
      * traitSet, limit and offset.
      */
-    public abstract AbstractVoltDBTableScan copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit);
+    public abstract AbstractVoltTableScan copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit);
 
     /**
-     * Returns a copy of this {@link AbstractVoltDBTableScan} but with a new traitSet and program.
+     * Returns a copy of this {@link AbstractVoltTableScan} but with a new traitSet and program.
      */
-    public abstract AbstractVoltDBTableScan copyWithProgram(RelTraitSet traitSet, RexProgram program, RexBuilder rexBuilder);
+    public abstract AbstractVoltTableScan copyWithProgram(RelTraitSet traitSet, RexProgram program, RexBuilder rexBuilder);
 
     /**
-     * Returns a copy of this {@link AbstractVoltDBTableScan} but with a new traitSet and aggregate.
+     * Returns a copy of this {@link AbstractVoltTableScan} but with a new traitSet and aggregate.
      */
-    public abstract AbstractVoltDBTableScan copyWithAggregate(RelTraitSet traitSet, RelNode aggregate);
+    public abstract AbstractVoltTableScan copyWithAggregate(RelTraitSet traitSet, RelNode aggregate);
 
     protected double estimateRowCountWithLimit(double rowCount) {
         if (m_limit != null) {
