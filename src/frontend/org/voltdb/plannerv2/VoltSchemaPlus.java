@@ -20,7 +20,6 @@ package org.voltdb.plannerv2;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.voltdb.catalog.Database;
-import org.voltdb.plannerv2.rel.VoltTable;
 
 /**
  * This is the common adapter that VoltDB should query any catalog object from.

@@ -32,8 +32,8 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
-import org.voltdb.plannerv2.rel.VoltTable;
 
 /**
  * Abstract sub-class of {@link AbstractVoltTableScan}

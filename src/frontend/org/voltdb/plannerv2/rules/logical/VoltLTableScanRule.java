@@ -22,7 +22,7 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.logical.VoltDBLTableScan;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 
 public class VoltLTableScanRule extends RelOptRule {
@@ -30,15 +30,15 @@ public class VoltLTableScanRule extends RelOptRule {
     public static final VoltLTableScanRule INSTANCE = new VoltLTableScanRule();
 
     private VoltLTableScanRule() {
-        super(operand(VoltDBLTableScan.class, Convention.NONE, any()));
+        super(operand(VoltLogicalTableScan.class, Convention.NONE, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLTableScan tableScan = call.rel(0);
+        VoltLogicalTableScan tableScan = call.rel(0);
         RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltLogicalRel.CONVENTION);
         // The only change is replace(VoltDBLRel.VOLTDB_LOGICAL)
-        call.transformTo(new VoltDBLTableScan(
+        call.transformTo(new VoltLogicalTableScan(
                 tableScan.getCluster(),
                 convertedTraits,
                 tableScan.getTable(),

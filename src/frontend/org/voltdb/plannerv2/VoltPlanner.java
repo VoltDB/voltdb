@@ -189,7 +189,7 @@ public class VoltPlanner implements Planner {
      * @param rel    The root node
      * @return the transformed relational expression tree.
      */
-    public static RelNode transformHep(VoltPlannerRules.Phase phase, RelNode rel) {
+    public static RelNode transformHep(PlannerRules.Phase phase, RelNode rel) {
         return transformHep(phase, false, rel);
     }
 
@@ -202,7 +202,7 @@ public class VoltPlanner implements Planner {
      * @param rel       The root node
      * @return the transformed relational expression tree.
      */
-    public static RelNode transformHep(VoltPlannerRules.Phase phase, boolean bottomUp, RelNode rel) {
+    public static RelNode transformHep(PlannerRules.Phase phase, boolean bottomUp, RelNode rel) {
         final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
         if (bottomUp) {
             hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);

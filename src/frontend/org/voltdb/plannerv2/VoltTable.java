@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.plannerv2.rel;
+package org.voltdb.plannerv2;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,15 +41,12 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
-import org.voltdb.plannerv2.rel.logical.VoltDBLTableScan;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
 
 /**
- * An adapter between a {@link org.voltdb.catalog.Table} and a {@link TranslateableTable}
- * which can be translated into a relational expression ({@link RelNode}).
- * A relational expression can fulfill roles to be sort-able, join-able, project-able,
- * filter-able, scan-able, and sample-able.
+ * Implementation of {@link TranslateableTable} representing a {@link org.voltdb.catalog.Table}.
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -101,8 +98,7 @@ public class VoltTable implements TranslatableTable {
         return TableType.TABLE;
     }
 
-    @Override
-    public RelDataType getRowType(RelDataTypeFactory typeFactory) {
+    @Override public RelDataType getRowType(RelDataTypeFactory typeFactory) {
         return new RelDataTypeFactory.Builder(typeFactory) {{
             CatalogUtil.getSortedCatalogItems(getCatalogTable().getColumns(), "index")
                 .forEach(catColumn ->
@@ -115,23 +111,18 @@ public class VoltTable implements TranslatableTable {
         }}.build();
     }
 
-    @Override
-    public Statistic getStatistic() {
+    @Override public Statistic getStatistic() {
         return new Statistic() {
-            @Override
-            public Double getRowCount() {
+            @Override public Double getRowCount() {
                 return null;
             }
-            @Override
-            public boolean isKey(ImmutableBitSet columns) {
+            @Override public boolean isKey(ImmutableBitSet columns) {
                 return false;
             }
-            @Override
-            public List<RelCollation> getCollations() {
+            @Override public List<RelCollation> getCollations() {
                 return new ArrayList<>();
             }
-            @Override
-            public RelDistribution getDistribution() {
+            @Override public RelDistribution getDistribution() {
                 if (m_catTable.getIsreplicated()) {
                     return RelDistributions.SINGLETON;
                 } else {
@@ -141,8 +132,7 @@ public class VoltTable implements TranslatableTable {
                     return hashDist;
                 }
             }
-            @Override
-            public List<RelReferentialConstraint> getReferentialConstraints() {
+            @Override public List<RelReferentialConstraint> getReferentialConstraints() {
                 /** TODO: Returns the collection of referential constraints (foreign-keys)
                  * for this table. */
                 return null;
@@ -150,11 +140,10 @@ public class VoltTable implements TranslatableTable {
         };
     }
 
-    @Override
-    public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
+    @Override public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
         RelOptCluster cluster = context.getCluster();
         // Start conservatively with a Logical Scan
-        return new VoltDBLTableScan(cluster,
+        return new VoltLogicalTableScan(cluster,
                 cluster.traitSet(),
                 relOptTable,
                 this);
@@ -167,14 +156,12 @@ public class VoltTable implements TranslatableTable {
         return m_catTable;
     }
 
-    @Override
-    public boolean isRolledUp(String column) {
+    @Override public boolean isRolledUp(String column) {
         // VoltDB does not support RollUp
         return false;
     }
 
-    @Override
-    public boolean rolledUpColumnValidInsideAgg(String column, SqlCall call,
+    @Override public boolean rolledUpColumnValidInsideAgg(String column, SqlCall call,
             SqlNode parent, CalciteConnectionConfig config) {
         // VoltDB does not support RollUp
         return false;

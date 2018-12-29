@@ -52,8 +52,7 @@ public class VoltLogicalSort extends Sort implements VoltLogicalRel {
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
-    @Override
-    public VoltLogicalSort copy(RelTraitSet traitSet, RelNode input,
+    @Override public VoltLogicalSort copy(RelTraitSet traitSet, RelNode input,
                             RelCollation collation,
                             RexNode offset,
                             RexNode fetch) {

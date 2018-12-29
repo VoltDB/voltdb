@@ -18,12 +18,14 @@
 package org.voltdb.plannerv2.rel;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptSchema;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.TableScan;
+import org.voltdb.plannerv2.VoltTable;
 
 /**
- * Relational expression representing a scan of a {@link org.voltdb.calciteadapter.rel.VoltTable}.
+ * Relational expression representing a scan of a {@link VoltTable}.
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -32,6 +34,14 @@ public abstract class AbstractVoltTableScan extends TableScan {
 
     protected final VoltTable m_voltTable;
 
+    /**
+     * Constructor for the subclasses.
+     *
+     * @param cluster    Cluster that this relational expression belongs to
+     * @param traitSet   Trait set
+     * @param table      The corresponding relational dataset in a {@link RelOptSchema}.
+     * @param voltTable  VoltDB translatable table
+     */
     protected AbstractVoltTableScan(RelOptCluster cluster,
                                       RelTraitSet traitSet,
                                       RelOptTable table,
@@ -42,19 +52,19 @@ public abstract class AbstractVoltTableScan extends TableScan {
     }
 
     /**
-     * The digest needs to be updated because Calcite considers any two nodes with the same digest
-     * to be identical.
+     * @return the {@link VoltTable} this will scan.
      */
-    @Override
-    protected String computeDigest() {
-        // Make an instance of the scan unique for Calcite to be able to distinguish them
-        // specially when we merge scans with other redundant nodes like sort for example.
-        // Are there better ways of doing this?
-        String dg = super.computeDigest();
-        return dg + "_" + m_voltTable.getCatalogTable().getTypeName();
-    }
-
     public VoltTable getVoltTable() {
         return m_voltTable;
     }
+
+    /*
+     * Note - ethan - 12/29/2018 - about digest:
+     * Before the digest is used, computeDigest() will always be called.
+     * For this particular class, the digest may be something like
+     *  "VoltLogicalTableScan.NONE.[](table=[public, T1])".
+     * The table name will be included as part of the digest so there is no need to append the
+     * table name manually. Even if you want to change the digest, you should override the explainTerms()
+     * instead of overriding the computeDigest().
+     */
 }

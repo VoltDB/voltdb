@@ -31,6 +31,7 @@ import com.google.common.base.Preconditions;
 /**
  * Sub-class of {@link Aggregate} targeted at the VoltDB logical calling convention.
  *
+ * @see org.apache.calcite.rel.logical.LogicalAggregate
  * @author Michael Alexeev
  * @since 9.0
  */
@@ -60,7 +61,8 @@ public class VoltLogicalAggregate extends Aggregate implements VoltLogicalRel {
     @Override public VoltLogicalAggregate copy(RelTraitSet traitSet, RelNode input,
                                  boolean indicator, ImmutableBitSet groupSet,
                                  List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        return new VoltLogicalAggregate(getCluster(), traitSet, input,
+        return new VoltLogicalAggregate(
+                getCluster(), traitSet, input,
                 groupSet, groupSets, aggCalls);
     }
 }

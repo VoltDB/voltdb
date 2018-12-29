@@ -24,7 +24,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistribution.Type;
 import org.apache.calcite.rel.RelDistributions;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.logical.VoltDBLTableScan;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 import org.voltdb.plannerv2.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPSingletonExchange;
@@ -32,7 +32,7 @@ import org.voltdb.plannerv2.rel.physical.VoltDBPTableSeqScan;
 import org.voltdb.plannerv2.rel.physical.VoltDBPUnionExchange;
 
 /**
- * VoltDB physical rule that transform {@link VoltDBLTableScan} to {@link VoltDBPTableSeqScan}.
+ * VoltDB physical rule that transform {@link VoltLogicalTableScan} to {@link VoltDBPTableSeqScan}.
  * And add {@link AbstractVoltDBPExchange} on top of it.
  *
  * @author Michael Alexeev
@@ -43,12 +43,12 @@ public class VoltPSeqScanRule extends RelOptRule {
     public static final VoltPSeqScanRule INSTANCE = new VoltPSeqScanRule();
 
     private VoltPSeqScanRule() {
-        super(operand(VoltDBLTableScan.class, VoltLogicalRel.CONVENTION, any()));
+        super(operand(VoltLogicalTableScan.class, VoltLogicalRel.CONVENTION, any()));
     }
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLTableScan tableScan = call.rel(0);
+        VoltLogicalTableScan tableScan = call.rel(0);
         RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
 
         // Table distribution

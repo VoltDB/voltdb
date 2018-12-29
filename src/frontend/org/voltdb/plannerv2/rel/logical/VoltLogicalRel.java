@@ -27,7 +27,7 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
  */
 public interface VoltLogicalRel extends RelNode  {
     /**
-     * [Ethan] Why is this necessary?
+     * Note - ethan - 12/29/2018 - Why is this necessary?
      * The default convention is Convention.NONE.
      * In {@link VolcanoPlanner#getCost(RelNode, RelMetadataQuery)},
      * you can see that if the convention is NONE, the relational node

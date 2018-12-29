@@ -49,8 +49,6 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
     /**
      * Creates a VoltLogicalJoin.
      *
-     * <p>Use {@link #create} unless you know what you're doing.
-     *
      * @param cluster          Cluster
      * @param traitSet         Trait set
      * @param left             Left input
@@ -79,32 +77,29 @@ public class VoltLogicalJoin extends Join implements VoltLogicalRel {
             ImmutableList<RelDataTypeField> systemFieldList) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
+
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
     }
 
-    @Override
-    public VoltLogicalJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
+    @Override public VoltLogicalJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
             RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
         return new VoltLogicalJoin(getCluster(), traitSet, left, right, conditionExpr,
                 variablesSet, joinType, semiJoinDone, systemFieldList);
     }
 
-    @Override
-    public RelWriter explainTerms(RelWriter pw) {
+    @Override public RelWriter explainTerms(RelWriter pw) {
         // Don't ever print semiJoinDone=false. This way, we
         // don't clutter things up in optimizers that don't use semi-joins.
         return super.explainTerms(pw)
                 .itemIf("semiJoinDone", semiJoinDone, semiJoinDone);
     }
 
-    @Override
-    public boolean isSemiJoinDone() {
+    @Override public boolean isSemiJoinDone() {
         return semiJoinDone;
     }
 
-    @Override
-    public List<RelDataTypeField> getSystemFieldList() {
+    @Override public List<RelDataTypeField> getSystemFieldList() {
         return systemFieldList;
     }
 }

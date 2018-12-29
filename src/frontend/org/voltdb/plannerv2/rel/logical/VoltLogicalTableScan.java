@@ -20,38 +20,38 @@ package org.voltdb.plannerv2.rel.logical;
 import java.util.List;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptSchema;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
-import org.voltdb.plannerv2.rel.VoltTable;
 
-public class VoltDBLTableScan extends AbstractVoltTableScan implements VoltLogicalRel {
+/**
+ * Relational expression representing a scan of a {@link VoltTable}, in the logical phase.
+ *
+ * @author Mike Alexeev
+ * @since 9.0
+ */
+public class VoltLogicalTableScan extends AbstractVoltTableScan implements VoltLogicalRel {
 
-    public VoltDBLTableScan(RelOptCluster cluster,
+    /**
+     * Create a {@link VoltLogicalTableScan}.
+     *
+     * @param cluster    Cluster that this relational expression belongs to
+     * @param traitSet   Trait set
+     * @param table      The corresponding relational dataset in a {@link RelOptSchema}.
+     * @param voltTable  VoltDB translatable table
+     */
+    public VoltLogicalTableScan(RelOptCluster cluster,
             RelTraitSet traitSet,
             RelOptTable table,
-            VoltTable voltDBTable) {
-          super(cluster,
-                  traitSet,
-                  table,
-                  voltDBTable);
+            VoltTable voltTable) {
+        super(cluster, traitSet, table, voltTable);
     }
 
-    @Override
-    public RelNode copy(RelTraitSet traits, List<RelNode> inputs) {
-        return new VoltDBLTableScan(
-                getCluster(),
-                traits,
-                getTable(),
-                getVoltTable());
-    }
-
-    public VoltDBLTableScan copy() {
-        return new VoltDBLTableScan(
-                getCluster(),
-                getTraitSet(),
-                getTable(),
-                getVoltTable());
+    @Override public RelNode copy(RelTraitSet traits, List<RelNode> inputs) {
+        return new VoltLogicalTableScan(
+                getCluster(), traits, getTable(), getVoltTable());
     }
 }

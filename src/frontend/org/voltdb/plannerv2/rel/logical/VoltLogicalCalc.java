@@ -26,21 +26,32 @@ import org.apache.calcite.rex.RexProgram;
 import com.google.common.base.Preconditions;
 
 /**
- * Logical Calc with the <code>VOLTDB_LOGICAL</code> convention trait.
+ * Sub-class of {@link Calc} targeted at the VoltDB logical calling convention.
  *
+ * @see org.apache.calcite.rel.logical.LogicalCalc
  * @author Michael Alexeev
  * @since 9.0
  */
 public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
 
-    public VoltLogicalCalc(RelOptCluster cluster, RelTraitSet traitSet,
-            RelNode input, RexProgram program) {
+    /**
+     * Create a VoltLogicalCalc.
+     *
+     * @param cluster Cluster
+     * @param traits Traits
+     * @param child Input relation
+     * @param program Calc program
+     */
+    public VoltLogicalCalc(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode input,
+            RexProgram program) {
         super(cluster, traitSet, input, program);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
     }
 
-    @Override
-    public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program) {
-        return new VoltLogicalCalc(this.getCluster(), traitSet, child, program);
+    @Override public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program) {
+        return new VoltLogicalCalc(getCluster(), traitSet, child, program);
     }
 }

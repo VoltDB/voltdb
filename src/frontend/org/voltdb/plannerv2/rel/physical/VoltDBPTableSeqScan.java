@@ -28,8 +28,8 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
+import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
-import org.voltdb.plannerv2.rel.VoltTable;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannerv2.rules.physical.Constants;
 

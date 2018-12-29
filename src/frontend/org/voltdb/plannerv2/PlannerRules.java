@@ -32,7 +32,7 @@ import com.google.common.collect.ImmutableList;
  * @author Yiqun Zhang
  * @since 9.0
  */
-public class VoltPlannerRules {
+public class PlannerRules {
 
     /**
      * Planning phases and the rules for them.
@@ -41,7 +41,7 @@ public class VoltPlannerRules {
         LOGICAL {
             @Override
             public RuleSet getRules() {
-                return VoltPlannerRules.LOGICAL;
+                return PlannerRules.LOGICAL;
             }
         };
         public abstract RuleSet getRules();

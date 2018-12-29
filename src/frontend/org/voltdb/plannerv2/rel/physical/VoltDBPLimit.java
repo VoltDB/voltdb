@@ -17,13 +17,12 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google.common.base.Preconditions;
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelDistributionTraitDef;
-import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.SingleRel;
@@ -33,7 +32,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
 
 public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
 

@@ -17,7 +17,8 @@
 
 package org.voltdb.plannerv2.rel.logical;
 
-import com.google.common.base.Preconditions;
+import java.util.List;
+
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -25,7 +26,7 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.SingleRel;
 import org.apache.calcite.rex.RexNode;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
 
 /**
  * Limit operator with <code>VOLTDB_LOGICAL</code> convention trait.
@@ -55,8 +56,7 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
         return new VoltLogicalLimit(getCluster(), traitSet, input, offset, limit);
     }
 
-    @Override
-    public VoltLogicalLimit copy(RelTraitSet traitSet,
+    @Override public VoltLogicalLimit copy(RelTraitSet traitSet,
                              List<RelNode> inputs) {
         return copy(traitSet, sole(inputs), m_offset, m_limit);
     }
@@ -69,8 +69,7 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
         return m_limit;
     }
 
-    @Override
-    public RelWriter explainTerms(RelWriter pw) {
+    @Override public RelWriter explainTerms(RelWriter pw) {
         return super.explainTerms(pw)
                 .itemIf("limit", m_limit, m_limit != null)
                 .itemIf("offset", m_offset, m_offset != null);
