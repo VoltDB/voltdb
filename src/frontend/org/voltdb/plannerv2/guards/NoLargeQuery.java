@@ -24,7 +24,7 @@ import org.voltdb.VoltDB;
  * Fail the check if the large query mode is enabled.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class NoLargeQuery extends CalciteCompatibilityCheck {
 

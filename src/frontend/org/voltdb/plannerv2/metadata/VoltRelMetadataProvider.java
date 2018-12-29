@@ -26,7 +26,7 @@ import com.google.common.collect.ImmutableList;
 /**
  * VoltDB's provider for providing metadata about relational expressions.
  *
- * @since 8.4
+ * @since 9.0
  */
 public class VoltRelMetadataProvider extends ChainedRelMetadataProvider {
 

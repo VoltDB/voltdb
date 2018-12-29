@@ -31,7 +31,7 @@ import org.apache.calcite.rel.core.Exchange;
  * with VoltDB specific attributes about distribution.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public abstract class AbstractVoltDBPExchange extends Exchange implements VoltDBPRel {
 

@@ -49,7 +49,7 @@ public class AdHoc extends AdHocNTBase {
      * @param params the user parameters. The first parameter is always the query text.
      *               The rest parameters are the ones used in the queries. </br>
      * @return the client response.
-     * @since 8.4
+     * @since 9.0
      * @author Yiqun Zhang
      */
     public CompletableFuture<ClientResponse> run(ParameterSet params) {
@@ -203,7 +203,7 @@ public class AdHoc extends AdHocNTBase {
      * Until I have further reshaped the legacy code path, I will leave this interface to call back
      * into the private methods of {@link org.voltdb.sysprocs.AdHoc}.
      * @author Yiqun Zhang
-     * @since 8.4
+     * @since 9.0
      */
     private class AdHocContext implements SqlBatch.Context {
 

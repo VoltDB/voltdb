@@ -29,7 +29,7 @@ import org.apache.calcite.util.Util.FoundOne;
  * and store its parameter values as a list of {@link SqlLiteral}.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public class ParameterizedSqlTask extends AbstractSqlTaskDecorator {
 
@@ -80,7 +80,7 @@ public class ParameterizedSqlTask extends AbstractSqlTaskDecorator {
      * A visitor to find {@link SqlDynamicParam} in a node tree.
      *
      * @author Yiqun Zhang
-     * @since 8.4
+     * @since 9.0
      */
     private static final class DynamicParamFinder extends SqlBasicVisitor<Void> {
         static final DynamicParamFinder INSTANCE = new DynamicParamFinder();

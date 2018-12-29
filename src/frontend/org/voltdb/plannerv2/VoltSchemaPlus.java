@@ -34,7 +34,7 @@ import org.voltdb.plannerv2.rel.VoltTable;
  * @see org.voltdb.compiler.VoltCompiler#loadSchema(org.hsqldb_voltpatches.HSQLInterface,
  *      org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad, String...)
  * @author Lukai Liu
- * @since 8.4
+ * @since 9.0
  */
 public class VoltSchemaPlus {
 

@@ -37,7 +37,7 @@ import org.voltdb.plannerv2.rules.physical.Constants;
  * The relational expression that represent a VoltDB physical table scan.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
 

@@ -25,7 +25,7 @@ import org.apache.calcite.sql.parser.SqlParser;
  * Direct API provider for parsing a SQL query.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class VoltFastSqlParser {
 

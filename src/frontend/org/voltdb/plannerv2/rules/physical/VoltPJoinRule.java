@@ -32,7 +32,7 @@ import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
  * VoltDB physical rule that transform {@link VoltLogicalJoin} to {@link VoltDBPJoin}.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public class VoltPJoinRule extends RelOptRule {
 

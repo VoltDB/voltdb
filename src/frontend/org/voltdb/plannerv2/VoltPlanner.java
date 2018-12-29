@@ -53,7 +53,7 @@ import com.google.common.collect.ImmutableList;
  * You can use this planner for multiple queries unless there is a catalog change.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class VoltPlanner implements Planner {
 

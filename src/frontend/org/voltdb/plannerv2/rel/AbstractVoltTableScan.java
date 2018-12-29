@@ -23,8 +23,10 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.TableScan;
 
 /**
- * This is from Mike A. as an adapter of <code>org.apache.calcite.rel.core.TableScan</code> that
- * views a <code>org.voltdb.calciteadapter.rel.VoltDBTable</code> as a relational expression.
+ * Relational expression representing a scan of a {@link org.voltdb.calciteadapter.rel.VoltTable}.
+ *
+ * @author Michael Alexeev
+ * @since 9.0
  */
 public abstract class AbstractVoltTableScan extends TableScan {
 

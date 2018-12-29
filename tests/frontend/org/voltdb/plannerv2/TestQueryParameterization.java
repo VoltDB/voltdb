@@ -162,7 +162,7 @@ public class TestQueryParameterization {
      * A visitor to count {@link SqlLiteral} in a node tree.
      * Used for testing in {@link testAvoidTooAggressiveParameterization}
      * @author Yiqun Zhang
-     * @since 8.4
+     * @since 9.0
      */
     private static final class SqlLiteralCounter extends SqlBasicVisitor<Void> {
         private int m_count = 0;

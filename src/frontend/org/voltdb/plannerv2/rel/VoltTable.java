@@ -47,11 +47,12 @@ import org.voltdb.utils.CatalogUtil;
 
 /**
  * An adapter between a {@link org.voltdb.catalog.Table} and a {@link TranslateableTable}
- * which can be translated into a relational expression ({@link org.apache.calcite.rel.RelNode}).
+ * which can be translated into a relational expression ({@link RelNode}).
  * A relational expression can fulfill roles to be sort-able, join-able, project-able,
  * filter-able, scan-able, and sample-able.
- * @since 8.4
+ *
  * @author Michael Alexeev
+ * @since 9.0
  */
 public class VoltTable implements TranslatableTable {
 
@@ -59,6 +60,7 @@ public class VoltTable implements TranslatableTable {
 
     /**
      * Build a {@code VoltTable} from a catalog table.
+     *
      * @param catTable the catalog table.
      */
     public VoltTable(org.voltdb.catalog.Table catTable) {
@@ -67,7 +69,8 @@ public class VoltTable implements TranslatableTable {
     }
 
     /**
-     * Create a {@link org.apache.calcite.rel.type.RelDataType} from a {@link org.voltdb.VoltType}.
+     * Create a {@link RelDataType} from a {@link VoltType}.
+     *
      * @param typeFactory the RelDataTypeFactory.
      * @param vt VoltDB type.
      * @param prec the precision

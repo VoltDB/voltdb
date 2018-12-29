@@ -46,7 +46,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
  * Returns RuleSet for concrete planner phase.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public enum PlannerPhase {
     CALCITE_LOGICAL("Calcite logical rules") {

@@ -38,7 +38,7 @@ import org.voltcore.utils.Pair;
  * {@link ParameterizedSqlTask}.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
 
@@ -146,7 +146,7 @@ public class ParameterizationVisitor extends SqlBasicVisitor<SqlNode> {
      * Comparator for Pair<Integer, SqlNode>, based on the SqlNode's parser position.
      *
      * @author Yiqun Zhang
-     * @since 8.4
+     * @since 9.0
      */
     private static final class PositionBasedIndexedSqlNodePairComparator implements Comparator<Pair<Integer,SqlNode>> {
         final static PositionBasedIndexedSqlNodePairComparator INSTANCE =

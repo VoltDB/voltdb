@@ -30,7 +30,7 @@ import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
  * a VoltDBPSort at the later stage
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltDBPSortRule extends RelOptRule {
 

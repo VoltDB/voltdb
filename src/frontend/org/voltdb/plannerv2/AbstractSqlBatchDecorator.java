@@ -28,7 +28,7 @@ import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
  * Extend this class to create a decorator for a {@link SqlBatch}.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public abstract class AbstractSqlBatchDecorator extends SqlBatch {
 

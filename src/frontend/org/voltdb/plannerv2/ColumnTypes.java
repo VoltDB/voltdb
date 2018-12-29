@@ -33,7 +33,7 @@ import org.voltdb.VoltType;
  * Calcite needs to understand VoltDB data types in the planning stage.
  *
  * @author Lukai Liu
- * @since 8.4
+ * @since 9.0
  */
 public class ColumnTypes {
 

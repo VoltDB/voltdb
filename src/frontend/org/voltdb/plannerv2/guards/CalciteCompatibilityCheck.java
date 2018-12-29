@@ -22,7 +22,7 @@ package org.voltdb.plannerv2.guards;
  * This is a temporary check before we can make Calcite support all the VoltDB syntaxes.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public abstract class CalciteCompatibilityCheck {
 

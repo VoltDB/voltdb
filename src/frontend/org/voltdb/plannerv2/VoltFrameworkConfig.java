@@ -52,7 +52,7 @@ import com.google.common.collect.ImmutableList;
  * describing how to configure VoltDB planning sessions with Calcite.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class VoltFrameworkConfig implements FrameworkConfig {
 

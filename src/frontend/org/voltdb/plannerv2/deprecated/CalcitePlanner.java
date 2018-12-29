@@ -126,7 +126,7 @@ import com.google.common.collect.ImmutableList;
  * Util class to provide Calcite Planning methods.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 @Deprecated
 public class CalcitePlanner {

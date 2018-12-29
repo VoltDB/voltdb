@@ -22,7 +22,7 @@ package org.voltdb.plannerv2.guards;
  * VoltDB parser and planner.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class PlannerFallbackException extends Exception {
     private static final long serialVersionUID = 1L;

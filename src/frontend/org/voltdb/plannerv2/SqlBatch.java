@@ -37,7 +37,7 @@ import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
  * It provides the {@code Iterable<SqlTask>} interface to give access to its contained tasks.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public abstract class SqlBatch implements Iterable<SqlTask>  {
 
@@ -114,7 +114,7 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
      * into the private methods of {@link org.voltdb.sysprocs.AdHoc} as a compromise.
      *
      * @author Yiqun Zhang
-     * @since 8.4
+     * @since 9.0
      */
     public interface Context {
         CompletableFuture<ClientResponse> runDDLBatch(List<String> sqlStatements, List<SqlNode> sqlNodes);

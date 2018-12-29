@@ -36,7 +36,7 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
  * A base class for implementing tests against {@link VoltSqlToRelConverter}.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public class VoltConverterTestCase extends VoltSqlValidatorTestCase {
 

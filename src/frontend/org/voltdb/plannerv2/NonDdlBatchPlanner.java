@@ -37,7 +37,7 @@ import org.voltdb.utils.VoltTrace;
  * A planner for DQL/DML batches.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class NonDdlBatchPlanner {
 

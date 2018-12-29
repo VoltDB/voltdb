@@ -32,7 +32,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
  * VoltDB logical rule that transform {@link LogicalJoin} to {@link VoltLogicalJoin}.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public class VoltLJoinRule extends RelOptRule {
     public static final VoltLJoinRule INSTANCE = new VoltLJoinRule();

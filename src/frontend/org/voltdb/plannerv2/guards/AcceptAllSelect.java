@@ -21,7 +21,7 @@ package org.voltdb.plannerv2.guards;
  * Accepts all SELECT queries.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class AcceptAllSelect extends CalciteCompatibilityCheck {
 

@@ -24,7 +24,7 @@ import org.apache.calcite.sql.parser.SqlParseException;
  * SqlTask stores a parsed query tree.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public interface SqlTask {
 

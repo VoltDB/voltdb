@@ -30,7 +30,7 @@ import com.google.common.collect.ImmutableList;
  * Rules used by the VoltDB query planner in various planning stages.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class VoltPlannerRules {
 

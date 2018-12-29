@@ -31,7 +31,7 @@ import java.util.List;
  * Limit operator with <code>VOLTDB_LOGICAL</code> convention trait.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
 

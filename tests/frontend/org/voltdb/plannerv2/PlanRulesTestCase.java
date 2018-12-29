@@ -29,7 +29,7 @@ import org.apache.calcite.plan.RelOptRule;
  * A base class for implementing tests against {@link RelOptRule}.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public abstract class PlanRulesTestCase extends VoltConverterTestCase {
     /**

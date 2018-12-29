@@ -23,7 +23,7 @@ import org.apache.calcite.sql.validate.SqlValidatorImpl;
  * VoltDB SQL validator.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class VoltSqlValidator extends SqlValidatorImpl {
 

@@ -23,7 +23,7 @@ import org.apache.calcite.sql.SqlNode;
  * Extend this class to create a decorator for a {@link SqlTask}.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public abstract class AbstractSqlTaskDecorator implements SqlTask {
 

@@ -36,7 +36,7 @@ import org.voltdb.plannerv2.utils.VoltDBRelUtil;
  * VoltDB physical rule that transform {@link Sort} to {@link VoltDBPSort}.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltPSortConvertRule extends ConverterRule {
 

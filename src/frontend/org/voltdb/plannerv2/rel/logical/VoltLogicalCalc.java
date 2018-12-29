@@ -29,7 +29,7 @@ import com.google.common.base.Preconditions;
  * Logical Calc with the <code>VOLTDB_LOGICAL</code> convention trait.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
 

@@ -35,7 +35,7 @@ import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
  * adding some additional context information for planning. It cannot be used alone.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public final class NonDdlBatch extends AbstractSqlBatchDecorator {
 

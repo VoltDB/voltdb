@@ -25,7 +25,7 @@ import org.apache.calcite.sql.parser.SqlParseException;
  * Basic {@link SqlTask} implementation.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class SqlTaskImpl implements SqlTask {
 

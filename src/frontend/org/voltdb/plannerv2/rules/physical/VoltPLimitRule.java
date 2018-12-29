@@ -31,7 +31,7 @@ import org.voltdb.plannerv2.utils.VoltDBRelUtil;
  * VoltDB physical rule that transform {@link VoltLogicalLimit} to {@link VoltDBPLimit}.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltPLimitRule extends RelOptRule {
 

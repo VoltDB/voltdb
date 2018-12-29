@@ -39,7 +39,7 @@ import com.google.common.collect.ImmutableList;
  * to bulk up the information contained in the batch.
  *
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class SqlBatchImpl extends SqlBatch {
 

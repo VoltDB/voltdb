@@ -36,7 +36,7 @@ import org.voltdb.plannerv2.rel.util.PlanCostUtil;
  * target at {@link #VOLTDB_PHYSICAL} convention
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltDBPCalc extends Calc implements VoltDBPRel {
 

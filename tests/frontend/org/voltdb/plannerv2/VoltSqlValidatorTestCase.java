@@ -37,7 +37,7 @@ import org.voltdb.plannerv2.VoltSqlValidator;
  * A base class for implementing tests against {@link VoltSqlValidator}.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public class VoltSqlValidatorTestCase extends PlannerTestCase {
     private VoltSqlValidator m_validator;

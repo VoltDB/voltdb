@@ -36,7 +36,7 @@ import org.voltdb.plannerv2.rel.physical.VoltDBPUnionExchange;
  * And add {@link AbstractVoltDBPExchange} on top of it.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltPSeqScanRule extends RelOptRule {
 

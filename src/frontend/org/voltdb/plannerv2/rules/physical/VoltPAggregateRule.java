@@ -45,7 +45,7 @@ import java.util.Map;
  * or {@link VoltDBPSerialAggregate}.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltPAggregateRule extends RelOptRule {
 

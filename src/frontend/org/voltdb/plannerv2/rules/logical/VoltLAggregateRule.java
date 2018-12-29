@@ -30,7 +30,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
  * VoltDB logical rule that transform {@link LogicalAggregate} to {@link VoltLogicalAggregate}.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltLAggregateRule extends RelOptRule {
 

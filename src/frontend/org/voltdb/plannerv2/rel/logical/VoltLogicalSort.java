@@ -31,7 +31,7 @@ import com.google.common.base.Preconditions;
  * targeted at the VoltDB logical calling convention.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltLogicalSort extends Sort implements VoltLogicalRel {
 

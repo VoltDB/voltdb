@@ -26,7 +26,7 @@ import org.apache.calcite.rel.RelNode;
  * targeted at Exchange on a single partition.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltDBPSingletonExchange extends AbstractVoltDBPExchange implements VoltDBPRel {
 

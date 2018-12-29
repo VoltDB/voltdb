@@ -31,7 +31,7 @@ import org.voltdb.plannerv2.utils.VoltDBRelUtil;
  * VoltDB physical rule that transform {@link VoltLogicalCalc} to {@link VoltDBPCalc}.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltPCalcRule extends RelOptRule {
 

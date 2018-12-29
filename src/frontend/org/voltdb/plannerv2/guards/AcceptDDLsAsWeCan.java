@@ -25,7 +25,7 @@ import org.voltdb.plannerv2.VoltFastSqlParser;
 /**
  * Allow all DDLs if we support them.
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
 

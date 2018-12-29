@@ -33,7 +33,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
  * {@link VoltLogicalSort} or {@link VoltLogicalLimit}.
  *
  * @author Michael Alexeev
- * @since 8.4
+ * @since 9.0
  */
 public class VoltLSortRule extends RelOptRule {
 
