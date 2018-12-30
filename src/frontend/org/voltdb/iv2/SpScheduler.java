@@ -313,6 +313,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // for MP write txns, we should use it's first SpHandle in the TransactionState
                 // for SP write txns, we can just use the SpHandle from the DuplicateCounterKey
                 long safeSpHandle = txn == null ? key.m_spHandle: txn.m_spHandle;
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("[SpScheduler.updateReplicas] truncate:" + TxnEgo.txnIdToString(safeSpHandle));
+                }
                 setRepairLogTruncationHandle(safeSpHandle, false);
             }
 
@@ -820,6 +823,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(dcKey);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.info("Transaction " + TxnEgo.txnIdToString(message.getTxnId()) + " completed: truncate:" +
+                            TxnEgo.txnIdToString(spHandle) + " isForLeader:" + message.isForOldLeader());
+                }
                 setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
@@ -1633,6 +1640,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void setRepairLogTruncationHandle(long newHandle, boolean isForLeader)
     {
         if (newHandle > m_repairLogTruncationHandle) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                        "to" + TxnEgo.txnIdToString(newHandle));
+            }
             m_repairLogTruncationHandle = newHandle;
             // ENG-14553: release buffered reads regardless of leadership status
             m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
@@ -1641,13 +1652,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Because we still want to release the reads if no following writes will come to this replica.
             // Also advance the truncation point if this is not a leader but the response message is for leader.
             if (m_isLeader || isForLeader) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Schedule truncation" + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                           " isLeader:" + m_isLeader + " isForLeader:" + isForLeader);
+                }
                 scheduleRepairLogTruncateMsg();
             }
         } else {
             // As far as I know, they are cases that will move truncation handle backwards.
             // These include node failures (promotion phase) and node rejoin (early rejoin phase).
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
+                tmLog.debug("Skipping trucation handle update " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
                         "to" + TxnEgo.txnIdToString(newHandle)+ " isLeader:" + m_isLeader + " isForLeader:" + isForLeader);
             }
         }
@@ -1693,6 +1708,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         // so that it can trigger the callbacks.
                         m_mailbox.deliver(truncMsg);
                         m_mailbox.send(m_sendToHSIds, truncMsg);
+                        if (tmLog.isDebugEnabled()) {
+                            List<Long> ids = Arrays.stream(m_sendToHSIds).boxed().collect(Collectors.toList());
+                            tmLog.debug("Send truncation " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " to " + CoreUtils.hsIdCollectionToString(ids));
+                        }
                     }
                 }
             }

@@ -44,11 +44,10 @@ public class SpProcedureTask extends ProcedureTask
 {
     private static final boolean EXEC_TRACE_ENABLED;
     private static final boolean HOST_DEBUG_ENABLED;
-    private static final boolean HOST_TRACE_ENABLED;
     static {
         EXEC_TRACE_ENABLED = execLog.isTraceEnabled();
         HOST_DEBUG_ENABLED = hostLog.isDebugEnabled();
-        HOST_TRACE_ENABLED = hostLog.isTraceEnabled();
+        hostLog.isTraceEnabled();
     }
 
     public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
@@ -241,6 +240,12 @@ public class SpProcedureTask extends ProcedureTask
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        if (m_txnState != null) {
+            SpTransactionState txnState = (SpTransactionState)m_txnState;
+            if (txnState.m_initiationMsg != null) {
+                sb.append("  TRUNCATION HANDLE: ").append(TxnEgo.txnIdToString(txnState.m_initiationMsg.getTruncationHandle()));
+            }
+        }
         return sb.toString();
     }
 
