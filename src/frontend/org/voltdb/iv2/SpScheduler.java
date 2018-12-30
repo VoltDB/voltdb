@@ -824,7 +824,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(dcKey);
                 if (hostLog.isDebugEnabled()) {
-                    hostLog.info("Transaction " + TxnEgo.txnIdToString(message.getTxnId()) + " completed: truncate:" +
+                    hostLog.debug("Transaction " + TxnEgo.txnIdToString(message.getTxnId()) + " completed: truncate:" +
                             TxnEgo.txnIdToString(spHandle) + " isForLeader:" + message.isForOldLeader());
                 }
                 setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
@@ -1215,6 +1215,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 if (txn != null && txn.isDone()) {
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("Fragment " + TxnEgo.txnIdToString(message.getTxnId()) + " completed: truncate:" +
+                                TxnEgo.txnIdToString(txn.m_spHandle) + " isForLeader:" + message.isForOldLeader());
+                    }
                     setRepairLogTruncationHandle(txn.m_spHandle, message.isForOldLeader());
                 }
 
@@ -1363,6 +1367,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
                 assert txn.isDone() : "Counter " + counter + ", leader " + m_isLeader + ", " + msg;
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Transaction " + TxnEgo.txnIdToString(msg.getTxnId()) + " completed: truncate:" +
+                            TxnEgo.txnIdToString(txn.m_spHandle) + " isForLeader:" + msg.requireAck());
+                }
                 setRepairLogTruncationHandle(txn.m_spHandle, msg.requireAck());
             }
         }
