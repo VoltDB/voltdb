@@ -98,6 +98,10 @@ public class InitiatorMailbox implements Mailbox
     public static final CopyOnWriteArrayList<InitiatorMailbox> m_allInitiatorMailboxes
                                                                          = new CopyOnWriteArrayList<InitiatorMailbox>();
 
+    synchronized public RepairLog getRepairLog() {
+        return m_repairLog;
+    }
+
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
         setLeaderStateInternal(maxSeenTxnId);

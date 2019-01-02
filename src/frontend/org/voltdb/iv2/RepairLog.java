@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
@@ -58,6 +57,7 @@ public class RepairLog
     long m_lastMpHandle = Long.MAX_VALUE;
 
     // Truncation point
+    long m_truncationOrigin = 0L;
     long m_truncationHandle = Long.MIN_VALUE;
     final List<TransactionCommitInterest> m_txnCommitInterests = new CopyOnWriteArrayList<>();
 
@@ -129,6 +129,14 @@ public class RepairLog
         m_logMP = new ArrayDeque<Item>();
     }
 
+    public long getTruncationHandle() {
+        return m_truncationHandle;
+    }
+
+    public long getTruncationOrigin() {
+        return m_truncationOrigin;
+    }
+
     // get the HSID for dump logging
     void setHSId(long HSId)
     {
@@ -144,7 +152,7 @@ public class RepairLog
         // action always happens after repair is completed.
         if (m_isLeader) {
             if (!m_logSP.isEmpty()) {
-                truncate(m_logSP.getLast().getHandle(), IS_SP);
+                truncate(m_logSP.getLast().getHandle(), IS_SP, 0L);
             }
         }
     }
@@ -170,7 +178,7 @@ public class RepairLog
                 return;
             }
             m_lastSpHandle = m.getSpHandle();
-            truncate(m.getTruncationHandle(), IS_SP);
+            truncate(m.getTruncationHandle(), IS_SP, 0L);
 
             //Cann't repair MigratePartitionLeader
             if ("@MigratePartitionLeader".equalsIgnoreCase(m.getStoredProcedureName())) {
@@ -191,7 +199,7 @@ public class RepairLog
                 return;
             }
 
-            truncate(m.getTruncationHandle(), IS_MP);
+            truncate(m.getTruncationHandle(), IS_MP, 0L);
             // only log the first fragment of a procedure (and handle 1st case)
             if (newMp) {
                 m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
@@ -214,7 +222,7 @@ public class RepairLog
                 return;
             }
 
-            truncate(ctm.getTruncationHandle(), IS_MP);
+            truncate(ctm.getTruncationHandle(), IS_MP, 0L);
             m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
             m_lastSpHandle = ctm.getSpHandle();
         }
@@ -228,12 +236,16 @@ public class RepairLog
         }
         else if (msg instanceof RepairLogTruncationMessage) {
             final RepairLogTruncationMessage truncateMsg = (RepairLogTruncationMessage) msg;
-            truncate(truncateMsg.getHandle(), IS_SP);
+            truncate(truncateMsg.getHandle(), IS_SP, truncateMsg.m_sourceHSId);
+            if (m_isLeader && m_HSId != truncateMsg.m_sourceHSId) {
+                repairLogger.error("XXX RepairLogTruncationMessage from " + CoreUtils.hsIdToString(truncateMsg.m_sourceHSId)
+                + " is executed on LEADER, truncating to  " + TxnEgo.txnIdToString(truncateMsg.getHandle()));
+            }
         }
     }
 
     // trim unnecessary log messages.
-    private void truncate(long handle, boolean isSP)
+    private void truncate(long handle, boolean isSP, long originHSId)
     {
         // MIN value means no work to do, is a startup condition
         if (handle == Long.MIN_VALUE) {
@@ -245,6 +257,7 @@ public class RepairLog
             deq = m_logSP;
             if (m_truncationHandle < handle) {
                 m_truncationHandle = handle;
+                m_truncationOrigin = originHSId;
                 notifyTxnCommitInterests(handle);
             }
         }

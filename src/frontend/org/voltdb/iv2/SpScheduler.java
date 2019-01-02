@@ -1690,7 +1690,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
                         final RepairLogTruncationMessage truncMsg = new RepairLogTruncationMessage(m_repairLogTruncationHandle);
                         // Also keep the local repair log's truncation point up-to-date
-                        // so that it can trigger the callbacks.
+                        // so that it can trigger the callbacks (ensure the message has the correct source HSId).
+                        truncMsg.m_sourceHSId = m_mailbox.getHSId();
                         m_mailbox.deliver(truncMsg);
                         m_mailbox.send(m_sendToHSIds, truncMsg);
                     }

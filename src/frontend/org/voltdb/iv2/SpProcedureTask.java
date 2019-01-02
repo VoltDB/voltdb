@@ -241,9 +241,15 @@ public class SpProcedureTask extends ProcedureTask
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
+        if (m_initiator instanceof InitiatorMailbox) {
+            InitiatorMailbox imbx = (InitiatorMailbox) m_initiator;
+            sb.append("  TRUNC: ").append(TxnEgo.txnIdToString(imbx.getRepairLog().getTruncationHandle()));
+            sb.append("  FROM: ").append(CoreUtils.hsIdToString(imbx.getRepairLog().getTruncationOrigin()));
+        }
         return sb.toString();
     }
 
+    @Override
     public boolean needCoordination() {
         return false;
     }
