@@ -1281,7 +1281,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
             msg.setForReplica(true);
-            msg.setRequireAck(true);
+            if (!m_isLeader) {
+                msg.setRequireAck(true);
+            }
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
