@@ -103,6 +103,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.messaging.SiteMailbox;
+import org.voltcore.messaging.SocketJoiner;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
@@ -244,8 +245,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
-
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
@@ -1691,6 +1690,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             @Override
             public void run()
             {
+                // stop this node if rejoining.
+                if (stopRejoiningHost()) {
+                    return;
+                }
+
                 //create a blocker for repair if this is a MP leader and partition leaders change
                 if (m_leaderAppointer.isLeader() && m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
                     VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
@@ -1747,8 +1751,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_messenger.removeStopNodeNotice(hostId);
                 }
 
-                stopRejoiningHost();
-
                 // let the client interface know host(s) have failed to clean up any outstanding work
                 // especially non-transactional work
                 m_clientInterface.handleFailedHosts(failedHosts);
@@ -1757,7 +1759,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     // If the current node hasn't finished rejoin when another node fails, fail this node to prevent locking up.
-    private void stopRejoiningHost() {
+    private boolean stopRejoiningHost() {
 
         // The host failure notification could come before mesh determination, wait for the determination
         try {
@@ -1768,7 +1770,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (m_rejoining) {
             VoltDB.crashLocalVoltDB("Another node failed before this node could finish rejoining. " +
                     "As a result, the rejoin operation has been canceled. Please try again.");
+            return true;
         }
+        return false;
     }
 
     private void handleHostsFailedForMigratePartitionLeader(Set<Integer> failedHosts) {
@@ -3144,16 +3148,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         try {
             m_messenger.start();
-        } catch (CoreUtils.RetryException e) {
-
-            // do not log as fatal in this case
-            boolean printStackTrace = true;
-            if (e.getMessage() != null  && e.getMessage().indexOf(MeshProber.MESH_ONE_REJOIN_MSG )> -1) {
-                printStackTrace = false;
+        } catch (Exception e) {
+            boolean printStackTrace =  true;
+            // do not log fatal exception message in these cases
+            if (e.getMessage() != null) {
+                if (e.getMessage().indexOf(SocketJoiner.FAIL_ESTABLISH_MESH_MSG) > -1 ||
+                        e.getMessage().indexOf(MeshProber.MESH_ONE_REJOIN_MSG )> -1) {
+                    printStackTrace = false;
+                }
             }
             VoltDB.crashLocalVoltDB(e.getMessage(), printStackTrace, e);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
         VoltZK.createPersistentZKNodes(m_messenger.getZK());
@@ -3327,6 +3331,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 hostId,
                                 MiscUtils.formatHostMetadataFromJSON(hostMeta)));
             }
+        }
+
+        final String drRole = m_catalogContext.getCluster().getDrrole();
+        if (m_producerDRGateway != null && (DrRoleType.MASTER.value().equals(drRole) || DrRoleType.XDCR.value().equals(drRole))) {
+            m_producerDRGateway.logActiveConversations();
+        }
+        if (m_consumerDRGateway != null) {
+            m_consumerDRGateway.logActiveConversations();
         }
 
         try {

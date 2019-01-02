@@ -143,7 +143,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final AtomicReference<AckingContainer> m_pendingContainer = new AtomicReference<>();
     // Is EDS from catalog or from disk pdb?
     private volatile boolean m_isInCatalog;
-    private volatile boolean m_eos;
     private final Generation m_generation;
     private final File m_adFile;
     private ExportClientBase m_client;
@@ -290,7 +289,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             fos.getFD().sync();
         }
         m_isInCatalog = true;
-        m_eos = false;
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                     m_tableName + " partition " + m_partitionId, 1);
@@ -360,7 +358,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         //EDS created from adfile is always from disk.
         m_isInCatalog = false;
-        m_eos = false;
         m_client = null;
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                 m_tableName + " partition " + m_partitionId, 1);
@@ -637,7 +634,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 m_tupleCount += tupleCount;
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Dropping already acked buffer. " +
-                            " Buffer info: " + startSequenceNumber + " Size: " + tupleCount +
+                            " Buffer info: [" + startSequenceNumber + "," + lastSequenceNumber + "] Size: " + tupleCount +
                             " last released seq: " + m_lastReleasedSeqNo);
                 }
                 cont.discard();
@@ -659,21 +656,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (isAcked(sb.startSequenceNumber())) {
                     if (exportLog.isDebugEnabled()) {
                         exportLog.debug("Setting releaseSeqNo as " + m_lastReleasedSeqNo +
-                                " for SB with sequence number " + sb.startSequenceNumber() +
-                                " for partition " + m_partitionId);
+                                " for SB [" + sb.startSequenceNumber() + "," + sb.lastSequenceNumber() +
+                                "] for partition " + m_partitionId);
                     }
                     sb.releaseTo(m_lastReleasedSeqNo);
                 }
-
-                m_gapTracker.addRange(sb.unreleasedSequenceNumber(), lastSequenceNumber);
+                long newTuples = m_gapTracker.addRange(sb.unreleasedSequenceNumber(), lastSequenceNumber);
                 if (exportLog.isDebugEnabled()) {
                     exportLog.debug("Append [" + sb.unreleasedSequenceNumber() + "," + lastSequenceNumber +"] to gap tracker.");
                 }
 
                 m_lastQueuedTimestamp = sb.getTimestamp();
                 m_lastPushedSeqNo = lastSequenceNumber;
-                m_tupleCount += tupleCount;
-                m_tuplesPending.addAndGet((int)sb.unreleasedRowCount());
+                m_tupleCount += newTuples;
+                m_tuplesPending.addAndGet((int)newTuples);
                 m_committedBuffers.offer(sb);
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to write to export overflow.", true, e);
@@ -695,13 +691,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 //Its ok.
             }
         }
-    }
-
-
-    public void pushEndOfStream() {
-        exportLog.info("End of stream for table: " + getTableName() +
-                " partition: " + getPartitionId() + " signature: " + getSignature());
-        m_eos = true;
     }
 
     public void pushExportBuffer(
@@ -1061,6 +1050,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
+    public void forwardAckToOtherReplicas() {
+        forwardAckToOtherReplicas(m_lastReleasedSeqNo);
+    }
+
     private void forwardAckToOtherReplicas(long seq) {
         // In RunEveryWhere mode, every data source is master, no need to send out acks.
         if (m_runEveryWhere) {
@@ -1314,8 +1307,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug(toString() + " is no longer the export stream master.");
         }
         m_mastershipAccepted.set(false);
-        m_isInCatalog = false;
-        m_eos = false;
         m_pollFuture = null;
         m_readyForPolling = false;
         m_seqNoToDrain = Long.MAX_VALUE;
@@ -1638,8 +1629,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void resetStateInRejoinOrRecover(long initialSequenceNumber) {
-        m_lastReleasedSeqNo = Math.max(initialSequenceNumber,
-                m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo() - 1);
+        m_lastReleasedSeqNo = Math.max(m_lastReleasedSeqNo,
+                Math.max(initialSequenceNumber,
+                        m_gapTracker.isEmpty() ? initialSequenceNumber : m_gapTracker.getFirstSeqNo() - 1));
         m_firstUnpolledSeqNo =  m_lastReleasedSeqNo + 1;
         m_tuplesPending.set(m_gapTracker.sizeInSequence());
     }

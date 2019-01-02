@@ -68,6 +68,8 @@ class Topend {
             std::string signature,
             StreamBlock *block,
             bool sync) = 0;
+    // Not used right now and will be removed or altered after a decision has been made on how Schema changes
+    // are managed (they really don't belong in row buffers).
     virtual void pushEndOfStream(
             int32_t partitionId,
             std::string signature) = 0;
