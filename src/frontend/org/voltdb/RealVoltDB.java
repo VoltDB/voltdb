@@ -1280,7 +1280,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         m_config.asClusterSettingsMap(), fromPropertyFile.asMap(), fromDeploymentFile);
                 clusterSettings.store();
                 m_clusterSettings.set(clusterSettings, 2);
-
+                hostLog.info("Partitions on this host:" +  m_config.m_recoveredPartitions);
                 for (int ii = 0; ii < partitions.size(); ii++) {
                     Integer partition = partitions.get(ii);
                     m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
