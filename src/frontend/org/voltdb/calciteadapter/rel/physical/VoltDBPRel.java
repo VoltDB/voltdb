@@ -42,7 +42,6 @@ public interface VoltDBPRel extends RelNode {
     /**
      * Convert VoltDBPRel and its descendant(s) to a AbstractPlanNode tree
      * This is the key piece that bridges between Calcite planner and VoltDB planner.
-     * TODO: implement the method in future
      * @return AbstractPlanNode
      */
     default AbstractPlanNode toPlanNode() {
