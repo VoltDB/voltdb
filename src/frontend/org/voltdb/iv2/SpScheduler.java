@@ -823,10 +823,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(dcKey);
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("Transaction " + TxnEgo.txnIdToString(message.getTxnId()) + " completed: truncate:" +
-                            TxnEgo.txnIdToString(spHandle) + " isForLeader:" + message.isForOldLeader());
-                }
                 setRepairLogTruncationHandle(spHandle, message.isForOldLeader());
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
@@ -1215,10 +1211,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 if (txn != null && txn.isDone()) {
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("Fragment " + TxnEgo.txnIdToString(message.getTxnId()) + " completed: truncate:" +
-                                TxnEgo.txnIdToString(txn.m_spHandle) + " isForLeader:" + message.isForOldLeader());
-                    }
                     setRepairLogTruncationHandle(txn.m_spHandle, message.isForOldLeader());
                 }
 
@@ -1367,10 +1359,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 // FragmentResponseMessage to avoid letting replicas think a
                 // fragment is done before the MP txn is fully committed.
                 assert txn.isDone() : "Counter " + counter + ", leader " + m_isLeader + ", " + msg;
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("Transaction " + TxnEgo.txnIdToString(msg.getTxnId()) + " completed: truncate:" +
-                            TxnEgo.txnIdToString(txn.m_spHandle) + " isForLeader:" + msg.requireAck());
-                }
                 setRepairLogTruncationHandle(txn.m_spHandle, msg.requireAck());
             }
         }
@@ -1648,10 +1636,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void setRepairLogTruncationHandle(long newHandle, boolean isForLeader)
     {
         if (newHandle > m_repairLogTruncationHandle) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
-                        "to" + TxnEgo.txnIdToString(newHandle) + " isForLeader:" + isForLeader);
-            }
             // ENG-14553: release buffered reads regardless of leadership status
             m_bufferedReadLog.releaseBufferedReads(m_mailbox, newHandle);
             // We have to advance the local truncation point on the replica. It's important for
@@ -1659,9 +1643,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Because we still want to release the reads if no following writes will come to this replica.
             // Also advance the truncation point if this is not a leader but the response message is for leader.
             if (m_isLeader || isForLeader) {
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("Schedule truncation" + TxnEgo.txnIdToString(newHandle));
-                }
                 scheduleRepairLogTruncateMsg(newHandle);
             }
             m_repairLogTruncationHandle = newHandle;

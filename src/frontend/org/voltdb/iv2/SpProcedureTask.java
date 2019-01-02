@@ -47,7 +47,6 @@ public class SpProcedureTask extends ProcedureTask
     static {
         EXEC_TRACE_ENABLED = execLog.isTraceEnabled();
         HOST_DEBUG_ENABLED = hostLog.isDebugEnabled();
-        hostLog.isTraceEnabled();
     }
 
     public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
