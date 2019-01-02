@@ -41,7 +41,7 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
         VOLT.IntegerOption('-s', '--sitesperhost', 'sitesperhost', None),
         VOLT.IntegerOption('-m', '--missing', 'missing', 'specifying how many nodes are missing at K-safe cluster startup'),
-        VOLT.BooleanOption('-p', '--restoreplacement', 'restoreplacement','Recover previous partition placement', default = False),
+        VOLT.BooleanOption('-t', '--restoreplacement', 'restoreplacement','Recover previous partition placement topology', default = False),
     ),
     description = 'Starts a database, which has been initialized.'
 )
