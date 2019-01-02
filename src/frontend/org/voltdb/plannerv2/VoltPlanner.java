@@ -155,7 +155,15 @@ public class VoltPlanner implements Planner {
 
         m_relRoot = m_sqlToRelConverter.convertQuery(
                 m_validatedSqlNode, false /*needs validation*/, true /*top*/);
-        m_relRoot = m_relRoot.withRel(m_sqlToRelConverter.flattenTypes(m_relRoot.rel, true /*restructure*/));
+
+        // Note - ethan - 1/2/2019:
+        // Since we do not supported structured (compound) types in VoltDB now,
+        // I disabled the type flattening operation here.
+        // Enable in the future if structured types become supported in VoltDB.
+        // See: org.apache.calcite.sql2rel.RelStructuredTypeFlattener
+
+        // m_relRoot = m_relRoot.withRel(m_sqlToRelConverter.flattenTypes(m_relRoot.rel, true /*restructure*/));
+
         m_relRoot = m_relRoot.withRel(RelDecorrelator.decorrelateQuery(m_relRoot.rel, m_relBuilder));
 
         m_state = State.STATE_3_CONVERTED;

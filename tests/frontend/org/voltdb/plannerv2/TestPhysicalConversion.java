@@ -23,32 +23,19 @@
 
 package org.voltdb.plannerv2;
 
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelDistributionTraitDef;
-import org.apache.calcite.rel.RelDistributions;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
-import org.voltdb.plannerv2.deprecated.CalcitePlanner;
-import org.voltdb.plannerv2.deprecated.CalcitePlannerType;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
-import org.voltdb.plannerv2.rules.PlannerPhase;
-import org.voltdb.plannerv2.utils.VoltDBRelUtil;
+public class TestPhysicalConversion extends Plannerv2TestCase {
 
-public class TestPhysicalConversionRules extends PlanRulesTestCase {
-    @Override
-    protected void setUp() throws Exception {
-        setupSchema(TestVoltSqlValidator.class.getResource(
+    @Override protected void setUp() throws Exception {
+        setupSchema(TestValidation.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
-        init(VoltSchemaPlus.from(getDatabase()));
+        init();
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @Override public void tearDown() throws Exception {
         super.tearDown();
     }
 
+    /*
     @Override
     void assertPlanMatch(String sql, String expectedPlan) {
         RelRoot root = parseValidateAndConvert(sql);
@@ -499,4 +486,5 @@ public class TestPhysicalConversionRules extends PlanRulesTestCase {
                         "      VoltDBPSingletonExchange(distribution=[single])\n" +
                         "        VoltDBPTableSeqScan(table=[[catalog, R2]], split=[1], expr#0..5=[{inputs}], proj#0..5=[{exprs}])\n");
     }
+    */
 }

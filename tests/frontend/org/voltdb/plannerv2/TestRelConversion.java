@@ -23,27 +23,23 @@
 
 package org.voltdb.plannerv2;
 
-import org.apache.calcite.rel.RelRoot;
-import org.voltdb.plannerv2.VoltSchemaPlus;
+public class TestRelConversion extends Plannerv2TestCase {
 
-public class TestVoltConverter extends VoltConverterTestCase {
-    @Override
-    protected void setUp() throws Exception {
-        setupSchema(TestVoltSqlValidator.class.getResource(
+    ConversionTester m_tester = new ConversionTester();
+
+    @Override protected void setUp() throws Exception {
+        setupSchema(TestValidation.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
-        init(VoltSchemaPlus.from(getDatabase()));
+        init();
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @Override public void tearDown() throws Exception {
         super.tearDown();
     }
 
-
     public void testSimple() {
-        RelRoot root = parseValidateAndConvert("select i from R2");
-        assertEquals("Root {kind: SELECT, rel: LogicalProject#1, rowType: RecordType(INTEGER I), fields: [<0, I>], collation: []}",
-                root.toString());
+        m_tester.sql("select i from R2")
+                .plan("Root {kind: SELECT, rel: LogicalProject#1, rowType: RecordType(INTEGER I), fields: [<0, I>], collation: []}")
+                .test();
     }
-
 }

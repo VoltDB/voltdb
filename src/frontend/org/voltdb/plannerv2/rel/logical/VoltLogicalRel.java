@@ -29,6 +29,8 @@ public interface VoltLogicalRel extends RelNode  {
     /**
      * Note - ethan - 12/29/2018 - Why is this necessary?
      * The default convention is Convention.NONE.
+     * It means that a relational expression cannot be implemented; typically there
+     * are rules which can transform it to equivalent, implementable expressions.
      * In {@link VolcanoPlanner#getCost(RelNode, RelMetadataQuery)},
      * you can see that if the convention is NONE, the relational node
      * will be made infinite cost. The planner will fail to come up

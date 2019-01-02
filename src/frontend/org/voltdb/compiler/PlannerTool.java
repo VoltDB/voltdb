@@ -233,6 +233,8 @@ public class PlannerTool {
         RelNode transformed = planner.transform(
                 PlannerRules.Phase.LOGICAL.ordinal(),
                 requiredLogicalOutputTraits, rel);
+
+        compileLog.info("LOGICAL\n" + RelOptUtil.toString(transformed));
 //
 //        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
 //        // If RelDistributionTraitDef is added to the planner as the initial traits,

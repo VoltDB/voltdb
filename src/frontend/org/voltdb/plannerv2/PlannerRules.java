@@ -1,5 +1,12 @@
 package org.voltdb.plannerv2;
 
+import org.apache.calcite.rel.rules.CalcMergeRule;
+import org.apache.calcite.rel.rules.FilterCalcMergeRule;
+import org.apache.calcite.rel.rules.FilterMergeRule;
+import org.apache.calcite.rel.rules.FilterToCalcRule;
+import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
+import org.apache.calcite.rel.rules.ProjectMergeRule;
+import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
@@ -41,17 +48,24 @@ public class PlannerRules {
      * @see org.apache.calcite.tools.Programs.RULE_SET
      */
     private static final RuleSet LOGICAL = RuleSets.ofList(
-//            ProjectMergeRule.INSTANCE,
-//            FilterMergeRule.INSTANCE,
-//            ProjectToCalcRule.INSTANCE,
-//            FilterToCalcRule.INSTANCE,
-//            FilterCalcMergeRule.INSTANCE,
-//            ProjectCalcMergeRule.INSTANCE,
-//            // Merge two LogicalCalc's.
-//            // Who produces LogicalCalc? - See comments in LogicalCalc.java
-//            // Is there an example of this merge?
-//            // - See comments in RexProgramBuilder.mergePrograms()
-//            CalcMergeRule.INSTANCE,
+            ProjectMergeRule.INSTANCE,
+            FilterMergeRule.INSTANCE,
+            // Who produces LogicalCalc? - See comments in LogicalCalc.java
+            ProjectToCalcRule.INSTANCE,
+            FilterToCalcRule.INSTANCE,
+            FilterCalcMergeRule.INSTANCE,
+            ProjectCalcMergeRule.INSTANCE,
+            // Merge two LogicalCalc's.
+            // Is there an example of this merge?
+            // - See comments in RexProgramBuilder.mergePrograms()
+            CalcMergeRule.INSTANCE,
+
+            // -- VoltDB logical rules.
+            VoltLSortRule.INSTANCE,
+            VoltLTableScanRule.INSTANCE,
+            VoltLCalcRule.INSTANCE,
+            VoltLAggregateRule.INSTANCE,
+            VoltLJoinRule.INSTANCE
 //            // Filter   ->  Project
 //            // Project      Filter
 //            FilterProjectTransposeRule.INSTANCE,
@@ -78,13 +92,6 @@ public class PlannerRules {
 //            JoinPushThroughJoinRule.LEFT,
 //            JoinPushThroughJoinRule.RIGHT,
 //            SortProjectTransposeRule.INSTANCE,
-
-            // -- VoltDB logical rules.
-            VoltLSortRule.INSTANCE,
-            VoltLTableScanRule.INSTANCE,
-            VoltLCalcRule.INSTANCE,
-            VoltLAggregateRule.INSTANCE,
-            VoltLJoinRule.INSTANCE
             );
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
