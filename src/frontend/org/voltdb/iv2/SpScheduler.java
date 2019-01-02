@@ -682,12 +682,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
         }
         else if (message instanceof FragmentTaskMessage) {
+            ((FragmentTaskMessage)message).setForOldLeader(false);
             handleFragmentTaskMessageRepair(needsRepair, (FragmentTaskMessage)message);
         }
         else if (message instanceof CompleteTransactionMessage) {
             // It should be safe to just send CompleteTransactionMessages to everyone.
             //if it gets here, the message is for the leader to repair from MpScheduler
             ((CompleteTransactionMessage) message).setForReplica(false);
+            ((CompleteTransactionMessage) message).setRequireAck(false);
             handleCompleteTransactionMessage((CompleteTransactionMessage)message);
         }
         else {
@@ -1650,22 +1652,21 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (newHandle > m_repairLogTruncationHandle) {
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
-                        "to" + TxnEgo.txnIdToString(newHandle));
+                        "to" + TxnEgo.txnIdToString(newHandle) + " isForLeader:" + isForLeader);
             }
-            m_repairLogTruncationHandle = newHandle;
             // ENG-14553: release buffered reads regardless of leadership status
-            m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
+            m_bufferedReadLog.releaseBufferedReads(m_mailbox, newHandle);
             // We have to advance the local truncation point on the replica. It's important for
             // node promotion when there are no missing repair log transactions on the replica.
             // Because we still want to release the reads if no following writes will come to this replica.
             // Also advance the truncation point if this is not a leader but the response message is for leader.
             if (m_isLeader || isForLeader) {
                 if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("Schedule truncation" + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
-                           " isLeader:" + m_isLeader + " isForLeader:" + isForLeader);
+                    tmLog.debug("Schedule truncation" + TxnEgo.txnIdToString(newHandle));
                 }
-                scheduleRepairLogTruncateMsg();
+                scheduleRepairLogTruncateMsg(newHandle);
             }
+            m_repairLogTruncationHandle = newHandle;
         } else {
             // As far as I know, they are cases that will move truncation handle backwards.
             // These include node failures (promotion phase) and node rejoin (early rejoin phase).
@@ -1692,7 +1693,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      * benefit of sending more truncation messages when the throughput is low,
      * which makes the replicas see committed transactions faster.
      */
-    private void scheduleRepairLogTruncateMsg()
+    private void scheduleRepairLogTruncateMsg(long newHandle)
     {
         // skip schedule jobs if no TxnCommitInterests need to be notified
         if (m_sendToHSIds.length == 0 && m_repairLog.hasNoTxnCommitInterests()) {
@@ -1704,21 +1705,21 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             void run()
             {
                 synchronized (m_lock) {
-                    if (m_lastSentTruncationHandle < m_repairLogTruncationHandle) {
-                        m_lastSentTruncationHandle = m_repairLogTruncationHandle;
+                    if (m_lastSentTruncationHandle < newHandle) {
+                        m_lastSentTruncationHandle = newHandle;
                         m_repairLog.notifyTxnCommitInterests(m_lastSentTruncationHandle);
                         if (m_sendToHSIds.length == 0) {
                             return;
                         }
 
-                        final RepairLogTruncationMessage truncMsg = new RepairLogTruncationMessage(m_repairLogTruncationHandle);
+                        final RepairLogTruncationMessage truncMsg = new RepairLogTruncationMessage(newHandle);
                         // Also keep the local repair log's truncation point up-to-date
                         // so that it can trigger the callbacks.
                         m_mailbox.deliver(truncMsg);
                         m_mailbox.send(m_sendToHSIds, truncMsg);
                         if (tmLog.isDebugEnabled()) {
                             List<Long> ids = Arrays.stream(m_sendToHSIds).boxed().collect(Collectors.toList());
-                            tmLog.debug("Send truncation " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + " to " + CoreUtils.hsIdCollectionToString(ids));
+                            tmLog.debug("Send truncation " + TxnEgo.txnIdToString(newHandle) + " to " + CoreUtils.hsIdCollectionToString(ids));
                         }
                     }
                 }
