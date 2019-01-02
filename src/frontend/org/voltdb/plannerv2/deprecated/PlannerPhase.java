@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.plannerv2.rules;
+package org.voltdb.plannerv2.deprecated;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.CalcMergeRule;
@@ -48,6 +48,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
  * @author Chao Zhou
  * @since 9.0
  */
+@Deprecated
 public enum PlannerPhase {
     CALCITE_LOGICAL("Calcite logical rules") {
         @Override

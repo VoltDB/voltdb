@@ -67,7 +67,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
         SqlNode m_validatedNode;
         RelRoot m_root;
         RelNode m_transformedNode;
-        int m_ruleSetIndex;
+        int m_ruleSetIndex = -1;
         RelTraitSet m_requiredOutputTraits;
 
         void reset() {

@@ -33,7 +33,6 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.voltdb.plannerv2.metadata.VoltRelMetadataProvider;
-import org.voltdb.plannerv2.rules.PlannerPhase;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;

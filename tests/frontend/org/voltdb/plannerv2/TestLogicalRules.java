@@ -25,6 +25,7 @@ package org.voltdb.plannerv2;
 
 import org.apache.calcite.plan.RelTraitSet;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 
 public class TestLogicalRules extends Plannerv2TestCase {
 
@@ -35,7 +36,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
                 "testcalcite-ddl.sql"), "testcalcite", false);
         init();
         RelTraitSet requiredOutputTraits = getEmptyTraitSet().replace(VoltLogicalRel.CONVENTION);
-        m_tester.traitSet(requiredOutputTraits);
+        m_tester.traitSet(requiredOutputTraits)
+                .phase(Phase.LOGICAL);
     }
 
     @Override public void tearDown() throws Exception {

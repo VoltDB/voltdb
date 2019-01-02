@@ -35,14 +35,10 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.util.Litmus;
 import org.junit.Test;
-import org.voltdb.plannerv2.ParameterizationVisitor;
-import org.voltdb.plannerv2.ParameterizedSqlTask;
-import org.voltdb.plannerv2.SqlTask;
 
 public class TestQueryParameterization {
 
-    @Test
-    public void testParameterization() throws SqlParseException {
+    @Test public void testParameterization() throws SqlParseException {
         ParameterizationTestCase[] testCases = {
                 new ParameterizationTestCase(
                         "select * from T where id = 7 and name = 'Chao' and cnt = 566 LIMIT 2 OFFSET 3",
@@ -79,8 +75,7 @@ public class TestQueryParameterization {
      * {@link ParameterizedSqlTask#ParameterizedSqlTask(SqlTask)}
      * @throws SqlParseException
      */
-    @Test
-    public void testNotParameterizable() throws SqlParseException {
+    @Test public void testNotParameterizable() throws SqlParseException {
         // Cannot parameterized a query that already got user parameters.
         ParameterizedSqlTask task = new ParameterizedSqlTask(SqlTask.from(
                 "select * from T where id = 7 and cnt < ? and name = 'Chao'"));
@@ -100,8 +95,7 @@ public class TestQueryParameterization {
      * @throws SqlParseException if the parsing goes wrong.
      * @see ParameterizationVisitor#visit(SqlLiteral)
      */
-    @Test
-    public void testAvoidTooAggressiveParameterization() throws SqlParseException {
+    @Test public void testAvoidTooAggressiveParameterization() throws SqlParseException {
         // Window aggregation query
         // The allow-partial case is not tested, but it is not supported by VoltDB yet.
         assertHasLiteralsLeft("select id, rank() over(PARTITION BY cnt+1 ORDER BY name) LIMIT 2 OFFSET 3", 1);
