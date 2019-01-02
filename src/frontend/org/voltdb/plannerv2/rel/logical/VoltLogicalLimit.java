@@ -29,8 +29,11 @@ import org.apache.calcite.rex.RexNode;
 import com.google.common.base.Preconditions;
 
 /**
- * Limit operator with <code>VOLTDB_LOGICAL</code> convention trait.
+ * VoltDB logical limit operator.
+ * There are specific reasons that we pulled the limit/offset information out of
+ * the sort node. This limit operator may still be subject to changes.
  *
+ * @see org.voltdb.plannerv2.rules.logical.VoltLSortRule
  * @author Michael Alexeev
  * @since 9.0
  */
@@ -39,6 +42,15 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
     private RexNode m_offset;
     private RexNode m_limit;
 
+    /**
+     * Creates a VoltLogicalLimit.
+     *
+     * @param cluster   Cluster
+     * @param traitSet  Trait set
+     * @param input     Input relation
+     * @param offset    The offset
+     * @param limit     The Limit
+     */
     public VoltLogicalLimit(
             RelOptCluster cluster,
             RelTraitSet traitSet,
@@ -51,20 +63,20 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
             m_limit = limit;
         }
 
-    public VoltLogicalLimit copy(RelTraitSet traitSet, RelNode input,
-                             RexNode offset, RexNode limit) {
-        return new VoltLogicalLimit(getCluster(), traitSet, input, offset, limit);
+    @Override public VoltLogicalLimit copy(RelTraitSet traitSet, List<RelNode> inputs) {
+        return new VoltLogicalLimit(getCluster(), traitSet, sole(inputs), m_offset, m_limit);
     }
 
-    @Override public VoltLogicalLimit copy(RelTraitSet traitSet,
-                             List<RelNode> inputs) {
-        return copy(traitSet, sole(inputs), m_offset, m_limit);
-    }
-
+    /**
+     * @return the offset value.
+     */
     public RexNode getOffset() {
         return m_offset;
     }
 
+    /**
+     * @return the limit value.
+     */
     public RexNode getLimit() {
         return m_limit;
     }
@@ -74,5 +86,4 @@ public class VoltLogicalLimit extends SingleRel implements VoltLogicalRel {
                 .itemIf("limit", m_limit, m_limit != null)
                 .itemIf("offset", m_offset, m_offset != null);
     }
-
 }

@@ -65,35 +65,6 @@ public class VoltTable implements TranslatableTable {
         m_catTable = catTable;
     }
 
-    /**
-     * Create a {@link RelDataType} from a {@link VoltType}.
-     *
-     * @param typeFactory the RelDataTypeFactory.
-     * @param vt VoltDB type.
-     * @param prec the precision
-     * @return the created {@link org.apache.calcite.rel.type.RelDataType}.
-     */
-    public static RelDataType toRelDataType(RelDataTypeFactory typeFactory, VoltType vt, int prec) {
-        SqlTypeName sqlTypeName = SqlTypeName.get(vt.toSQLString().toUpperCase());
-        RelDataType rdt;
-        // This doesn't seem quite right. Build a VoltDB TypeSystem inherits from RelDataTypeSystemImpl,
-        // ENG-14727
-        switch (vt) {
-            case STRING:
-            case VARBINARY:
-                // The default precision for VARBINARY and VARCHAR (STRING) is not specified.
-                rdt = typeFactory.createSqlType(sqlTypeName, prec);
-                break;
-            case DECIMAL:
-                rdt = typeFactory.createSqlType(sqlTypeName,
-                        VoltDecimalHelper.kDefaultPrecision, VoltDecimalHelper.kDefaultScale);
-                break;
-            default:
-                rdt = typeFactory.createSqlType(sqlTypeName);
-        }
-        return rdt;
-    }
-
     @Override public TableType getJdbcTableType() {
         return TableType.TABLE;
     }
@@ -142,18 +113,11 @@ public class VoltTable implements TranslatableTable {
 
     @Override public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
         RelOptCluster cluster = context.getCluster();
-        // Start conservatively with a Logical Scan
+        // The corresponding relational expression for the table is VoltLogicalTableScan.
         return new VoltLogicalTableScan(cluster,
                 cluster.traitSet(),
                 relOptTable,
                 this);
-    }
-
-    /**
-     * @return the table information stored in the VoltDB catalog.
-     */
-    public org.voltdb.catalog.Table getCatalogTable() {
-        return m_catTable;
     }
 
     @Override public boolean isRolledUp(String column) {
@@ -165,5 +129,42 @@ public class VoltTable implements TranslatableTable {
             SqlNode parent, CalciteConnectionConfig config) {
         // VoltDB does not support RollUp
         return false;
+    }
+
+    /**
+     * @return the table information stored in the VoltDB catalog.
+     */
+    public org.voltdb.catalog.Table getCatalogTable() {
+        return m_catTable;
+    }
+
+    /**
+     * Create a {@link RelDataType} from a {@link VoltType}.
+     *
+     * @param typeFactory the RelDataTypeFactory.
+     * @param vt VoltDB type.
+     * @param prec the precision
+     * @return the created {@link org.apache.calcite.rel.type.RelDataType}.
+     */
+    public static RelDataType toRelDataType(RelDataTypeFactory typeFactory, VoltType vt, int prec) {
+        SqlTypeName sqlTypeName = SqlTypeName.get(vt.toSQLString().toUpperCase());
+        RelDataType rdt;
+        // Note - ethan - 1/1/2019:
+        // We probably need some code refactor for this type conversion.
+        // See RelDataTypeSystemImpl and ENG-14727
+        switch (vt) {
+            case STRING:
+            case VARBINARY:
+                // The default precision for VARBINARY and VARCHAR (STRING) is not specified.
+                rdt = typeFactory.createSqlType(sqlTypeName, prec);
+                break;
+            case DECIMAL:
+                rdt = typeFactory.createSqlType(sqlTypeName,
+                        VoltDecimalHelper.kDefaultPrecision, VoltDecimalHelper.kDefaultScale);
+                break;
+            default:
+                rdt = typeFactory.createSqlType(sqlTypeName);
+        }
+        return rdt;
     }
 }

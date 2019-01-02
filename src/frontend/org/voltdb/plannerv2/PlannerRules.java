@@ -1,19 +1,5 @@
 package org.voltdb.plannerv2;
 
-import org.apache.calcite.rel.rules.AggregateExpandDistinctAggregatesRule;
-import org.apache.calcite.rel.rules.AggregateReduceFunctionsRule;
-import org.apache.calcite.rel.rules.CalcMergeRule;
-import org.apache.calcite.rel.rules.FilterAggregateTransposeRule;
-import org.apache.calcite.rel.rules.FilterCalcMergeRule;
-import org.apache.calcite.rel.rules.FilterJoinRule;
-import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
-import org.apache.calcite.rel.rules.FilterToCalcRule;
-import org.apache.calcite.rel.rules.JoinCommuteRule;
-import org.apache.calcite.rel.rules.JoinPushThroughJoinRule;
-import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
-import org.apache.calcite.rel.rules.ProjectMergeRule;
-import org.apache.calcite.rel.rules.ProjectToCalcRule;
-import org.apache.calcite.rel.rules.SortProjectTransposeRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
@@ -55,42 +41,43 @@ public class PlannerRules {
      * @see org.apache.calcite.tools.Programs.RULE_SET
      */
     private static final RuleSet LOGICAL = RuleSets.ofList(
-            // Merge two LogicalCalc's.
-            // Who produces LogicalCalc? - See comments in LogicalCalc.java
-            // Is there an example of this merge?
-            // - See comments in RexProgramBuilder.mergePrograms()
-            CalcMergeRule.INSTANCE,
-            FilterCalcMergeRule.INSTANCE,
-            FilterToCalcRule.INSTANCE,
-            ProjectCalcMergeRule.INSTANCE,
-            ProjectToCalcRule.INSTANCE,
-            ProjectMergeRule.INSTANCE,
-            // Filter   ->  Project
-            // Project      Filter
-            FilterProjectTransposeRule.INSTANCE,
-            // This is similar to FilterProjectTransposeRule but it's for aggregations.
-            FilterAggregateTransposeRule.INSTANCE,
-            FilterJoinRule.FILTER_ON_JOIN,
-            // For example,
-            //    SELECT deptno, COUNT(*), SUM(bonus), MIN(DISTINCT sal)
-            //    FROM emp
-            //    GROUP BY deptno
-            //
-            // becomes
-            //
-            //    SELECT deptno, SUM(cnt), SUM(bonus), MIN(sal)
-            //    FROM (
-            //          SELECT deptno, COUNT(*) as cnt, SUM(bonus), sal
-            //          FROM EMP
-            //          GROUP BY deptno, sal)            // Aggregate B
-            //    GROUP BY deptno                        // Aggregate A
-            AggregateExpandDistinctAggregatesRule.INSTANCE,
-            // See comments inside for examples.
-            AggregateReduceFunctionsRule.INSTANCE,
-            JoinCommuteRule.INSTANCE,
-            JoinPushThroughJoinRule.LEFT,
-            JoinPushThroughJoinRule.RIGHT,
-            SortProjectTransposeRule.INSTANCE,
+//            ProjectMergeRule.INSTANCE,
+//            FilterMergeRule.INSTANCE,
+//            ProjectToCalcRule.INSTANCE,
+//            FilterToCalcRule.INSTANCE,
+//            FilterCalcMergeRule.INSTANCE,
+//            ProjectCalcMergeRule.INSTANCE,
+//            // Merge two LogicalCalc's.
+//            // Who produces LogicalCalc? - See comments in LogicalCalc.java
+//            // Is there an example of this merge?
+//            // - See comments in RexProgramBuilder.mergePrograms()
+//            CalcMergeRule.INSTANCE,
+//            // Filter   ->  Project
+//            // Project      Filter
+//            FilterProjectTransposeRule.INSTANCE,
+//            // This is similar to FilterProjectTransposeRule but it's for aggregations.
+//            FilterAggregateTransposeRule.INSTANCE,
+//            FilterJoinRule.FILTER_ON_JOIN,
+//            // For example,
+//            //    SELECT deptno, COUNT(*), SUM(bonus), MIN(DISTINCT sal)
+//            //    FROM emp
+//            //    GROUP BY deptno
+//            //
+//            // becomes
+//            //
+//            //    SELECT deptno, SUM(cnt), SUM(bonus), MIN(sal)
+//            //    FROM (
+//            //          SELECT deptno, COUNT(*) as cnt, SUM(bonus), sal
+//            //          FROM EMP
+//            //          GROUP BY deptno, sal)            // Aggregate B
+//            //    GROUP BY deptno                        // Aggregate A
+//            AggregateExpandDistinctAggregatesRule.INSTANCE,
+//            // See comments inside for examples.
+//            AggregateReduceFunctionsRule.INSTANCE,
+//            JoinCommuteRule.INSTANCE,
+//            JoinPushThroughJoinRule.LEFT,
+//            JoinPushThroughJoinRule.RIGHT,
+//            SortProjectTransposeRule.INSTANCE,
 
             // -- VoltDB logical rules.
             VoltLSortRule.INSTANCE,

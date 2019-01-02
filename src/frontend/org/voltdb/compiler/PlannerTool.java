@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.tools.RelConversionException;
@@ -40,10 +41,12 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
+import org.voltdb.plannerv2.PlannerRules;
 import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.VoltPlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
@@ -219,18 +222,17 @@ public class PlannerTool {
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
         // See Drill's DefaultSqlHandler.convertToRel()
 
-        // FILTER_SET_OP_TRANSPOSE_RULE, PROJECT_SET_OP_TRANSPOSE_RULE? They need to be run by Hep.
-        //
+        // Take Drill's DefaultSqlHandler.convertToRawDrel() as reference.
+        // We probably need FILTER_SET_OP_TRANSPOSE_RULE and PROJECT_SET_OP_TRANSPOSE_RULE?
+        // They need to be run by Hep planner (CALCITE-1271).
 
-
-
-//        RelTraitSet requiredLogicalOutputTraits = planner.getEmptyTraitSet().replace(VoltRel.CONVENTION);
-//        // Apply Calcite logical rules
-//        // See comments in VoltPlannerPrograms.directory.LOGICAL to find out
-//        // what each rule is used for.
-//        RelNode transformed = planner.transform(
-//                VoltPlannerPrograms.VoltPlannerRules.LOGICAL.ordinal(),
-//                requiredLogicalOutputTraits, rel);
+        RelTraitSet requiredLogicalOutputTraits = planner.getEmptyTraitSet().replace(VoltLogicalRel.CONVENTION);
+        // Apply Calcite logical rules
+        // See comments in PlannerPrograms.directory.LOGICAL to find out
+        // what each rule is used for.
+        RelNode transformed = planner.transform(
+                PlannerRules.Phase.LOGICAL.ordinal(),
+                requiredLogicalOutputTraits, rel);
 //
 //        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
 //        // If RelDistributionTraitDef is added to the planner as the initial traits,

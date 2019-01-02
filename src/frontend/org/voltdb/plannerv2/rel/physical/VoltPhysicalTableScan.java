@@ -17,12 +17,10 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
@@ -35,6 +33,8 @@ import org.apache.calcite.rex.RexProgram;
 import org.voltdb.plannerv2.VoltTable;
 import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
 
+import com.google_voltpatches.common.base.Preconditions;
+
 /**
  * Abstract sub-class of {@link AbstractVoltTableScan}
  * target at {@link #VOLTDB_PHYSICAL} convention
@@ -42,12 +42,12 @@ import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
  * @author Michael Alexeev
  * @since 9.0
  */
-public abstract class AbstractVoltDBPTableScan extends AbstractVoltTableScan implements VoltDBPRel {
+public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implements VoltDBPRel {
 
     // If Limit ?, it's likely to be a small number. So pick up 50 here.
     private static final int DEFAULT_LIMIT_VALUE_PARAMETERIZED = 50;
 
-    private static final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
+    static final double MAX_PER_POST_FILTER_DISCOUNT = 0.1;
 
     protected final RexProgram m_program;
     protected final int m_splitCount;
@@ -74,7 +74,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltTableScan imp
      * @param preAggregateProgram The program before aggregation
      * @param splitCount Number of concurrent processes that this relational expression will be executed in
      */
-    protected AbstractVoltDBPTableScan(RelOptCluster cluster,
+    protected VoltPhysicalTableScan(RelOptCluster cluster,
                                        RelTraitSet traitSet,
                                        RelOptTable table,
                                        VoltTable voltDBTable,
@@ -128,6 +128,7 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltTableScan imp
         return dg;
     }
 
+    @Override
     public VoltTable getVoltTable() {
         return m_voltTable;
     }

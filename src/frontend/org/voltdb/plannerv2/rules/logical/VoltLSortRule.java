@@ -24,9 +24,9 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.logical.LogicalSort;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalSort;
 
 /**
  * VoltDB logical rule that transform {@link LogicalSort} to
@@ -59,7 +59,7 @@ public class VoltLSortRule extends RelOptRule {
                     convertedInput,
                     sort.getCollation());
         }
-        // Q: why split it to two phases? why instead of single VoltDBLSort we need VoltDBLSort and VoltDBLLimit
+        // Q: why split it to two phases? Why instead of single VoltDBLSort we need VoltDBLSort and VoltDBLLimit
         // Mike:
         // We split it into two res mainly for a couple of reasons:
         // 1.During physical phase the VoltDBLSort is transformed into a collation trait that Volcano Planner would propagate

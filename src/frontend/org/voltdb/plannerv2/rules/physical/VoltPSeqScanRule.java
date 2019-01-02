@@ -28,11 +28,11 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 import org.voltdb.plannerv2.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPSingletonExchange;
-import org.voltdb.plannerv2.rel.physical.VoltDBPTableSeqScan;
+import org.voltdb.plannerv2.rel.physical.VoltSeqTableScan;
 import org.voltdb.plannerv2.rel.physical.VoltDBPUnionExchange;
 
 /**
- * VoltDB physical rule that transform {@link VoltLogicalTableScan} to {@link VoltDBPTableSeqScan}.
+ * VoltDB physical rule that transform {@link VoltLogicalTableScan} to {@link VoltSeqTableScan}.
  * And add {@link AbstractVoltDBPExchange} on top of it.
  *
  * @author Michael Alexeev
@@ -55,7 +55,7 @@ public class VoltPSeqScanRule extends RelOptRule {
         RelDistribution tableDist = tableScan.getTable().getDistribution();
         int scanSplitCount = (Type.SINGLETON == tableDist.getType()) ?
                 1 : Constants.DISTRIBUTED_SPLIT_COUNT;
-        VoltDBPTableSeqScan scanRel = new VoltDBPTableSeqScan(
+        VoltSeqTableScan scanRel = new VoltSeqTableScan(
                 tableScan.getCluster(),
                 convertedTraits.plus(tableDist),
                 tableScan.getTable(),

@@ -17,7 +17,6 @@
 
 package org.voltdb.plannerv2.rel.physical;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
@@ -33,15 +32,17 @@ import org.voltdb.plannerv2.rel.AbstractVoltTableScan;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannerv2.rules.physical.Constants;
 
+import com.google.common.base.Preconditions;
+
 /**
- * The relational expression that represent a VoltDB physical table scan.
+ * The relational expression that represent a sequential VoltDB physical table scan.
  *
  * @author Michael Alexeev
  * @since 9.0
  */
-public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
+public class VoltSeqTableScan extends VoltPhysicalTableScan {
 
-    public VoltDBPTableSeqScan(RelOptCluster cluster,
+    public VoltSeqTableScan(RelOptCluster cluster,
                                RelTraitSet traitSet,
                                RelOptTable table,
                                VoltTable voltTable,
@@ -65,7 +66,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                 splitCount);
     }
 
-    public VoltDBPTableSeqScan(RelOptCluster cluster,
+    public VoltSeqTableScan(RelOptCluster cluster,
                                RelTraitSet traitSet,
                                RelOptTable table,
                                VoltTable voltTable,
@@ -99,7 +100,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
 
     @Override
     public AbstractVoltTableScan copyWithLimitOffset(RelTraitSet traitSet, RexNode offset, RexNode limit) {
-        VoltDBPTableSeqScan newScan = new VoltDBPTableSeqScan(
+        VoltSeqTableScan newScan = new VoltSeqTableScan(
                 getCluster(),
                 traitSet,
                 getTable(),
@@ -122,7 +123,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                 m_program,
                 programRexBuilder);
 
-        VoltDBPTableSeqScan newScan = new VoltDBPTableSeqScan(
+        VoltSeqTableScan newScan = new VoltSeqTableScan(
                 getCluster(),
                 traitSet,
                 getTable(),
@@ -145,7 +146,7 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
         RexProgram aggProgram = RexProgram.createIdentity(aggregate.getRowType());
         RelDataType preAggRowType = getRowType();
         RexProgram preAggProgram = getProgram();
-        VoltDBPTableSeqScan newScan = new VoltDBPTableSeqScan(
+        VoltSeqTableScan newScan = new VoltSeqTableScan(
                 getCluster(),
                 traitSet,
                 getTable(),
