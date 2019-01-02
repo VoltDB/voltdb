@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.voltdb.catalog.Index;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -31,7 +32,6 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedUnionStmt;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.StmtEphemeralTableScan;
 import org.voltdb.plannodes.SchemaColumn;

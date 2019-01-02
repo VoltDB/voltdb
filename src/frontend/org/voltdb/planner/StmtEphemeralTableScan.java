@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;

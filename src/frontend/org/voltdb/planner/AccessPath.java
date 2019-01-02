@@ -57,10 +57,10 @@ public class AccessPath {
     // then no window function uses the index, but
     // the window function ordering is compatible with the statement
     // level ordering, and the statement level order does not need
-    // an order by node.  If it is set to SubPlanAssembler.NO_INDEX_USE,
+    // an order by node.  If it is set to WindowFunctionScoreboard.NO_INDEX_USE,
     // then nothing uses the index.
     //
-    int m_windowFunctionUsesIndex = SubPlanAssembler.NO_INDEX_USE;
+    int m_windowFunctionUsesIndex = WindowFunctionScoreboard.NO_INDEX_USE;
     //
     // This is true iff there is a window function which
     // uses an index for order, but the statement level
@@ -76,6 +76,9 @@ public class AccessPath {
     // if there is no index in this access path.
     //
     final List<AbstractExpression> m_finalExpressionOrder = new ArrayList<>();
+
+    public AccessPath () {
+    }
 
     @Override
     public String toString() {
@@ -120,7 +123,7 @@ public class AccessPath {
         switch (m_windowFunctionUsesIndex) {
         case SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX:
             return "Statement Level Order By";
-        case SubPlanAssembler.NO_INDEX_USE:
+        case WindowFunctionScoreboard.NO_INDEX_USE:
             return "No Indexing Used";
         default:
             if (0 <= m_windowFunctionUsesIndex) {
@@ -133,4 +136,32 @@ public class AccessPath {
         assert(false);
         return "";
     }
+
+    public SortDirectionType getSortDirection() {
+        return sortDirection;
+    }
+
+    public void setSortDirection(SortDirectionType newSortDirection) {
+        sortDirection = newSortDirection;
+    }
+    public IndexLookupType getIndexLookupType() {
+        return lookupType;
+    }
+
+    public List<AbstractExpression> getIndexExpressions() {
+        return indexExprs;
+    }
+
+    public List<AbstractExpression> getEndExpressions() {
+        return endExprs;
+    }
+
+    public List<AbstractExpression> getEliminatedPostExpressions() {
+        return eliminatedPostExprs;
+    }
+
+    public List<AbstractExpression> getOtherExprs() {
+        return otherExprs;
+    }
+
 }

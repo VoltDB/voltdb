@@ -36,6 +36,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -311,7 +312,7 @@ public class PlanAssembler {
                 // Convert RIGHT joins to the LEFT ones
                 ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
             }
-            m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
+            m_subAssembler = new SelectSubPlanAssembler(m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
             if (isPartitionColumnInGroupbyList(m_parsedSelect.groupByColumns())) {
@@ -400,7 +401,7 @@ public class PlanAssembler {
             Collection<StmtTableScan> scans = parsedStmt.allScans();
             m_partitioning.analyzeForMultiPartitionAccess(scans, valueEquivalence);
         }
-        m_subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+        m_subAssembler = new WriterSubPlanAssembler(parsedStmt, m_partitioning);
     }
 
     private boolean isPartitionColumnInWindowedAggregatePartitionByList() {
@@ -1656,13 +1657,11 @@ public class PlanAssembler {
                 // in getBestCostPlan, above.
                 throw new PlanningErrorException("INSERT INTO ... SELECT subquery could not be planned: "
                         + m_recentErrorMsg);
-
             }
 
             boolean targetIsExportTable = tableListIncludesExportOnly(m_parsedInsert.m_tableList);
             InsertSubPlanAssembler subPlanAssembler =
-                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning,
-                            targetIsExportTable);
+                    new InsertSubPlanAssembler(m_parsedInsert, m_partitioning, targetIsExportTable);
             AbstractPlanNode subplan = subPlanAssembler.nextPlan();
             if (subplan == null) {
                 throw new PlanningErrorException(subPlanAssembler.m_recentErrorMsg);
@@ -2081,7 +2080,7 @@ public class PlanAssembler {
             return true;
         }
         if ( numberWindowFunctions == 0 ) {
-            if ( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.NO_INDEX_USE ) {
+            if ( indexUse.getWindowFunctionUsesIndex() == WindowFunctionScoreboard.NO_INDEX_USE ) {
                 return true;
             }
             assert( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX );
@@ -2494,7 +2493,7 @@ public class PlanAssembler {
         // into an inline order by in a MergeReceivePlanNode.
         IndexUseForOrderBy scanNode = findScanNodeForWindowFunction(root);
         AbstractPlanNode cnode = null;
-        int winfunc = (scanNode == null) ? SubPlanAssembler.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
+        int winfunc = (scanNode == null) ? WindowFunctionScoreboard.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
         // If we have an index which is compatible with the statement
         // level order by, and we have a window function which can't
         // use the index we have to ignore the statement level order by
@@ -2502,7 +2501,7 @@ public class PlanAssembler {
         // window function first, and that will in general invalidate the
         // statement level order by ordering.
         if ((SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc)
-                || (SubPlanAssembler.NO_INDEX_USE == winfunc)) {
+                || (WindowFunctionScoreboard.NO_INDEX_USE == winfunc)) {
             // No index.  Calculate the expression order here and stuff it into
             // the order by node.  Note that if we support more than one window
             // function this would be the case when scanNode.getWindowFunctionUsesIndex()
