@@ -3422,6 +3422,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
 
+        final String drRole = m_catalogContext.getCluster().getDrrole();
+        if (m_producerDRGateway != null && (DrRoleType.MASTER.value().equals(drRole) || DrRoleType.XDCR.value().equals(drRole))) {
+            m_producerDRGateway.logActiveConversations();
+        }
+        if (m_consumerDRGateway != null) {
+            m_consumerDRGateway.logActiveConversations();
+        }
+
         try {
             if (operationModeFuture.getData() != null) {
                 String operationModeStr = new String(operationModeFuture.getData(), "UTF-8");
