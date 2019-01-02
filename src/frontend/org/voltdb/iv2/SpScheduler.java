@@ -682,14 +682,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
         }
         else if (message instanceof FragmentTaskMessage) {
-            ((FragmentTaskMessage)message).setForOldLeader(false);
             handleFragmentTaskMessageRepair(needsRepair, (FragmentTaskMessage)message);
         }
         else if (message instanceof CompleteTransactionMessage) {
             // It should be safe to just send CompleteTransactionMessages to everyone.
             //if it gets here, the message is for the leader to repair from MpScheduler
             ((CompleteTransactionMessage) message).setForReplica(false);
-            ((CompleteTransactionMessage) message).setRequireAck(false);
             handleCompleteTransactionMessage((CompleteTransactionMessage)message);
         }
         else {
@@ -1281,9 +1279,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
             msg.setForReplica(true);
-            if (!m_isLeader) {
-                msg.setRequireAck(true);
-            }
+            msg.setRequireAck(true);
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
