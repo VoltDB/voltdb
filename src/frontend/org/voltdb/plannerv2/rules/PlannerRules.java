@@ -1,4 +1,4 @@
-package org.voltdb.plannerv2;
+package org.voltdb.plannerv2.rules;
 
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;

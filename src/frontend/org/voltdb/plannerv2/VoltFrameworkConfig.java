@@ -44,6 +44,7 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Program;
+import org.voltdb.plannerv2.rules.PlannerRules;
 
 import com.google.common.collect.ImmutableList;
 

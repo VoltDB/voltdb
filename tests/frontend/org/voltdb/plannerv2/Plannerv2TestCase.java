@@ -33,6 +33,7 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.planner.PlannerTestCase;
+import org.voltdb.plannerv2.rules.PlannerRules;
 
 /**
  * Base class for planner v2 test cases.

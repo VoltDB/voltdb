@@ -45,6 +45,7 @@ import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 import org.apache.calcite.util.Pair;
 import org.voltdb.plannerv2.metadata.VoltRelMetadataProvider;
+import org.voltdb.plannerv2.rules.PlannerRules;
 
 import com.google.common.collect.ImmutableList;
 
