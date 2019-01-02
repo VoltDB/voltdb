@@ -492,7 +492,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      *
      * @param childSchema
      */
-    private void setOutputSchema(NodeSchema childSchema) {
+    public void setOutputSchema(NodeSchema childSchema) {
         assert( ! m_hasSignificantOutputSchema);
         m_outputSchema = childSchema;
     }
@@ -1446,5 +1446,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public void adjustDifferentiatorField(TupleValueExpression tve) {
         assert (m_children.size() == 1);
         m_children.get(0).adjustDifferentiatorField(tve);
+    }
+
+    public void setHaveSignificantOutputSchema(boolean hasSignificantOutputSchema) {
+        m_hasSignificantOutputSchema = hasSignificantOutputSchema;
     }
 }

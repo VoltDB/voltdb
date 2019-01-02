@@ -29,7 +29,11 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexProgram;
+import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.calciteadapter.rel.util.PlanCostUtil;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.ProjectionPlanNode;
 
 /**
  * Sub-class of {@link Calc}
@@ -100,5 +104,21 @@ public class VoltDBPCalc extends Calc implements VoltDBPRel {
         RelOptCost defaultCost = super.computeSelfCost(planner, mq);
         return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
 
+    }
+
+    @Override
+    public AbstractPlanNode toPlanNode() {
+        // Calc can be converted to the ProjectionPlanNode only if its program
+        // contains Project fields and no condition (Filter)
+        RexProgram program = getProgram();
+        if (program.getCondition() != null) {
+            throw new IllegalStateException(
+                    "VoltDBCalc(with Condition).toPlanNode is not implemented.");
+        }
+        AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
+        NodeSchema schema = RexConverter.convertToVoltDBNodeSchema(program);
+        ProjectionPlanNode ppn = new ProjectionPlanNode(schema);
+        ppn.addAndLinkChild(child);
+        return ppn;
     }
 }

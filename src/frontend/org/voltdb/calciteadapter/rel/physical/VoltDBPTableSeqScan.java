@@ -32,6 +32,10 @@ import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 import org.voltdb.calciteadapter.rel.VoltTable;
 import org.voltdb.calciteadapter.rel.util.PlanCostUtil;
 import org.voltdb.newplanner.rules.physical.Constants;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+
+import java.util.List;
 
 /**
  * The relational expression that represent a VoltDB physical table scan.
@@ -158,5 +162,23 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
                 preAggProgram,
                 m_splitCount);
         return newScan;
+    }
+
+    @Override
+    public AbstractPlanNode toPlanNode() {
+        SeqScanPlanNode sspn = new SeqScanPlanNode();
+        List<String> qualName = table.getQualifiedName();
+        sspn.setTargetTableAlias(qualName.get(0));
+        sspn.setTargetTableName(m_voltTable.getCatTable().getTypeName());
+
+        addProjection(sspn);
+        addPredicate(sspn);
+        if (m_aggregate == null) {
+            // If there is an aggregate, the Limit / Offset will be inlined with aggregate node
+            addLimitOffset(sspn);
+        }
+        addAggregate(sspn);
+
+        return sspn;
     }
 }

@@ -30,10 +30,22 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
+import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.calciteadapter.rel.AbstractVoltDBTableScan;
 import org.voltdb.calciteadapter.rel.VoltTable;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Abstract sub-class of {@link AbstractVoltDBTableScan}
@@ -260,4 +272,79 @@ public abstract class AbstractVoltDBPTableScan extends AbstractVoltDBTableScan i
         return m_splitCount;
     }
 
+    /**
+     * Convert Scan's predicate (condition) to VoltDB AbstractExpressions
+     *
+     * @param scan
+     * @return
+     */
+    protected AbstractPlanNode addPredicate(AbstractScanPlanNode scan) {
+        // If there is an inline aggregate, the scan's original program is saved as a m_preAggregateProgram
+        RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
+        assert program != null;
+
+        RexLocalRef condition = program.getCondition();
+        if (condition != null) {
+            List<AbstractExpression> predList = new ArrayList<>();
+            predList.add(RexConverter.convert(program.expandLocalRef(condition)));
+            scan.setPredicate(predList);
+        }
+        return scan;
+    }
+
+    /**
+     * Convert Scan's LIMIT / OFFSET to an inline LimitPlanNode
+     *
+     * @param node
+     * @return
+     */
+    protected AbstractPlanNode addLimitOffset(AbstractPlanNode node) {
+        if (hasLimitOffset()) {
+            LimitPlanNode limitPlanNode = VoltDBPLimit.toPlanNode(m_limit, m_offset);
+            node.addInlinePlanNode(limitPlanNode);
+        }
+        return node;
+    }
+
+    /**
+     * Convert Scan's Project to an inline ProjectionPlanNode
+     *
+     * @param node
+     * @return
+     */
+    protected AbstractPlanNode addProjection(AbstractPlanNode node) {
+        // If there is an inline aggregate, the scan's original program is saved as a m_preAggregateProgram
+        RexProgram program = (m_aggregate == null) ? m_program : m_preAggregateProgram;
+        assert program != null;
+
+        ProjectionPlanNode ppn = new ProjectionPlanNode();
+        ppn.setOutputSchemaWithoutClone(RexConverter.convertToVoltDBNodeSchema(program));
+        node.addInlinePlanNode(ppn);
+        return node;
+    }
+
+    /**
+     * Convert Scan's aggregate to an inline AggregatePlanNode / HashAggregatePlanNode
+     *
+     * @param node
+     * @return
+     */
+    protected AbstractPlanNode addAggregate(AbstractPlanNode node) {
+        if (m_aggregate != null) {
+
+            assert (m_preAggregateRowType != null);
+            AbstractPlanNode aggr = ((AbstractVoltDBPAggregate) m_aggregate).toPlanNode(m_preAggregateRowType);
+            aggr.clearChildren();
+            node.addInlinePlanNode(aggr);
+            node.setOutputSchema(aggr.getOutputSchema());
+            node.setHaveSignificantOutputSchema(true);
+            // Inline limit /offset with Serial Aggregate only. This is enforced by the VoltDBPLimitScanMergeRule.
+            // The VoltDBPAggregateScanMergeRule should be triggered prior to the VoltDBPLimitScanMergeRule
+            // allowing the latter to avoid merging VoltDBLimit and Scan nodes if the scan already has an inline aggregate
+            assert ((aggr instanceof HashAggregatePlanNode && !hasLimitOffset()) ||
+                    aggr instanceof AggregatePlanNode);
+            node = addLimitOffset(aggr);
+        }
+        return node;
+    }
 }

@@ -191,7 +191,7 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
         for(AggregateCall aggrCall : getAggCallList()) {
             // Aggr type
             ExpressionType aggrType =
-                    ExpressionTypeConverter.calicteTypeToVoltType(aggrCall.getAggregation().kind);
+                    ExpressionTypeConverter.calciteTypeToVoltType(aggrCall.getAggregation().kind);
             if (aggrType == null) {
                 throw new CalcitePlanningException("Unsupported aggregate function: " + aggrCall.getAggregation().kind.lowerName);
             }

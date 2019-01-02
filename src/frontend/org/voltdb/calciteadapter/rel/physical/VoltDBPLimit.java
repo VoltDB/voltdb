@@ -32,6 +32,8 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.voltdb.calciteadapter.rel.util.PlanCostUtil;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 
 import java.util.List;
 
@@ -132,5 +134,36 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
     @Override
     public int getSplitCount() {
         return m_splitCount;
+    }
+
+    @Override
+    public AbstractPlanNode toPlanNode() {
+
+        LimitPlanNode lpn = new LimitPlanNode();
+        if (m_limit != null) {
+            lpn.setLimit(RexLiteral.intValue(m_limit));
+        }
+        if (m_offset != null) {
+            lpn.setOffset(RexLiteral.intValue(m_offset));
+        }
+
+        if (this.getInput() != null) {
+            // Limit is not inlined
+            AbstractPlanNode child = inputRelNodeToPlanNode(this, 0);
+            lpn.addAndLinkChild(child);
+        }
+
+        return lpn;
+    }
+
+    public static LimitPlanNode toPlanNode(RexNode limit, RexNode offset) {
+        LimitPlanNode lpn = new LimitPlanNode();
+        if (limit != null) {
+            lpn.setLimit(RexLiteral.intValue(limit));
+        }
+        if (offset != null) {
+            lpn.setOffset(RexLiteral.intValue(offset));
+        }
+        return lpn;
     }
 }
