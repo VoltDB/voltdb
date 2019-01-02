@@ -59,6 +59,8 @@ import org.voltdb.types.CalcitePlannerType;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
+import static org.voltdb.newplanner.util.VoltDBRelUtil.calciteToVoltDBPlan;
+
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
  * interactively accept SQL and outputs plans on standard out.
@@ -208,13 +210,7 @@ public class PlannerTool {
         return plan;
     }
 
-    /**
-     * Plan a query with the Calcite planner.
-     * @param task the query to plan.
-     * @param batch the query batch which this query belongs to.
-     * @return a planned statement.
-     */
-    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
+    public synchronized CompiledPlan getCompiledPlanCalcite(SqlTask task, NonDdlBatch batch) {
         // create VoltSqlValidator from SchemaPlus.
         VoltSqlValidator validator = new VoltSqlValidator(m_schemaPlus);
         // validate the task's SqlNode.
@@ -246,7 +242,28 @@ public class PlannerTool {
         RelNode nodeAfterPhysicalConversion = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
                 PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogical, physicalTraits);
 
-        return null;
+        // assume not large query
+        CompiledPlan compiledPlan = new CompiledPlan(false);
+        calciteToVoltDBPlan((VoltDBPRel)nodeAfterPhysicalConversion, compiledPlan);
+
+        compiledPlan.explainedPlan = compiledPlan.rootPlanGraph.toExplainPlanString();
+        // Renumber the plan node ids to start with 1
+        compiledPlan.resetPlanNodeIds(1);
+
+        return compiledPlan;
+    }
+
+    /**
+     * Plan a query with the Calcite planner.
+     * @param task the query to plan.
+     * @param batch the query batch which this query belongs to.
+     * @return a planned statement.
+     */
+    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
+        CompiledPlan plan = getCompiledPlanCalcite(task, batch);
+
+        CorePlan core = new CorePlan(plan, m_catalogHash);
+        return new AdHocPlannedStatement(plan, core);
     }
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,

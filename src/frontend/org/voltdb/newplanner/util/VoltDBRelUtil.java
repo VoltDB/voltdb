@@ -37,7 +37,12 @@ import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.rel.logical.LogicalValues;
+import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
+import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.SendPlanNode;
 
 public class VoltDBRelUtil {
 
@@ -57,6 +62,31 @@ public class VoltDBRelUtil {
     public static int decideSplitCount(RelNode rel) {
         return (rel instanceof VoltDBPRel) ?
                 ((VoltDBPRel) rel).getSplitCount() : 1;
+    }
+
+    public static CompiledPlan calciteToVoltDBPlan(VoltDBPRel rel, CompiledPlan compiledPlan) {
+
+        RexConverter.resetParameterIndex();
+
+        AbstractPlanNode root = rel.toPlanNode();
+        assert (root instanceof SendPlanNode);
+
+        compiledPlan.rootPlanGraph = root;
+
+        PostBuildVisitor postPlannerVisitor = new PostBuildVisitor();
+        root.acceptVisitor(postPlannerVisitor);
+
+        compiledPlan.setReadOnly(true);
+        compiledPlan.statementGuaranteesDeterminism(
+                postPlannerVisitor.hasLimitOffset(), // no limit or offset
+                postPlannerVisitor.isOrderDeterministic(),  // is order deterministic
+                null); // no details on determinism
+
+        compiledPlan.setStatementPartitioning(StatementPartitioning.forceSP());
+
+        compiledPlan.setParameters(postPlannerVisitor.getParameterValueExpressions());
+
+        return compiledPlan;
     }
 
     private static class RelTraitShuttle extends RelShuttleImpl {
