@@ -278,6 +278,7 @@ public class FragmentTask extends FragmentTaskBase
         }
 
         int drBufferChanged = 0;
+        boolean exceptionThrown = false;
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
             byte[] planHash = m_fragmentMsg.getPlanHash(frag);
@@ -338,71 +339,84 @@ public class FragmentTask extends FragmentTaskBase
                         m_txnState.isReadOnly(),
                         VoltTrace.log(VoltTrace.Category.EE) != null);
 
-                // get a copy of the result buffers from the cache buffer so we can post the
-                // fragment response to the network
-                final int tableSize;
-                final byte fullBacking[];
-                try {
-                    // read the size of the DR buffer used
-                    drBufferChanged = fragResult.readInt();
-                    // read the complete size of the buffer used
-                    fragResult.readInt();
-                    // read number of dependencies (1)
-                    fragResult.readInt();
-                    // read the dependencyId() -1;
-                    fragResult.readInt();
-                    tableSize = fragResult.readInt();
-                    fullBacking = new byte[tableSize];
-                    // get a copy of the buffer
-                    fragResult.readFully(fullBacking);
-                } catch (final IOException ex) {
-                    hostLog.error("Failed to deserialze result table" + ex);
-                    throw new EEException(ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
-                }
+                if (!exceptionThrown) {
+                    // Ignore results for all work done after an exception is thrown. We need to still do
+                    // the work because Shared Replicated Table changes require participation by all sites.
 
-                if (hostLog.isTraceEnabled()) {
-                    hostLog.l7dlog(Level.TRACE,
-                       LogKeys.org_voltdb_ExecutionSite_SendingDependency.name(),
-                       new Object[] { outputDepId }, null);
+                    // get a copy of the result buffers from the cache buffer so we can post the
+                    // fragment response to the network
+                    final int tableSize;
+                    final byte fullBacking[];
+                    try {
+                        // read the size of the DR buffer used
+                        drBufferChanged = fragResult.readInt();
+                        // read the complete size of the buffer used
+                        fragResult.readInt();
+                        // read number of dependencies (1)
+                        fragResult.readInt();
+                        // read the dependencyId() -1;
+                        fragResult.readInt();
+                        tableSize = fragResult.readInt();
+                        fullBacking = new byte[tableSize];
+                        // get a copy of the buffer
+                        fragResult.readFully(fullBacking);
+                    } catch (final IOException ex) {
+                        hostLog.error("Failed to deserialze result table" + ex);
+                        throw new EEException(ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                    }
+
+                    if (hostLog.isTraceEnabled()) {
+                        hostLog.l7dlog(Level.TRACE,
+                           LogKeys.org_voltdb_ExecutionSite_SendingDependency.name(),
+                           new Object[] { outputDepId }, null);
+                    }
+                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId, fullBacking, 0, tableSize));
                 }
-                currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId, fullBacking, 0, tableSize));
             } catch (final EEException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                            m_rawDummyResult, 0, m_rawDummyResult.length));
+                if (!exceptionThrown) {
+                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
+                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                    if (currentFragResponse.getTableCount() == 0) {
+                        // Make sure the response has at least 1 result with a valid DependencyId
+                        currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                                m_rawDummyResult, 0, m_rawDummyResult.length));
+                    }
+                    exceptionThrown = true;
                 }
-                break;
             } catch (final SQLException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                            m_rawDummyResult, 0, m_rawDummyResult.length));
+                if (!exceptionThrown) {
+                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
+                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                    if (currentFragResponse.getTableCount() == 0) {
+                        // Make sure the response has at least 1 result with a valid DependencyId
+                        currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                                m_rawDummyResult, 0, m_rawDummyResult.length));
+                    }
+                    exceptionThrown = true;
                 }
-                break;
             } catch (final ReplicatedTableException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                            m_rawDummyResult, 0, m_rawDummyResult.length));
+                if (!exceptionThrown) {
+                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
+                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                    if (currentFragResponse.getTableCount() == 0) {
+                        // Make sure the response has at least 1 result with a valid DependencyId
+                        currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                                m_rawDummyResult, 0, m_rawDummyResult.length));
+                    }
+                    exceptionThrown = true;
                 }
-                break;
             }
             catch (final InterruptException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                if (currentFragResponse.getTableCount() == 0) {
-                    // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                            m_rawDummyResult, 0, m_rawDummyResult.length));
+                if (!exceptionThrown) {
+                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
+                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                    if (currentFragResponse.getTableCount() == 0) {
+                        // Make sure the response has at least 1 result with a valid DependencyId
+                        currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                                m_rawDummyResult, 0, m_rawDummyResult.length));
+                    }
+                    exceptionThrown = true;
                 }
-                break;
             }
             finally {
                 // ensure adhoc plans are unloaded
