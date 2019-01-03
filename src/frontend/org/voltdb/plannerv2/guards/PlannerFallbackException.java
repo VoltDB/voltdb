@@ -24,6 +24,6 @@ package org.voltdb.plannerv2.guards;
  * @author Yiqun Zhang
  * @since 9.0
  */
-public class PlannerFallbackException extends Exception {
+public class PlannerFallbackException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 }

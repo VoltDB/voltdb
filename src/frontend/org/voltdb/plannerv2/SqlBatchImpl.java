@@ -102,7 +102,7 @@ public class SqlBatchImpl extends SqlBatch {
             SqlTask sqlTask = SqlTask.from(sql);
             if (isDDLBatch == null) {
                 isDDLBatch = sqlTask.isDDL();
-            } else if (isDDLBatch ^ sqlTask.isDDL()) { // True if isDDLBatch is different from isDDL
+            } else if (isDDLBatch != sqlTask.isDDL()) {
                 // No mixing DDL and DML/DQL. Turn this into an error and return it to the client.
                 throw new UnsupportedOperationException("Mixing DDL with DML/DQL queries is unsupported.");
             }

@@ -25,7 +25,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalLimit;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPLimit;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
-import org.voltdb.plannerv2.utils.VoltDBRelUtil;
+import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
  * VoltDB physical rule that transform {@link VoltLogicalLimit} to {@link VoltDBPLimit}.
@@ -50,7 +50,7 @@ public class VoltPLimitRule extends RelOptRule {
                 .replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
         RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
-        int splitCount = VoltDBRelUtil.decideSplitCount(convertedInput);
+        int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
 
         call.transformTo(new VoltDBPLimit(
                 limitOffset.getCluster(),

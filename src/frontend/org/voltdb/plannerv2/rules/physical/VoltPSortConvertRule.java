@@ -30,7 +30,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.AbstractVoltDBPExchange;
 import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
 import org.voltdb.plannerv2.rel.physical.VoltDBPSort;
-import org.voltdb.plannerv2.utils.VoltDBRelUtil;
+import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
  * VoltDB physical rule that transform {@link Sort} to {@link VoltDBPSort}.
@@ -62,7 +62,7 @@ public class VoltPSortConvertRule extends ConverterRule {
         RelNode input = sort.getInput();
         RelNode convertedInput = convert(input,
                 input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
-        int splitCount = VoltDBRelUtil.decideSplitCount(convertedInput);
+        int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
 
         return new VoltDBPSort(
                 sort.getCluster(),

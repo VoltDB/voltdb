@@ -21,6 +21,8 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.tools.RelConversionException;
@@ -47,6 +49,7 @@ import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules;
+import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
@@ -94,8 +97,9 @@ public class PlannerTool {
         for (String command : commands) {
             String decoded_cmd = Encoder.hexDecodeToString(command);
             decoded_cmd = decoded_cmd.trim();
-            if (decoded_cmd.length() == 0)
+            if (decoded_cmd.length() == 0) {
                 continue;
+            }
             try {
                 m_hsql.runDDLCommand(decoded_cmd);
             }
@@ -224,7 +228,7 @@ public class PlannerTool {
 
         // Take Drill's DefaultSqlHandler.convertToRawDrel() as reference.
         // We probably need FILTER_SET_OP_TRANSPOSE_RULE and PROJECT_SET_OP_TRANSPOSE_RULE?
-        // They need to be run by Hep planner (CALCITE-1271).
+        // They need to be run by the Hep planner (CALCITE-1271).
 
         RelTraitSet requiredLogicalOutputTraits = planner.getEmptyTraitSet().replace(VoltLogicalRel.CONVENTION);
         // Apply Calcite logical rules
@@ -235,14 +239,17 @@ public class PlannerTool {
                 requiredLogicalOutputTraits, rel);
 
         compileLog.info("LOGICAL\n" + RelOptUtil.toString(transformed));
-//
-//        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
-//        // If RelDistributionTraitDef is added to the planner as the initial traits,
-//        // ProjectToCalcRule will fire RelMdDistribution.calc() which will result in an AssertionError.
-//        transformed.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
-//
-//        // Add RelDistributions.SINGLETON trait to the rel tree.
-//        transformed = VoltDBRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);
+
+        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
+        //
+        // If RelDistributionTraitDef is added to the planner as the initial traits,
+        // ProjectToCalcRule.onMatch() will fire RelMdDistribution.calc() which will result in
+        // an AssertionError. It is cheaper to manually add RelDistributionTrait here than replacing all
+        // the LogicalCalc and Calc-related rules to fix this.
+        transformed.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
+
+        // Add RelDistributions.SINGLETON trait to the rel tree.
+        transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);
 //
 //        // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
 //        RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);

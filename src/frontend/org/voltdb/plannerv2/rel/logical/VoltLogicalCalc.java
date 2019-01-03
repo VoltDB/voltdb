@@ -17,10 +17,15 @@
 
 package org.voltdb.plannerv2.rel.logical;
 
+import java.util.Set;
+
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Calc;
+import org.apache.calcite.rel.core.CorrelationId;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 
 import com.google.common.base.Preconditions;
@@ -53,5 +58,13 @@ public class VoltLogicalCalc extends Calc implements VoltLogicalRel{
 
     @Override public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program) {
         return new VoltLogicalCalc(getCluster(), traitSet, child, program);
+    }
+
+    @Override public void collectVariablesUsed(Set<CorrelationId> variableSet) {
+        final RelOptUtil.VariableUsedVisitor vuv = new RelOptUtil.VariableUsedVisitor(null);
+        for (RexNode expr : program.getExprList()) {
+            expr.accept(vuv);
+        }
+        variableSet.addAll(vuv.variables);
     }
 }
