@@ -308,7 +308,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Recursively build sets of read tables read and index names used.
+     * Recursively build sets of tables read and index names used.
      *
      * @param tablesRead Set of table aliases read potentially added to at each recursive level.
      * @param indexes Set of index names used in the plan tree
