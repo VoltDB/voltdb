@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -218,6 +218,7 @@ def check_export_stats(runner, export_tables_with_data, last_collection_time):
         else:
             collection_time = firsttuple.column(0)
 
+    export_tables_with_data.clear()
     for r in tablestats.tuples():
         # TUPLE_PENDING
         pendingData = r[9]
@@ -234,15 +235,6 @@ def check_export_stats(runner, export_tables_with_data, last_collection_time):
             if not hostname in tabledata:
                 tabledata[hostname] = set()
             tabledata[hostname].add(pid)
-        else:
-            if tablename in export_tables_with_data:
-                tabledata = export_tables_with_data[tablename]
-                if hostname in tabledata:
-                    tabledata[hostname].discard(pid)
-                    if not tabledata[hostname]:
-                        del tabledata[hostname]
-                        if not export_tables_with_data[tablename]:
-                            del export_tables_with_data[tablename]
     return collection_time
 
 
@@ -402,11 +394,7 @@ def check_command_log(runner):
 def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component, msg="The cluster has not drained any transactions for %s in last %d seconds. There are outstanding transactions."):
     currentTime = time.time()
     timeout = runner.opts.timeout
-    statsProgressed = True
-    if isinstance(lastUpdatedParams, dict):
-        statsProgressed = (cmp(lastUpdatedParams, currentParams) <> 0)
-    else :
-        statsProgressed = (lastUpdatedParams <> currentParams)
+    statsProgressed = (lastUpdatedParams != currentParams)
 
     # stats progressed, update lastUpdatedTime
     if statsProgressed:

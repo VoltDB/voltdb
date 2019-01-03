@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,7 +37,6 @@ public interface Generation {
 
     public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
                                  long uniqueId, ByteBuffer buffer, boolean sync);
-    public void pushEndOfStream(int partitionId, String signature);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
                                                 boolean isRecover, long sequenceNumber);
 

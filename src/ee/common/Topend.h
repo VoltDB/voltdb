@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -68,6 +68,8 @@ class Topend {
             std::string signature,
             StreamBlock *block,
             bool sync) = 0;
+    // Not used right now and will be removed or altered after a decision has been made on how Schema changes
+    // are managed (they really don't belong in row buffers).
     virtual void pushEndOfStream(
             int32_t partitionId,
             std::string signature) = 0;

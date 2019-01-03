@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1227,6 +1227,12 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        crashLocalVoltDB(errMsg, stackTrace, thrown, true);
+    }
+    /**
+     * Exit the process with an error message, optionally with a stack trace.
+     */
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown, boolean logFatal) {
 
         if (exitAfterMessage) {
             System.err.println(errMsg);
@@ -1323,7 +1329,9 @@ public class VoltDB {
 
                 if (log != null)
                 {
-                    log.fatal(errMsg);
+                    if (logFatal) {
+                        log.fatal(errMsg);
+                    }
                     if (thrown != null) {
                         if (stackTrace) {
                             log.fatal("Fatal exception", thrown);

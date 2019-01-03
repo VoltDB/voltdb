@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -221,7 +221,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 if (!migratePartitionLeader && !m_initiatorMailbox.acceptPromotion()) {
                     tmLog.info(m_whoami
                             + "rejoining site can not be promoted to leader. Terminating.");
-                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
+                    // rejoining not completed. The node will be shutdown @RealVoltDB.hostFailed() anyway.
+                    // do not log extra fatal message.
+                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null, false);
                     return;
                 }
 

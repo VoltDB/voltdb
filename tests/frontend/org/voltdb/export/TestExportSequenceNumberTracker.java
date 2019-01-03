@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -126,7 +126,19 @@ public class TestExportSequenceNumberTracker {
         assertEquals(2, tracker.size());
         assertEquals(2, truncated);
         assertEquals(6, tracker.sizeInSequence());
+    }
 
-
+    @Test
+    public void testAddRange() {
+        long nonOverlapSize = tracker.addRange(5L, 10L);
+        assertEquals(6, nonOverlapSize);
+        nonOverlapSize = tracker.addRange(8L, 20L);
+        assertEquals(10, nonOverlapSize);
+        nonOverlapSize = tracker.addRange(20L, 30L);
+        assertEquals(10, nonOverlapSize);
+        nonOverlapSize = tracker.addRange(32L, 40L);
+        assertEquals(9, nonOverlapSize);
+        nonOverlapSize = tracker.addRange(4L, 41L);
+        assertEquals(3, nonOverlapSize);
     }
 }

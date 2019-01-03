@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -90,9 +90,23 @@ public class ExportSequenceNumberTracker {
      * Add a range to the tracker.
      * @param start
      * @param end
+     * @return number of non-overlapped sequence being added
      */
-    public void addRange(long start, long end) {
+    public long addRange(long start, long end) {
+        Range<Long> newRange = range(start, end);
+        long nonOverlapSize = end - start + 1;
+        if (m_map.intersects(newRange)) {
+            final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
+            while (iter.hasNext()) {
+                final Range<Long> next = iter.next();
+                Range<Long> intersection = next.intersection(newRange);
+                if (intersection != null) {
+                    nonOverlapSize -= end(intersection) - start(intersection) + 1;
+                }
+            }
+        }
         m_map.add(range(start, end));
+        return nonOverlapSize;
     }
 
     /**

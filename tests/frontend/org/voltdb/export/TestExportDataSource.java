@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -116,10 +116,6 @@ public class TestExportDataSource extends TestCase {
         @Override
         public void pushExportBuffer(int partitionId, String signature, long seqNo,
                 int tupleCount, long uniqueId, ByteBuffer buffer, boolean sync) {
-        }
-
-        @Override
-        public void pushEndOfStream(int partitionId, String signature) {
         }
 
         @Override
