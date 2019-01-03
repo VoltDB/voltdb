@@ -1874,9 +1874,9 @@ public class TestJoinsSuite extends RegressionSuite {
                 "rowkeys.dataset_id = 2889597788000092160 AND rowkeys.part = 3297";
         final ClientResponse cr = client.callProcedure("@Explain", bigJoin);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        assertTrue("Expect that the plan contains at least 3 index scans, got fewer",
+        assertTrue("Expect that the plan contains at least 5 index scans, got fewer",
                 Arrays.stream(cr.getResults()[0].toString().split("\n"))
-                        .filter(line -> line.contains("INDEX SCAN of")).count() >= 3);
+                        .filter(line -> line.contains("INDEX SCAN of")).count() >= 5);
     }
 
     static public junit.framework.Test suite() {

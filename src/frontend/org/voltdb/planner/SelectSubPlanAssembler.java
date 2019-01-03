@@ -57,16 +57,24 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
     private ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<>();
 
-    private static final long S_TOTAL_JVM_BYTES = Runtime.getRuntime().maxMemory();
-    // Approximate size in bytes of each plan: about 50 KB with some experiments.
-    private static final long S_PLAN_SIZE = 50_000;
+    private static final Runtime RUN_TIME = Runtime.getRuntime();
     // Number of times generateSubPlanForJoinNode() gets called recursively that we collect an estimate of heap size,
     // and early exit if too large heap size had been used.
-    private static final int S_PLAN_ESTIMATE_PERIOD = 100;
+    private static final int PLAN_ESTIMATE_PERIOD = 300;
     // Stop generating any further possible plans, if we have reached xx% of available JVM heap memory
-    private static final short S_MAX_HEAP_MEMORY_USAGE_PCT = 98;
-    private static final long S_MAX_ALLOWED_PLAN_MEMORY = S_TOTAL_JVM_BYTES * S_MAX_HEAP_MEMORY_USAGE_PCT/ 100;
+    private static final short MAX_HEAP_MEMORY_USAGE_PCT = 85;
+    private static final long MAX_ALLOWED_PLAN_MEMORY = RUN_TIME.maxMemory() * MAX_HEAP_MEMORY_USAGE_PCT / 100;
 
+    /**
+     * Stop further planning, if we have used more heap memory than we could hopefully exhaustively plan it out,
+     * at the time this method is called.
+     *
+     * @return whether we should stop further planning. By the time it returns true, GC had already kicked in a few
+     * rounds.
+     */
+    private static boolean shouldStopPlanning() {
+        return RUN_TIME.totalMemory() - RUN_TIME.freeMemory() >= MAX_ALLOWED_PLAN_MEMORY;
+    }
     /**
      *
      * @param db The catalog's Database object.
@@ -542,37 +550,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return;
         }
 
-        if (! m_plans.isEmpty() && m_plans.size() % S_PLAN_ESTIMATE_PERIOD == 0) {
-            final long usedHeapMemory = evaluatePlanSize() * S_PLAN_SIZE;
-            if (usedHeapMemory >= S_MAX_ALLOWED_PLAN_MEMORY) {
-                //System.err.println("Running out of heap memory. Stop further planning. Free memory = " +
-                //        Runtime.getRuntime().freeMemory());
-                return;
-            }
+        // If we have drained heap memory, don't recurse further on.
+        if (! m_plans.isEmpty() && m_plans.size() % PLAN_ESTIMATE_PERIOD == 0 && shouldStopPlanning()) {
+            return;
         }
         for (AccessPath path : joinNode.m_accessPaths) {
             joinNode.m_currentAccessPath = path;
             generateSubPlanForJoinNodeRecursively(rootNode, nextNode+1, nodes);
-        }
-    }
-
-    /**
-     * Evaluate size of currently generated plans.
-     * @return the total number of plan nodes contained in generated plan candidates.
-     */
-    private long evaluatePlanSize() {
-        return m_plans.stream().mapToLong(SelectSubPlanAssembler::evaluetePlanSize).sum();
-    }
-
-    private static long evaluetePlanSize(AbstractPlanNode node) {
-        if (node == null) {
-            return 0;
-        } else {
-            long cost = 1;
-            for (int index = 0; index < node.getChildCount(); ++index) {
-                cost += evaluetePlanSize(node.getChild(index));
-            }
-            return cost;
         }
     }
 
