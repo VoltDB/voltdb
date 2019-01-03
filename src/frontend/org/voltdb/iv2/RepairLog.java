@@ -238,7 +238,7 @@ public class RepairLog
             final RepairLogTruncationMessage truncateMsg = (RepairLogTruncationMessage) msg;
             truncate(truncateMsg.getHandle(), IS_SP, truncateMsg.m_sourceHSId);
             if (m_isLeader && m_HSId != truncateMsg.m_sourceHSId) {
-                repairLogger.error("XXX RepairLogTruncationMessage from " + CoreUtils.hsIdToString(truncateMsg.m_sourceHSId)
+                repairLogger.info("XXX RepairLogTruncationMessage from " + CoreUtils.hsIdToString(truncateMsg.m_sourceHSId)
                 + " is executed on LEADER, truncating to  " + TxnEgo.txnIdToString(truncateMsg.getHandle()));
             }
         }
