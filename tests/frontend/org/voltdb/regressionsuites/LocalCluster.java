@@ -1903,6 +1903,10 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public List<String> getListenerAddresses() {
+        return getListenerAddresses(false);
+    }
+
+    public List<String> getListenerAddresses(boolean useAdmin) {
         if (!m_running) {
             return null;
         }
@@ -1912,7 +1916,7 @@ public class LocalCluster extends VoltServerConfig {
             Process p = m_cluster.get(i);
             // if the process is alive, or is the in-process server
             if ((p != null) || (i == 0 && m_hasLocalServer)) {
-                listeners.add("localhost:" + cl.m_port);
+                listeners.add("localhost:" + (useAdmin ? cl.m_adminPort : cl.m_port));
             }
         }
         return listeners;
@@ -2393,7 +2397,9 @@ public class LocalCluster extends VoltServerConfig {
 
     public Client createAdminClient(ClientConfig config) throws IOException {
         Client client = ClientFactory.createClient(config);
-        client.createConnection(getAdminAddress(0));
+        for (String address : getListenerAddresses(true)) {
+            client.createConnection(address);
+        }
         return client;
     }
 
