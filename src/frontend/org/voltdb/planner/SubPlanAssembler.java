@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.IntStream;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
@@ -107,7 +106,7 @@ public abstract class SubPlanAssembler {
      * expressions for a table.
      * The list includes the naive (scan) pass and possible index scans
      *
-     * @param table Table to generate access path for
+     * @param tableScan Table to generate access path for
      * @param joinExprs join expressions this table is part of
      * @param filterExprs filter expressions this table is part of
      * @param postExprs post expressions this table is part of
@@ -278,7 +277,7 @@ public abstract class SubPlanAssembler {
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    public static AbstractPlanNode buildIndexAccessPlanForTable( IndexScanPlanNode scanNode, AccessPath path) {
+    public static AbstractPlanNode buildIndexAccessPlanForTable(IndexScanPlanNode scanNode, AccessPath path) {
         AbstractPlanNode resultNode = scanNode;
         // set sortDirection here because it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
@@ -394,7 +393,7 @@ public abstract class SubPlanAssembler {
             ComparisonExpression ltFilter = m_filter.getLtFilterFromPrefixLike();
             return new IndexableExpression(null, ltFilter, m_bindings);
         }
-    };
+    }
 
     /**
      * Split the index WHERE clause into a list of sub-expressions and process
@@ -460,7 +459,7 @@ public abstract class SubPlanAssembler {
         private final List<AbstractExpression> m_indexedExpressions;
         private final List<AbstractExpression> m_filtersToCover;
 
-        private int m_coveredCount;
+        private int m_coveredCount = 0;
         private int m_coveringColId = -1;
         private AbstractExpression m_coveringExpression = null;
         private IndexableExpression m_inListExpr = null;
@@ -475,11 +474,8 @@ public abstract class SubPlanAssembler {
             m_accessPath = accessPath;
             m_indexedExpressions = indexedExprs;
             m_filtersToCover = filtersToCover;
-            for (m_coveredCount = 0 ; m_coveredCount < keyComponentCount && ! filtersToCover.isEmpty();
-                 ++m_coveredCount) {
-                if (! iterate()) {
-                    break;
-                }
+            while(m_coveredCount < keyComponentCount && ! filtersToCover.isEmpty() && iterate()) {
+                ++m_coveredCount;
             }
         }
         boolean iterate() {
@@ -709,7 +705,7 @@ public abstract class SubPlanAssembler {
      * Given a table, a set of predicate expressions and a specific index, find the best way to
      * access the data using the given index, or return null if no good way exists.
      *
-     * @param table The table we want data from.
+     * @param tableScan The table we want data from.
      * @param exprs The set of predicate expressions.
      * @param index The index we want to use to access the data.
      * @return A valid access path using the data or null if none found.
@@ -783,7 +779,7 @@ public abstract class SubPlanAssembler {
         int[] orderSpoilers = new int[keyComponentCount];
         final List<AbstractExpression> bindingsForOrder = new ArrayList<>();
         final int nSpoilers = determineIndexOrdering(
-                tableScan, keyComponentCount, indexedExprs, indexedColRefs, retval, orderSpoilers, bindingsForOrder);
+                tableScan, keyComponentCount, indexedExprs, indexedColRefs, retval, orderSpoilers);
 
         // Use as many covering indexed expressions as possible to optimize comparator expressions that can use them.
 
@@ -1112,9 +1108,7 @@ public abstract class SubPlanAssembler {
      * retval, can satisfy a parsed select statement's order by or
      * window function ordering requirements.
      *
-     * @param table              only used here to validate base table names of ORDER BY columns' .
-     * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
-     *                           any ordering optimization determined here
+     * @param tableScan          only used here to validate base table names of ORDER BY columns' .
      * @param keyComponentCount  the length of indexedExprs or indexedColRefs,
      *                           ONE of which must be valid
      * @param indexedExprs       expressions for key components in the general case
@@ -1123,15 +1117,12 @@ public abstract class SubPlanAssembler {
      *               the bearer of a (tentative) sortDirection determined here
      * @param orderSpoilers      positions of key components which MAY invalidate the tentative
      *                           sortDirection
-     * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
-     *                           any ordering optimization determined here.
      * @return the number of discovered orderSpoilers that will need to be recovered from,
      *         to maintain the established sortDirection - always 0 if no sort order was determined.
      */
     private int determineIndexOrdering(
             StmtTableScan tableScan, int keyComponentCount, List<AbstractExpression> indexedExprs,
-            List<ColumnRef> indexedColRefs, AccessPath retval, int[] orderSpoilers,
-            List<AbstractExpression> bindingsForOrder) {
+            List<ColumnRef> indexedColRefs, AccessPath retval, int[] orderSpoilers) {
         // Organize a little bit.
         final ParsedSelectStmt pss = (m_parsedStmt instanceof ParsedSelectStmt) ?
                 ((ParsedSelectStmt) m_parsedStmt) : null;
@@ -1197,7 +1188,7 @@ public abstract class SubPlanAssembler {
             // We keep a scoreboard which keeps track of everything.  All the window
             // functions and statement level order by functions are kept in the scoreboard.
             //
-            final WindowFunctionScoreboard windowFunctionScores = new WindowFunctionScoreboard(m_parsedStmt, tableScan);
+            final WindowFunctionScoreboard windowFunctionScores = new WindowFunctionScoreboard(m_parsedStmt);
             // indexCtr is an index into the index expressions or columns.
             for (int indexCtr = 0; !windowFunctionScores.isDone() && indexCtr < keyComponentCount; ++indexCtr) {
                 // Figure out what to do with index expression or column at indexCtr.
@@ -1218,7 +1209,7 @@ public abstract class SubPlanAssembler {
             // spoilers themselves and the bindings.  Return these
             // by reference.
             //
-            return windowFunctionScores.getResult(retval, orderSpoilers, bindingsForOrder);
+            return windowFunctionScores.getResult(retval, orderSpoilers);
         }
     }
 
@@ -1226,8 +1217,6 @@ public abstract class SubPlanAssembler {
      * @param orderSpoilers  positions of index key components that would need to be
      *                       equality filtered to keep from interfering with the desired order
      * @param nSpoilers      the number of valid orderSpoilers
-     * @param coveredCount   the number of prefix key components already known to be filtered --
-     *                       orderSpoilers before this position are covered.
      * @param indexedExprs   the index key component expressions in the general case
      * @param colIds         the index key component columns in the simple case
      * @param tableScan      the index base table scan, used to validate column base tables
@@ -1570,7 +1559,7 @@ public abstract class SubPlanAssembler {
      * Given an access path, build the single-site or distributed plan that will
      * assess the data from the table according to the path.
      *
-     * @param table The table to get data from.
+     * @param tableNode The table to get data from.
      * @return The root of a plan graph to get the data.
      */
     static AbstractPlanNode getAccessPlanForTable(JoinNode tableNode) {
@@ -1591,7 +1580,7 @@ public abstract class SubPlanAssembler {
      * Get a sequential scan access plan for a table. For multi-site plans/tables,
      * scans at all partitions.
      *
-     * @param table The table to scan.
+     * @param tableScan The table to scan.
      * @param path The access path to access the data in the table (index/scan/etc).
      * @return A scan plan node
      */
@@ -1606,7 +1595,7 @@ public abstract class SubPlanAssembler {
     /**
      * Get an index scan access plan for a table.
      *
-     * @param tableAliasIndex The table to get data from.
+     * @param tableScan The table to get data from.
      * @param path The access path to access the data in the table (index/scan/etc).
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.

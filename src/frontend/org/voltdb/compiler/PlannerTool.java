@@ -50,6 +50,7 @@ import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.VoltSqlValidator;
 import org.voltdb.plannerv2.VoltPlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
+import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;

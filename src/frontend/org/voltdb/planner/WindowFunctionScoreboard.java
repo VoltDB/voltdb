@@ -21,8 +21,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.SortDirectionType;
 
 /**
@@ -43,7 +41,7 @@ public class WindowFunctionScoreboard {
      */
     public final static int NO_INDEX_USE = -2;
 
-    public WindowFunctionScoreboard(AbstractParsedStmt stmt, StmtTableScan tableScan) {
+    public WindowFunctionScoreboard(AbstractParsedStmt stmt) {
         m_numWinScores = stmt.getWindowFunctionExpressionCount();
         m_numOrderByScores = stmt.hasOrderByColumns() ? 1 : 0;
         m_winFunctions = new ArrayList<>(m_numWinScores + m_numOrderByScores);
@@ -51,8 +49,7 @@ public class WindowFunctionScoreboard {
             // stmt has to be a ParsedSelectStmt if 0 < m_numWinScores.
             // So this cast will be ok.
             m_winFunctions.add(new WindowFunctionScore(
-                    ((ParsedSelectStmt) stmt).getWindowFunctionExpressions().get(idx),
-                    idx));
+                    stmt.getWindowFunctionExpressions().get(idx), idx));
         }
         if (m_numOrderByScores > 0) {
             m_winFunctions.add(new WindowFunctionScore(stmt.orderByColumns()));
@@ -61,11 +58,6 @@ public class WindowFunctionScoreboard {
 
     public boolean isDone() {
         return m_winFunctions.stream().allMatch(WindowFunctionScore::isDone);
-    }
-
-    public boolean isDead(boolean windowFunctionsOnly) {
-        return m_winFunctions.stream().allMatch(score ->
-                windowFunctionsOnly && ! score.isWindowFunction());
     }
 
     public void matchIndexEntry(ExpressionOrColumn indexEntry) {
@@ -94,7 +86,7 @@ public class WindowFunctionScoreboard {
      *
      * @return The number of order spoilers in the candidate we choose.
      */
-    public int getResult(AccessPath retval, int orderSpoilers[], List<AbstractExpression> bindings) {
+    public int getResult(AccessPath retval, int orderSpoilers[]) {
         WindowFunctionScore answer = null;
         // Fill in the failing return values as a fallback.
         retval.bindings.clear();

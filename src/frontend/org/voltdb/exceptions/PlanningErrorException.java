@@ -24,7 +24,7 @@ public class PlanningErrorException extends RuntimeException {
         super(msg);
     }
     public PlanningErrorException(Throwable e) {
-        super(e.getCause());
+        super(e);
     }
     public PlanningErrorException(String msg, Throwable e) {
        super(msg, e);

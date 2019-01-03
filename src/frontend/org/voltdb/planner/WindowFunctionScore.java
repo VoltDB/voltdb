@@ -17,6 +17,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
@@ -97,8 +98,9 @@ class WindowFunctionScore {
      * A constructor for creating a score from a
      * WindowFunctionExpression.
      *
-     * @param winfunc
-     * @param tableAlias
+     * @param winfunc window function expression
+     * @param winFuncNum This is the number of the window function.  It is
+     *                   STATEMENT_LEVEL_ORDER_BY for the statement level order by list.
      */
     WindowFunctionScore(WindowFunctionExpression winfunc, int winFuncNum) {
         for (int idx = 0; idx < winfunc.getPartitionbySize(); idx += 1) {
@@ -153,7 +155,7 @@ class WindowFunctionScore {
         }
     }
 
-    public SortDirectionType sortDirection() {
+    SortDirectionType sortDirection() {
         return m_sortDirection;
     }
 
@@ -187,11 +189,8 @@ class WindowFunctionScore {
                     //
                     // If there are more than one instances of
                     // an expression, say with "PARTITION BY A, A",
-                    // we need to remove them all.  But guard against
-                    // an infinite loop here;
-                    while (m_partitionByExprs.remove(eorc)) {
-                        /* Do Nothing */;
-                    }
+                    // we need to remove them all.
+                    m_partitionByExprs.removeAll(Collections.singleton(eorc));
                     m_bindings.addAll(moreBindings);
                     return MatchResults.MATCHED;
                 }
@@ -231,10 +230,7 @@ class WindowFunctionScore {
                 m_bindings.addAll(moreBindings);
                 // Remove the next statement EOC from the unmatched OrderByExpressions
                 // list since we matched it.  We need to remove all of them,
-                while (m_unmatchedOrderByExprs.remove(nextStatementEOC)) {
-                    /* Do Nothing */
-                    ;
-                }
+                m_unmatchedOrderByExprs.removeAll(Collections.singleton(nextStatementEOC));
                 return MatchResults.MATCHED;
             } else {
                 // No Bindings were found.  Mark this as a
