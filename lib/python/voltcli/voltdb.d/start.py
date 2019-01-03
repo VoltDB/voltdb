@@ -60,4 +60,6 @@ def start(runner):
         runner.args.extend(['missing', runner.opts.missing])
     if runner.opts.enableadd:
         runner.args.extend(['enableadd'])
+    if runner.opts.restoreplacement:
+        runner.args.extend(['restoreplacement'])
     runner.go()
