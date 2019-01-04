@@ -35,8 +35,8 @@ from traceback import print_exc
 
 __SYMBOL_DEFN      = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.*)")
 __SYMBOL_REF       = re.compile(r"{(?P<symbolname>[\w-]+)}")
-__SYMBOL_REF_REUSE = re.compile(r"{(?P<symbolname>[\w-]*):(?P<reusename>[\w-]+)}")
-__SYMBOL_REF_EXIST = re.compile(r"{(?P<symbolname>[\w-]*);(?P<existingnames>[\w,-]+)}")
+__SYMBOL_REF_REUSE = re.compile(r"{(?P<symbolname>[\w-]*):(?P<reusenames>[\w,-]+)(:(?P<repeatpercent>[\d-]+))?}")
+__SYMBOL_REF_EXIST = re.compile(r"{(?P<symbolname>[\w-]*);(?P<existingnames>[\w,-]+)(;'(?P<separator>.*)')?}")
 __OPTIONAL         = re.compile(r"(?<!\\)\[(?P<optionaltext>[^\[\]]*[^\[\]\\]?)\]")
 __WEIGHTED_XOR     = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
 __XOR              = ' | '
@@ -140,31 +140,46 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
         symbol_name = symbol.group('symbolname')
         symbol_opts = None
         existing_names = []
-        reuse_name = None
+        reuse_names = None
+        reuse_name  = None
         reuse_value = None
         try:
             symbol_opts = symbol.group('existingnames')
             existing_names = symbol_opts.split(',')
+            separator = symbol.group('separator')
         except IndexError as ex:
             pass
         if existing_names:
+            # Leave out any (alleged) existing names that do not yet
+            # have assigned values
             remove_names = []
             for en in existing_names:
                 if symbol_reuse.get(en) is None:
                     remove_names.append(en)
             for en in remove_names:
                 existing_names.remove(en)
-            last = len(existing_names) - 1
-            for en in existing_names:
-                if (en is existing_names[last] or
-                        randrange(0, 100) < optional_percent):
-                    reuse_name = en
-                    break
+
+            if separator:
+                reuse_value = separator.join(symbol_reuse.get(en) for en in existing_names)
+                sql = sql.replace(bracketed_name, reuse_value)
+                symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql) or __SYMBOL_REF_EXIST.search(sql)
+
+                # For debugging purposes, we may wish to track symbol use
+                if options.echo_grammar and symbol_name:
+                    symbol_order.append((symbol_name, sql, symbol_opts, str(existing_names), bracketed_name, reuse_value))
+                continue
+            else:
+                last = len(existing_names) - 1
+                for en in existing_names:
+                    if (en is existing_names[last] or
+                            randrange(0, 100) < optional_percent):
+                        reuse_names = en
+                        break
         else:
             try:
-                reuse_name = symbol.group('reusename')
+                reuse_names = symbol.group('reusenames')
             except IndexError as ex:
-                reuse_name = None
+                reuse_names = None
         definition = grammar.get(symbol_name)
         if debug > 6:
             print 'DEBUG: sql           :', str(sql)
@@ -173,24 +188,104 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
             print 'DEBUG: symbol_name   :', str(symbol_name)
             print 'DEBUG: symbol_opts   :', str(symbol_opts)
             print 'DEBUG: existing_names:', str(existing_names)
-            print 'DEBUG: reuse_name    :', str(reuse_name)
+            print 'DEBUG: reuse_names   :', str(reuse_names)
             print 'DEBUG: definition    :', str(definition)
 
         # Handle the case where the same symbol could be used twice (or more)
         # in the same SQL statement, e.g., {table-name:t1} can be reused to
         # refer to the same table name more than once; the shorter {:t1} may
-        # also be used, after the first occurrence
-        if reuse_name:
-            if symbol_reuse.get(reuse_name) is not None:
-                # This reuse_name has been used before, so replace all
-                # occurrences of it with the same value used before
-                reuse_value = symbol_reuse[reuse_name]
+        # also be used, after the first occurrence; or, a list of reusable
+        # names may be used consecutively, e.g. {column-name:c1,c2,c3} will
+        # first set 'c1' to be a possible value of 'column-name', then (the
+        # next time this symbol is used) it will set 'c2', and finally 'c3'
+        # (thereafter, the 'c1' value will be used, but a Warning printed)
+        if reuse_names:
+            reuse_name_list = reuse_names.split(',')
+            if len(reuse_name_list) is 1:
+                reuse_name = reuse_names
+                if symbol_reuse.get(reuse_name) is not None:
+                    # This reuse_name has been used before, so replace all
+                    # occurrences of it with the same value used before
+                    reuse_value = symbol_reuse[reuse_name]
+                else:
+                    # This reuse_name has not been used before, so choose a value
+                    # that will be used to replace it, throughout this SQL statement
+                    try:
+                        reuse_value = get_one_sql_statement(grammar, symbol_name, max_depth,
+                                                            optional_percent, symbol_reuse, False)
+                    except RuntimeError as ex:
+                        print "\n\nCaught RuntimeError, possibly due to infinite loop in grammar dictionary:"
+                        print "    RuntimeError:", str(ex)
+                        print "    symbol_name :", str(symbol_name)
+                        print "    reuse_names :", str(reuse_names)
+                        print "    reuse_value :", str(reuse_value)
+                        print "    symbol_reuse:", str(symbol_reuse)
+                        exit(22)
+                    symbol_reuse[reuse_name] = reuse_value
             else:
-                # This reuse_name has not been used before, so choose a value
-                # that will be used to replace it, throughout this SQL statement
-                reuse_value = get_one_sql_statement(grammar, symbol_name, max_depth,
-                                                    optional_percent, symbol_reuse, False)
-                symbol_reuse[reuse_name] = reuse_value
+                repeat_percent = None
+                repeat_percent_str = symbol.group('repeatpercent')
+                forbid_repeats = False
+                if repeat_percent_str is not None:
+                    try:
+                        repeat_percent = int(repeat_percent_str)
+                    except IndexError as ex:
+                        print "\n\nFATAL ERROR: Illegal repeat percentage of '" + str(repeat_percent_str) + \
+                              "' in '"+str(bracketed_name)+"'; must be an integer (between 0 and 100)!!!"
+                        exit(23)
+                    if repeat_percent < 0 or repeat_percent > 100:
+                        print "\n\nFATAL ERROR: Illegal repeat percentage of '" + str(repeat_percent) + \
+                              "' in '"+str(bracketed_name)+"; must be (an integer) between 0 and 100'!!!"
+                        exit(24)
+                    if randrange(0, 100) > repeat_percent:
+                        forbid_repeats = True
+                reuse_value_list = []
+                for reuse_name in reuse_name_list:
+                    symbol_reuse_value = symbol_reuse.get(reuse_name)
+                    if symbol_reuse_value is None:
+                        # We found the first reuse_name, in the reuse_name_list,
+                        # that has not been used before, so choose a value that
+                        # will be used to replace it, throughout this SQL statement
+                        reuse_value = get_one_sql_statement(grammar, symbol_name, max_depth,
+                                                            optional_percent, symbol_reuse, False)
+                        max_while_count = 10
+                        while_count = 0
+                        while (forbid_repeats and reuse_value in reuse_value_list and while_count < max_while_count):
+                            while_count += 1
+                            reuse_value = get_one_sql_statement(grammar, symbol_name, max_depth,
+                                                                optional_percent, symbol_reuse, False)
+                        symbol_reuse[reuse_name] = reuse_value
+                        if while_count >= max_while_count:
+                            print 'WARNING: unable to find unused value:'
+                            print '         bracketed_name  :', str(bracketed_name)
+                            print '         symbol_name     :', str(symbol_name)
+                            print '         symbol_opts     :', str(symbol_opts)
+                            print '         reuse_names     :', str(reuse_names)
+                            print '         reuse_name_list :', str(reuse_name_list)
+                            print '         reuse_value_list:', str(reuse_value_list)
+                            print '         reuse_n. values :', ', '.join(str(symbol_reuse.get(rn)) for rn in reuse_name_list)
+                            print 'Using last: reuse_name   :', str(reuse_name)
+                            print '         reuse_value     :', str(reuse_value)
+                            print '         symbol_reuse    :', str(symbol_reuse)
+                        break
+                    else:
+                        reuse_value_list.append(symbol_reuse_value)
+                if reuse_value is None:
+                    print 'WARNING: used up all reuse names:'
+                    print '         bracketed_name  :', str(bracketed_name)
+                    print '         symbol_name     :', str(symbol_name)
+                    print '         symbol_opts     :', str(symbol_opts)
+                    print '         reuse_names     :', str(reuse_names)
+                    print '         reuse_name_list :', str(reuse_name_list)
+                    print '         reuse_value_list:', str(reuse_value_list)
+                    print '         reuse_n. values :', ', '.join(symbol_reuse[rn] for rn in reuse_name_list)
+                    print '         reuse_name      :', str(reuse_name)
+                    print '         reuse_value     :', str(reuse_value)
+                    reuse_name = reuse_name_list[0]
+                    reuse_value = symbol_reuse[reuse_name]
+                    print 'Using 1st: reuse_name    :', str(reuse_name)
+                    print '         reuse_value     :', str(reuse_value)
+                    print '         symbol_reuse    :', str(symbol_reuse)
 
             sql = sql.replace(bracketed_name, reuse_value)
             symbol = __SYMBOL_REF_REUSE.search(sql) or __SYMBOL_REF.search(sql) or __SYMBOL_REF_EXIST.search(sql)
@@ -207,7 +302,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
         if definition is None:
             print "\n\nFATAL ERROR: Could not find definition of '" + str(symbol_name) + \
                   "' in grammar dictionary!!!"
-            exit(22)
+            exit(25)
 
         # Check how deep into a recursive definition we're going
         if symbol_depth.get(symbol_name):
@@ -648,6 +743,21 @@ def increment_sql_statement_type(type=None, num_chars_in_sql_type=6, validity=No
                         increment_sql_statement_indexes(type[0:total_chars_in_sub_type], validity)
 
 
+def increment_sql_statement_types(type=None, num_chars_in_sql_type=6, validity=None,
+                                  sql_contains_echo_substring=False, incrementTotal=True,
+                                  echo_type=' [echo'):
+    """Increment the value of 'count_sql_statements' (a 2D dictionary, i.e.,
+    a dict of dict), both for the 'total', 'total' element and for the 'type',
+    if specified (i.e., for the type, 'total' element); also, if the 'validity'
+    is specified (normally equal to 'valid' or 'invalid'), increment those
+    values as well (i.e., the 'total', validity and type, validity elements).
+    TODO
+    """
+    increment_sql_statement_type(type, num_chars_in_sql_type, validity, incrementTotal)
+    if sql_contains_echo_substring:
+        increment_sql_statement_type(echo_type, num_chars_in_sql_type, validity, False)
+
+
 class TimeoutException(Exception):
     """A custom exception class used for timeout when reading from
     the sqlcmd process.
@@ -767,9 +877,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         # which can return multiple '(Returned N rows in X.XXs)' messages
                         continue
                     elif sql_was_echoed_as_output:
-                        increment_sql_statement_type(sql, num_chars_in_sql_type, 'valid')
-                        if sql_contains_echo_substring:
-                            increment_sql_statement_type(' [echo', num_chars_in_sql_type, 'valid', False)
+                        increment_sql_statement_types(sql, num_chars_in_sql_type, 'valid',
+                                                      sql_contains_echo_substring)
                         break
                     elif debug > 3:
                         # this can happen, though it's uncommon, when two SQL statements
@@ -783,9 +892,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 # indicated by the word 'ERROR' (case insensitive)
                 elif 'ERROR' in output.upper():
                     if sql_was_echoed_as_output:
-                        increment_sql_statement_type(sql, num_chars_in_sql_type, 'invalid')
-                        if sql_contains_echo_substring:
-                            increment_sql_statement_type(' [echo', num_chars_in_sql_type, 'invalid', False)
+                        increment_sql_statement_types(sql, num_chars_in_sql_type, 'invalid',
+                                                      sql_contains_echo_substring)
                         break
                     elif debug > 3:
                         # this can happen, though it's uncommon, when there is a multi-line
@@ -797,9 +905,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 # respond with various messages that do not include 'ERROR'
                 elif any( all(err_msg in output for err_msg in kem) for kem in known_error_messages):
                     if sql_was_echoed_as_output:
-                        increment_sql_statement_type(sql, num_chars_in_sql_type, 'invalid')
-                        if sql_contains_echo_substring:
-                            increment_sql_statement_type(' [echo', num_chars_in_sql_type, 'invalid', False)
+                        increment_sql_statement_types(sql, num_chars_in_sql_type, 'invalid',
+                                                      sql_contains_echo_substring)
                         break
                     elif debug > 2:
                         # this can happen, though it's uncommon, when there is a multi-line
@@ -824,17 +931,15 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                             continue
 
                     # Normal 'show' command case
-                    increment_sql_statement_type(sql, num_chars_in_sql_type, 'valid')
-                    if sql_contains_echo_substring:
-                        increment_sql_statement_type(' [echo', num_chars_in_sql_type, 'valid', False)
+                        increment_sql_statement_types(sql, num_chars_in_sql_type, 'valid',
+                                                      sql_contains_echo_substring)
                     break
 
                 # Invalid 'show' commands return a simple error message; also, once again, these commands
                 # don't get echoed back by sqlcmd, so we don't check sql_was_echoed_as_output here
                 elif 'The valid SHOW command completions are' in output:
-                    increment_sql_statement_type(sql, num_chars_in_sql_type, 'invalid')
-                    if sql_contains_echo_substring:
-                        increment_sql_statement_type(' [echo', num_chars_in_sql_type, 'invalid', False)
+                    increment_sql_statement_types(sql, num_chars_in_sql_type, 'invalid',
+                                                  sql_contains_echo_substring)
                     break
 
                 # Check if sqlcmd command not found, or if sqlcmd cannot, or
@@ -843,6 +948,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                       or 'Unable to connect' in output or 'No connections' in output
                       or 'Connection refused' in output
                       or ('Connection to database host' in output and 'was lost' in output) ):
+                    increment_sql_statement_types(sql, num_chars_in_sql_type, 'invalid',
+                                                  sql_contains_echo_substring)
                     error_message = '\n\n\nFATAL ERROR: sqlcmd responded:\n    "' + output + \
                                     '"\nprobably due to a VoltDB server crash (or it was ' + \
                                     'never started??), after SQL statement:\n    "' + sql + '"\n'
@@ -854,6 +961,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 # mode, usually due using too much memory (RSS), typically caused
                 # by a Recursive CTE causing an infinite loop
                 elif ('Server is paused and is available in read-only mode' in output):
+                    increment_sql_statement_types(sql, num_chars_in_sql_type, 'invalid',
+                                                  sql_contains_echo_substring)
                     error_message = '\n\n\nFATAL ERROR: sqlcmd responded:\n    "' + output + \
                                     '"\npossibly due to a Recursive CTE (WITH) statement that caused ' + \
                                     'an infinite loop, consuming too much memory (RSS):\n    "' + sql + '"\n'
@@ -1180,6 +1289,13 @@ if __name__ == "__main__":
                             ['cannot contain calls to user defined functions'],
                             ['cannot contain subqueries'],
                             ['cannot include the function NOW or CURRENT_TIMESTAMP'],
+                            ['Scalar subquery can have only one output column'],
+                            ['Materialized view', 'not supported'],
+                            ['Materialized view', 'must have non-group by columns aggregated by'],
+                            ['A materialized view', 'can not be defined on another view'],
+                            ['Materialized view', 'cannot contain subquery sources'],
+                            ['Not unique table/alias'],
+                            ['ORDER BY parsed with strange child node type'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
