@@ -51,18 +51,19 @@ public abstract class CalciteCompatibilityCheck {
 
     /**
      * Start the chained check to see if the SQL statement should be routed to Calcite.
+     * A query is permissible when at least one positive check in the chain passed (returns true);
+     * or when at least one negative check in the chain failed (returns false).
      *
      * @param sql the SQL statement to check.
      * @return true if this statement should be routed to Calcite.
      */
     public final boolean check(String sql) {
-        boolean pass = doCheck(sql);
-        if (doCheck(sql) == isNegativeCheck()) {
-            if (m_next != null) {
-                return m_next.check(sql);
-            }
+        final boolean pass = doCheck(sql), checkNext = pass == isNegativeCheck();
+        if (checkNext && m_next != null) {
+            return m_next.check(sql);
+        } else {        // logic short-circuit: stops on first failed positive check, or first passed negative check.
+            return ! checkNext;   // returns true when we don't need to bother checking next in the chain.
         }
-        return pass;
     }
 
     /**
@@ -84,9 +85,8 @@ public abstract class CalciteCompatibilityCheck {
      */
     public static CalciteCompatibilityCheck create() {
         // As we add more features to Calcite, this list should be expanded, and eventually removed.
-        CalciteCompatibilityCheck checks = new AcceptDDLsAsWeCan();
-        checks.addNext(new AcceptAllSelect())
-              .addNext(new NoLargeQuery());
-        return checks;
+        return new AcceptDDLsAsWeCan()
+                .addNext(new AcceptAllSelect())
+                .addNext(new NoLargeQuery());
     }
 }

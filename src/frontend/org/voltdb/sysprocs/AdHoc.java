@@ -28,6 +28,7 @@ import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
@@ -72,7 +73,7 @@ public class AdHoc extends AdHocNTBase {
             // AdHocAcceptancePolicy will sanitize the parameters ahead of time.
             batch = SqlBatch.from(params, m_context);
             return batch.execute();
-        } catch (PlannerFallbackException ex) {
+        } catch (PlannerFallbackException | SqlParseException ex) {
             // Use the legacy planner to run this.
             return runFallback(params);
         } catch (Exception ex) {
