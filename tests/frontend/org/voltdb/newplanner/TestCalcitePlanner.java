@@ -16,6 +16,8 @@ public class TestCalcitePlanner extends CalcitePlannerTestCase {
     }
 
     public void testSimpleSeqScan() {
-        comparePlans("select si from Ri1");
+        comparePlans("select * from R1");
+//        comparePlans("select si from R1");
+//        comparePlans("select si from Ri1");
     }
 }

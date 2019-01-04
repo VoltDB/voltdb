@@ -69,7 +69,7 @@ public class VoltDBRelUtil {
         RexConverter.resetParameterIndex();
 
         AbstractPlanNode root = rel.toPlanNode();
-        assert (root instanceof SendPlanNode);
+//        Preconditions.checkArgument(root instanceof SendPlanNode);
 
         compiledPlan.rootPlanGraph = root;
 
