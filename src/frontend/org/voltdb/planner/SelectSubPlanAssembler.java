@@ -68,7 +68,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     // and early exit if too large heap size had been used.
     private static final int PLAN_ESTIMATE_PERIOD = 300;
     // Stop generating any further possible plans, if we have reached xx% of available JVM heap memory
-    private static final short MAX_HEAP_MEMORY_USAGE_PCT = 85;
+    private static final short MAX_HEAP_MEMORY_USAGE_PCT = 80;
     private static final long MAX_ALLOWED_PLAN_MEMORY = RUN_TIME.maxMemory() * MAX_HEAP_MEMORY_USAGE_PCT / 100;
 
     /**
@@ -534,7 +534,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /**
      * generate all possible plans for the tree, or to the extend that further planning would drain JVM heap memory
-     * (at threshold of 98% of JVM memory, with estimated size of each plan of 50 KB).
+     * (at threshold of MAX_HEAP_MEMORY_USAGE_PCT% of available JVM heap memory)
      *
      * @param rootNode The root node for the whole join tree.
      * @param nodes The node list to iterate over.
