@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -51,7 +51,9 @@ import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.SimulatedExitException;
@@ -68,6 +70,11 @@ import com.google_voltpatches.common.base.Charsets;
 
 public class TestCollector extends JUnit4LocalClusterTest {
     private static final int STARTUP_DELAY = 3000;
+    private static final String LOG_NAME_PREFIX = "volt-junit-fulllog.txt.";
+
+    @Rule
+    public TestName name = new TestName();
+
     VoltProjectBuilder builder;
     LocalCluster cluster;
     String listener;
@@ -229,83 +236,93 @@ public class TestCollector extends JUnit4LocalClusterTest {
         return logPaths;
     }
 
-    private void createLogFiles() throws Exception {
+    private void createLogFiles(Date now) throws Exception {
+        Collector.m_currentTimeMillis = now.getTime();
 
         try {
-           String configInfoPath = m_voltDbRootPath + File.separator + Constants.CONFIG_DIR + File.separator + "config.json";;
-           JSONObject jsonObject= Collector.parseJSONFile(configInfoPath);
-           JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
+            String configInfoPath = m_voltDbRootPath + File.separator + Constants.CONFIG_DIR + File.separator
+                    + "config.json";
+            JSONObject jsonObject = Collector.parseJSONFile(configInfoPath);
+            JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
 
-           //maintain the file naming format
-           String fileNamePrefix = "volt-junit-fulllog.txt.";
-           String fileText = "This is a dummy log file.";
-           String workingDir = getWorkingDir(m_voltDbRootPath);
-           VoltFile logFolder = new VoltFile(workingDir + "/obj/release/testoutput/");
-           logFolder.mkdir();
+            // maintain the file naming format
+            String fileText = "This is a dummy log file.";
+            String workingDir = getWorkingDir(m_voltDbRootPath);
+            VoltFile logFolder = new VoltFile(workingDir + "/obj/release/testoutput/");
+            logFolder.mkdir();
 
-           for(File oldLogFile : logFolder.listFiles()) {
-               if(oldLogFile.getName().startsWith(fileNamePrefix)) {
-                   oldLogFile.delete();
-               }
-           }
+            for (File oldLogFile : logFolder.listFiles()) {
+                if (oldLogFile.getName().startsWith(LOG_NAME_PREFIX)) {
+                    oldLogFile.delete();
+                }
+            }
 
-           SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-           String[] fileDates = new String[6];
-           Calendar cal, cal2;
-           cal = Calendar.getInstance();
-           cal2 = Calendar.getInstance();
-           for(int i=-1; i < 2; i++) {
-               cal.add(Calendar.DATE, -i-1);
-               fileDates[i+1] = formatter.format(cal.getTime());
-           }
-           cal = Calendar.getInstance();
-           cal.add(Calendar.YEAR, -1);
-           cal2.set(cal.get(Calendar.YEAR), 11, 31);
-           fileDates[3] = formatter.format(cal2.getTime());
-           cal2.add(Calendar.DATE, -4);
-           fileDates[4] = formatter.format(cal2.getTime());
-           cal2 = Calendar.getInstance();
-           cal2.set(cal2.get(Calendar.YEAR), 0, 02);
-           fileDates[5] = formatter.format(cal2.getTime());
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+            Date[] fileDates = new Date[6];
+            Calendar cal;
+            cal = Calendar.getInstance();
 
-           for(String fileDate: fileDates) {
-               VoltFile file = new VoltFile(logFolder, fileNamePrefix + fileDate);
-               file.createNewFile();
+            // Create one log for today, yesterday and 3 days ago
+            cal.setTime(now);
+            for (int i = 0; i < 3; i++) {
+                cal.add(Calendar.DATE, -i);
+                fileDates[i] = cal.getTime();
+            }
 
-               BufferedWriter writer = new BufferedWriter(new FileWriter(file.getAbsolutePath()));
-               writer.write(fileText);
-               writer.close();
+            // 4 days ago
+            cal.add(Calendar.DATE, -1);
+            fileDates[3] = cal.getTime();
 
-               formatter.format(file.lastModified());
-               file.setLastModified(formatter.parse(fileDate).getTime());
+            // One year ago
+            cal.setTime(now);
+            cal.add(Calendar.YEAR, -1);
+            fileDates[4] = cal.getTime();
 
-               JSONObject object = new JSONObject();
-               object.put("path", file.getCanonicalPath());
-               object.put("format", "'.'" + fileDate);
-               jsonArray.put(object);
-           }
+            // Tomorrow
+            cal.setTime(now);
+            cal.add(Calendar.DATE, 1);
+            fileDates[5] = cal.getTime();
 
-           VoltFile repeatFileFolder = new VoltFile(logFolder, "test");
-           repeatFileFolder.mkdir();
-           VoltFile file = new VoltFile(repeatFileFolder, fileNamePrefix + fileDates[0]);
-           file.createNewFile();
+            for (Date fileDate : fileDates) {
+                VoltFile file = new VoltFile(logFolder, LOG_NAME_PREFIX + formatter.format(fileDate));
+                file.createNewFile();
 
-           BufferedWriter writer = new BufferedWriter(new FileWriter(file.getAbsolutePath()));
-           writer.write(fileText);
-           writer.close();
+                BufferedWriter writer = new BufferedWriter(new FileWriter(file.getAbsolutePath()));
+                writer.write(fileText);
+                writer.close();
 
-           JSONObject object = new JSONObject();
-           object.put("path", file.getCanonicalPath());
-           object.put("format", "'.'" + fileDates[0]);
-           jsonArray.put(object);
+                file.setLastModified(fileDate.getTime());
 
-           FileOutputStream fos = new FileOutputStream(configInfoPath);
-           fos.write(jsonObject.toString(4).getBytes(Charsets.UTF_8));
-           fos.close();
+                JSONObject object = new JSONObject();
+                object.put("path", file.getCanonicalPath());
+                object.put("format", "'.'" + fileDate);
+                jsonArray.put(object);
+            }
+
+            // Create a repeat file for today
+            VoltFile repeatFileFolder = new VoltFile(logFolder, "test");
+            repeatFileFolder.mkdir();
+            String fileDateFormatted = formatter.format(fileDates[0]);
+            VoltFile file = new VoltFile(repeatFileFolder, LOG_NAME_PREFIX + fileDateFormatted);
+            file.createNewFile();
+
+            BufferedWriter writer = new BufferedWriter(new FileWriter(file.getAbsolutePath()));
+            writer.write(fileText);
+            writer.close();
+            file.setLastModified(fileDates[0].getTime());
+
+            JSONObject object = new JSONObject();
+            object.put("path", file.getCanonicalPath());
+            object.put("format", "'.'" + fileDateFormatted);
+            jsonArray.put(object);
+
+            FileOutputStream fos = new FileOutputStream(configInfoPath);
+            fos.write(jsonObject.toString(4).getBytes(Charsets.UTF_8));
+            fos.close();
         } catch (JSONException e) {
-              System.err.print(e.getMessage());
+            System.err.print(e.getMessage());
         } catch (ParseException e) {
-              System.err.print(e.getMessage());
+            System.err.print(e.getMessage());
         }
     }
 
@@ -337,10 +354,11 @@ public class TestCollector extends JUnit4LocalClusterTest {
         }
 
         InputStream systemStatsIS;
-        if (System.getProperty("os.name").contains("Mac"))
+        if (System.getProperty("os.name").contains("Mac")) {
             systemStatsIS = new FileInputStream(getWorkingDir(m_voltDbRootPath)+"/lib/macstats.properties");
-        else
+        } else {
             systemStatsIS = new FileInputStream(getWorkingDir(m_voltDbRootPath)+"/lib/linuxstats.properties");
+        }
         assertNotNull(systemStatsIS);
         Properties systemStats = new Properties();
         systemStats.load(systemStatsIS);
@@ -447,61 +465,55 @@ public class TestCollector extends JUnit4LocalClusterTest {
 
     @Test
     public void testDaysToCollectOption() throws Exception {
-
-        createLogFiles();
-
-        m_outputFileName = new File(m_voltDbRootPath).getParent() + File.separator + m_pid + "_withDaysToCollect.zip";
-        deleteOutputFileIfExists();
-        ZipFile collectionZip = collect(true, 3, false);
-        int logCount = 0;
-        Enumeration<? extends ZipEntry> e = collectionZip.entries();
-        while (e.hasMoreElements()) {
-            ZipEntry z = e.nextElement();
-            if (z.getName().startsWith(m_collectBaseFolder + File.separator + "voltdb_logs" + File.separator))
-                logCount++;
-        }
-        assertEquals(logCount, 4);
-        collectionZip.close();
+        testCollectLogFiles(new Date());
     }
 
     @Test
     public void testCollectFilesonYearBoundary() throws Exception {
-
-        createLogFiles();
-
         //set reference date to be 1st January of the current year
         Calendar cal = Calendar.getInstance();
         cal.set(cal.get(Calendar.YEAR), 0, 01);
-        Collector.m_currentTimeMillis = cal.getTimeInMillis();
 
-        resetCurrentTime = false;
-        m_outputFileName = new File(m_voltDbRootPath).getParent() + File.separator + m_pid + "_withFilesOnYrBndry.zip";
-        ZipFile collectionZip = collect(true, 4, false);
-        int logCount = 0;
-        Enumeration<? extends ZipEntry> e = collectionZip.entries();
-        while (e.hasMoreElements()) {
-            if (e.nextElement().getName().startsWith(m_collectBaseFolder + File.separator + "voltdb_logs" + File.separator))
-                logCount++;
-        }
-        assertEquals(logCount, 1);
-        resetCurrentTime = true;
-        collectionZip.close();
+        testCollectLogFiles(cal.getTime());
     }
 
     @Test
     public void testRepeatFileName() throws Exception {
 
-        createLogFiles();
+        createLogFiles(new Date());
         m_outputFileName = new File(m_voltDbRootPath).getParent() + File.separator + m_pid + "_withRepeatedFileName.zip";
         deleteOutputFileIfExists();
-        ZipFile collectionZip = collect(true, 3, false);
 
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-        ZipEntry repeatFile = collectionZip.getEntry(m_collectBaseFolder + File.separator + "voltdb_logs" + File.separator +
-                "volt-junit-fulllog.txt." + formatter.format(new Date()) + "(1)");
-        assertNotNull(repeatFile);
-        collectionZip.close();
+        try (ZipFile collectionZip = collect(true, 3, false)) {
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+            ZipEntry repeatFile = collectionZip.getEntry(m_collectBaseFolder + File.separator + "voltdb_logs"
+                    + File.separator + "volt-junit-fulllog.txt." + formatter.format(new Date()) + "(1)");
+            assertNotNull(repeatFile);
+        }
     }
 
+    private void testCollectLogFiles(Date date) throws Exception {
+        createLogFiles(date);
 
+        resetCurrentTime = false;
+        m_outputFileName = new File(m_voltDbRootPath).getParent() + File.separator + m_pid + '_' + name.getMethodName()
+                + ".zip";
+        try (ZipFile collectionZip = collect(true, 4, false)) {
+            assertEquals(4, countLogEntries(collectionZip));
+        } finally {
+            resetCurrentTime = true;
+        }
+    }
+
+    private int countLogEntries(ZipFile zipFile) {
+        String basePath = m_collectBaseFolder + File.separator + "voltdb_logs" + File.separator + LOG_NAME_PREFIX;
+        int logCount = 0;
+        Enumeration<? extends ZipEntry> e = zipFile.entries();
+        while (e.hasMoreElements()) {
+            if (e.nextElement().getName().startsWith(basePath)) {
+                logCount++;
+            }
+        }
+        return logCount;
+    }
 }

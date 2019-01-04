@@ -97,7 +97,7 @@ CREATE TABLE adhocr
 , jmp        bigint             NOT NULL
 , CONSTRAINT PK_id_ar PRIMARY KEY (id)
 );
-CREATE INDEX R_TSINDEX ON adhocr (ts DESC);
+CREATE INDEX R_TSINDEX ON adhocr (ts);
 
 -- partitioned table
 CREATE TABLE adhocp
@@ -109,7 +109,7 @@ CREATE TABLE adhocp
 , CONSTRAINT PK_id_ap PRIMARY KEY (id)
 );
 PARTITION TABLE adhocp ON COLUMN id;
-CREATE INDEX P_TSINDEX ON adhocp (ts DESC);
+CREATE INDEX P_TSINDEX ON adhocp (ts);
 
 -- replicated table
 CREATE TABLE bigr
@@ -442,12 +442,8 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTableInsert;
 PARTITION PROCEDURE TRUPTableInsert ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTableInsert;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableSP;
-PARTITION PROCEDURE TRUPTruncateTableSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTruncateTable;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPSwapTablesSP;
-PARTITION PROCEDURE TRUPSwapTablesSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPSwapTablesMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURSwapTables;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;

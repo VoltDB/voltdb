@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -88,6 +88,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.jni.ExecutionEngine.TaskType;
@@ -552,19 +553,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap, boolean hasReplicatedStream) {
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             for (Map.Entry<Byte, Integer> entry : clusterIdToPartitionCountMap.entrySet()) {
                 int producerClusterId = entry.getKey();
                 Map<Integer, DRSiteDrIdTracker> clusterSources =
                         m_maxSeenDrLogsBySrcPartition.getOrDefault(producerClusterId, new HashMap<>());
-                if (hasReplicatedStream && !clusterSources.containsKey(MpInitiator.MP_INIT_PID)) {
+                if (!clusterSources.containsKey(MpInitiator.MP_INIT_PID)) {
                     DRSiteDrIdTracker tracker =
                             DRConsumerDrIdTracker.createSiteTracker(0,
                                     DRLogSegmentId.makeEmptyDRId(producerClusterId),
                                     Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
                     clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
                 }
-                int oldProducerPartitionCount = clusterSources.size() - (clusterSources.containsKey(MpInitiator.MP_INIT_PID) ? 1 : 0);
+                int oldProducerPartitionCount = clusterSources.size() - 1;
                 int newProducerPartitionCount = entry.getValue();
                 assert(oldProducerPartitionCount >= 0);
                 assert(newProducerPartitionCount != -1);
@@ -1483,6 +1484,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     sequenceNumbers.getSecond(),
                     m_partitionId,
                     catalogTable.getSignature());
+            // assign the stats to the other partition's value
+            ExportManager.instance().updateInitialExportStateToSeqNo(m_partitionId, catalogTable.getSignature(),
+                    false, sequenceNumbers.getSecond());
         }
 
         if (drSequenceNumbers != null) {
@@ -1745,8 +1749,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setProcedureName(String procedureName) {
-        m_ee.setProcedureName(procedureName);
+    public void setupProcedure(String procedureName) {
+        m_ee.setupProcedure(procedureName);
+    }
+
+    @Override
+    public void completeProcedure() {
+        m_ee.completeProcedure();
     }
 
     @Override
@@ -1800,19 +1809,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle, long uniqueId) {
-//        Enable this code and fix up generateDREvent in DRTuplestream once the DR ReplicatedTable Stream has been removed
-//        if (m_partitionId >= oldPartitionCnt) {
-//            generateDREvent(
-//                    EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
-//        }
-//        else {
-            ByteBuffer paramBuffer = ByteBuffer.allocate(8);
-            paramBuffer.putInt(oldPartitionCnt);
-            paramBuffer.putInt(newPartitionCnt);
-            generateDREvent(
-                    EventType.DR_ELASTIC_CHANGE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle, paramBuffer.array());
-//        }
+    public void generateElasticChangeEvents(int oldPartitionCnt, int newPartitionCnt, long txnId, long spHandle,
+            long uniqueId) {
+        ByteBuffer paramBuffer = ByteBuffer.allocate(8);
+        paramBuffer.putInt(oldPartitionCnt);
+        paramBuffer.putInt(newPartitionCnt);
+        generateDREvent(EventType.DR_ELASTIC_CHANGE, txnId, uniqueId, m_lastCommittedSpHandle, spHandle,
+                paramBuffer.array());
     }
 
     @Override

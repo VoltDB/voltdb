@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -170,7 +170,7 @@ public class UpdateCore extends VoltSystemProcedure {
             long tupleCount = stats.getLong("TUPLE_COUNT");
             String tableName = stats.getString("TABLE_NAME");
             boolean isEmpty = true;
-            if (tupleCount > 0 && !"StreamedTable".equals(stats.getString("TABLE_TYPE"))) {
+            if (tupleCount > 0) {
                 isEmpty = false;
                 // Hang on, don't say so fast that it is non-empty. Check materializer for views.
                 final Table materializer = getMaterializer(m_cluster, tableName);

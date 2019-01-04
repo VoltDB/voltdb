@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,7 +45,6 @@ public:
                 int64_t peakMemoryInBytes);
     std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(
             int32_t partitionId,
             std::string signature,
@@ -94,7 +93,6 @@ private:
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;
     jmethodID m_pushExportEOFMID;
-    jmethodID m_getQueuedExportBytesMID;
     jmethodID m_pushDRBufferMID;
     jmethodID m_pushPoisonPillMID;
     jmethodID m_reportDRConflictMID;

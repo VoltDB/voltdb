@@ -15,4 +15,3 @@ SELECT COUNT(*) FROM @fromtables A HAVING COUNT(*) _cmp @comparableconstant
 
 SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables A GROUP BY __[#grouped] HAVING @agg(_variable[#arg @comparabletype]) _cmp @comparableconstant
 SELECT _variable[#grouped], COUNT(*) AS FOO FROM @fromtables A GROUP BY __[#grouped] HAVING @agg(_variable[#arg @comparabletype]) _cmp @comparableconstant ORDER BY 2, 1 _optionallimitoffset 
-

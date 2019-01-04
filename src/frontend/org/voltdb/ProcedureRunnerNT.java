@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -86,6 +86,12 @@ public class ProcedureRunnerNT {
     protected String m_appStatusString = null;
     protected final boolean m_isAdmin;
 
+    // Track the outstanding all host procedures
+    private final Object m_allHostCallbackLock = new Object();
+    private Set<Integer> m_outstandingAllHostProcedureHostIds;
+    private Map<Integer, ClientResponse> m_allHostResponses;
+    private CompletableFuture<Map<Integer, ClientResponse>> m_allHostFut;
+
     ProcedureRunnerNT(long id,
                       AuthUser user,
                       Connection ccxn,
@@ -147,11 +153,6 @@ public class ProcedureRunnerNT {
         }
     }
 
-    Object m_allHostCallbackLock = new Object();
-    Set<Integer> m_outstandingAllHostProcedureHostIds;
-    Map<Integer,ClientResponse> m_allHostResponses;
-    CompletableFuture<Map<Integer,ClientResponse>> m_allHostFut;
-
     /**
      * This is called when an all-host proc responds from a particular node.
      * It completes the future when all of the
@@ -160,22 +161,24 @@ public class ProcedureRunnerNT {
      * Since this is just for sysprocs, VoltDB devs making sysprocs should know
      * that string app status doesn't work.
      */
-    public synchronized void allHostNTProcedureCallback(ClientResponse clientResponse) {
-        int hostId = Integer.parseInt(clientResponse.getAppStatusString());
-        boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
-        // log this for now... I don't expect it to ever happen, but will be interesting to see...
-        if (!removed) {
-            tmLog.error(String.format(
-                      "ProcedureRunnerNT.allHostNTProcedureCallback for procedure %s received late or unexepected response from hostID %d.",
-                      m_procedureName, hostId));
-            return;
-        }
+    public void allHostNTProcedureCallback(ClientResponse clientResponse) {
+        synchronized(m_allHostCallbackLock) {
+            int hostId = Integer.parseInt(clientResponse.getAppStatusString());
+            boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
+            // log this for now... I don't expect it to ever happen, but will be interesting to see...
+            if (!removed) {
+                tmLog.error(String.format(
+                          "ProcedureRunnerNT.allHostNTProcedureCallback for procedure %s received late or unexepected response from hostID %d.",
+                          m_procedureName, hostId));
+                return;
+            }
 
-        m_allHostResponses.put(hostId, clientResponse);
-        if (m_outstandingAllHostProcedureHostIds.size() == 0) {
-            m_outstandingAllHostProc.set(false);
+            m_allHostResponses.put(hostId, clientResponse);
+            if (m_outstandingAllHostProcedureHostIds.size() == 0) {
+                m_outstandingAllHostProc.set(false);
 
-            m_allHostFut.complete(m_allHostResponses);
+                m_allHostFut.complete(m_allHostResponses);
+            }
         }
     }
 
@@ -257,10 +260,9 @@ public class ProcedureRunnerNT {
      */
     protected CompletableFuture<Map<Integer,ClientResponse>> callAllNodeNTProcedure(String procName, Object... params) {
         // only one of these at a time
-        if (m_outstandingAllHostProc.get()) {
+        if (!m_outstandingAllHostProc.compareAndSet(false, true)) {
             throw new VoltAbortException(new IllegalStateException("Only one AllNodeNTProcedure operation can be running at a time."));
         }
-        m_outstandingAllHostProc.set(true);
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName(procName);
@@ -283,21 +285,18 @@ public class ProcedureRunnerNT {
         m_allHostFut = new CompletableFuture<>();
         m_allHostResponses = new HashMap<>();
 
-        Set<Integer> liveHostIds = null;
-
         // hold this lock while getting the count of live nodes
         // also held when
+        long[] hsids;
         synchronized(m_allHostCallbackLock) {
             // collect the set of live client interface mailbox ids
-            liveHostIds = VoltDB.instance().getHostMessenger().getLiveHostIds();
-            m_outstandingAllHostProcedureHostIds = liveHostIds;
+            m_outstandingAllHostProcedureHostIds = VoltDB.instance().getHostMessenger().getLiveHostIds();
+            // convert host ids to hsids
+            hsids = m_outstandingAllHostProcedureHostIds.stream()
+                    .mapToLong(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
+                    .toArray();
         }
 
-        // convert host ids to hsids
-        long[] hsids = liveHostIds.stream()
-                .map(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
-                .mapToLong(x -> x)
-                .toArray();
         // send the invocation to all live nodes
         // n.b. can't combine this step with above because sometimes the callbacks comeback so fast
         //  you get a concurrent modification exception
@@ -478,8 +477,11 @@ public class ProcedureRunnerNT {
                         }
 
                         String msg = "PROCEDURE " + m_procedureName + " THREW EXCEPTION: ";
-                        if (se != null) msg += se.getMessage();
-                        else msg += e.toString();
+                        if (se != null) {
+                            msg += se.getMessage();
+                        } else {
+                            msg += e.toString();
+                        }
                         m_statusCode = ClientResponse.GRACEFUL_FAILURE;
                         completeCall(ProcedureRunner.getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, se));
                         return null;

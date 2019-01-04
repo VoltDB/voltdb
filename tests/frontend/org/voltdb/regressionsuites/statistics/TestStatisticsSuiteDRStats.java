@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -211,8 +211,6 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         validateSchema(results[0], new VoltTable(expectedDRPartitionStatsSchema));
         // One row per site, including the MPI on each host if there is DR replicated stream
         // don't have HSID for ease of check, just check a bunch of stuff
-        boolean hasReplicatedStream = DRProtocol.PROTOCOL_VERSION < DRProtocol.NO_REPLICATED_STREAM_PROTOCOL_VERSION;
-        assertEquals(consumerClusterCount * (HOSTS * (SITES + (hasReplicatedStream ? 1 : 0))), results[0].getRowCount());
         results[0].advanceRow();
         Map<String, String> columnTargets = new HashMap<>();
         columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));

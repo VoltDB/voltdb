@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1541,8 +1541,11 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         // Choose the lowest site ID on this host to truncate export data
         if (isRecover && context.isLowestSiteId()) {
-            ExportManager.instance().
-                    truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
+            final VoltLogger exportLog = new VoltLogger("EXPORT");
+            if (exportLog.isDebugEnabled()) {
+                exportLog.debug("Truncating export data after snapshot txnId " +
+                        TxnEgo.txnIdSeqToString(snapshotTxnId));
+            }
         }
 
         Database db = context.getDatabase();
@@ -1588,6 +1591,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     sequenceNumber,
                     myPartitionId,
                     signature);
+            // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
+            ExportManager.instance().updateInitialExportStateToSeqNo(myPartitionId, signature,
+                    isRecover, sequenceNumber);
         }
     }
 

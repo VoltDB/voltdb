@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -188,7 +188,7 @@ public class OperatorExpression extends AbstractExpression {
                         explainLeftTableName, m_right.m_left.explain(impliedTableName),
                         m_right.m_right.explain(impliedTableName));
             case OPERATOR_UNARY_MINUS:
-                return String.format("-%s", explainLeftTableName);
+                return String.format("(-%s)", explainLeftTableName);
             default:
                 return String.format("(%s %s %s)",
                         explainLeftTableName,

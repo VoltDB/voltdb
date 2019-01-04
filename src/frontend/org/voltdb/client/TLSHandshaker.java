@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -84,12 +84,13 @@ public class TLSHandshaker {
         }
         Selector selector = Selector.open();
         m_sc.register(selector, SelectionKey.OP_READ);
+
         try {
             while (status != HandshakeStatus.FINISHED && status != HandshakeStatus.NOT_HANDSHAKING) {
-
+                boolean waitForData = true;
                 switch(status) {
                 case NEED_UNWRAP:
-                    if (selector.select(2) == 1 && canread(selector)) {
+                    if (waitForData && selector.select(2) == 1 && canread(selector)) {
                         if (m_sc.read(m_rxNetData) < 0) {
                             if (m_eng.isInboundDone() && m_eng.isOutboundDone()) {
                                 return false;
@@ -108,7 +109,8 @@ public class TLSHandshaker {
                     try {
                         result = m_eng.unwrap(m_rxNetData, clearData);
                         m_rxNetData.compact();
-                        status = m_eng.getHandshakeStatus();
+                        waitForData = m_rxNetData.position() == 0;
+                        status = result.getHandshakeStatus();
                     } catch (SSLException e) {
                         m_eng.closeOutbound();
                         throw e;
@@ -122,6 +124,7 @@ public class TLSHandshaker {
                     case BUFFER_UNDERFLOW:
                         // During handshake, this indicates that there's not yet data to read.  We'll stay
                         // in this state until data shows up in m_rxNetData.
+                        waitForData = true;
                        break;
                     case CLOSED:
                         if (m_eng.isOutboundDone()) {
@@ -139,7 +142,7 @@ public class TLSHandshaker {
                     txNetData.clear();
                     try {
                         result = m_eng.wrap(clearData, txNetData);
-                        status = m_eng.getHandshakeStatus();
+                        status = result.getHandshakeStatus();
                     } catch (SSLException e) {
                         m_eng.closeOutbound();
                         throw e;
@@ -152,7 +155,7 @@ public class TLSHandshaker {
                         }
                         break;
                     case BUFFER_OVERFLOW:
-                        clearData = expand(txNetData, false);
+                        txNetData = expand(txNetData, false);
                         break;
                     case BUFFER_UNDERFLOW:
                         throw new SSLException("Buffer underflow occured after a wrap");
@@ -187,10 +190,16 @@ public class TLSHandshaker {
             SelectionKey sk = m_sc.keyFor(selector);
             sk.cancel();
             selector.close();
-            if (isBlocked) synchronized (m_sc.blockingLock()) {
-                m_sc.configureBlocking(isBlocked);
+            if (isBlocked) {
+                synchronized (m_sc.blockingLock()) {
+                    m_sc.configureBlocking(isBlocked);
+                }
             }
         }
+
+        // Flip the buffer so it is setup in case there is a remnant
+        m_rxNetData.flip();
+
         return true;
     }
 
@@ -206,15 +215,14 @@ public class TLSHandshaker {
      * @throws IOException if the decryption operation fails
      */
     public ByteBuffer getRemnant() throws IOException {
-        ByteBuffer bb = ((ByteBuffer)m_rxNetData.duplicate().flip()).slice();
-        if (!bb.hasRemaining()) {
-            return bb;
+        if (!m_rxNetData.hasRemaining()) {
+            return m_rxNetData.slice();
         }
         ByteBuffer remnant = ByteBuffer.allocate(m_eng.getSession().getApplicationBufferSize());
-        SSLEngineResult result = m_eng.unwrap(bb, remnant);
+        SSLEngineResult result = m_eng.unwrap(m_rxNetData, remnant);
         switch (result.getStatus()) {
         case OK:
-            assert !bb.hasRemaining() : "there are unexpected additional remnants";
+            assert !m_rxNetData.hasRemaining() : "there are unexpected additional remnants";
             return ((ByteBuffer)remnant.flip()).slice().asReadOnlyBuffer();
         case BUFFER_OVERFLOW:
             throw new IOException("buffer underflow while decrypting handshake remnant");
@@ -226,8 +234,12 @@ public class TLSHandshaker {
         return null; // unreachable
     }
 
-    public ByteBuffer getRemnantUnencrypted() {
-        return ((ByteBuffer)m_rxNetData.duplicate().flip()).slice();
+    public boolean hasRemnant() {
+        return m_rxNetData.hasRemaining();
+    }
+
+    public SSLEngine getSslEngine() {
+        return m_eng;
     }
 
     private static ByteBuffer expand(ByteBuffer bb, boolean copy) {

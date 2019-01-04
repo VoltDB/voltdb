@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -202,8 +202,16 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
         return new NibbleStatus(rowsLeft, rowsJustDeleted, "");
     }
 
-    public VoltTable run(String tableName, String columnName, String valueStr, String comparisonOp, long chunksize, long timeoutms, long maxFrequency, long interval) {
-
+    public VoltTable run(
+            String tableName,
+            String columnName,
+            String valueStr,
+            String comparisonOp,
+            long chunksize,
+            long timeoutms,
+            long maxFrequency,
+            long interval)
+    {
         VoltTable returnTable = new VoltTable(new ColumnInfo("ROWS_DELETED", VoltType.BIGINT),
                                 new ColumnInfo("ROWS_LEFT", VoltType.BIGINT),
                                 new ColumnInfo("DELETED_LAST_ROUND", VoltType.BIGINT),
@@ -250,7 +258,7 @@ public class LowImpactDeleteNT extends VoltNTSystemProcedure {
         }
 
         //spread additional deletes within the interval
-        long delay = TimeUnit.SECONDS.toMillis(interval)/attemptsLeft;
+        long delay = interval/attemptsLeft;
         ScheduledExecutorService es = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("TTLDeleter"));
         CountDownLatch latch = new CountDownLatch(attemptsLeft);
         String[] errors = new String[attemptsLeft];

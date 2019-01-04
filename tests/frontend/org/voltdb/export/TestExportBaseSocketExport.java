@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -155,7 +155,6 @@ public class TestExportBaseSocketExport extends RegressionSuite {
             @Override
             public void run() {
                 Thread.currentThread().setName("Client handler:" + m_clientSocket);
-                System.out.println("Starting Client handler");
                 try {
                     while (true) {
                         BufferedReader in = new BufferedReader(new InputStreamReader(m_clientSocket.getInputStream()));
@@ -293,7 +292,75 @@ public class TestExportBaseSocketExport extends RegressionSuite {
      * @param client
      * @throws Exception
      */
-    public void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
+    public void waitForStreamedTargetAllocatedMemoryZero(Client client) throws Exception {
+        boolean passed = false;
+
+        // Quiesce to see all data flushed.
+        System.out.println("Quiesce client....");
+        quiesce(client);
+        System.out.println("Quiesce done....");
+
+        VoltTable stats = null;
+        long ftime = 0;
+        long st = System.currentTimeMillis();
+        // Wait 10 mins only
+        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        while (true) {
+            stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+            boolean passedThisTime = true;
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                System.out.println("Waited too long...");
+                System.out.println(stats);
+                break;
+            }
+            if (ctime - st > (3 * 60 * 1000)) {
+                System.out.println(stats);
+                st = System.currentTimeMillis();
+            }
+            long ts = 0;
+            while (stats.advanceRow()) {
+                Long tts = stats.getLong("TIMESTAMP");
+                // Get highest timestamp and watch is change
+                if (tts > ts) {
+                    ts = tts;
+                }
+                long m = stats.getLong("TUPLE_PENDING");
+                if (0 != m) {
+                    passedThisTime = false;
+                    String ttable = stats.getString("SOURCE");
+                    Long host = stats.getLong("HOST_ID");
+                    Long pid = stats.getLong("PARTITION_ID");
+                    System.out.println("Partition Not Zero: " + ttable + " pend:" + m  + " host:" + host + " partid:" + pid);
+                    break;
+                }
+            }
+            if (passedThisTime) {
+                if (ftime == 0) {
+                    ftime = ts;
+                    continue;
+                }
+                // we got 0 stats 2 times in row with diff highest timestamp.
+                if (ftime != ts) {
+                    passed = true;
+                    break;
+                }
+                System.out.println("Passed but not ready to declare victory.");
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        // System.out.println(stats);
+        assertTrue(passed);
+    }
+
+    /**
+     * Wait for export processor to catch up and have nothing to be exported.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public void waitForStreamedTableAllocatedMemoryZero(Client client) throws Exception {
         boolean passed = false;
 
         // Quiesc to see all data flushed.
@@ -358,9 +425,16 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         assertTrue(passed);
     }
 
-    public void quiesceAndVerify(final Client client, ExportTestExpectedData tester) throws Exception {
+    public void quiesceAndVerifyStream(final Client client, ExportTestExpectedData tester) throws Exception {
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
+        tester.verifyRows();
+        System.out.println("Passed!");
+    }
+
+    public void quiesceAndVerifyTarget(final Client client, ExportTestExpectedData tester) throws Exception {
+        client.drain();
+        waitForStreamedTargetAllocatedMemoryZero(client);
         tester.verifyRows();
         System.out.println("Passed!");
     }
@@ -417,7 +491,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         }
     }
 
-    public void closeClientAndServer() throws IOException {
+    public static void closeClientAndServer() throws IOException {
         for (Entry<String, Integer> target : m_portForTable.entrySet()) {
             ServerListener m_serverSocket = m_serverSockets.remove(target.getKey());
             if (m_serverSocket != null) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -163,12 +163,12 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
             numberOfInserts = cr.getResults()[0].asScalarLong();
         }
         assertEquals(ROWS.size(), numberOfInserts);
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         System.out.println("Again Seen Verifiers: " + m_verifier.m_seen_verifiers);
 
         assertEquals(ROWS.size(), m_verifier.getExportedDataCount());
-        quiesceAndVerify(client,m_verifier);
+        quiesceAndVerifyTarget(client,m_verifier);
     }
 
     static private enum AdHocKind {

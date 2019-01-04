@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -84,7 +84,7 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
             client.callProcedure("Insert", params);
             client.callProcedure("Insert", paramsGrp);
         }
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTableAllocatedMemoryZero(client);
         quiesce(client);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
@@ -112,8 +112,12 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
         System.out.println("Insert Data is done...........");
 
         // must still be able to verify the export data.
-        // ENG-5708
-        quiesceAndVerify(client, m_verifier);
+        // ENG-570
+        client.drain();
+        Thread.sleep(2000);
+        quiesce(client);
+        Thread.sleep(2000);
+        quiesceAndVerifyStream(client, m_verifier);
     }
 
     public TestExportSnapshot(final String name) {

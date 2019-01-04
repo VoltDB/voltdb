@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,7 @@
 
 #include "catalog/database.h"
 
+#include "common/debuglog.h"
 #include "common/ExecuteWithMpMemory.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
@@ -66,6 +67,8 @@ const static int RESOLVED_BIT = 1 << 1;
 
 // a c++ style way to limit access from outside this file
 namespace {
+
+TIMER_LVLS(applyLogs, micro, 100000, 10000, 1000, 100)
 
 // Utility functions to convert types to strings. Each type string has a fixed
 // length. Check the schema of the conflict export table for the limits.
@@ -580,7 +583,6 @@ public:
         m_sequenceNumber = m_taskInfo.readLong();
 
         m_hashFlag = static_cast<DRTxnPartitionHashFlag>(m_taskInfo.readByte());
-        assert((m_hashFlag & REPLICATED_TABLE_MASK) != REPLICATED_TABLE_MASK);
 
         m_txnLen = m_taskInfo.readInt();
         assert(m_txnStart + m_txnLen <= m_logEnd);
@@ -649,6 +651,8 @@ int64_t BinaryLogSink::apply(const char *rawLogs,
     rawLogs += sizeof(int32_t);
     int64_t rowCount = 0;
 
+    START_TIMER(apply);
+
     if (logCount == 1) {
         // Optimization for single log
         VOLT_DEBUG("Handling single binary log");
@@ -661,6 +665,7 @@ int64_t BinaryLogSink::apply(const char *rawLogs,
         rowCount = applyMpTxn(rawLogs, logCount, tables, pool, engine, remoteClusterId, localUniqueId);
     }
 
+    STOP_TIMER(apply, applyLogs, "applied %d logs", logCount);
     VOLT_DEBUG("Completed applying %d log(s) resulting in %jd rows", logCount, (intmax_t ) rowCount);
     return rowCount;
 }
@@ -721,7 +726,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
     assert(UniqueId::isMpUniqueId(localUniqueId));
 
     VOLT_DEBUG("Applying MP binary log: log count: %d, unique ID: %jd, sequence number: %jd", logCount,
-            logs[0]->m_uniqueId, logs[0]->m_sequenceNumber);
+            (intmax_t) logs[0]->m_uniqueId, (intmax_t) logs[0]->m_sequenceNumber);
 
     /*
      * Iterate over all of the logs until they are depleted. If a TRUNCATE_TABLE is encountered stop processing
@@ -819,15 +824,29 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, boost::unordered_map<int64_t, Pe
 
     DRRecordType type;
     int64_t rowCount = 0;
-    bool checkForSkip = !log->isReplicatedTableLog() && UniqueId::isMpUniqueId(localUniqueId);
+    bool checkForSkip = !log->isReplicatedTableLog();
+    bool canSkip = UniqueId::isMpUniqueId(localUniqueId);
+
+    START_TIMER(timer);
 
     while ((type = log->readRecordType()) != DR_RECORD_END_TXN) {
         assert(log->m_hashFlag != TXN_PAR_HASH_PLACEHOLDER);
-        bool skipRow = checkForSkip && !engine->isLocalSite(log->m_partitionHash);
+        bool skipRow = false;
+        if (checkForSkip && !engine->isLocalSite(log->m_partitionHash)) {
+            if (canSkip) {
+                skipRow = true;
+            } else {
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED,
+                    "Binary log txns were sent to the wrong partition");
+            }
+        }
         rowCount += applyRecord(log, type, tables, pool, engine, remoteClusterId, replicatedTable, skipRow);
     }
 
     log->validateEndTxn();
+
+    STOP_TIMER(timer, applyLogs, "applied %ld rows from %d uniqueId: %ld, sequenceNumber: %ld", rowCount,
+            remoteClusterId, log->m_uniqueId, log->m_sequenceNumber);
 
     return rowCount;
 }
@@ -868,6 +887,12 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
     int64_t uniqueId = log->m_uniqueId;
     int64_t sequenceNumber = log->m_sequenceNumber;
 
+    START_TIMER(startTime);
+
+#define STOP_TIMER_OP(msg, ...) STOP_TIMER(startTime, applyLogs,             \
+        "Applying transaction from %d uniqueId: %ld, sequenceNumber: %ld " msg, \
+        remoteClusterId, uniqueId, sequenceNumber, ##__VA_ARGS__)
+
     switch (type) {
     case DR_RECORD_INSERT: {
         int64_t tableHandle = taskInfo->readLong();
@@ -905,6 +930,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
             }
             throw;
         }
+        STOP_TIMER_OP("INSERT into %s of %s", table->name().c_str(), tempTuple.toJsonArray().c_str());
         break;
     }
     case DR_RECORD_DELETE: {
@@ -958,6 +984,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
         }
 
         table->deleteTuple(deleteTuple, true);
+        STOP_TIMER_OP("DELETE from %s of %s", table->name().c_str(), tempTuple.toJsonArray().c_str());
         break;
     }
     case DR_RECORD_UPDATE: {
@@ -1044,6 +1071,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
             }
             throw;
         }
+        STOP_TIMER_OP("UPDATE in %s of %s to %s", table->name().c_str(), oldTuple.toJsonArray().c_str(), tempTuple.toJsonArray().c_str());
         break;
     }
     case DR_RECORD_DELETE_BY_INDEX: {
@@ -1057,6 +1085,7 @@ int64_t BinaryLogSink::applyRecord(BinaryLog *log,
         std::string tableName = taskInfo->readTextString();
 
         truncateTable(tables, engine, replicatedTable, tableHandle, &tableName);
+        STOP_TIMER_OP("TRUNCATE TABLE %s", tableName.c_str());
 
         break;
     }

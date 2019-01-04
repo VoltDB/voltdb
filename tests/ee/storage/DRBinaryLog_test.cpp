@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -112,8 +112,9 @@ static std::map<int, ClusterCtx> s_clusterMap;
 
 class MockExportTupleStream : public ExportTupleStream {
 public:
-    MockExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature)
-        : ExportTupleStream(partitionId, siteId, generation, signature)
+    MockExportTupleStream(CatalogId partitionId, int64_t siteId, int64_t generation, std::string signature,
+                          const std::string &tableName, const std::vector<std::string> &columnNames)
+        : ExportTupleStream(partitionId, siteId, generation, signature, tableName, columnNames)
     { }
 
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
@@ -121,9 +122,7 @@ public:
                                            int64_t seqNo,
                                            int64_t uniqueId,
                                            int64_t timestamp,
-                                           const std::string &tableName,
                                            const TableTuple &tuple,
-                                           const std::vector<std::string> &columnNames,
                                            int partitionColumn,
                                            ExportTupleStream::Type type) {
         receivedTuples.push_back(tuple);
@@ -135,8 +134,8 @@ public:
 
 class MockHashinator : public TheHashinator {
 public:
-    static MockHashinator* newInstance() {
-        return new MockHashinator();
+    static MockHashinator* newInstance(int32_t partition = 0) {
+        return new MockHashinator(partition);
     }
 
     std::string debug() const {
@@ -156,8 +155,13 @@ protected:
 
     int32_t partitionForToken(int32_t hashCode) const {
         // partition of VoltDBEngine super of MockVoltDBEngine is 0
-        return 0;
+        return m_partition;
     }
+
+private:
+    MockHashinator(int32_t partition) : m_partition(partition) {}
+
+    int32_t m_partition;
 };
 
 class MockVoltDBEngine : public VoltDBEngine {
@@ -195,10 +199,11 @@ public:
                                            "ROW_DECISION", "CLUSTER_ID", "TIMESTAMP", "DIVERGENCE", "TABLE_NAME",
                                            "CURRENT_CLUSTER_ID", "CURRENT_TIMESTAMP", "TUPLE"};
         const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12);
+        const std::string tableName = "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED";
 
-        m_exportStream = new MockExportTupleStream(1, 1, 0, "sign");
+        m_exportStream = new MockExportTupleStream(1, 1, 0, "sign", tableName, exportColumnName);
         m_conflictStreamedTable.reset(TableFactory::getStreamedTableForTest(0,
-                "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED",
+                tableName,
                 m_exportSchema,
                 exportColumnName,
                 m_exportStream,
@@ -220,6 +225,10 @@ public:
     ExportTupleStream* getExportTupleStream() { return m_exportStream; }
     ExecutorContext* getExecutorContext() { return m_context.get(); }
     void prepareContext() { m_context.get()->bindToThread(); }
+
+    void setHashinator(TheHashinator *hashinator) {
+        VoltDBEngine::setHashinator(hashinator);
+    }
 
 private:
     boost::scoped_ptr<StreamedTable> m_conflictStreamedTable;
@@ -1197,20 +1206,6 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWritesWithReplicatedStream) {
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(3, committed.seqNum);
 }
-
-// ENG-13685: this test seems to fail due to an issue
-// with how the tuple stream is created on the master cluster.
-//TEST_F(DRBinaryLogTest, ReplicatedTableWritesNoReplicatedStream) {
-//    // Use the NO_REPLICATED_STREAM protocol version so that dr replicated stream won't be used
-//    m_drStream.setDrProtocolVersion(DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION);
-//    m_drReplicatedStream.setDrProtocolVersion(DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION);
-//    replicatedTableWritesCommon();
-//
-//    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
-//    EXPECT_EQ(3, committed.seqNum);
-//    committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
-//    EXPECT_EQ(0, committed.seqNum);
-//}
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {
     beginTxn(m_engine, 109, 99, 98, 70);
@@ -2388,6 +2383,38 @@ TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {
     m_undoToken = prevUndoToken;
 
     s_multiPartitionFlag = false;
+}
+
+TEST_F(DRBinaryLogTest, MissPartitionedExceptionIsThrown) {
+    // replica hashinator puts everything in partition 1
+    m_engineReplica->setHashinator(MockHashinator::newInstance(1));
+
+    // Replicated table updates do not throw TXN_MISPARTITIONED
+    beginTxn(m_engine, 99, 99, 98, 70);
+    TableTuple source_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+    endTxn(m_engine, true);
+
+    {
+        ReplicaProcessContextSwitcher switcher;
+        flushAndApply(99, true, true);
+    }
+
+    EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());
+    TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(source_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+
+    // Partitioned table updates do throw TXN_MISPARTITIONED
+    beginTxn(m_engine, 100, 100, 99, 71);
+    insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    endTxn(m_engine, true);
+
+    try {
+        flushAndApply(100);
+        FAIL("Should have thrown SerializableEEException");
+    } catch (SerializableEEException &e) {
+        ASSERT_EQ(VOLT_EE_EXCEPTION_TYPE_TXN_MISPARTITIONED, e.getType());
+    }
 }
 
 int main() {

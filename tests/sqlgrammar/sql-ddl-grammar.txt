@@ -14,14 +14,6 @@
 #   CREATE STREAM, DROP STREAM; CREATE PROCEDURE FROM CLASS
 
 ################################################################################
-# Grammar rules for any (SQL) DDL statement:
-ddl-statement           ::= {create-statement} | {alter-table-statement} | \
-                            {drop-statement}   | {partition-statement}
-
-create-statement        ::= {create-table-statement} | {create-view-statement} | \
-                            {create-index-statement} | {create-proc-as-statement}
-
-################################################################################
 # Define names & types needed in the DDL definitions below:
 small-digit             ::= 1 | 2 | 3 | 4 | 5 | 6
 
@@ -66,15 +58,6 @@ create-view-statement   ::= CREATE VIEW {view-name} ({column-name-list}) AS \
                             [GROUP BY {column-expression}]
 
 column-name-list        ::= {column-name} [, {column-name-list}] [, {column-name-list}]
-
-################################################################################
-# Grammar rules for CREATE INDEX statements:
-################################################################################
-create-index-statement  ::= CREATE [{unique-or-assume-unique}] INDEX {index-name} \
-                            ON {table-or-view-name} ({column-name-list}) \
-                            [{where-clause}]
-
-unique-or-assume-unique ::= UNIQUE | ASSUMEUNIQUE
 
 ################################################################################
 # Grammar rules for ALTER TABLE statements:

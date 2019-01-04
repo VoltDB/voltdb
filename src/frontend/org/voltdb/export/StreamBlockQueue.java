@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.BinaryDeque;
 import org.voltdb.utils.BinaryDeque.BinaryDequeReader;
+import org.voltdb.utils.BinaryDeque.BinaryDequeScanner;
 import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse;
 import org.voltdb.utils.PersistentBinaryDeque;
@@ -37,13 +38,32 @@ import org.voltdb.utils.VoltFile;
  * overflow to disk when more then two stream blocks are stored
  * as well as persist to disk when sync is invoked. Right now sync doesn't actually do an fsync on
  * the file unless it is specifically requested. It just pushed the two in memory blocks to the persistent
+ * portion of the queue.
  *
- * portion of the queue
+ * Export PBD buffer layout:
+ *    --- Buffer Header   ---
+ *    seqNo(8) + tupleCount(4) + uniqueId(8) + exportVersion(1) + generationId(8) + schemaLen(4) + tupleSchema(var length)
+ *    {
+ *          ---Inside schema---
+ *          tableNameLength(4) + tableName(var length) + colNameLength(4) + colName(var length) + colType(1) + colLength(4) + ...
+ *    }
+ *    --- Row Header      ---
+ *    rowLength(4) + partitionColumnIndex(4) + columnCount(4, includes metadata columns) +
+ *    nullArrayLength(4) + nullArray(var length)
+ *    --- Metadata        ---
+ *    TxnId(8) + timestamp(8) + seqNo(8) + partitionId(8) + siteId(8) + exportOperation(1)
+ *    --- Row Data        ---
+ *    rowData(var length)
  *
+ *    repeat row header, meta data and row data...
  */
 public class StreamBlockQueue {
 
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
+    public static final int EXPORT_BUFFER_VERSION = 1;
+
+    public static final String EXPORT_DISABLE_COMPRESSION_OPTION = "EXPORT_DISABLE_COMPRESSION";
+    private static final boolean DISABLE_COMPRESSION = Boolean.getBoolean(EXPORT_DISABLE_COMPRESSION_OPTION);
 
     /**
      * Deque containing reference to stream blocks that are in memory. Some of these
@@ -65,8 +85,9 @@ public class StreamBlockQueue {
         m_path = path;
         m_nonce = nonce;
         m_reader = m_persistentDeque.openForRead(m_nonce);
-        // temporary debug stmt
-        exportLog.info(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
+        if (exportLog.isDebugEnabled()) {
+            exportLog.debug(m_nonce + " At SBQ creation, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
+        }
     }
 
     public boolean isEmpty() throws IOException {
@@ -96,13 +117,18 @@ public class StreamBlockQueue {
         if (cont == null) {
             return null;
         } else {
+            cont.b().order(ByteOrder.LITTLE_ENDIAN);
             //If the container is not null, unpack it.
             final BBContainer fcont = cont;
-            long uso = cont.b().getLong(0);
+            long seqNo = cont.b().getLong(0);
+            int tupleCount = cont.b().getInt(8);
+            long uniqueId = cont.b().getLong(12);
             //Pass the stream block a subset of the bytes, provide
             //a container that discards the original returned by the persistent deque
             StreamBlock block = new StreamBlock( fcont,
-                uso,
+                seqNo,
+                tupleCount,
+                uniqueId,
                 true);
 
             //Optionally store a reference to the block in the in memory deque
@@ -199,13 +225,13 @@ public class StreamBlockQueue {
      * Only allow two blocks in memory, put the rest in the persistent deque
      */
     public void offer(StreamBlock streamBlock) throws IOException {
-        m_persistentDeque.offer(streamBlock.asBBContainer());
-        long unreleasedUso = streamBlock.unreleasedUso();
+        m_persistentDeque.offer(streamBlock.asBBContainer(), !DISABLE_COMPRESSION);
+        long unreleasedSeqNo = streamBlock.unreleasedSequenceNumber();
         if (m_memoryDeque.size() < 2) {
             StreamBlock fromPBD = pollPersistentDeque(false);
-            if ((streamBlock.uso() == fromPBD.uso()) && (unreleasedUso > streamBlock.uso())) {
-                fromPBD.releaseUso(unreleasedUso - 1);
-                assert(fromPBD.unreleasedUso() < fromPBD.uso() + fromPBD.totalSize() - 1);
+            if ((streamBlock.startSequenceNumber() == fromPBD.startSequenceNumber()) &&
+                    (unreleasedSeqNo > streamBlock.startSequenceNumber())) {
+                fromPBD.releaseTo(unreleasedSeqNo - 1);
             }
         }
     }
@@ -219,16 +245,17 @@ public class StreamBlockQueue {
         }
     }
 
+    // Only used in tests, should be removed.
     public long sizeInBytes() throws IOException {
         long memoryBlockUsage = 0;
         for (StreamBlock b : m_memoryDeque) {
-            //Use only unreleased size, but throw in the USO
+            //Use only total size, but throw in the USO
             //to make book keeping consistent when flushed to disk
             //Also dont count persisted blocks.
-            memoryBlockUsage += b.unreleasedSize();
+            memoryBlockUsage += b.totalSize();
         }
         //Subtract USO from on disk size
-        return memoryBlockUsage + m_reader.sizeInBytes() - (8 * m_reader.getNumObjects());
+        return memoryBlockUsage + m_reader.sizeInBytes() - (StreamBlock.HEADER_SIZE * m_reader.getNumObjects());
     }
 
     public void close() throws IOException {
@@ -247,94 +274,59 @@ public class StreamBlockQueue {
         }
     }
 
-    public void truncateToTxnId(final long txnId) throws IOException {
+    // See PDB segment layout at beginning of this file.
+    public void truncateToSequenceNumber(final long truncationSeqNo) throws IOException {
         assert(m_memoryDeque.isEmpty());
         m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
-        @Override
-        public TruncatorResponse parse(BBContainer bbc) {
-            ByteBuffer b = bbc.b();
-            b.order(ByteOrder.LITTLE_ENDIAN);
-            try {
-                final int headerSize = 8 + 4 + 4 + 1; // generation, partition index + column count + byte for schema flag.
-                b.position(b.position() + 8);//Don't need the USO
-                while (b.hasRemaining()) {
-                    int rowLength = b.getInt();
-                    //Get Generation
-                    b.getLong();
-                    //Get partition col index
-                    b.getInt();
-                    //Get column count includes metadata column count.
-                    int columnCount = b.getInt();
-                    //Get schema flag.
-                    byte hasSchema = b.get();
-
-                    int nullArrayLength = ((columnCount + 7) & -8) >> 3;
-                    b.position(b.position() + nullArrayLength);
-
-                    int skiplen = 0;
-                    if (hasSchema == 1) {
-                        //Table Name + Its length size
-                        skiplen += 4;
-                        int tlen = b.getInt();
-                        byte[] bx = new byte[tlen];
-                        b.get(bx);
-                        skiplen += tlen;
-
-                        for (int i = 0; i < columnCount; i++) {
-                            //Col Name length
-                            tlen = b.getInt();
-                            skiplen += 4;
-                            bx = new byte[tlen];
-                            //Col Name
-                            b.get(bx);
-                            skiplen += tlen;
-                            //Type Byte
-                            b.get();
-                            skiplen++;
-                            //Get length of column
-                            b.getInt();
-                            skiplen += 4;
-                        }
-                    }
-
-                    long rowTxnId = b.getLong();
-                    if (exportLog.isTraceEnabled()) {
-                        exportLog.trace("Evaluating row with txnId " + rowTxnId + " for truncation, skiplen=" + skiplen);
-                    }
-                    if (rowTxnId > txnId) {
-                        if (exportLog.isDebugEnabled()) {
-                            exportLog.debug(
-                                    "Export stream " + m_nonce + " found export data to truncate at txn " + rowTxnId);
-                        }
-                        //The txnid of this row is the greater then the truncation txnid.
-                        //Don't want this row, but want to preserve all rows before it.
-                        //Move back before the row length prefix, txnId and header
-                        b.position(b.position() - (skiplen + 12 + headerSize + nullArrayLength));
-
-                        //If the truncation point was the first row in the block, the entire block is to be discard
-                        //We know it is the first row if the position before the row is after the uso (8 bytes)
-                        if (b.position() == 8) {
-                            return PersistentBinaryDeque.fullTruncateResponse();
-                        } else {
-                            //Return everything in the block before the truncation point.
-                            //Indicate this is the end of the interesting data.
-                            b.limit(b.position());
-                            b.position(0);
-                            return new ByteBufferTruncatorResponse(b);
-                        }
-                    } else {
-                        //Not the row we are looking to truncate at. Skip past it keeping in mind
-                        //we read the first 8 bytes for the txn id, the null array which
-                        //is included in the length prefix and the header size
-                        b.position(b.position() + (rowLength - (skiplen + 8 + headerSize + nullArrayLength)));
-                    }
+            @Override
+            public TruncatorResponse parse(BBContainer bbc) {
+                ByteBuffer b = bbc.b();
+                b.order(ByteOrder.LITTLE_ENDIAN);
+                final long startSequenceNumber = b.getLong();
+                // If after the truncation point is the first row in the block, the entire block is to be discarded
+                if (startSequenceNumber > truncationSeqNo) {
+                    return PersistentBinaryDeque.fullTruncateResponse();
                 }
-            } finally {
-                b.order(ByteOrder.BIG_ENDIAN);
+                final int tupleCountPos = b.position();
+                final int tupleCount = b.getInt();
+                // There is nothing to do with this buffer
+                final long lastSequenceNumber = startSequenceNumber + tupleCount - 1;
+                if (lastSequenceNumber <= truncationSeqNo) {
+                    return null;
+                }
+                b.getLong(); // uniqueId
+                byte version = b.get(); // export version
+                assert(version == EXPORT_BUFFER_VERSION);
+                b.getLong(); // generation id
+                int firstRowStart = b.getInt() + b.position();
+                b.position(firstRowStart);
+
+                // Partial truncation
+                int offset = 0;
+                while (b.hasRemaining()) {
+                    if (startSequenceNumber + offset > truncationSeqNo) {
+                        // The sequence number of this row is the greater than the truncation sequence number.
+                        // Don't want this row, but want to preserve all rows before it.
+                        // Move back before the row length prefix, txnId and header
+                        // Return everything in the block before the truncation point.
+                        // Indicate this is the end of the interesting data.
+                        b.limit(b.position());
+                        // update tuple count in the header
+                        b.putInt(tupleCountPos, offset - 1);
+                        b.position(0);
+                        return new ByteBufferTruncatorResponse(b);
+                    }
+                    offset++;
+                    // Not the row we are looking to truncate at. Skip past it (row length + row length field).
+                    final int rowLength = b.getInt();
+                    if (b.position() + rowLength > b.limit()) {
+                        System.out.println(rowLength);
+                    }
+                    b.position(b.position() + rowLength);
+                }
+                return null;
             }
-            return null;
-        }
         });
 
         // close reopen reader
@@ -343,6 +335,23 @@ public class StreamBlockQueue {
         m_reader = m_persistentDeque.openForRead(m_nonce);
         // temporary debug stmt
         exportLog.info("After truncate, PBD size is " + (m_reader.sizeInBytes() - (8 * m_reader.getNumObjects())));
+    }
+
+    public ExportSequenceNumberTracker scanForGap() throws IOException {
+        assert(m_memoryDeque.isEmpty());
+        return m_persistentDeque.scanForGap(new BinaryDequeScanner() {
+
+            public ExportSequenceNumberTracker scan(BBContainer bbc) {
+                ByteBuffer b = bbc.b();
+                b.order(ByteOrder.LITTLE_ENDIAN);
+                final long startSequenceNumber = b.getLong();
+                final int tupleCount = b.getInt();
+                ExportSequenceNumberTracker gapTracker = new ExportSequenceNumberTracker();
+                gapTracker.append(startSequenceNumber, startSequenceNumber + tupleCount - 1);
+                return gapTracker;
+            }
+
+        });
     }
 
 
@@ -362,4 +371,5 @@ public class StreamBlockQueue {
             }
         }
     }
+
 }

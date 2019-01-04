@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -3944,7 +3944,19 @@ inline NValue NValue::like(const NValue& rhs) const {
                     }
 
                     const char *postPercentPatternIterator = m_pattern.getCursor();
-                    const uint32_t nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
+                    uint32_t nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
+
+                    // ENG-14485 handle two or more consecutive '%' characters at the end of the pattern
+                    if (m_value.atEnd()) {
+                        while (nextPatternCodePointAfterPercent == '%') {
+                            if (m_pattern.atEnd()) {
+                                return true;
+                            }
+                            nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
+                        }
+                        return false;
+                    }
+
                     const bool nextPatternCodePointAfterPercentIsSpecial =
                             (nextPatternCodePointAfterPercent == '_') ||
                             (nextPatternCodePointAfterPercent == '%');

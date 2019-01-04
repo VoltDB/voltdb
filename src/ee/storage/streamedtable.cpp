@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -59,10 +59,11 @@ StreamedTable::StreamedTable(ExportTupleStream *wrapper, int partitionColumn)
 
 StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx,
-    TupleSchema *schema, std::vector<std::string> & columnNames) {
+    TupleSchema *schema, std::string tableName, std::vector<std::string> & columnNames) {
     StreamedTable * st = new StreamedTable();
+    st->m_name = tableName;
     st->m_wrapper = new ExportTupleStream(ctx->m_partitionId,
-                                           ctx->m_siteId, 0, "sign");
+                                           ctx->m_siteId, 0, "sign", st->m_name, columnNames);
     st->initializeWithColumns(schema, columnNames, false, wrapperBufSize);
     st->m_wrapper->setDefaultCapacityForTest(wrapperBufSize);
     return st;
@@ -143,23 +144,22 @@ bool StreamedTable::insertTuple(TableTuple &source)
         for (int i = 0; i < m_views.size(); i++) {
             m_views[i]->processTupleInsert(source, true);
         }
+        int64_t currSequenceNo = ++m_sequenceNo;
         mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
                                       m_executorContext->currentSpHandle(),
-                                      m_sequenceNo++,
+                                      currSequenceNo,
                                       m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
-                                      name(),
                                       source,
-                                      getColumnNames(),
                                       partitionColumn(),
                                       ExportTupleStream::INSERT);
-        m_tupleCount++;
+
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
         if (!uq) {
             // With no active UndoLog, there is no undo support.
             return true;
         }
-        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
+        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark, currSequenceNo));
     }
     else {
         // handle any materialized views even though we dont have any connector.
@@ -191,12 +191,12 @@ void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t gen
     }
 }
 
-void StreamedTable::undo(size_t mark) {
+void StreamedTable::undo(size_t mark, int64_t seqNo) {
     if (m_wrapper) {
-        m_wrapper->rollbackTo(mark, SIZE_MAX);
+        m_wrapper->rollbackTo(mark, SIZE_MAX, seqNo);
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
-        //then having gaps.
+        //than having gaps.
         m_sequenceNo--;
     }
 }
@@ -206,9 +206,6 @@ size_t StreamedTable::allocatedBlockCount() const {
 }
 
 int64_t StreamedTable::allocatedTupleMemory() const {
-    if (m_wrapper) {
-        return m_wrapper->allocatedByteCount();
-    }
     return 0;
 }
 
@@ -232,6 +229,6 @@ void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUs
     assert(m_sequenceNo == 0);
     m_sequenceNo = seqNo;
     if (m_wrapper) {
-        m_wrapper->setBytesUsed(streamBytesUsed);
+        m_wrapper->setBytesUsed(seqNo, streamBytesUsed);
     }
 }

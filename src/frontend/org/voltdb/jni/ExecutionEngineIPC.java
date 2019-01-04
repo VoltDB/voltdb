@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -256,9 +256,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         static final int kErrorCode_CrashVoltDB = 104;
 
         /**
-         * Retrieve value from Java for stats
+         * Retrieve value from Java for stats (DEPRECATED)
          */
-        static final int kErrorCode_getQueuedExportBytes = 105;
+        //static final int kErrorCode_getQueuedExportBytes = 105;
 
         /**
          * An error code that can be sent at any time indicating that
@@ -426,7 +426,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     // partition id - 4 bytes
                     // signature length (in bytes) - 4 bytes
                     // signature - signature length bytes
-                    // uso - 8 bytes
+                    // start sequence number - 8 bytes
+                    // tupleCount - 8 bytes
+                    // uniqueId - 8 bytes
                     // sync - 1 byte
                     // export buffer length - 4 bytes
                     // export buffer - export buffer length bytes
@@ -435,48 +437,20 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     byte signatureBytes[] = new byte[signatureLength];
                     getBytes(signatureLength).get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
-                    long uso = getBytes(8).getLong();
+                    long startSequenceNumber = getBytes(8).getLong();
+                    long tupleCount = getBytes(8).getLong();
+                    long uniqueId = getBytes(8).getLong();
                     boolean sync = getBytes(1).get() == 1 ? true : false;
                     int length = getBytes(4).getInt();
                     ExportManager.pushExportBuffer(
                             partitionId,
                             signature,
-                            uso,
+                            startSequenceNumber,
+                            tupleCount,
+                            uniqueId,
                             0,
                             length == 0 ? null : getBytes(length),
                             sync);
-                }
-                else if (status == kErrorCode_getQueuedExportBytes) {
-                    ByteBuffer header = ByteBuffer.allocate(8);
-                    while (header.hasRemaining()) {
-                        final int read = m_socket.getChannel().read(header);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    header.flip();
-
-                    int partitionId = header.getInt();
-                    int signatureLength = header.getInt();
-                    ByteBuffer sigbuf = ByteBuffer.allocate(signatureLength);
-                    while (sigbuf.hasRemaining()) {
-                        final int read = m_socket.getChannel().read(sigbuf);
-                        if (read == -1) {
-                            throw new EOFException();
-                        }
-                    }
-                    sigbuf.flip();
-                    byte signatureBytes[] = new byte[signatureLength];
-                    sigbuf.get(signatureBytes);
-                    String signature = new String(signatureBytes, "UTF-8");
-
-                    long retval = ExportManager.getQueuedExportBytes(partitionId, signature);
-                    ByteBuffer buf = ByteBuffer.allocate(8);
-                    buf.putLong(retval).flip();
-
-                    while (buf.hasRemaining()) {
-                        m_socketChannel.write(buf);
-                    }
                 }
                 else if (status == kErrorCode_pushEndOfStream) {
                     ByteBuffer header = ByteBuffer.allocate(8);

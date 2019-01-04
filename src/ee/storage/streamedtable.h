@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,7 +50,8 @@ public:
     StreamedTable(int partitionColumn = -1);
     //Used for test
     StreamedTable(ExportTupleStream *wrapper, int partitionColumn = -1);
-    static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema, std::vector<std::string> & columnNames);
+    static StreamedTable* createForTest(size_t, ExecutorContext*, TupleSchema *schema,
+            std::string tableName, std::vector<std::string> & columnNames);
 
     virtual ~StreamedTable();
 
@@ -87,7 +88,7 @@ public:
     virtual std::string tableType() const { return "StreamedTable"; }
 
     // undo interface particular to streamed table.
-    void undo(size_t mark);
+    void undo(size_t mark, int64_t seqNo);
 
     //Override and say how many bytes are in Java and C++
     int64_t allocatedTupleMemory() const;

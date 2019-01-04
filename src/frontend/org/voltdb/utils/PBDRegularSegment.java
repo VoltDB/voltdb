@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,14 +17,6 @@
 
 package org.voltdb.utils;
 
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DeferredSerialization;
-import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
-
-import com.google_voltpatches.common.base.Preconditions;
-
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
@@ -32,6 +24,14 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.utils.BinaryDeque.OutputContainerFactory;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Objects placed in the deque are stored in file segments that are up to 64 megabytes.
