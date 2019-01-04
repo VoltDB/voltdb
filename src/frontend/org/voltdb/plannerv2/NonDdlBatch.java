@@ -24,9 +24,9 @@ import java.util.concurrent.CompletableFuture;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
+import org.voltdb.exceptions.AdHocPlanningException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
-import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 
 /**
  * DQL/DML query batch.

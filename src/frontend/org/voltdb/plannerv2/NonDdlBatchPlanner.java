@@ -29,8 +29,8 @@ import org.voltdb.VoltType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.exceptions.AdHocPlanningException;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
-import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 import org.voltdb.utils.VoltTrace;
 
 /**

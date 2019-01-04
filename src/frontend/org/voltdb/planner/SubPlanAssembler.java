@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
@@ -413,7 +414,7 @@ public abstract class SubPlanAssembler {
     public static boolean isPartialIndexPredicateCovered(
             StmtTableScan tableScan, Collection<AbstractExpression> coveringExprs,
             String predicatejson, List<AbstractExpression> exactMatchCoveringExprs) {
-        assert ! predicatejson.isEmpty();
+        Preconditions.checkArgument(! predicatejson.isEmpty(), "Precondition JSON cannot be empty");
         final AbstractExpression indexPredicate;
         try {
             indexPredicate = AbstractExpression.fromJSONString(predicatejson, tableScan);
@@ -900,7 +901,7 @@ public abstract class SubPlanAssembler {
                     /*
                     boolean isReverseScanPossible = true;
                     if (filtersToCover.size() > 0) {
-                        // Look forward to see the remainning filters.
+                        // Look forward to see the remaining filters.
                         for (int ii = coveredCount + 1; ii < keyComponentCount; ++ii) {
                             if (indexedExprs == null) {
                                 coveringColId = indexedColIds[ii];
@@ -1018,9 +1019,10 @@ public abstract class SubPlanAssembler {
     private AccessPath getRelevantAccessPathForGeoIndex(AccessPath retval, StmtTableScan tableScan,
             List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs,
             List<AbstractExpression> filtersToCover) {
-        assert indexedExprs == null; // geo expressions not yet supported
-        assert indexedColRefs != null; // for now a geo COLUMN is required.
-        assert isAGeoColumnIndex(indexedColRefs);
+        Preconditions.checkArgument(indexedExprs == null,
+                "Geo expression not yet supported, so indxedExprs should be null");
+        Preconditions.checkNotNull(indexedColRefs); // for now a geo COLUMN is required.
+        Preconditions.checkState(isAGeoColumnIndex(indexedColRefs));
         Column geoCol = indexedColRefs.get(0).getColumn();
         // Match only the table's column that has the coveringColId
         // Handle a simple indexed column identified by its column id.
@@ -1566,7 +1568,7 @@ public abstract class SubPlanAssembler {
         final StmtTableScan tableScan = tableNode.getTableScan();
         // Access path to access the data in the table (index/scan/etc).
         final AccessPath path = tableNode.m_currentAccessPath;
-        assert path != null;
+        Preconditions.checkNotNull(tableNode.m_currentAccessPath);
 
         // if no index, it is a sequential scan
         if (path.index == null) {
@@ -1630,15 +1632,12 @@ public abstract class SubPlanAssembler {
                 // Set up the similar VectorValue --> TVE replacement of the search key expression.
                 exprRightChild = elemExpr;
             }
-            if (exprRightChild instanceof AbstractSubqueryExpression) {
-                // The AbstractSubqueryExpression must be wrapped up into a
-                // ScalarValueExpression which extracts the actual row/column from
-                // the subquery
-                // ENG-8175: this part of code seems not working for float/varchar type index ?!
-
-                // DEAD CODE with the guards on index: ENG-8203
-                assert(false);
-            }
+            // The AbstractSubqueryExpression must be wrapped up into a
+            // ScalarValueExpression which extracts the actual row/column from
+            // the subquery
+            // ENG-8175: this part of code seems not working for float/varchar type index ?!
+            // DEAD CODE with the guards on index: ENG-8203
+            Preconditions.checkState(! (exprRightChild instanceof AbstractSubqueryExpression));
             scanNode.addSearchKeyExpression(exprRightChild);
             // If the index expression is an "IS NOT DISTINCT FROM" comparison, let the NULL values go through. (ENG-11096)
             scanNode.addCompareNotDistinctFlag(expr.getExpressionType() == ExpressionType.COMPARE_NOTDISTINCT);
@@ -1668,7 +1667,9 @@ public abstract class SubPlanAssembler {
     private static AbstractPlanNode injectIndexedJoinWithMaterializedScan(
             AbstractExpression listElements, IndexScanPlanNode scanNode) {
         final MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
-        assert listElements instanceof VectorValueExpression || listElements instanceof ParameterValueExpression;
+        Preconditions.checkArgument(
+                listElements instanceof VectorValueExpression || listElements instanceof ParameterValueExpression,
+                "Argument listElements must be either VVE or PVE");
         matScan.setRowData(listElements);
         matScan.setSortDirection(scanNode.getSortDirection());
 

@@ -29,8 +29,8 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
+import org.voltdb.exceptions.AdHocPlanningException;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
-import org.voltdb.sysprocs.AdHocNTBase.AdHocPlanningException;
 
 /**
  * The base class for defining a query batch with one or more {@link SqlTask}.</br>

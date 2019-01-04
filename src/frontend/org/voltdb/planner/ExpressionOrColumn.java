@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ package org.voltdb.planner;
 import java.util.Collections;
 import java.util.List;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -143,7 +144,7 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
  * contain values that are constrained by the WHERE clause to be equal to constants or parameters
  * and the other ORDER BY columns match the index key components in the usual way.
  * Such a case will simply fail to match, here, possibly resulting in suboptimal plans that
- * make unneccesary use of ORDER BY plan nodes, and possibly even use sequential scan plan nodes.
+ * make unnecessary use of ORDER BY plan nodes, and possibly even use sequential scan plan nodes.
  * The rationale for not complicating this code to handle that case is that the case should be
  * detected by a statement pre-processor that simplifies the ORDER BY clause prior to any
  * "scan planning".
@@ -203,8 +204,10 @@ class ExpressionOrColumn {
                        SortDirectionType sortDir,
                        ColumnRef colRef) {
         // Exactly one of expr or colRef can be null.
-        assert (expr == null) == (colRef != null);
-        assert colRef == null || tableScan != null;
+        Preconditions.checkArgument((expr == null) == (colRef != null),
+                "Exactly one of argument expr or colRef must be null.");
+        Preconditions.checkArgument(colRef == null || tableScan != null,
+                "When argument colRef is null, tableScan cannot be null.");
         m_expr = expr;
         m_colRef = colRef;
         m_indexKeyComponentPosition = aIndexEntryNumber;
@@ -281,14 +284,12 @@ class ExpressionOrColumn {
      */
     static List<AbstractExpression> findBindingsForOneIndexedExpression(
             ExpressionOrColumn nextStatementEOC, ExpressionOrColumn indexEntry) {
-        assert nextStatementEOC.m_expr != null;
-        AbstractExpression nextStatementExpr = nextStatementEOC.m_expr;
+        Preconditions.checkNotNull(nextStatementEOC.m_expr);
         if (indexEntry.m_colRef != null) {
-            ColumnRef indexColRef = indexEntry.m_colRef;
             // This is a column.  So try to match it
             // with the expression in nextStatementEOC.
             if (ExpressionOrColumn.matchExpressionAndColumnRef(
-                    nextStatementExpr, indexColRef, indexEntry.m_tableScan)) {
+                    nextStatementEOC.m_expr, indexEntry.m_colRef, indexEntry.m_tableScan)) {
                 return s_reusableImmutableEmptyBinding;
             } else {
                 return null;

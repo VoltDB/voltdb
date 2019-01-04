@@ -41,6 +41,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.exceptions.AdHocPlanningException;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
@@ -157,17 +158,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
         }
         assert(hasDDL != null);
         return hasDDL ? AdHocSQLMix.ALL_DDL : AdHocSQLMix.ALL_DML_OR_DQL;
-    }
-
-    public static class AdHocPlanningException extends Exception {
-        private static final long serialVersionUID = 1L;
-
-        public AdHocPlanningException(String message) {
-            super(message);
-        }
-        public AdHocPlanningException(String message, Throwable cause) {
-            super(message, cause);
-        }
     }
 
     /**
