@@ -168,7 +168,8 @@ public class VoltDBPTableSeqScan extends AbstractVoltDBPTableScan {
     public AbstractPlanNode toPlanNode() {
         SeqScanPlanNode sspn = new SeqScanPlanNode();
         List<String> qualName = table.getQualifiedName();
-        sspn.setTargetTableAlias(qualName.get(0));
+        // index_0: schema name, Index_1: table name
+        sspn.setTargetTableAlias(qualName.get(1));
         sspn.setTargetTableName(m_voltTable.getCatTable().getTypeName());
 
         addProjection(sspn);

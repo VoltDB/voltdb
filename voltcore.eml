@@ -3,6 +3,7 @@
 	<exclude-output/>
 	<contentEntry url="file://$MODULE_DIR$"/>
 	<lib name="commons-lang3-3.0.jar" scope="COMPILE">
+		<srcroot url="jar://$USER_HOME$/.ideaLibSources/commons-lang3-3.0-sources.jar!/"/>
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/commons-lang3-3.0.jar!/"/>
 	</lib>
 	<lib name="jline-2.10.jar" scope="COMPILE">
@@ -30,6 +31,7 @@
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/jfreechart-1.0.13.jar!/"/>
 	</lib>
 	<lib name="junit-dep-4.10.jar" scope="COMPILE">
+		<srcroot url="jar://$USER_HOME$/.ideaLibSources/junit-dep-4.10-sources.jar!/"/>
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/junit-dep-4.10.jar!/"/>
 	</lib>
 	<lib name="pmd-4.2.5.jar" scope="COMPILE">
@@ -206,4 +208,13 @@
 	<lib name="jetty-security-9.3.21.v20170918.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jetty-security-9.3.21.v20170918.jar!/"/>
 	</lib>
+	<levels>
+		<level name="janino-2.7.6" value="project"/>
+		<level name="commons-compiler-2.7.6" value="project"/>
+		<level name="avatica-core-1.12.0" value="project"/>
+		<level name="calcite-linq4j-1.17.0" value="project"/>
+		<level name="commons-lang3-3.0" value="project"/>
+		<level name="calcite-server-1.17.0" value="project"/>
+		<level name="calcite-core-1.17.0" value="project"/>
+	</levels>
 </component>

@@ -30,6 +30,8 @@ import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
+import org.voltdb.newplanner.rules.inlining.VoltDBPLimitScanMergeRule;
+import org.voltdb.newplanner.rules.inlining.VoltPhysicalCalcScanMergeRule;
 import org.voltdb.newplanner.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.newplanner.rules.logical.MPQueryFallBackRule;
 import org.voltdb.newplanner.rules.logical.VoltDBLAggregateRule;
@@ -80,6 +82,11 @@ public enum PlannerPhase {
         public RuleSet getRules() {
             return getVoltPhysicalConversionRules();
         }
+    },
+    INLINING("Inlining rules") {
+        public RuleSet getRules() {
+            return getInliningRules();
+        }
     };
 
     public final String description;
@@ -92,6 +99,7 @@ public enum PlannerPhase {
     private static final RuleSet s_VoltLogicalRules;
     private static final RuleSet s_VoltMPFallbackRules;
     private static final RuleSet s_VoltPhysicalConversionRules;
+    private static final RuleSet s_InliningRules;
 
     static {
         s_CalciteLogicalRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
@@ -127,6 +135,11 @@ public enum PlannerPhase {
                         VoltDBPLimitRule.INSTANCE,
                         VoltDBPAggregateRule.INSTANCE,
                         VoltDBPJoinRule.INSTANCE
+                ).build());
+        s_InliningRules = RuleSets.ofList(ImmutableSet.<RelOptRule>builder()
+                .add(
+                        VoltPhysicalCalcScanMergeRule.INSTANCE,
+                        VoltDBPLimitScanMergeRule.INSTANCE_2
                 ).build());
     }
 
@@ -187,5 +200,9 @@ public enum PlannerPhase {
 
     static RuleSet getVoltMPFallbackRules() {
         return s_VoltMPFallbackRules;
+    }
+
+    static RuleSet getInliningRules() {
+        return s_InliningRules;
     }
 }

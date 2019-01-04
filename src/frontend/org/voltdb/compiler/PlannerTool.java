@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
@@ -242,9 +243,14 @@ public class PlannerTool {
         RelNode nodeAfterPhysicalConversion = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
                 PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogical, physicalTraits);
 
+        System.out.println(RelOptUtil.toString(nodeAfterPhysicalConversion));
+        // apply inlining rules.
+        RelNode nodeAfterInlining = CalcitePlanner.transform(CalcitePlannerType.HEP_ORDERED,
+                PlannerPhase.INLINING, nodeAfterPhysicalConversion);
+
         // assume not large query
         CompiledPlan compiledPlan = new CompiledPlan(false);
-        calciteToVoltDBPlan((VoltDBPRel)nodeAfterPhysicalConversion, compiledPlan);
+        calciteToVoltDBPlan((VoltDBPRel)nodeAfterInlining, compiledPlan);
 
         compiledPlan.explainedPlan = compiledPlan.rootPlanGraph.toExplainPlanString();
         // Renumber the plan node ids to start with 1

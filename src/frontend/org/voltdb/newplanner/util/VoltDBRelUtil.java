@@ -68,8 +68,8 @@ public class VoltDBRelUtil {
 
         RexConverter.resetParameterIndex();
 
-        AbstractPlanNode root = rel.toPlanNode();
-//        Preconditions.checkArgument(root instanceof SendPlanNode);
+        AbstractPlanNode root = new SendPlanNode();
+        root.addAndLinkChild(rel.toPlanNode());
 
         compiledPlan.rootPlanGraph = root;
 

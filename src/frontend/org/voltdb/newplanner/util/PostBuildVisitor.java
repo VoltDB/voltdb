@@ -31,7 +31,8 @@ import java.util.Set;
 public class PostBuildVisitor extends AbstractPlanNodeVisitor {
 
     private boolean m_hasLimitOffset = false;
-    private boolean m_isOrderDeterministic = true;
+    // TODO: set the flag instead of default value
+    private boolean m_isOrderDeterministic = false;
     private Set<ParameterValueExpression> m_pveSet = new HashSet<>();
 
     @Override
