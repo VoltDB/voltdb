@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 
 # Author: Phil Rosegay
 
