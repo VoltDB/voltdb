@@ -348,6 +348,10 @@ public class InitiatorMailbox implements Mailbox
         }
         else if (message instanceof RepairLogTruncationMessage) {
             m_repairLog.deliver(message);
+            if (message.m_sourceHSId != m_hsId) {
+                RepairLogTruncationMessage msg = (RepairLogTruncationMessage)message;
+                ((SpScheduler)m_scheduler).updateRepairLogTruncationHandle(msg.getHandle());
+            }
             return;
         }
         else if (message instanceof MigratePartitionLeaderMessage) {
