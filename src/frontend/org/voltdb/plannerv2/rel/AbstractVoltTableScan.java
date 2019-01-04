@@ -24,6 +24,8 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.TableScan;
 import org.voltdb.plannerv2.VoltTable;
 
+import com.google.common.base.Preconditions;
+
 /**
  * Relational expression representing a scan of a {@link VoltTable}.
  *
@@ -47,7 +49,7 @@ public abstract class AbstractVoltTableScan extends TableScan {
                                       RelOptTable table,
                                       VoltTable voltTable) {
         super(cluster, traitSet, table);
-        assert(voltTable != null) : "VoltTable is null";
+        Preconditions.checkNotNull(voltTable, "VoltTable cannot be null.");
         this.m_voltTable = voltTable;
     }
 

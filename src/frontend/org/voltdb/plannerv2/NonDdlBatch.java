@@ -103,7 +103,7 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
      */
     public NonDdlBatch setInferPartitioning(boolean value) {
         value = m_batchToDecorate.getTaskCount() == 1 && value;
-        if (m_inferPartitioning ^ value) {
+        if (m_inferPartitioning != value) {
             m_inferPartitioning = value;
             updateStatementPartitioning();
         }

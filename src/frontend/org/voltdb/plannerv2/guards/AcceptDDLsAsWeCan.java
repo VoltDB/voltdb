@@ -44,7 +44,10 @@ public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
             if (e.getCause() instanceof StackOverflowError) {
                 // Note - ethan - 12/28/2008:
                 // I think this is copied from NonDdlBatchCompiler and
-                // AdHocNTBase.compileAdHocSQL() by Lukai. It may be unnecessary.
+                // AdHocNTBase.compileAdHocSQL() by Lukai.
+                // It is necessary, and the purpose is to abort planning.
+                // There is a JUnit test case to check this.
+
                 // Throwing an exception that's not a PlannerFallbackException will abort the planning.
                 throw new PlanningErrorException("Encountered stack overflow error. " +
                         "Try reducing the number of predicate expressions in the query.");

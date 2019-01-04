@@ -45,6 +45,8 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
 
+import com.google.common.base.Preconditions;
+
 /**
  * Implementation of {@link TranslateableTable} representing a {@link org.voltdb.catalog.Table}.
  *
@@ -61,7 +63,7 @@ public class VoltTable implements TranslatableTable {
      * @param catTable the catalog table.
      */
     public VoltTable(org.voltdb.catalog.Table catTable) {
-        assert(catTable != null) : "Null org.voltdb.catalog.Table";
+        Preconditions.checkNotNull(catTable, "org.voltdb.catalog.Table cannot be null");
         m_catTable = catTable;
     }
 

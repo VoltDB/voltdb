@@ -47,6 +47,7 @@ import org.apache.calcite.util.Pair;
 import org.voltdb.plannerv2.metadata.VoltRelMetadataProvider;
 import org.voltdb.plannerv2.rules.PlannerRules;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 /**
@@ -138,7 +139,7 @@ public class VoltPlanner implements Planner {
 
     @Override public Pair<SqlNode, RelDataType> validateAndGetType(SqlNode sqlNode)
             throws ValidationException {
-        final SqlNode validatedNode = this.validate(sqlNode);
+        final SqlNode validatedNode = validate(sqlNode);
         final RelDataType type = m_validator.getValidatedNodeType(validatedNode);
         return Pair.of(validatedNode, type);
     }
@@ -152,7 +153,7 @@ public class VoltPlanner implements Planner {
             }
         }
         ensure(State.STATE_2_VALIDATED);
-        assert(m_validatedSqlNode != null);
+        Preconditions.checkNotNull(m_validatedSqlNode, "Validated SQL node cannot be null.");
 
         m_relRoot = m_sqlToRelConverter.convertQuery(
                 m_validatedSqlNode, false /*needs validation*/, true /*top*/);
@@ -199,7 +200,7 @@ public class VoltPlanner implements Planner {
      * @return the transformed relational expression tree.
      */
     public static RelNode transformHep(PlannerRules.Phase phase, RelNode rel) {
-        return transformHep(phase, false, rel);
+        return transformHep(phase, null, rel);
     }
 
     /**
@@ -211,10 +212,10 @@ public class VoltPlanner implements Planner {
      * @param rel       The root node
      * @return the transformed relational expression tree.
      */
-    public static RelNode transformHep(PlannerRules.Phase phase, boolean bottomUp, RelNode rel) {
+    public static RelNode transformHep(PlannerRules.Phase phase, HepMatchOrder matchOrder, RelNode rel) {
         final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
-        if (bottomUp) {
-            hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
+        if (matchOrder != null) {
+            hepProgramBuilder.addMatchOrder(matchOrder);
         }
         phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
         HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
@@ -233,19 +234,23 @@ public class VoltPlanner implements Planner {
     /**
      * Make sure the planner is at a certain state.
      *
-     * @param state the expected planner state.
+     * @param targetedState the expected planner state.
      */
-    private void ensure(State state) {
-        if (state == m_state) {
+    private void ensure(State targetedState) {
+        if (targetedState == m_state) {
             return;
         }
-        if (! state.allowTransitFromAny() && state.ordinal() < m_state.ordinal()) {
-            throw new IllegalArgumentException("Cannot move to " + state + " from " + m_state);
-        }
-        state.from(this);
+        Preconditions.checkArgument(targetedState.allowTransitFromAny()
+                                    || targetedState.ordinal() > m_state.ordinal(),
+                "Cannot move to " + targetedState + " from " + m_state);
+        targetedState.from(this);
     }
 
-    /** Stage of a statement in the query-preparation life cycle. */
+    /**
+     * Stage of a statement in the query-preparation life cycle.
+     * Adapted but different from {@link org.apache.calcite.prepare.PlannerImpl#State},
+     * removing some unused states.
+     */
     enum State {
         STATE_1_READY {
             @Override void from(VoltPlanner planner) {

@@ -23,18 +23,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.TableFunctionScan;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.logical.LogicalCorrelate;
-import org.apache.calcite.rel.logical.LogicalExchange;
-import org.apache.calcite.rel.logical.LogicalFilter;
-import org.apache.calcite.rel.logical.LogicalIntersect;
-import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rel.logical.LogicalMatch;
-import org.apache.calcite.rel.logical.LogicalMinus;
-import org.apache.calcite.rel.logical.LogicalProject;
-import org.apache.calcite.rel.logical.LogicalSort;
-import org.apache.calcite.rel.logical.LogicalUnion;
-import org.apache.calcite.rel.logical.LogicalValues;
 
 public class RelTraitShuttle extends RelShuttleImpl {
 
@@ -45,22 +33,9 @@ public class RelTraitShuttle extends RelShuttleImpl {
     }
 
     private <T extends RelNode> RelNode _visit(T visitor) {
-        RelNode newRel = visitor.copy(visitor.getTraitSet().plus(m_newTrait), visitor.getInputs());
+        RelTraitSet newTraitSet = visitor.getTraitSet().plus(m_newTrait);
+        RelNode newRel = visitor.copy(newTraitSet, visitor.getInputs());
         return visitChildren(newRel);
-    }
-
-    @Override public RelNode visit(RelNode other) {
-        RelTraitSet newTraitSet = other.getTraitSet().plus(m_newTrait);
-        RelNode newRel = other.copy(newTraitSet, other.getInputs());
-        return visitChildren(newRel);
-    }
-
-    @Override public RelNode visit(LogicalAggregate aggregate) {
-        return _visit(aggregate);
-    }
-
-    @Override public RelNode visit(LogicalMatch match) {
-        return _visit(match);
     }
 
     @Override public RelNode visit(TableScan scan) {
@@ -72,44 +47,7 @@ public class RelTraitShuttle extends RelShuttleImpl {
         return _visit(scan);
     }
 
-    @Override public RelNode visit(LogicalValues values) {
-        RelNode newValues = values.copy(values.getTraitSet().plus(m_newTrait), values.getInputs());
-        return newValues;
-    }
-
-    @Override public RelNode visit(LogicalFilter filter) {
-        return _visit(filter);
-    }
-
-    @Override public RelNode visit(LogicalProject project) {
-        return _visit(project);
-    }
-
-    @Override public RelNode visit(LogicalJoin join) {
-        return _visit(join);
-    }
-
-    @Override public RelNode visit(LogicalCorrelate correlate) {
-        return _visit(correlate);
-    }
-
-    @Override public RelNode visit(LogicalUnion union) {
-        return _visit(union);
-    }
-
-    @Override public RelNode visit(LogicalIntersect intersect) {
-        return _visit(intersect);
-    }
-
-    @Override public RelNode visit(LogicalMinus minus) {
-        return _visit(minus);
-    }
-
-    @Override public RelNode visit(LogicalSort sort) {
-        return _visit(sort);
-    }
-
-    @Override public RelNode visit(LogicalExchange exchange) {
-        return _visit(exchange);
+    @Override public RelNode visit(RelNode other) {
+        return _visit(other);
     }
 }
