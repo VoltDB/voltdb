@@ -30,6 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -57,7 +58,7 @@ public class RepairLog
     long m_lastMpHandle = Long.MAX_VALUE;
 
     // Truncation point
-    long m_truncationOrigin = 0L;
+    long m_truncationOrigin = -1L;
     long m_truncationHandle = Long.MIN_VALUE;
     final List<TransactionCommitInterest> m_txnCommitInterests = new CopyOnWriteArrayList<>();
 
@@ -178,7 +179,7 @@ public class RepairLog
                 return;
             }
             m_lastSpHandle = m.getSpHandle();
-            truncate(m.getTruncationHandle(), IS_SP, 0L);
+            truncate(m.getTruncationHandle(), IS_SP, -1L);
 
             //Cann't repair MigratePartitionLeader
             if ("@MigratePartitionLeader".equalsIgnoreCase(m.getStoredProcedureName())) {
@@ -199,7 +200,7 @@ public class RepairLog
                 return;
             }
 
-            truncate(m.getTruncationHandle(), IS_MP, 0L);
+            truncate(m.getTruncationHandle(), IS_MP, -1L);
             // only log the first fragment of a procedure (and handle 1st case)
             if (newMp) {
                 m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
@@ -222,7 +223,7 @@ public class RepairLog
                 return;
             }
 
-            truncate(ctm.getTruncationHandle(), IS_MP, 0L);
+            truncate(ctm.getTruncationHandle(), IS_MP, -1L);
             m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
             m_lastSpHandle = ctm.getSpHandle();
         }
@@ -236,10 +237,22 @@ public class RepairLog
         }
         else if (msg instanceof RepairLogTruncationMessage) {
             final RepairLogTruncationMessage truncateMsg = (RepairLogTruncationMessage) msg;
+            checkRepairLogTruncationMessage(truncateMsg.getHandle(), truncateMsg.m_sourceHSId);
             truncate(truncateMsg.getHandle(), IS_SP, truncateMsg.m_sourceHSId);
-            if (m_isLeader && m_HSId != truncateMsg.m_sourceHSId) {
-                repairLogger.info("XXX RepairLogTruncationMessage from " + CoreUtils.hsIdToString(truncateMsg.m_sourceHSId)
-                + " is executed on LEADER, truncating to  " + TxnEgo.txnIdToString(truncateMsg.getHandle()));
+        }
+    }
+
+    private void checkRepairLogTruncationMessage(long tHandle, long sourceHSId) {
+        if (m_isLeader) {
+            if (m_HSId != sourceHSId) {
+                VoltDB.crashLocalVoltDB("Leader got truncation: " + TxnEgo.txnIdToString(tHandle)
+                        + ", from replica, source: " + CoreUtils.hsIdToString(sourceHSId),
+                        true, null);
+            }
+        } else {
+            if (m_HSId == sourceHSId) {
+                VoltDB.crashLocalVoltDB("Replica got truncation: " + TxnEgo.txnIdToString(tHandle)
+                + ", from itself", true, null);
             }
         }
     }
