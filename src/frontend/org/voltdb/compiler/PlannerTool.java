@@ -210,13 +210,13 @@ public class PlannerTool {
         return plan;
     }
 
-    public synchronized CompiledPlan getCompiledPlanCalcite(SqlTask task, NonDdlBatch batch) {
+    public static synchronized CompiledPlan getCompiledPlanCalcite(SchemaPlus schemaPlus, SqlNode sqlNode) {
         // create VoltSqlValidator from SchemaPlus.
-        VoltSqlValidator validator = new VoltSqlValidator(m_schemaPlus);
+        VoltSqlValidator validator = new VoltSqlValidator(schemaPlus);
         // validate the task's SqlNode.
-        SqlNode validatedNode = validator.validate(task.getParsedQuery());
+        SqlNode validatedNode = validator.validate(sqlNode);
         // convert SqlNode to RelNode.
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, m_schemaPlus);
+        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, schemaPlus);
         RelRoot root = converter.convertQuery(validatedNode, false, true);
         root = root.withRel(converter.decorrelate(validatedNode, root.rel));
         // apply calcite and Volt logical rules
@@ -260,7 +260,7 @@ public class PlannerTool {
      * @return a planned statement.
      */
     public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
-        CompiledPlan plan = getCompiledPlanCalcite(task, batch);
+        CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
 
         CorePlan core = new CorePlan(plan, m_catalogHash);
         return new AdHocPlannedStatement(plan, core);
