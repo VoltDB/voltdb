@@ -107,7 +107,7 @@ public class StreamBlock {
      * Returns the total amount of bytes in the stream
      * @return
      */
-    long totalSize() {
+    public long totalSize() {
         return m_totalSize;
     }
 
@@ -165,7 +165,7 @@ public class StreamBlock {
      * Does not increment the refcount, uses the implicit 1 count
      * and should only be called once to get a container for pushing the data to disk
      */
-    BBContainer asBBContainer() {
+    public BBContainer asBBContainer() {
         m_buffer.b().order(ByteOrder.LITTLE_ENDIAN);
         m_buffer.b().putLong(0, startSequenceNumber());
         m_buffer.b().putInt(8, rowCount());
