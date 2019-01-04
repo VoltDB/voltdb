@@ -682,7 +682,7 @@ public class Inits {
             try {
                 String exportMgrName = "org.voltdb.export.ExportManager";
                 if (m_config.m_isEnterprise) {
-                    exportMgrName = "org.voltdb.export.E3ExportManager";
+                    exportMgrName = "org.voltdb.e3.E3ExportManager";
                 }
                 Class<?> exportMgrClass = Class.forName(exportMgrName);
                 Constructor<?> constructor = exportMgrClass.getConstructor(int.class, CatalogContext.class, HostMessenger.class);

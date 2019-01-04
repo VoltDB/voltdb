@@ -48,7 +48,7 @@ public class StreamBlock {
 
     public static final int HEADER_SIZE = 20; //sequence number + row count + uniqueId
 
-    StreamBlock(BBContainer cont, long startSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
+    public StreamBlock(BBContainer cont, long startSequenceNumber, int rowCount, long uniqueId, boolean isPersisted) {
         m_buffer = cont;
         m_startSequenceNumber = startSequenceNumber;
         m_rowCount = rowCount;
@@ -65,7 +65,7 @@ public class StreamBlock {
     /*
      * Call discard on the underlying buffer used for storage
      */
-    void discard() {
+    public void discard() {
         final int count = m_refCount.decrementAndGet();
         if (count == 0) {
             m_buffer.discard();
@@ -75,23 +75,23 @@ public class StreamBlock {
         }
     }
 
-    long startSequenceNumber() {
+    public long startSequenceNumber() {
         return m_startSequenceNumber;
     }
 
-    long lastSequenceNumber() {
+    public long lastSequenceNumber() {
         return m_startSequenceNumber + m_rowCount - 1;
     }
 
     /**
      * Returns the sequence number of the first unreleased export row in this block
      */
-    long unreleasedSequenceNumber()
+    public long unreleasedSequenceNumber()
     {
         return m_startSequenceNumber + m_releaseOffset + 1;
     }
 
-    int rowCount() {
+    public int rowCount() {
         return m_rowCount;
     }
 
@@ -99,7 +99,7 @@ public class StreamBlock {
         return m_uniqueId;
     }
 
-    long getTimestamp() {
+    public long getTimestamp() {
         return UniqueIdGenerator.getTimestampFromUniqueId(m_uniqueId) * 1000;
     }
 
@@ -120,7 +120,7 @@ public class StreamBlock {
     }
 
     // The sequence number for export rows up to which are being released
-    void releaseTo(long releaseSequenceNumber)
+    public void releaseTo(long releaseSequenceNumber)
     {
         assert(releaseSequenceNumber >= m_startSequenceNumber);
         m_releaseOffset = (int)(releaseSequenceNumber - m_startSequenceNumber);
@@ -146,7 +146,7 @@ public class StreamBlock {
      */
     private final boolean m_isPersisted;
 
-    BBContainer unreleasedContainer() {
+    public BBContainer unreleasedContainer() {
         m_refCount.incrementAndGet();
         return getRefCountingContainer(m_buffer.b().slice().asReadOnlyBuffer());
     }

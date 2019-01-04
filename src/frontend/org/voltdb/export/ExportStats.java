@@ -31,7 +31,7 @@ public class ExportStats extends ExportStatsBase {
 
     List<ExportStatsRow> m_stats;
 
-    ExportStats() {
+    public ExportStats() {
         super();
     }
 

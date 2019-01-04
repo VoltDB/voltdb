@@ -86,7 +86,7 @@ public interface ExportManagerInterface {
     public static class SetupException extends Exception {
         private static final long serialVersionUID = 1L;
 
-        SetupException(final String msg) {
+        public SetupException(final String msg) {
             super(msg);
         }
 
