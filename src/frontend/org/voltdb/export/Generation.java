@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,9 +17,11 @@
 package org.voltdb.export;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltdb.ExportStatsBase.ExportStatsRow;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -30,12 +32,13 @@ public interface Generation {
     public void acceptMastership(int partitionId);
     public void close(final HostMessenger messenger);
 
-    public long getQueuedExportBytes(int partitionId, String signature);
+    public List<ExportStatsRow> getStats(boolean interval);
     public void onSourceDone(int partitionId, String signature);
 
-    public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync);
-    public void pushEndOfStream(int partitionId, String signature);
-    public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds);
+    public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
+                                 long uniqueId, ByteBuffer buffer, boolean sync);
+    public void updateInitialExportStateToSeqNo(int partitionId, String signature,
+                                                boolean isRecover, long sequenceNumber);
 
     public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
 }

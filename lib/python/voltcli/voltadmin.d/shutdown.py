@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -20,13 +20,14 @@ from voltcli import checkstats
 from voltcli.checkstats import StatisticsProcedureException
 from voltcli import utility
 
+
 @VOLT.Command(
-    bundles = VOLT.AdminBundle(),
-    description = 'Shutdown the running VoltDB cluster.',
-    options = (
-        VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default = False),
-        VOLT.BooleanOption('-s', '--save', 'save', 'snapshot database contents', default = False),
-        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default = 120),
+    bundles=VOLT.AdminBundle(),
+    description='Shutdown the running VoltDB cluster.',
+    options=(
+        VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default=False),
+        VOLT.BooleanOption('-s', '--save', 'save', 'snapshot database contents', default=False),
+        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default=120),
     )
 )
 def shutdown(runner):
@@ -67,8 +68,8 @@ def shutdown(runner):
             if runner.opts.save:
                actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown --save".'
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
-               shutdown_params =  [zk_pause_txnid]
-               #save option, check more stats
+               shutdown_params = [zk_pause_txnid]
+               # save option, check more stats
                checkstats.check_dr_consumer(runner)
                runner.info('Starting resolution of external commitments...')
                checkstats.check_exporter(runner)
@@ -86,7 +87,7 @@ def shutdown(runner):
         except (KeyboardInterrupt, SystemExit):
             runner.info(stateMessage)
             runner.abort(actionMessage)
-    response = runner.call_proc('@Shutdown', columns, shutdown_params, check_status = False)
+    response = runner.call_proc('@Shutdown', columns, shutdown_params, check_status=False)
     print response
 
 

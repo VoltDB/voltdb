@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,12 +63,13 @@ class Topend {
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;
 
-    virtual int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) = 0;
     virtual void pushExportBuffer(
             int32_t partitionId,
             std::string signature,
             StreamBlock *block,
             bool sync) = 0;
+    // Not used right now and will be removed or altered after a decision has been made on how Schema changes
+    // are managed (they really don't belong in row buffers).
     virtual void pushEndOfStream(
             int32_t partitionId,
             std::string signature) = 0;
@@ -133,12 +134,11 @@ public:
 
     void crashVoltDB(voltdb::FatalException e);
 
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-
+    int64_t getFlushedExportBytes(int32_t partitionId, std::string signature);
     virtual void pushExportBuffer(int32_t partitionId, std::string signature, StreamBlock *block, bool sync);
     virtual void pushEndOfStream(int32_t partitionId, std::string signature);
 
-    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
     void pushPoisonPill(int32_t partitionId, std::string& reason, StreamBlock *block);
 

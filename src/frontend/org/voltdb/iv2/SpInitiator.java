@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -158,15 +158,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
         CommandLog commandLog = VoltDB.instance().getCommandLog();
         boolean asyncCommandLogEnabled = commandLog.isEnabled() && !commandLog.isSynchronous();
 
-        // DRProducerProtocol.NO_REPLICATED_STREAM_PROTOCOL_VERSION
-        // TODO get rid of createMpDRGateway and related code in the .1 release once
-        // the next compatible version doesn't use replicated stream
-
         // configure DR
         PartitionDRGateway drGateway = PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway, startAction);
         if (asyncCommandLogEnabled) {
             configureDurableUniqueIdListener(drGateway, true);
         }
+        m_repairLog.registerTransactionCommitInterest(drGateway);
 
         final PartitionDRGateway mpPDRG;
         if (createMpDRGateway) {
@@ -174,6 +171,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             if (asyncCommandLogEnabled) {
                 configureDurableUniqueIdListener(mpPDRG, true);
             }
+            m_repairLog.registerTransactionCommitInterest(mpPDRG);
         } else {
             mpPDRG = null;
         }
@@ -223,7 +221,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 if (!migratePartitionLeader && !m_initiatorMailbox.acceptPromotion()) {
                     tmLog.info(m_whoami
                             + "rejoining site can not be promoted to leader. Terminating.");
-                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
+                    // rejoining not completed. The node will be shutdown @RealVoltDB.hostFailed() anyway.
+                    // do not log extra fatal message.
+                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null, false);
                     return;
                 }
 
@@ -277,7 +277,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     exportLog.debug("Export Manager has been notified that local partition " +
                             m_partitionId + " to accept export stream mastership.");
                 }
-                ExportManager.instance().acceptMastership(m_partitionId);
+                ExportManager.instance().takeMastership(m_partitionId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);

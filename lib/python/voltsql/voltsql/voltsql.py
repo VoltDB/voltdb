@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -98,9 +98,9 @@ style = Style.from_dict({
 
 
 class VoltCli(object):
-    def __init__(self, server, port, user, password, credentials, kerberos, query_timeout, ssl, ssl_set,
+    def __init__(self, servers, port, user, password, credentials, kerberos, query_timeout, ssl, ssl_set,
                  output_format, output_skip_metadata, stop_on_error):
-        self.server = server
+        self.servers = servers
         self.port = port
         self.user = user
         self.password = password
@@ -115,7 +115,7 @@ class VoltCli(object):
 
         self.completer = VoltCompleter()
         self.refresher = VoltRefresher()
-        self.executor = VoltExecutor(self.server, self.port, self.user, self.password,
+        self.executor = VoltExecutor(self.servers, self.port, self.user, self.password,
                                      self.query_timeout, self.kerberos, self.ssl, self.ssl_set, self.credentials)
         self.multiline = False
         self.auto_refresh = True
@@ -183,7 +183,7 @@ class VoltCli(object):
         option_str = "--servers={server} --port={port_number}{user}{password}{credentials}" \
                      "{ssl}{output_format}{output_skip_metadata}{stop_on_error}{kerberos} " \
                      "--query-timeout={number_of_milliseconds}".format(
-            server=self.server, port_number=self.port,
+            server=self.servers, port_number=self.port,
             user=" --user=" + self.user if self.user else "",
             password=" --password=" + self.password if self.password else "",
             credentials=" --credentials=" + self.credentials if self.credentials else "",
@@ -202,15 +202,19 @@ class VoltCli(object):
             except EOFError:
                 break
             else:
-                if sql_cmd.lower() == "refresh":
+                stripped_cmd = sql_cmd.strip().lower().rstrip(';')
+                if stripped_cmd == "refresh":
                     # use "refresh" command to force a fresh
                     self.refresher.refresh(self.executor, self.completer, [])
                     continue
-                if sql_cmd.strip().lower() in ("quit", "quit;", "exit", "exit;"):
+                if stripped_cmd in ("quit", "exit"):
                     # exit
                     break
-                if sql_cmd.strip().lower() in ("help", "help;"):
+                if stripped_cmd == "help":
                     print(README)
+                    continue
+                if not stripped_cmd:
+                    # do nothing when empty line
                     continue
                 call(
                     "echo \"{sql_cmd}\" | sqlcmd {options}".format(
@@ -251,8 +255,8 @@ class RegisterWriterCommand(click.Command):
 
 
 @click.command(cls=RegisterWriterCommand)
-@click.option('-s', '--server', default='localhost',
-              help='VoltDB server to connect to.')
+@click.option('-s', '--servers', default='localhost',
+              help='VoltDB servers to connect to.')
 @click.option('-p', '--port', default=21212,
               help='Client port to connect to on cluster nodes.')
 @click.option('-u', '--user', default='',
@@ -279,15 +283,15 @@ class RegisterWriterCommand(click.Command):
               help='Causes the utility to stop immediately or continue after detecting an error. '
                    'In interactive mode, a value of "true" discards any unprocessed input and returns '
                    'to the command prompt. Default: true.')
-def cli(server, port, user, password, credentials, kerberos, query_timeout, ssl, ssl_set,
+def cli(servers, port, user, password, credentials, kerberos, query_timeout, ssl, ssl_set,
         output_format, output_skip_metadata, stop_on_error):
     if not sys.stdin.isatty():
         # if pipe from stdin
         sql_cmd = sys.stdin.read()
-        option_str = "--servers={server} --port={port_number}{user}{password}{credentials}" \
+        option_str = "--servers={servers} --port={port_number}{user}{password}{credentials}" \
                      "{ssl}{output_format}{output_skip_metadata}{stop_on_error}{kerberos} " \
                      "--query-timeout={number_of_milliseconds}".format(
-            server=server, port_number=port,
+            servers=servers, port_number=port,
             user=" --user=" + user if user else "",
             password=" --password=" + password if password else "",
             credentials=" --credentials=" + credentials if credentials else "",
@@ -305,7 +309,7 @@ def cli(server, port, user, password, credentials, kerberos, query_timeout, ssl,
             shell=True)
         return
 
-    volt_cli = VoltCli(server, port, user, password, credentials, kerberos, query_timeout, ssl, ssl_set,
+    volt_cli = VoltCli(servers, port, user, password, credentials, kerberos, query_timeout, ssl, ssl_set,
                        output_format, output_skip_metadata, stop_on_error)
     volt_cli.run_cli()
 

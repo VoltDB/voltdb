@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -160,7 +160,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(ILjava/lang/String;JJLjava/nio/ByteBuffer;Z)V");
+            "(ILjava/lang/String;JJJJLjava/nio/ByteBuffer;Z)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
@@ -173,16 +173,6 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     if (m_pushExportEOFMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportEOFMID != NULL);
-        throw std::exception();
-    }
-
-    m_getQueuedExportBytesMID = m_jniEnv->GetStaticMethodID(
-            m_exportManagerClass,
-            "getQueuedExportBytes",
-            "(ILjava/lang/String;)J");
-    if (m_getQueuedExportBytesMID == NULL) {
-        m_jniEnv->ExceptionDescribe();
-        assert(m_getQueuedExportBytesMID != NULL);
         throw std::exception();
     }
 
@@ -203,7 +193,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "pushDRBuffer",
-            "(IJJJJILjava/nio/ByteBuffer;)J");
+            "(IJJJJJILjava/nio/ByteBuffer;)J");
 
     m_pushPoisonPillMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
@@ -543,51 +533,43 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_decompressionClass);
 }
 
-int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
-    jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
-    int64_t retval = m_jniEnv->CallStaticLongMethod(
-            m_exportManagerClass,
-            m_getQueuedExportBytesMID,
-            partitionId,
-            signatureString);
-    m_jniEnv->DeleteLocalRef(signatureString);
-    return retval;
-}
-
 void JNITopend::pushExportBuffer(
         int32_t partitionId,
         string signature,
         StreamBlock *block,
         bool sync) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
+
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
             m_jniEnv->ExceptionDescribe();
             throw std::exception();
         }
-
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,
                 m_pushExportBufferMID,
                 partitionId,
                 signatureString,
-                block->uso(),
+                block->startExportSequenceNumber(),
+                block->getRowCountforExport(),
+                block->lastSpUniqueId(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
                 sync ? JNI_TRUE : JNI_FALSE);
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
-
         m_jniEnv->CallStaticVoidMethod(
-                        m_exportManagerClass,
-                        m_pushExportBufferMID,
-                        partitionId,
-                        signatureString,
-                        static_cast<int64_t>(0),
-                        NULL,
-                        NULL,
-                        sync ? JNI_TRUE : JNI_FALSE);
+                m_exportManagerClass,
+                m_pushExportBufferMID,
+                partitionId,
+                signatureString,
+                static_cast<int64_t>(0),
+                static_cast<int64_t>(0),
+                static_cast<int64_t>(0),
+                NULL,
+                NULL,
+                sync ? JNI_TRUE : JNI_FALSE);
     }
     m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {
@@ -626,6 +608,7 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
                 m_partitionDRGatewayClass,
                 m_pushDRBufferMID,
                 partitionId,
+                block->lastCommittedSpHandle(),
                 block->startDRSequenceNumber(),
                 block->lastDRSequenceNumber(),
                 block->lastSpUniqueId(),

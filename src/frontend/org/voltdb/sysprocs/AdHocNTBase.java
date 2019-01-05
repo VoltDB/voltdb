@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,9 +41,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
-import org.voltdb.newplanner.NonDdlBatch;
-import org.voltdb.newplanner.NonDdlBatchCompiler;
-import org.voltdb.newplanner.SqlBatch;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
@@ -83,7 +80,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Log ad hoc batch info
      * @param batch planned statement batch
      */
-    private void logBatch(final CatalogContext context,
+    void logBatch(final CatalogContext context,
                           final AdHocPlannedStmtBatch batch,
                           final Object[] userParams)
     {
@@ -250,41 +247,6 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
 
             adhocLog.error(msg + "\n" + stackTrace);
             throw new AdHocPlanningException(msg);
-        }
-    }
-
-    /**
-     * Plan and execute a batch of DML/DQL SQL. Any DDL has been filtered out at this point.
-     * @param batchIn the batch to run.
-     * @return the response for the client.
-     * @since 8.4
-     * @author Yiqun Zhang
-     */
-    protected CompletableFuture<ClientResponse> runNonDDLBatchThroughCalcite(SqlBatch batchIn) {
-        // TRAIL [Calcite:1] runNonDDLAdHocThroughCalcite
-        NonDdlBatch batch = new NonDdlBatch(batchIn);
-        NonDdlBatchCompiler compiler = new NonDdlBatchCompiler(batch);
-        AdHocPlannedStmtBatch plannedStmtBatch;
-        try {
-            plannedStmtBatch = compiler.compile();
-        } catch (AdHocPlanningException ex) {
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, ex.getLocalizedMessage());
-        }
-
-        if (adhocLog.isDebugEnabled()) {
-            logBatch(batch.m_catalogContext, plannedStmtBatch, batch.getUserParameters());
-        }
-        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
-        if (traceLog != null) {
-            traceLog.add(() -> VoltTrace.endAsync("planadhoc", getClientHandle()));
-        }
-
-        // No explain mode and swap tables now.
-        try {
-            return createAdHocTransaction(plannedStmtBatch, false);
-        } catch (VoltTypeException vte) {
-            String msg = "Unable to execute AdHoc SQL statement(s): " + vte.getMessage();
-            return makeQuickResponse(ClientResponse.GRACEFUL_FAILURE, msg);
         }
     }
 
@@ -481,7 +443,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
      * Take a set of adhoc plans and pass them off to the right transactional
      * adhoc variant.
      */
-    private final CompletableFuture<ClientResponse> createAdHocTransaction(
+    final CompletableFuture<ClientResponse> createAdHocTransaction(
             final AdHocPlannedStmtBatch plannedStmtBatch,
             final boolean isSwapTables)
                     throws VoltTypeException

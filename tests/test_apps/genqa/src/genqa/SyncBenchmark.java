@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -136,7 +136,7 @@ public class SyncBenchmark
             final long duration        = apph.longValue("duration");
             final String servers       = apph.stringValue("servers");
             final int port             = apph.intValue("port");
-            final int poolSize         = apph.intValue("pool-size");
+            final int poolSize         = apph.intValue("poolsize");
             final String procedure     = apph.stringValue("procedure");
             final long wait            = apph.intValue("wait");
             final String csv           = apph.stringValue("statsfile");
@@ -221,6 +221,10 @@ public class SyncBenchmark
             // Dump statistics to a CSV file
             Con.saveStatistics(csv);
 
+            if (TrackingResults.get(0) == 0 ) {
+                System.err.println("ERROR no transactions succeeded");
+                System.exit(1);
+            }
             Con.close();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -228,8 +232,9 @@ public class SyncBenchmark
         }
         catch(Exception x)
         {
-            System.out.println("Exception: " + x);
+            System.out.println("ERROR Exception: " + x);
             x.printStackTrace();
+            System.exit(1);
         }
     }
 }

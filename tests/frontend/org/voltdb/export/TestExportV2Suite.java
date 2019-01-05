@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,8 +30,10 @@ import java.util.Map;
 import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -99,7 +101,21 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             client.callProcedure("Insert", params);
             client.callProcedure("Insert", paramsGrp);
         }
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
+    }
+
+    public void testExportControlParams() throws Exception {
+        System.out.println("testFlowControl");
+        final Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
+
+        String[] targets = {"custom"};
+        ClientResponse r = client.callProcedure("@ExportControl", "ALLOW_NULLS", targets, "release");
+        assert(r.getStatus() == ClientResponse.SUCCESS);
+        assert(r.getResults()[0].getRowCount() == 0);
     }
 
     public TestExportV2Suite(final String name) {
@@ -146,7 +162,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
         /*
          * compile the catalog all tests start with
          */
-        config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, k_factor,
+        config = new LocalCluster("export-ddl-cluster-rep.jar", 6, 3, k_factor,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
         config.setMaxHeap(1024);

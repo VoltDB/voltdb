@@ -78,6 +78,8 @@
 	<classpathentry kind="lib" path="lib/calcite-server-1.17.0.jar" sourcepath="lib/calcite-server-1.17.0-sources.jar"/>
 	<classpathentry kind="lib" path="lib/calcite-linq4j-1.17.0.jar" sourcepath="lib/calcite-linq4j-1.17.0-sources.jar"/>
 	<classpathentry kind="lib" path="lib/avatica-core-1.12.0.jar" sourcepath="lib/avatica-core-1.12.0-sources.jar"/>
+	<classpathentry kind="lib" path="lib/janino-2.7.6.jar"/>
+	<classpathentry kind="lib" path="lib/commons-compiler-2.7.6.jar"/>
 	<!-- zkclient is used for tests only -->
 	<classpathentry kind="lib" path="third_party/java/jars/zkclient-0.10.jar"/>
 	<!-- regular zookeeaper server 3.4.10 is used for tests only -->
@@ -94,5 +96,7 @@
 	<classpathentry kind="lib" path="lib/jetty-util-9.3.21.v20170918.jar"/>
 	<classpathentry kind="lib" path="lib/jetty-servlet-9.3.21.v20170918.jar"/>
 	<classpathentry kind="lib" path="lib/jetty-security-9.3.21.v20170918.jar"/>
+	<classpathentry kind="lib" path="lib/netty-tcnative-boringssl-static-2.0.20.Final.jar"/>
+	<classpathentry kind="lib" path="lib/netty-all-4.1.32.Final.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,11 +26,14 @@ package org.voltdb;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.HashinatorLite;
+import org.voltdb.client.ClientUtils;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestExpectedData;
@@ -38,6 +41,7 @@ import org.voltdb.export.TestExportBaseSocketExport;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -83,7 +87,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
      * @param tuple2 Expected tuple count on partition 1
      * @throws Exception if an assumption is violated or the test times out
      */
-    private void checkForExpectedStats(Client client, String tableName, int mem1, int tuple1, int mem2, int tuple2) throws Exception {
+    private void checkForExpectedStats(Client client, String tableName, int mem1, int tuple1, int mem2, int tuple2, boolean isPersistent) throws Exception {
         boolean passed = false;
         boolean zpassed, opassed;
         zpassed = opassed = false;
@@ -91,9 +95,10 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         VoltTable stats = null;
         long st = System.currentTimeMillis();
         //Wait 10 mins only
-        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        long maxWait = TimeUnit.MINUTES.toMillis(10);
+        long end = System.currentTimeMillis() + maxWait;
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            stats = client.callProcedure("@Statistics", isPersistent ? "table" : "export", 0).getResults()[0];
             boolean passedThisTime = false;
             long ctime = System.currentTimeMillis();
             if (ctime > end) {
@@ -101,22 +106,25 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
                 System.out.println(stats);
                 break;
             }
-            if (ctime - st > (3 * 60 * 1000)) {
+            if (ctime - st > maxWait) {
                 System.out.println(stats);
                 st = System.currentTimeMillis();
             }
             while (stats.advanceRow()) {
-                if (stats.getString("TABLE_NAME").equalsIgnoreCase(tableName)) {
+                String memoryColumnName = isPersistent ? "TUPLE_ALLOCATED_MEMORY" : "TUPLE_PENDING";
+                String tableColumnName = isPersistent ? "TABLE_NAME": "SOURCE";
+                if (stats.getString(tableColumnName).equalsIgnoreCase(tableName)) {
                     if (stats.getLong("PARTITION_ID") == 0 && !zpassed) {
                         if (tuple1 == stats.getLong("TUPLE_COUNT")
-                                && ((mem1 == SKIP_MEMORY_CHECK) || (mem1 == stats.getLong("TUPLE_ALLOCATED_MEMORY")))) {
+                                && ((mem1 == SKIP_MEMORY_CHECK) || (mem1 == stats.getLong(memoryColumnName)))) {
                             zpassed = true;
                             System.out.println("Partition Zero passed.");
                         }
+                        System.out.println("tuple1:"+tuple1+" TUPLE_COUNT:"+stats.getLong("TUPLE_COUNT")+" mem1:"+mem1+" "+memoryColumnName+":"+stats.getLong(memoryColumnName));
                     }
                     if (stats.getLong("PARTITION_ID") == 1 && !opassed) {
                         if (tuple2 == stats.getLong("TUPLE_COUNT")
-                                && ((mem2 == SKIP_MEMORY_CHECK) || (mem2 == stats.getLong("TUPLE_ALLOCATED_MEMORY")))) {
+                                && ((mem2 == SKIP_MEMORY_CHECK) || (mem2 == stats.getLong(memoryColumnName)))) {
                             opassed = true;
                             System.out.println("Partition One passed.");
                         }
@@ -167,11 +175,11 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         callAdHocExpectSuccess(client,
                 "INSERT INTO tuple_count_persist VALUES ( 2 ); " +
                 "INSERT INTO tuple_count_export VALUES ( 2 );");
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         // Verify that table stats show both insertions.
-        checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1);
-        checkForExpectedStats(client, "tuple_count_export", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1);
+        checkForExpectedStats(client, "tuple_count_persist", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, true);
+        checkForExpectedStats(client, "tuple_count_export", SKIP_MEMORY_CHECK, 0, SKIP_MEMORY_CHECK, 1, false);
 
         // Memory statistics need to show the persistent table but not the export.
         // We can assume no other tables have tuples since any catalog update clears the stats.
@@ -183,6 +191,61 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         callAdHocExpectSuccess(client, "DROP TABLE tuple_count_persist; DROP STREAM tuple_count_export;");
     }
 
+    public void testStatisticsWithCatlogAndDeploymentUpdate() throws Exception {
+        System.out.println("\n\nTESTING testStatisticsWithCatlogAndDeploymentUpdate STATISTICS\n\n\n");
+        Client client = getFullyConnectedClient();
+
+        callAdHocExpectSuccess(client,
+                "CREATE STREAM tuple_count_export PARTITION ON COLUMN foobar EXPORT TO TARGET tuple_count_export ( foobar SMALLINT NOT NULL );");
+
+        VoltTable stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("ACTIVE".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+
+        // drop stream
+        callAdHocExpectSuccess(client, "DROP STREAM tuple_count_export;");
+        stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("DROPPED".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+
+        // recreate stream
+        callAdHocExpectSuccess(client,
+                "CREATE STREAM tuple_count_export PARTITION ON COLUMN foobar EXPORT TO TARGET tuple_count_export ( foobar SMALLINT NOT NULL );");
+        stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("ACTIVE".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+
+        // update deployment, no TUPLE_COUNT_EXPORT connector
+        String deploymentURL = Configuration.getPathToCatalogForTest("stats_no_connector.xml");
+        String depBytes = new String(ClientUtils.fileToBytes(new File(deploymentURL)), Constants.UTF8ENCODING);
+        client.callProcedure("@UpdateApplicationCatalog", null, depBytes);
+        stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("DROPPED".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+
+        // add connector back
+        deploymentURL = Configuration.getPathToCatalogForTest("stats_full.xml");
+        depBytes = new String(ClientUtils.fileToBytes(new File(deploymentURL)), Constants.UTF8ENCODING);
+        client.callProcedure("@UpdateApplicationCatalog", null, depBytes);
+        stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("ACTIVE".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+    }
     //
     // Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
     // when the snapshot is restored
@@ -217,18 +280,20 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
+//        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
+        checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
         System.out.println("Quiesce client....");
         quiesce(client);
         System.out.println("Quiesce done....");
 
-        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16);
+//        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
+        checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         //Resume will put flg on onserver export to start consuming.
         startListener();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
 
         for (int i = 40; i < 50; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -242,14 +307,9 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
             assertEquals(responseGrp.getStatus(), ClientResponse.SUCCESS);
         }
         client.drain();
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         m_config.shutDown();
-        if (isNewCli) {
-            m_config.startUp(true);
-        } else {
-            m_config.startUp(false);
-        }
-
+        m_config.startUp(false);
         client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
@@ -260,11 +320,11 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         client.drain();
 
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
 
         //Allocated memory should go to 0
         //If this is failing watch out for ENG-5708
-        checkForExpectedStats(client, "NO_NULLS", 0, 24, 0, 16);
+        checkForExpectedStats(client, "NO_NULLS", 0, 24, 0, 16, false);
     }
 
     public TestExportStatsSuite(final String name) {
@@ -298,29 +358,31 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         wireupExportTableToSocketExport("ALLOW_NULLS_GRP");
         wireupExportTableToSocketExport("NO_NULLS_GRP");
         wireupExportTableToSocketExport("tuple_count_export");
-
         project.addProcedures(PROCEDURES);
 
-        // JNI, single server
-        // Use the cluster only config. Multiple topologies with the extra catalog for the
-        // Add drop tests is harder. Restrict to the single (complex) topology.
-        //
-        //        config = new LocalSingleProcessServer("export-ddl.jar", 2,
-        //                                              BackendTarget.NATIVE_EE_JNI);
-        //        config.compile(project);
-        //        builder.addServerConfig(config);
-
-
-        /*
-         * compile the catalog all tests start with
-         */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 1, KFACTOR,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config, false);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("stats_full.xml"));
 
+
+        // A catalog change that enables snapshots
+        config = new LocalCluster("export-ddl-cluster-rep2.jar",  2, 1, KFACTOR,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+        project = new VoltProjectBuilder();
+        project.setSecurityEnabled(true, true);
+        project.addRoles(GROUPS);
+        project.addUsers(USERS);
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl-with-target.sql"));
+        // needed for tuple count test
+        project.setUseDDLSchema(true);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("stats_no_connector.xml"));
         return builder;
     }
 }

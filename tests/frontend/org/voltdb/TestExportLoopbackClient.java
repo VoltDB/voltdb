@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -93,7 +93,7 @@ public class TestExportLoopbackClient extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         response = client.callProcedure("@AdHoc", "select count(*) from LOOPBACK_NO_NULLS");
         assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         assertEquals(response.getResults()[0].asScalarLong(),10);
@@ -107,7 +107,7 @@ public class TestExportLoopbackClient extends TestExportBaseSocketExport {
         }
         quiesce(client);
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         response = client.callProcedure("@AdHoc", "select count(*) from LOOPBACK_NO_NULLS");
         assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         assertEquals(response.getResults()[0].asScalarLong(),10);
@@ -135,7 +135,7 @@ public class TestExportLoopbackClient extends TestExportBaseSocketExport {
         quiesce(client);
 
         //We should consume all again.
-        waitForStreamedAllocatedMemoryZero(client);
+        waitForStreamedTargetAllocatedMemoryZero(client);
         response = client.callProcedure("@AdHoc", "select count(*) from LOOPBACK_NO_NULLS");
         assertEquals(response.getStatus(), ClientResponse.SUCCESS);
         assertEquals(response.getResults()[0].asScalarLong(),20);

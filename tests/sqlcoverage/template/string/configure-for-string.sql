@@ -25,8 +25,8 @@
 {@onefun = ""}
 --{@onefun = "LOWER"}
 {@optionalfn = "_stringfun"}
-{@plus10 = " + '10'"}  -- Addition here is interpreted as concatenation
-{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
+{@plus10 = " || '10'"}  -- 'plus' here is interpreted as concatenation
+{@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "VCHAR"}

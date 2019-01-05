@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -385,11 +385,6 @@ public class InitiatorMailbox implements Mailbox
         Long newLeaderHSId = db.getCartographer().getHSIDForPartitionHost(hostId, pid);
         if (newLeaderHSId == null || newLeaderHSId == m_hsId) {
             tmLog.warn(String.format("@MigratePartitionLeader the partition leader is already on the host %d or the host id is invalid.", hostId));
-            return;
-        }
-
-        //one more check to make sure all the hosts are up before any changes are made
-        if (!db.isClusterComplete()) {
             return;
         }
 

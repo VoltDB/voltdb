@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -114,6 +114,7 @@ public class TestLikeQueries extends TestCase {
             new LikeTestData("âxxxéyy", "âxxx%"),
             new LikeTestData("â🀲x一xxéyyԱ", "â🀲x一%"),
             new LikeTestData("â🀲x", "â🀲%"),
+            new LikeTestData("ENG-14485", "ENG-14485%%"),
         };
 
     static final LikeTest[] tests = new LikeTest[] {
@@ -137,6 +138,13 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("â🀲x_xxéyyԱ", 1),
             new LikeTest("â🀲x一xxéyy_", 1),
             new LikeTest("â🀲x一xéyyԱ", 0),
+            // ENG-14485 handle two or more consecutive '%' characters
+            new LikeTest("ENG-14485%%%", 1),
+            new LikeTest("%%ENG-14485", 1),
+            new LikeTest("EN%%G-14485", 1),
+            new LikeTest("ENG-144__%%", 1),
+            new LikeTest("%%%", rowData.length),
+
             new NotLikeTest("aaa%", rowData.length - 1),
             new EscapeLikeTest("ââ🀲x一xxéyyԱ", 1, "â"),
             new EscapeLikeTest("abccccâ%", 1, "â"),

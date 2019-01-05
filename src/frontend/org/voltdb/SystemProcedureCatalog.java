@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -148,7 +148,7 @@ public class SystemProcedureCatalog {
 
     public static final ImmutableMap<String, Config> listing;
 
-    static {                                                                                            // SP     RO     Every  Param ParamType           PRO    killDR skipDR replica-ok durable allowedInShutdown transactional restartable
+    static {                                                                                                                    // SP     RO     Every  Param ParamType           PRO    killDR skipDR replica-ok durable allowedInShutdown transactional restartable
         // special-case replica acceptability by DR version
         ImmutableMap.Builder<String, Config> builder = ImmutableMap.builder();
         builder.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, 0,    VoltType.INVALID,   false, false, false, false,     true,   false,            true,         true  ));
@@ -156,6 +156,7 @@ public class SystemProcedureCatalog {
         builder.put("@AdHoc_RO_MP",             new Config("org.voltdb.sysprocs.AdHoc_RO_MP",              false, true,  false, 0,    VoltType.INVALID,   false, false, false, true,      false,  false,            true,         true  ));
         builder.put("@MigratePartitionLeader",  new Config("org.voltdb.sysprocs.MigratePartitionLeader",   true,  true,  false, 0,    VoltType.BIGINT,    false, true,  true,  false,     false,  false,            true,         false  ));
         builder.put("@AdHoc_RO_SP",             new Config("org.voltdb.sysprocs.AdHoc_RO_SP",              true,  true,  false, 0,    VoltType.VARBINARY, false, false, false, true,      false,  false,            true,         true  ));
+        builder.put("@JStack",                  new Config(null,                                           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true,             true,         false ));
         builder.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",                    false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
         builder.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",                   false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
         builder.put("@Quiesce",                 new Config("org.voltdb.sysprocs.Quiesce",                  false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  true ,            true,         false ));
@@ -199,6 +200,7 @@ public class SystemProcedureCatalog {
         builder.put("@AdHocSpForTest",          new Config("org.voltdb.sysprocs.AdHocSpForTest",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        true  ));
         builder.put("@AdHocLarge",              new Config("org.voltdb.sysprocs.AdHocLarge",               false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        true  ));
         builder.put("@StopNode",                new Config(null,                                           true,  false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
+        builder.put("@PrepareStopNode",         new Config(null,                                           true,  false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
         builder.put("@Explain",                 new Config("org.voltdb.sysprocs.Explain",                  false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
         builder.put("@ExplainProc",             new Config("org.voltdb.sysprocs.ExplainProc",              false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
         builder.put("@ExplainView",             new Config("org.voltdb.sysprocs.ExplainView",              false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            false,        false ));
@@ -219,7 +221,9 @@ public class SystemProcedureCatalog {
                                                                                                            false, false, false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,  false,            false,        false ));
         builder.put("@NibbleDeleteSP",          new Config("org.voltdb.sysprocs.NibbleDeleteSP",           true,  false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            true,         true ));
         builder.put("@NibbleDeleteMP",          new Config("org.voltdb.sysprocs.NibbleDeleteMP",           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      true,   false,            true,         true ));
-        builder.put("@LowImpactDeleteNT",       new Config("org.voltdb.sysprocs.LowImpactDeleteNT",        true, false, false, 0,    VoltType.INVALID,   false, false, false, true,      false,  false,            false,        false ));
+        builder.put("@LowImpactDeleteNT",       new Config("org.voltdb.sysprocs.LowImpactDeleteNT",        true,  false, false, 0,    VoltType.INVALID,   false, false, false, true,      false,  false,            false,        false ));
+        builder.put("@ExportControl",           new Config("org.voltdb.sysprocs.ExportControl",            false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,  false,            true,         false ));
+
         listing = builder.build();
     }
 }

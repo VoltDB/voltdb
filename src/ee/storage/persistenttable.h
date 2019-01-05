@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -698,9 +698,6 @@ private:
 
     AbstractDRTupleStream* getDRTupleStream(ExecutorContext* ec) {
         if (isReplicatedTable()) {
-            if (ec->drStream()->drProtocolVersion() >= DRTupleStream::NO_REPLICATED_STREAM_PROTOCOL_VERSION) {
-                return (ec->m_partitionId == 0) ? ec->drStream() : NULL;
-            }
             return ec->drReplicatedStream();
         }
         return ec->drStream();

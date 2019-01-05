@@ -26,6 +26,7 @@ import datetime
 
 STATS_SERVER = 'volt2'
 NaN = float("nan")
+MASTER = 'master'
 
 # These are the "Tableau 20" colors as RGB.
 COLORS = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),
@@ -212,11 +213,13 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
     pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate, series)
 
     toc = dict()
-    branches_sort = sorted(plot_data.keys())
 
-    if 'master' in branches_sort:
-        branches_sort.remove('master')
-        branches_master_first = ['master'] + branches_sort
+    # if MASTER != 'master':
+    #     branches_sort.remove('master')
+
+    if MASTER in branches_sort:
+        branches_sort.remove(MASTER)
+        branches_master_first = [MASTER] + branches_sort
     else:
         branches_master_first = branches_sort
         print "WARN: has no master: %s" % title
@@ -247,8 +250,8 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             bdata = Bdata(branch=b, title=title, chart=k, color=None, seriescolor=branch_colors[b][0],
                           seriesmarker=branch_colors[b][1], xdata=u[0], ydata=u[1],
                           last=u[1][-1], avg=np.average(u[1]), median=np.median(u[1]), stdev=np.std(u[1]), ma=[NaN],
-                          ama=NaN, mstd=[NaN],
-                          pctmadiff=NaN, mnstddiff=NaN, failed=None, bgcolor=None)
+                          ama=NaN, mstd=[NaN], mastd=NaN, pctmadiff=NaN, mnstddiff=NaN, failed=None, bgcolor=None,
+                          pctmaxdev=NaN, mnstdmadiff=NaN)
 
             analyze.append(bdata)
 
@@ -256,7 +259,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             pl.plot(u[0], u[1], bdata.seriescolor, bdata.seriesmarker, bdata.branch, '-')
 
             # master is processed first, but set this up in case there is no master data for a chart
-            master = analyze[-1]  # remember master
+            master = analyze[0]  # remember master
 
             MOVING_AVERAGE_DAYS = 10
 
@@ -265,13 +268,12 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             if len(ma) > MOVING_AVERAGE_DAYS:
                 pl.plot(bdata.xdata, ma, bdata.seriescolor, None, None, ":")
 
-            if b == 'master':
+            if b == MASTER:
                 # if we have enough data compute moving average and moving std dev
                 # std is std of data correspoinding to each ma window
                 # nb. std is used only in the charts for the 2-sigma line
                 # ama is mean of moving average population
                 # mstd is std of moving average all values
-
 
                 if len(ma) >= MOVING_AVERAGE_DAYS:
 
@@ -285,13 +287,13 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                         # increasing is bad
                         bestpoint = np.nanmin(ma)
                         localminormax = (bdata.xdata[np.nanargmin(ma)], bestpoint)
-                        if b == 'master' and bdata.ma[last] > bdata.median * 1.05:
+                        if b == MASTER and bdata.ma[last] > bdata.median * 1.05:
                             failed = 1
                     else:
                         # decreasing is bad
                         bestpoint = np.nanmax(ma)
                         localminormax = (bdata.xdata[np.nanargmax(ma)], bestpoint)
-                        if b == 'master' and bdata.ma[last] < bdata.median * 0.95:
+                        if b == MASTER and bdata.ma[last] < bdata.median * 0.95:
                             failed = 1
 
                     # plot the 2-sigma line
@@ -307,8 +309,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     pl.ax.annotate(r"20%", xy=(bdata.xdata[last], twntypercent[last]), xycoords='data', xytext=(20, 0),
                                    textcoords='offset points', ha='right', color=bdata.seriescolor, alpha=0.5)
 
-                    #pctmaxdev = (bestpoint - master.ma[last]) / bestpoint * 100. * polarity  # pct diff min/max
-                    pctmaxdev = (ama - master.ma[last]) / ama * 100. * polarity  # pct diff ma deviation
+                    pctmaxdev = (bestmapoint- master.ma[last]) / bestmapoint * 100. * polarity  # pct diff min/max
                     # pctmedian = (master.ma[last] - bdata.median) / master.median * 100.  #pct diff median
                     pctmadiff = (master.ma[last] - bdata.ydata[last]) / master.ma[last] * 100. * polarity  # pct diff last vs ma mean
                     mnstddiff = (master.ma[last] - bdata.ydata[last]) / master.stdev * polarity  # no std diff last vs ma
@@ -350,7 +351,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     bdata.update(failed=failed, bgcolor=color)
 
                     # annotate value of the best point aka localminormax
-                    pl.ax.annotate("%.2f" % bestpoint, xy=localminormax, xycoords='data', xytext=(0, -10 * polarity),
+                    pl.ax.annotate("%.2f" % bestmapoint, xy=localminormax, xycoords='data', xytext=(0, -10 * polarity),
                                    textcoords='offset points', ha='center', color=bdata.seriescolor, alpha=0.5)
 
                     # annotate value and percent vs reference point of most recent moving average on master
@@ -362,7 +363,8 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                                    textcoords='offset points', ha='left', alpha=0.5)
 
                     # annotation with moving average values
-                    # bdata.update(pctmedian=pctmedian, bestpoint=bestpoint, pctmaxdev=pctmaxdev)
+                    # bdata.update(pctmedian=pctmedian, bestmapoint=bestmapoint, pctmaxdev=pctmaxdev)
+
                     # raw data to the chart
                     pl.ax.annotate('%s %s: %s n: %d last: %.2f avg: %.2f sdev: %.2f (%.2f%% avg)  (%.2f%% ma) ma: %.2f'
                                    ' (%+.2f%% of bestma) (%+.2f%% of lastma) (%+.2f #stdev) (%.2f  #mstd) avg(ma):'
@@ -378,8 +380,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             else:
                 # branches comparing to master (no moving average component)
                 if master.ama is not NaN:
-                    pctmadiff = (master.ama - bdata.ydata[
-                        last]) / master.ama * 100. * polarity  # pct diff last vs ma mean
+                    pctmadiff = (master.ama - bdata.ydata[last]) / master.ama * 100. * polarity  # pct diff last vs ma mean
                     mnstddiff = (master.ama - bdata.ydata[last]) / master.stdev * polarity  # no std diff last vs ma
 
                     color = 'black'
@@ -390,14 +391,22 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     if mnstddiff >= 2.0:
                         color = 'red'
 
+                    bdata.update(ma=ma, ama=ama, mstd=mstd, mastd=mastd)
+
                     bdata.update(bgcolor=color, pctmadiff=pctmadiff, mnstddiff=mnstddiff)
 
-                pl.ax.annotate(
-                    bdata.seriesmarker + ' %s: %s n: %d last %.2f avg: %.2f sdev: %.2f (%.2f%% of ma) no-std-master-avg(ma): %.2f pct-master-avg(ma): %.2f' %
-                    (bdata.branch, bdata.bgcolor, len(bdata.ydata), bdata.ydata[last], bdata.avg, bdata.stdev,
-                     bdata.stdev / master.ama * 100., bdata.mnstddiff, bdata.pctmadiff),
-                    xy=(APX, APY * bn), xycoords='figure points', horizontalalignment='left', verticalalignment='top',
-                    color=bdata.seriescolor, fontsize=10, alpha=1.0)
+                pl.ax.annotate('%s %s: %s n: %d last: %.2f avg: %.2f sdev: %.2f (%.2f%% avg)  (%.2f%% ma) ma: %.2f'
+                               ' (%+.2f%% of bestma) (%+.2f%% of lastma) (%+.2f #stdev) (%.2f  #mstd) avg(ma):'
+                               ' %.2f std(ma): %.2f' % (
+                                   bdata.seriesmarker, bdata.branch, bdata.bgcolor, len(bdata.ydata),
+                                   bdata.ydata[last],
+                                   bdata.avg, bdata.stdev, bdata.stdev / bdata.avg * 100.,
+                                   bdata.stdev / bdata.ma[last] * 100.,
+                                   bdata.ma[last], bdata.pctmaxdev, bdata.pctmadiff, bdata.mnstddiff, bdata.mnstdmadiff, bdata.ama,
+                                   bdata.mastd),
+                               xy=(APX, APY * bn),
+                               xycoords='figure points', horizontalalignment='left', verticalalignment='top',
+                               color=bdata.seriescolor, fontsize=10, alpha=1.0)
 
         if len(analyze) == 1:
             pl.ax.annotate(datetime.datetime.today().strftime("%Y/%m/%d %H:%M:%S"), xy=(.20, .95),
@@ -575,7 +584,7 @@ def moving_average(x, n, type='simple'):
     """
 
     if len(x) < n:
-        return ([], NaN, [], NaN)
+        return ([NaN], NaN, [NaN], NaN)
 
     x = np.asarray(x)
     if type == 'simple':
@@ -619,20 +628,25 @@ def main():
         exit(-1)
 
     if not os.path.exists(sys.argv[1]):
+        print (os.getcwd())
         print sys.argv[1], "does not exist"
-        exit(-1)
+        os.mkdir(sys.argv[1])
+        #exit(-1)
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
     ndays = 2000
     if len(sys.argv) >= 4:
         ndays = int(sys.argv[3])
+    if len(sys.argv) >= 5:
+        global MASTER
+        MASTER = str(sys.argv[4])
     width = WIDTH
     height = HEIGHT
-    if len(sys.argv) >= 5:
-        width = int(sys.argv[4])
     if len(sys.argv) >= 6:
-        height = int(sys.argv[5])
+        width = int(sys.argv[5])
+    if len(sys.argv) >= 7:
+        height = int(sys.argv[6])
 
     # show all the history
     (stats, mindate, maxdate) = get_stats(STATS_SERVER, 21212, ndays)
@@ -687,6 +701,7 @@ def main():
                 analyze.append(tuple(
                     [branch['branch'], branch['bgcolor'], branch['title'], master['last'], master['ma'][last], master['stdev'], branch['last'],
                      branch['mnstddiff'], branch['pctmadiff']]))
+
             if toc:
                 tocs.update(toc)
 
