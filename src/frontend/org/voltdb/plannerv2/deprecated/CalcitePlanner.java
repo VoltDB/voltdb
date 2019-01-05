@@ -68,13 +68,8 @@ import com.google.common.collect.ImmutableList;
  * Struct field access     -->  RexFieldAccess
  * Function call           -->  RexCall
  * Window expression       -->  RexOver
-<<<<<<< HEAD:src/frontend/org/voltdb/newplanner/CalcitePlanner.java
- *
- * # traits
-=======
  *
  * # Traits
->>>>>>> calcite:src/frontend/org/voltdb/plannerv2/deprecated/CalcitePlanner.java
  * Defined by the {@link org.apache.calcite.plan.RelTrait} interface
  * Traits are used to validate plan output
  * {@link org.apache.calcite.plan.Convention}

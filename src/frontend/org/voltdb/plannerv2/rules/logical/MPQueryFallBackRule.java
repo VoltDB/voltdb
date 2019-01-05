@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,7 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.newplanner.rules.logical;
+package org.voltdb.plannerv2.rules.logical;
+
+import java.util.List;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -32,16 +34,14 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.sql.SqlKind;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLCalc;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
-
-import java.util.List;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 /**
  * Rules that fallback a query if it is multi-partitioned.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public class MPQueryFallBackRule extends RelOptRule {
     public static final MPQueryFallBackRule INSTANCE = new MPQueryFallBackRule(
@@ -90,9 +90,9 @@ public class MPQueryFallBackRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        if (call.rel(0) instanceof VoltDBLCalc && call.rel(1) instanceof VoltDBLTableScan) {
-            VoltDBLCalc calc = call.rel(0);
-            VoltDBLTableScan tableScan = call.rel(1);
+        if (call.rel(0) instanceof VoltLogicalCalc && call.rel(1) instanceof VoltLogicalTableScan) {
+            VoltLogicalCalc calc = call.rel(0);
+            VoltLogicalTableScan tableScan = call.rel(1);
             RelDistribution tableDist = tableScan.getTable().getDistribution();
             if (tableDist.getType() != RelDistribution.Type.SINGLETON) {
                 if (calc.getProgram().getCondition() == null ||

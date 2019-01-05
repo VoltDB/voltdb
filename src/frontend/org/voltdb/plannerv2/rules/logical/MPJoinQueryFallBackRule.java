@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.newplanner.rules.logical;
+package org.voltdb.plannerv2.rules.logical;
 
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -24,19 +24,19 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLJoin;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLTableScan;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 /**
  * Rules that fallback a query with Join operator if it is multi-partitioned.
  *
  * @author Chao Zhou
- * @since 8.4
+ * @since 9.0
  */
 public class MPJoinQueryFallBackRule extends RelOptRule {
     public static final MPJoinQueryFallBackRule INSTANCE =
             new MPJoinQueryFallBackRule(
-                    operand(VoltDBLJoin.class, RelDistributions.ANY,
+                    operand(VoltLogicalJoin.class, RelDistributions.ANY,
                             some(operand(RelNode.class, any()),
                                     operand(RelNode.class, any()))), "MPJoinQueryFallBackRule");
 
@@ -45,7 +45,7 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
     }
 
     private RelDistribution getDistribution(RelNode node) {
-        if (node instanceof VoltDBLTableScan) {
+        if (node instanceof VoltLogicalTableScan) {
             return node.getTable().getDistribution();
         }
         return node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
@@ -53,12 +53,12 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-        VoltDBLJoin join = call.rel(0);
+        VoltLogicalJoin join = call.rel(0);
         RelDistribution leftDist = getDistribution(call.rel(1));
         RelDistribution rightDist = getDistribution(call.rel(2));
 
-        if ((call.rel(1) instanceof VoltDBLTableScan && leftDist != RelDistributions.SINGLETON) ||
-                (call.rel(2) instanceof VoltDBLTableScan && rightDist != RelDistributions.SINGLETON)) {
+        if ((call.rel(1) instanceof VoltLogicalTableScan && leftDist != RelDistributions.SINGLETON) ||
+                (call.rel(2) instanceof VoltLogicalTableScan && rightDist != RelDistributions.SINGLETON)) {
             // partitioned table without filter, throw
             throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
         }
