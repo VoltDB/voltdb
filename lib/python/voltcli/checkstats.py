@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -218,14 +218,15 @@ def check_export_stats(runner, export_tables_with_data, last_collection_time):
         else:
             collection_time = firsttuple.column(0)
 
+    export_tables_with_data.clear()
     for r in tablestats.tuples():
-        # TUPLE_ALLOCATED_MEMORY
-        pendingData = r[8]
-        # table name
-        tablename = str(r[4])
-        # partition id...
-        pid = r[3]
-        # host name
+        # TUPLE_PENDING
+        pendingData = r[9]
+        # SOURCE
+        tablename = str(r[5])
+        # PARTITION_ID
+        pid = r[4]
+        # HOSTNAME
         hostname = str(r[2])
         if pendingData > 0:
             if not tablename in export_tables_with_data:
@@ -234,15 +235,6 @@ def check_export_stats(runner, export_tables_with_data, last_collection_time):
             if not hostname in tabledata:
                 tabledata[hostname] = set()
             tabledata[hostname].add(pid)
-        else:
-            if tablename in export_tables_with_data:
-                tabledata = export_tables_with_data[tablename]
-                if hostname in tabledata:
-                    tabledata[hostname].discard(pid)
-                    if not tabledata[hostname]:
-                        del tabledata[hostname]
-                        if not export_tables_with_data[tablename]:
-                            del export_tables_with_data[tablename]
     return collection_time
 
 
@@ -402,11 +394,7 @@ def check_command_log(runner):
 def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component, msg="The cluster has not drained any transactions for %s in last %d seconds. There are outstanding transactions."):
     currentTime = time.time()
     timeout = runner.opts.timeout
-    statsProgressed = True
-    if isinstance(lastUpdatedParams, dict):
-        statsProgressed = (cmp(lastUpdatedParams, currentParams) <> 0)
-    else :
-        statsProgressed = (lastUpdatedParams <> currentParams)
+    statsProgressed = (lastUpdatedParams != currentParams)
 
     # stats progressed, update lastUpdatedTime
     if statsProgressed:
@@ -422,6 +410,70 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
     # not timeout yet
     return lastUpdatedTime
 
+def check_partition_leaders_on_host(runner, hostid):
+    lastUpdatedTime = time.time()
+    notifyInterval = 10
+    lastValidationParamms = [sys.maxint]
+    while True:
+        resp = get_stats(runner, 'TOPO')
+        if len(resp.table(0).tuples()) == 0:
+            return
+        # TOPO stats
+        # column 0: partition id
+        # column 2: partition leader
+        leaders = 0;
+        for r in resp.table(0).tuples():
+            if r[0] == 16383:
+                continue
+            leader = int(r[2].split(":")[0])
+            if leader == hostid:
+                leaders +=1
+
+        # all partition leaders have been moved
+        if leaders == 0:
+            return
+
+        notifyInterval -= 1
+        if notifyInterval == 0:
+            notifyInterval = 10
+            runner.info('\tThe number of partition leaders on the host: %d' % (leaders))
+
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, [leaders], lastUpdatedTime, runner, str(hostid),
+                                                    msg="The cluster has not moved any partition leaders away from host %s in %d seconds.")
+        lastValidationParamms = [leaders]
+        time.sleep(1)
+
+def check_export_mastership_on_host(runner, hostid):
+    lastUpdatedTime = time.time()
+    notifyInterval = 10
+    lastValidationParamms = [sys.maxint]
+    while True:
+        resp = get_stats(runner, 'EXPORT')
+        if len(resp.table(0).tuples()) == 0:
+            return
+        # EXPORT stats
+        # column 1: host id
+        # column 7: active
+        mastershipCount = 0;
+        for r in resp.table(0).tuples():
+            host = int(r[1])
+            active = r[7]
+            if host == hostid and active == 'TRUE':
+                mastershipCount +=1
+
+        # all partition leaders have been moved
+        if mastershipCount == 0:
+            return
+
+        notifyInterval -= 1
+        if notifyInterval == 0:
+            notifyInterval = 10
+            runner.info('\tThe number of export masters on the host: %d' % (mastershipCount))
+
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, [mastershipCount], lastUpdatedTime, runner, str(hostid),
+                                                    msg="The cluster has not moved any export masters away from host %s in %d seconds.")
+        lastValidationParamms = [mastershipCount]
+        time.sleep(1)
 
 class StatisticsProcedureException(Exception):
 

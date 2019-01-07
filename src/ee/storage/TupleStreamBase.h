@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,7 +55,7 @@ public:
     virtual void setSecondaryCapacity(size_t capacity) {}
 
     /** truncate stream back to mark */
-    virtual void rollbackTo(size_t mark, size_t drRowCost);
+    virtual void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo);
 
     /** age out committed data */
     virtual void periodicFlush(int64_t timeInMillis,
@@ -85,7 +85,12 @@ public:
     /** max allowed buffer capacity */
     size_t m_maxCapacity;
 
-    /** Universal stream offset. Total bytes appended to this stream. */
+    /**
+     * Universal stream offset. Total bytes appended to this stream.
+     *
+     * PLEASE NOTE THAT this is only used in TABLE stats while rest
+     * of the export system use sequence number to track rows.
+     * */
     size_t m_uso;
 
     /** Current block */
@@ -117,6 +122,8 @@ public:
      * Note that before the Export Tuples are only committed by the *next* Txn that updates the StreamBLock
      */
     int64_t m_uncommittedTupleCount;
+
+    int64_t m_exportSequenceNumber;
 };
 
 }

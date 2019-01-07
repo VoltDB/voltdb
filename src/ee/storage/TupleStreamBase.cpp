@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,7 +53,8 @@ TupleStreamBase::TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpa
       m_committedSpHandle(0), m_committedUso(0),
       m_committedUniqueId(0),
       m_headerSpace(MAGIC_HEADER_SPACE_FOR_JAVA + extraHeaderSpace),
-      m_uncommittedTupleCount(0)
+      m_uncommittedTupleCount(0),
+      m_exportSequenceNumber(1) // sequence number starts from 1
 {
     extendBufferChain(m_defaultCapacity);
 }
@@ -209,7 +210,7 @@ void TupleStreamBase::pushPendingBlocks()
 /*
  * Discard all data with a uso gte mark
  */
-void TupleStreamBase::rollbackTo(size_t mark, size_t)
+void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
 {
     if (mark > m_uso) {
         throwFatalException("Truncating the future: mark %jd, current USO %jd.",
@@ -221,7 +222,10 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t)
 
     // back up the universal stream counter
     m_uso = mark;
-    m_uncommittedTupleCount = 0;
+    // make the stream of tuples contiguous outside of actual system failures
+    m_uncommittedTupleCount -= m_exportSequenceNumber - exportSeqNo;
+    assert (m_uncommittedTupleCount < 0);
+    m_exportSequenceNumber = exportSeqNo;
 
     // working from newest to oldest block, throw
     // away blocks that are fully after mark; truncate
@@ -308,6 +312,8 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
+
+    m_currBlock->recordStartExportSequenceNumber(m_exportSequenceNumber);
 
     if (openTransaction) {
         handleOpenTransaction(oldBlock);

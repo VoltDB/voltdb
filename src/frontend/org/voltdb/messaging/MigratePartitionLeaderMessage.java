@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,8 @@ public class MigratePartitionLeaderMessage extends VoltMessage {
 
     private boolean m_resetStatus = false;
 
+    private boolean m_stopNodeService = false;
+
     public MigratePartitionLeaderMessage() {
         super();
     }
@@ -52,6 +54,7 @@ public class MigratePartitionLeaderMessage extends VoltMessage {
         msgsize += 8; // m_priorLeaderHSID
         msgsize += 1; // m_startingBalanceSpiService
         msgsize += 1; // m_resetStatus
+        msgsize += 1; // m_stopNodeService
         return msgsize;
     }
 
@@ -62,6 +65,7 @@ public class MigratePartitionLeaderMessage extends VoltMessage {
         buf.putLong(m_priorLeaderHSID);
         buf.put(m_startingService ? (byte) 1 : (byte) 0);
         buf.put(m_resetStatus ? (byte) 1 : (byte) 0);
+        buf.put(m_stopNodeService ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -72,6 +76,7 @@ public class MigratePartitionLeaderMessage extends VoltMessage {
         m_priorLeaderHSID = buf.getLong();
         m_startingService = buf.get() == 1;
         m_resetStatus = buf.get() == 1;
+        m_stopNodeService = buf.get() == 1;
     }
 
     public long getNewLeaderHSID() {
@@ -96,5 +101,13 @@ public class MigratePartitionLeaderMessage extends VoltMessage {
 
     public boolean isStatusReset() {
         return m_resetStatus;
+    }
+
+    public void setStopNodeService() {
+        m_stopNodeService = true;
+    }
+
+    public boolean isForStopNode() {
+        return m_stopNodeService;
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -88,4 +88,9 @@ public interface ConsumerDRGateway extends Promotable {
     boolean isSafeForDropLocal();
 
     void handleProducerClusterElasticChange(byte producerClusterId, int newProducerPartitionCount);
+
+    /**
+     * Log the current set of clusters that this consumer is receiving data from.
+     */
+    public void logActiveConversations();
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -92,7 +92,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(findTableInSystemCatalogResults("T1"));
         assertTrue(findIndexInSystemCatalogResults("area"));
         assertTrue(verifyIndexUniqueness("area", true));
-        assertEquals(indexedColumnCount("T1"), 2);
+        assertEquals(indexedColumnCount("T1"), 3);
     }
 
     @Test

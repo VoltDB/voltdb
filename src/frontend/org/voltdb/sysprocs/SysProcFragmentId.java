@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -230,6 +230,10 @@ public class SysProcFragmentId
 
     // Pause/resume materialized views
     public static final long PF_setViewEnabled = 340;
+
+    // @ExportControl
+    public static final long PF_exportControl = 350;
+    public static final long PF_exportControlAggregate = 351;
 
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);

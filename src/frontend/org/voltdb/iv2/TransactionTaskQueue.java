@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,6 +42,11 @@ public class TransactionTaskQueue
     final private Scoreboard m_scoreboard;
     private boolean m_scoreboardEnabled;
 
+    public static class CompletionCounter {
+        long txnId = 0L;
+        int completionCount = 0;
+        long timestamp = 0L;
+    }
     private static class RelativeSiteOffset {
         private SiteTaskerQueue[] m_stashedMpQueues;
         private Scoreboard[] m_stashedMpScoreboards;
@@ -96,10 +101,11 @@ public class TransactionTaskQueue
                     hostLog.debug("release stashed complete transaction message:" + TxnEgo.txnIdToString(txnId));
                 }
             }
-            int tasksAtTail = 0;
+
+            CompletionCounter nextTaskCounter = new CompletionCounter();
             for (int ii = m_siteCount-1; ii >= 0; ii--) {
                 // only release completions at head of queue
-                Pair<CompleteTransactionTask, Boolean> task = m_stashedMpScoreboards[ii].getCompletionTasks().pollFirst();
+                Pair<CompleteTransactionTask, Boolean> task = m_stashedMpScoreboards[ii].pollFirstCompletionTask(nextTaskCounter);
                 CompleteTransactionTask completion = task.getFirst();
                 if (missingTxn) {
                     completion.setFragmentNotExecuted();
@@ -109,13 +115,9 @@ public class TransactionTaskQueue
                 }
                 Iv2Trace.logSiteTaskerQueueOffer(completion);
                 m_stashedMpQueues[ii].offer(completion);
-                Pair<CompleteTransactionTask, Boolean> tail = m_stashedMpScoreboards[ii].getCompletionTasks().pollLast();
-                if (tail != null) {
-                    m_stashedMpScoreboards[ii].getCompletionTasks().addFirst(tail);
-                    tasksAtTail++;
-                }
             }
-            return tasksAtTail != m_siteCount;
+
+            return nextTaskCounter.completionCount == m_siteCount;
         }
 
         Scoreboard[] getScoreboards() {
@@ -301,13 +303,12 @@ public class TransactionTaskQueue
                         }
                         fragmentScore++;
                     }
-                }
-                else {
+                } else {
                     for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
                         if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
                             break;
                         }
-                        missingTxn |= sb.getCompletionTasks().peekFirst().getSecond();
+                        missingTxn |= sb.peekFirst().getSecond();
                         // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
                         // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
                         // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
@@ -349,15 +350,13 @@ public class TransactionTaskQueue
             while (!done) {
                 int completionScore = 0;
                 for (Scoreboard sb : s_stashedMpWrites.getScoreboards()) {
-                    if (!sb.getCompletionTasks().isEmpty()) {
-                        if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
-                            break;
-                        }
-                        // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
-                        // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
-                        // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
-                        completionScore++;
+                    if (!sb.matchCompleteTransactionTask(taskTxnId, taskTimestamp)) {
+                        break;
                     }
+                    // At repair time MPI may send many rounds of CompleteTxnMessage due to the fact that
+                    // many SPI leaders are promoted, each round of CompleteTxnMessages share the same
+                    // timestamp, so at TransactionTaskQueue level it only counts messages from the same round.
+                    completionScore++;
                 }
 
                 if (hostLog.isDebugEnabled()) {

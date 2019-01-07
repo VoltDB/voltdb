@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -295,7 +295,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     public void waitForStreamedTargetAllocatedMemoryZero(Client client) throws Exception {
         boolean passed = false;
 
-        // Quiesc to see all data flushed.
+        // Quiesce to see all data flushed.
         System.out.println("Quiesce client....");
         quiesce(client);
         System.out.println("Quiesce done....");
@@ -328,7 +328,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
                 long m = stats.getLong("TUPLE_PENDING");
                 if (0 != m) {
                     passedThisTime = false;
-                    String ttable = stats.getString("STREAM_NAME");
+                    String ttable = stats.getString("SOURCE");
                     Long host = stats.getLong("HOST_ID");
                     Long pid = stats.getLong("PARTITION_ID");
                     System.out.println("Partition Not Zero: " + ttable + " pend:" + m  + " host:" + host + " partid:" + pid);
@@ -491,7 +491,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
         }
     }
 
-    public void closeClientAndServer() throws IOException {
+    public static void closeClientAndServer() throws IOException {
         for (Entry<String, Integer> target : m_portForTable.entrySet()) {
             ServerListener m_serverSocket = m_serverSockets.remove(target.getKey());
             if (m_serverSocket != null) {

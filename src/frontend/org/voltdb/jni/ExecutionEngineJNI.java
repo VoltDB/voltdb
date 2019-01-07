@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -677,6 +677,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public void exportAction(boolean syncAction,
             long uso, long seqNo, int partitionId, String tableSignature)
     {
+        if (EXPORT_LOG.isDebugEnabled()) {
+            EXPORT_LOG.debug("exportAction on partition " + partitionId + " syncAction: " + syncAction + ", uso: " +
+                    uso + ", seqNo: " + seqNo + ", tableSignature: " + tableSignature);
+        }
         //Clear is destructive, do it before the native call
         m_nextDeserializer.clear();
         long retval = nativeExportAction(pointer,

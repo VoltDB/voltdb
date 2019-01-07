@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,8 @@
  */
 
 package org.voltdb;
+
+import static org.voltdb.DRLogSegmentId.isEmptyDRId;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -38,8 +40,6 @@ import com.google_voltpatches.common.collect.Range;
 import com.google_voltpatches.common.collect.RangeSet;
 import com.google_voltpatches.common.collect.TreeRangeSet;
 
-import static org.voltdb.DRLogSegmentId.isEmptyDRId;
-
 /*
  * WARNING:
  * The implementation assumes that the range set is never completely empty in methods like
@@ -49,6 +49,11 @@ import static org.voltdb.DRLogSegmentId.isEmptyDRId;
  */
 public class DRConsumerDrIdTracker implements Serializable {
     private static final long serialVersionUID = -4057397384030151271L;
+
+    /** The offset at which {@link #m_lastSpUniqueId} can be found in the result of {@link #serialize(ByteBuffer)} */
+    public static final int LAST_SP_UNIQUE_ID_OFFSET = 0;
+    /** The offset at which {@link #m_lastMpUniqueId} can be found in the result of {@link #serialize(ByteBuffer)} */
+    public static final int LAST_MP_UNIQUE_ID_OFFSET = LAST_SP_UNIQUE_ID_OFFSET + Long.BYTES;
 
     protected RangeSet<Long> m_map;
     private long m_lastSpUniqueId;
@@ -89,6 +94,7 @@ public class DRConsumerDrIdTracker implements Serializable {
             return obj;
         }
 
+        @Override
         public String toShortString() {
             if (m_map.isEmpty()) {
                 return "Empty Map";
@@ -332,7 +338,9 @@ public class DRConsumerDrIdTracker implements Serializable {
      * @param newTruncationPoint    New safe point
      */
     public void truncate(long newTruncationPoint) {
-        if (newTruncationPoint < getFirstDrId()) return;
+        if (newTruncationPoint < getFirstDrId()) {
+            return;
+        }
         final Iterator<Range<Long>> iter = m_map.asRanges().iterator();
         while (iter.hasNext()) {
             final Range<Long> next = iter.next();
@@ -445,7 +453,7 @@ public class DRConsumerDrIdTracker implements Serializable {
     }
 
     protected void toShortString(StringBuilder sb) {
-        sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
+        sb.append("lastSpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastSpUniqueId)).append(" ");
         sb.append("lastMpUniqueId ").append(UniqueIdGenerator.toShortString(m_lastMpUniqueId)).append(" ");
         sb.append("producerPartitionId ").append(m_producerPartitionId).append(" ");
         sb.append("span [").append(DRLogSegmentId.getSequenceNumberFromDRId(getFirstDrId())).append("-");

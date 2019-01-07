@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -595,8 +595,11 @@ public class StatsAgent extends OpsAgent
     {
         VoltTable[] stats = null;
 
-        VoltTable[] partitionStats = collectStats(StatsSelector.DRPRODUCERPARTITION, false);
+        // TODO: getStatsRowKeyIterator method in NodeStatsSource and PartitionStatsSource has an implicit assumption
+        // that they are going to be called togeher and in the order of NodeStatsSource followed by PartitionStatsSource
+        // call individual stats or out of order could result stale DRPRODUCERPARTITION stats
         VoltTable[] nodeStats = collectStats(StatsSelector.DRPRODUCERNODE, false);
+        VoltTable[] partitionStats = collectStats(StatsSelector.DRPRODUCERPARTITION, false);
         if (partitionStats != null && nodeStats != null) {
             stats = new VoltTable[2];
             stats[0] = partitionStats[0];
@@ -836,7 +839,7 @@ public class StatsAgent extends OpsAgent
             while (iter.hasNext()) {
                 ExportStatsRow stat = statsRows.getStatsRow(iter.next());
                 resultTable.addRow(now, statsRows.getHostId(), statsRows.getHostname(),
-                        stat.m_siteId, stat.m_partitionId, stat.m_streamName, "StreamedTable",
+                        stat.m_siteId, stat.m_partitionId, stat.m_sourceName, "StreamedTable",
                         stat.m_tupleCount, 0L, 0L, 0L, null, 0);
             }
         }

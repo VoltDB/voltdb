@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -205,6 +205,9 @@ public class AsyncBenchmark {
 
         @Option(desc = "Enable SSL with configuration file.")
         String sslfile = "";
+
+        @Option(desc = "Ignore client errors.")
+        boolean ignoreerrors = false;
 
         @Override
         public void validate() {
@@ -486,12 +489,15 @@ public class AsyncBenchmark {
         } catch (Exception e) {
             String msg = "In printStatistics. We got an exception: '" + e.getMessage() + "'!!";
             prt(msg);
+            System.exit(1);
+
         }
         if (lastSuccessfulResponse > 0  && (System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
             prt("Not making any progress, last at " +
                     (new SimpleDateFormat("yyyy-MM-DD HH:mm:ss.S")).format(new Date(lastSuccessfulResponse)) + ", exiting");
             printJStack();
-            System.exit(1);
+            if (!config.ignoreerrors)
+                System.exit(1);
         }
     }
 
@@ -657,7 +663,8 @@ public class AsyncBenchmark {
                 ClientResponseImpl cri = (ClientResponseImpl) response;
                 System.err.println(cri.toJSONString());
                 System.out.println("ERROR: Bad Client response from Volt");
-                System.exit(1);
+                if (!config.ignoreerrors)
+                    System.exit(1);
             }
         }
     }
@@ -696,7 +703,8 @@ public class AsyncBenchmark {
                 ClientResponseImpl cri = (ClientResponseImpl) response;
                 System.err.println(cri.toJSONString());
                 System.out.println("ERROR: Bad Client response from Volt");
-                System.exit(1);
+                if (!config.ignoreerrors)
+                    System.exit(1);
             }
             networkPutData.addAndGet(storeValueLength);
             rawPutData.addAndGet(rawValueLength);
@@ -733,7 +741,8 @@ public class AsyncBenchmark {
                 ClientResponseImpl cri = (ClientResponseImpl) response;
                 System.err.println(cri.toJSONString());
                 System.out.println("ERROR: Bad Client response from Volt");
-                System.exit(1);
+                if (!config.ignoreerrors)
+                    System.exit(1);
             }
         }
     }
@@ -867,7 +876,8 @@ public class AsyncBenchmark {
             }
             if (!response) {
                 System.err.print("Invocation failed...");
-                System.exit(1);
+                if (!config.ignoreerrors)
+                    System.exit(1);
             }
             currentTime = System.currentTimeMillis();
             diff = benchmarkEndTime - currentTime;

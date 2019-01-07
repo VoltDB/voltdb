@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,9 +28,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientUtils;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestExpectedData;
@@ -38,6 +41,7 @@ import org.voltdb.export.TestExportBaseSocketExport;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -108,7 +112,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
             }
             while (stats.advanceRow()) {
                 String memoryColumnName = isPersistent ? "TUPLE_ALLOCATED_MEMORY" : "TUPLE_PENDING";
-                String tableColumnName = isPersistent ? "TABLE_NAME": "STREAM_NAME";
+                String tableColumnName = isPersistent ? "TABLE_NAME": "SOURCE";
                 if (stats.getString(tableColumnName).equalsIgnoreCase(tableName)) {
                     if (stats.getLong("PARTITION_ID") == 0 && !zpassed) {
                         if (tuple1 == stats.getLong("TUPLE_COUNT")
@@ -187,6 +191,61 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         callAdHocExpectSuccess(client, "DROP TABLE tuple_count_persist; DROP STREAM tuple_count_export;");
     }
 
+    public void testStatisticsWithCatlogAndDeploymentUpdate() throws Exception {
+        System.out.println("\n\nTESTING testStatisticsWithCatlogAndDeploymentUpdate STATISTICS\n\n\n");
+        Client client = getFullyConnectedClient();
+
+        callAdHocExpectSuccess(client,
+                "CREATE STREAM tuple_count_export PARTITION ON COLUMN foobar EXPORT TO TARGET tuple_count_export ( foobar SMALLINT NOT NULL );");
+
+        VoltTable stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("ACTIVE".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+
+        // drop stream
+        callAdHocExpectSuccess(client, "DROP STREAM tuple_count_export;");
+        stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("DROPPED".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+
+        // recreate stream
+        callAdHocExpectSuccess(client,
+                "CREATE STREAM tuple_count_export PARTITION ON COLUMN foobar EXPORT TO TARGET tuple_count_export ( foobar SMALLINT NOT NULL );");
+        stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("ACTIVE".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+
+        // update deployment, no TUPLE_COUNT_EXPORT connector
+        String deploymentURL = Configuration.getPathToCatalogForTest("stats_no_connector.xml");
+        String depBytes = new String(ClientUtils.fileToBytes(new File(deploymentURL)), Constants.UTF8ENCODING);
+        client.callProcedure("@UpdateApplicationCatalog", null, depBytes);
+        stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("DROPPED".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+
+        // add connector back
+        deploymentURL = Configuration.getPathToCatalogForTest("stats_full.xml");
+        depBytes = new String(ClientUtils.fileToBytes(new File(deploymentURL)), Constants.UTF8ENCODING);
+        client.callProcedure("@UpdateApplicationCatalog", null, depBytes);
+        stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
+        while (stats.advanceRow()) {
+            if ("TUPLE_COUNT_EXPORT".equalsIgnoreCase(stats.getString("SOURCE"))) {
+                assert("ACTIVE".equalsIgnoreCase(stats.getString("STATUS")));
+            }
+        }
+    }
     //
     // Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
     // when the snapshot is restored
@@ -221,6 +280,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
+//        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
         checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
@@ -228,6 +288,7 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         quiesce(client);
         System.out.println("Quiesce done....");
 
+//        checkForExpectedStats(client, "NO_NULLS", 9, 24, 6, 16, false);
         checkForExpectedStats(client, "NO_NULLS", 24, 24, 16, 16, false);
 
         //Resume will put flg on onserver export to start consuming.
@@ -297,29 +358,31 @@ public class TestExportStatsSuite extends TestExportBaseSocketExport {
         wireupExportTableToSocketExport("ALLOW_NULLS_GRP");
         wireupExportTableToSocketExport("NO_NULLS_GRP");
         wireupExportTableToSocketExport("tuple_count_export");
-
         project.addProcedures(PROCEDURES);
 
-        // JNI, single server
-        // Use the cluster only config. Multiple topologies with the extra catalog for the
-        // Add drop tests is harder. Restrict to the single (complex) topology.
-        //
-        //        config = new LocalSingleProcessServer("export-ddl.jar", 2,
-        //                                              BackendTarget.NATIVE_EE_JNI);
-        //        config.compile(project);
-        //        builder.addServerConfig(config);
-
-
-        /*
-         * compile the catalog all tests start with
-         */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 1, KFACTOR,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config, false);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("stats_full.xml"));
 
+
+        // A catalog change that enables snapshots
+        config = new LocalCluster("export-ddl-cluster-rep2.jar",  2, 1, KFACTOR,
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+        project = new VoltProjectBuilder();
+        project.setSecurityEnabled(true, true);
+        project.addRoles(GROUPS);
+        project.addUsers(USERS);
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-export-ddl-with-target.sql"));
+        project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-nonulls-export-ddl-with-target.sql"));
+        // needed for tuple count test
+        project.setUseDDLSchema(true);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("stats_no_connector.xml"));
         return builder;
     }
 }

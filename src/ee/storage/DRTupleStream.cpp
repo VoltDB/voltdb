@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -534,7 +534,9 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     }
     else {
         m_lastCommittedSpUniqueId = uniqueId;
-        m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+        m_currBlock->recordCompletedSpTxn(uniqueId);
+        // for sp, update the last Committed SpHandle
+        m_currBlock->recordLastCommittedSpHandle(m_openSpHandle);
     }
     m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
 
@@ -636,7 +638,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
             m_currBlock->recordCompletedMpTxnForDR(uniqueId);
         } else {
             m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+            m_currBlock->recordCompletedSpTxn(uniqueId);
         }
 
         m_committedUso = m_uso;
@@ -666,7 +668,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
             m_currBlock->recordCompletedMpTxnForDR(uniqueId);
         } else {
             m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+            m_currBlock->recordCompletedSpTxn(uniqueId);
         }
 
         m_committedUso = m_uso;

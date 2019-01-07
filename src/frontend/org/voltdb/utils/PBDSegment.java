@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,13 +17,14 @@
 
 package org.voltdb.utils;
 
-import org.voltcore.utils.DBBPool;
-import org.voltcore.utils.DeferredSerialization;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltdb.export.ExportSequenceNumberTracker;
 
 public abstract class PBDSegment {
 
@@ -97,6 +98,7 @@ public abstract class PBDSegment {
     }
 
     private static final String TRUNCATOR_CURSOR = "__truncator__";
+    private static final String SCANNER_CURSOR = "__scanner__";
     static final int NO_FLAGS = 0;
     static final int FLAG_COMPRESSED = 1;
 
@@ -106,7 +108,7 @@ public abstract class PBDSegment {
     // Has to be able to hold at least one object (compressed or not)
     public static final int CHUNK_SIZE = Integer.getInteger("PBDSEGMENT_CHUNK_SIZE", 1024 * 1024 * 64);
     static final int OBJECT_HEADER_BYTES = 8;
-    static final int SEGMENT_HEADER_BYTES = 8;
+    static final int SEGMENT_HEADER_BYTES = 8; // number of entries (4 bytes), total bytes of data (4 bytes)
     protected final File m_file;
 
     protected boolean m_closed = true;
@@ -175,8 +177,9 @@ public abstract class PBDSegment {
      * @throws IOException
      */
     int parseAndTruncate(BinaryDeque.BinaryDequeTruncator truncator) throws IOException {
-        if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
-
+        if (!m_closed) {
+            close();
+        }
         openForWrite(false);
         PBDSegmentReader reader = openForRead(TRUNCATOR_CURSOR);
 
@@ -243,5 +246,40 @@ public abstract class PBDSegment {
         close();
 
         return entriesTruncated;
+    }
+
+    /**
+     * Parse the segment and truncate the file if necessary.
+     * @param truncator    A caller-supplied truncator that decides where in the segment to truncate
+     * @return The number of objects that was truncated. This number will be subtracted from the total number
+     * of available objects in the PBD. -1 means that this whole segment should be removed.
+     * @throws IOException
+     */
+    ExportSequenceNumberTracker scan(BinaryDeque.BinaryDequeScanner scanner) throws IOException {
+        if (!m_closed) throw new IOException(("Segment should not be open before truncation"));
+
+        openForWrite(false);
+        PBDSegmentReader reader = openForRead(SCANNER_CURSOR);
+        ExportSequenceNumberTracker tracker = new ExportSequenceNumberTracker();
+
+        DBBPool.BBContainer cont;
+        while (true) {
+            cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+            if (cont == null) {
+                break;
+            }
+            try {
+                //Handoff the object to the truncator and await a decision
+                ExportSequenceNumberTracker retval = scanner.scan(cont);
+                tracker.mergeTracker(retval);
+
+            } finally {
+                cont.discard();
+            }
+        }
+
+        close();
+
+        return tracker;
     }
 }

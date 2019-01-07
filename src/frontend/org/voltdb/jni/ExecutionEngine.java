@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -66,6 +66,7 @@ import org.voltdb.utils.VoltTrace;
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
     protected static VoltLogger LOG = new VoltLogger("HOST");
+    protected static VoltLogger EXPORT_LOG = new VoltLogger("EXPORT");
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),

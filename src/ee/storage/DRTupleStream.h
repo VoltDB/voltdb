@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -163,7 +163,7 @@ public:
     void pushExportBuffer(StreamBlock *block, bool sync) {}
     void pushEndOfStream() {}
 
-    void rollbackTo(size_t mark, size_t drRowCost) {}
+    void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo) {}
 
     size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,

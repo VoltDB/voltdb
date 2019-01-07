@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,7 +39,9 @@ import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportDataSource.AckingContainer;
+import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportGeneration;
+import org.voltdb.export.StreamBlockQueue;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
@@ -221,6 +223,7 @@ public class GuestProcessor implements ExportDataProcessor {
             m_decoders.add(pair);
             final ListenableFuture<AckingContainer> fut = m_source.poll();
             addBlockListener(m_source, fut, edb);
+            m_source.forwardAckToOtherReplicas();
         }
 
         private void runDataSource() {
@@ -311,6 +314,7 @@ public class GuestProcessor implements ExportDataProcessor {
          * For JDBC we want a dedicated thread to block on calls to the remote database
          * so the data source thread can overflow data to disk.
          */
+
         if (fut == null) {
             return;
         }
@@ -322,7 +326,6 @@ public class GuestProcessor implements ExportDataProcessor {
                     if (cont == null) {
                         return;
                     }
-                    cont.updateStartTime(System.currentTimeMillis());
                     try {
                         //Position to restart at on error
                         final int startPosition = cont.b().position();
@@ -341,7 +344,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 buf.position(startPosition);
                                 buf.order(ByteOrder.LITTLE_ENDIAN);
                                 byte version = buf.get();
-                                assert(version == 1);
+                                assert(version == StreamBlockQueue.EXPORT_BUFFER_VERSION);
                                 long generation = buf.getLong();
                                 int schemaSize = buf.getInt();
                                 ExportRow previousRow = edb.getPreviousRow();
@@ -363,11 +366,13 @@ public class GuestProcessor implements ExportDataProcessor {
                                     byte[] rowdata = new byte[length];
                                     buf.get(rowdata, 0, length);
                                     if (edb.isLegacy()) {
+                                        cont.updateStartTime(System.currentTimeMillis());
                                         edb.onBlockStart();
                                         edb.processRow(length, rowdata);
                                     } else {
                                         //New style connector.
                                         try {
+                                            cont.updateStartTime(System.currentTimeMillis());
                                             row = ExportRow.decodeRow(edb.getPreviousRow(), source.getPartitionId(), m_startTS, rowdata);
                                             edb.setPreviousRow(row);
                                         } catch (IOException ioe) {
@@ -418,10 +423,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                 }
                             }
                         }
-                        // Don't discard the block also set the start position to the begining.
-                        // TODO: it would be nice to keep the last position in the buffer so that
-                        //       next time connector can pick up from where it left last time and
-                        //       continue. It helps to reduce exporting duplicated rows.
+                        //Dont discard the block also set the start position to the begining.
                         if (m_shutdown && cont != null) {
                             if (m_logger.isDebugEnabled()) {
                                 // log message for debugging.
@@ -437,7 +439,13 @@ public class GuestProcessor implements ExportDataProcessor {
                         }
                     }
                 } catch (Exception e) {
-                    m_logger.error("Error processing export block", e);
+                    if (e.getCause() instanceof ReentrantPollException) {
+                        m_logger.info("Stopping processing export blocks: " + e.getMessage());
+                        return;
+
+                    } else {
+                        m_logger.error("Error processing export block, continuing processing: ", e);
+                    }
                 }
                 if (!m_shutdown) {
                     addBlockListener(source, source.poll(), edb);
