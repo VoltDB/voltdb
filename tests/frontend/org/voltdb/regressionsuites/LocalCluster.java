@@ -513,6 +513,10 @@ public class LocalCluster extends VoltServerConfig {
         m_callingMethodName = name;
     }
 
+    public void setCallingClassName(String name) {
+        m_callingClassName = name;
+    }
+
     public boolean compile(VoltProjectBuilder builder, final String voltRootPath) {
         if (! m_compiled) {
             m_initialCatalog = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, voltRootPath, m_clusterId);
@@ -2308,16 +2312,27 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
+            int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar, DrRoleType drRole,
+            boolean hasLocalServer, VoltProjectBuilder builder, String callingMethodName, boolean enableSPIMigration,
+            Map<String, String> javaProps) throws IOException {
+        return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort,
+                remoteReplicationPort, pathToVoltDBRoot, jar, drRole, hasLocalServer, builder, null,
+                callingMethodName, enableSPIMigration, javaProps);
+    }
+
+    public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor,
+                                                  int clusterId,
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder,
-                                                  String callingMethodName,
+                                                  String callingClassName, String callingMethodName,
                                                   boolean enableSPIMigration,
                                                   Map<String, String> javaProps) throws IOException {
         if (builder == null) {
             builder = new VoltProjectBuilder();
         }
         LocalCluster lc = compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId,
-                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, callingMethodName);
+                replicationPort, remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, callingClassName,
+                callingMethodName);
 
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(hasLocalServer);
@@ -2356,10 +2371,19 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
+            int kfactor, int clusterId, int replicationPort,
+            int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+            DrRoleType drRole, VoltProjectBuilder builder,
+            String callingMethodName) throws IOException {
+        return compileBuilder(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort,
+                remoteReplicationPort, pathToVoltDBRoot, jar, drRole, builder, null, callingMethodName);
+    }
+
+    public static LocalCluster compileBuilder(String schemaDDL, int siteCount, int hostCount,
                                               int kfactor, int clusterId, int replicationPort,
                                               int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                               DrRoleType drRole, VoltProjectBuilder builder,
-                                              String callingMethodName) throws IOException {
+                                              String callingClassName, String callingMethodName) throws IOException {
         builder.addLiteralSchema(schemaDDL);
         if (drRole == DrRoleType.REPLICA) {
             builder.setDrReplica();
@@ -2372,6 +2396,9 @@ public class LocalCluster extends VoltServerConfig {
         builder.setUseDDLSchema(true);
         LocalCluster lc = new LocalCluster(jar, siteCount, hostCount, kfactor, clusterId, BackendTarget.NATIVE_EE_JNI);
         lc.setReplicationPort(replicationPort);
+        if (callingClassName != null) {
+            lc.setCallingClassName(callingClassName);
+        }
         if (callingMethodName != null) {
             lc.setCallingMethodName(callingMethodName);
         }
