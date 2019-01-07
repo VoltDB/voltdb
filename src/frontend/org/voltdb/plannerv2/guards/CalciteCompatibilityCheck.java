@@ -52,7 +52,8 @@ public abstract class CalciteCompatibilityCheck {
     /**
      * Start the chained check to see if the SQL statement should be routed to Calcite.
      * A query is permissible when at least one positive check in the chain passed (returns true);
-     * or when at least one negative check in the chain failed (returns false).
+     * given that all negative check in the chain failed (returns false), meaning that the condition
+     * is not banned.
      *
      * @param sql the SQL statement to check.
      * @return true if this statement should be routed to Calcite.
@@ -85,6 +86,10 @@ public abstract class CalciteCompatibilityCheck {
      */
     public static CalciteCompatibilityCheck create() {
         // As we add more features to Calcite, this list should be expanded, and eventually removed.
+        //
+        // NOTE: all negative checks **must** preceed any positive checks. This is because we must ensure that
+        // no negative test fails, and only after this can we early return on the first matched/passed
+        // positive check.
         return new AcceptDDLsAsWeCan()
                 .addNext(new AcceptAllSelect())
                 .addNext(new NoLargeQuery());
