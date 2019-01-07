@@ -290,7 +290,7 @@ SnapshotCompletionInterest, Promotable
             pathType = SnapshotPathType.valueOf(jo.getString(SnapshotUtil.JSON_PATH_TYPE));
             nonce = jo.getString(SnapshotUtil.JSON_NONCE);
             partitionCount = jo.getInt("partitionCount");
-            newPartitionCount = jo.getInt("newPartitionCount");
+            newPartitionCount = jo.getInt(SnapshotUtil.JSON_NEW_PARTITION_COUNT);
             catalogCrc = jo.getLong("catalogCrc");
             hostId = jo.getInt("hostId");
             instanceId = new InstanceId(jo.getJSONObject("instanceId"));
@@ -336,7 +336,7 @@ SnapshotCompletionInterest, Promotable
                 stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, pathType.name());
                 stringer.keySymbolValuePair("nonce", nonce);
                 stringer.keySymbolValuePair("partitionCount", partitionCount);
-                stringer.keySymbolValuePair("newPartitionCount", newPartitionCount);
+                stringer.keySymbolValuePair(SnapshotUtil.JSON_NEW_PARTITION_COUNT, newPartitionCount);
                 stringer.keySymbolValuePair("catalogCrc", catalogCrc);
                 stringer.keySymbolValuePair("hostId", hostId);
                 stringer.key("tables").array();
@@ -795,8 +795,8 @@ SnapshotCompletionInterest, Promotable
                 instanceId = new InstanceId(digest_detail.getJSONObject("instanceId"));
             }
 
-            if (digest_detail.has("newPartitionCount")) {
-                newPartitionCount = digest_detail.getInt("newPartitionCount");
+            if (digest_detail.has(SnapshotUtil.JSON_NEW_PARTITION_COUNT)) {
+                newPartitionCount = digest_detail.getInt(SnapshotUtil.JSON_NEW_PARTITION_COUNT);
             }
 
             if (digest_detail.has("tables")) {

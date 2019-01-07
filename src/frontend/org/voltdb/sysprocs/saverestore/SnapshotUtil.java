@@ -188,7 +188,7 @@ public class SnapshotUtil {
                 stringer.keySymbolValuePair("txnId", txnId);
                 stringer.keySymbolValuePair("timestamp", timestamp);
                 stringer.keySymbolValuePair("timestampString", SnapshotUtil.formatHumanReadableDate(timestamp));
-                stringer.keySymbolValuePair("newPartitionCount", newPartitionCount);
+                stringer.keySymbolValuePair(JSON_NEW_PARTITION_COUNT, newPartitionCount);
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
