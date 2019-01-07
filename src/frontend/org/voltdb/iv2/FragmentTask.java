@@ -279,6 +279,7 @@ public class FragmentTask extends FragmentTaskBase
 
         int drBufferChanged = 0;
         boolean exceptionThrown = false;
+        boolean exceptionCaught = false;
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
             byte[] planHash = m_fragmentMsg.getPlanHash(frag);
@@ -426,7 +427,7 @@ public class FragmentTask extends FragmentTaskBase
                 // If the executed fragment comes from a stored procedure, we need to update the per-fragment stats for it.
                 // Notice that this code path is used to handle multi-partition stored procedures.
                 // The single-partition stored procedure handler is in the ProcedureRunner.
-                if (currRunner != null) {
+                if (currRunner != null && !exceptionCaught) {
                     succeededFragmentsCount = currRunner.getExecutionEngine().extractPerFragmentStats(1, executionTimes);
 
                     long stmtDuration = 0;
@@ -445,6 +446,10 @@ public class FragmentTask extends FragmentTaskBase
                                                                stmtDuration,
                                                                stmtResultSize,
                                                                stmtParameterSetSize);
+                    if (exceptionThrown) {
+                        // skip the stats work for all fragments after the fragment that threw an exception
+                        exceptionCaught = true;
+                    }
                 }
             }
         }
