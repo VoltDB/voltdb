@@ -79,8 +79,7 @@ public class ExtensibleSnapshotDigestData {
         m_terminus = jsData != null ? jsData.optLong(SnapshotUtil.JSON_TERMINUS, 0L) : 0L;
     }
 
-    private void writeExportSequencesToSnapshot(JSONStringer stringer) throws IOException {
-        try {
+    private void writeExportSequencesToSnapshot(JSONStringer stringer) throws JSONException {
             stringer.key(EXPORT_SEQUENCE_NUMBER_ARR).array();
             for (Map.Entry<String, Map<Integer, Pair<Long, Long>>> entry : m_exportSequenceNumbers.entrySet()) {
                 stringer.object();
@@ -99,9 +98,6 @@ public class ExtensibleSnapshotDigestData {
                 stringer.endObject();
             }
             stringer.endArray();
-        } catch (JSONException e) {
-            throw new IOException(e);
-        }
     }
 
     /*
@@ -167,28 +163,24 @@ public class ExtensibleSnapshotDigestData {
         jsonObj.put(SnapshotUtil.JSON_TERMINUS, m_terminus);
     }
 
-    private void writeDRTupleStreamInfoToSnapshot(JSONStringer stringer) throws IOException {
-        try {
-            stringer.key("drTupleStreamStateInfo");
+    private void writeDRTupleStreamInfoToSnapshot(JSONStringer stringer) throws JSONException {
+        stringer.key("drTupleStreamStateInfo");
+        stringer.object();
+        for (Map.Entry<Integer, TupleStreamStateInfo> e : m_drTupleStreamInfo.entrySet()) {
+            stringer.key(e.getKey().toString());
             stringer.object();
-            for (Map.Entry<Integer, TupleStreamStateInfo> e : m_drTupleStreamInfo.entrySet()) {
-                stringer.key(e.getKey().toString());
-                stringer.object();
-                if (e.getKey() != MpInitiator.MP_INIT_PID) {
-                    stringer.keySymbolValuePair("sequenceNumber", e.getValue().partitionInfo.drId);
-                    stringer.keySymbolValuePair("spUniqueId", e.getValue().partitionInfo.spUniqueId);
-                    stringer.keySymbolValuePair("mpUniqueId", e.getValue().partitionInfo.mpUniqueId);
-                } else {
-                    stringer.keySymbolValuePair("sequenceNumber", e.getValue().replicatedInfo.drId);
-                    stringer.keySymbolValuePair("spUniqueId", e.getValue().replicatedInfo.spUniqueId);
-                    stringer.keySymbolValuePair("mpUniqueId", e.getValue().replicatedInfo.mpUniqueId);
-                }
-                stringer.endObject();
+            if (e.getKey() != MpInitiator.MP_INIT_PID) {
+                stringer.keySymbolValuePair("sequenceNumber", e.getValue().partitionInfo.drId);
+                stringer.keySymbolValuePair("spUniqueId", e.getValue().partitionInfo.spUniqueId);
+                stringer.keySymbolValuePair("mpUniqueId", e.getValue().partitionInfo.mpUniqueId);
+            } else {
+                stringer.keySymbolValuePair("sequenceNumber", e.getValue().replicatedInfo.drId);
+                stringer.keySymbolValuePair("spUniqueId", e.getValue().replicatedInfo.spUniqueId);
+                stringer.keySymbolValuePair("mpUniqueId", e.getValue().replicatedInfo.mpUniqueId);
             }
             stringer.endObject();
-        } catch (JSONException e) {
-            throw new IOException(e);
         }
+        stringer.endObject();
     }
 
     private void mergeDRTupleStreamInfoToZK(JSONObject jsonObj, VoltLogger log) throws JSONException {
@@ -301,31 +293,31 @@ public class ExtensibleSnapshotDigestData {
         }
     }
 
-    private void writeDRStateToSnapshot(JSONStringer stringer) throws IOException {
-        try {
-            long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
-            stringer.keySymbolValuePair("clusterCreateTime", clusterCreateTime);
+    private void writeDRStateToSnapshot(JSONStringer stringer) throws JSONException {
+        long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
+        stringer.keySymbolValuePair("clusterCreateTime", clusterCreateTime);
 
-            Iterator<Entry<Integer, TupleStreamStateInfo>> iter = m_drTupleStreamInfo.entrySet().iterator();
-            if (iter.hasNext()) {
-                stringer.keySymbolValuePair("drVersion", iter.next().getValue().drVersion);
-            }
-            writeDRTupleStreamInfoToSnapshot(stringer);
-            stringer.key("drMixedClusterSizeConsumerState");
-            stringer.object();
-            for (Entry<Integer, JSONObject> e : m_drMixedClusterSizeConsumerState.entrySet()) {
-                stringer.key(e.getKey().toString());    // Consumer partitionId
-                stringer.value(e.getValue());           // Trackers from that site
-            }
-            stringer.endObject();
-        } catch (JSONException e) {
-            throw new IOException(e);
+        Iterator<Entry<Integer, TupleStreamStateInfo>> iter = m_drTupleStreamInfo.entrySet().iterator();
+        if (iter.hasNext()) {
+            stringer.keySymbolValuePair("drVersion", iter.next().getValue().drVersion);
         }
+        writeDRTupleStreamInfoToSnapshot(stringer);
+        stringer.key("drMixedClusterSizeConsumerState");
+        stringer.object();
+        for (Entry<Integer, JSONObject> e : m_drMixedClusterSizeConsumerState.entrySet()) {
+            stringer.key(e.getKey().toString()); // Consumer partitionId
+            stringer.value(e.getValue()); // Trackers from that site
+        }
+        stringer.endObject();
     }
 
     public void writeToSnapshotDigest(JSONStringer stringer) throws IOException {
-        writeExportSequencesToSnapshot(stringer);
-        writeDRStateToSnapshot(stringer);
+        try {
+            writeExportSequencesToSnapshot(stringer);
+            writeDRStateToSnapshot(stringer);
+        } catch (JSONException e) {
+            throw new IOException(e);
+        }
     }
 
     public void mergeToZooKeeper(JSONObject jsonObj, VoltLogger log) throws JSONException {
