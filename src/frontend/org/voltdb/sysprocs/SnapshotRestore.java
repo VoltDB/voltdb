@@ -67,7 +67,6 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil.StringCallback;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
@@ -75,7 +74,6 @@ import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StartAction;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableCompressor;
 import org.voltdb.TheHashinator;
@@ -2833,59 +2831,6 @@ public class SnapshotRestore extends VoltSystemProcedure {
     private Table getCatalogTable(String tableName)
     {
         return m_database.getTables().get(tableName);
-    }
-
-    /*
-     * Do parameter checking for the pre-JSON version of @SnapshotRestore old version
-     */
-    public static ClientResponseImpl transformRestoreParamsToJSON(StoredProcedureInvocation task) {
-        Object params[] = task.getParams().toArray();
-        if (params.length == 1) {
-            return null;
-        } else if (params.length == 2) {
-            if (params[0] == null) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "@SnapshotRestore parameter 0 was null",
-                        task.getClientHandle());
-            }
-            if (params[1] == null) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "@SnapshotRestore parameter 1 was null",
-                        task.getClientHandle());
-            }
-            if (!(params[0] instanceof String)) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "@SnapshotRestore param 0 (path) needs to be a string, but was type "
-                        + params[0].getClass().getSimpleName(),
-                        task.getClientHandle());
-            }
-            if (!(params[1] instanceof String)) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "@SnapshotRestore param 1 (nonce) needs to be a string, but was type "
-                        + params[1].getClass().getSimpleName(),
-                        task.getClientHandle());
-            }
-            JSONObject jsObj = new JSONObject();
-            try {
-                jsObj.put(SnapshotUtil.JSON_PATH, params[0]);
-                jsObj.put(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH);
-                jsObj.put(SnapshotUtil.JSON_NONCE, params[1]);
-            } catch (JSONException e) {
-                throw new RuntimeException(e);
-            }
-            task.setParams( jsObj.toString() );
-            return null;
-        } else {
-            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[0],
-                    "@SnapshotRestore supports a single json document parameter or two parameters (path, nonce), " +
-                    params.length + " parameters provided",
-                    task.getClientHandle());
-        }
     }
 
     /*
