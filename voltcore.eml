@@ -146,9 +146,6 @@
 	<lib name="joda-time-2.9.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/joda-time-2.9.3.jar!/"/>
 	</lib>
-	<lib name="commons-lang-2.6.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/commons-lang-2.6.jar!/"/>
-	</lib>
 	<lib name="guava-18.0.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/guava-18.0.jar!/"/>
 	</lib>
