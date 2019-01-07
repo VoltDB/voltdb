@@ -26,7 +26,7 @@ import java.util.Date;
 import java.util.regex.Pattern;
 import java.nio.ByteBuffer;
 
-import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.voltdb.common.Constants;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.types.GeographyPointValue;
