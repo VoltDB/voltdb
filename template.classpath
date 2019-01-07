@@ -64,7 +64,6 @@
 	<classpathentry kind="lib" path="third_party/java/jars/jackson-core-2.9.10.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/jackson-annotations-2.9.10.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/joda-time-2.9.3.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/commons-lang-2.6.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/guava-18.0.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
 		<attributes>
