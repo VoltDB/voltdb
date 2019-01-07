@@ -685,7 +685,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
              */
             while (true) {
                 bpm = (BinaryPayloadMessage)m.recvBlocking();
-                if (bpm == null) continue;
+                if (bpm == null) {
+                    continue;
+                }
                 ByteBuffer wrappedMap = ByteBuffer.wrap(bpm.m_payload);
 
                 while (wrappedMap.hasRemaining()) {
@@ -707,7 +709,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
              */
             while (true) {
                 VoltMessage vm = m.recvBlocking(1000);
-                if (vm == null) continue;
+                if (vm == null) {
+                    continue;
+                }
 
                 if (vm instanceof FragmentTaskMessage) {
                     FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
@@ -853,9 +857,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
             if (result == null) {
                 return new DependencyPair.TableDependencyPair(dependency_id, null);
-            }
-            else
+            } else {
                 return new DependencyPair.TableDependencyPair(dependency_id, result);
+            }
         }
 
         else if (fragmentId == SysProcFragmentId.PF_restoreLoadReplicatedTable)
@@ -1553,8 +1557,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         //Iterate the export tables
         for (Table t : db.getTables()) {
-            if (!CatalogUtil.isTableExportOnly(db, t))
+            if (!CatalogUtil.isTableExportOnly(db, t)) {
                 continue;
+            }
 
             String signature = t.getSignature();
             String name = t.getTypeName();
@@ -2202,7 +2207,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 Map<Long, Long> actualToGenerated = new HashMap<Long, Long>();
                 while (discoveredMailboxes < totalMailboxes) {
                     BinaryPayloadMessage bpm = (BinaryPayloadMessage)m.recvBlocking();
-                    if (bpm == null) continue;
+                    if (bpm == null) {
+                        continue;
+                    }
                     discoveredMailboxes++;
                     ByteBuffer payload = ByteBuffer.wrap(bpm.m_payload);
 
@@ -2235,7 +2242,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 int acksReceived = 0;
                 while (acksReceived < totalMailboxes) {
                     BinaryPayloadMessage bpm = (BinaryPayloadMessage)m.recvBlocking();
-                    if (bpm == null) continue;
+                    if (bpm == null) {
+                        continue;
+                    }
                     acksReceived++;
                 }
 
@@ -2948,7 +2957,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
             //Lightly spinning makes debugging easier by allowing inspection
             //of stuff on the stack
             VoltMessage vm = m.recvBlocking(1000);
-            if (vm == null) continue;
+            if (vm == null) {
+                continue;
+            }
 
             if (vm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
@@ -3042,7 +3053,9 @@ public class SnapshotRestore extends VoltSystemProcedure {
     }
 
     private void validateIncludeTables(final ClusterSaveFileState savefileState, List<String> include) {
-        if(include == null || include.size() == 0) return;
+        if(include == null || include.size() == 0) {
+            return;
+        }
         Set<String> savedTableNames = savefileState.getSavedTableNames();
         for(String s : include) {
             if(!savedTableNames.contains(s)) {
