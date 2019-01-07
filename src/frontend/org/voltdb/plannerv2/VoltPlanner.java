@@ -180,8 +180,7 @@ public class VoltPlanner implements Planner {
         return m_config.getTypeFactory();
     }
 
-    @Override public RelNode transform(int ruleSetIndex, RelTraitSet requiredOutputTraits, RelNode rel)
-            throws RelConversionException {
+    @Override public RelNode transform(int ruleSetIndex, RelTraitSet requiredOutputTraits, RelNode rel) {
         ensure(State.STATE_3_CONVERTED);
         requiredOutputTraits = requiredOutputTraits.simplify();
         Program program = m_config.getPrograms().get(ruleSetIndex);
