@@ -199,7 +199,7 @@ public class VoltPlanner implements Planner {
      * @return the transformed relational expression tree.
      */
     public static RelNode transformHep(PlannerRules.Phase phase, RelNode rel) {
-        return transformHep(phase, null, rel);
+        return transformHep(phase, null, rel, false);
     }
 
     /**
@@ -207,17 +207,25 @@ public class VoltPlanner implements Planner {
      * expression based on a particular rule set and requires set of traits.
      *
      * @param phase     The planner phase
-     * @param bottomUp  Whether to use the bottom-up match order.
+     * @param matchOrder  The match order.
      * @param rel       The root node
+     * @param ordered   If it is true, rules will only apply once in order
      * @return the transformed relational expression tree.
      */
-    public static RelNode transformHep(PlannerRules.Phase phase, HepMatchOrder matchOrder, RelNode rel) {
+    public static RelNode transformHep(PlannerRules.Phase phase, HepMatchOrder matchOrder, RelNode rel, boolean ordered) {
         final HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
         if (matchOrder != null) {
             hepProgramBuilder.addMatchOrder(matchOrder);
         }
-        phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+        if (ordered) {
+            phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+        } else {
+            hepProgramBuilder.addGroupBegin();
+            phase.getRules().forEach(hepProgramBuilder::addRuleInstance);
+            hepProgramBuilder.addGroupEnd();
+        }
         HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
+
         planner.setRoot(rel);
         return planner.findBestExp();
     }
@@ -228,6 +236,10 @@ public class VoltPlanner implements Planner {
 
     @Override public RelTraitSet getEmptyTraitSet() {
         return m_relPlanner.emptyTraitSet();
+    }
+
+    public void addRelTraitDef(RelTraitDef def) {
+        m_relPlanner.addRelTraitDef(def);
     }
 
     /**

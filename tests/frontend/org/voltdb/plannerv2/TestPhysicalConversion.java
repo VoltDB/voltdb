@@ -34,7 +34,6 @@ public class TestPhysicalConversion extends Plannerv2TestCase {
     @Override public void tearDown() throws Exception {
         super.tearDown();
     }
-
     /*
     @Override
     void assertPlanMatch(String sql, String expectedPlan) {

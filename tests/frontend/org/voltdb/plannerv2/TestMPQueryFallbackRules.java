@@ -23,24 +23,18 @@
 
 package org.voltdb.plannerv2;
 
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelDistributionTraitDef;
-import org.apache.calcite.rel.RelDistributions;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
-import org.voltdb.calciteadapter.CatalogAdapter;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
-import org.voltdb.newplanner.rules.PlannerPhase;
-import org.voltdb.newplanner.util.VoltDBRelUtil;
-import org.voltdb.types.CalcitePlannerType;
+import org.voltdb.plannerv2.rules.PlannerRules;
 
-public class TestMPQueryFallbackRules extends VoltConverterTestCase {
+public class TestMPQueryFallbackRules extends Plannerv2TestCase {
+
+    MPFallbackTester m_tester = new MPFallbackTester();
+
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestVoltSqlValidator.class.getResource(
+        setupSchema(TestValidation.class.getResource(
                 "testcalcite-ddl.sql"), "testcalcite", false);
-        init(CatalogAdapter.schemaPlusFromDatabase(getDatabase()));
+        init();
+        m_tester.phase(PlannerRules.Phase.MP_FALLBACK);
     }
 
     @Override
@@ -48,247 +42,247 @@ public class TestMPQueryFallbackRules extends VoltConverterTestCase {
         super.tearDown();
     }
 
-    private void assertNotFallback(String sql) {
-        RelRoot root = parseValidateAndConvert(sql);
-
-        // apply logical rules
-        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
-        RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
-                root.rel, logicalTraits);
-
-        // Add RelDistributions.ANY trait to the rel tree.
-        nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.ANY);
-
-        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
-        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
-
-        // do the MP fallback check
-        CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
-                nodeAfterLogicalRules);
-    }
-
-    private void assertFallback(String sql) {
-        try {
-            assertNotFallback(sql);
-        } catch (RuntimeException e) {
-            assertTrue(e.getMessage().startsWith("Error while applying rule") ||
-                    e.getMessage().equals("MP query not supported in Calcite planner."));
-            // we got the exception, we are good.
-            return;
-        }
-        fail("Expected fallback.");
-    }
+//    private void assertNotFallback(String sql) {
+//        RelRoot root = parseValidateAndConvert(sql);
+//
+//        // apply logical rules
+//        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
+//        RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
+//                root.rel, logicalTraits);
+//
+//        // Add RelDistributions.ANY trait to the rel tree.
+//        nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.ANY);
+//
+//        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
+//        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
+//
+//        // do the MP fallback check
+//        CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
+//                nodeAfterLogicalRules);
+//    }
+//
+//    private void assertFallback(String sql) {
+//        try {
+//            assertNotFallback(sql);
+//        } catch (RuntimeException e) {
+//            assertTrue(e.getMessage().startsWith("Error while applying rule") ||
+//                    e.getMessage().equals("MP query not supported in Calcite planner."));
+//            // we got the exception, we are good.
+//            return;
+//        }
+//        fail("Expected fallback.");
+//    }
 
     // when we only deal with replicated table, we will always have a SP query.
     public void testReplicated() {
-        assertNotFallback("select * from R2");
+        m_tester.sql("select * from R2").test();
 
-        assertNotFallback("select i, si from R1");
+        m_tester.sql("select i, si from R1").test();
 
-        assertNotFallback("select i, si from R1 where si = 9");
+        m_tester.sql("select i, si from R1 where si = 9").test();
     }
 
     // Partitioned with no filter, always a MP query
     public void testPartitionedWithoutFilter() {
-        assertFallback("select * from P1");
+        m_tester.sql("select * from P1").testFail();
 
-        assertFallback("select i from P1");
+        m_tester.sql("select i from P1").testFail();
     }
 
     public void testPartitionedWithFilter() {
         // equal condition on partition key
-        assertNotFallback("select * from P1 where i = 1");
+        m_tester.sql("select * from P1 where i = 1").test();
 
-        assertNotFallback("select * from P1 where 1 = i");
+        m_tester.sql("select * from P1 where 1 = i").test();
 
         // other conditions on partition key
-        assertFallback("select * from P1 where i > 10");
-        assertFallback("select * from P1 where i <> 10");
+        m_tester.sql("select * from P1 where i > 10").testFail();
+        m_tester.sql("select * from P1 where i <> 10").testFail();
 
         // equal condition on partition key with ANDs
-        assertNotFallback("select si, v from P1 where 7=si and i=2");
-        assertNotFallback("select si, v from P1 where 7>si and i=2 and ti<3");
+        m_tester.sql("select si, v from P1 where 7=si and i=2").test();
+        m_tester.sql("select si, v from P1 where 7>si and i=2 and ti<3").test();
 
         // equal condition on partition key with ORs
-        assertFallback("select si, v from P1 where 7=si or i=2");
-        assertFallback("select si, v from P1 where 7=si or i=2 or ti=3");
+        m_tester.sql("select si, v from P1 where 7=si or i=2").testFail();
+        m_tester.sql("select si, v from P1 where 7=si or i=2 or ti=3").testFail();
 
         // equal condition on partition key with ORs and ANDs
-        assertFallback("select si, v from P1 where 7>si or (i=2 and ti<3)");
-        assertNotFallback("select si, v from P1 where 7>si and (i=2 and ti<3)");
-        assertNotFallback("select si, v from P1 where (7>si or ti=2) and i=2");
-        assertFallback("select si, v from P1 where (7>si or ti=2) or i=2");
+        m_tester.sql("select si, v from P1 where 7>si or (i=2 and ti<3)").testFail();
+        m_tester.sql("select si, v from P1 where 7>si and (i=2 and ti<3)").test();
+        m_tester.sql("select si, v from P1 where (7>si or ti=2) and i=2").test();
+        m_tester.sql("select si, v from P1 where (7>si or ti=2) or i=2").testFail();
 
         // equal condition with some expression that always TURE
-        assertNotFallback("select si, v from P1 where (7=si and i=2) and 1=1");
-        assertFallback("select si, v from P1 where (7=si and i=2) or 1=1");
+        m_tester.sql("select si, v from P1 where (7=si and i=2) and 1=1").test();
+        m_tester.sql("select si, v from P1 where (7=si and i=2) or 1=1").testFail();
 
         // equal condition with some expression that always FALSE
-        assertNotFallback("select si, v from P1 where (7=si and i=2) and 1=2");
+        m_tester.sql("select si, v from P1 where (7=si and i=2) and 1=2").test();
         // TODO: we should pass the commented test below if the planner is clever enough
 //        assertNotFallback("select si, v from P1 where (7=si and i=2) or 1=2");
     }
 
     public void testJoin() {
-        assertNotFallback("select R1.i, R2.v from R1, R2 " +
-                "where R2.si = R1.i and R2.v = 'foo'");
+        m_tester.sql("select R1.i, R2.v from R1, R2 " +
+                "where R2.si = R1.i and R2.v = 'foo'").test();
 
-        assertNotFallback("select R1.i, R2.v from R1 inner join R2 " +
-                "on R2.si = R1.i where R2.v = 'foo'");
+        m_tester.sql("select R1.i, R2.v from R1 inner join R2 " +
+                "on R2.si = R1.i where R2.v = 'foo'").test();
 
-        assertNotFallback("select R2.si, R1.i from R1 inner join " +
-                "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i");
+        m_tester.sql("select R2.si, R1.i from R1 inner join " +
+                "R2 on R2.i = R1.si where R2.v = 'foo' and R1.si > 4 and R1.ti > R2.i").test();
 
-        assertNotFallback("select R1.i from R1 inner join " +
-                "R2  on R1.si = R2.si where R1.I + R2.ti = 5");
+        m_tester.sql("select R1.i from R1 inner join " +
+                "R2  on R1.si = R2.si where R1.I + R2.ti = 5").test();
     }
 
     public void testJoinPartitionedTable() {
         // when join 2 partitioned table, assume it is always MP
-        assertFallback("select P1.i, P2.v from P1, P2 " +
-                "where P2.si = P1.i and P2.v = 'foo'");
+        m_tester.sql("select P1.i, P2.v from P1, P2 " +
+                "where P2.si = P1.i and P2.v = 'foo'").testFail();
 
-        assertFallback("select P1.i, P2.v from P1, P2 " +
-                "where P2.si = P1.i and P2.i = 34");
+        m_tester.sql("select P1.i, P2.v from P1, P2 " +
+                "where P2.si = P1.i and P2.i = 34").testFail();
 
-        assertFallback("select P1.i, P2.v from P1 inner join P2 " +
-                "on P2.si = P1.i where P2.v = 'foo'");
+        m_tester.sql("select P1.i, P2.v from P1 inner join P2 " +
+                "on P2.si = P1.i where P2.v = 'foo'").testFail();
 
         // when join a partitioned table with a replicated table,
         // if the filtered result on the partitioned table is not SP, then the query is MP
-        assertFallback("select R1.i, P2.v from R1, P2 " +
-                "where P2.si = R1.i and P2.v = 'foo'");
+        m_tester.sql("select R1.i, P2.v from R1, P2 " +
+                "where P2.si = R1.i and P2.v = 'foo'").testFail();
 
-        assertFallback("select R1.i, P2.v from R1, P2 " +
-                "where P2.si = R1.i and P2.i > 3");
+        m_tester.sql("select R1.i, P2.v from R1, P2 " +
+                "where P2.si = R1.i and P2.i > 3").testFail();
 
-        assertFallback("select R1.i, P2.v from R1 inner join P2 " +
-                "on P2.si = R1.i and (P2.i > 3 or P2.i =1)");
+        m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i and (P2.i > 3 or P2.i =1)").testFail();
 
         // when join a partitioned table with a replicated table,
         // if the filtered result on the partitioned table is SP, then the query is SP
-        assertNotFallback("select R1.i, P2.v from R1, P2 " +
-                "where P2.si = R1.i and P2.i = 3");
+        m_tester.sql("select R1.i, P2.v from R1, P2 " +
+                "where P2.si = R1.i and P2.i = 3").test();
 
-        assertNotFallback("select R1.i, P2.v from R1 inner join P2 " +
-                "on P2.si = R1.i where P2.i =3");
+        m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i where P2.i =3").test();
 
-        assertNotFallback("select R1.i, P2.v from R1 inner join P2 " +
-                "on P2.si = R1.i where P2.i =3 and P2.v = 'bar'");
+        m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i where P2.i =3 and P2.v = 'bar'").test();
 
         // when join a partitioned table with a replicated table,
         // if the join condition can filter the partitioned table in SP, then the query is SP
-        assertNotFallback("select R1.i, P2.v from R1 inner join P2 " +
-                "on P2.si = R1.i and P2.i =3");
+        m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i and P2.i =3").test();
 
-        assertNotFallback("select R1.i, P2.v from R1 inner join P2 " +
-                "on P2.si = R1.i and P2.i =3 where P2.v = 'bar'");
+        m_tester.sql("select R1.i, P2.v from R1 inner join P2 " +
+                "on P2.si = R1.i and P2.i =3 where P2.v = 'bar'").test();
     }
 
     public void testThreeWayJoinWithoutFilter() {
         // three-way join on replicated tables, SP
-        assertNotFallback("select R1.i from R1 inner join " +
+        m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.si inner join " +
-                "R3 on R2.i = R3.ii");
+                "R3 on R2.i = R3.ii").test();
 
         // all partitioned, MP
-        assertFallback("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "P2  on P1.si = P2.si inner join " +
-                "P3 on P2.i = P3.i");
+                "P3 on P2.i = P3.i").testFail();
 
         // one of them partitioned, MP
-        assertFallback("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "R2  on P1.si = R2.si inner join " +
-                "R3 on R2.i = R3.ii");
+                "R3 on R2.i = R3.ii").testFail();
 
-        assertFallback("select R1.i from R1 inner join " +
+        m_tester.sql("select R1.i from R1 inner join " +
                 "P2  on R1.si = P2.si inner join " +
-                "R3 on P2.i = R3.ii");
+                "R3 on P2.i = R3.ii").testFail();
 
-        assertFallback("select R1.i from R1 inner join " +
+        m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.si inner join " +
-                "P3 on R2.i = P3.i");
+                "P3 on R2.i = P3.i").testFail();
 
         // two of them partitioned, MP
-        assertFallback("select R1.i from R1 inner join " +
+        m_tester.sql("select R1.i from R1 inner join " +
                 "P2  on R1.si = P2.si inner join " +
-                "P3 on P2.i = P3.i");
+                "P3 on P2.i = P3.i").testFail();
 
-        assertFallback("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "R2  on P1.si = R2.si inner join " +
-                "P3 on R2.i = P3.i");
+                "P3 on R2.i = P3.i").testFail();
 
-        assertFallback("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "P2  on P1.si = P2.si inner join " +
-                "R3 on P2.i = R3.ii");
+                "R3 on P2.i = R3.ii").testFail();
 
         // this is tricky. Note `P1.si = R2.i` will produce a Calc with CAST.
-        assertFallback("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "R2  on P1.si = R2.i inner join " +
-                "R3 on R2.i = R3.ii");
+                "R3 on R2.i = R3.ii").testFail();
     }
 
     public void testThreeWayJoinWithFilter() {
-        assertNotFallback("select R1.i from R1 inner join " +
+        m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +
-                "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'");
+                "R3 on R2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo'").test();
 
-        assertFallback("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "R2  on P1.si = R2.i inner join " +
-                "R3 on R2.v = R3.vc where P1.si > 4 and R3.vc <> 'foo'");
+                "R3 on R2.v = R3.vc where P1.si > 4 and R3.vc <> 'foo'").testFail();
 
-        assertFallback("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "P2  on P1.si = P2.i inner join " +
-                "R3 on P2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'");
+                "R3 on P2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'").testFail();
 
-        assertFallback("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "P2  on P1.si = P2.i inner join " +
-                "R3 on P2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo' and P2.i = 5");
+                "R3 on P2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo' and P2.i = 5").testFail();
 
-        assertFallback("select R1.i from R1 inner join " +
+        m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +
-                "P3 on R2.v = P3.v where R1.si > 4 and P3.si = 6");
+                "P3 on R2.v = P3.v where R1.si > 4 and P3.si = 6").testFail();
 
-        assertNotFallback("select P1.i from P1 inner join " +
+        m_tester.sql("select P1.i from P1 inner join " +
                 "R2  on P1.si = R2.i inner join " +
-                "R3 on R2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'");
+                "R3 on R2.v = R3.vc where P1.i = 4 and R3.vc <> 'foo'").test();
 
-        assertNotFallback("select R1.i from R1 inner join " +
+        m_tester.sql("select R1.i from R1 inner join " +
                 "P2  on R1.si = P2.i inner join " +
-                "R3 on P2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo' and P2.i = 5");
+                "R3 on P2.v = R3.vc where R1.si > 4 and R3.vc <> 'foo' and P2.i = 5").test();
 
-        assertNotFallback("select R1.i from R1 inner join " +
+        m_tester.sql("select R1.i from R1 inner join " +
                 "R2  on R1.si = R2.i inner join " +
-                "P3 on R2.v = P3.v where R1.si > 4 and P3.i = 6");
+                "P3 on R2.v = P3.v where R1.si > 4 and P3.i = 6").test();
     }
 
     public void testSubqueriesJoin() {
-        assertNotFallback("select t1.v, t2.v "
+        m_tester.sql("select t1.v, t2.v "
                 + "from "
                 + "  (select * from R1 where v = 'foo') as t1 "
                 + "  inner join "
                 + "  (select * from R2 where f = 30.3) as t2 "
                 + "on t1.i = t2.i "
-                + "where t1.i = 3");
+                + "where t1.i = 3").test();
 
-        assertFallback("select t1.v, t2.v "
+        m_tester.sql("select t1.v, t2.v "
                 + "from "
                 + "  (select * from R1 where v = 'foo') as t1 "
                 + "  inner join "
                 + "  (select * from P2 where f = 30.3) as t2 "
                 + "on t1.i = t2.i "
-                + "where t1.i = 3");
+                + "where t1.i = 3").testFail();
 
-        assertNotFallback("select t1.v, t2.v "
+        m_tester.sql("select t1.v, t2.v "
                 + "from "
                 + "  (select * from R1 where v = 'foo') as t1 "
                 + "  inner join "
                 + "  (select * from P2 where i = 303) as t2 "
                 + "on t1.i = t2.i "
-                + "where t1.i = 3");
+                + "where t1.i = 3").test();
 
-        assertFallback("select RI1.bi from RI1, (select I from P2 order by I) P22 where RI1.i = P22.I");
+        m_tester.sql("select RI1.bi from RI1, (select I from P2 order by I) P22 where RI1.i = P22.I").testFail();
 
-        assertNotFallback("select RI1.bi from RI1, (select I from P2 where I = 5 order by I) P22 where RI1.i = P22.I");
+        m_tester.sql("select RI1.bi from RI1, (select I from P2 where I = 5 order by I) P22 where RI1.i = P22.I").test();
     }
 }

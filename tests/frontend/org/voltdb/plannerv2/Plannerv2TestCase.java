@@ -25,6 +25,9 @@ package org.voltdb.plannerv2;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepMatchOrder;
+import org.apache.calcite.rel.RelDistributionTraitDef;
+import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
@@ -33,7 +36,9 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.planner.PlannerTestCase;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules;
+import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
  * Base class for planner v2 test cases.
@@ -68,7 +73,6 @@ public class Plannerv2TestCase extends PlannerTestCase {
         RelRoot m_root;
         RelNode m_transformedNode;
         int m_ruleSetIndex = -1;
-        RelTraitSet m_requiredOutputTraits;
 
         void reset() {
             m_sap = null;
@@ -99,11 +103,6 @@ public class Plannerv2TestCase extends PlannerTestCase {
             return this;
         }
 
-        public Tester traitSet(RelTraitSet traitSet) {
-            m_requiredOutputTraits = traitSet;
-            return this;
-        }
-
         public Tester transform(String expectedTransform) {
             m_expectedTransform = expectedTransform;
             return this;
@@ -122,6 +121,10 @@ public class Plannerv2TestCase extends PlannerTestCase {
             } else {
                 m_planner.reset();
             }
+        }
+
+        public void testFail() {
+            fail("Not implemented.");
         }
 
         void checkEx(Exception ex) throws AssertionError {
@@ -166,24 +169,41 @@ public class Plannerv2TestCase extends PlannerTestCase {
         }
     }
 
-    public class TransformationTester extends ConversionTester {
+    public class LogicalRulesTester extends ConversionTester {
         @Override public void test() throws AssertionError {
             super.test();
             if (m_ruleSetIndex < 0) {
                 throw new AssertionError("Need to specify a planner phase.");
             }
-            if (m_requiredOutputTraits == null) {
-                throw new AssertionError("Need to specify the output trait set.");
+
+            m_transformedNode = m_planner.transform(PlannerRules.Phase.LOGICAL.ordinal(),
+                    getEmptyTraitSet().replace(VoltLogicalRel.CONVENTION), m_root.rel);
+            if (m_ruleSetIndex == PlannerRules.Phase.LOGICAL.ordinal() && m_expectedTransform != null) {
+                String actualTransform = RelOptUtil.toString(m_transformedNode);
+                assertEquals(m_expectedTransform, actualTransform);
             }
+        }
+    }
+
+    public class MPFallbackTester extends LogicalRulesTester {
+        @Override public void test() throws AssertionError {
+            super.test();
+            m_transformedNode = VoltRelUtil.addTraitRecurcively(m_transformedNode, RelDistributions.ANY);
+            m_planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
+            m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK,
+                    HepMatchOrder.BOTTOM_UP, m_transformedNode, false);
+        }
+
+        @Override public void testFail() {
             try {
-                m_transformedNode = m_planner.transform(m_ruleSetIndex, m_requiredOutputTraits, m_root.rel);
-                if (m_expectedTransform != null) {
-                    String actualTransform = RelOptUtil.toString(m_transformedNode);
-                    assertEquals(m_expectedTransform, actualTransform);
-                }
-            } catch (Exception ex) {
-                checkEx(ex);
+                test();
+            } catch (RuntimeException e) {
+                assertTrue(e.getMessage().startsWith("Error while applying rule") ||
+                        e.getMessage().equals("MP query not supported in Calcite planner."));
+                // we got the exception, we are good.
+                return;
             }
+            fail("Expected fallback.");
         }
     }
 }
