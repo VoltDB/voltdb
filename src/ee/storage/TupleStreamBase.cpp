@@ -224,7 +224,7 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t, int64_t exportSeqNo)
     m_uso = mark;
     // make the stream of tuples contiguous outside of actual system failures
     m_uncommittedTupleCount -= m_exportSequenceNumber - exportSeqNo;
-    assert (m_uncommittedTupleCount < 0);
+    assert (m_uncommittedTupleCount >= 0 || exportSeqNo == SIZE_MAX);
     m_exportSequenceNumber = exportSeqNo;
 
     // working from newest to oldest block, throw
