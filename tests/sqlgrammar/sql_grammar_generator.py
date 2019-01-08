@@ -1296,6 +1296,7 @@ if __name__ == "__main__":
                             ['Materialized view', 'cannot contain subquery sources'],
                             ['Not unique table/alias'],
                             ['ORDER BY parsed with strange child node type'],
+                            ['Materialized view', 'joins multiple tables'],
                            ]
 
     # A list of headers found in responses to valid 'show' commands: one of
