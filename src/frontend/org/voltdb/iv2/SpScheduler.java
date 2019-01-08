@@ -1193,7 +1193,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // Send the message to the duplicate counter, if any
         DuplicateCounter counter =
             m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()));
-        final MpTransactionState txn = (MpTransactionState)m_outstandingTxns.get(message.getTxnId());
+        final TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         if (counter != null) {
             String traceName = "recvfragment";
             if (message.m_sourceHSId != m_mailbox.getHSId()) {
@@ -1348,7 +1348,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         if (txnDone) {
             assert !msg.isRestart();
-            final MpTransactionState txn = (MpTransactionState)m_outstandingTxns.remove(msg.getTxnId());
+            final TransactionState txn = m_outstandingTxns.remove(msg.getTxnId());
             m_duplicateCounters.remove(duplicateCounterKey);
 
             if (txn != null) {

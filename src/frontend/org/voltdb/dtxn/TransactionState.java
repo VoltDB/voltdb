@@ -54,6 +54,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     private ArrayList<UndoAction> m_undoLog;
     // This timestamp is only used for restarted transactions
     protected long m_restartTimestamp = TransactionInfoBaseMessage.INITIAL_TIMESTAMP;
+    long m_oldFragmentExecutedSiteId = -1;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -219,5 +220,15 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public long getTimetamp() {
         return m_restartTimestamp;
+    }
+
+    // During partition leader migration, a site acts as leader for a transaction if the leader switch occurs
+    // in the middle of transaction
+    public void setOldFragmentExecutedSiteId(long oldFragmentExecutedSiteId) {
+        m_oldFragmentExecutedSiteId = oldFragmentExecutedSiteId;
+    }
+
+    public long getOldFragmentExecutedSiteId() {
+        return m_oldFragmentExecutedSiteId;
     }
 }
