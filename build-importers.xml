@@ -127,7 +127,7 @@
         </fileset>
         <fileset dir='${lib.dir}'>
             <include name='felix.jar'/>
-            <include name='commons-lang3-3.0.jar'/>
+            <include name='commons-lang3-3.8.1.jar'/>
         </fileset>
         <fileset refid="voltpro.classpath"/>
      </path>
