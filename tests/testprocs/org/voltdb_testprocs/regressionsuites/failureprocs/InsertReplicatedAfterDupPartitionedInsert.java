@@ -26,8 +26,6 @@ package org.voltdb_testprocs.regressionsuites.failureprocs;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.VoltType;
 
 public class InsertReplicatedAfterDupPartitionedInsert extends VoltProcedure {
 
