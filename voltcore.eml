@@ -2,8 +2,8 @@
 <component inheritJdk="true">
 	<exclude-output/>
 	<contentEntry url="file://$MODULE_DIR$"/>
-	<lib name="commons-lang3-3.0.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/commons-lang3-3.0.jar!/"/>
+	<lib name="commons-lang3-3.8.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/commons-lang3-3.8.1.jar!/"/>
 	</lib>
 	<lib name="jline-2.10.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jline-2.10.jar!/"/>
