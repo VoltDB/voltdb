@@ -97,6 +97,7 @@ public class MpTransactionState extends TransactionState
     boolean m_fragmentRestarted = false;
     final boolean m_nPartTxn;
     boolean m_haveSentfragment = false;
+    long m_oldFragmentExecutedSiteId = -1;
 
     //Master change from MigratePartitionLeader. The remote dependencies are built before MigratePartitionLeader. After
     //fragment restart, the FragmentResponseMessage will come from the new partition master. The map is used to remove
@@ -715,6 +716,16 @@ public class MpTransactionState extends TransactionState
     // When MP txn is restarted, the flag is reset to false.
     public boolean haveSentFragment() {
         return m_haveSentfragment;
+    }
+
+    // During partition leader migration, a site acts as leader for a transaction if the leader switch occurs
+    // in the middle of transaction
+    public void setOldFragmentExecutedSiteId(long oldFragmentExecutedSiteId) {
+        m_oldFragmentExecutedSiteId = oldFragmentExecutedSiteId;
+    }
+
+    public long getOldFragmentExecutedSiteId() {
+        return m_oldFragmentExecutedSiteId;
     }
 }
 

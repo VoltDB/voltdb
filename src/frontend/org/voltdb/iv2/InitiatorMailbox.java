@@ -35,6 +35,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
@@ -448,10 +449,10 @@ public class InitiatorMailbox implements Mailbox
             return false;
         }
 
-        boolean seenTheTxn = (((SpScheduler)m_scheduler).getTransactionState(message.getTxnId()) != null);
+        TransactionState txnState = (((SpScheduler)m_scheduler).getTransactionState(message.getTxnId()));
 
         // If a fragment is part of a transaction which have not been seen on this site, restart it.
-        if (!seenTheTxn) {
+        if (txnState == null) {
             FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
             TransactionRestartException restart = new TransactionRestartException(
                     "Transaction being restarted due to MigratePartitionLeader.", message.getTxnId());
@@ -468,15 +469,14 @@ public class InitiatorMailbox implements Mailbox
 
         // A transaction may have multiple batches or fragments. If the first batch or fragment has already been
         // processed, the follow-up batches or fragments should also be processed on this site.
-        if (!m_scheduler.isLeader() && !message.isForReplica() && seenTheTxn) {
+        if (!m_scheduler.isLeader() && !message.isForReplica()) {
             message.setForOldLeader(true);
+            if (txnState instanceof MpTransactionState) {
+                ((MpTransactionState)txnState).setOldFragmentExecutedSiteId(m_hsId);
+            }
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Follow-up fragment will be processed on " + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
             }
-        }
-        if (message.getCurrentBatchIndex() > 0 && !seenTheTxn && tmLog.isDebugEnabled()) {
-            tmLog.debug("The batch index of the fragment: " + message.getCurrentBatchIndex() + ". It is the 1st time on:"
-                    + CoreUtils.hsIdToString(getHSId()) + "\n" + message);
         }
         return false;
     }
