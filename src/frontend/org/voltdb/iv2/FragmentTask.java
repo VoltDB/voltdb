@@ -373,41 +373,7 @@ public class FragmentTask extends FragmentTaskBase
                     }
                     currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId, fullBacking, 0, tableSize));
                 }
-            } catch (final EEException e) {
-                if (!exceptionThrown) {
-                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                    if (currentFragResponse.getTableCount() == 0) {
-                        // Make sure the response has at least 1 result with a valid DependencyId
-                        currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                                m_rawDummyResult, 0, m_rawDummyResult.length));
-                    }
-                    exceptionThrown = true;
-                }
-            } catch (final SQLException e) {
-                if (!exceptionThrown) {
-                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                    if (currentFragResponse.getTableCount() == 0) {
-                        // Make sure the response has at least 1 result with a valid DependencyId
-                        currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                                m_rawDummyResult, 0, m_rawDummyResult.length));
-                    }
-                    exceptionThrown = true;
-                }
-            } catch (final ReplicatedTableException e) {
-                if (!exceptionThrown) {
-                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
-                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                    if (currentFragResponse.getTableCount() == 0) {
-                        // Make sure the response has at least 1 result with a valid DependencyId
-                        currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
-                                m_rawDummyResult, 0, m_rawDummyResult.length));
-                    }
-                    exceptionThrown = true;
-                }
-            }
-            catch (final InterruptException e) {
+            } catch (final EEException | SQLException | ReplicatedTableException | InterruptException e) {
                 if (!exceptionThrown) {
                     hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                     currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
