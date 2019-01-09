@@ -42,6 +42,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.elastic.ElasticService;
 import org.voltdb.exceptions.InterruptException;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
@@ -175,10 +176,12 @@ public class SnapshotSaveAPI
                         }
                     }
 
+                    ElasticService es = VoltDB.instance().getElasticService();
                     m_allLocalSiteSnapshotDigestData = new ExtensibleSnapshotDigestData(
                             SnapshotSiteProcessor.getExportSequenceNumbers(),
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
-                            remoteDataCenterLastIds, finalJsData);
+                            remoteDataCenterLastIds, es == null ? null : es.getResumeMetadata(),
+                            finalJsData);
                     createSetupIv2(
                             file_path,
                             pathType,

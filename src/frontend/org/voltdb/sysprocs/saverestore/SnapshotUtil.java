@@ -109,6 +109,7 @@ public class SnapshotUtil {
     public static final String JSON_NEW_PARTITION_COUNT = "newPartitionCount";
     public static final String JSON_TABLES = "tables";
     public static final String JSON_SKIPTABLES = "skiptables";
+    public static final String JSON_ELASTIC_OPERATION = "elasticOperationMetadata";
     /**
      * milestone used to mark a shutdown save snapshot
      */
