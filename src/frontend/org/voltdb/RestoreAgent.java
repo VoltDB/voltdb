@@ -260,6 +260,7 @@ SnapshotCompletionInterest, Promotable
         // Track the tables for which we found files on the node reporting this SnapshotInfo
         public final Set<String> fileTables = new HashSet<String>();
         public final SnapshotPathType pathType;
+        public final JSONObject elasticOperationMetadata;
 
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
@@ -269,7 +270,7 @@ SnapshotCompletionInterest, Promotable
         public SnapshotInfo(long txnId, String path, String nonce,
                             int partitions, int newPartitionCount,
                             long catalogCrc, int hostId, InstanceId instanceId,
-                            Set<String> digestTables, SnapshotPathType snaptype)
+                Set<String> digestTables, SnapshotPathType snaptype, JSONObject elasticOperationMetadata)
         {
             this.txnId = txnId;
             this.path = path;
@@ -281,6 +282,7 @@ SnapshotCompletionInterest, Promotable
             this.instanceId = instanceId;
             this.digestTables.addAll(digestTables);
             this.pathType = snaptype;
+            this.elasticOperationMetadata = elasticOperationMetadata;
         }
 
         public SnapshotInfo(JSONObject jo) throws JSONException
@@ -294,6 +296,7 @@ SnapshotCompletionInterest, Promotable
             catalogCrc = jo.getLong("catalogCrc");
             hostId = jo.getInt("hostId");
             instanceId = new InstanceId(jo.getJSONObject("instanceId"));
+            elasticOperationMetadata = jo.optJSONObject(SnapshotUtil.JSON_ELASTIC_OPERATION);
 
             JSONArray tables = jo.getJSONArray("tables");
             int cnt = tables.length();
@@ -367,6 +370,7 @@ SnapshotCompletionInterest, Promotable
                     stringer.value(fileTable);
                 }
                 stringer.endArray();
+                stringer.key(SnapshotUtil.JSON_ELASTIC_OPERATION).value(elasticOperationMetadata);
                 stringer.endObject();
                 return new JSONObject(stringer.toString());
             } catch (JSONException e) {
@@ -719,7 +723,8 @@ SnapshotCompletionInterest, Promotable
                 // in the truncation snapshot. Truncation snapshot taken at the end of the join process
                 // actually records the new partition count in the digest.
                 m_replayAgent.generateReplayPlan(infoWithMinHostId.instanceId.getTimestamp(),
-                        infoWithMinHostId.txnId, infoWithMinHostId.newPartitionCount, m_isLeader);
+                        infoWithMinHostId.txnId, infoWithMinHostId.newPartitionCount, m_isLeader,
+                        infoWithMinHostId.elasticOperationMetadata);
             }
         }
 
@@ -773,6 +778,7 @@ SnapshotCompletionInterest, Promotable
         // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
         InstanceId instanceId = new InstanceId(0, 0);
         int newPartitionCount = -1;
+        JSONObject elasticOperationMetadata = null;
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest, LOG);
@@ -805,6 +811,8 @@ SnapshotCompletionInterest, Promotable
                     digestTableNames.add(tableObj.getString(i));
                 }
             }
+
+            elasticOperationMetadata = digest_detail.optJSONObject(SnapshotUtil.JSON_ELASTIC_OPERATION);
         }
         catch (IOException ioe)
         {
@@ -870,7 +878,7 @@ SnapshotCompletionInterest, Promotable
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
                     partitionCount, newPartitionCount, catalog_crc, m_hostId, instanceId,
-                    digestTableNames, s.m_stype);
+                    digestTableNames, s.m_stype, elasticOperationMetadata);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();

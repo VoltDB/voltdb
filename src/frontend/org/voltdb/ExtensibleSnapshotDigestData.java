@@ -68,15 +68,18 @@ public class ExtensibleSnapshotDigestData {
      */
     private long m_terminus;
 
+    private final JSONObject m_elasticOperationMetadata;
+
     public ExtensibleSnapshotDigestData(
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             Map<Integer, JSONObject> drMixedClusterSizeConsumerState,
-            final JSONObject jsData) {
+            JSONObject elasticOperationMetadata, final JSONObject jsData) {
         m_exportSequenceNumbers = exportSequenceNumbers;
         m_drTupleStreamInfo = drTupleStreamInfo;
         m_drMixedClusterSizeConsumerState = drMixedClusterSizeConsumerState;
         m_terminus = jsData != null ? jsData.optLong(SnapshotUtil.JSON_TERMINUS, 0L) : 0L;
+        m_elasticOperationMetadata = elasticOperationMetadata;
     }
 
     private void writeExportSequencesToSnapshot(JSONStringer stringer) throws JSONException {
@@ -315,6 +318,7 @@ public class ExtensibleSnapshotDigestData {
         try {
             writeExportSequencesToSnapshot(stringer);
             writeDRStateToSnapshot(stringer);
+            stringer.key(SnapshotUtil.JSON_ELASTIC_OPERATION).value(m_elasticOperationMetadata);
         } catch (JSONException e) {
             throw new IOException(e);
         }
@@ -325,6 +329,7 @@ public class ExtensibleSnapshotDigestData {
         mergeDRTupleStreamInfoToZK(jsonObj, log);
         mergeConsumerDrIdTrackerToZK(jsonObj);
         mergeTerminusToZK(jsonObj);
+        jsonObj.put(SnapshotUtil.JSON_ELASTIC_OPERATION, m_elasticOperationMetadata);
     }
 
     public long getTerminus() {

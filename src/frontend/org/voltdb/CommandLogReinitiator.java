@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.util.Map;
 
+import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.InstanceId;
 import org.voltdb.dtxn.TransactionCreator;
 
@@ -41,13 +42,15 @@ public interface CommandLogReinitiator {
 
     /**
      * Generate the local replay plan. Call this before starting replay.
+     *
      * @param snapshotTimeStamp
      * @param snapshotTxnId
      * @param newPartitionCount
-     * @param true if this node contains the MPI
+     * @param isMPINode                true if this node contains the MPI
+     * @param elasticOperationMetadata metadata describing any elastic operation which was occuring
      */
     public void generateReplayPlan(long snapshotTimeStamp, long snapshotTxnId,
-            int newPartitionCount, boolean isMPINode);
+            int newPartitionCount, boolean isMPINode, JSONObject elasticOperationMetadata);
 
     /**
      * Start replaying the log. Two threads will be started, one for reading the

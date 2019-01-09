@@ -17,9 +17,18 @@
 
 package org.voltdb.elastic;
 
+import org.json_voltpatches.JSONObject;
 import org.voltdb.CatalogContext;
 
 public interface ElasticService {
     void shutdown();
     void updateConfig(CatalogContext context);
+
+    /**
+     * Return any metadata required to resume a running elastic operation after a cluster recovery.
+     *
+     * @return {@link JSONObject} with metadata required to resume the currently running elastic operation. May return
+     *         {@code null}
+     */
+    JSONObject getResumeMetadata();
 }
