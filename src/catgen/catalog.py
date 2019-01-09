@@ -66,19 +66,9 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     pkgdir = package.replace('.', '/')
     shutil.rmtree(postpath, ignore_errors=True)
     os.makedirs(postpath)
-    shutil.copy(prepath + "/Catalog.java", postpath)
-    shutil.copy(prepath + "/CatalogType.java", postpath)
-    shutil.copy(prepath + "/CatalogMap.java", postpath)
-    shutil.copy(prepath + "/CatalogException.java", postpath)
-    shutil.copy(prepath + "/CatalogChangeGroup.java", postpath)
-    shutil.copy(prepath + "/CatalogDiffEngine.java", postpath)
-    shutil.copy(prepath + "/CatalogOperator.java", postpath)
-    shutil.copy(prepath + "/CatalogVisitor.java", postpath)
-    shutil.copy(prepath + "/CatalogSerializer.java", postpath)
-    shutil.copy(prepath + "/FilteredCatalogDiffEngine.java", postpath)
-    shutil.copy(prepath + "/DRCatalogDiffEngine.java", postpath)
-    shutil.copy(prepath + "/DRCatalogCommands.java", postpath)
-    shutil.copy(prepath + "/DatabaseConfiguration.java", postpath)
+    javasrcs = os.listdir(prepath)
+    for javasrc in javasrcs:
+        shutil.copy(os.path.join(prepath, javasrc), postpath)
 
     ##########
     # WRITE THE SOURCE FILES
@@ -301,11 +291,9 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
     ##########
     shutil.rmtree(postpath, ignore_errors=True)
     os.makedirs(postpath)
-    shutil.copy(prepath + "/catalog.h", postpath)
-    shutil.copy(prepath + "/catalogtype.h", postpath)
-    shutil.copy(prepath + "/catalogmap.h", postpath)
-    shutil.copy(prepath + "/catalog.cpp", postpath)
-    shutil.copy(prepath + "/catalogtype.cpp", postpath)
+    cppsrcs = os.listdir(prepath)
+    for cppsrc in cppsrcs:
+        shutil.copy(os.path.join(prepath, cppsrc), postpath)
 
     ##########
     # WRITE THE SOURCE FILES

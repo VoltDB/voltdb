@@ -35,7 +35,7 @@ public final class Catalog extends CatalogType {
 
     CatalogMap<Cluster> m_clusters;
 
-    final CatalogOperator m_operator = new CatalogOperator(this);
+    private final CatalogOperator m_operator = new CatalogOperator(this);
 
     /**
      * Create a new Catalog hierarchy.
@@ -44,6 +44,10 @@ public final class Catalog extends CatalogType {
         setBaseValues(null, "catalog");
         m_clusters = new CatalogMap<Cluster>(this, this, "clusters", Cluster.class, 1);
         m_relativeIndex = 1;
+    }
+    
+    CatalogOperator getCatalogOperator() {
+        return m_operator;
     }
 
     @Override

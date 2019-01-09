@@ -48,6 +48,8 @@ doc/tutorials/*/*.jar
 /src/frontend/org/voltdb/catalog/*.java
 /voltdb/libvoltdb*.so
 /voltdb/libvoltdb*.dylib
+/voltdb/libcatalog*.so
+/voltdb/libcatalog*.dylib
 /voltdb/voltdb*.jar
 /examples/*/*.jar
 /plannerlog.txt

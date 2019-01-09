@@ -30,7 +30,7 @@ import org.voltdb.NativeLibraryLoader;
 /**
  * Helps serialize the VoltDB catalog.
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public final class CatalogSerializer implements CatalogVisitor {
 

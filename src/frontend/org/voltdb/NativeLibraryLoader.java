@@ -144,6 +144,8 @@ public class NativeLibraryLoader {
         String libPath = null;
         if (System.getProperty("os.name").toLowerCase().contains("mac")) {
             libPath = String.format(pathFormat, "Mac");
+        } else if(System.getProperty("os.name").toLowerCase().contains("windows")) {
+            throw new RuntimeException("Unsupported system: " + System.getProperty("os.name"));
         } else {
             libPath = String.format(pathFormat, "Linux");
         }
@@ -183,30 +185,15 @@ public class NativeLibraryLoader {
 
         String libPath = libFolder + "/" + libFileName;
         // Extract a native library file into the target directory
-        InputStream reader = null;
-        FileOutputStream writer = null;
-        try {
-            reader = NativeLibraryLoader.class.getResourceAsStream(libPath);
-            try {
-                writer = new FileOutputStream(extractedLibFile);
-
+        try (InputStream reader = NativeLibraryLoader.class.getResourceAsStream(libPath)) {
+            try (FileOutputStream writer = new FileOutputStream(extractedLibFile)) {
                 byte[] buffer = new byte[8192];
                 int bytesRead = 0;
                 while ((bytesRead = reader.read(buffer)) != -1) {
                     writer.write(buffer, 0, bytesRead);
                 }
             }
-            finally {
-                if (writer != null) {
-                    writer.close();
-                }
-            }
-        }
-        finally {
-            if (reader != null) {
-                reader.close();
-            }
-
+        } finally {
             // Delete the extracted lib file on JVM exit.
             extractedLibFile.deleteOnExit();
         }

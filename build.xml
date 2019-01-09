@@ -634,6 +634,7 @@ DISTRIBUTION
             <exclude name="doc/tutorials/**" />
             <exclude name="voltdb/libvoltdb*" />
             <exclude name="voltdb/libcatalog*" />
+            <!-- This will be packaged into the Jar, do not need to include it into the distribution. -->
             <exclude name="lib/libcatalog*" />
         </fileset>
     </copy>
@@ -791,6 +792,7 @@ DISTRIBUTION
             <include name="bin/sqlcmd"/>
             <exclude name="voltdb/libvoltdb*"/>
             <exclude name="voltdb/libcatalog*"/>
+            <exclude name="lib/libcatalog*"/>
             <exclude name="voltdb/voltdb-*.jar"/>
         </fileset>
     </copy>
@@ -834,6 +836,7 @@ DISTRIBUTION
     <antcall target="call_strip_lib" />
 
     <!-- copy to dir where jar picks it up as well -->
+    <!-- libcatalog is copied to ${jar.nativelib.dir} in the ee target (earlier than this) -->
     <copy todir="${jar.nativelib.dir}">
         <fileset dir="${base.dir}/voltdb">
             <include name="libvoltdb-${dist.version}.*"/>

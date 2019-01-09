@@ -24,7 +24,7 @@ package org.voltdb.catalog;
 /**
  * A visitor to the catalog items.
  * @author Yiqun Zhang
- * @since 8.4
+ * @since 9.0
  */
 public interface CatalogVisitor {
 
