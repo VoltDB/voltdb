@@ -58,10 +58,10 @@ public class VoltPAggregateRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltLogicalAggregate aggregate = call.rel(0);
-        RelTraitSet convertedAggrTraits = aggregate.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).simplify();
+        RelTraitSet convertedAggrTraits = aggregate.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify();
 
         RelNode input = aggregate.getInput();
-        RelTraitSet convertedInputTraits = input.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).simplify();
+        RelTraitSet convertedInputTraits = input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify();
         RelNode convertedInput = convert(input, convertedInputTraits);
 
         if (needHashAggregator(aggregate)) {

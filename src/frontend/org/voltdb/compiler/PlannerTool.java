@@ -21,12 +21,14 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
+import org.apache.calcite.util.Util;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
@@ -48,6 +50,7 @@ import org.voltdb.plannerv2.VoltPlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.utils.CompressionService;
@@ -246,20 +249,24 @@ public class PlannerTool {
         // ProjectToCalcRule.onMatch() will fire RelMdDistribution.calc() which will result in
         // an AssertionError. It is cheaper to manually add RelDistributionTrait here than replacing all
         // the LogicalCalc and Calc-related rules to fix this.
-        transformed.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
+        planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
         // Add RelDistributions.SINGLETON trait to the rel tree.
         transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);
-//
-//        // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-//        RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL);
-//
-//        // Apply physical conversion rules.
-//        RelNode nodeAfterPhysicalConversion = planner.transform(
-//                VoltPlannerPrograms.VoltPlannerRules.VOLT_PHYSICAL_CONVERSION.ordinal(),
-//                requiredPhysicalOutputTraits, transformed);
-//
-//        Util.discard(nodeAfterPhysicalConversion);
+
+        // apply MP query fallback rules
+        transformed = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK,
+                HepMatchOrder.BOTTOM_UP, transformed, false);
+
+        // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
+        RelTraitSet physicalTraits = transformed.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
+                replace(RelDistributions.ANY);
+
+        // Apply physical conversion rules.
+        transformed = planner.transform(PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal(),
+                physicalTraits, transformed);
+
+        Util.discard(transformed);
 
         planner.close();
         // TODO: finish Calcite planning and convert into AdHocPlannedStatement.

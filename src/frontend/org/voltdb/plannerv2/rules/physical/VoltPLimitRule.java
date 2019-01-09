@@ -47,9 +47,9 @@ public class VoltPLimitRule extends RelOptRule {
         VoltLogicalLimit limitOffset = call.rel(0);
         RelNode input = limitOffset.getInput();
         RelTraitSet convertedTraits = limitOffset.getTraitSet()
-                .replace(VoltPhysicalRel.VOLTDB_PHYSICAL).simplify();
+                .replace(VoltPhysicalRel.CONVENTION).simplify();
         RelNode convertedInput = convert(input,
-                input.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).simplify());
+                input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
         int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
 
         call.transformTo(new VoltPhysicalLimit(

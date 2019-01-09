@@ -51,7 +51,7 @@ public class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
             ImmutableList<RelDataTypeField> systemFieldList,
             int splitCount) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
-        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
         m_splitCount = splitCount;

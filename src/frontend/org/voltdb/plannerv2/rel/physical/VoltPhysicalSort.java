@@ -52,7 +52,7 @@ public class VoltPhysicalSort extends Sort implements VoltPhysicalRel {
             RexNode limit,
             int splitCount) {
         super(cluster, traitSet, input, collation, offset, limit);
-        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
     }
 

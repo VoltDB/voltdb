@@ -25,6 +25,11 @@ package org.voltdb.plannerv2;
 
 import org.voltdb.plannerv2.rules.PlannerRules;
 
+/**
+ * Test if we can correctly throw an exception if the query is determined to be multi-partitioned.
+ * We have this test because we only have SP query support in our first release of calcite planner.
+ * And it will go away when we can handle MP query in calcite.
+ */
 public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
     private MPFallbackTester m_tester = new MPFallbackTester();
@@ -72,6 +77,9 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select si, v from P1 where 7=si and i=2").test();
         m_tester.sql("select si, v from P1 where 7>si and i=2 and ti<3").test();
 
+        m_tester.sql("SELECT si + 1 FROM P1 WHERE 7 = i").test();
+        m_tester.sql("SELECT max(v) FROM P1 WHERE 7 = i").test();
+
         // equal condition on partition key with ORs
         m_tester.sql("select si, v from P1 where 7=si or i=2").testFail();
         m_tester.sql("select si, v from P1 where 7=si or i=2 or ti=3").testFail();
@@ -88,8 +96,26 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         // equal condition with some expression that always FALSE
         m_tester.sql("select si, v from P1 where (7=si and i=2) and 1=2").test();
-        // TODO: we should pass the commented test below if the planner is clever enough
-//        assertNotFallback("select si, v from P1 where (7=si and i=2) or 1=2");
+
+        m_tester.sql("select si, v from P1 where (7=si and i=2) or 1=2").test();
+    }
+
+    public void testPartitionedWithNotFilter() {
+        // when comes to NOT operator, we need to decide if the complement of its
+        // operand is single-partitioned
+        m_tester.sql("select * from P1 where NOT i <> 15").test();
+
+        m_tester.sql("select * from P1 where NOT (NOT i = 1)").test();
+
+        m_tester.sql("select * from P1 where NOT (i <> 15 OR si = 16)").test();
+
+        m_tester.sql("select * from P1 where NOT ( NOT (i = 15 AND si = 16))").test();
+
+        m_tester.sql("select * from P1 where NOT si <> 15").testFail();
+
+        m_tester.sql("select * from P1 where NOT (i <> 15 AND si = 16)").testFail();
+
+        m_tester.sql("select * from P1 where NOT ( NOT (i = 15 OR si = 16))").testFail();
     }
 
     public void testJoin() {

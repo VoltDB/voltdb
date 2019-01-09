@@ -36,10 +36,13 @@ import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.planner.PlannerTestCase;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
+
+import static junit.framework.Assert.assertEquals;
 
 /**
  * Base class for planner v2 test cases.
@@ -198,9 +201,14 @@ public class Plannerv2TestCase extends PlannerTestCase {
         @Override public void testFail() {
             try {
                 test();
-            } catch (RuntimeException e) {
-                assertTrue(e.getMessage().startsWith("Error while applying rule") ||
-                        e.getMessage().equals("MP query not supported in Calcite planner."));
+            }
+            catch (PlannerFallbackException e){
+                assertEquals("MP query not supported in Calcite planner.", e.getMessage());
+                // we got the exception, we are good.
+                return;
+            }
+            catch (RuntimeException e) {
+                assertTrue(e.getMessage().startsWith("Error while applying rule"));
                 // we got the exception, we are good.
                 return;
             }
@@ -212,8 +220,8 @@ public class Plannerv2TestCase extends PlannerTestCase {
         @Override public void test() throws AssertionError {
             super.test();
             // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-            RelTraitSet physicalTraits = m_transformedNode.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).
-                    replace(RelDistributions.SINGLETON);
+            RelTraitSet physicalTraits = m_transformedNode.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
+                    replace(RelDistributions.ANY);
             m_transformedNode = m_planner.transform(PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal(),
                     physicalTraits, m_transformedNode);
             if (m_ruleSetIndex == PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal() && m_expectedTransform != null) {

@@ -50,7 +50,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
             RexNode limit,
             int splitCount) {
         super(cluster, traitSet, input);
-        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_offset = offset;
         m_limit = limit;
         m_splitCount = splitCount;

@@ -24,6 +24,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalJoin;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
@@ -60,11 +61,11 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
         if ((call.rel(1) instanceof VoltLogicalTableScan && leftDist != RelDistributions.SINGLETON) ||
                 (call.rel(2) instanceof VoltLogicalTableScan && rightDist != RelDistributions.SINGLETON)) {
             // partitioned table without filter, throw
-            throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
+            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
         }
 
         if (leftDist != RelDistributions.SINGLETON && rightDist != RelDistributions.SINGLETON) {
-            throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
+            throw new PlannerFallbackException("MP query not supported in Calcite planner.");
         }
 
         if (leftDist == RelDistributions.SINGLETON && rightDist == RelDistributions.SINGLETON) {

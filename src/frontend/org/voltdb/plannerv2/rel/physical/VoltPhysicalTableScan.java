@@ -37,7 +37,7 @@ import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Abstract sub-class of {@link AbstractVoltTableScan}
- * target at {@link #VOLTDB_PHYSICAL} convention
+ * target at {@link #CONVENTION} convention
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -85,7 +85,7 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
                                        RelDataType preAggregateRowType,
                                        RexProgram preAggregateProgram,
                                        int splitCount) {
-        super(cluster, traitSet.plus(VoltPhysicalRel.VOLTDB_PHYSICAL), table, voltDBTable);
+        super(cluster, traitSet.plus(VoltPhysicalRel.CONVENTION), table, voltDBTable);
         Preconditions.checkNotNull(program);
         Preconditions.checkArgument(aggregate == null || aggregate instanceof AbstractVoltPhysicalAggregate);
         Preconditions.checkArgument(program.getOutputRowType().getFieldCount() > 0);

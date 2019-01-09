@@ -53,7 +53,7 @@ public class VoltDBPSortRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         VoltLogicalSort sort = call.rel(0);
         RelNode input = sort.getInput();
-        RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltPhysicalRel.VOLTDB_PHYSICAL);
+        RelTraitSet convertedTraits = sort.getTraitSet().plus(VoltPhysicalRel.CONVENTION);
         RelNode convertedInput = convert(input, convertedTraits);
         call.transformTo(convertedInput);
     }

@@ -27,7 +27,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import java.util.Objects;
 
 public interface VoltPhysicalRel extends RelNode {
-    final static Convention VOLTDB_PHYSICAL = new Convention.Impl("VOLTDB_PHYSICAL", VoltPhysicalRel.class) {
+    Convention CONVENTION = new Convention.Impl("CONVENTION", VoltPhysicalRel.class) {
         public boolean canConvertConvention(Convention toConvention) {
             return true;
         }

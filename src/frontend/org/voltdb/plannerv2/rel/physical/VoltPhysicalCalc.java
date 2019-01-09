@@ -31,7 +31,7 @@ import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 
 /**
  * Sub-class of {@link Calc}
- * target at {@link #VOLTDB_PHYSICAL} convention
+ * target at {@link #CONVENTION} convention
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -47,7 +47,7 @@ public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
             RexProgram program,
             int splitCount) {
         super(cluster, traitSet, input, program);
-        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.CONVENTION);
         m_splitCount = splitCount;
     }
 

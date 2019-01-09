@@ -26,6 +26,7 @@ import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
+import org.apache.calcite.rel.rules.ReduceExpressionsRule;
 import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
@@ -101,6 +102,7 @@ public class PlannerRules {
             // - See comments in RexProgramBuilder.mergePrograms()
             CalcMergeRule.INSTANCE,
             FilterProjectTransposeRule.INSTANCE,
+            ReduceExpressionsRule.CALC_INSTANCE,
             FilterJoinRule.FILTER_ON_JOIN,
             FilterJoinRule.JOIN,
 

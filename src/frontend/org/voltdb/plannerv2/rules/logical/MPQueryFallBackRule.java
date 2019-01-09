@@ -34,6 +34,7 @@ import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.sql.SqlKind;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
@@ -60,20 +61,26 @@ public class MPQueryFallBackRule extends RelOptRule {
      * @param partitionKeys the list of partition keys for the target table.
      * @return true if the filtered result is located at a single partition.
      */
-    private boolean isSinglePartitioned(RexProgram program, RexNode rexNode, List<Integer> partitionKeys) {
+    private static boolean isSinglePartitioned(RexProgram program, RexNode rexNode, List<Integer> partitionKeys) {
         if (rexNode instanceof RexCall) {
             RexCall rexCall = (RexCall) rexNode;
             SqlKind sqlKind = rexCall.getOperator().getKind();
             switch (sqlKind) {
                 case EQUALS:
+                    // SELECT ... FROM t WHERE PK = 0;
                     return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
                             isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
                 case AND:
+                    // SELECT ... FROM t WHERE PK = 0 and A = 1;
                     return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
                             isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
                 case OR:
+                    // SELECT ... FROM t WHERE PK = 0 or A = 1;
                     return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) &&
                             isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                case NOT:
+                    // SELECT ... FROM t WHERE NOT PK <> 0;
+                    return isComplementSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys);
                 default:
                     return false;
             }
@@ -88,20 +95,64 @@ public class MPQueryFallBackRule extends RelOptRule {
         return false;
     }
 
+    /**
+     * Helper function to decide whether the complement of the filtered result is located at a single partition.
+     *
+     * @param program       the program of a {@link LogicalCalc}.
+     * @param rexNode       the condition of the program.
+     * @param partitionKeys the list of partition keys for the target table.
+     * @return true if the complement of the filtered result is located at a single partition.
+     */
+    private static boolean isComplementSinglePartitioned(RexProgram program, RexNode rexNode, List<Integer> partitionKeys) {
+        if (rexNode instanceof RexCall) {
+            RexCall rexCall = (RexCall) rexNode;
+            SqlKind sqlKind = rexCall.getOperator().getKind();
+            switch (sqlKind) {
+                case NOT_EQUALS:
+                    // SELECT ... FROM t WHERE NOT PK <> 0;
+                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
+                            isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                case NOT:
+                    // SELECT ... FROM t WHERE NOT (NOT PK = 0);
+                    // I assume this branch will never be reached, cause calcite have a ReduceExpressionsRule
+                    // to simplify NOT(NOT..), but it is better safe than sorry.
+                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys);
+                case AND:
+                    // SELECT ... FROM t WHERE NOT (PK <> 0 and A = 2);
+                    return isComplementSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) &&
+                            isComplementSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                case OR:
+                    // SELECT ... FROM t WHERE NOT (PK <> 0 or A = 2);
+                    return isComplementSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||
+                            isComplementSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                default:
+                    return false;
+            }
+        }
+        if (rexNode instanceof RexLocalRef) {
+            return isComplementSinglePartitioned(program,
+                    program.getExprList().get(((RexLocalRef) rexNode).getIndex()), partitionKeys);
+        }
+        return false;
+    }
+
     @Override
     public void onMatch(RelOptRuleCall call) {
         if (call.rel(0) instanceof VoltLogicalCalc && call.rel(1) instanceof VoltLogicalTableScan) {
+            // if it is a VoltLogicalCalc / VoltLogicalTableScan pattern, check if the filter is SP
             VoltLogicalCalc calc = call.rel(0);
             VoltLogicalTableScan tableScan = call.rel(1);
             RelDistribution tableDist = tableScan.getTable().getDistribution();
-            if (tableDist.getType() != RelDistribution.Type.SINGLETON) {
-                if (calc.getProgram().getCondition() == null ||
-                        !isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys())) {
-                    throw new UnsupportedOperationException("MP query not supported in Calcite planner.");
+            if (tableDist.getType() != RelDistribution.Type.SINGLETON &&
+                    (calc.getProgram().getCondition() == null ||   // SELECT ... FROM t (no filter)
+                            !isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys()))) {
+                {
+                    throw new PlannerFallbackException("MP query not supported in Calcite planner.");
                 }
             }
             call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), calc.getInputs()));
         } else {
+            // otherwise, propagate the DistributionTrait bottom up.
             RelNode child = call.rel(1);
             RelDistribution childDist = child.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
             if (childDist != RelDistributions.ANY) {

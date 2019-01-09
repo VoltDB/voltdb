@@ -45,7 +45,7 @@ public class VoltPSeqScanRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltLogicalTableScan tableScan = call.rel(0);
-        RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL);
+        RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltPhysicalRel.CONVENTION);
 
         // Table distribution
         RelDistribution tableDist = tableScan.getTable().getDistribution();
@@ -54,9 +54,10 @@ public class VoltPSeqScanRule extends RelOptRule {
         // TODO: we make the distribution trait here ALWAYS SINGLE because we only support SP in our initial release.
         // when come to MP, distribution trait can be HASH and Exchange nodes should be introduced to
         // handle this.
+        System.out.println(convertedTraits.plus(tableDist));
         VoltSeqTableScan scanRel = new VoltSeqTableScan(
                 tableScan.getCluster(),
-                convertedTraits,
+                convertedTraits.plus(tableDist),
                 tableScan.getTable(),
                 tableScan.getVoltTable(),
                 scanSplitCount);

@@ -46,7 +46,7 @@ public class VoltPSortConvertRule extends ConverterRule {
         super(
                 Sort.class,
                 inTrait,
-                VoltPhysicalRel.VOLTDB_PHYSICAL,
+                VoltPhysicalRel.CONVENTION,
                 "VoltDBSortConvertRule" + inTrait.toString());
     }
 
@@ -54,10 +54,10 @@ public class VoltPSortConvertRule extends ConverterRule {
     public RelNode convert(RelNode rel) {
         Sort sort = (Sort) rel;
         RelTraitSet traits = sort.getInput().getTraitSet()
-                .replace(VoltPhysicalRel.VOLTDB_PHYSICAL);
+                .replace(VoltPhysicalRel.CONVENTION);
         RelNode input = sort.getInput();
         RelNode convertedInput = convert(input,
-                input.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).simplify());
+                input.getTraitSet().replace(VoltPhysicalRel.CONVENTION).simplify());
         int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
 
         return new VoltPhysicalSort(
