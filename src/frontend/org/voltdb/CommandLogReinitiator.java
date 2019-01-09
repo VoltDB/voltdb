@@ -106,9 +106,7 @@ public interface CommandLogReinitiator {
     public void returnAllSegments();
 
     /**
-     * Call @BalancePartitions until the partitions are balanced if necessary. Does nothing if the partitions are
-     * already balanced or if the legacy hashinator is used.
-     * @return true if the partitions are balanced successfully.
+     * Resume any elastic operations which were already started
      */
-    public boolean checkAndBalancePartitions();
+    public void resumeElasticOperationIfNecessary();
 }
