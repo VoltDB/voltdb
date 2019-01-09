@@ -36,8 +36,12 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -59,6 +63,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
+import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -78,6 +83,7 @@ public class TestExportDataSource extends TestCase {
     int m_site = 1;
     int m_part = 2;
     TestGeneration m_generation;
+    ExportDataProcessor m_processor;
 
     private static TreeSet<String> getSortedDirectoryListingSegments() {
         TreeSet<String> names = new TreeSet<String>();
@@ -139,7 +145,6 @@ public class TestExportDataSource extends TestCase {
         m_mockVoltDB.addTable("RepTableName", false);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
-
         if (TEST_DIR.exists()) {
             for (File f : TEST_DIR.listFiles()) {
                 VoltFile.recursivelyDelete(f);
@@ -148,14 +153,34 @@ public class TestExportDataSource extends TestCase {
         }
         TEST_DIR.mkdir();
         m_generation = new TestGeneration();
+        m_processor = getProcessor();
     }
 
     @Override
     public void tearDown() throws Exception {
         m_mockVoltDB.shutdown(null);
+        m_generation = null;
+        m_processor = null;
         System.gc();
         System.runFinalization();
         Thread.sleep(200);
+    }
+
+    private ExportDataProcessor getProcessor() {
+        Map<String, Pair<Properties, Set<String>>> config = new HashMap<>();
+        Properties props = new Properties();
+        props.put("nonce", "mynonce");
+        props.put("type", "csv");
+        props.put("__EXPORT_TO_TYPE__", "org.voltdb.exportclient.ExportToFileClient");
+        props.put("replicated", false);
+        props.put("outdir", TEST_DIR + "/my_exports");
+        Set<String> tables = new HashSet<>();
+        tables.add("TableName");
+        tables.add("RepTableName");
+        config.put("LOG", new Pair<>(props, tables));
+        ExportDataProcessor processor = new GuestProcessor();
+        processor.setProcessorConfig(config);
+        return processor;
     }
 
     public void testExportDataSource() throws Exception {
@@ -163,7 +188,7 @@ public class TestExportDataSource extends TestCase {
         String[] tables = {"TableName", "RepTableName"};
         for (String table_name : tables) {
             Table table = m_mockVoltDB.getCatalogContext().database.getTables().get(table_name);
-            ExportDataSource s = new ExportDataSource(null, "database",
+            ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                     table.getTypeName(),
                     m_part,
                     CoreUtils.getSiteIdFromHSId(m_site),
@@ -186,7 +211,7 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testPollV2");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, "database",
+        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -203,7 +228,7 @@ public class TestExportDataSource extends TestCase {
                     cdl.countDown();
                 }
             };
-            s.setOnMastership(cdlWaiter, false);
+            s.setOnMastership(cdlWaiter);
             s.acceptMastership();
             cdl.await();
 
@@ -285,7 +310,7 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testDoublePoll");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, "database",
+        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -302,7 +327,7 @@ public class TestExportDataSource extends TestCase {
                     cdl.countDown();
                 }
             };
-            s.setOnMastership(cdlWaiter, false);
+            s.setOnMastership(cdlWaiter);
             s.acceptMastership();
             // Set ready for polling to enable satisfying fut on push
             s.setReadyForPolling(true);
@@ -363,7 +388,7 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testReplicatedPoll");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, "database",
+        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -391,7 +416,7 @@ public class TestExportDataSource extends TestCase {
 
         s.updateAckMailboxes(Pair.<Mailbox,ImmutableList<Long>>of(mockedMbox, ImmutableList.<Long>of(42L)));
 
-        s.setOnMastership(cdlWaiter, false);
+        s.setOnMastership(cdlWaiter);
         s.acceptMastership();
         cdl.await();
 
@@ -469,7 +494,7 @@ public class TestExportDataSource extends TestCase {
         System.out.println("Running testReleaseExportBytes");
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         Table table = m_mockVoltDB.getCatalogContext().database.getTables().get("TableName");
-        ExportDataSource s = new ExportDataSource(null, "database",
+        ExportDataSource s = new ExportDataSource(null, m_processor, "database",
                 table.getTypeName(),
                 m_part,
                 CoreUtils.getSiteIdFromHSId(m_site),
@@ -522,7 +547,7 @@ public class TestExportDataSource extends TestCase {
                     cdl.countDown();
                 }
             };
-            s.setOnMastership(cdlWaiter, false);
+            s.setOnMastership(cdlWaiter);
             s.acceptMastership();
             cdl.await();
 
