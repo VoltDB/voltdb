@@ -1304,9 +1304,7 @@ SnapshotCompletionInterest, Promotable
 
             // Call balance partitions after enabling transactions on the node to shorten the recovery time
             if (m_isLeader) {
-                if (!m_replayAgent.checkAndBalancePartitions()) {
-                    VoltDB.crashLocalVoltDB("Failed to finish balancing partitions", false, null);
-                }
+                m_replayAgent.resumeElasticOperationIfNecessary();
             }
         }
     }

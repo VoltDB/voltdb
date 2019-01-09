@@ -71,10 +71,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public boolean checkAndBalancePartitions()
-    {
-        return true;
-    }
+    public void resumeElasticOperationIfNecessary() {}
 
     @Override
     public boolean hasReplayedTxns() {
