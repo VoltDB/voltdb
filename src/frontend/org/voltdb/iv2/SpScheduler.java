@@ -1630,33 +1630,25 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         return m_repairLogTruncationHandle;
     }
 
-    private void setRepairLogTruncationHandle(long newHandle, boolean isForLeader)
+    private void setRepairLogTruncationHandle(long newHandle, boolean isExecutedOnOldLeader)
     {
         if (newHandle > m_repairLogTruncationHandle) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("Updating truncation point from " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
-                        "to" + TxnEgo.txnIdToString(newHandle) + " isLeader:" + m_isLeader  + " isForLeader:" + isForLeader);
-            }
-
+            m_repairLogTruncationHandle = newHandle;
             // ENG-14553: release buffered reads regardless of leadership status
             m_bufferedReadLog.releaseBufferedReads(m_mailbox, newHandle);
             // We have to advance the local truncation point on the replica. It's important for
             // node promotion when there are no missing repair log transactions on the replica.
             // Because we still want to release the reads if no following writes will come to this replica.
             // Also advance the truncation point if this is not a leader but the response message is for leader.
-            if (m_isLeader || isForLeader) {
+            if (m_isLeader || isExecutedOnOldLeader) {
                 scheduleRepairLogTruncateMsg(newHandle);
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("Schedule truncation" + TxnEgo.txnIdToString(newHandle) + " isLeader:" + m_isLeader  + " isForLeader:" + isForLeader);
-                }
             }
-            m_repairLogTruncationHandle = newHandle;
         } else {
             // As far as I know, they are cases that will move truncation handle backwards.
             // These include node failures (promotion phase) and node rejoin (early rejoin phase).
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug("Skipping trucation handle update " + TxnEgo.txnIdToString(m_repairLogTruncationHandle) +
-                        "to" + TxnEgo.txnIdToString(newHandle)+ " isLeader:" + m_isLeader + " isForLeader:" + isForLeader);
+                        "to" + TxnEgo.txnIdToString(newHandle)+ " isLeader:" + m_isLeader + " isExecutedOnOldLeader:" + isExecutedOnOldLeader);
             }
         }
     }
@@ -1701,10 +1693,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         // so that it can trigger the callbacks.
                         m_mailbox.deliver(truncMsg);
                         m_mailbox.send(m_sendToHSIds, truncMsg);
-                        if (tmLog.isDebugEnabled()) {
-                            List<Long> ids = Arrays.stream(m_sendToHSIds).boxed().collect(Collectors.toList());
-                            tmLog.debug("Send truncation " + TxnEgo.txnIdToString(newHandle) + " to " + CoreUtils.hsIdCollectionToString(ids));
-                        }
                     }
                 }
             }
