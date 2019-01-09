@@ -252,7 +252,7 @@ public class PlannerTool {
         transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);
 //
 //        // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-//        RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+//        RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL);
 //
 //        // Apply physical conversion rules.
 //        RelNode nodeAfterPhysicalConversion = planner.transform(

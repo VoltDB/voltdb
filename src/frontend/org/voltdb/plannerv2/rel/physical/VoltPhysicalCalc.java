@@ -22,70 +22,51 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelDistributionTraitDef;
-import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
-import org.apache.calcite.rel.core.Sort;
+import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
-import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexProgram;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 
-public class VoltDBPSort extends Sort implements VoltDBPRel {
+/**
+ * Sub-class of {@link Calc}
+ * target at {@link #VOLTDB_PHYSICAL} convention
+ *
+ * @author Michael Alexeev
+ * @since 9.0
+ */
+public class VoltPhysicalCalc extends Calc implements VoltPhysicalRel {
 
     private final int m_splitCount;
 
-    public VoltDBPSort(
+    public VoltPhysicalCalc(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
-            RelCollation collation,
+            RexProgram program,
             int splitCount) {
-        this(cluster, traitSet, input, collation, null, null, splitCount);
-    }
-
-    private VoltDBPSort(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode input,
-            RelCollation collation,
-            RexNode offset,
-            RexNode limit,
-            int splitCount) {
-        super(cluster, traitSet, input, collation, offset, limit);
-        Preconditions.checkArgument(getConvention() == VoltDBPRel.VOLTDB_PHYSICAL);
+        super(cluster, traitSet, input, program);
+        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.VOLTDB_PHYSICAL);
         m_splitCount = splitCount;
     }
 
     @Override
-    public VoltDBPSort copy(RelTraitSet traitSet,
-                            RelNode input,
-                            RelCollation collation,
-                            RexNode offset,
-                            RexNode limit) {
-        return copy(
+    public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program) {
+        return new VoltPhysicalCalc(
+                getCluster(),
                 traitSet,
-                input,
-                collation,
-                offset,
-                limit,
+                child,
+                program,
                 m_splitCount);
     }
 
-    public VoltDBPSort copy(RelTraitSet traitSet,
-                            RelNode input,
-                            RelCollation collation,
-                            RexNode offset,
-                            RexNode limit,
-                            int splitCount) {
-        return new VoltDBPSort(
+    public Calc copy(RelTraitSet traitSet, RelNode child, RexProgram program, int splitCount) {
+        return new VoltPhysicalCalc(
                 getCluster(),
                 traitSet,
-                input,
-                collation,
-                offset,
-                limit,
+                child,
+                program,
                 splitCount);
     }
 
@@ -116,6 +97,6 @@ public class VoltDBPSort extends Sort implements VoltDBPRel {
 
         RelOptCost defaultCost = super.computeSelfCost(planner, mq);
         return planner.getCostFactory().makeCost(rowCount, defaultCost.getCpu(), defaultCost.getIo());
-    }
 
+    }
 }

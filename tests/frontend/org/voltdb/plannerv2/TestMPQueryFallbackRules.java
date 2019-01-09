@@ -27,7 +27,7 @@ import org.voltdb.plannerv2.rules.PlannerRules;
 
 public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
-    MPFallbackTester m_tester = new MPFallbackTester();
+    private MPFallbackTester m_tester = new MPFallbackTester();
 
     @Override
     protected void setUp() throws Exception {
@@ -41,37 +41,6 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
     public void tearDown() throws Exception {
         super.tearDown();
     }
-
-//    private void assertNotFallback(String sql) {
-//        RelRoot root = parseValidateAndConvert(sql);
-//
-//        // apply logical rules
-//        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
-//        RelNode nodeAfterLogicalRules = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
-//                root.rel, logicalTraits);
-//
-//        // Add RelDistributions.ANY trait to the rel tree.
-//        nodeAfterLogicalRules = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogicalRules, RelDistributions.ANY);
-//
-//        // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
-//        nodeAfterLogicalRules.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
-//
-//        // do the MP fallback check
-//        CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
-//                nodeAfterLogicalRules);
-//    }
-//
-//    private void assertFallback(String sql) {
-//        try {
-//            assertNotFallback(sql);
-//        } catch (RuntimeException e) {
-//            assertTrue(e.getMessage().startsWith("Error while applying rule") ||
-//                    e.getMessage().equals("MP query not supported in Calcite planner."));
-//            // we got the exception, we are good.
-//            return;
-//        }
-//        fail("Expected fallback.");
-//    }
 
     // when we only deal with replicated table, we will always have a SP query.
     public void testReplicated() {

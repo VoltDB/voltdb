@@ -33,13 +33,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-public class VoltDBPJoin extends Join implements VoltDBPRel {
+public class VoltPhysicalJoin extends Join implements VoltPhysicalRel {
     private final boolean semiJoinDone;
     private final ImmutableList<RelDataTypeField> systemFieldList;
 
     private final int m_splitCount;
 
-    public VoltDBPJoin(
+    public VoltPhysicalJoin(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode left,
@@ -51,16 +51,16 @@ public class VoltDBPJoin extends Join implements VoltDBPRel {
             ImmutableList<RelDataTypeField> systemFieldList,
             int splitCount) {
         super(cluster, traitSet, left, right, condition, variablesSet, joinType);
-        Preconditions.checkArgument(getConvention() == VoltDBPRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.VOLTDB_PHYSICAL);
         this.semiJoinDone = semiJoinDone;
         this.systemFieldList = Objects.requireNonNull(systemFieldList);
         m_splitCount = splitCount;
     }
 
     @Override
-    public VoltDBPJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
-                            RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
-        return new VoltDBPJoin(getCluster(),
+    public VoltPhysicalJoin copy(RelTraitSet traitSet, RexNode conditionExpr,
+                                 RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
+        return new VoltPhysicalJoin(getCluster(),
                 traitSet, left, right, conditionExpr,
                 variablesSet, joinType, semiJoinDone, systemFieldList, m_splitCount);
     }

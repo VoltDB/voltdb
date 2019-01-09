@@ -24,12 +24,12 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.Sort;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
-import org.voltdb.plannerv2.rel.physical.VoltDBPSort;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
- * VoltDB physical rule that transform {@link Sort} to {@link VoltDBPSort}.
+ * VoltDB physical rule that transform {@link Sort} to {@link VoltPhysicalSort}.
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -46,7 +46,7 @@ public class VoltPSortConvertRule extends ConverterRule {
         super(
                 Sort.class,
                 inTrait,
-                VoltDBPRel.VOLTDB_PHYSICAL,
+                VoltPhysicalRel.VOLTDB_PHYSICAL,
                 "VoltDBSortConvertRule" + inTrait.toString());
     }
 
@@ -54,13 +54,13 @@ public class VoltPSortConvertRule extends ConverterRule {
     public RelNode convert(RelNode rel) {
         Sort sort = (Sort) rel;
         RelTraitSet traits = sort.getInput().getTraitSet()
-                .replace(VoltDBPRel.VOLTDB_PHYSICAL);
+                .replace(VoltPhysicalRel.VOLTDB_PHYSICAL);
         RelNode input = sort.getInput();
         RelNode convertedInput = convert(input,
-                input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
+                input.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).simplify());
         int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
 
-        return new VoltDBPSort(
+        return new VoltPhysicalSort(
                 sort.getCluster(),
                 traits.plus(sort.getCollation()),
                 convertedInput,

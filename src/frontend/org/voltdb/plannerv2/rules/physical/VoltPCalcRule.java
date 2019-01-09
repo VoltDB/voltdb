@@ -23,12 +23,12 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.physical.VoltDBPCalc;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalCalc;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 
 /**
- * VoltDB physical rule that transform {@link VoltLogicalCalc} to {@link VoltDBPCalc}.
+ * VoltDB physical rule that transform {@link VoltLogicalCalc} to {@link VoltPhysicalCalc}.
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -45,11 +45,11 @@ public class VoltPCalcRule extends RelOptRule {
     public void onMatch(RelOptRuleCall call) {
         VoltLogicalCalc calc = call.rel(0);
         RelNode input = calc.getInput();
-        RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet convertedTraits = calc.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL);
         RelNode convertedInput = convert(input,
-                input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify());
+                input.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).simplify());
         int splitCount = VoltRelUtil.decideSplitCount(convertedInput);
-        call.transformTo(new VoltDBPCalc(
+        call.transformTo(new VoltPhysicalCalc(
                 calc.getCluster(),
                 convertedTraits,
                 convertedInput,

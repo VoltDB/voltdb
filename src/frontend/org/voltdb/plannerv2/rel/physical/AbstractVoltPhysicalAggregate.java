@@ -31,7 +31,7 @@ import org.apache.calcite.util.ImmutableBitSet;
 
 import java.util.List;
 
-public abstract class AbstractVoltDBPAggregate extends Aggregate implements VoltDBPRel {
+public abstract class AbstractVoltPhysicalAggregate extends Aggregate implements VoltPhysicalRel {
 
     // HAVING expression
     final private RexNode m_postPredicate;
@@ -55,10 +55,10 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
      * @param groupSets List of all grouping sets; null for just {@code groupSet}
      * @param aggCalls Collection of calls to aggregate functions
      * @param havingExpression HAVING expression
-     * @param splitCount Number of concurrent processes that this VoltDBPRel will be executed in
+     * @param splitCount Number of concurrent processes that this VoltPhysicalRel will be executed in
      * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
      */
-    protected AbstractVoltDBPAggregate(
+    protected AbstractVoltPhysicalAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -114,11 +114,11 @@ public abstract class AbstractVoltDBPAggregate extends Aggregate implements Volt
      * @param groupSets List of all grouping sets; null for just {@code groupSet}
      * @param aggCalls Collection of calls to aggregate functions
      * @param havingExpression HAVING expression
-     * @param splitCount Number of concurrent processes that this VoltDBPRel will be executed in
+     * @param splitCount Number of concurrent processes that this VoltPhysicalRel will be executed in
      * @param isCoordinatorAggr If this aggregate relation is part of a coordinator tree.
-     * @return A cloned {@link AbstractVoltDBPAggregate}.
+     * @return A cloned {@link AbstractVoltPhysicalAggregate}.
      */
-    public abstract AbstractVoltDBPAggregate copy(
+    public abstract AbstractVoltPhysicalAggregate copy(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,

@@ -18,21 +18,57 @@
 package org.voltdb.plannerv2.rel.physical;
 
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 
 import java.util.List;
 
-public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
+public class VoltPhysicalSerialAggregate extends AbstractVoltPhysicalAggregate {
+
+    // Inline Rels
+    final private RexNode m_offset;
+    final private RexNode m_limit;
 
     /**
      * Constructor
      */
-    public VoltDBPHashAggregate(
+    public VoltPhysicalSerialAggregate(
+            RelOptCluster cluster,
+            RelTraitSet traitSet,
+            RelNode child,
+            boolean indicator,
+            ImmutableBitSet groupSet,
+            List<ImmutableBitSet> groupSets,
+            List<AggregateCall> aggCalls,
+            RexNode postPredicate,
+            int splitCount,
+            boolean isCoordinatorAggr,
+            RexNode offset,
+            RexNode limit
+    ) {
+        super(cluster,
+                traitSet,
+                child,
+                indicator,
+                groupSet,
+                groupSets,
+                aggCalls,
+                postPredicate,
+                splitCount,
+                isCoordinatorAggr);
+        m_offset = offset;
+        m_limit = limit;
+    }
+
+    public VoltPhysicalSerialAggregate(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode child,
@@ -53,42 +89,27 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 postPredicate,
                 splitCount,
                 isCoordinatorAggr);
-    }
-
-    public VoltDBPHashAggregate(
-            RelOptCluster cluster,
-            RelTraitSet traitSet,
-            RelNode child,
-            boolean indicator,
-            ImmutableBitSet groupSet,
-            List<ImmutableBitSet> groupSets,
-            List<AggregateCall> aggCalls,
-            RexNode postPredicate,
-            boolean isCoordinatorAggr) {
-        this(cluster,
-                traitSet,
-                child,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                postPredicate,
-                1,
-                isCoordinatorAggr);
+        m_offset = null;
+        m_limit = null;
     }
 
     @Override
-    public RelWriter explainTerms(RelWriter pw) {
-        super.explainTerms(pw);
-        pw.item("type", "hash");
-        return pw;
+    public RelOptCost computeSelfCost(RelOptPlanner planner,
+                                      RelMetadataQuery mq) {
+        double rowCount = getInput().estimateRowCount(mq);
+
+        rowCount = PlanCostUtil.discountRowCountSerialAggregate(rowCount, getGroupCount());
+        return planner.getCostFactory().makeCost(rowCount, 0, 0);
     }
 
     @Override
-    public VoltDBPHashAggregate copy(RelTraitSet traitSet, RelNode input,
-                                     boolean indicator, ImmutableBitSet groupSet,
-                                     List<ImmutableBitSet> groupSets, List<AggregateCall> aggCalls) {
-        return new VoltDBPHashAggregate(
+    public VoltPhysicalSerialAggregate copy(RelTraitSet traitSet,
+                                            RelNode input,
+                                            boolean indicator,
+                                            ImmutableBitSet groupSet,
+                                            List<ImmutableBitSet> groupSets,
+                                            List<AggregateCall> aggCalls) {
+        return new VoltPhysicalSerialAggregate(
                 getCluster(),
                 traitSet,
                 input,
@@ -98,34 +119,13 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 aggCalls,
                 getPostPredicate(),
                 getSplitCount(),
-                getIsCoordinatorAggr());
+                getIsCoordinatorAggr(),
+                m_offset,
+                m_limit);
     }
-
-    public VoltDBPHashAggregate copy(RelTraitSet traitSet,
-                                     RelNode input,
-                                     boolean indicator,
-                                     ImmutableBitSet groupSet,
-                                     List<ImmutableBitSet> groupSets,
-                                     List<AggregateCall> aggCalls,
-                                     int splitCount,
-                                     boolean isCoordinatorAggr
-    ) {
-        return new VoltDBPHashAggregate(
-                getCluster(),
-                traitSet,
-                input,
-                indicator,
-                groupSet,
-                groupSets,
-                aggCalls,
-                getPostPredicate(),
-                splitCount,
-                isCoordinatorAggr);
-    }
-
 
     @Override
-    public VoltDBPHashAggregate copy(
+    public VoltPhysicalSerialAggregate copy(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
@@ -136,7 +136,7 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
             RexNode havingExpression,
             int splitCount,
             boolean isCoordinatorAggr) {
-        return new VoltDBPHashAggregate(
+        return new VoltPhysicalSerialAggregate(
                 cluster,
                 traitSet,
                 input,
@@ -146,7 +146,39 @@ public class VoltDBPHashAggregate extends AbstractVoltDBPAggregate {
                 aggCalls,
                 havingExpression,
                 splitCount,
-                isCoordinatorAggr);
+                isCoordinatorAggr,
+                m_offset,
+                m_limit);
+    }
 
+    @Override
+    public RelWriter explainTerms(RelWriter pw) {
+        super.explainTerms(pw);
+        pw.item("type", "serial");
+        return pw;
+    }
+
+    private boolean hasLimitOffset() {
+        return (m_limit != null || m_offset != null);
+    }
+
+    public RexNode getOffset() {
+        return m_offset;
+    }
+
+    public RexNode getLimit() {
+        return m_limit;
+    }
+
+    @Override
+    protected String computeDigest() {
+        String digest = super.computeDigest();
+        if (m_limit != null) {
+            digest += "_limit_" + m_limit.toString();
+        }
+        if (m_offset != null) {
+            digest += "_offset_" + m_offset.toString();
+        }
+        return digest;
     }
 }

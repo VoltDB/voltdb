@@ -23,13 +23,11 @@
 
 package org.voltdb.plannerv2;
 
-import org.apache.calcite.plan.RelTraitSet;
-import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 
 public class TestLogicalRules extends Plannerv2TestCase {
 
-    LogicalRulesTester m_tester = new LogicalRulesTester();
+    private LogicalRulesTester m_tester = new LogicalRulesTester();
 
     @Override protected void setUp() throws Exception {
         setupSchema(TestValidation.class.getResource(

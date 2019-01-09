@@ -39,6 +39,12 @@ import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
 import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
 
 import com.google.common.collect.ImmutableList;
+import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
+import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
+import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
+import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
+import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
 
 /**
  * Rules used by the VoltDB query planner in various planning stages.
@@ -64,7 +70,14 @@ public class PlannerRules {
             public RuleSet getRules() {
                 return PlannerRules.MP_FALLBACK;
             }
-        };
+        },
+        PHYSICAL_CONVERSION {
+            @Override
+            public RuleSet getRules() {
+                return PlannerRules.PHYSICAL_CONVERSION;
+            }
+        }
+        ;
         public abstract RuleSet getRules();
     }
 
@@ -130,10 +143,20 @@ public class PlannerRules {
             MPJoinQueryFallBackRule.INSTANCE
     );
 
+    private static final RuleSet PHYSICAL_CONVERSION = RuleSets.ofList(
+            VoltPCalcRule.INSTANCE,
+            VoltPSeqScanRule.INSTANCE,
+            VoltPSortConvertRule.INSTANCE_VOLTDB,
+            VoltPLimitRule.INSTANCE,
+            VoltPAggregateRule.INSTANCE,
+            VoltPJoinRule.INSTANCE
+    );
+
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
             Programs.listOf(
                     LOGICAL,
-                    MP_FALLBACK
+                    MP_FALLBACK,
+                    PHYSICAL_CONVERSION
                     )
             );
 

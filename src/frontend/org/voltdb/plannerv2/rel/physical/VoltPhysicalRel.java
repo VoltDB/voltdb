@@ -26,8 +26,8 @@ import org.voltdb.plannodes.AbstractPlanNode;
 
 import java.util.Objects;
 
-public interface VoltDBPRel extends RelNode {
-    final static Convention VOLTDB_PHYSICAL = new Convention.Impl("VOLTDB_PHYSICAL", VoltDBPRel.class) {
+public interface VoltPhysicalRel extends RelNode {
+    final static Convention VOLTDB_PHYSICAL = new Convention.Impl("VOLTDB_PHYSICAL", VoltPhysicalRel.class) {
         public boolean canConvertConvention(Convention toConvention) {
             return true;
         }
@@ -40,7 +40,7 @@ public interface VoltDBPRel extends RelNode {
     };
 
     /**
-     * Convert VoltDBPRel and its descendant(s) to a AbstractPlanNode tree
+     * Convert VoltPhysicalRel and its descendant(s) to a AbstractPlanNode tree
      * This is the key piece that bridges between Calcite planner and VoltDB planner.
      * TODO: implement the method in future
      * @return AbstractPlanNode
@@ -50,7 +50,7 @@ public interface VoltDBPRel extends RelNode {
     }
 
     /**
-     * Return number of concurrent processes that this VoltDBPRel will be executed in.
+     * Return number of concurrent processes that this VoltPhysicalRel will be executed in.
      * If this rel/plan node belongs to a coordinator then its split count is 1
      * For a fragment rel/node the split count = a number of hosts * number of sites per host
      *
@@ -65,7 +65,7 @@ public interface VoltDBPRel extends RelNode {
      * @param childOrdinal Child position
      * @return VoltDBRel
      */
-    default VoltDBPRel getInputNode(RelNode node, int childOrdinal) {
+    default VoltPhysicalRel getInputNode(RelNode node, int childOrdinal) {
         RelNode inputNode = node.getInput(childOrdinal);
         if (inputNode != null) {
             if (inputNode instanceof RelSubset) {
@@ -73,9 +73,9 @@ public interface VoltDBPRel extends RelNode {
                 Objects.requireNonNull(inputNode);
 
             }
-            Preconditions.checkArgument(inputNode instanceof VoltDBPRel);
+            Preconditions.checkArgument(inputNode instanceof VoltPhysicalRel);
         }
-        return (VoltDBPRel) inputNode;
+        return (VoltPhysicalRel) inputNode;
     }
 
     /**
@@ -86,7 +86,7 @@ public interface VoltDBPRel extends RelNode {
      * @return AbstractPlanNode
      */
     default AbstractPlanNode inputRelNodeToPlanNode(RelNode node, int childOrdinal) {
-        VoltDBPRel inputNode = getInputNode(node, childOrdinal);
+        VoltPhysicalRel inputNode = getInputNode(node, childOrdinal);
         Objects.requireNonNull(inputNode);
         return inputNode.toPlanNode();
     }

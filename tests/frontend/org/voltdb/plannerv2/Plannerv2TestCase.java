@@ -37,6 +37,7 @@ import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.test.SqlTests;
 import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 
@@ -204,6 +205,21 @@ public class Plannerv2TestCase extends PlannerTestCase {
                 return;
             }
             fail("Expected fallback.");
+        }
+    }
+
+    public class PhysicalConversionRulesTester extends MPFallbackTester {
+        @Override public void test() throws AssertionError {
+            super.test();
+            // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
+            RelTraitSet physicalTraits = m_transformedNode.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).
+                    replace(RelDistributions.SINGLETON);
+            m_transformedNode = m_planner.transform(PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal(),
+                    physicalTraits, m_transformedNode);
+            if (m_ruleSetIndex == PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal() && m_expectedTransform != null) {
+                String actualTransform = RelOptUtil.toString(m_transformedNode);
+                assertEquals(m_expectedTransform, actualTransform);
+            }
         }
     }
 }

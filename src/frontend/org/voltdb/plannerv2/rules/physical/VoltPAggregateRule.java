@@ -30,10 +30,10 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalAggregate;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
-import org.voltdb.plannerv2.rel.physical.VoltDBPHashAggregate;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
-import org.voltdb.plannerv2.rel.physical.VoltDBPSerialAggregate;
-import org.voltdb.plannerv2.rel.physical.VoltDBPSort;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalHashAggregate;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalSerialAggregate;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalSort;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,8 +41,8 @@ import java.util.Map;
 
 
 /**
- * VoltDB physical rule that transform {@link VoltLogicalAggregate} to {@link VoltDBPHashAggregate}
- * or {@link VoltDBPSerialAggregate}.
+ * VoltDB physical rule that transform {@link VoltLogicalAggregate} to {@link VoltPhysicalHashAggregate}
+ * or {@link VoltPhysicalSerialAggregate}.
  *
  * @author Michael Alexeev
  * @since 9.0
@@ -58,15 +58,15 @@ public class VoltPAggregateRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltLogicalAggregate aggregate = call.rel(0);
-        RelTraitSet convertedAggrTraits = aggregate.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
+        RelTraitSet convertedAggrTraits = aggregate.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).simplify();
 
         RelNode input = aggregate.getInput();
-        RelTraitSet convertedInputTraits = input.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL).simplify();
+        RelTraitSet convertedInputTraits = input.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL).simplify();
         RelNode convertedInput = convert(input, convertedInputTraits);
 
         if (needHashAggregator(aggregate)) {
             // Transform to a physical Hash Aggregate
-            VoltDBPHashAggregate hashAggr = new VoltDBPHashAggregate(
+            VoltPhysicalHashAggregate hashAggr = new VoltPhysicalHashAggregate(
                     aggregate.getCluster(),
                     convertedAggrTraits,
                     convertedInput,
@@ -92,7 +92,7 @@ public class VoltPAggregateRule extends RelOptRule {
             convertedAggrTraits = convertedAggrTraits.plus(groupByCollation);
         }
         RelNode convertedSerialAggrInput = convert(input, convertedInputTraits);
-        VoltDBPSerialAggregate serialAggr = new VoltDBPSerialAggregate(
+        VoltPhysicalSerialAggregate serialAggr = new VoltPhysicalSerialAggregate(
                 aggregate.getCluster(),
                 convertedAggrTraits,
                 convertedSerialAggrInput,
@@ -109,7 +109,7 @@ public class VoltPAggregateRule extends RelOptRule {
         // logical aggregate. This way Calcite will later eliminate the added sort because it would have
         // higher processing cost
         if (hasGroupBy(aggregate)) {
-            VoltDBPSort sort = new VoltDBPSort(
+            VoltPhysicalSort sort = new VoltPhysicalSort(
                     aggregate.getCluster(),
                     convertedAggrTraits,
                     serialAggr,

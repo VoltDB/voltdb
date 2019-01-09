@@ -24,7 +24,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistribution.Type;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
-import org.voltdb.plannerv2.rel.physical.VoltDBPRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltSeqTableScan;
 
 /**
@@ -45,7 +45,7 @@ public class VoltPSeqScanRule extends RelOptRule {
     @Override
     public void onMatch(RelOptRuleCall call) {
         VoltLogicalTableScan tableScan = call.rel(0);
-        RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL);
+        RelTraitSet convertedTraits = tableScan.getTraitSet().replace(VoltPhysicalRel.VOLTDB_PHYSICAL);
 
         // Table distribution
         RelDistribution tableDist = tableScan.getTable().getDistribution();

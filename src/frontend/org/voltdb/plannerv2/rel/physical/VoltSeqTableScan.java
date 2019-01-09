@@ -82,7 +82,7 @@ public class VoltSeqTableScan extends VoltPhysicalTableScan {
                 null, // preAggregateRowType
                 null, // preAggregateProgram
                 splitCount);
-        Preconditions.checkArgument(getConvention() == VoltDBPRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.VOLTDB_PHYSICAL);
     }
 
     @Override

@@ -34,7 +34,7 @@ import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 
 import com.google.common.base.Preconditions;
 
-public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
+public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     // TODO: limit / offset as expressions or parameters
     private RexNode m_offset;
@@ -42,7 +42,7 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
 
     private final int m_splitCount;
 
-    public VoltDBPLimit(
+    public VoltPhysicalLimit(
             RelOptCluster cluster,
             RelTraitSet traitSet,
             RelNode input,
@@ -50,15 +50,15 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
             RexNode limit,
             int splitCount) {
         super(cluster, traitSet, input);
-        Preconditions.checkArgument(getConvention() == VoltDBPRel.VOLTDB_PHYSICAL);
+        Preconditions.checkArgument(getConvention() == VoltPhysicalRel.VOLTDB_PHYSICAL);
         m_offset = offset;
         m_limit = limit;
         m_splitCount = splitCount;
     }
 
-    public VoltDBPLimit copy(RelTraitSet traitSet, RelNode input,
-                             RexNode offset, RexNode limit, int splitCount) {
-        return new VoltDBPLimit(
+    public VoltPhysicalLimit copy(RelTraitSet traitSet, RelNode input,
+                                  RexNode offset, RexNode limit, int splitCount) {
+        return new VoltPhysicalLimit(
                 getCluster(),
                 traitSet,
                 input,
@@ -68,8 +68,8 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
     }
 
     @Override
-    public VoltDBPLimit copy(RelTraitSet traitSet,
-                             List<RelNode> inputs) {
+    public VoltPhysicalLimit copy(RelTraitSet traitSet,
+                                  List<RelNode> inputs) {
         return copy(traitSet, sole(inputs), m_offset, m_limit, m_splitCount);
     }
 
@@ -120,8 +120,8 @@ public class VoltDBPLimit extends SingleRel implements VoltDBPRel {
         double rowCount = estimateRowCount(mq);
         // Hack. Discourage Calcite from picking a plan with a Limit that has a RelDistributions.ANY
         // distribution trait. This would make a "correct"
-        // VoltDBPLimit (Single) / DistributedExchange / VoltDBPLimit (Hash) plan
-        // less expensive than an "incorrect" VoltDBPLimit (Any) / DistributedExchange one.
+        // VoltPhysicalLimit (Single) / DistributedExchange / VoltPhysicalLimit (Hash) plan
+        // less expensive than an "incorrect" VoltPhysicalLimit (Any) / DistributedExchange one.
         rowCount = PlanCostUtil.adjustRowCountOnRelDistribution(rowCount, getTraitSet());
 
         RelOptCost defaultCost = super.computeSelfCost(planner, mq);
