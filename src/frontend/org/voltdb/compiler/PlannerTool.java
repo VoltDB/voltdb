@@ -21,7 +21,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -51,7 +50,7 @@ import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
-import org.voltdb.plannerv2.rules.PlannerRules;
+import org.voltdb.plannerv2.rules.PlannerRules.Phase;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
@@ -238,7 +237,7 @@ public class PlannerTool {
         // See comments in PlannerPrograms.directory.LOGICAL to find out
         // what each rule is used for.
         RelNode transformed = planner.transform(
-                PlannerRules.Phase.LOGICAL.ordinal(),
+                Phase.LOGICAL.ordinal(),
                 requiredLogicalOutputTraits, rel);
 
         compileLog.info("LOGICAL\n" + RelOptUtil.toString(transformed));
@@ -254,18 +253,19 @@ public class PlannerTool {
         // Add RelDistributions.ANY trait to the rel tree.
         transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.ANY);
 
-        // apply MP query fallback rules
-        transformed = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK,
-                HepMatchOrder.BOTTOM_UP, transformed, false);
+        // Apply MP query fallback rules
+        // As of 9.0, only SP AdHoc queries are using this new planner.
+        transformed = VoltPlanner.transformHep(Phase.MP_FALLBACK, transformed);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         // RelDistributions.ANY can satisfy any other types of RelDistributions.
         // See RelDistributions.RelDistributionImpl.satisfies()
-        RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
-                replace(RelDistributions.ANY);
+        RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet()
+                .replace(VoltPhysicalRel.CONVENTION)
+                .replace(RelDistributions.ANY);
 
         // Apply physical conversion rules.
-        transformed = planner.transform(PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal(),
+        transformed = planner.transform(Phase.PHYSICAL_CONVERSION.ordinal(),
                 requiredPhysicalOutputTraits, transformed);
 
         Util.discard(transformed);

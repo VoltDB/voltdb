@@ -38,14 +38,14 @@ import org.voltdb.plannerv2.rules.logical.VoltLCalcRule;
 import org.voltdb.plannerv2.rules.logical.VoltLJoinRule;
 import org.voltdb.plannerv2.rules.logical.VoltLSortRule;
 import org.voltdb.plannerv2.rules.logical.VoltLTableScanRule;
-
-import com.google.common.collect.ImmutableList;
 import org.voltdb.plannerv2.rules.physical.VoltPAggregateRule;
 import org.voltdb.plannerv2.rules.physical.VoltPCalcRule;
 import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
 import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * Rules used by the VoltDB query planner in various planning stages.
@@ -60,21 +60,18 @@ public class PlannerRules {
      */
     public enum Phase {
         LOGICAL {
-            @Override
-            public RuleSet getRules() {
+            @Override public RuleSet getRules() {
                 return PlannerRules.LOGICAL;
             }
         },
-        // always use a HEP_BOTTOM_UP planner for MP_FALLBACK, it is match order sensitive.
+        // Always use a HEP_BOTTOM_UP planner for MP_FALLBACK, it is match order sensitive.
         MP_FALLBACK {
-            @Override
-            public RuleSet getRules() {
+            @Override public RuleSet getRules() {
                 return PlannerRules.MP_FALLBACK;
             }
         },
         PHYSICAL_CONVERSION {
-            @Override
-            public RuleSet getRules() {
+            @Override public RuleSet getRules() {
                 return PlannerRules.PHYSICAL_CONVERSION;
             }
         }
@@ -102,9 +99,11 @@ public class PlannerRules {
             // - See comments in RexProgramBuilder.mergePrograms()
             CalcMergeRule.INSTANCE,
             FilterProjectTransposeRule.INSTANCE,
-            ReduceExpressionsRule.CALC_INSTANCE,
             FilterJoinRule.FILTER_ON_JOIN,
             FilterJoinRule.JOIN,
+
+            // Reduces constants inside a LogicalCalc.
+            ReduceExpressionsRule.CALC_INSTANCE,
 
             // -- VoltDB logical rules.
             VoltLSortRule.INSTANCE,
@@ -112,6 +111,7 @@ public class PlannerRules {
             VoltLCalcRule.INSTANCE,
             VoltLAggregateRule.INSTANCE,
             VoltLJoinRule.INSTANCE
+
 //            // Filter   ->  Project
 //            // Project      Filter
 //            FilterProjectTransposeRule.INSTANCE,
