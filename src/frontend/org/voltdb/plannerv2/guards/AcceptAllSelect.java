@@ -28,8 +28,4 @@ public class AcceptAllSelect extends CalciteCompatibilityCheck {
     @Override protected final boolean doCheck(String sql) {
         return sql.toUpperCase().startsWith("SELECT");
     }
-
-    @Override protected final boolean isNegativeCheck() {
-        return false;
-    }
 }

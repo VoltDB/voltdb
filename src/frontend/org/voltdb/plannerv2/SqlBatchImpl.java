@@ -26,6 +26,9 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.plannerv2.guards.AcceptAllSelect;
+import org.voltdb.plannerv2.guards.AcceptDDLsAsWeCan;
+import org.voltdb.plannerv2.guards.BanLargeQuery;
 import org.voltdb.plannerv2.guards.CalciteCompatibilityCheck;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.sysprocs.AdHocNTBase;
@@ -57,7 +60,11 @@ public class SqlBatchImpl extends SqlBatch {
      * A chain of checks to determine whether a SQL statement should be routed to Calcite.
      * Eventually we will let Calcite support all the VoltDB SQLs and remove this check from the code.
      */
-    static final CalciteCompatibilityCheck CALCITE_CHECKS = CalciteCompatibilityCheck.create();
+    static final CalciteCompatibilityCheck CALCITE_CHECKS =
+            CalciteCompatibilityCheck.chain(
+                    new AcceptDDLsAsWeCan(),
+                    new AcceptAllSelect(),
+                    new BanLargeQuery());
 
     /**
      * Build a batch from a string of one or more SQL statements. </br>

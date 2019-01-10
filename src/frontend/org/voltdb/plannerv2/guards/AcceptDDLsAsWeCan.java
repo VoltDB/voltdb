@@ -58,8 +58,4 @@ public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
             }
         }
     }
-
-    @Override protected boolean isNegativeCheck() {
-        return false;
-    }
 }

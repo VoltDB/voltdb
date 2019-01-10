@@ -36,34 +36,32 @@ public abstract class CalciteCompatibilityCheck {
      * to do their own checks and return a result.
      *
      * @param sql the SQL statement to check
-     * @return the check result
+     * @return true if the SQL statement passed the check.
      */
     protected abstract boolean doCheck(String sql);
 
     /**
-     * Indicates whether this check is a negative check.
-     * A positive check should proceed to its next chained check on check failure.
-     * A negative check should proceed to its next chained check on check success.
-     *
-     * @return true if the check is a negative one.
+     * @return true if the result of the current check should become final and
+     *         no subsequent checks should be visited.
      */
-    protected abstract boolean isNegativeCheck();
+    protected boolean isFinal() {
+        return false;
+    }
 
     /**
      * Start the chained check to see if the SQL statement should be routed to Calcite.
      * A query is permissible when at least one positive check in the chain passed (returns true);
-     * given that all negative check in the chain failed (returns false), meaning that the condition
-     * is not banned.
      *
      * @param sql the SQL statement to check.
      * @return true if this statement should be routed to Calcite.
      */
     public final boolean check(String sql) {
-        final boolean pass = doCheck(sql), checkNext = pass == isNegativeCheck();
-        if (checkNext && m_next != null) {
+        if (doCheck(sql)) {
+            return true;
+        } else if (m_next == null || isFinal()) {
+            return false;
+        } else {
             return m_next.check(sql);
-        } else {        // logic short-circuit: stops on first failed positive check, or first passed negative check.
-            return ! checkNext;   // returns true when we don't need to bother checking next in the chain.
         }
     }
 
@@ -80,18 +78,19 @@ public abstract class CalciteCompatibilityCheck {
     }
 
     /**
-     * The factory method to create a default check chain.
+     * The factory method to create a check chain.
      *
      * @return The head of the chain.
      */
-    public static CalciteCompatibilityCheck create() {
-        // As we add more features to Calcite, this list should be expanded, and eventually removed.
-        //
-        // NOTE: all negative checks **must** preceed any positive checks. This is because we must ensure that
-        // no negative test fails, and only after this can we early return on the first matched/passed
-        // positive check.
-        return new AcceptDDLsAsWeCan()
-                .addNext(new AcceptAllSelect())
-                .addNext(new NoLargeQuery());
+    public static CalciteCompatibilityCheck chain(CalciteCompatibilityCheck...checks) {
+        if (checks == null || checks.length == 0) {
+            return null;
+        }
+        CalciteCompatibilityCheck head, cur;
+        cur = head = checks[0];
+        for (int i = 1; i < checks.length; ++i) {
+            cur = cur.addNext(checks[i]);
+        }
+        return head;
     }
 }
