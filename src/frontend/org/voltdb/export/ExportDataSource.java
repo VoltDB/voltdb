@@ -193,6 +193,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      */
     public ExportDataSource(
             Generation generation,
+            ExportDataProcessor processor,
             String db,
             String tableName,
             int partitionId,
@@ -289,13 +290,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             fos.getFD().sync();
         }
         m_isInCatalog = true;
-        m_client = null;
+        m_client = processor.getExportClient(m_tableName);
+        if (m_client != null) {
+            m_runEveryWhere = m_client.isRunEverywhere();
+            if (exportLog.isDebugEnabled() && m_runEveryWhere) {
+                exportLog.debug(toString() + " is a replicated export stream");
+            }
+        }
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                     m_tableName + " partition " + m_partitionId, 1);
     }
 
     public ExportDataSource(Generation generation, File adFile,
-            List<Pair<Integer, Integer>> localPartitionsToSites) throws IOException {
+            List<Pair<Integer, Integer>> localPartitionsToSites,
+            final ExportDataProcessor processor) throws IOException {
         m_generation = generation;
         m_adFile = adFile;
         String overflowPath = adFile.getParent();
@@ -358,7 +366,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         //EDS created from adfile is always from disk.
         m_isInCatalog = false;
-        m_client = null;
+        m_client = processor.getExportClient(m_tableName);
+        if (m_client != null) {
+            m_runEveryWhere = m_client.isRunEverywhere();
+            if (exportLog.isDebugEnabled() && m_runEveryWhere) {
+                exportLog.debug(toString() + " is a replicated export stream");
+            }
+        }
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
                 m_tableName + " partition " + m_partitionId, 1);
     }
@@ -1358,27 +1372,28 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * @param runEveryWhere       Set if connector "replicated" property is set to true Like replicated table, every
      *                            replicated export stream is its own master.
      */
-    public void setOnMastership(Runnable toBeRunOnMastership, boolean runEveryWhere) {
+    public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        runEveryWhere(runEveryWhere);
-    }
-
-    public ExportFormat getExportFormat() {
-        return m_format;
-    }
-
-    /**
-     * @param runEveryWhere Set if connector "replicated" property is set to true Like replicated table, every
-     *                      replicated export stream is its own master.
-     */
-    public synchronized void runEveryWhere(boolean runEveryWhere) {
-        m_runEveryWhere = runEveryWhere;
-        if (runEveryWhere) {
+        // If connector "replicated" property is set to true then every
+        // replicated export stream is its own master
+        if (m_runEveryWhere) {
             //export stream for run-everywhere clients doesn't need ack mailbox
             m_ackMailboxRefs.set(null);
             acceptMastership();
         }
+    }
+
+    public void setRunEveryWhere(boolean runEveryWhere) {
+        if (exportLog.isDebugEnabled() && runEveryWhere != m_runEveryWhere) {
+            exportLog.debug("Change " + toString() + " to " +
+                    (runEveryWhere ? "replicated stream" : " non-replicated stream"));
+        }
+        m_runEveryWhere = runEveryWhere;
+    }
+
+    public ExportFormat getExportFormat() {
+        return m_format;
     }
 
     public ListeningExecutorService getExecutorService() {
