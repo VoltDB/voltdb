@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.calciteadapter.rel.util;
+package org.voltdb.plannerv2.utils;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelCollation;
@@ -30,13 +30,10 @@ import org.apache.calcite.rex.RexProgram;
 import org.apache.calcite.rex.RexProgramBuilder;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.util.Pair;
-import org.voltdb.calciteadapter.converter.RelConverter;
-import org.voltdb.calciteadapter.converter.RexConverter;
-import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.plannerv2.converter.RelConverter;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
 
 import java.util.ArrayList;

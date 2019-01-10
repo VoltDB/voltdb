@@ -67,6 +67,10 @@ public class Plannerv2TestCase extends PlannerTestCase {
         return m_planner.getEmptyTraitSet();
     }
 
+    protected SchemaPlus getSchemaPlus() {
+        return m_schemaPlus;
+    }
+
     public abstract class Tester {
         SqlParserUtil.StringAndPos m_sap;
         String m_expectedException;

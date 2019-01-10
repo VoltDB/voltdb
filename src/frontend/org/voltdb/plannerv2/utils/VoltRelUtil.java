@@ -17,14 +17,13 @@
 
 package org.voltdb.plannerv2.utils;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.rel.RelNode;
-import org.voltdb.calciteadapter.converter.RexConverter;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
-
-import com.google.common.base.Preconditions;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 

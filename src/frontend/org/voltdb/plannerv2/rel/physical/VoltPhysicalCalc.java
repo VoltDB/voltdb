@@ -27,7 +27,7 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexProgram;
-import org.voltdb.calciteadapter.converter.RexConverter;
+import org.voltdb.plannerv2.converter.RexConverter;
 import org.voltdb.plannerv2.rel.util.PlanCostUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.NodeSchema;

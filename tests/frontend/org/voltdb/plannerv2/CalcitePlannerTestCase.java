@@ -29,12 +29,13 @@ import java.util.Map;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.tools.RelConversionException;
+import org.apache.calcite.tools.ValidationException;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.parser.SqlParserFactory;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.PlannerTestCase;
+
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlannerType;
@@ -43,7 +44,7 @@ import org.voltdb.types.PlannerType;
  * An abstract base class for implementing tests against CalcitePlanner.
  * Most of the implementations is taken from Mike A.
  */
-public abstract class CalcitePlannerTestCase extends VoltSqlValidatorTestCase {
+public abstract class CalcitePlannerTestCase extends Plannerv2TestCase {
 
     /**
      * Compile a plan using the Calcite Planner
@@ -61,15 +62,21 @@ public abstract class CalcitePlannerTestCase extends VoltSqlValidatorTestCase {
                                                    boolean inferPartitioning,
                                                    boolean forcedSP,
                                                    DeterminismMode detMode) {
-//        CompiledPlan cp = m_aide.compileAdHocPlan(PlannerType.CALCITE, sql, inferPartitioning, forcedSP, detMode);
-
         SqlNode sqlNode;
+        VoltPlanner planner = new VoltPlanner(getSchemaPlus());
         try {
-            sqlNode = SqlParserFactory.parse(sql);
+            sqlNode = planner.parse(sql);
         } catch (Throwable e) {
             throw new RuntimeException("Error while parsing query: " + sql, e);
         }
-        CompiledPlan cp = PlannerTool.getCompiledPlanCalcite(getSchemaPlus(), sqlNode);
+        CompiledPlan cp;
+        try {
+            cp = PlannerTool.getCompiledPlanCalcite(getSchemaPlus(), sqlNode);
+        } catch (ValidationException e) {
+            throw new RuntimeException("Error while Validating query: " + sql, e);
+        } catch (RelConversionException e) {
+            throw new RuntimeException("Error while Converting query: " + sql, e);
+        }
         assertNotNull(cp);
         return cp;
     }

@@ -39,7 +39,6 @@ import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Database;
-import org.voltdb.newplanner.rules.PlannerPhase;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
 import org.voltdb.planner.ParameterizationInfo;
@@ -267,11 +266,11 @@ public class PlannerTool {
         transformed = planner.transform(PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal(),
                 requiredPhysicalOutputTraits, transformed);
 
-        Util.discard(transformed);
+        System.out.println(RelOptUtil.toString(transformed));
 
-//        // apply inlining rules.
-//        RelNode nodeAfterInlining = CalcitePlanner.transform(CalcitePlannerType.HEP_ORDERED,
-//                PlannerPhase.INLINING, nodeAfterPhysicalConversion);
+        // apply inlining rules.
+        transformed = VoltPlanner.transformHep(PlannerRules.Phase.INLINE,
+                HepMatchOrder.ARBITRARY, transformed, true);
 
         // assume not large query
         CompiledPlan compiledPlan = new CompiledPlan(false);
@@ -290,7 +289,7 @@ public class PlannerTool {
      * @param batch the query batch which this query belongs to.
      * @return a planned statement.
      */
-    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch)
+    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task)
             throws ValidationException, RelConversionException {
         CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
 

@@ -32,7 +32,7 @@ import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
-import org.voltdb.plannerv2.rules.inlining.Apple;
+import org.voltdb.plannerv2.rules.inlining.VoltDBPhysicalScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
 import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
@@ -78,8 +78,14 @@ public class PlannerRules {
             public RuleSet getRules() {
                 return PlannerRules.PHYSICAL_CONVERSION;
             }
-        }
-        ;
+        },
+        INLINE {
+            @Override
+            public RuleSet getRules() {
+                return PlannerRules.INLINE;
+            }
+        };
+
         public abstract RuleSet getRules();
     }
 
@@ -139,7 +145,7 @@ public class PlannerRules {
 //            JoinPushThroughJoinRule.LEFT,
 //            JoinPushThroughJoinRule.RIGHT,
 //            SortProjectTransposeRule.INSTANCE,
-            );
+    );
 
     private static final RuleSet MP_FALLBACK = RuleSets.ofList(
             MPQueryFallBackRule.INSTANCE,
@@ -157,16 +163,17 @@ public class PlannerRules {
 
     private static final RuleSet INLINE = RuleSets.ofList(
             VoltPhysicalCalcScanMergeRule.INSTANCE,
-            VoltDBPLimitScanMergeRule.INSTANCE_2
+            VoltDBPhysicalScanMergeRule.INSTANCE_2
     );
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(
             Programs.listOf(
                     LOGICAL,
                     MP_FALLBACK,
-                    PHYSICAL_CONVERSION
-                    )
-            );
+                    PHYSICAL_CONVERSION,
+                    INLINE
+            )
+    );
 
     public static ImmutableList<Program> getPrograms() {
         return PROGRAMS;
