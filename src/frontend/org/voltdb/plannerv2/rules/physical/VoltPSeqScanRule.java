@@ -51,10 +51,7 @@ public class VoltPSeqScanRule extends RelOptRule {
         RelDistribution tableDist = tableScan.getTable().getDistribution();
         int scanSplitCount = (Type.SINGLETON == tableDist.getType()) ?
                 1 : Constants.DISTRIBUTED_SPLIT_COUNT;
-        // TODO: we make the distribution trait here ALWAYS SINGLE because we only support SP in our initial release.
-        // when come to MP, distribution trait can be HASH and Exchange nodes should be introduced to
-        // handle this.
-        System.out.println(convertedTraits.plus(tableDist));
+
         VoltSeqTableScan scanRel = new VoltSeqTableScan(
                 tableScan.getCluster(),
                 convertedTraits.plus(tableDist),
