@@ -28,15 +28,6 @@ import java.util.Objects;
 
 public interface VoltPhysicalRel extends RelNode {
     Convention CONVENTION = new Convention.Impl("CONVENTION", VoltPhysicalRel.class) {
-        public boolean canConvertConvention(Convention toConvention) {
-            return true;
-        }
-
-        public boolean useAbstractConvertersForConversion(RelTraitSet fromTraits,
-                                                          RelTraitSet toTraits) {
-            return true;
-        }
-
     };
 
     /**
@@ -46,7 +37,7 @@ public interface VoltPhysicalRel extends RelNode {
      * @return AbstractPlanNode
      */
     default AbstractPlanNode toPlanNode() {
-        return null;
+        throw new UnsupportedOperationException("Not implemented!");
     }
 
     /**

@@ -251,20 +251,22 @@ public class PlannerTool {
         // the LogicalCalc and Calc-related rules to fix this.
         planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
-        // Add RelDistributions.SINGLETON trait to the rel tree.
-        transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.SINGLETON);
+        // Add RelDistributions.ANY trait to the rel tree.
+        transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.ANY);
 
         // apply MP query fallback rules
         transformed = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK,
                 HepMatchOrder.BOTTOM_UP, transformed, false);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-        RelTraitSet physicalTraits = transformed.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
+        // RelDistributions.ANY can satisfy any other types of RelDistributions.
+        // See RelDistributions.RelDistributionImpl.satisfies()
+        RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
                 replace(RelDistributions.ANY);
 
         // Apply physical conversion rules.
         transformed = planner.transform(PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal(),
-                physicalTraits, transformed);
+                requiredPhysicalOutputTraits, transformed);
 
         Util.discard(transformed);
 

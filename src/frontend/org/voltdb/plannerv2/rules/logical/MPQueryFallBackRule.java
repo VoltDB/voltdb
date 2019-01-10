@@ -46,12 +46,11 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
  */
 public class MPQueryFallBackRule extends RelOptRule {
 
-    public static final MPQueryFallBackRule INSTANCE = new MPQueryFallBackRule(
-            operand(SingleRel.class, RelDistributions.ANY,
-                    some(operand(RelNode.class, any()))), "MPQueryFallBackRule");
+    public static final MPQueryFallBackRule INSTANCE = new MPQueryFallBackRule();
 
-    private MPQueryFallBackRule(RelOptRuleOperand operand, String desc) {
-        super(operand, desc);
+    private MPQueryFallBackRule() {
+        super(operand(SingleRel.class, RelDistributions.ANY,
+                some(operand(RelNode.class, any()))));
     }
 
     /**
