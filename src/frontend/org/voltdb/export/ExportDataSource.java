@@ -771,6 +771,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             exportLog.debug("Truncating tracker via snapshot truncation to " + sequenceNumber +
                                     ", tracker map is " + m_gapTracker.toString());
                         }
+                        // In recovery PBDs may be on node that there is no partition replica on,
+                        // those dangling buffer also need to be truncated after snapshot
+                        forwardAckToOtherReplicas(sequenceNumber);
                     }
                     // Need to update pending tuples in rejoin
                     resetStateInRejoinOrRecover(sequenceNumber);
