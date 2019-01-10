@@ -710,13 +710,15 @@ public class ExportManager
     }
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover, long sequenceNumber) {
+                                                boolean isRecover,
+                                                Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+                                                boolean isLowestSite) {
         //If the generation was completely drained, wait for the task to finish running
         //by waiting for the permit that will be generated
         ExportGeneration generation = m_generation.get();
         if (generation != null) {
             generation.updateInitialExportStateToSeqNo(partitionId, signature,
-                                                       isRecover, sequenceNumber);
+                                                       isRecover, sequenceNumberPerPartition, isLowestSite);
         }
     }
 
