@@ -24,7 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
-import org.voltdb.exceptions.AdHocPlanningException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 
@@ -78,7 +78,7 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
     }
 
     @Override public CompletableFuture<ClientResponse> execute()
-            throws AdHocPlanningException, PlannerFallbackException {
+            throws PlanningErrorException, PlannerFallbackException {
         // TRAIL [Calcite-AdHoc-DQL/DML:1] NonDDLBatch.execute()
 
         NonDdlBatchPlanner planner = new NonDdlBatchPlanner(this);
@@ -90,7 +90,7 @@ public final class NonDdlBatch extends AbstractSqlBatchDecorator {
             return getContext().createAdHocTransaction(plannedStmtBatch);
         } catch (VoltTypeException vte) {
             String msg = "Unable to execute AdHoc SQL statement(s): " + vte.getMessage();
-            throw new AdHocPlanningException(msg);
+            throw new PlanningErrorException(msg);
         }
     }
 

@@ -29,7 +29,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
-import org.voltdb.exceptions.AdHocPlanningException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 
 /**
@@ -70,11 +70,11 @@ public abstract class SqlBatch implements Iterable<SqlTask>  {
      * Execute the batch.
      *
      * @return the client response.
-     * @throws AdHocPlanningException if the planning went wrong.
+     * @throws PlanningErrorException if the planning went wrong.
      * @throws PlannerFallbackException if we need to switch to the legacy parser/planner.
      */
     public abstract CompletableFuture<ClientResponse> execute()
-            throws AdHocPlanningException, PlannerFallbackException;
+            throws PlanningErrorException, PlannerFallbackException;
 
     /**
      * Build a {@link SqlBatch} from a {@link org.voltdb.ParameterSet}

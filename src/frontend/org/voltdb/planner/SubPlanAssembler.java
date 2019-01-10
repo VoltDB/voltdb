@@ -87,7 +87,6 @@ public abstract class SubPlanAssembler {
     /// the matched filter must remain in the list
     /// to eventually be applied as a post-filter.
     private final static boolean KEEP_IN_POST_FILTERS = false;
-    final static int STATEMENT_LEVEL_ORDER_BY_INDEX = -1;
 
     SubPlanAssembler(AbstractParsedStmt parsedStmt, StatementPartitioning partitioning) {
         m_parsedStmt = parsedStmt;

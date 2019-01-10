@@ -40,6 +40,7 @@ public class WindowFunctionScoreboard {
      * These are some constants for using indexes for window functions.
      */
     public final static int NO_INDEX_USE = -2;
+    public final static int STATEMENT_LEVEL_ORDER_BY_INDEX = -1;
 
     public WindowFunctionScoreboard(AbstractParsedStmt stmt) {
         m_numWinScores = stmt.getWindowFunctionExpressionCount();
@@ -61,16 +62,14 @@ public class WindowFunctionScoreboard {
     }
 
     public void matchIndexEntry(ExpressionOrColumn indexEntry) {
-        for (int idx = 0; idx < m_winFunctions.size(); idx += 1) {
-            WindowFunctionScore score = m_winFunctions.get(idx);
-            WindowFunctionScore.MatchResults result = score.matchIndexEntry(indexEntry);
-            // This can only happen with a statement level order by
-            // clause.  We don't return POSSIBLE_ORDER_SPOILER for
-            // window functions.
-            if (result == WindowFunctionScore.MatchResults.POSSIBLE_ORDER_SPOILER) {
-                m_orderSpoilers.add(indexEntry.m_indexKeyComponentPosition);
-            }
-        }
+        m_winFunctions.stream()
+                .filter(score -> score.matchIndexEntry(indexEntry) == WindowFunctionScore.MatchResults.POSSIBLE_ORDER_SPOILER)
+                .forEach(unused ->
+                        // This can only happen with a statement level order by
+                        // clause.  We don't return POSSIBLE_ORDER_SPOILER for
+                        // window functions.
+                        m_orderSpoilers.add(indexEntry.m_indexKeyComponentPosition)
+                );
     }
 
     /**
@@ -84,15 +83,17 @@ public class WindowFunctionScoreboard {
      * return the first one in the list, which is essentially
      * random.  Perhaps we can do better.
      *
+     * @param access portal to access/update table traits
+     * @param orderSpoilers counts agreements between ORDER BY column and table index.
      * @return The number of order spoilers in the candidate we choose.
      */
-    public int getResult(AccessPath retval, int orderSpoilers[]) {
+    public int getResult(AccessPath access, int[] orderSpoilers) {
         WindowFunctionScore answer = null;
         // Fill in the failing return values as a fallback.
-        retval.bindings.clear();
-        retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
-        retval.m_stmtOrderByIsCompatible = false;
-        retval.sortDirection = SortDirectionType.INVALID;
+        access.bindings.clear();
+        access.m_windowFunctionUsesIndex = NO_INDEX_USE;
+        access.m_stmtOrderByIsCompatible = false;
+        access.sortDirection = SortDirectionType.INVALID;
         int numOrderSpoilers = 0;
 
         // The statement level order by expressions
@@ -110,7 +111,8 @@ public class WindowFunctionScoreboard {
                 assert ! score.isDead();
                 // Prefer window functions, and prefer longer matches, but we'll
                 // take anything.
-                if ((answer == null) || !answer.isWindowFunction() || answer.getNumberMatches() < score.getNumberMatches()) {
+                if (answer == null || ! answer.isWindowFunction() ||
+                        answer.getNumberMatches() < score.getNumberMatches()) {
                     answer = score;
                 }
             }
@@ -126,41 +128,41 @@ public class WindowFunctionScoreboard {
                 // index may be usable for the statement level
                 // order by as well as for any
                 // window functions.
-                retval.m_stmtOrderByIsCompatible = orderByScore.sortDirection() == answer.sortDirection() &&
+                access.m_stmtOrderByIsCompatible = orderByScore.sortDirection() == answer.sortDirection() &&
                         orderByScore.isDone();
             }
             if (answer.sortDirection() != SortDirectionType.INVALID) {
 
                 // Mark how we are using this index.
-                retval.m_windowFunctionUsesIndex = answer.m_windowFunctionNumber;
+                access.m_windowFunctionUsesIndex = answer.m_windowFunctionNumber;
                 // If we have an index for the Statement Level
                 // Order By clause but there is a window function
                 // that can't use the index, then we can't use the
                 // index at all. for ordering.  The window function
                 // will invalidate the ordering for the statment level
                 // order by clause.
-                if ((retval.m_windowFunctionUsesIndex == SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX)
+                if ((access.m_windowFunctionUsesIndex == STATEMENT_LEVEL_ORDER_BY_INDEX)
                         && (0 < m_numWinScores)) {
-                    retval.m_stmtOrderByIsCompatible = false;
-                    retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
-                    retval.sortDirection = SortDirectionType.INVALID;
+                    access.m_stmtOrderByIsCompatible = false;
+                    access.m_windowFunctionUsesIndex = NO_INDEX_USE;
+                    access.sortDirection = SortDirectionType.INVALID;
                     return 0;
                 }
 
                 // Add the bindings.
-                retval.bindings.addAll(answer.m_bindings);
+                access.bindings.addAll(answer.m_bindings);
 
                 // Mark the sort direction.
-                if (retval.m_windowFunctionUsesIndex == NO_INDEX_USE) {
-                    retval.sortDirection = SortDirectionType.INVALID;
+                if (access.m_windowFunctionUsesIndex == NO_INDEX_USE) {
+                    access.sortDirection = SortDirectionType.INVALID;
                 } else {
-                    retval.sortDirection = answer.sortDirection();
+                    access.sortDirection = answer.sortDirection();
                 }
 
                 // Add the order spoilers if the index is
                 // compatible with the statement level
                 // order by clause.
-                if (retval.m_stmtOrderByIsCompatible) {
+                if (access.m_stmtOrderByIsCompatible) {
                     assert(m_orderSpoilers.size() <= orderSpoilers.length);
                     int idx = 0;
                     for (Integer spoiler : m_orderSpoilers) {
@@ -169,7 +171,7 @@ public class WindowFunctionScoreboard {
                     // We will return this.
                     numOrderSpoilers = m_orderSpoilers.size();
                 }
-                retval.m_finalExpressionOrder.addAll(answer.m_orderedMatchingExpressions);
+                access.m_finalExpressionOrder.addAll(answer.m_orderedMatchingExpressions);
                 // else numOrderSpoilers is already zero.
             }
         }

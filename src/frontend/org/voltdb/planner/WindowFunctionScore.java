@@ -68,7 +68,7 @@ class WindowFunctionScore {
 
     // Set of active partition by expressions
     // for this window function.
-    List<ExpressionOrColumn> m_partitionByExprs = new ArrayList<>();
+    private List<ExpressionOrColumn> m_partitionByExprs = new ArrayList<>();
     // Sequence of expressions which
     // either match index expression or which have
     // single values.   These are from the partition
@@ -79,14 +79,14 @@ class WindowFunctionScore {
     // List of order by expressions, originally from the
     // WindowFunctionExpression.  These migrate to
     // m_orderedMatchingExpressions as they match.
-    final List<ExpressionOrColumn> m_unmatchedOrderByExprs = new ArrayList<>();
+    private final List<ExpressionOrColumn> m_unmatchedOrderByExprs = new ArrayList<>();
     // This is the index of the unmatched expression
     // we will be working on.
     // This is the number of the window function.  It is
     // STATEMENT_LEVEL_ORDER_BY for the statement level order by list.
     int m_windowFunctionNumber;
 
-    MatchingState m_matchingState = MatchingState.INPROGRESS;
+    private MatchingState m_matchingState = MatchingState.INPROGRESS;
     // This is the sort direction for this window function
     // or order by list.
     private SortDirectionType m_sortDirection;
@@ -129,7 +129,7 @@ class WindowFunctionScore {
             m_unmatchedOrderByExprs.add(new ExpressionOrColumn(-1, pci.m_expression, sortDir));
         }
         // Statement level order by expressions are number STATEMENT_LEVEL_ORDER_BY_INDEX.
-        m_windowFunctionNumber = SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX;
+        m_windowFunctionNumber = WindowFunctionScoreboard.STATEMENT_LEVEL_ORDER_BY_INDEX;
         m_sortDirection = SortDirectionType.INVALID;
     }
     int getNumberMatches() {
@@ -164,7 +164,7 @@ class WindowFunctionScore {
         // we are dead or done.
         if (isDead() || isDone()) {
             return MatchResults.DONE_OR_DEAD;
-        } else if ( ! m_partitionByExprs.isEmpty() ) {
+        } else if ( ! m_partitionByExprs.isEmpty()) {
             // If there are more partition by expressions, then
             // find one which matches the indexEntry and move it
             // to the end of the ordered  matching expressions.

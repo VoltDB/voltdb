@@ -29,7 +29,7 @@ import org.voltdb.VoltType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
-import org.voltdb.exceptions.AdHocPlanningException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.utils.VoltTrace;
 
@@ -58,12 +58,12 @@ public class NonDdlBatchPlanner {
      * Plan this DQL/DML batch.
      *
      * @return a {@link AdHocPlannedStmtBatch}.
-     * @throws AdHocPlanningException if the planning went wrong. </br>
-     *         The {@code AdHocPlanningException} will be aggregated with all exceptions
+     * @throws PlanningErrorException if the planning went wrong. </br>
+     *         The {@code PlanningErrorException} will be aggregated with all exceptions
      *         collected from planning the entire batch.
      * @throws PlannerFallbackException if we need to switch back to the legacy parser/planner.
      */
-    public AdHocPlannedStmtBatch plan() throws AdHocPlanningException, PlannerFallbackException {
+    public AdHocPlannedStmtBatch plan() throws PlanningErrorException, PlannerFallbackException {
         // TRAIL [Calcite-AdHoc-DQL/DML:2] NonDDLBatchPlanner.plan()
 
         List<String> errorMsgs = new ArrayList<>();
@@ -83,7 +83,7 @@ public class NonDdlBatchPlanner {
                     partitionParamValue = result.getPartitioningParameterValue();
                 }
                 plannedStmts.add(result);
-            } catch (AdHocPlanningException e) {
+            } catch (PlanningErrorException e) {
                 errorMsgs.add(e.getMessage());
             }
         }
@@ -91,7 +91,7 @@ public class NonDdlBatchPlanner {
         if ( ! errorMsgs.isEmpty()) {
             // Aggregate all the exceptions and re-throw.
             String errorSummary = StringUtils.join(errorMsgs, "\n");
-            throw new AdHocPlanningException(errorSummary);
+            throw new PlanningErrorException(errorSummary);
         }
 
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
@@ -116,11 +116,11 @@ public class NonDdlBatchPlanner {
      *
      * @param task SqlTask for one SQL statement
      * @return planned statement
-     * @throws AdHocPlanningException
+     * @throws PlanningErrorException
      * @throws PlannerFallbackException if we need to switch to the legacy parser/planner.
      */
     private AdHocPlannedStatement planTask(SqlTask task)
-            throws AdHocPlanningException, PlannerFallbackException {
+            throws PlanningErrorException, PlannerFallbackException {
         // TRAIL [Calcite-AdHoc-DQL/DML:3] NonDdlBatchCompiler.compileTask()
 
         final PlannerTool ptool = m_catalogContext.m_ptool;
@@ -131,7 +131,7 @@ public class NonDdlBatchPlanner {
             // Let go the PlannerFallbackException so we can fall back to the legacy planner.
             throw ex;
         } catch (Exception ex) {
-            throw new AdHocPlanningException(ex.getMessage());
+            throw new PlanningErrorException(ex.getMessage());
         } catch (StackOverflowError error) {
             // TODO: This is from AdHocNTBase.compileAdHocSQL()
             // Maybe it is not needed any more in Calcite.
@@ -157,7 +157,7 @@ public class NonDdlBatchPlanner {
              * catch blocks that re-throw the error to bypass more generic catch blocks for
              * Error or Throwable on the same try block.
              */
-            throw new AdHocPlanningException("Encountered stack overflow error. " +
+            throw new PlanningErrorException("Encountered stack overflow error. " +
                     "Try reducing the number of predicate expressions in the query.");
         } catch (AssertionError ae) {
             String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc. "
@@ -167,7 +167,7 @@ public class NonDdlBatchPlanner {
             ae.printStackTrace(writer);
             String stackTrace = stringWriter.toString();
             m_batch.getContext().getLogger().error(msg + "\n" + stackTrace);
-            throw new AdHocPlanningException(msg);
+            throw new PlanningErrorException(msg);
         }
     }
 }

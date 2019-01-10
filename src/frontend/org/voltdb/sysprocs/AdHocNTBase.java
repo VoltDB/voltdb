@@ -41,7 +41,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.PlannerTool;
-import org.voltdb.exceptions.AdHocPlanningException;
+import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
@@ -171,8 +171,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                                         ExplainMode explainMode,
                                                         boolean isLargeQuery,
                                                         boolean isSwapTables,
-                                                        Object[] userParamSet)
-                                                                throws AdHocPlanningException
+                                                        Object[] userParamSet) throws PlanningErrorException
     {
         assert(plannerTool != null);
         assert(sqlStatement != null);
@@ -201,7 +200,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                                  isLargeQuery);
         }
         catch (Exception e) {
-            throw new AdHocPlanningException(e.getMessage());
+            throw new PlanningErrorException(e.getMessage());
         }
         catch (StackOverflowError error) {
             // Overly long predicate expressions can cause a
@@ -224,7 +223,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             // explicit StackOverflowError catch blocks that re-throw
             // the error to bypass more generic catch blocks
             // for Error or Throwable on the same try block.
-            throw new AdHocPlanningException("Encountered stack overflow error. " +
+            throw new PlanningErrorException("Encountered stack overflow error. " +
                     "Try reducing the number of predicate expressions in the query.");
         }
         catch (AssertionError ae) {
@@ -236,7 +235,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
             String stackTrace = stringWriter.toString();
 
             adhocLog.error(msg + "\n" + stackTrace);
-            throw new AdHocPlanningException(msg);
+            throw new PlanningErrorException(msg);
         }
     }
 
@@ -293,7 +292,7 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
                 }
                 stmts.add(result);
             }
-            catch (AdHocPlanningException e) {
+            catch (PlanningErrorException e) {
                 errorMsgs.add(e.getMessage());
             }
         }
@@ -497,23 +496,23 @@ public abstract class AdHocNTBase extends UpdateApplicationBase {
     }
 
     public static AdHocPlannedStmtBatch plan(PlannerTool ptool, String sql, Object[] userParams, boolean singlePartition)
-            throws AdHocPlanningException
+            throws PlanningErrorException
     {
         List<String> sqlStatements = new ArrayList<>();
         AdHocSQLMix mix = processAdHocSQLStmtTypes(sql, sqlStatements);
 
         switch (mix) {
         case EMPTY:
-            throw new AdHocPlanningException("No valid SQL found.");
+            throw new PlanningErrorException("No valid SQL found.");
         case ALL_DDL:
         case MIXED:
-            throw new AdHocPlanningException("DDL not supported in stored procedures.");
+            throw new PlanningErrorException("DDL not supported in stored procedures.");
         default:
             break;
         }
 
         if (sqlStatements.size() != 1) {
-            throw new AdHocPlanningException("Only one statement is allowed in stored procedure, but received " + sqlStatements.size());
+            throw new PlanningErrorException("Only one statement is allowed in stored procedure, but received " + sqlStatements.size());
         }
 
         sql = sqlStatements.get(0);
