@@ -314,7 +314,7 @@ public class VoltZK {
             Integer hostId = p.getFirst();
             ZKUtil.ByteArrayCallback cb = p.getSecond();
             try {
-               clusterMetadata.put( hostId, new String(cb.getData(), "UTF-8"));
+               clusterMetadata.put( hostId, new String(cb.get(), "UTF-8"));
             } catch (KeeperException.NoNodeException e){}
         }
     }

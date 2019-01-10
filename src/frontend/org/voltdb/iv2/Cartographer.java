@@ -557,7 +557,7 @@ public class Cartographer extends StatsSource
         for (Pair<Integer, ZKUtil.ChildrenCallback> p : callbacks ) {
             final Integer partition = p.getFirst();
             try {
-                List<String> children = p.getSecond().getChildren();
+                List<String> children = p.getSecond().get();
                 List<Long> sites = new ArrayList<Long>();
                 for (String child : children) {
                     sites.add(Long.valueOf(child.split("_")[0]));
@@ -1138,7 +1138,7 @@ public class Cartographer extends StatsSource
          * @throws KeeperException      If there was an error retrieving the state from zookeeper
          */
         public boolean isInitializing() throws InterruptedException, KeeperException {
-            byte[] state = m_stateCallback.getData();
+            byte[] state = m_stateCallback.get();
             return state != null && state.length == 1 && state[0] == LeaderElector.INITIALIZING;
         }
 
@@ -1150,7 +1150,7 @@ public class Cartographer extends StatsSource
          * @throws KeeperException      If there was an error retrieving the state from zookeeper
          */
         public boolean isInitialized() throws InterruptedException, KeeperException {
-            byte[] state = m_stateCallback.getData();
+            byte[] state = m_stateCallback.get();
             assert state != null && state.length == 1;
             return state != null && state.length == 1 && state[0] == LeaderElector.INITIALIZED;
         }
@@ -1163,7 +1163,7 @@ public class Cartographer extends StatsSource
          * @throws KeeperException      If there was an error retrieving the state from zookeeper
          */
         public List<String> getReplicas() throws InterruptedException, KeeperException {
-            return m_childrenCallback.getChildren();
+            return m_childrenCallback.get();
         }
     }
 }

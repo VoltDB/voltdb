@@ -256,7 +256,7 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
         HashMap<String, JSONObject> cache = new HashMap<String, JSONObject>();
         for (ByteArrayCallback callback : callbacks) {
             try {
-                byte payload[] = callback.getData();
+                byte payload[] = callback.get();
                 JSONObject jsObj = new JSONObject(new String(payload, "UTF-8"));
                 cache.put(callback.getPath(), jsObj);
             } catch (KeeperException.NoNodeException e) {
@@ -279,7 +279,7 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
         ByteArrayCallback cb = new ByteArrayCallback();
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
-            byte payload[] = cb.getData();
+            byte payload[] = cb.get();
             JSONObject jsObj = new JSONObject(new String(payload, "UTF-8"));
             cacheCopy.put(cb.getPath(), jsObj);
         } catch (KeeperException.NoNodeException e) {
