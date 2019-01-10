@@ -294,7 +294,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_client != null) {
             m_runEveryWhere = m_client.isRunEverywhere();
             if (exportLog.isDebugEnabled() && m_runEveryWhere) {
-                exportLog.debug(toString() + " is replicated export stream");
+                exportLog.debug(toString() + " is a replicated export stream");
             }
         }
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
@@ -370,7 +370,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_client != null) {
             m_runEveryWhere = m_client.isRunEverywhere();
             if (exportLog.isDebugEnabled() && m_runEveryWhere) {
-                exportLog.debug(toString() + " is replicated export stream");
+                exportLog.debug(toString() + " is a replicated export stream");
             }
         }
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource for table " +
