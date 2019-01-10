@@ -55,11 +55,6 @@ public abstract class TransactionState extends OrderableTransaction  {
     // This timestamp is only used for restarted transactions
     protected long m_restartTimestamp = TransactionInfoBaseMessage.INITIAL_TIMESTAMP;
 
-    // The site where a transaction is processed when partition leader is being migrated.
-    // When its partition leader changes between the fragment processing in a multiple fragment transaction,
-    // the site would still act as leader for all the follow-up fragments to complete the transaction.
-    long m_oldFragmentExecutedSiteId = -1;
-
     /**
      * Set up the final member variables from the parameters. This will
      * be called exclusively by subclasses.
@@ -224,13 +219,5 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public long getTimetamp() {
         return m_restartTimestamp;
-    }
-
-    public void setOldFragmentExecutedSiteId(long oldFragmentExecutedSiteId) {
-        m_oldFragmentExecutedSiteId = oldFragmentExecutedSiteId;
-    }
-
-    public long getOldFragmentExecutedSiteId() {
-        return m_oldFragmentExecutedSiteId;
     }
 }
