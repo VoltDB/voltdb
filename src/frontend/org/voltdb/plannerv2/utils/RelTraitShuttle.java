@@ -21,7 +21,6 @@ import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
-import org.apache.calcite.rel.core.TableFunctionScan;
 import org.apache.calcite.rel.core.TableScan;
 
 public class RelTraitShuttle extends RelShuttleImpl {
@@ -33,17 +32,12 @@ public class RelTraitShuttle extends RelShuttleImpl {
     }
 
     private <T extends RelNode> RelNode _visit(T visitor) {
-        RelTraitSet newTraitSet = visitor.getTraitSet().plus(m_newTrait);
+        RelTraitSet newTraitSet = visitor.getTraitSet().plus(m_newTrait).simplify();
         RelNode newRel = visitor.copy(newTraitSet, visitor.getInputs());
         return visitChildren(newRel);
     }
 
     @Override public RelNode visit(TableScan scan) {
-        RelNode newScan = scan.copy(scan.getTraitSet().plus(m_newTrait), scan.getInputs());
-        return newScan;
-    }
-
-    @Override public RelNode visit(TableFunctionScan scan) {
         return _visit(scan);
     }
 

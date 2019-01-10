@@ -39,12 +39,13 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 /**
- * Rules that fallback a query if it is multi-partitioned.
+ * Rule that fallback a multi-partition query.
  *
  * @author Chao Zhou
  * @since 9.0
  */
 public class MPQueryFallBackRule extends RelOptRule {
+
     public static final MPQueryFallBackRule INSTANCE = new MPQueryFallBackRule(
             operand(SingleRel.class, RelDistributions.ANY,
                     some(operand(RelNode.class, any()))), "MPQueryFallBackRule");

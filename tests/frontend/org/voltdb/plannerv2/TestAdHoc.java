@@ -53,7 +53,8 @@ public class TestAdHoc extends RegressionSuite {
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("create table t1(a int, b varchar);");
+        project.addLiteralSchema("create table t1(a int not null, b varchar);");
+        project.addLiteralSchema("partition table t1 on column a;");
         project.addLiteralSchema("create table t2(c int, d varchar);");
 
         LocalCluster config = new LocalCluster("calcite-adhoc.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);

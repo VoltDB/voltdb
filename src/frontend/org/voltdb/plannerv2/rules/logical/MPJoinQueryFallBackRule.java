@@ -35,6 +35,7 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
  * @since 9.0
  */
 public class MPJoinQueryFallBackRule extends RelOptRule {
+
     public static final MPJoinQueryFallBackRule INSTANCE =
             new MPJoinQueryFallBackRule(
                     operand(VoltLogicalJoin.class, RelDistributions.ANY,

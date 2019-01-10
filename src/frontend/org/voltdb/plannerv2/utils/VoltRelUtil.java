@@ -42,6 +42,4 @@ public class VoltRelUtil {
         return (rel instanceof VoltPhysicalRel) ?
                 ((VoltPhysicalRel) rel).getSplitCount() : 1;
     }
-
-
 }
