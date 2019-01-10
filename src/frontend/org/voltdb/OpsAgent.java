@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -270,6 +270,10 @@ public abstract class OpsAgent
                     collectStatsImpl(c, clientHandle, selector, params);
                 } catch (Exception e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
+                    // ENG-14639, prevent clients like sqlcmd from hanging on exception
+                    sendErrorResponse(c, ClientResponse.OPERATIONAL_FAILURE,
+                            "Failed to get statistics (" + e.getMessage() + ").",
+                            clientHandle);
                 }
             }
         });

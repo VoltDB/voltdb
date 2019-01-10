@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -161,10 +161,14 @@ public class JDBCVoltVerifier {
 
         rvr = new ReadVoltRows(client);
         if ( ! processRows(rvr, client, jdbcConnection) ) {
-            System.err.println("Check Table failed, see log for errors");
+            System.err.println("ERROR Check Table failed, see log for errors");
             System.exit(1);
         }
         System.out.println("Total rows checked in VoltDB and JDBC Table: " + rowCheckTotal);
+        if ( rowCheckTotal == 0 ) {
+            System.err.println("ERROR No rows were found, is export_mirror_partitioned_table empty?");
+            System.exit(1);
+        }
         System.exit(0);
     }
 }

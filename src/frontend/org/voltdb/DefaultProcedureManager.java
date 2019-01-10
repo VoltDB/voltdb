@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,9 +20,9 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.catalog.Catalog;
@@ -49,7 +49,8 @@ import org.voltdb.utils.CatalogUtil;
  */
 public class DefaultProcedureManager {
 
-    Map<String, Procedure> m_defaultProcMap = new HashMap<>();
+    // ENG-14639, made concurrent to support LoadedProcedureSet.getNibbleDeleteProc
+    Map<String, Procedure> m_defaultProcMap = new ConcurrentHashMap<>();
 
     private final Database m_db;
     // fake db makes it easy to create procedures that aren't

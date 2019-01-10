@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -92,7 +92,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
             client.callProcedure("InsertAddedTable", paramsGrp);
         }
 
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     //  Test Export of a DROPPED table.  Queues some data to a table.
@@ -124,7 +124,7 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         client = getClient();
 
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyTarget(client, m_verifier);
     }
 
     public TestExportV2SuitePro(final String name) {

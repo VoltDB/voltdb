@@ -41,7 +41,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.newplanner.guards.CalcitePlanningException;
+import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;

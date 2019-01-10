@@ -27,7 +27,7 @@ import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.newplanner.guards.CalcitePlanningException;
+import org.voltdb.plannerv2.guards.CalcitePlanningException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.QuantifierType;
 

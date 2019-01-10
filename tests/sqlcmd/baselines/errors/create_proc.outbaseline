@@ -19,6 +19,7 @@ create procedure from class sqlcmdtest.Trivial;
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -73,6 +74,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -111,6 +113,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -197,6 +200,7 @@ create procedure from class sqlcmdtest.Trivial;
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -256,6 +260,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -323,6 +328,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -391,6 +397,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -458,6 +465,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  

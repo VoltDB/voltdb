@@ -23,7 +23,7 @@
 {@onefun = " "} -- There are no handy unary timestamp-to-timestamp functions.
 {@optionalfn = " "} -- There are no handy unary timestamp-to-timestamp functions.
 {@plus10 = ""} -- You cannot add to a timestamp
-{@rankorderbytype = "timestamp"} -- as used in the ORDER BY clause in a RANK function
+{@rankorderbytype = "timestamp"} -- as used in the ORDER BY clause in a RANK function (must be int or timestamp)
 {@star = "*"}
 {@lhsstar = "*"}
 {@updatecolumn = "PRESENT"}

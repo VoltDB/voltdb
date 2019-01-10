@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,6 +63,24 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
     private ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<>();
 
+    private static final Runtime RUNTIME = Runtime.getRuntime();
+    // Number of times generateSubPlanForJoinNode() gets called recursively that we collect an estimate of heap size,
+    // and early exit if too large heap size had been used.
+    private static final int PLAN_ESTIMATE_PERIOD = 300;
+    // Stop generating any further possible plans, if we have reached xx% of available JVM heap memory
+    private static final short MAX_HEAP_MEMORY_USAGE_PCT = 80;
+    private static final long MAX_ALLOWED_PLAN_MEMORY = RUNTIME.maxMemory() * MAX_HEAP_MEMORY_USAGE_PCT / 100;
+
+    /**
+     * Stop further planning, if we have used more heap memory than we could hopefully exhaustively plan it out,
+     * at the time this method is called.
+     *
+     * @return whether we should stop further planning. By the time it returns true, GC had already kicked in a few
+     * rounds.
+     */
+    private static boolean shouldStopPlanning() {
+        return RUNTIME.totalMemory() - RUNTIME.freeMemory() >= MAX_ALLOWED_PLAN_MEMORY;
+    }
     /**
      *
      * @param db The catalog's Database object.
@@ -516,7 +534,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * generate all possible plans for the tree.
+     * Generate all possible plans for the tree, or to the extent that further planning would drain JVM heap memory
+     * (at threshold of MAX_HEAP_MEMORY_USAGE_PCT% of available JVM heap memory)
      *
      * @param rootNode The root node for the whole join tree.
      * @param nodes The node list to iterate over.

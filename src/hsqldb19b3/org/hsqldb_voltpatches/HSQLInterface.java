@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -255,7 +255,7 @@ public class HSQLInterface {
         VoltXMLDiff diff = VoltXMLElement.computeDiff(tableXMLOld, tableXMLNew);
 
         // now find any views that might be missing and make sure the diff reflects that
-        // they're gone NOTE!!!
+        // they're gone
         if (stmtInfo.cascade) {
             Set<String> finalTableNames = getTableNames();
             for (String tableName : existingTableNames) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -33,7 +33,7 @@
 {
     # Tests of SQL Analytic Windowed Functions (e.g. RANK, DENSE_RANK)
     "analytic-ints": {"schema": "int-schema.py",
-                      "ddl": "int-DDL.sql",
+                      "ddl": "int-DDL-null.sql",
                       "template": "analytic-ints.sql",
                       "normalizer": "normalizer.py"},
 }

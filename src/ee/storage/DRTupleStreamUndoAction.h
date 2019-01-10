@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,7 @@ DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
 
     void undo() {
         if (m_stream) {
-            m_stream->rollbackTo(m_mark, m_cost);
+            m_stream->rollbackTo(m_mark, m_cost, SIZE_MAX);
         }
     }
 

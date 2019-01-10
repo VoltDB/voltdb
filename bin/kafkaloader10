@@ -2,7 +2,7 @@
 
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -123,12 +123,15 @@ else
   exit 1
 fi
 
-SUPERCSV=$VOLTDB_LIB/super-csv-2.1.0.jar
-if [ ! -f ${SUPERCSV} ]; then
-  echo "Couldn't find ${SUPERCSV} jar file."
-  exit 1
-fi
-CLASSPATH=${CLASSPATH}:${SUPERCSV}
+LIB_JARS="super-csv-2.1.0.jar netty-all-4.1.32.Final.jar netty-tcnative-boringssl-static-2.0.20.Final.jar"
+for jar in $LIB_JARS; do
+  jar_path="${VOLTDB_LIB}/${jar}"
+  if [ ! -f ${jar_path} ]; then
+    echo "Couldn't find ${jar_path} jar file."
+    exit 1
+  fi
+  CLASSPATH=${CLASSPATH}:${jar_path}
+done
 
 # add formatter lib if using --formatter option.
 for f in $FORMATTER_LIB/*.jar; do

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -52,7 +52,7 @@ public:
     void pushStreamBuffer(StreamBlock *block, bool sync);
 
     /** truncate stream back to mark */
-    virtual void rollbackTo(size_t mark, size_t drRowCost);
+    virtual void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo);
 
     virtual void periodicFlush(int64_t timeInMillis,
                        int64_t lastComittedSpHandle);

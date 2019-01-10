@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,7 +43,7 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.newplanner.util.AbstractPlanNodeVisitor;
+import org.voltdb.plannerv2.utils.AbstractPlanNodeVisitor;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatsField;

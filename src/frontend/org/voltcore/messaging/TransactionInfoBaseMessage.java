@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -87,6 +87,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_subject = rhs.m_subject;
         m_spHandle = rhs.m_spHandle;
         m_truncationHandle = rhs.m_truncationHandle;
+        m_isForReplica = rhs.m_isForReplica;
     }
 
     public long getInitiatorHSId() {

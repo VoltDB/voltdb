@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,13 +64,13 @@ public:
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
         std::vector<bool> columnAllowNull;
-        std::vector<std::string> columnNames;
         //Five columns
-        columnNames.push_back("one");
-        columnNames.push_back("two");
-        columnNames.push_back("three");
-        columnNames.push_back("four");
-        columnNames.push_back("five");
+        m_columnNames = new std::vector<std::string>();
+        m_columnNames->push_back("one");
+        m_columnNames->push_back("two");
+        m_columnNames->push_back("three");
+        m_columnNames->push_back("four");
+        m_columnNames->push_back("five");
         for (int i = 0; i < COLUMN_COUNT; i++) {
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
@@ -93,7 +93,7 @@ public:
 
         // a simple helper around the constructor that sets the
         // wrapper buffer size to the specified value
-        m_table = StreamedTable::createForTest(1024, m_context, m_schema, columnNames);
+        m_table = StreamedTable::createForTest(1024, m_context, m_schema, "test", *m_columnNames);
     }
 
     void nextQuantum(int i, int64_t tokenOffset)
@@ -114,6 +114,7 @@ public:
         UndoQuantum::release(std::move(*m_quantum));
         delete m_pool;
         delete m_topend;
+        delete m_columnNames;
         voltdb::globalDestroyOncePerProcess();
     }
 
@@ -127,7 +128,7 @@ protected:
     TupleSchema* m_schema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
     TableTuple* m_tuple;
-
+    std::vector<std::string>* m_columnNames;
 };
 
 /**

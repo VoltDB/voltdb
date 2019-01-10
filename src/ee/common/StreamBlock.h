@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 #define STREAMBLOCK_H_
 
 #include "common/FatalException.hpp"
+#include "common/types.h"
 
 #include <cassert>
 #include <cstring>
@@ -40,19 +41,21 @@ namespace voltdb
             : m_data(data + headerSize), m_capacity(capacity - headerSize),
               m_headerSize(headerSize), m_offset(0),
               m_uso(uso),
+              m_lastDRBeginTxnOffset(0),
+              m_rowCountForDR(0),
+              m_rowCountForExport(0),
+              m_type(NORMAL_STREAM_BLOCK),
+              m_drEventType(voltdb::NOT_A_EVENT),
+              m_hasDRBeginTxn(false),
+              m_needsSchema(true),
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastDRBeginTxnOffset(0),
-              m_hasDRBeginTxn(false),
-              m_rowCountForDR(0),
+              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::min()),
               m_startDRSequenceNumber(std::numeric_limits<int64_t>::max()),
               m_lastDRSequenceNumber(std::numeric_limits<int64_t>::max()),
               m_lastSpUniqueId(0),
               m_lastMpUniqueId(0),
-              m_type(NORMAL_STREAM_BLOCK),
-              m_drEventType(voltdb::NOT_A_EVENT),
-              m_needsSchema(true)
+              m_startExportSequenceNumber(0)
         {
         }
 
@@ -60,19 +63,21 @@ namespace voltdb
             : m_data(other->m_data), m_capacity(other->m_capacity),
               m_headerSize(other->m_headerSize), m_offset(other->m_offset),
               m_uso(other->m_uso),
+              m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
+              m_rowCountForDR(other->m_rowCountForDR),
+              m_rowCountForExport(other->m_rowCountForExport),
+              m_type(other->m_type),
+              m_drEventType(other->m_drEventType),
+              m_hasDRBeginTxn(other->m_hasDRBeginTxn),
+              m_needsSchema(other->m_needsSchema),
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
-              m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
-              m_hasDRBeginTxn(other->m_hasDRBeginTxn),
-              m_rowCountForDR(other->m_rowCountForDR),
+              m_lastCommittedSpHandle(std::numeric_limits<int64_t>::min()),
               m_startDRSequenceNumber(other->m_startDRSequenceNumber),
               m_lastDRSequenceNumber(other->m_lastDRSequenceNumber),
               m_lastSpUniqueId(other->m_lastSpUniqueId),
               m_lastMpUniqueId(other->m_lastMpUniqueId),
-              m_type(other->m_type),
-              m_drEventType(other->m_drEventType),
-              m_needsSchema(other->m_needsSchema)
+              m_startExportSequenceNumber(other->m_startExportSequenceNumber)
         {
         }
 
@@ -151,16 +156,36 @@ namespace voltdb
             return m_lastMpUniqueId;
         }
 
+        int64_t lastCommittedSpHandle() {
+            return m_lastCommittedSpHandle;
+        }
+
+        int64_t startExportSequenceNumber() const {
+            return m_startExportSequenceNumber;
+        }
+
+        int64_t lastExportSequenceNumber() const {
+            return m_startExportSequenceNumber + (int64_t)getRowCountforExport() - 1;
+        }
+
         void recordCompletedSequenceNumForDR(int64_t lastDRSequenceNumber) {
             m_lastDRSequenceNumber = lastDRSequenceNumber;
         }
 
-        void recordCompletedSpTxnForDR(int64_t lastSpUniqueId) {
+        void recordCompletedSpTxn(int64_t lastSpUniqueId) {
             m_lastSpUniqueId = lastSpUniqueId;
         }
 
         void recordCompletedMpTxnForDR(int64_t lastMpUniqueId) {
             m_lastMpUniqueId = lastMpUniqueId;
+        }
+
+        void recordLastCommittedSpHandle(int64_t spHandle) {
+            m_lastCommittedSpHandle = spHandle;
+        }
+
+        void recordStartExportSequenceNumber(int64_t startExportSequenceNumber) {
+            m_startExportSequenceNumber = startExportSequenceNumber;
         }
 
         void markAsEventBuffer(DREventType type) {
@@ -176,6 +201,14 @@ namespace voltdb
             return m_rowCountForDR;
         }
 
+        void updateRowCountForExport(size_t rowsToExport) {
+            m_rowCountForExport += rowsToExport;
+        }
+
+        size_t getRowCountforExport() const {
+            return m_rowCountForExport;
+        }
+
         StreamBlockType type() const {
             return m_type;
         }
@@ -185,6 +218,10 @@ namespace voltdb
     private:
         char* mutableDataPtr() {
             return m_data + m_offset;
+        }
+
+        char* headerDataPtr() {
+            return m_data - (m_headerSize - MAGIC_HEADER_SPACE_FOR_JAVA);
         }
 
         void consumed(size_t consumed) {
@@ -231,19 +268,23 @@ namespace voltdb
         const size_t m_headerSize;
         size_t m_offset;         // position for next write.
         size_t m_uso;            // universal stream offset of m_offset 0.
+        size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
+        size_t m_rowCountForDR;
+        size_t m_rowCountForExport;
+
+        StreamBlockType m_type;
+        DREventType m_drEventType;
+        bool m_hasDRBeginTxn;    // only used for DR Buffer
+        bool m_needsSchema;
+
         int64_t m_startSpHandle;
         int64_t m_lastSpHandle;
-        int64_t m_lastCommittedSpHandle;
-        size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
-        bool m_hasDRBeginTxn;    // only used for DR Buffer
-        size_t m_rowCountForDR;
+        int64_t m_lastCommittedSpHandle; // for record last CommittedSpHandle for Sp Txn in this block
         int64_t m_startDRSequenceNumber;
         int64_t m_lastDRSequenceNumber;
         int64_t m_lastSpUniqueId;
         int64_t m_lastMpUniqueId;
-        StreamBlockType m_type;
-        DREventType m_drEventType;
-        bool m_needsSchema;
+        int64_t m_startExportSequenceNumber;
 
         friend class TupleStreamBase;
         friend class ExportTupleStream;

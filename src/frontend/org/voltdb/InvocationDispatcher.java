@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -44,6 +45,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.ForeignHost;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
@@ -65,6 +67,7 @@ import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
@@ -419,6 +422,10 @@ public final class InvocationDispatcher {
                 CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
                 return dispatchStopNode(task);
             }
+            else if ("@PrepareStopNode".equals(procName)) {
+                CoreUtils.logProcedureInvocation(hostLog, user.m_name, clientInfo, procName);
+                return dispatchPrepareStopNode(task);
+            }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
@@ -457,6 +464,9 @@ public final class InvocationDispatcher {
             }
             else if ("@UpdateLogging".equals(procName)) {
                 task = appendAuditParams(task, ccxn, user);
+            }
+            else if ("@JStack".equals(procName)) {
+                return dispatchJstack(task);
             }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
@@ -623,6 +633,51 @@ public final class InvocationDispatcher {
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] { partitionKeys }, null, task.clientHandle);
     }
 
+    private static ClientResponseImpl dispatchJstack(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length != 1 || params[0] == null) {
+            return gracefulFailureResponse(
+                    "@JStack must provide hostId",
+                    task.clientHandle);
+        }
+        if (!(params[0] instanceof Integer)) {
+            return gracefulFailureResponse(
+                    "@JStack must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
+                    task.clientHandle);
+        }
+        int ihid = (Integer) params[0];
+        final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+        if (ihid >=0 && !liveHids.contains(ihid)) {
+            return gracefulFailureResponse(
+                    "Invalid Host Id or Host Id not member of cluster: " + ihid,
+                    task.clientHandle);
+        }
+
+        boolean success = true;
+        if (ihid < 0) { // all hosts
+            //collect thread dumps
+            String dumpDir = new File(VoltDB.instance().getVoltDBRootPath(), "thread_dumps").getAbsolutePath();
+            String fileName =  hostMessenger.getHostname() + "_host-" + hostMessenger.getHostId() + "_" + System.currentTimeMillis()+".jstack";
+            success = VoltDB.dumpThreadTraceToFile(dumpDir, fileName );
+            liveHids.remove(hostMessenger.getHostId());
+            hostMessenger.sendPoisonPill(liveHids, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
+        } else if (ihid == hostMessenger.getHostId()) { // only local
+            //collect thread dumps
+            String dumpDir = new File(VoltDB.instance().getVoltDBRootPath(), "thread_dumps").getAbsolutePath();
+            String fileName =  hostMessenger.getHostname() + "_host-" + hostMessenger.getHostId() + "_" + System.currentTimeMillis()+".jstack";
+            success = VoltDB.dumpThreadTraceToFile(dumpDir, fileName );
+        } else { // only remote
+            hostMessenger.sendPoisonPill(ihid, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
+        }
+        if (success) {
+            return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+        }
+        return gracefulFailureResponse(
+                "Failed to create the thread dump of " + ((ihid < 0) ? "all hosts." : "Host Id " + ihid + "."),
+                task.clientHandle);
+    }
+
     private final ClientResponseImpl dispatchSubscribe(InvocationClientHandler handler, StoredProcedureInvocation task) {
         final ParameterSet ps = task.getParams();
         final Object params[] = ps.toArray();
@@ -703,6 +758,51 @@ public final class InvocationDispatcher {
         }
 
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+    }
+
+    private ClientResponseImpl dispatchPrepareStopNode(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length != 1 || params[0] == null) {
+            return gracefulFailureResponse(
+                    "@PrepareStopNode must provide hostId",
+                    task.clientHandle);
+        }
+        if (!(params[0] instanceof Integer)) {
+            return gracefulFailureResponse(
+                    "@PrepareStopNode must have one Integer parameter specified. Provided type was " + params[0].getClass().getName(),
+                    task.clientHandle);
+        }
+        int ihid = (Integer) params[0];
+        final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
+        Set<Integer> liveHids = hostMessenger.getLiveHostIds();
+        if (!liveHids.contains(ihid)) {
+            return gracefulFailureResponse("@PrepareStopNode: " + ihid + " is not valid.", task.clientHandle);
+        }
+
+       String reason = m_cartographer.verifyPartitonLeaderMigrationForStopNode(ihid);
+       if (reason != null) {
+           return gracefulFailureResponse(
+                   "@PrepareStopNode:" + reason, task.clientHandle);
+       }
+
+       // The host has partition masters, go ahead to move them
+       if (m_cartographer.getMasterCount(ihid) > 0) {
+
+           // shutdown partition leader migration
+           MigratePartitionLeaderMessage message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
+           for (Iterator<Integer> it = liveHids.iterator(); it.hasNext();) {
+               m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(it.next(),
+                           HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
+           }
+
+           // start leader migration on this node
+           message = new MigratePartitionLeaderMessage(ihid, Integer.MIN_VALUE);
+           message.setStartTask();
+           message.setStopNodeService();
+           m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(ihid, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
+       }
+
+       return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
     public final ClientResponseImpl dispatchNTProcedure(InvocationClientHandler handler,

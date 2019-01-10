@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,38 +17,29 @@
 
 package org.voltdb.compiler;
 
-import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.tools.RelConversionException;
+import org.apache.calcite.tools.ValidationException;
+import org.apache.calcite.util.Util;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
-import org.voltdb.calciteadapter.rel.logical.VoltDBLRel;
-import org.voltdb.calciteadapter.rel.physical.VoltDBPRel;
 import org.voltdb.catalog.Database;
-import org.voltdb.common.Constants;
-import org.voltdb.newplanner.CalcitePlanner;
-import org.voltdb.newplanner.NonDdlBatch;
-import org.voltdb.newplanner.SqlTask;
-import org.voltdb.newplanner.VoltSqlToRelConverter;
-import org.voltdb.newplanner.VoltSqlValidator;
 import org.voltdb.newplanner.rules.PlannerPhase;
-import org.voltdb.newplanner.util.VoltDBRelUtil;
-import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
 import org.voltdb.planner.ParameterizationInfo;
@@ -56,17 +47,27 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.types.CalcitePlannerType;
+import org.voltdb.plannerv2.NonDdlBatch;
+import org.voltdb.plannerv2.SqlTask;
+import org.voltdb.plannerv2.VoltPlanner;
+import org.voltdb.plannerv2.VoltSchemaPlus;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
+import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
+import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
+import org.voltdb.plannerv2.rules.PlannerRules;
+import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
-import static org.voltdb.newplanner.util.VoltDBRelUtil.calciteToVoltDBPlan;
+import javax.ws.rs.HEAD;
+
+import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
 
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
  * interactively accept SQL and outputs plans on standard out.
  *
- * Used only for ad hoc queries.
+ * Used only for AdHoc queries.
  */
 public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -90,13 +91,13 @@ public class PlannerTool {
     private final double m_largeModeRatio = Double.valueOf((System.getenv("LARGE_MODE_RATIO") == null ||
             System.getenv("LARGE_MODE_RATIO").equals("-1")) ? System.getProperty("LARGE_MODE_RATIO", "0") : System.getenv("LARGE_MODE_RATIO"));
 
-    public PlannerTool(final Database database, byte[] catalogHash)
-    {
+    public PlannerTool(final Database database, byte[] catalogHash) {
         assert(database != null);
 
         m_database = database;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
+        m_schemaPlus = VoltSchemaPlus.from(m_database);
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb(ParameterizationInfo.getParamStateManager());
@@ -106,8 +107,9 @@ public class PlannerTool {
         for (String command : commands) {
             String decoded_cmd = Encoder.hexDecodeToString(command);
             decoded_cmd = decoded_cmd.trim();
-            if (decoded_cmd.length() == 0)
+            if (decoded_cmd.length() == 0) {
                 continue;
+            }
             try {
                 m_hsql.runDDLCommand(decoded_cmd);
             }
@@ -138,11 +140,11 @@ public class PlannerTool {
         m_schemaPlus = schemaPlus;
     }
 
-    public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash, SchemaPlus schemaPlus) {
+    public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash) {
         m_database = database;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
-        m_schemaPlus = schemaPlus;
+        m_schemaPlus = VoltSchemaPlus.from(m_database);
 
         return this;
     }
@@ -211,46 +213,69 @@ public class PlannerTool {
         return plan;
     }
 
-    public static synchronized CompiledPlan getCompiledPlanCalcite(SchemaPlus schemaPlus, SqlNode sqlNode) {
-        // create VoltSqlValidator from SchemaPlus.
-        VoltSqlValidator validator = new VoltSqlValidator(schemaPlus);
-        // validate the task's SqlNode.
-        SqlNode validatedNode = validator.validate(sqlNode);
-        // convert SqlNode to RelNode.
-        VoltSqlToRelConverter converter = VoltSqlToRelConverter.create(validator, schemaPlus);
-        RelRoot root = converter.convertQuery(validatedNode, false, true);
-        root = root.withRel(converter.decorrelate(validatedNode, root.rel));
-        // apply calcite and Volt logical rules
-        RelTraitSet logicalTraits = root.rel.getTraitSet().replace(VoltDBLRel.VOLTDB_LOGICAL);
-        RelNode nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.VOLCANO, PlannerPhase.LOGICAL,
-                root.rel, logicalTraits);
+    public static synchronized CompiledPlan getCompiledPlanCalcite(SchemaPlus schemaPlus, SqlNode sqlNode)
+            throws ValidationException, RelConversionException, PlannerFallbackException{
+        // TRAIL [Calcite-AdHoc-DQL/DML:4] PlannerTool.planSqlCalcite()
+        VoltPlanner planner = new VoltPlanner(schemaPlus);
 
-        // Add RelDistributions.ANY trait to the rel tree.
-        nodeAfterLogical = VoltDBRelUtil.addTraitRecurcively(nodeAfterLogical, RelDistributions.ANY);
+        // Validate the task's SqlNode.
+        planner.validate(sqlNode);
+
+        // Convert SqlNode to RelNode.
+        RelNode rel = planner.convert(sqlNode);
+        compileLog.info("ORIGINAL\n" + RelOptUtil.toString(rel));
+
+        // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
+        // See Drill's DefaultSqlHandler.convertToRel()
+
+        // Take Drill's DefaultSqlHandler.convertToRawDrel() as reference.
+        // We probably need FILTER_SET_OP_TRANSPOSE_RULE and PROJECT_SET_OP_TRANSPOSE_RULE?
+        // They need to be run by the Hep planner (CALCITE-1271).
+
+        RelTraitSet requiredLogicalOutputTraits = planner.getEmptyTraitSet().replace(VoltLogicalRel.CONVENTION);
+        // Apply Calcite logical rules
+        // See comments in PlannerPrograms.directory.LOGICAL to find out
+        // what each rule is used for.
+        RelNode transformed = planner.transform(
+                PlannerRules.Phase.LOGICAL.ordinal(),
+                requiredLogicalOutputTraits, rel);
+
+        compileLog.info("LOGICAL\n" + RelOptUtil.toString(transformed));
 
         // Add RelDistribution trait definition to the planner to make Calcite aware of the new trait.
-        nodeAfterLogical.getCluster().getPlanner().addRelTraitDef(RelDistributionTraitDef.INSTANCE);
+        //
+        // If RelDistributionTraitDef is added to the planner as the initial traits,
+        // ProjectToCalcRule.onMatch() will fire RelMdDistribution.calc() which will result in
+        // an AssertionError. It is cheaper to manually add RelDistributionTrait here than replacing all
+        // the LogicalCalc and Calc-related rules to fix this.
+        planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
 
-        // do the MP fallback check
-        nodeAfterLogical = CalcitePlanner.transform(CalcitePlannerType.HEP_BOTTOM_UP, PlannerPhase.MP_FALLBACK,
-                nodeAfterLogical);
+        // Add RelDistributions.ANY trait to the rel tree.
+        transformed = VoltRelUtil.addTraitRecurcively(transformed, RelDistributions.ANY);
+
+        // apply MP query fallback rules
+        transformed = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK,
+                HepMatchOrder.BOTTOM_UP, transformed, false);
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
-        RelTraitSet physicalTraits = nodeAfterLogical.getTraitSet().replace(VoltDBPRel.VOLTDB_PHYSICAL)
-                .replace(RelDistributions.SINGLETON);
+        // RelDistributions.ANY can satisfy any other types of RelDistributions.
+        // See RelDistributions.RelDistributionImpl.satisfies()
+        RelTraitSet requiredPhysicalOutputTraits = transformed.getTraitSet().replace(VoltPhysicalRel.CONVENTION).
+                replace(RelDistributions.ANY);
 
-        // apply physical conversion rules.
-        RelNode nodeAfterPhysicalConversion = CalcitePlanner.transform(CalcitePlannerType.VOLCANO,
-                PlannerPhase.PHYSICAL_CONVERSION, nodeAfterLogical, physicalTraits);
+        // Apply physical conversion rules.
+        transformed = planner.transform(PlannerRules.Phase.PHYSICAL_CONVERSION.ordinal(),
+                requiredPhysicalOutputTraits, transformed);
 
-        System.out.println(RelOptUtil.toString(nodeAfterPhysicalConversion));
-        // apply inlining rules.
-        RelNode nodeAfterInlining = CalcitePlanner.transform(CalcitePlannerType.HEP_ORDERED,
-                PlannerPhase.INLINING, nodeAfterPhysicalConversion);
+        Util.discard(transformed);
+
+//        // apply inlining rules.
+//        RelNode nodeAfterInlining = CalcitePlanner.transform(CalcitePlannerType.HEP_ORDERED,
+//                PlannerPhase.INLINING, nodeAfterPhysicalConversion);
 
         // assume not large query
         CompiledPlan compiledPlan = new CompiledPlan(false);
-        calciteToVoltDBPlan((VoltDBPRel)nodeAfterInlining, compiledPlan);
+        calciteToVoltDBPlan((VoltPhysicalRel) transformed, compiledPlan);
 
         compiledPlan.explainedPlan = compiledPlan.rootPlanGraph.toExplainPlanString();
         // Renumber the plan node ids to start with 1
@@ -265,7 +290,8 @@ public class PlannerTool {
      * @param batch the query batch which this query belongs to.
      * @return a planned statement.
      */
-    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch) {
+    public synchronized AdHocPlannedStatement planSqlCalcite(SqlTask task, NonDdlBatch batch)
+            throws ValidationException, RelConversionException {
         CompiledPlan plan = getCompiledPlanCalcite(m_schemaPlus, task.getParsedQuery());
 
         CorePlan core = new CorePlan(plan, m_catalogHash);
@@ -273,7 +299,8 @@ public class PlannerTool {
     }
 
     public synchronized AdHocPlannedStatement planSql(String sql, StatementPartitioning partitioning,
-            boolean isExplainMode, final Object[] userParams, boolean isSwapTables, boolean isLargeQuery) {
+                                                      boolean isExplainMode, final Object[] userParams,
+                                                      boolean isSwapTables, boolean isLargeQuery) {
         // large_mode_ratio will force execution of SQL queries to use the "large" path (for read-only queries)
         // a certain percentage of the time
         if (m_largeModeRatio > 0 && !isLargeQuery) {
@@ -286,8 +313,6 @@ public class PlannerTool {
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
         }
-        boolean hasUserQuestionMark = false;
-        boolean wrongNumberParameters = false;
         try {
             if ((sql == null) || (sql = sql.trim()).isEmpty()) {    // remove any spaces or newlines
                 throw new RuntimeException("Can't plan empty or null SQL.");
@@ -310,8 +335,7 @@ public class PlannerTool {
                 if (cachedPlan != null) {
                     cacheUse = CacheUse.HIT1;
                     return cachedPlan;
-                }
-                else {
+                } else {
                     cacheUse = CacheUse.MISS;
                 }
             }
@@ -320,152 +344,45 @@ public class PlannerTool {
             // PLAN THE STMT
             //////////////////////
 
-            CompiledPlan plan = null;
-            boolean planHasExceptionsWhenParameterized = false;
-            String[] extractedLiterals = null;
-            String parsedToken = null;
+            final SqlPlanner planner = new SqlPlanner(m_database, partitioning, m_hsql, sql,
+                    isLargeQuery, isSwapTables, isExplainMode, m_adHocLargeFallbackCount, userParams, m_cache, compileLog);
+            final CompiledPlan plan = planner.getCompiledPlan();
+            final AdHocPlannedStatement adhocPlan = planner.getAdhocPlan();
+            assert (plan == null) != (adhocPlan == null) : "It should be either planned or cached";
+            partitioning = planner.getPartitioning();
+            m_adHocLargeFallbackCount = planner.getAdHocLargeFallBackCount();
+            if (adhocPlan != null) {
+                cacheUse = CacheUse.HIT2;   // IMPORTANT
+                return adhocPlan;
+            } else {
+                final String parsedToken = planner.getParsedToken();
+                //////////////////////
+                // OUTPUT THE RESULT
+                //////////////////////
+                final CorePlan core = new CorePlan(plan, m_catalogHash);
+                final AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
-            TrivialCostModel costModel = new TrivialCostModel();
-            DatabaseEstimates estimates = new DatabaseEstimates();
-            // This try-with-resources block acquires a global lock on all planning
-            // This is required until we figure out how to do parallel planning.
-            try (QueryPlanner planner = new QueryPlanner(
-                    sql,
-                    "PlannerTool",
-                    "PlannerToolProc",
-                    m_database,
-                    partitioning,
-                    m_hsql,
-                    estimates,
-                    !VoltCompiler.DEBUG_MODE,
-                    costModel,
-                    null,
-                    null,
-                    DeterminismMode.FASTER,
-                    isLargeQuery)) {
-
-                if (isSwapTables) {
-                    planner.planSwapTables();
-                } else {
-                    planner.parse();
+                // Do not put wrong parameter explain query into cache.
+                // Also, do not put large query plans into the cache.
+                if (planner.isCacheable()) {
+                    // Note either the parameter index (per force to a user-provided parameter) or
+                    // the actual constant value of the partitioning key inferred from the plan.
+                    // Either or both of these two values may simply default
+                    // to -1 and to null, respectively.
+                    core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
+                    core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
+                    assert (parsedToken != null);
+                    // Again, plans with inferred partitioning are the only ones supported in the cache.
+                    m_cache.put(sql, parsedToken, ahps, planner.getExtractedLiterals(), planner.hasQuestionMark(),
+                            planner.hasExceptionWhenParameterized());
                 }
-                parsedToken = planner.parameterize();
-
-                // check the parameters count
-                // check user input question marks with input parameters
-                int inputParamsLengh = userParams == null ? 0: userParams.length;
-                if (planner.getAdhocUserParamsCount() > CompiledPlan.MAX_PARAM_COUNT) {
-                    throw new PlanningErrorException(
-                            "The statement's parameter count " + planner.getAdhocUserParamsCount() +
-                            " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
-                }
-                if (planner.getAdhocUserParamsCount() != inputParamsLengh) {
-                    wrongNumberParameters = true;
-                    if (!isExplainMode) {
-                        throw new PlanningErrorException(String.format(
-                                "Incorrect number of parameters passed: expected %d, passed %d",
-                                planner.getAdhocUserParamsCount(), inputParamsLengh));
-                    }
-                }
-                hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
-
-                // do not put wrong parameter explain query into cache
-                if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
-                    // if cacheable, check the cache for a matching pre-parameterized plan
-                    // if plan found, build the full plan using the parameter data in the
-                    // QueryPlanner.
-                    assert(parsedToken != null);
-                    extractedLiterals = planner.extractedParamLiteralValues();
-                    List<BoundPlan> boundVariants = m_cache.getWithParsedToken(parsedToken);
-                    if (boundVariants != null) {
-                        assert( ! boundVariants.isEmpty());
-                        BoundPlan matched = null;
-                        for (BoundPlan boundPlan : boundVariants) {
-                            if (boundPlan.allowsParams(extractedLiterals)) {
-                                matched = boundPlan;
-                                break;
-                            }
-                        }
-                        if (matched != null) {
-                            CorePlan core = matched.m_core;
-                            ParameterSet params = null;
-                            if (planner.compiledAsParameterizedPlan()) {
-                                params = planner.extractedParamValues(core.parameterTypes);
-                            } else if (hasUserQuestionMark) {
-                                params = ParameterSet.fromArrayNoCopy(userParams);
-                            } else {
-                                // No constants AdHoc queries
-                                params = ParameterSet.emptyParameterSet();
-                            }
-
-                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
-                                                                                   core,
-                                                                                   params,
-                                                                                   null);
-                            ahps.setBoundConstants(matched.m_constants);
-                            // parameterized plan from the cache does not have exception
-                            m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, false);
-                            cacheUse = CacheUse.HIT2;
-                            return ahps;
-                        }
-                    }
-                }
-
-                // If not caching or there was no cache hit, do the expensive full planning.
-                plan = planner.plan();
-                if (plan.getStatementPartitioning() != null) {
-                    partitioning = plan.getStatementPartitioning();
-                }
-                if (plan.getIsLargeQuery() != isLargeQuery) {
-                    ++m_adHocLargeFallbackCount;
-                }
-
-                planHasExceptionsWhenParameterized = planner.wasBadPameterized();
+                return ahps;
             }
-            catch (Exception e) {
-                /*
-                 * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
-                 * they are at least somewhat expected.
-                 */
-                String loggedMsg = "";
-                if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
-                    logException(e, "Error compiling query");
-                    loggedMsg = " (Stack trace has been written to the log.)";
-                }
-                if (e.getMessage() != null) {
-                    throw new RuntimeException("SQL error while compiling query: " + e.getMessage() + loggedMsg, e);
-                }
-                throw new RuntimeException("SQL error while compiling query: " + e.toString() + loggedMsg, e);
-            }
-
-            //////////////////////
-            // OUTPUT THE RESULT
-            //////////////////////
-            CorePlan core = new CorePlan(plan, m_catalogHash);
-            AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
-
-            // Do not put wrong parameter explain query into cache.
-            // Also, do not put large query plans into the cache.
-            if (!wrongNumberParameters && partitioning.isInferred() && !isLargeQuery) {
-
-                // Note either the parameter index (per force to a user-provided parameter) or
-                // the actual constant value of the partitioning key inferred from the plan.
-                // Either or both of these two values may simply default
-                // to -1 and to null, respectively.
-                core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
-                core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
-
-
-                assert(parsedToken != null);
-                // Again, plans with inferred partitioning are the only ones supported in the cache.
-                m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planHasExceptionsWhenParameterized);
-            }
-            return ahps;
-        }
-        finally {
+        } finally {
             if (m_plannerStats != null) {
                 m_plannerStats.endStatsCollection(m_cache.getLiteralCacheSize(), m_cache.getCoreCacheSize(), cacheUse, -1);
             }
         }
     }
 }
+

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,7 +42,7 @@ import com.google_voltpatches.common.base.Preconditions;
 
 public class ExportToSocketTestVerifier {
     private final ArrayDeque<String[]> m_data = new ArrayDeque<String[]>();
-    private int m_sequenceNumber = 0;
+    private int m_sequenceNumber = 1;
     protected final ThreadLocal<SimpleDateFormat> m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
         @Override
         protected SimpleDateFormat initialValue() {

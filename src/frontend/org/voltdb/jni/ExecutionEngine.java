@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -66,6 +66,7 @@ import org.voltdb.utils.VoltTrace;
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
     protected static VoltLogger LOG = new VoltLogger("HOST");
+    protected static VoltLogger EXPORT_LOG = new VoltLogger("EXPORT");
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
@@ -608,8 +609,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass the catalog to the engine */
     public void loadCatalog(long timestamp, String serializedCatalog) {
         try {
-            m_startTime = 0;
-            m_logDuration = INITIAL_LOG_DURATION;
+            setupProcedure(null);
             m_fragmentContext = FragmentContext.CATALOG_LOAD;
             coreLoadCatalog(timestamp, getStringBytes(serializedCatalog));
         }
@@ -623,8 +623,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass diffs to apply to the EE's catalog to update it */
     public final void updateCatalog(final long timestamp, final boolean isStreamUpdate, final String diffCommands) throws EEException {
         try {
-            m_startTime = 0;
-            m_logDuration = INITIAL_LOG_DURATION;
+            setupProcedure(null);
             m_fragmentContext = FragmentContext.CATALOG_UPDATE;
             coreUpdateCatalog(timestamp, isStreamUpdate, diffCommands);
         }
@@ -639,8 +638,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         m_currentBatchIndex = batchIndex;
     }
 
-    public void setProcedureName(String procedureName) {
+    public void setupProcedure(String procedureName) {
         m_currentProcedureName = procedureName;
+        m_startTime = 0;
+        m_logDuration = INITIAL_LOG_DURATION;
+    }
+
+    public void completeProcedure() {
+        m_currentProcedureName = null;
     }
 
     /** Run multiple plan fragments */
@@ -665,8 +670,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_fragmentContext = (undoQuantumToken == Long.MAX_VALUE) ? FragmentContext.RO_BATCH : FragmentContext.RW_BATCH;
 
             // reset context for progress updates
-            m_startTime = 0;
-            m_logDuration = INITIAL_LOG_DURATION;
             m_sqlTexts = sqlTexts;
 
             if (traceOn) {

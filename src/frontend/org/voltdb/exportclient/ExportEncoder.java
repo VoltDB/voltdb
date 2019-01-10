@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,17 +37,63 @@ import org.voltdb.types.VoltDecimalHelper;
  */
 public class ExportEncoder {
 
+    static class SizeWriter {
+        final FastSerializer m_fs;
+        final int m_writePos;
+
+        SizeWriter(FastSerializer fs) throws IOException {
+            m_fs = fs;
+            m_writePos = fs.getPosition();
+            m_fs.writeInt(0);
+        }
+
+        void finishWrite() throws IOException {
+            int bookmark = m_fs.getPosition();
+            m_fs.setPosition(m_writePos);
+            m_fs.writeInt(bookmark - m_writePos - 4);
+            m_fs.setPosition(bookmark);
+        }
+    }
+
+    static void writeSchema(FastSerializer fs, VoltTable table, String tableName) throws IOException {
+        SizeWriter schemaSize = new SizeWriter(fs);
+
+        fs.writeString(tableName);
+        VoltType type;
+        for (int i = 0; i < table.getColumnCount(); i++) {
+            fs.writeString(table.getColumnName(i));         // name
+
+            type = table.getColumnType(i);
+            fs.writeByte(type.getValue());                  // type
+
+            int columnLength = 0;
+            if (type.isVariableLength()) {
+                if (type.equals(VoltType.STRING)) {
+                    columnLength = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS;
+                } else {
+                    columnLength = VoltType.MAX_VALUE_LENGTH;
+                }
+            } else {
+                columnLength = type.getLengthInBytesForFixedTypes();
+            }
+            fs.writeInt(columnLength);                      // length
+        }
+        schemaSize.finishWrite();
+    }
+
     static byte[] encodeRow(VoltTable table, String tableName, int partitionColumnIndex, long generation)
     throws IOException {
 
         FastSerializer fs = new FastSerializer(false, true);
         try {
-            fs.writeLong(generation);
-            fs.writeInt(partitionColumnIndex);
+            writeSchema(fs, table, tableName);
+
             int colCount = table.getColumnCount();
+
+            SizeWriter rowSize = new SizeWriter(fs);
+            fs.writeInt(partitionColumnIndex);
             // column count
             fs.writeInt(colCount);
-            fs.writeByte(1);                  // has schema
             // pack the null flags
             int nullArrayLen = ((colCount + 7) & -8) >> 3;
             boolean[] nullArray = new boolean[colCount];
@@ -63,33 +109,13 @@ public class ExportEncoder {
             }
             fs.write(nullBits);
 
-            fs.writeString(tableName);
-            VoltType type;
-            for (int i = 0; i < table.getColumnCount(); i++) {
-                fs.writeString(table.getColumnName(i));         // name
-
-                type = table.getColumnType(i);
-                fs.writeByte(type.getValue());                  // type
-
-                int columnLength = 0;
-                if (type.isVariableLength()) {
-                    if (type.equals(VoltType.STRING)) {
-                        columnLength = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS;
-                    } else {
-                        columnLength = VoltType.MAX_VALUE_LENGTH;
-                    }
-                } else {
-                    columnLength = type.getLengthInBytesForFixedTypes();
-                }
-                fs.writeInt(columnLength);                      // length
-            }
-
             // write the non-null columns
             for (int i = 0; i < colCount; i++) {
                 if (!nullArray[i]) {
                     encodeColumn(fs, i, table);
                 }
             }
+            rowSize.finishWrite();
 
             final byte[] bytes = fs.getBytes();
             return bytes;
@@ -103,18 +129,13 @@ public class ExportEncoder {
 
         FastSerializer fs = new FastSerializer(false, true);
         try {
-            boolean hasSchema = true;
+            writeSchema(fs, table, tableName);
             while (table.advanceRow()) {
-                fs.writeLong(generation);
+                SizeWriter rowSize = new SizeWriter(fs);
                 fs.writeInt(partitionColumnIndex);
                 int colCount = table.getColumnCount();
                 // column count
                 fs.writeInt(colCount);
-                if (hasSchema) {
-                    fs.writeByte(1);                  // has schema
-                } else {
-                    fs.writeByte(0);                  // No schema
-                }
                 // pack the null flags
                 int nullArrayLen = ((colCount + 7) & -8) >> 3;
                 boolean[] nullArray = new boolean[colCount];
@@ -129,29 +150,6 @@ public class ExportEncoder {
                     }
                 }
                 fs.write(nullBits);
-                if (hasSchema) {
-                    fs.writeString(tableName);
-                    VoltType type;
-                    for (int i = 0; i < table.getColumnCount(); i++) {
-                        fs.writeString(table.getColumnName(i));         // name
-
-                        type = table.getColumnType(i);
-                        fs.writeByte(type.getValue());                  // type
-
-                        int columnLength = 0;
-                        if (type.isVariableLength()) {
-                            if (type.equals(VoltType.STRING)) {
-                                columnLength = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS;
-                            } else {
-                                columnLength = VoltType.MAX_VALUE_LENGTH;
-                            }
-                        } else {
-                            columnLength = type.getLengthInBytesForFixedTypes();
-                        }
-                        fs.writeInt(columnLength);                      // length
-                    }
-                    hasSchema = false;
-                }
 
                 // write the non-null columns
                 for (int i = 0; i < colCount; i++) {
@@ -159,6 +157,7 @@ public class ExportEncoder {
                         encodeColumn(fs, i, table);
                     }
                 }
+                rowSize.finishWrite();
                 System.out.println("Row done.");
             }
             final byte[] bytes = fs.getBytes();

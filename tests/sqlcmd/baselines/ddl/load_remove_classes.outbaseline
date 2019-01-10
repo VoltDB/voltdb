@@ -98,6 +98,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -142,6 +143,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -254,6 +256,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -312,6 +315,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -356,6 +360,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  
@@ -474,6 +479,7 @@ Command succeeded.
 @ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
+@JStack                   	int
 @Pause                    
 @Ping                     
 @Promote                  

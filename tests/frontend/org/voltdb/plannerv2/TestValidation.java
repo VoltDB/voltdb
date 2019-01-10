@@ -1,0 +1,108 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2019 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package org.voltdb.plannerv2;
+
+public class TestValidation extends Plannerv2TestCase {
+
+    private ValidationTester m_tester = new ValidationTester();
+
+    @Override protected void setUp() throws Exception {
+        setupSchema(TestValidation.class.getResource(
+                "testcalcite-ddl.sql"), "testcalcite", false);
+        init();
+    }
+
+    @Override public void tearDown() throws Exception {
+        super.tearDown();
+    }
+
+    public void testTableColumn() {
+        // valid columns
+        m_tester.sql("select i from R2").test();
+        m_tester.sql("select pk from R3").test();;
+        // select a not exist column
+        m_tester.sql("select ^bad^ from R2").exception("Column 'BAD' not found in any table").test();
+        // select a not exist column from another table
+        m_tester.sql("select ^pk^ from R2").exception("Column 'PK' not found in any table").test();
+        // well, this one's error message is a little misleading. But it is the expected behavior for calcite validator
+        m_tester.sql("select ^R3^.pk from R2").exception("Table 'R3' not found").test();
+        // select a not exist table.column
+        m_tester.sql("select R2.^bad^ from R2").exception("Column 'BAD' not found in table 'R2'").test();
+        // not exist column in where clause
+        m_tester.sql("select pk from R3 where ^bad^ < 0").exception("Column 'BAD' not found in any table").test();
+        // not exist table.column in where clause
+        m_tester.sql("select pk from R3 where R3.^bad^ < 0").exception("Column 'BAD' not found in table 'R3'").test();
+    }
+
+    public void testTableName() {
+        // valid table
+        m_tester.sql("select * from R3").test();
+        // not exist table
+        m_tester.sql("select * from ^bad^").exception("Object 'BAD' not found").test();
+    }
+
+    public void testCaseInsensitivity() {
+        m_tester.sql("select pK from R3").test();
+        m_tester.sql("select * from r3").test();
+    }
+
+    public void testGroupBy() {
+        m_tester.sql("select i from R2 group by i").test();
+        m_tester.sql("select i + 1 from R2 group by i").test();
+        m_tester.sql("select i, count(*) from R2 group by i").test();
+
+        m_tester.sql("select ^i^, count(*) from R2 group by i + 1").exception("Expression 'I' is not being grouped").test();
+        m_tester.sql("select i, ^ti^ from R2 group by i").exception("Expression 'TI' is not being grouped").test();
+    }
+
+    public void testPartitionBy() {
+        m_tester.sql("select i, sum(i) over(partition by i + ti order by i) from R2").test();
+
+        m_tester.sql("select i, sum(i) over(partition by ^i + v^ order by i) from R2")
+                .exception("(?s)Cannot apply '\\+' to arguments of type '<INTEGER> \\+ <VARCHAR\\(32\\)>'.*")
+                .test();
+    }
+
+    public void testFunctionArg() {
+        m_tester.sql("select sum(i) from R2").test();
+
+        m_tester.sql("select ^sum()^ from R2")
+                .exception("Invalid number of arguments to function 'SUM'. Was expecting 1 arguments")
+                .test();
+        m_tester.sql("select ^sum(i, ti)^ from R2")
+                .exception("Invalid number of arguments to function 'SUM'. Was expecting 1 arguments")
+                .test();
+    }
+
+    public void testType() {
+        m_tester.sql("select i from R2 where v > 1").test();
+
+        m_tester.sql("select i from R2 where ^NOT v^")
+                .exception("Cannot apply 'NOT' to arguments of type 'NOT<VARCHAR\\(32\\)>'.*")
+                .test();
+        m_tester.sql("select ^True or i^ from R2")
+                .exception("Cannot apply 'OR' to arguments of type '<BOOLEAN> OR <INTEGER>'.*")
+                .test();
+    }
+}

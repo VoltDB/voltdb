@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,18 +30,10 @@ namespace voltdb {
 
 class Topend;
 
-//If you change this constant here change it in Java in the StreamBlockQueue where
-//it is used to calculate the number of bytes queued
-//I am not sure if the statements on the previous 2 lines are correct. I didn't see anything in SBQ that would care
-//It just reports the size of used bytes and not the size of the allocation
-//Add a 4k page at the end for bytes beyond the 2 meg row limit due to null mask and length prefix and so on
-//Necessary for very large rows
-const int EL_BUFFER_SIZE = /* 1024; */ (2 * 1024 * 1024) + MAGIC_HEADER_SPACE_FOR_JAVA + (4096 - MAGIC_HEADER_SPACE_FOR_JAVA);
-
 class TupleStreamBase {
 public:
 
-    TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace = 0, int maxBufferSize = -1);
+    TupleStreamBase(size_t defaultBufferSize, size_t extraHeaderSpace, int maxBufferSize = -1);
 
     virtual ~TupleStreamBase()
     {
@@ -63,13 +55,13 @@ public:
     virtual void setSecondaryCapacity(size_t capacity) {}
 
     /** truncate stream back to mark */
-    virtual void rollbackTo(size_t mark, size_t drRowCost);
+    virtual void rollbackTo(size_t mark, size_t drRowCost, int64_t exportSeqNo);
 
     /** age out committed data */
     virtual void periodicFlush(int64_t timeInMillis,
                                int64_t lastComittedSpHandle);
 
-    virtual void extendBufferChain(size_t minLength);
+    void extendBufferChain(size_t minLength);
     virtual void pushStreamBuffer(StreamBlock *block, bool sync) = 0;
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
@@ -93,7 +85,12 @@ public:
     /** max allowed buffer capacity */
     size_t m_maxCapacity;
 
-    /** Universal stream offset. Total bytes appended to this stream. */
+    /**
+     * Universal stream offset. Total bytes appended to this stream.
+     *
+     * PLEASE NOTE THAT this is only used in TABLE stats while rest
+     * of the export system use sequence number to track rows.
+     * */
     size_t m_uso;
 
     /** Current block */
@@ -119,6 +116,14 @@ public:
     int64_t m_committedUniqueId;
 
     size_t m_headerSpace;
+
+    /**
+     * The number of Export Tuples applied to the Export Stream Block in the current txn;
+     * Note that before the Export Tuples are only committed by the *next* Txn that updates the StreamBLock
+     */
+    int64_t m_uncommittedTupleCount;
+
+    int64_t m_exportSequenceNumber;
 };
 
 }

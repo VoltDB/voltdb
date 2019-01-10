@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -98,9 +98,11 @@ public class TestExportSnapshotPreservesSequenceNumber extends TestExportBaseSoc
             client.callProcedure("Insert", paramsGrp);
         }
         client.drain();
-
+        Thread.sleep(2000);
+        quiesce(client);
+        Thread.sleep(2000);
         // must still be able to verify the export data.
-        quiesceAndVerify(client, m_verifier);
+        quiesceAndVerifyStream(client, m_verifier);
     }
 
 

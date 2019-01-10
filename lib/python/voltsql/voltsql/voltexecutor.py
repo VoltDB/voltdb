@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -47,9 +47,9 @@ from voltdbclient import *
 
 
 class VoltExecutor(object):
-    def __init__(self, server, port, user, password, query_timeout, kerberos, ssl, ssl_set, credentials):
+    def __init__(self, servers, port, user, password, query_timeout, kerberos, ssl, ssl_set, credentials):
         self.client = None
-        self.parameters = {"host": server, "port": port, "procedure_timeout": query_timeout}
+        self.parameters = {"host": servers, "port": port, "procedure_timeout": query_timeout}
         if user:
             self.parameters["username"] = user
         if password:

@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2018 VoltDB Inc.
+# Copyright (C) 2008-2019 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -238,6 +238,7 @@ BANNER("Configuring the VoltDB Execution Engine."
        "VOLTDB_CORE_COUNT:      ${VOLTDB_CORE_COUNT}"
        "VOLT_LOG_LEVEL:         ${VOLT_LOG_LEVEL}"
        "VOLT_POOL_CHECKING:     ${VOLT_POOL_CHECKING}"
+       "VOLT_TIMER_ENABLED:     ${VOLT_TIMER_ENABLED}"
    )
 
 ########################################################################
