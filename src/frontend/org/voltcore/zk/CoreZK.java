@@ -203,7 +203,7 @@ public class CoreZK {
         }
 
         for (ZKUtil.ChildrenCallback callback : childrenCallbacks) {
-            if (callback.getChildren().isEmpty()) {
+            if (callback.get().isEmpty()) {
                 return true;
             }
         }

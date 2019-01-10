@@ -3303,7 +3303,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 try {
                     ZKUtil.ByteArrayCallback cb = entry.getValue();
                     Integer hostId = entry.getKey();
-                    clusterMetadata.put(hostId, new String(cb.getData(), "UTF-8"));
+                    clusterMetadata.put(hostId, new String(cb.get(), "UTF-8"));
                     metadataToRetrieve.remove(hostId);
                 } catch (KeeperException.NoNodeException e) {}
                 catch (Exception e) {
@@ -3342,8 +3342,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         try {
-            if (operationModeFuture.getData() != null) {
-                String operationModeStr = new String(operationModeFuture.getData(), "UTF-8");
+            if (operationModeFuture.get() != null) {
+                String operationModeStr = new String(operationModeFuture.get(), "UTF-8");
                 m_startMode = OperationMode.valueOf(operationModeStr);
             }
         } catch (KeeperException.NoNodeException e) {}

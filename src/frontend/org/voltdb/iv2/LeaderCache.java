@@ -323,7 +323,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         HashMap<Integer, LeaderCallBackInfo> cache = new HashMap<Integer, LeaderCallBackInfo>();
         for (ByteArrayCallback callback : callbacks) {
             try {
-                byte payload[] = callback.getData();
+                byte payload[] = callback.get();
                 String data = new String(payload, "UTF-8");
                 LeaderCallBackInfo info = LeaderCache.buildLeaderCallbackFromString(data);
                 Integer partitionId = getPartitionIdFromZKPath(callback.getPath());
@@ -349,7 +349,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
             // cb.getData() and cb.getPath() throw KeeperException
-            byte payload[] = cb.getData();
+            byte payload[] = cb.get();
             String data = new String(payload, "UTF-8");
             LeaderCallBackInfo info = LeaderCache.buildLeaderCallbackFromString(data);
             Integer partitionId = getPartitionIdFromZKPath(cb.getPath());
