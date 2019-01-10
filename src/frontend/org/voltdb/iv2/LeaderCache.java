@@ -36,12 +36,9 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
-import org.voltdb.VoltZK;
-import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -102,17 +99,6 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             nextHSId = Long.parseLong(HSIdInfo.substring(nextHSIdOffset+1));
         }
         return new LeaderCallBackInfo(lastHSId, nextHSId, migratePartitionLeader);
-    }
-
-    public static void removeStopNodeIndicator(ZooKeeper zk, String node, VoltLogger log) {
-        try {
-            ZKUtil.deleteRecursively(zk, node);
-        } catch (KeeperException e) {
-            if (e.code() != KeeperException.Code.NONODE) {
-                log.debug("Failed to remove stop node indicator " + node + " on ZK: " + e.getMessage());
-            }
-            return;
-        } catch (InterruptedException ignore) {}
     }
 
     /**
