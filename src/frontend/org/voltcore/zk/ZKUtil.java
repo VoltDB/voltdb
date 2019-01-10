@@ -163,7 +163,9 @@ public class ZKUtil {
         int ii = 0;
         PureJavaCrc32 crc = getCRC ? new PureJavaCrc32() : null;
         for (String chunk : chunks) {
-            if (chunk.endsWith("_complete")) continue;
+            if (chunk.endsWith("_complete")) {
+                continue;
+            }
             resultBuffers[ii] = zk.getData(chunk, false, null);
             if (crc != null) {
                 crc.update(resultBuffers[ii]);
@@ -492,7 +494,9 @@ public class ZKUtil {
            es.execute(new Runnable() {
                @Override
                public void run() {
-                   if (canceled) return;
+                   if (canceled) {
+                    return;
+                }
                    pProcess(event);
                }
            });
@@ -603,20 +607,26 @@ public class ZKUtil {
 
         @Override
         public boolean equals(Object obj) {
-            if (this == obj)
+            if (this == obj) {
                 return true;
-            if (obj == null)
+            }
+            if (obj == null) {
                 return false;
-            if (getClass() != obj.getClass())
+            }
+            if (getClass() != obj.getClass()) {
                 return false;
+            }
             ListingNode other = (ListingNode) obj;
-            if (lvl != other.lvl)
+            if (lvl != other.lvl) {
                 return false;
+            }
             if (node == null) {
-                if (other.node != null)
+                if (other.node != null) {
                     return false;
-            } else if (!node.equals(other.node))
+                }
+            } else if (!node.equals(other.node)) {
                 return false;
+            }
             return true;
         }
 
