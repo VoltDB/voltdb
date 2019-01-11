@@ -75,8 +75,9 @@ public class MPQueryFallBackRule extends RelOptRule {
                             isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
                 case OR:
                     // SELECT ... FROM t WHERE PK = 0 or A = 1;
-                    return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) &&
-                            isSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                    // SELECT ... FROM t WHERE PK in (1, 2, 3);
+                    // TODO: It could be SP, if all the values of PK are in the same partition,
+                    return false;
                 case NOT:
                     // SELECT ... FROM t WHERE NOT PK <> 0;
                     return isComplementSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys);
@@ -117,8 +118,7 @@ public class MPQueryFallBackRule extends RelOptRule {
                     return isSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys);
                 case AND:
                     // SELECT ... FROM t WHERE NOT (PK <> 0 and A = 2);
-                    return isComplementSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) &&
-                            isComplementSinglePartitioned(program, rexCall.getOperands().get(1), partitionKeys);
+                    return false;
                 case OR:
                     // SELECT ... FROM t WHERE NOT (PK <> 0 or A = 2);
                     return isComplementSinglePartitioned(program, rexCall.getOperands().get(0), partitionKeys) ||

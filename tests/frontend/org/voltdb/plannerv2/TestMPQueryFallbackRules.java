@@ -280,4 +280,16 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         m_tester.sql("select RI1.bi from RI1, (select I from P2 where I = 5 order by I) P22 where RI1.i = P22.I").test();
     }
+
+    public void testIn() {
+        // calcite will use equal to rewrite IN
+        m_tester.sql("select * from P1 where i in (16)").test();
+
+        m_tester.sql("select * from P1 where i in (1,2,3,4,5,6,7,8,9,10)").test();
+
+        m_tester.sql("select * from P1 where i Not in (1, 2)").testFail();
+
+        // calcite will use Join to rewrite IN (sub query)
+        m_tester.sql("select si from P1 where i in (select i from R1)").testFail();
+    }
 }
