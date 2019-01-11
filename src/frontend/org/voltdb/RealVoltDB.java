@@ -2096,6 +2096,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else if (startAction.doesRejoin()) {
             topology = TopologyZKUtils.readTopologyFromZK(m_messenger.getZK());
         } else {
+            try {
+                return TopologyZKUtils.readTopologyFromZK(m_messenger.getZK(), null);
+            } catch (KeeperException.NoNodeException e) {
+                hostLog.debug("Topology doesn't exist yet try to create it");
+            } catch (KeeperException | InterruptedException | JSONException e) {
+                VoltDB.crashLocalVoltDB("Unable to read topology from ZK, dying", true, e);
+            }
+
             // initial start or recover
             int hostcount = m_clusterSettings.get().hostcount();
             if (hostInfos.size() != (hostcount - m_config.m_missingHostCount)) {
@@ -2141,7 +2149,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (topology.hasMissingPartitions()) {
                 VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
             }
-            TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
+            topology = TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
         }
 
         return topology;
