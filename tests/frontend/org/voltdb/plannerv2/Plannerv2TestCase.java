@@ -25,7 +25,6 @@ package org.voltdb.plannerv2;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -41,8 +40,6 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalRel;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalRel;
 import org.voltdb.plannerv2.rules.PlannerRules;
 import org.voltdb.plannerv2.utils.VoltRelUtil;
-
-import static junit.framework.Assert.assertEquals;
 
 /**
  * Base class for planner v2 test cases.
@@ -198,8 +195,7 @@ public class Plannerv2TestCase extends PlannerTestCase {
             super.test();
             m_transformedNode = VoltRelUtil.addTraitRecurcively(m_transformedNode, RelDistributions.ANY);
             m_planner.addRelTraitDef(RelDistributionTraitDef.INSTANCE);
-            m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK,
-                    HepMatchOrder.BOTTOM_UP, m_transformedNode, false);
+            m_transformedNode = VoltPlanner.transformHep(PlannerRules.Phase.MP_FALLBACK, m_transformedNode);
         }
 
         @Override public void testFail() {

@@ -283,7 +283,7 @@ public class VoltPlanner implements Planner {
      * @return the transformed relational expression tree.
      */
     public static RelNode transformHep(PlannerRules.Phase phase, RelNode rel) {
-        return transformHep(phase, null, rel, false);
+        return transformHep(phase, HepMatchOrder.BOTTOM_UP, rel, false);
     }
 
     /**
@@ -322,6 +322,7 @@ public class VoltPlanner implements Planner {
         return m_relPlanner.emptyTraitSet();
     }
 
+    @SuppressWarnings("rawtypes")
     public void addRelTraitDef(RelTraitDef def) {
         m_relPlanner.addRelTraitDef(def);
     }
