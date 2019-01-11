@@ -1260,7 +1260,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 for (Initiator ii : m_iv2Initiators.values()) {
                     localHSIds.add(ii.getInitiatorHSId());
                 }
-                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent(), m_globalServiceElector.getLeaderElectorNode());
+                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
                 m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
 
                 // Make a list of HDIds to join

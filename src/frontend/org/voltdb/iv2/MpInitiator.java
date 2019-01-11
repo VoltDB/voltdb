@@ -51,7 +51,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent, int leaderNodeId)
+    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
     {
         super(VoltZK.iv2mpi,
                 messenger,
@@ -60,7 +60,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     MP_INIT_PID,
                     buddyHSIds,
                     new SiteTaskerQueue(MP_INIT_PID),
-                    leaderNodeId),
+                    messenger.getHostId()),
                 "MP",
                 agent,
                 StartAction.CREATE /* never for rejoin */);
