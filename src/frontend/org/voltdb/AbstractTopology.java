@@ -39,7 +39,6 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -85,7 +84,7 @@ public class AbstractTopology {
         public final int id;
         public final int k;
         public int leaderHostId;
-        public final ImmutableSortedSet<Integer> hostIds;
+        public ImmutableSortedSet<Integer> hostIds;
 
         private Partition(int id, int k, int leaderHostId, Collection<Integer> hostIds) {
             this.id = id;
@@ -99,6 +98,10 @@ public class AbstractTopology {
         public String toString() {
             String[] hostIdStrings = hostIds.stream().map(id -> String.valueOf(id)).toArray(String[]::new);
             return String.format("Partition %d (leader %d, hosts %s)", id, leaderHostId, String.join(",", hostIdStrings));
+        }
+
+        public void updateHosts(Collection<Integer> hostIds) {
+            this.hostIds = ImmutableSortedSet.copyOf(hostIds);
         }
 
         private void toJSON(JSONStringer stringer) throws JSONException {
@@ -209,7 +212,7 @@ public class AbstractTopology {
         public final int id;
         public final int targetSiteCount;
         public final HAGroup haGroup;
-        public final ImmutableSortedSet<Partition> partitions;
+        public ImmutableSortedSet<Partition> partitions;
 
         //a flag indicating if the host is missing or not
         public boolean isMissing = false;
@@ -237,6 +240,10 @@ public class AbstractTopology {
             this.isMissing = isMissing;
         }
 
+        public void updatePartitions(Collection<Partition> partitions) {
+            this.partitions = ImmutableSortedSet.copyOf(partitions);
+        }
+
         public int getleaderCount() {
             int leaders = 0;
             for( Partition p : partitions) {
@@ -250,8 +257,8 @@ public class AbstractTopology {
         @Override
         public String toString() {
             String[] partitionIdStrings = partitions.stream().map(p -> String.valueOf(p.id)).toArray(String[]::new);
-            return String.format("Host %d sph:%d ha:%s (Partitions %s)",
-                    id, targetSiteCount, haGroup.token, String.join(",", partitionIdStrings));
+            return String.format("Host %d sph:%d ha:%s (Partitions %s) [%s]",
+                    id, targetSiteCount, haGroup.token, String.join(",", partitionIdStrings), partitions);
         }
 
         private void toJSON(JSONStringer stringer) throws JSONException {
@@ -1701,55 +1708,77 @@ public class AbstractTopology {
      * @param partitionsByHostsMap The partition id string by hosts
      * @return recovered topology
      */
-    public static AbstractTopology recoverTopologyFromPartitions(AbstractTopology topology,
-            Map<String, List<Integer>> partitionsByHostsMap) throws PartitionRestoreException{
+    public static AbstractTopology recoverPartitionPlacement(AbstractTopology topology,
+            Map<String, List<Integer>> partitionsByHostsMap){
         if (partitionsByHostsMap == null || partitionsByHostsMap.isEmpty()) {
             return topology;
         }
 
         Map<Integer, Host> hostsById = new TreeMap<>(topology.hostsById);
+        List<Host> hosts = Lists.newArrayList();
         for (Map.Entry<String, List<Integer>> entry : partitionsByHostsMap.entrySet()) {
             List<Integer> restoredHosts = entry.getValue();
-            List<Integer> partitionsByHosts = new ArrayList<>();
-            for (Host host : hostsById.values()) {
+            List<Integer> matchedHosts = new ArrayList<>();
+            for (Iterator<Map.Entry<Integer, Host>> it = hostsById.entrySet().iterator(); it.hasNext();) {
+                Host host = it.next().getValue();
                 String partitions = host.getSortedPartitionIdList().stream()
                         .map(n -> n.toString()).collect(Collectors.joining( "," ));
-                if (partitions.equals(entry.getKey()) && !restoredHosts.remove(new Integer(host.id))) {
-                    partitionsByHosts.add(host.id);
+
+                // host the same list of partitions but different host id, a candidate for swap
+                if (partitions.equals(entry.getKey())) {
+                    if (!restoredHosts.remove(new Integer(host.id))) {
+                        matchedHosts.add(host.id);
+                    } else {
+                        it.remove();
+                        hosts.add(host);
+                    }
                 }
             }
-            // Partitions on right hosts, no restoration
-            if (restoredHosts.isEmpty()) {
+
+            // all the partitions are on the right hosts, no restoration needed
+            if (restoredHosts.isEmpty() || matchedHosts.isEmpty()) {
                 continue;
             }
-            if (restoredHosts.size() != partitionsByHosts.size()) {
-                throw new PartitionRestoreException(entry.getKey(), entry.getValue());
-            }
-            for(int i = 0; i < partitionsByHosts.size(); i++) {
-                int fromHostId = restoredHosts.get(i);
-                int toHostId = partitionsByHosts.get(i);
-                Host fromHost = hostsById.get(fromHostId);
-                Host toHost = hostsById.get(toHostId);
-                hostsById.put(fromHostId, movePartitions(toHost, fromHostId));
-                hostsById.put(toHostId, movePartitions(fromHost,toHostId));
+
+            // found matching hosts, let us swap
+            for(int i = 0; i < restoredHosts.size(); i++) {
+                Host restoredHost = hostsById.get(new Integer(restoredHosts.get(i)));
+                Host matchedHost = hostsById.get(new Integer(matchedHosts.get(i)));
+                exhangePartitionPlacement(restoredHost, matchedHost);
+                hostsById.remove(new Integer(restoredHost.id));
+                hosts.add(restoredHost);
             }
         }
-        return new AbstractTopology(topology.version + 1, hostsById.values());
+        hosts.addAll(hostsById.values());
+        return new AbstractTopology(topology.version + 1, hosts);
     }
 
-    private static Host movePartitions(Host host, int hostId) {
-        List<Partition> partitions = Lists.newArrayList();
-        for (Partition p: host.partitions) {
+    // exchange partitions between two hosts
+    private static void exhangePartitionPlacement(Host restoredHost, Host matchedHost) {
+        List<Partition> restoredPartitionsOnHost = Lists.newArrayList();
+        for (Partition p: restoredHost.partitions) {
             List<Integer> hostIds = new ArrayList<>(p.hostIds);
-            hostIds.remove(new Integer(host.id));
-            hostIds.add(hostId);
-            int leaderHostId = (p.leaderHostId == host.id) ? hostId : p.leaderHostId;
-            Partition e = new Partition(p.id, p.k, leaderHostId, hostIds);
-            partitions.add(e);
+            if (hostIds.contains(restoredHost.id) && !hostIds.contains(matchedHost.id)) {
+                hostIds.remove(new Integer(restoredHost.id));
+                hostIds.add(matchedHost.id);
+            }
+            p.leaderHostId = (p.leaderHostId == restoredHost.id) ? matchedHost.id : p.leaderHostId;
+            p.updateHosts(hostIds);
+            restoredPartitionsOnHost.add(p);
         }
-        Host h = new Host(hostId, host.targetSiteCount, host.haGroup, partitions);
-        h.isMissing = host.isMissing;
-        return h;
+        List<Partition> macthedPartitionsOnHost = Lists.newArrayList();
+        for (Partition p: matchedHost.partitions) {
+            List<Integer> hostIds = new ArrayList<>(p.hostIds);
+            if (hostIds.contains(matchedHost.id) && !hostIds.contains(restoredHost.id)) {
+                hostIds.remove(new Integer(matchedHost.id));
+                hostIds.add(restoredHost.id);
+            }
+            p.leaderHostId = (p.leaderHostId == matchedHost.id) ? restoredHost.id : p.leaderHostId;
+            p.updateHosts(hostIds);
+            macthedPartitionsOnHost.add(p);
+        }
+        restoredHost.updatePartitions(macthedPartitionsOnHost);
+        matchedHost.updatePartitions(restoredPartitionsOnHost);
     }
 
     /**

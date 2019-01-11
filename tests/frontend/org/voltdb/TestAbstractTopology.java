@@ -23,8 +23,6 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,8 +50,6 @@ import org.voltdb.AbstractTopology.HostDescription;
 import org.voltdb.AbstractTopology.KSafetyViolationException;
 import org.voltdb.AbstractTopology.Partition;
 import org.voltdb.AbstractTopology.PartitionDescription;
-import org.voltdb.AbstractTopology.PartitionRestoreException;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 
@@ -445,36 +441,6 @@ public class TestAbstractTopology extends TestCase {
         }
     }
 
-    public void testPartitionsLayoutStability() throws JSONException {
-
-        // 5 node k1 with partition group
-        String partitionGroup = null;
-        for (int i = 0; i < 10000; i++) {
-            TestDescription td = getBoringDescription(5, 6, 1, 1, 2);
-            AbstractTopology topo = subTestDescription(td, false);
-            String partitionGroupTemp = null;
-            Map<String, List<Integer>> partitionsByHostsMap = Maps.newHashMap();
-            for (Host host : topo.hostsById.values()) {
-                String partitions = host.getSortedPartitionIdList().stream()
-                        .map(n -> n.toString()).collect(Collectors.joining( "," ));
-                List<Integer> hosts = partitionsByHostsMap.get(partitions);
-                if (hosts == null) {
-                    hosts = Lists.newArrayList();
-                    partitionsByHostsMap.put(partitions, hosts);
-                }
-                hosts.add(host.id);
-                if (hosts.size() == 2) {
-                    partitionGroupTemp = partitions;
-                }
-            }
-            if (partitionGroup == null) {
-                partitionGroup = partitionGroupTemp;
-            } else if (!partitionGroup.equals(partitionGroupTemp)) {
-               fail("Generated different partition groups: " + partitionGroup + "/" + partitionGroupTemp);
-            }
-        }
-
-    }
     public void testPartitionsRecovery() throws JSONException {
         // 5 node k1
         TestDescription td = getBoringDescription(5, 6, 1, 1, 2);
@@ -504,13 +470,9 @@ public class TestAbstractTopology extends TestCase {
             }
             incorrectPartitionsByHosts.put(partitionsList.get(i), hostList.get(shift));
         }
-        try {
-            // incorrect partition layout: {6,7,8,9,10,11=[4], 0,1,2,12,13,14=[0], 3,4,5,12,13,14=[1], 0,1,2,3,4,5=[2, 3]}
-            topo = AbstractTopology.recoverTopologyFromPartitions(topo, incorrectPartitionsByHosts);
-            fail();
-        } catch (PartitionRestoreException e) {
-            //expected.
-        }
+
+        // incorrect partition layout: {6,7,8,9,10,11=[4], 0,1,2,12,13,14=[0], 3,4,5,12,13,14=[1], 0,1,2,3,4,5=[2, 3]}
+        topo = AbstractTopology.recoverPartitionPlacement(topo, incorrectPartitionsByHosts);
 
         Map<String, List<Integer>> correctPartitionsByHosts = Maps.newHashMap();
         correctPartitionsByHosts.put("6,7,8,9,10,11", new ArrayList<Integer>(Arrays.asList(0,1)));
@@ -518,12 +480,8 @@ public class TestAbstractTopology extends TestCase {
         correctPartitionsByHosts.put("3,4,5,12,13,14", new ArrayList<Integer>(Arrays.asList(3)));
         correctPartitionsByHosts.put("0,1,2,3,4,5", new ArrayList<Integer>(Arrays.asList(2)));
 
-        try {
-            // correct placement layout: {6,7,8,9,10,11=[0,1], 0,1,2,12,13,14=[4], 3,4,5,12,13,14=[3], 0,1,2,3,4,5=[2]}
-            topo = AbstractTopology.recoverTopologyFromPartitions(topo, correctPartitionsByHosts);
-        } catch (PartitionRestoreException e) {
-            fail(e.getMessage());
-        }
+        // correct placement layout: {6,7,8,9,10,11=[0,1], 0,1,2,12,13,14=[4], 3,4,5,12,13,14=[3], 0,1,2,3,4,5=[2]}
+        topo = AbstractTopology.recoverPartitionPlacement(topo, correctPartitionsByHosts);
 
         // verify partitions
         Map<String, List<Integer>> recoveredPartitionsByHosts = Maps.newHashMap();
@@ -1006,7 +964,7 @@ public class TestAbstractTopology extends TestCase {
     public void testRestorePlacementOnRecovery() throws Exception {
         LocalCluster cluster = null;
         try{
-            cluster = createLocalCluster("testRestorePlacement.jar", 6, 5, 1);
+            cluster = createLocalCluster("testRestorePlacementOnRecovery.jar", 30, 3, 1);
             cluster.startUp();
             cluster.shutDown();
             // host ids in LocalCluster will be assigned async. So when a local host is recovered, it may be assigned
