@@ -396,6 +396,8 @@ public class TestLogicalRules extends Plannerv2TestCase {
     }
 
     public void testJoin() {
+        // TODO: Calcite casting to INTEGER instead of BigInt.
+        // We may fail some JUnit tests when we execute such Calcite plan.
         m_tester.sql("select R1.i, R2.v from R1, R2 where R2.si = R1.i and R2.v = 'foo'")
                 .transform("VoltLogicalCalc(expr#0..11=[{inputs}], I=[$t0], V=[$t11])\n" +
                         "  VoltLogicalJoin(condition=[=(CAST($7):INTEGER, $0)], joinType=[inner])\n" +

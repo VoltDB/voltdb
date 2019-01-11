@@ -82,7 +82,6 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         // equal condition on partition key with ORs
         m_tester.sql("select si, v from P1 where 7=si or i=2").testFail();
-        m_tester.sql("select si, v from P1 where 7=si or i=2 or ti=3").testFail();
 
         // equal condition on partition key with ORs and ANDs
         m_tester.sql("select si, v from P1 where 7>si or (i=2 and ti<3)").testFail();
@@ -92,6 +91,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         // equal condition with some expression that always TURE
         m_tester.sql("select si, v from P1 where (7=si and i=2) and 1=1").test();
+        m_tester.sql("select si, v from P1 where (7=si and i=2) and true").test();
         m_tester.sql("select si, v from P1 where (7=si and i=2) or 1=1").testFail();
 
         // equal condition with some expression that always FALSE
@@ -285,6 +285,8 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         // calcite will use equal to rewrite IN
         m_tester.sql("select * from P1 where i in (16)").test();
 
+        m_tester.sql("select * from P1 where i in (16, 16)").test();
+
         m_tester.sql("select * from P1 where i in (1,2,3,4,5,6,7,8,9,10)").testFail();
 
         m_tester.sql("select * from P1 where i Not in (1, 2)").testFail();
@@ -294,5 +296,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select si from P1 where i in (1,2) or i not in (1,3)").testFail();
         // calcite will use Join to rewrite IN (sub query)
         m_tester.sql("select si from P1 where si in (select i from R1)").testFail();
+
+        m_tester.sql("select i from R1 where i in (select si from P1)").testFail();
     }
 }
