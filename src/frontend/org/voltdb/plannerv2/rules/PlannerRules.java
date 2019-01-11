@@ -32,7 +32,8 @@ import org.apache.calcite.tools.Program;
 import org.apache.calcite.tools.Programs;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
-import org.voltdb.plannerv2.rules.inlining.VoltDBPhysicalScanMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitSortMergeRule;
+import org.voltdb.plannerv2.rules.inlining.VoltPhysicalLimitScanMergeRule;
 import org.voltdb.plannerv2.rules.inlining.VoltPhysicalCalcScanMergeRule;
 import org.voltdb.plannerv2.rules.logical.MPJoinQueryFallBackRule;
 import org.voltdb.plannerv2.rules.logical.MPQueryFallBackRule;
@@ -47,8 +48,6 @@ import org.voltdb.plannerv2.rules.physical.VoltPJoinRule;
 import org.voltdb.plannerv2.rules.physical.VoltPLimitRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSeqScanRule;
 import org.voltdb.plannerv2.rules.physical.VoltPSortConvertRule;
-
-import com.google.common.collect.ImmutableList;
 
 /**
  * Rules used by the VoltDB query planner in various planning stages.
@@ -165,7 +164,10 @@ public class PlannerRules {
 
     private static final RuleSet INLINE = RuleSets.ofList(
             VoltPhysicalCalcScanMergeRule.INSTANCE,
-            VoltDBPhysicalScanMergeRule.INSTANCE_2
+            VoltPhysicalLimitSortMergeRule.INSTANCE_1,
+            VoltPhysicalLimitSortMergeRule.INSTANCE_2,
+            VoltPhysicalLimitScanMergeRule.INSTANCE_1
+//            VoltPhysicalLimitScanMergeRule.INSTANCE_2
     );
 
     private static final ImmutableList<Program> PROGRAMS = ImmutableList.copyOf(

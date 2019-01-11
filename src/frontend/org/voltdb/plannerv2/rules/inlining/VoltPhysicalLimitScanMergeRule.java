@@ -26,13 +26,13 @@ import org.voltdb.plannerv2.rel.physical.VoltPhysicalLimit;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalSerialAggregate;
 import org.voltdb.plannerv2.rel.physical.VoltPhysicalTableScan;
 
-public class VoltDBPhysicalScanMergeRule extends RelOptRule {
+public class VoltPhysicalLimitScanMergeRule extends RelOptRule {
 
-    public static final VoltDBPhysicalScanMergeRule INSTANCE_1 =
-            new VoltDBPhysicalScanMergeRule(operand(VoltPhysicalLimit.class,
+    public static final VoltPhysicalLimitScanMergeRule INSTANCE_1 =
+            new VoltPhysicalLimitScanMergeRule(operand(VoltPhysicalLimit.class,
                     operand(VoltPhysicalTableScan.class, none())));
-    public static final VoltDBPhysicalScanMergeRule INSTANCE_2 =
-            new VoltDBPhysicalScanMergeRule(operand(VoltPhysicalLimit.class,
+    public static final VoltPhysicalLimitScanMergeRule INSTANCE_2 =
+            new VoltPhysicalLimitScanMergeRule(operand(VoltPhysicalLimit.class,
                     operand(VoltPhysicalCalc.class,
                             operand(VoltPhysicalTableScan.class, none()))));
 
@@ -42,7 +42,7 @@ public class VoltDBPhysicalScanMergeRule extends RelOptRule {
      * If a scan has already inline aggregate, the LIMIT can be inlined only if it is the serial aggregate.
      * The Hash aggregate requires a full scan.
      */
-    private VoltDBPhysicalScanMergeRule(RelOptRuleOperand operand) {
+    private VoltPhysicalLimitScanMergeRule(RelOptRuleOperand operand) {
         super(operand);
     }
 

@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.SingleRel;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
@@ -158,7 +159,11 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
     public static LimitPlanNode toPlanNode(RexNode limit, RexNode offset) {
         LimitPlanNode lpn = new LimitPlanNode();
         if (limit != null) {
-            lpn.setLimit(RexLiteral.intValue(limit));
+            if (limit instanceof RexDynamicParam) {
+                lpn.setLimit(-1);
+            } else {
+                lpn.setLimit(RexLiteral.intValue(limit));
+            }
         }
         if (offset != null) {
             lpn.setOffset(RexLiteral.intValue(offset));

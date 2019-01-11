@@ -23,10 +23,12 @@
 
 package org.voltdb.plannerv2;
 
+import org.voltdb.types.PlannerType;
+
 import java.util.HashMap;
 import java.util.Map;
 
-public class TestCalcitePlanner extends CalcitePlannerTestCase {
+public class TestPlanConversion extends CalcitePlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestValidation.class.getResource(
@@ -81,6 +83,10 @@ public class TestCalcitePlanner extends CalcitePlannerTestCase {
     }
 
     public void testSeqScanWithLimit() {
+        comparePlans("select i from R1 limit 5");
+    }
+
+    public void testSeqScanWithLimitParam() {
         Map<String, String> ignores = new HashMap<>();
         // Inline nodes ids are swapped
         String calciteProj = "\"ID\":4,\"PLAN_NODE_TYPE\":\"PROJECTION\"";
@@ -91,6 +97,36 @@ public class TestCalcitePlanner extends CalcitePlannerTestCase {
         String voltLimit = "\"ID\":4,\"PLAN_NODE_TYPE\":\"LIMIT\"";
         ignores.put(calciteLimit, voltLimit);
 
-//        comparePlans("select i from R1 limit 5", ignores);
+        // TODO: limit / offset as expressions or parameters
+//        comparePlans("select i from R1 limit ?", ignores);
+    }
+
+    public void testSeqScanWithFilterAndLimit() {
+        comparePlans("select i from R1 where si > 3 limit 5");
+    }
+
+    public void testSeqScanWithOffset() {
+        comparePlans("select i from R1 offset 1");
+    }
+
+    public void testSeqScanWithLimitOffset() {
+        comparePlans("select i from R1 limit 5 offset 1");
+    }
+
+    public void testSeqScanWithLimitOffsetSort() {
+        String sql;
+        sql = "select i from R1 order by bi limit 5 offset 1";
+
+        Map<String, String> ignores = new HashMap<>();
+        // Inline nodes ids are swapped
+        String calciteProj = "\"ID\":4,\"PLAN_NODE_TYPE\":\"PROJECTION\"";
+        String voltProj = "\"ID\":3,\"PLAN_NODE_TYPE\":\"PROJECTION\"";
+        ignores.put(calciteProj, voltProj);
+
+        String calciteLimit = "\"ID\":3,\"PLAN_NODE_TYPE\":\"LIMIT\"";
+        String voltLimit = "\"ID\":4,\"PLAN_NODE_TYPE\":\"LIMIT\"";
+        ignores.put(calciteLimit, voltLimit);
+
+        comparePlans(sql);
     }
 }

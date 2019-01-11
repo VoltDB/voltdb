@@ -21,6 +21,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -28,7 +29,6 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
-import org.apache.calcite.util.Util;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
@@ -45,7 +45,6 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
-import org.voltdb.plannerv2.NonDdlBatch;
 import org.voltdb.plannerv2.SqlTask;
 import org.voltdb.plannerv2.VoltPlanner;
 import org.voltdb.plannerv2.VoltSchemaPlus;
@@ -57,7 +56,6 @@ import org.voltdb.plannerv2.utils.VoltRelUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
-import javax.ws.rs.HEAD;
 
 import static org.voltdb.plannerv2.utils.VoltRelUtil.calciteToVoltDBPlan;
 
@@ -222,6 +220,7 @@ public class PlannerTool {
         // Convert SqlNode to RelNode.
         RelNode rel = planner.convert(sqlNode);
         compileLog.info("ORIGINAL\n" + RelOptUtil.toString(rel));
+        System.out.println(RelOptUtil.toString(rel));
 
         // Drill has SUBQUERY_REWRITE and WINDOW_REWRITE here, add?
         // See Drill's DefaultSqlHandler.convertToRel()
@@ -237,6 +236,8 @@ public class PlannerTool {
         RelNode transformed = planner.transform(
                 Phase.LOGICAL.ordinal(),
                 requiredLogicalOutputTraits, rel);
+
+        System.out.println(RelOptUtil.toString(transformed));
 
         compileLog.info("LOGICAL\n" + RelOptUtil.toString(transformed));
 
@@ -269,8 +270,10 @@ public class PlannerTool {
         System.out.println(RelOptUtil.toString(transformed));
 
         // apply inlining rules.
-        transformed = VoltPlanner.transformHep(PlannerRules.Phase.INLINE,
+        transformed = VoltPlanner.transformHep(Phase.INLINE,
                 HepMatchOrder.ARBITRARY, transformed, true);
+
+        System.out.println(RelOptUtil.toString(transformed));
 
         // assume not large query
         CompiledPlan compiledPlan = new CompiledPlan(false);

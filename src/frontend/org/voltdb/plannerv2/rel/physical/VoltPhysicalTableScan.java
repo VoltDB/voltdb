@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
@@ -201,7 +202,11 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
 
     protected int getLimit() {
         if (m_limit != null) {
-            return RexLiteral.intValue(m_limit);
+            if (m_limit instanceof RexDynamicParam) {
+                return -1;
+            } else {
+                return RexLiteral.intValue(m_limit);
+            }
         } else {
             return Integer.MAX_VALUE;
         }
@@ -339,8 +344,8 @@ public abstract class VoltPhysicalTableScan extends AbstractVoltTableScan implem
             node.addInlinePlanNode(aggr);
             node.setOutputSchema(aggr.getOutputSchema());
             node.setHaveSignificantOutputSchema(true);
-            // Inline limit /offset with Serial Aggregate only. This is enforced by the VoltDBPhysicalScanMergeRule.
-            // The VoltDBPAggregateScanMergeRule should be triggered prior to the VoltDBPhysicalScanMergeRule
+            // Inline limit /offset with Serial Aggregate only. This is enforced by the VoltPhysicalLimitScanMergeRule.
+            // The VoltDBPAggregateScanMergeRule should be triggered prior to the VoltPhysicalLimitScanMergeRule
             // allowing the latter to avoid merging VoltDBLimit and Scan nodes if the scan already has an inline aggregate
             Preconditions.checkArgument((aggr instanceof HashAggregatePlanNode && !hasLimitOffset()) ||
                     aggr instanceof AggregatePlanNode);
