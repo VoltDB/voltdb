@@ -445,40 +445,18 @@ public class TestAbstractTopology extends TestCase {
         // 5 node k1
         TestDescription td = getBoringDescription(5, 6, 1, 1, 2);
         AbstractTopology topo = subTestDescription(td, false);
-        //partition layout: {6,7,8,9,10,11=[2, 3], 0,1,2,12,13,14=[4], 3,4,5,12,13,14=[0], 0,1,2,3,4,5=[1]}
-        Map<String, List<Integer>> partitionsByHostsMap = Maps.newHashMap();
-        for (Host host : topo.hostsById.values()) {
-            String partitions = host.getSortedPartitionIdList().stream()
-                    .map(n -> n.toString()).collect(Collectors.joining( "," ));
-            List<Integer> hosts = partitionsByHostsMap.get(partitions);
-            if (hosts == null) {
-                hosts = Lists.newArrayList();
-                partitionsByHostsMap.put(partitions, hosts);
-            }
-            hosts.add(host.id);
-        }
-
-        // mix around partition layout
-        Map<String, List<Integer>> incorrectPartitionsByHosts = Maps.newHashMap();
-        List<String> partitionsList = new ArrayList<> (partitionsByHostsMap.keySet());
-        List<List<Integer>> hostList = new ArrayList<> (partitionsByHostsMap.values());
-        int partitionCount = partitionsList.size();
-        for (int i = 0; i < partitionCount; i++) {
-            int shift = i + 1;
-            if (i == (partitionCount -1)){
-                shift = 0;
-            }
-            incorrectPartitionsByHosts.put(partitionsList.get(i), hostList.get(shift));
-        }
-
-        // incorrect partition layout: {6,7,8,9,10,11=[4], 0,1,2,12,13,14=[0], 3,4,5,12,13,14=[1], 0,1,2,3,4,5=[2, 3]}
-        topo = AbstractTopology.recoverPartitionPlacement(topo, incorrectPartitionsByHosts);
 
         Map<String, List<Integer>> correctPartitionsByHosts = Maps.newHashMap();
         correctPartitionsByHosts.put("6,7,8,9,10,11", new ArrayList<Integer>(Arrays.asList(0,1)));
         correctPartitionsByHosts.put("0,1,2,12,13,14", new ArrayList<Integer>(Arrays.asList(4)));
         correctPartitionsByHosts.put("3,4,5,12,13,14", new ArrayList<Integer>(Arrays.asList(3)));
         correctPartitionsByHosts.put("0,1,2,3,4,5", new ArrayList<Integer>(Arrays.asList(2)));
+
+        Map<String, List<Integer>> clonedPartitionsByHosts = Maps.newHashMap();
+        clonedPartitionsByHosts.put("6,7,8,9,10,11", new ArrayList<Integer>(Arrays.asList(0,1)));
+        clonedPartitionsByHosts.put("0,1,2,12,13,14", new ArrayList<Integer>(Arrays.asList(4)));
+        clonedPartitionsByHosts.put("3,4,5,12,13,14", new ArrayList<Integer>(Arrays.asList(3)));
+        clonedPartitionsByHosts.put("0,1,2,3,4,5", new ArrayList<Integer>(Arrays.asList(2)));
 
         // correct placement layout: {6,7,8,9,10,11=[0,1], 0,1,2,12,13,14=[4], 3,4,5,12,13,14=[3], 0,1,2,3,4,5=[2]}
         topo = AbstractTopology.recoverPartitionPlacement(topo, correctPartitionsByHosts);
@@ -495,9 +473,8 @@ public class TestAbstractTopology extends TestCase {
             }
             hosts.add(host.id);
         }
-
         // verify if the recovered placement layouts are the same as the ones from input.
-        for (Map.Entry<String, List<Integer>> e : correctPartitionsByHosts.entrySet()) {
+        for (Map.Entry<String, List<Integer>> e : clonedPartitionsByHosts.entrySet()) {
             List<Integer> recovered = recoveredPartitionsByHosts.get(e.getKey());
             recovered.removeAll(e.getValue());
             assert(recovered.isEmpty());
@@ -601,11 +578,6 @@ public class TestAbstractTopology extends TestCase {
             }
             haGroupTags.add(tag);
         }
-
-        /*for (String tag : haGroupTags) {
-            System.out.println(tag);
-        }*/
-
         return haGroupTags;
     }
 

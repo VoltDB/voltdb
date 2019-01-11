@@ -1735,7 +1735,7 @@ public class AbstractTopology {
                 }
             }
 
-            // all the partitions are on the right hosts, no restoration needed
+            // all the partitions are on the right hosts or no matching layout found, no restoration needed
             if (restoredHosts.isEmpty() || matchedHosts.isEmpty()) {
                 continue;
             }
