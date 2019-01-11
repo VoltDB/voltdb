@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,13 +19,7 @@ package org.voltdb.planner;
 
 import java.util.*;
 
-import org.hsqldb_voltpatches.HSQLInterface;
-import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
-import org.voltdb.compiler.DatabaseEstimates;
-import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -63,6 +57,24 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
     private ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<>();
 
+    private static final Runtime RUN_TIME = Runtime.getRuntime();
+    // Number of times generateSubPlanForJoinNode() gets called recursively that we collect an estimate of heap size,
+    // and early exit if too large heap size had been used.
+    private static final int PLAN_ESTIMATE_PERIOD = 300;
+    // Stop generating any further possible plans, if we have reached xx% of available JVM heap memory
+    private static final short MAX_HEAP_MEMORY_USAGE_PCT = 80;
+    private static final long MAX_ALLOWED_PLAN_MEMORY = RUN_TIME.maxMemory() * MAX_HEAP_MEMORY_USAGE_PCT / 100;
+
+    /**
+     * Stop further planning, if we have used more heap memory than we could hopefully exhaustively plan it out,
+     * at the time this method is called.
+     *
+     * @return whether we should stop further planning. By the time it returns true, GC had already kicked in a few
+     * rounds.
+     */
+    private static boolean shouldStopPlanning() {
+        return RUN_TIME.totalMemory() - RUN_TIME.freeMemory() >= MAX_ALLOWED_PLAN_MEMORY;
+    }
     /**
      *
      * @param db The catalog's Database object.
@@ -98,7 +110,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ArrayList<List<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
         // Reassemble the all possible combinations of the sub-tree and queue them
         ArrayDeque<JoinNode> joinOrders = new ArrayDeque<>();
-        queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>(), joinOrders, findAll);
+        queueSubJoinOrders(joinOrderList, 0, new ArrayList<>(), joinOrders, findAll);
         return joinOrders;
     }
 
@@ -156,8 +168,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 return generateFullJoinOrdersForTree(subTree);
             } else {
                 // Shouldn't get there
-                assert(false);
-                return null;
+                throw new PlanningErrorException("Internal error: unsupported join type " + joinType.toString());
             }
         } else {
             // Single tables and subqueries
@@ -516,7 +527,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * generate all possible plans for the tree.
+     * generate all possible plans for the tree, or to the extend that further planning would drain JVM heap memory
+     * (at threshold of MAX_HEAP_MEMORY_USAGE_PCT% of available JVM heap memory)
      *
      * @param rootNode The root node for the whole join tree.
      * @param nodes The node list to iterate over.
@@ -538,6 +550,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return;
         }
 
+        // If we have drained heap memory, don't recurse further on.
+        if (! m_plans.isEmpty() && m_plans.size() % PLAN_ESTIMATE_PERIOD == 0 && shouldStopPlanning()) {
+            return;
+        }
         for (AccessPath path : joinNode.m_accessPaths) {
             joinNode.m_currentAccessPath = path;
             generateSubPlanForJoinNodeRecursively(rootNode, nextNode+1, nodes);
@@ -549,7 +565,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * that gives the right tuples.
      *
      * @param joinNode The join node to build the plan for.
-     * @param isInnerTable True if the join node is the inner node in the join
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */

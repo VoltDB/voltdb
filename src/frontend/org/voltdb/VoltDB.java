@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -122,6 +122,7 @@ public class VoltDB {
 
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
+        private boolean m_validateSuccess;
 
         public int m_ipcPort = DEFAULT_IPC_PORT;
 
@@ -963,6 +964,17 @@ public class VoltDB {
             }
         }
 
+        private void generateFatalLog(String fatalMsg) {
+            if (m_validateSuccess) {
+                m_validateSuccess = false;
+                StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
+                sb.append(System.getProperty("sun.java.command", "[not available]"));
+                hostLog.info(sb.toString());
+            }
+            hostLog.fatal(fatalMsg);
+        }
+
+
         /**
          * Validates configuration settings and logs errors to the host log.
          * You typically want to have the system exit when this fails, but
@@ -970,25 +982,23 @@ public class VoltDB {
          * @return Returns true if all required configuration settings are present.
          */
         public boolean validate() {
-            boolean isValid = true;
+            m_validateSuccess = true;
 
             EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_startAction == null) {
-                isValid = false;
-                hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
+                generateFatalLog("The startup action is missing (either create, recover or rejoin).");
             }
             if (m_leader == null && !hostNotRequred.contains(m_startAction)) {
-                isValid = false;
-                hostLog.fatal("The hostname is missing.");
+                generateFatalLog("The hostname is missing.");
             }
 
             // check if start action is not valid in community
             if ((!m_isEnterprise) && (m_startAction.isEnterpriseOnly())) {
-                isValid = false;
-                hostLog.fatal("VoltDB Community Edition only supports the \"create\" start action.");
-                String msg = m_startAction.featureNameForErrorString();
-                msg += " is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.";
-                hostLog.fatal(msg);
+                StringBuilder sb = new StringBuilder().append(
+                        "VoltDB Community Edition only supports the \"create\" start action.");
+                sb.append(m_startAction.featureNameForErrorString());
+                sb.append(" is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.");
+                generateFatalLog(sb.toString());
             }
             EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
                     EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
@@ -996,39 +1006,32 @@ public class VoltDB {
             if (requiresDeployment.contains(m_startAction)) {
                 // require deployment file location (null is allowed to receive default deployment)
                 if (m_pathToDeployment != null && m_pathToDeployment.trim().isEmpty()) {
-                    isValid = false;
-                    hostLog.fatal("The deployment file location is empty.");
+                    generateFatalLog("The deployment file location is empty.");
                 }
             }
 
             //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
             EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
             if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
-                isValid = false;
-                hostLog.fatal("Starting in admin mode is only allowed when using start, create or recover.");
+                generateFatalLog("Starting in admin mode is only allowed when using start, create or recover.");
             }
             if (!hostNotRequred.contains(m_startAction) && m_coordinators.isEmpty()) {
-                isValid = false;
-                hostLog.fatal("List of hosts is missing");
+                generateFatalLog("List of hosts is missing");
             }
 
             if (m_startAction != StartAction.PROBE && m_hostCount != UNDEFINED) {
-                isValid = false;
-                hostLog.fatal("Option \"--count\" may only be specified when using start");
+                generateFatalLog("Option \"--count\" may only be specified when using start");
             }
             if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < m_coordinators.size()) {
-                isValid = false;
-                hostLog.fatal("List of hosts is greater than option \"--count\"");
+                generateFatalLog("List of hosts is greater than option \"--count\"");
             }
             if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < 0) {
-                isValid = false;
-                hostLog.fatal("\"--count\" may not be specified with negative values");
+                generateFatalLog("\"--count\" may not be specified with negative values");
             }
             if (m_startAction == StartAction.JOIN && !m_enableAdd) {
-                isValid = false;
-                hostLog.fatal("\"add\" and \"noadd\" options cannot be specified at the same time");
+                generateFatalLog("\"add\" and \"noadd\" options cannot be specified at the same time");
             }
-            return isValid;
+            return m_validateSuccess;
         }
 
         /**

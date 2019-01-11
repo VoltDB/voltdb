@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -308,7 +308,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Recursively build sets of read tables read and index names used.
+     * Recursively build sets of tables read and index names used.
      *
      * @param tablesRead Set of table aliases read potentially added to at each recursive level.
      * @param indexes Set of index names used in the plan tree

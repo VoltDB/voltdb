@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -484,8 +484,8 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     if (columnIndex < 0) {
         std::ostringstream message;
         message << "tupleValueFactory: invalid column_idx " << columnIndex <<
-                " for " << ((tableIdx == 0) ? "" : "inner ") << "table\nStack trace:\n" <<
-                StackTrace::stringStackTrace();
+                " for " << ((tableIdx == 0) ? "" : "inner ") << "table\nStack trace:\n";
+        StackTrace::streamStackTrace(message, "");
         throw UnexpectedEEException(message.str());
     }
 

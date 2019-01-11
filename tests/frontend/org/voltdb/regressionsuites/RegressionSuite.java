@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2018 VoltDB Inc.
+ * Copyright (C) 2008-2019 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -96,6 +96,7 @@ public class RegressionSuite extends TestCase {
     // If the current RegressionSuite instance is the last one in the current VoltServerConfig,
     // shutdown the cluster completely after finishing the test.
     protected boolean m_completeShutdown;
+    protected boolean m_fatalFailure;
 
     /**
      * Trivial constructor that passes parameter on to superclass.
@@ -107,6 +108,7 @@ public class RegressionSuite extends TestCase {
 
         VoltServerConfig.setInstanceSet(new HashSet<>());
         m_completeShutdown = false;
+        m_fatalFailure = false;
     }
 
     /**
@@ -140,6 +142,9 @@ public class RegressionSuite extends TestCase {
      */
     @Override
     public void tearDown() throws Exception {
+        if (m_fatalFailure) {
+            System.exit(0);
+        }
         if (m_completeShutdown) {
             m_config.shutDown();
         }
