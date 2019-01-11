@@ -285,7 +285,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         // calcite will use equal to rewrite IN
         m_tester.sql("select * from P1 where i in (16)").test();
 
-        m_tester.sql("select * from P1 where i in (1,2,3,4,5,6,7,8,9,10)").test();
+        m_tester.sql("select * from P1 where i in (1,2,3,4,5,6,7,8,9,10)").testFail();
 
         m_tester.sql("select * from P1 where i Not in (1, 2)").testFail();
 
