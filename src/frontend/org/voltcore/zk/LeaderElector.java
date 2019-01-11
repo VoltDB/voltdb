@@ -198,10 +198,6 @@ public class LeaderElector {
         return isLeader;
     }
 
-    public String getNode() {
-        return node;
-    }
-
     /**
      * Deletes the ephemeral node. Make sure that no future watches will fire.
      *
