@@ -289,7 +289,10 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
 
         m_tester.sql("select * from P1 where i Not in (1, 2)").testFail();
 
+        m_tester.sql("select si from P1 where i in (1,2) and i in (1,3)").testFail();
+
+        m_tester.sql("select si from P1 where i in (1,2) or i not in (1,3)").testFail();
         // calcite will use Join to rewrite IN (sub query)
-        m_tester.sql("select si from P1 where i in (select i from R1)").testFail();
+        m_tester.sql("select si from P1 where si in (select i from R1)").testFail();
     }
 }
