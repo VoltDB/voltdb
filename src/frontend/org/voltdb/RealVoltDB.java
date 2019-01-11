@@ -2213,12 +2213,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (hostLog.isDebugEnabled()) {
                     hostLog.debug("Recovered partition layout:" + restoredPartitionsByHosts);
                 }
-                try {
-                    System.out.println(topology.topologyToJSON());
-                } catch (JSONException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
                 long version = topology.version;
                 topology = AbstractTopology.recoverPartitionPlacement(topology, restoredPartitionsByHosts);
                 if (version < topology.version) {
@@ -2228,12 +2222,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             //move partition masters from missing hosts to live hosts
             topology = AbstractTopology.shiftPartitionLeaders(topology, missingHosts);
             topology = TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
-            try {
-                System.out.println(topology.topologyToJSON());
-            } catch (JSONException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
         }
 
         return topology;
