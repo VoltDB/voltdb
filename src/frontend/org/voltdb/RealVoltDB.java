@@ -386,6 +386,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private int m_maxThreadsCount;
 
+    // Using Boolean so if this is accessed before assignment the caller will get an NPE
+    private Boolean m_eligibleAsLeader = null;
+
     @Override
     public boolean isRunningWithOldVerbs() {
         return m_isRunningWithOldVerb;
@@ -1163,12 +1166,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Create the GlobalServiceElector.  Do this here so we can register the MPI with it
             // when we construct it below
             m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
-            // Start the GlobalServiceElector.  Not sure where this will actually belong.
-            try {
-                m_globalServiceElector.start();
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
-            }
 
             // Always create a mailbox for elastic join data transfer
             if (m_config.m_isEnterprise) {
@@ -1242,26 +1239,37 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     partitions = topo.getPartitionIdList(m_messenger.getHostId());
                     partitionGroupPeers = topo.getPartitionGroupPeers(m_messenger.getHostId());
                 }
+
+                m_eligibleAsLeader = determineIfEligibleAsLeader(partitions, partitionGroupPeers, topo);
+
                 m_messenger.setPartitionGroupPeers(partitionGroupPeers, m_clusterSettings.get().hostcount());
-                for (int ii = 0; ii < partitions.size(); ii++) {
-                    Integer partition = partitions.get(ii);
-                    m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
+                for (Integer partition : partitions) {
+                    m_iv2InitiatorStartingTxnIds.put(partition, TxnEgo.makeZero(partition).getTxnId());
                 }
                 m_iv2Initiators = createIv2Initiators(
                         partitions,
                         m_config.m_startAction,
                         m_partitionsToSitesAtStartupForExportInit);
-                m_iv2InitiatorStartingTxnIds.put(
-                        MpInitiator.MP_INIT_PID,
-                        TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
+
                 // Pass the local HSIds to the MPI so it can farm out buddy sites
                 // to the RO MP site pool
                 List<Long> localHSIds = new ArrayList<>();
                 for (Initiator ii : m_iv2Initiators.values()) {
                     localHSIds.add(ii.getInitiatorHSId());
                 }
-                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
-                m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
+
+                if (m_eligibleAsLeader) {
+                    // Start the GlobalServiceElector. Not sure where this will actually belong.
+                    try {
+                        m_globalServiceElector.start();
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
+                    }
+                    m_iv2InitiatorStartingTxnIds.put(MpInitiator.MP_INIT_PID,
+                            TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
+                    m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
+                    m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
+                }
 
                 // Make a list of HDIds to join
                 Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<>();
@@ -1310,7 +1318,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Current calculation needs pro/community knowledge, number of tables, and the sites/host,
             // which is the number of initiators (minus the possibly idle MPI initiator)
             checkHeapSanity(m_catalogContext.tables.size(),
-                    (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+                    (getLocalPartitionCount()), m_configuredReplicationFactor);
 
             if (m_joining) {
                 if (hostLog.isDebugEnabled()) {
@@ -1607,11 +1615,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Start elastic join service
             try {
                 if (m_config.m_isEnterprise) {
-                    m_elasticService = ProClass
-                            .newInstanceOf("org.voltdb.elastic.ElasticCoordinator", "Elastic Operations",
-                                    ProClass.HANDLER_CRASH, m_messenger, m_clientInterface, m_cartographer,
-                                    rebalanceStats, VoltDB.instance().getCommandLogSnapshotPath(),
-                                    m_catalogContext.getDeployment().getCluster().getKfactor(), m_clusterSettings);
+                    m_elasticService = ProClass.newInstanceOf("org.voltdb.elastic.ElasticCoordinator",
+                            "Elastic Operations", ProClass.HANDLER_CRASH, m_messenger, m_clientInterface,
+                            m_cartographer, rebalanceStats, VoltDB.instance().getCommandLogSnapshotPath(),
+                            m_catalogContext.getDeployment().getCluster().getKfactor(), m_clusterSettings,
+                            m_eligibleAsLeader);
                     m_elasticService.updateConfig(m_catalogContext);
                 }
             } catch (Exception e) {
@@ -2259,6 +2267,35 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (em != null) { em.setupMaintenaceTasks(); }
 
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
+    }
+
+    /**
+     * This host can be a leader if partition 0 is on it or it is in the same partition group as a node which has
+     * partition 0. This is because the partition group with partition 0 can never be removed by elastic remove.
+     *
+     * @param partitions          {@link List} of partitions on this host
+     * @param partitionGroupPeers {@link List} of hostIds which are in the same partition group as this host
+     * @param topology            {@link AbstractTopology} for the cluster
+     * @return {@code true} if this host is eligible as a leader for non partition services
+     */
+    private boolean determineIfEligibleAsLeader(Collection<Integer> partitions, Set<Integer> partitionGroupPeers,
+            AbstractTopology topology) {
+        if (partitions.contains(Integer.valueOf(0))) {
+            return true;
+        }
+        for (Integer host : topology.getHostIdList(0)) {
+            if (partitionGroupPeers.contains(host)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return The number of local partition initiators not including MPI
+     */
+    private int getLocalPartitionCount() {
+        return m_iv2Initiators.size() - (m_eligibleAsLeader ? 1 : 0);
     }
 
     public boolean isClusterComplete() {
@@ -3254,7 +3291,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Computed minimum heap requirement
         long minRqt = computeMinimumHeapRqt(m_catalogContext.tables.size(),
-                (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+                (getLocalPartitionCount()), m_configuredReplicationFactor);
         hostLog.info("Minimum required Java heap for catalog and server config is " + minRqt + " MB.");
 
         SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog(true);
@@ -3940,7 +3977,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 startHealthMonitor();
 
                 checkHeapSanity(m_catalogContext.tables.size(),
-                        (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+                        (getLocalPartitionCount()), m_configuredReplicationFactor);
 
                 checkThreadsSanity();
 
@@ -4859,7 +4896,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void checkThreadsSanity() {
         int tableCount = m_catalogContext.tables.size();
-        int partitions = m_iv2Initiators.size() - 1;
+        int partitions = getLocalPartitionCount();
         int replicates = m_configuredReplicationFactor;
         int importPartitions = ImportManager.getPartitionsCount();
         int exportTableCount = ExportManager.instance().getExportTablesCount();
