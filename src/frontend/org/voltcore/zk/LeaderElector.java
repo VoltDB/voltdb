@@ -25,7 +25,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -34,6 +33,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
@@ -52,39 +52,28 @@ public class LeaderElector {
     private String node = null;
     private Set<String> knownChildren = null;
 
-    private volatile String leader = null;
     private volatile boolean isLeader = false;
     private final ExecutorService es;
-    private final AtomicBoolean m_done = new AtomicBoolean(false);
+    private volatile boolean m_shutdown = false;
 
     private final Runnable electionEventHandler = new Runnable() {
         @Override
         public void run() {
             try {
-                leader = watchNextLowerNode();
-            } catch (KeeperException.SessionExpiredException e) {
+                isLeader = watchNextLowerNode();
+            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means zk shutdown without the elector being shutdown.
                 // ignore.
                 e.printStackTrace();
-            } catch (KeeperException.ConnectionLossException e) {
-                // lost the full connection. some test cases do this...
-                // means shutdoown without the elector being
-                // shutdown; ignore.
-                e.printStackTrace();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (Exception e) {
-                org.voltdb.VoltDB.crashLocalVoltDB(
-                        "Unexepected failure in LeaderElector.", true, e);
+                VoltDB.crashLocalVoltDB("Unexepected failure in LeaderElector.", true, e);
             }
 
-            if (node != null && node.equals(leader)) {
-                // become the leader
-                isLeader = true;
-                if (cb != null) {
-                    cb.becomeLeader();
-                }
+            if (isLeader && cb != null) {
+                cb.becomeLeader();
             }
         }
     };
@@ -94,12 +83,7 @@ public class LeaderElector {
         public void run() {
             try {
                 checkForChildChanges();
-            } catch (KeeperException.SessionExpiredException e) {
-                // lost the full connection. some test cases do this...
-                // means zk shutdown without the elector being shutdown.
-                // ignore.
-                e.printStackTrace();
-            } catch (KeeperException.ConnectionLossException e) {
+            } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdoown without the elector being
                 // shutdown; ignore.
@@ -107,8 +91,7 @@ public class LeaderElector {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (Exception e) {
-                org.voltdb.VoltDB.crashLocalVoltDB(
-                        "Unexepected failure in LeaderElector.", true, e);
+                VoltDB.crashLocalVoltDB("Unexepected failure in LeaderElector.", true, e);
             }
         }
     };
@@ -118,7 +101,7 @@ public class LeaderElector {
         @Override
         public void process(WatchedEvent event) {
             try {
-                if (!m_done.get()) {
+                if (!m_shutdown) {
                     es.submit(childrenEventHandler);
                 }
             } catch (RejectedExecutionException e) {
@@ -132,7 +115,7 @@ public class LeaderElector {
         @Override
         public void process(final WatchedEvent event) {
             try {
-                if (!m_done.get()) {
+                if (!m_shutdown) {
                     es.submit(electionEventHandler);
                 }
             } catch (RejectedExecutionException e) {
@@ -226,19 +209,18 @@ public class LeaderElector {
      * @throws KeeperException
      */
     synchronized public void shutdown() throws InterruptedException, KeeperException {
-        m_done.set(true);
+        m_shutdown = true;
         es.shutdown();
         es.awaitTermination(365, TimeUnit.DAYS);
     }
 
     /**
-     * Set a watch on the node that comes before the specified node in the
-     * directory.
-
-     * @return The lowest sequential node
+     * Set a watch on the node that comes before the specified node in the directory.
+     *
+     * @return {@code true} if this node is the lowest node and therefore leader
      * @throws Exception
      */
-    private String watchNextLowerNode() throws KeeperException, InterruptedException {
+    private boolean watchNextLowerNode() throws KeeperException, InterruptedException {
         /*
          * Iterate through the sorted list of children and find the given node,
          * then setup a electionWatcher on the previous node if it exists, otherwise the
@@ -259,21 +241,15 @@ public class LeaderElector {
         assert (me != null);
         //Back on me
         iter.previous();
-        String lowest = null;
         //Until we have previous nodes and we set a watch on previous node.
         while (iter.hasPrevious()) {
             //Proess my lower nodes and put a watch on whats live
             String previous = ZKUtil.joinZKPath(dir, iter.previous());
             if (zk.exists(previous, electionWatcher) != null) {
-                lowest = previous;
-                break;
+                return false;
             }
         }
-        //If we could not watch any lower node we are lowest and must become leader.
-        if (lowest == null) {
-            return node;
-        }
-        return lowest;
+        return true;
     }
 
 
