@@ -23,6 +23,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.apache.calcite.sql.parser.SqlParseException;
+
 /**
  * Check if a SQL statement should be routed to Calcite planner.
  * This is a temporary check before we can make Calcite support all the VoltDB syntaxes.
@@ -46,9 +48,10 @@ public abstract class CalciteCompatibilityCheck {
      *
      * @param sql the SQL statement to check
      * @return true if the SQL statement passed the check.
+     * @throws SqlParseException
      * @see DisapprovingCheck
      */
-    protected abstract boolean doCheck(String sql);
+    protected abstract boolean doCheck(String sql) throws SqlParseException;
 
     /**
      * @return true if the result of the current check should become final and
@@ -65,7 +68,7 @@ public abstract class CalciteCompatibilityCheck {
      * @param sql the SQL statement to check.
      * @return true if this statement should be routed to Calcite.
      */
-    public final boolean check(String sql) {
+    public final boolean check(String sql) throws SqlParseException {
         if (doCheck(sql)) {
             return true;
         } else if (m_next == null || isFinal()) {
