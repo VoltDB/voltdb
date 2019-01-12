@@ -37,7 +37,8 @@ public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
         }
     }
 
-    @Override protected boolean doCheck(String sql) {
+    @Override
+    protected boolean doCheck(String sql) throws SqlParseException {
         try {
             return VoltFastSqlParser.parse(sql).isA(SqlKind.DDL);
         } catch (SqlParseException e) {
@@ -51,10 +52,8 @@ public class AcceptDDLsAsWeCan extends CalciteCompatibilityCheck {
                 // Throwing an exception that's not a PlannerFallbackException will abort the planning.
                 throw new PlanningErrorException("Encountered stack overflow error. " +
                         "Try reducing the number of predicate expressions in the query.");
-            } else {
-                // For all Calcite unsupported syntax, fall back to VoltDB implementation by returning false.
-                System.err.println(truncate(e.getMessage(), 100));  // Print Calcite's parse error
-                return false;
+            } else { // For all Calcite unsupported syntax, fall back to VoltDB implementation
+                throw e;
             }
         }
     }
