@@ -385,6 +385,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_isInCatalog = true;
     }
 
+    public boolean inCatalog() {
+        return m_isInCatalog;
+    }
+
     public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         //export stream for run-everywhere clients doesn't need ack mailboxes
         if (m_runEveryWhere) {

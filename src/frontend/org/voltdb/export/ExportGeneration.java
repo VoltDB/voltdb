@@ -724,24 +724,47 @@ public class ExportGeneration implements Generation {
 
     @Override
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover, long sequenceNumber) {
+                                                boolean isRecover,
+                                                Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+                                                boolean isLowestSite) {
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
-
+        List<ListenableFuture<?>> tasks = new ArrayList<>();
         Map<String, ExportDataSource> dataSource = m_dataSourcesByPartition.get(partitionId);
         // It is possible that for restore the partitions have changed, in which case what we are doing is silly
         if (dataSource != null) {
             ExportDataSource source = dataSource.get(signature);
             if (source != null) {
+                long sequenceNumber = sequenceNumberPerPartition.get(partitionId).getSecond();
                 ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, sequenceNumber);
-                try {
-                    task.get();
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
-                                            "You can back up export overflow data and start the " +
-                                            "DB without it to get past this error", true, e);
+                tasks.add(task);
+            }
+        }
+        // After recovery partition layout may have changed, causing some export PBDs become dangling,
+        // truncate them as well, this should be done once per node.
+        if (isLowestSite) {
+            synchronized(m_dataSourcesByPartition) {
+                for (Map<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
+                    for (ExportDataSource source : dataSources.values()) {
+                        if (!source.inCatalog()) {
+                            Pair<Long, Long> pair = sequenceNumberPerPartition.get(source.getPartitionId());
+                            if (pair != null) {
+                                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, pair.getSecond());
+                                tasks.add(task);
+                            }
+                        }
+                    }
                 }
             }
+        }
+        try {
+            if (!tasks.isEmpty()) {
+                Futures.allAsList(tasks).get();
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
+                                    "You can back up export overflow data and start the " +
+                                    "DB without it to get past this error", true, e);
         }
     }
 
