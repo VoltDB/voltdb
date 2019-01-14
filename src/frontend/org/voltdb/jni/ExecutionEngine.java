@@ -66,6 +66,7 @@ import org.voltdb.utils.VoltTrace;
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
     protected static VoltLogger LOG = new VoltLogger("HOST");
+    protected static VoltLogger EXPORT_LOG = new VoltLogger("EXPORT");
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),

@@ -29,9 +29,13 @@ import static org.junit.Assert.fail;
 
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import java.io.IOException;
+import java.util.stream.Stream;
 
 public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
 
@@ -310,7 +314,8 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
 
     public static String unsafeIndexExprErrorMsg = "The index definition uses operations that cannot be applied";
 
-    public void ENG12024TestHelper(String ddlTemplate, String testExpression, boolean isSafeForDDL) throws Exception {
+
+    private void ENG12024TestHelper(String ddlTemplate, String testExpression, boolean isSafeForDDL) throws Exception {
         String ddl = String.format(ddlTemplate, testExpression);
 
         // Create index on empty table first.
@@ -393,6 +398,39 @@ public class TestAdhocCreateDropIndex extends AdhocDDLTestBase {
         }
         finally {
             teardownSystem();
+        }
+    }
+
+    @Test
+    public void testENG15047() {
+        final VoltDB.Configuration config = new VoltDB.Configuration();
+        final String ddl = "CREATE TABLE P4 (\n" +
+                        "INT     INTEGER  DEFAULT 0 PRIMARY KEY, -- also crashes on UNIQUE\n" +
+                        "VCHAR_JSON        VARCHAR(100) DEFAULT 'foo' NOT NULL," +
+                        "BIG     BIGINT   DEFAULT 0,\n" +
+                        ");\n" +
+                        "CREATE INDEX DIDX0 ON P4 (LOG10(P4.BIG));" +
+                        "CREATE TABLE T_ENG_12024 (a INT, b INT, c VARCHAR(10));";
+        try {
+            createSchema(config, ddl, 2, 1, 0);
+            startSystem(config);
+            Stream.of(
+                    "INSERT INTO P4(BIG) values(1);",                   // passes
+                    "INSERT INTO P4(VCHAR_JSON) VALUES('0');",          // fails: constraint violation
+                    "UPSERT INTO P4(INT, VCHAR_JSON) VALUES(1, '0');",  // fails: constraint violation
+                    "UPDATE P4 SET BIG = 0 WHERE BIG = 1;",             // fails: constraint violation
+                    "SELECT DISTINCT * FROM P4;")                       // passes
+                    .forEachOrdered(stmt -> {
+                        try {
+                            m_client.callProcedure("@AdHoc", stmt);
+                        } catch (IOException | ProcCallException e) { } // ignore query execution exceptions
+                    });
+        } catch (Exception e) {
+            // ignore exceptions
+        } finally {
+            try {
+                teardownSystem();
+            } catch (Exception e) {}
         }
     }
 

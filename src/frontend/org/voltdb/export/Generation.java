@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.Pair;
 import org.voltdb.ExportStatsBase.ExportStatsRow;
 
 /**
@@ -37,7 +38,9 @@ public interface Generation {
     public void pushExportBuffer(int partitionId, String signature, long seqNo, int tupleCount,
                                  long uniqueId, ByteBuffer buffer, boolean sync);
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-                                                boolean isRecover, long sequenceNumber);
+                                                boolean isRecover,
+                                                Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+                                                boolean isLowestSite);
 
     public void sync(boolean nofsync);
 }

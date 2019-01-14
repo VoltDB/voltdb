@@ -48,7 +48,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -1593,7 +1593,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     signature);
             // Truncate the PBD buffers (if recovering) and assign the stats to the restored value
             ExportManagerInterface.instance().updateInitialExportStateToSeqNo(myPartitionId, signature,
-                    isRecover, sequenceNumber);
+                    isRecover, sequenceNumberPerPartition, context.isLowestSiteId());
         }
     }
 

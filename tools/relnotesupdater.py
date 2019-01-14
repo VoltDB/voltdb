@@ -1,5 +1,34 @@
 #!/usr/bin/python
 
+# Written by Ruth Morgenstein
+#
+# This program compares the text extracted from the release notes to the release note field
+# in JIRA tickets. By default, the program writes information, including any errors, 
+# to the terminal. The -w,--write argument updates the tickets in JIRA.
+# 
+# REQUIRED PACKAGES:
+# - JIRA  1.0.10
+# - fuzzywuzzy
+#
+# HOW TO USE:
+# - in the voltdb-docs repo, make sure you've checked out the latest docs
+# - in the voltdb repo:
+#
+#   cd tools
+#   1. Convert the renotes into a csv file
+#       python ./relnotesparser.py ~/workspace/voltdb-doc/userdocs/releasenotes.xml > /tmp/relnotes.csv
+#   2. Do a dry-run of the jira inserts
+#       python ./relnotesupdater.py /tmp/relnotes.csv
+#   3. Review the errors on your screen - see if they make sense
+#   4. Fix anything in the xml and rerun steps 1 and 2
+#   5. Run and actually update
+#       python ./relnotesupdater.py /tmp/relnotes.csv -w
+#   6. Scan the issues and make sure the updates are in the right place. 
+#      Here's a search that finds all issues with non-empty relnotes field that were updated today:
+#
+#   https://issues.voltdb.com/issues/?jql=project%20%3D%20ENG%20and%20%22Release%20Note%22%20%20is%20not%20empty%20and%20updated%20%3E%20startOfDay()%20order%20by%20updated%20DESC
+#
+
 import argparse
 import csv
 import getpass
@@ -29,11 +58,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-u', dest='username', action="store")
 parser.add_argument('-p', dest='password', action="store")
 parser.add_argument('-w', '--write', dest='dryrun', action='store_false')
+parser.add_argument('-e', '--errors', dest='errors', action='store_true')
 parser.add_argument ('file')
 args = parser.parse_args()
 
 username = args.username
 password = args.password
+errors_only = False
+if (args.errors): errors_only = True
+if (args.errors and not args.dryrun):
+    sys.exit('FATAL: --errors and --dryrun are mutually exclusive.')
+
+#exit(1)
 
 if (not args.username):
     username = getpass.getuser()
@@ -100,9 +136,11 @@ with open (args.file) as csvfile:
                     ##release notes are the same. Nothing to do
                     pass
                 elif 90 <= fuzzyscore <= 99:
-                    print "SCORE", fuzzyscore
-                    print "updating JIRA release note with voltdb-doc release note"
-                    infostr = 'Inserted'
+                    if (errors_only): continue
+                    #print "Text comparison SCORE", fuzzyscore
+                    #print "updating JIRA release note with voltdb-doc release note"
+                    #infostr = 'Inserted'
+                    infostr = "Updated from release note (SCORE %s)" % (str(fuzzyscore)+'%')
                     if not args.dryrun:
                         issue.update(fields={relnote_field : text})
                     else:
@@ -114,10 +152,11 @@ with open (args.file) as csvfile:
                     #pass
                 else:
                     #Hmm - something else is there. and it is alot different
-                    print "SCORE", fuzzyscore
-                    errorstr = 'Another release note already exists:\n\told note:\n\t%s' % (existing_relnote)
+                    #print "Text comparison SCORE", fuzzyscore
+                    errorstr = 'Another release note already exists (SCORE %s):\n\told note:\n\t%s' % (str(fuzzyscore)+'%',existing_relnote )
                     results.append(('ERROR', jid, "new note:\n\t" + text, errorstr))
             else:
+                if (errors_only): continue
                 infostr = 'Inserted'
                 if not args.dryrun:
                     issue.update(fields={relnote_field : text})
@@ -125,6 +164,7 @@ with open (args.file) as csvfile:
                     infostr += '-- dry run, no updates done'
                 results.append(('INFO', jid, text, infostr))
 
+if (errors_only and len(results) == 0): print("SUCCESS - No errors found.")
 printresults(results)
 if args.dryrun:
     print '!!!No work done - this is a dry run!!!'

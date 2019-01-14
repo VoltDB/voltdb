@@ -1,4 +1,18 @@
 #!/usr/bin/env python
+
+# Written by Andrew Gent
+#
+# This program parses the XML source file for the release notes and extracts the text of
+# each note, along with the ticket number coded in the <revision> tag, and writes them
+# out as CSV data. The CSV file can then be compared to the # releasenote field in JIRA 
+# using the accompanying relnotesupdater.py script.
+#
+# HOW TO USE:
+# - in the voltdb-docs repo, make sure you've checked out the latest docs
+# - in the voltdb repo:
+#       python ./relnotesparser.py ~/workspace/voltdb-doc/userdocs/releasenotes.xml > /tmp/relnotes.csv
+#
+
 import sys
 from xml.dom.minidom import parse
 
