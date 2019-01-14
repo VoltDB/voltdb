@@ -18,5 +18,4 @@ package org.voltcore.zk;
 
 public interface LeaderNoticeHandler {
     public abstract void becomeLeader();
-    public void noticedTopologyChange(boolean added, boolean removed);
 }

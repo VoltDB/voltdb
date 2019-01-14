@@ -97,8 +97,4 @@ class GlobalServiceElector implements LeaderNoticeHandler
             VoltDB.crashLocalVoltDB("Error shutting down GlobalServiceElector's LeaderElector", true, e);
         }
     }
-
-    @Override
-    public void noticedTopologyChange(boolean added, boolean removed) {
-    }
 }
