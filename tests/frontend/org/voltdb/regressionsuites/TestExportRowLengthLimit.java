@@ -72,7 +72,7 @@ public class TestExportRowLengthLimit extends RegressionSuite {
         project.addExport(true, "custom", props);
 
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         config.setExpectedToCrash(true);
         boolean compile = config.compile(project);
@@ -107,7 +107,7 @@ public class TestExportRowLengthLimit extends RegressionSuite {
         project.addExport(true, "custom", props);
 
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         config.setExpectedToCrash(true);
         boolean compile = config.compile(project);
