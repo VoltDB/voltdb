@@ -70,7 +70,7 @@ void SerializableEEException::serialize(ReferenceSerializeOutput *output) const 
     output->writeIntAt( lengthPosition, length);
 }
 
-SerializableEEException::~SerializableEEException() {
+SerializableEEException::~SerializableEEException() throw() {
     // TODO Auto-generated destructor stub
 }
 

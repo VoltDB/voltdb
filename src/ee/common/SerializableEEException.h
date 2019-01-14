@@ -60,7 +60,7 @@ public:
      */
     SerializableEEException(VoltEEExceptionType exceptionType, std::string message);
     SerializableEEException(std::string message);
-    virtual ~SerializableEEException();
+    virtual ~SerializableEEException() throw();
 
     void serialize (ReferenceSerializeOutput *output) const;
     virtual const std::string message() const { return m_message; }
