@@ -19,13 +19,7 @@ package org.voltdb.planner;
 
 import java.util.*;
 
-import org.hsqldb_voltpatches.HSQLInterface;
-import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
-import org.voltdb.compiler.DatabaseEstimates;
-import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -116,7 +110,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ArrayList<List<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
         // Reassemble the all possible combinations of the sub-tree and queue them
         ArrayDeque<JoinNode> joinOrders = new ArrayDeque<>();
-        queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>(), joinOrders, findAll);
+        queueSubJoinOrders(joinOrderList, 0, new ArrayList<>(), joinOrders, findAll);
         return joinOrders;
     }
 
@@ -174,8 +168,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 return generateFullJoinOrdersForTree(subTree);
             } else {
                 // Shouldn't get there
-                assert(false);
-                return null;
+                throw new PlanningErrorException("Internal error: unsupported join type " + joinType.toString());
             }
         } else {
             // Single tables and subqueries
@@ -557,6 +550,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return;
         }
 
+        // If we have drained heap memory, don't recurse further on.
+        if (! m_plans.isEmpty() && m_plans.size() % PLAN_ESTIMATE_PERIOD == 0 && shouldStopPlanning()) {
+            return;
+        }
         for (AccessPath path : joinNode.m_accessPaths) {
             joinNode.m_currentAccessPath = path;
             generateSubPlanForJoinNodeRecursively(rootNode, nextNode+1, nodes);
@@ -568,7 +565,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * that gives the right tuples.
      *
      * @param joinNode The join node to build the plan for.
-     * @param isInnerTable True if the join node is the inner node in the join
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
