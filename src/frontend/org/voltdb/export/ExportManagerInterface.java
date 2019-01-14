@@ -20,6 +20,7 @@ package org.voltdb.export;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.messaging.HostMessenger;
@@ -124,7 +125,9 @@ public interface ExportManagerInterface {
             boolean requiresNewExportGeneration, List<Pair<Integer, Integer>> localPartitionsToSites);
 
     public void updateInitialExportStateToSeqNo(int partitionId, String signature,
-            boolean isRecover, long sequenceNumber);
+            boolean isRecover,
+            Map<Integer, Pair<Long, Long>> sequenceNumberPerPartition,
+            boolean isLowestSite);
 
     public void processStreamControl(String exportSource, List<String> exportTargets, OperationMode valueOf,
             VoltTable results);
