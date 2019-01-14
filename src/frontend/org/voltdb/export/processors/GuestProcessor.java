@@ -370,7 +370,10 @@ public class GuestProcessor implements ExportDataProcessor {
                                     buf.get(rowdata, 0, length);
                                     if (edb.isLegacy()) {
                                         cont.updateStartTime(System.currentTimeMillis());
-                                        edb.onBlockStart();
+                                        if (firstRowOfBlock) {
+                                            edb.onBlockStart(row);
+                                            firstRowOfBlock = false;
+                                        }
                                         edb.processRow(length, rowdata);
                                     } else {
                                         //New style connector.
