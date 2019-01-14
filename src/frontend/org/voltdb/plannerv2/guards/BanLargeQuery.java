@@ -32,7 +32,7 @@ public class BanLargeQuery extends CalciteCompatibilityCheck {
             VoltDB.instance().getBackendTargetType().isLargeTempTableTarget;
 
     @Override protected final boolean doCheck(String sql) {
-        return ! s_isLargeTempTableTarget;
+        return false;
     }
 
     @Override protected boolean isFinal() {
