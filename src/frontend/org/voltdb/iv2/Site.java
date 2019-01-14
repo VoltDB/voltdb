@@ -1167,12 +1167,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return;
         }
 
-        for (final ListIterator<UndoAction> iterator = undoLog.listIterator(undoLog.size()); iterator.hasPrevious();) {
-            final UndoAction action = iterator.previous();
+        ListIterator<UndoAction> iterator = (undo) ? undoLog.listIterator(undoLog.size()) : undoLog.listIterator();
+        for (; (undo ? iterator.hasPrevious() : iterator.hasNext());) {
             if (undo) {
-                action.undo();
+                iterator.previous().undo();
             } else {
-                action.release();
+                iterator.next().release();
             }
         }
         if (undo) {
