@@ -36,7 +36,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.Sets;
 
 public class LeaderElector {
     // The root is always created as INITIALIZING until the first participant is added,
@@ -82,7 +81,7 @@ public class LeaderElector {
         @Override
         public void run() {
             try {
-                checkForChildChanges();
+                updateChildren();
             } catch (KeeperException.SessionExpiredException | KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdoown without the elector being
@@ -252,30 +251,8 @@ public class LeaderElector {
     /*
      * Check for a change in present nodes
      */
-    private void checkForChildChanges() throws KeeperException, InterruptedException {
-        /*
-         * Iterate through the sorted list of children and find the given node,
-         * then setup a electionWatcher on the previous node if it exists, otherwise the
-         * previous of the previous...until we reach the beginning, then we are
-         * the lowest node.
-         */
-        Set<String> children = ImmutableSet.copyOf(zk.getChildren(dir, childWatcher));
-
-        boolean topologyChange = false;
-        boolean removed = false;
-        boolean added = false;
-        if (knownChildren != null) {
-            if (!knownChildren.equals(children)) {
-                removed = !Sets.difference(knownChildren, children).isEmpty();
-                added = !Sets.difference(children, knownChildren).isEmpty();
-                topologyChange = true;
-            }
-        }
-        knownChildren = children;
-
-        if (topologyChange && cb != null) {
-            cb.noticedTopologyChange(added, removed);
-        }
+    private void updateChildren() throws KeeperException, InterruptedException {
+        knownChildren = ImmutableSet.copyOf(zk.getChildren(dir, childWatcher));
     }
 
     public static String electionDirForPartition(String path, int partition) {
