@@ -32,7 +32,12 @@ import static org.voltdb.export.ExportMatchers.ackMbxMessageIs;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -57,6 +62,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportDataSource.AckingContainer;
 import org.voltdb.export.ExportMatchers.AckPayloadMessage;
+import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.MiscUtils;
 
@@ -122,6 +128,22 @@ public class TestExportGeneration {
             new AtomicReference<>();
     LocalMailbox m_mbox;
 
+    private ExportDataProcessor getProcessor() {
+        Map<String, Pair<Properties, Set<String>>> config = new HashMap<>();
+        Properties props = new Properties();
+        props.put("nonce", "mynonce");
+        props.put("type", "csv");
+        props.put("__EXPORT_TO_TYPE__", "org.voltdb.exportclient.ExportToFileClient");
+        props.put("replicated", false);
+        props.put("outdir", m_tempRoot.getAbsolutePath() + "/my_exports");
+        Set<String> tables = new HashSet<>();
+        tables.add("e1");
+        config.put(Constants.DEFAULT_EXPORT_CONNECTOR_NAME, new Pair<>(props, tables));
+        ExportDataProcessor processor = new GuestProcessor();
+        processor.setProcessorConfig(config);
+        return processor;
+    }
+
     @SuppressWarnings({ "unchecked", "rawtypes" })
     @Before
     public void setUp() throws Exception {
@@ -141,7 +163,7 @@ public class TestExportGeneration {
         m_exportGeneration = new ExportGeneration(m_dataDirectory);
 
         m_exportGeneration.initializeGenerationFromCatalog(m_mockVoltDB.getCatalogContext(),
-                m_connectors, m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
+                m_connectors, getProcessor(), m_mockVoltDB.m_hostId, m_mockVoltDB.getHostMessenger(),
                 ImmutableList.of(Pair.of(m_part, CoreUtils.getSiteIdFromHSId(m_site))));
 
         m_mbox = new LocalMailbox(m_mockVoltDB.getHostMessenger()) {
@@ -187,7 +209,7 @@ public class TestExportGeneration {
         ByteBuffer foo = ByteBuffer.allocate(20 + StreamBlock.HEADER_SIZE);
         final CountDownLatch promoted = new CountDownLatch(1);
         // Promote the data source to be master first, otherwise it won't send acks.
-        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature).setOnMastership(promoted::countDown, false);
+        m_exportGeneration.getDataSourceByPartition().get(m_part).get(m_tableSignature).setOnMastership(promoted::countDown);
         m_exportGeneration.acceptMastership(m_part);
         promoted.await(5, TimeUnit.SECONDS);
 
