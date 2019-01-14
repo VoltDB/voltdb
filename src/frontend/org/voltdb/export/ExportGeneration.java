@@ -722,9 +722,11 @@ public class ExportGeneration implements Generation {
         if (dataSource != null) {
             ExportDataSource source = dataSource.get(signature);
             if (source != null) {
-                long sequenceNumber = sequenceNumberPerPartition.get(partitionId).getSecond();
-                ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, sequenceNumber);
-                tasks.add(task);
+                Pair<Long, Long> usoAndSeq = sequenceNumberPerPartition.get(partitionId);
+                if (usoAndSeq != null) {
+                    ListenableFuture<?> task = source.truncateExportToSeqNo(isRecover, usoAndSeq.getSecond());
+                    tasks.add(task);
+                }
             }
         }
         // After recovery partition layout may have changed, causing some export PBDs become dangling,
