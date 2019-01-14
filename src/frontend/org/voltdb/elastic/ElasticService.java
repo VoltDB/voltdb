@@ -17,6 +17,8 @@
 
 package org.voltdb.elastic;
 
+import java.util.Collection;
+
 import org.json_voltpatches.JSONObject;
 import org.voltdb.CatalogContext;
 
@@ -31,4 +33,11 @@ public interface ElasticService {
      *         {@code null}
      */
     JSONObject getResumeMetadata();
+
+    /**
+     * Notify the ElasticService that one or more host failed
+     *
+     * @param failedHostIds {@link Collection} of host IDs which failed
+     */
+    void hostsFailed(Collection<Integer> failedHostIds);
 }
