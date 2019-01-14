@@ -1460,7 +1460,7 @@ void PersistentTable::checkUpdateOnExpressions(TableTuple& targetTupleToUpdate,
    try {
       BOOST_FOREACH (auto index, indexesToUpdate) {
          BOOST_FOREACH (auto expr, index->getIndexedExpressions()) {
-            expr->eval(&sourceTupleWithNewValues, nullptr);
+            expr->eval(&sourceTupleWithNewValues, NULL);
          }
       }
    } catch (SQLException const& e) {

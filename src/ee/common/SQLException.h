@@ -53,7 +53,7 @@ public:
     SQLException(std::string sqlState, int error_no, std::string message);
     SQLException(std::string sqlState, std::string message, VoltEEExceptionType type);
     SQLException(std::string sqlState, std::string message, int internalFlags);
-    virtual ~SQLException() {}
+    virtual ~SQLException() throw() {}
 
     const std::string& getSqlState() const { return m_sqlState; }
 
