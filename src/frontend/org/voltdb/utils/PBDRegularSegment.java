@@ -89,10 +89,10 @@ public class PBDRegularSegment extends PBDSegment {
             wasClosed = true;
             open(false, false);
         }
-        if (m_fc.size() > 0) {
+        if (m_fc.size() >= SEGMENT_HEADER_BYTES) {
             m_tmpHeaderBuf.b().clear();
-            PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf.b(), COUNT_OFFSET);
-            m_numOfEntries = m_tmpHeaderBuf.b().getInt();
+            PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf.b(), 0);
+            m_numOfEntries = m_tmpHeaderBuf.b().getInt(COUNT_OFFSET);
             m_size = m_tmpHeaderBuf.b().getInt();
         } else {
             m_numOfEntries = 0;
@@ -209,6 +209,19 @@ public class PBDRegularSegment extends PBDSegment {
         m_size = -1;
     }
 
+    @Override
+    public void closeAndTruncate() throws IOException {
+        try
+        {
+            if (m_ras != null) {
+                m_ras.setLength(0);
+            }
+        }
+        finally
+        {
+            close();
+        }
+    }
     @Override
     public boolean isClosed()
     {
