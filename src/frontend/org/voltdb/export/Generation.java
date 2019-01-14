@@ -18,6 +18,7 @@ package org.voltdb.export;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
