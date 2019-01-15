@@ -38,7 +38,8 @@ import org.voltdb.plannerv2.rel.logical.VoltLogicalCalc;
 import org.voltdb.plannerv2.rel.logical.VoltLogicalTableScan;
 
 /**
- * Rule that fallback a multi-partition query.
+ * Rule that fallback the processing of a multi-partition query without joins to
+ * the legacy planner.
  *
  * @author Chao Zhou
  * @since 9.0
@@ -52,11 +53,45 @@ public class MPQueryFallBackRule extends RelOptRule {
                 some(operand(RelNode.class, any()))));
     }
 
+    @Override public void onMatch(RelOptRuleCall call) {
+        // NOTE:
+        // This rule depends on the VoltLogicalCalc and the VoltLogicalTableScan nodes at the leaf level to
+        // determine whether this query is SP or not first, then propagate this information upwards to the root.
+        // Therefore, it can only be run using a Hep planner following the bottom-up order.
+        // It will not work properly with Hep planners following other orders or Volcano planners.
+
+        if (call.rel(0) instanceof VoltLogicalCalc && call.rel(1) instanceof VoltLogicalTableScan) {
+            // If it is a VoltLogicalCalc / VoltLogicalTableScan pattern, check the filter and see if it can be run SP.
+            // VoltLogicalTableScan gives the partitioning scheme information,
+            // and the VoltLogicalCalc above it gives the information about the filters.
+            VoltLogicalCalc calc = call.rel(0);
+            VoltLogicalTableScan tableScan = call.rel(1);
+            // See: org.voltdb.plannerv2.VoltTable.getStatistic().getDistribution()
+            RelDistribution tableDist = tableScan.getTable().getDistribution();
+            // RelDistribution.Type.SINGLETON means that the table is replicated.
+            // For partitioned tables, the distribution type will be HASH_DISTRIBUTED.
+            if (tableDist.getType() != RelDistribution.Type.SINGLETON
+                    && (calc.getProgram().getCondition() == null // SELECT ... FROM t (no filter)
+                            || ! isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys()))) {
+                    throw new PlannerFallbackException("MP query not supported in Calcite planner.");
+            }
+            call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), calc.getInputs()));
+        } else {
+            // Otherwise, propagate the DistributionTrait bottom up.
+            RelNode child = call.rel(1);
+            RelDistribution childDist = child.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+            if (childDist != RelDistributions.ANY) {
+                SingleRel node = call.rel(0);
+                call.transformTo(node.copy(node.getTraitSet().replace(childDist), node.getInputs()));
+            }
+        }
+    }
+
     /**
      * Helper function to decide whether the filtered result is located at a single partition.
      *
      * @param program       the program of a {@link LogicalCalc}.
-     * @param rexNode       the condition of the program.
+     * @param rexNode       the current condition we are checking.
      * @param partitionKeys the list of partition keys for the target table.
      * @return true if the filtered result is located at a single partition.
      */
@@ -131,29 +166,6 @@ public class MPQueryFallBackRule extends RelOptRule {
                     program.getExprList().get(((RexLocalRef) rexNode).getIndex()), partitionKeys);
         } else {
             return false;
-        }
-    }
-
-    @Override public void onMatch(RelOptRuleCall call) {
-        if (call.rel(0) instanceof VoltLogicalCalc && call.rel(1) instanceof VoltLogicalTableScan) {
-            // If it is a VoltLogicalCalc / VoltLogicalTableScan pattern, check if the filter is SP.
-            VoltLogicalCalc calc = call.rel(0);
-            VoltLogicalTableScan tableScan = call.rel(1);
-            RelDistribution tableDist = tableScan.getTable().getDistribution();
-            if (tableDist.getType() != RelDistribution.Type.SINGLETON
-                    && (calc.getProgram().getCondition() == null // SELECT ... FROM t (no filter)
-                            || ! isSinglePartitioned(calc.getProgram(), calc.getProgram().getCondition(), tableDist.getKeys()))) {
-                    throw new PlannerFallbackException("MP query not supported in Calcite planner.");
-            }
-            call.transformTo(calc.copy(calc.getTraitSet().replace(tableDist), calc.getInputs()));
-        } else {
-            // Otherwise, propagate the DistributionTrait bottom up.
-            RelNode child = call.rel(1);
-            RelDistribution childDist = child.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
-            if (childDist != RelDistributions.ANY) {
-                SingleRel node = call.rel(0);
-                call.transformTo(node.copy(node.getTraitSet().replace(childDist), node.getInputs()));
-            }
         }
     }
 }
