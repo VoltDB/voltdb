@@ -70,6 +70,7 @@ import org.voltdb.client.ClientStatusListenerExt.AutoConnectionStatus;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.common.Constants;
 
+import com.google_voltpatches.common.base.Strings;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -1456,7 +1457,7 @@ class Distributer {
 
             String leader = vt.getString("Leader");
             String sites = vt.getString("Sites");
-            if (sites == null || leader == null) {
+            if (Strings.isNullOrEmpty(sites) || Strings.isNullOrEmpty(leader)) {
                 continue;
             }
 
