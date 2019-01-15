@@ -681,6 +681,9 @@ def print_summary(error_message=''):
         print_exc()
         print '\n\nHere is hanging_sql_commands, which we were attempting to format & print:\n', hanging_sql_commands
 
+    if debug > 3:
+        print '\nDEBUG: count_sql_statements:\n', count_sql_statements
+
     # Print the summary messages, and close output file(s)
     if sql_output_file and sql_output_file is not sys.stdout:
         sql_output_file.close()
@@ -713,34 +716,65 @@ def increment_sql_statement_indexes(index1, index2):
         count_sql_statements[index1][index2] = 1
 
 
-def increment_sql_statement_type(type=None, num_chars_in_sql_type=6, validity=None,
+def increment_sql_statement_type(sql=None, num_chars_in_sql_type=6, validity=None,
                                  incrementTotal=True, num_chars_in_sub_type=None,
-                                 sql_types_to_use_sub_type='CREATE'):
+                                 sql_types_to_use_sub_type='CREATE,DROP,WITH'):
     """Increment the value of 'count_sql_statements' (a 2D dictionary, i.e.,
     a dict of dict), both for the 'total', 'total' element and for the 'type',
     if specified (i.e., for the type, 'total' element); also, if the 'validity'
     is specified (normally equal to 'valid' or 'invalid'), increment those
     values as well (i.e., the 'total', validity and type, validity elements).
+    Also, certain statement types (e.g. CREATE) have various sub-types (e.g.
+    CREATE TABLE, CREATE VIEW, CREATE INDEX, CREATE PROCEDURE); in those cases,
+    increment the sub-type value as well.
     """
 
+    # Determine the maximum numbers of characters
     if num_chars_in_sub_type is None:
         num_chars_in_sub_type = num_chars_in_sql_type
     total_chars_in_sub_type = num_chars_in_sql_type + num_chars_in_sub_type
 
+    # Increment the totals (with or without the validity)
     if incrementTotal:
         increment_sql_statement_indexes('total', 'total')
         if validity:
             increment_sql_statement_indexes('total', validity)
+
+    # Determine the statement type, and possibly a sub-type, based both on
+    # spaces as the delimiter between the first two 'words' of the SQL statement,
+    # and on maximum numbers of characters
+    type = None
+    sub_type = None
+    extra_spaces = 0
+    if sql:
+        type = sql[0:num_chars_in_sql_type]
+        space_index = sql.find(' ')
+        if space_index > 0 and space_index < num_chars_in_sql_type:
+            extra_spaces = num_chars_in_sql_type - space_index
+            type = type[0:space_index]
+        if sql_types_to_use_sub_type and type in sql_types_to_use_sub_type.split(','):
+            for i in range(space_index+1, total_chars_in_sub_type):
+                if sql[i:i+1] is ' ':
+                    space_index += 1
+                else:
+                    break
+            last_index = space_index + num_chars_in_sub_type
+            for i in xrange(space_index+2, total_chars_in_sub_type):
+                if sql[i:i+1] in [' ', '(']:
+                    last_index = i
+                    break
+            sub_type = type + (' ' * extra_spaces) + sql[space_index:last_index]
+
+    # Increment the statement type, and possibly a sub-type
+    # (with or without the validity)
     if type:
-        increment_sql_statement_indexes(type[0:num_chars_in_sql_type], 'total')
+        increment_sql_statement_indexes(type, 'total')
         if validity:
-            increment_sql_statement_indexes(type[0:num_chars_in_sql_type], validity)
-        if sql_types_to_use_sub_type:
-            for sub_type in sql_types_to_use_sub_type.split(','):
-                if type[0:num_chars_in_sql_type] in sub_type or sub_type in type[0:num_chars_in_sql_type]:
-                    increment_sql_statement_indexes(type[0:total_chars_in_sub_type], 'total')
-                    if validity:
-                        increment_sql_statement_indexes(type[0:total_chars_in_sub_type], validity)
+            increment_sql_statement_indexes(type, validity)
+        if sub_type:
+            increment_sql_statement_indexes(sub_type, 'total')
+            if validity:
+                increment_sql_statement_indexes(sub_type, validity)
 
 
 def increment_sql_statement_types(type=None, num_chars_in_sql_type=6, validity=None,
@@ -832,7 +866,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
         signal(SIGALRM, timeout_handler)
         max_seconds_to_wait_for_sqlcmd = 60  # must be larger than query timeout of 10
         if debug > 4:
-            print 'max_seconds_to_wait_for_sqlcmd: ' + str(max_seconds_to_wait_for_sqlcmd)
+            print 'DEBUG: max_seconds_to_wait_for_sqlcmd: ' + str(max_seconds_to_wait_for_sqlcmd)
 
         output = None
         while True:
@@ -1015,7 +1049,14 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
     if num_sql_statements < 0:
         num_sql_statements = sys.maxsize
 
-    for i in xrange(num_sql_statements):
+    count = 0
+    # Include any initial statements (e.g. INSERT) in the total count
+    if (count_sql_statements and count_sql_statements.get('total')
+                and count_sql_statements['total'].get('total')):
+        count = count_sql_statements['total'].get('total')
+
+    while count < num_sql_statements:
+        count += 1
         if max_time and time() > max_time:
             if debug > 3:
                 print 'DEBUG: exceeded max_time, at:', formatted_time(time())
@@ -1038,6 +1079,8 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
                 sqlcmd_output_file.close()
                 sqlcmd_output_file = open(filename, 'w', 0)
             for i in range(delete_statement_number):
+                # Include TRUNCATE (or DELETE) statements in the total count
+                count += 1
                 print_sql_statement(get_one_sql_statement(grammar, delete_statement_type))
 
 
