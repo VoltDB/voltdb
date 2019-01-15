@@ -27,11 +27,15 @@ package org.voltdb.plannerv2.guards;
 public class PlannerFallbackException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
-    public PlannerFallbackException(String msg) {
-        super(msg);
-    }
-
     public PlannerFallbackException() {
         super();
+    }
+
+    public PlannerFallbackException(String message) {
+        super(message);
+    }
+
+    public PlannerFallbackException(Throwable cause) {
+        super(cause);
     }
 }

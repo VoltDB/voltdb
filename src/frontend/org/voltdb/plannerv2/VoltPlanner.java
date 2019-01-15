@@ -31,6 +31,7 @@ import org.apache.calcite.rel.metadata.CachingRelMetadataProvider;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
@@ -44,6 +45,8 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.ValidationException;
 import org.apache.calcite.util.Pair;
+import org.voltdb.plannerv2.guards.AcceptAllSelect;
+import org.voltdb.plannerv2.guards.PlannerFallbackException;
 import org.voltdb.plannerv2.metadata.VoltRelMetadataProvider;
 import org.voltdb.plannerv2.rules.PlannerRules;
 
@@ -214,6 +217,12 @@ public class VoltPlanner implements Planner {
             // Meanwhile, any identifiers in the query will be fully-qualified.
             // For example: select a from T; -> select T.a from catalog.T as T;
             m_validatedSqlNode = m_validator.validate(sqlNode);
+        } catch (CalciteContextException cce) {
+            // Some of the validation errors happened because of the lack of support
+            // we ought to add to Calcite. We need to fallback for those cases.
+            if (AcceptAllSelect.fallback(cce.getLocalizedMessage())) {
+                throw new PlannerFallbackException(cce);
+            }
         } catch (RuntimeException e) {
             throw new ValidationException(e);
         }

@@ -28,4 +28,17 @@ public class AcceptAllSelect extends CalciteCompatibilityCheck {
     @Override protected final boolean doCheck(String sql) {
         return sql.toUpperCase().startsWith("SELECT");
     }
+
+    /**
+     * Some of the validation errors happened because of the lack of support we ought to add
+     * to Calcite. We need to fallback for those cases.
+     * @param message the error message.
+     * @return true if we need to fallback.
+     */
+    public static boolean fallback(String message) {
+        if (message.contains("No match found for function signature")) {
+            return true;
+        }
+        return false;
+    }
 }
