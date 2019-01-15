@@ -92,7 +92,7 @@ public class PBDRegularSegment extends PBDSegment {
         if (m_fc.size() >= SEGMENT_HEADER_BYTES) {
             m_tmpHeaderBuf.b().clear();
             PBDUtils.readBufferFully(m_fc, m_tmpHeaderBuf.b(), 0);
-            m_numOfEntries = m_tmpHeaderBuf.b().getInt(COUNT_OFFSET);
+            m_numOfEntries = m_tmpHeaderBuf.b().getInt();
             m_size = m_tmpHeaderBuf.b().getInt();
         } else {
             m_numOfEntries = 0;
