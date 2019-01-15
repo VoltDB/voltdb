@@ -2078,6 +2078,15 @@ public class LocalCluster extends VoltServerConfig {
         m_modeOverrides = modes;
     }
 
+    public void clearOverridesForModes() {
+        m_modeOverrides = null;
+        if (m_cmdLines != null) {
+            for (CommandLine commandLine : m_cmdLines) {
+                commandLine.m_modeOverrideForTest = null;
+            }
+        }
+    }
+
     public void setPlacementGroups(String[] placementGroups) {
         this.m_placementGroups = placementGroups;
     }
